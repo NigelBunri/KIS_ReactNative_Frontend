@@ -1,0 +1,322 @@
+# Phase 04 Frontend Architecture & Cleanup Sweep
+timestamp: 2026-03-07T17:48:52Z
+frontend_root: /Users/nigel/dev/KIS
+
+========== Frontend TypeScript ==========
+
+========== Frontend ESLint (quiet, full src) ==========
+
+/Users/nigel/dev/KIS/src/Module/AddContacts/AddContactsPage.tsx
+   53:20  error  'setCache' is defined but never used                           @typescript-eslint/no-unused-vars
+  130:12  error  'e' is defined but never used                                  @typescript-eslint/no-unused-vars
+  153:12  error  'e' is defined but never used                                  @typescript-eslint/no-unused-vars
+  171:7   error  'resolveParticipantUserId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/AddContacts/contactsService.ts
+  3:31  error  'RNContact' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/ChatRoomHandlers.tsx
+  3:10  error  'Alert' is defined but never used       @typescript-eslint/no-unused-vars
+  9:10  error  'getRequest' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/InteractiveMessageRow.tsx
+   3:3   error  'View' is defined but never used                                                 @typescript-eslint/no-unused-vars
+  46:3   error  'onEditMessage' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  84:24  error  'e' is defined but never used. Allowed unused args must match /^_/u              @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/MessageBubble.tsx
+  153:9   error  'kind' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  272:14  error  'e' is defined but never used              @typescript-eslint/no-unused-vars
+  334:16  error  'e' is defined but never used              @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/MessageTabs.tsx
+  168:6  error  React Hook useMemo has missing dependencies: 'communityByConversationId' and 'communityGroupConversationIds'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/CameraCaptureModal.tsx
+  12:3   error  'Platform' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  55:10  error  'galleryAssets' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/ChatHeader.tsx
+  88:9  error  'initials' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/ForAttachments/AttachmentPreviewPage.tsx
+  131:24  error  The ref value 'audioPlayerRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'audioPlayerRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/FroCamer/ImageEditor.tsx
+   95:3  error  'total' is defined but never used. Allowed unused args must match /^_/u     @typescript-eslint/no-unused-vars
+   99:3  error  'onGoPrev' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  100:3  error  'onGoNext' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/FroCamer/VideoEditor.tsx
+  45:3  error  'onGoNext' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/FroSticker/StickerBackgroundRemovalScreen.tsx
+  43:30  error  'originalBase64' is defined but never used. Allowed unused args must match /^_/u                             @typescript-eslint/no-unused-vars
+  46:10  error  'jobId' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/FroSticker/StickerEditor.tsx
+  83:10  error  'originalUri' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/MessageComposer.tsx
+  163:21  error  'setRecordUri' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u       @typescript-eslint/no-unused-vars
+  164:20  error  'setRecordMs' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u        @typescript-eslint/no-unused-vars
+  167:26  error  'setPreviewVisible' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+  168:10  error  'isPlayingPreview' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u   @typescript-eslint/no-unused-vars
+  169:10  error  'previewProgress' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u    @typescript-eslint/no-unused-vars
+  290:9   error  'startPreviewPlayback' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/MessageList.tsx
+  243:16  error  'e' is defined but never used                                            @typescript-eslint/no-unused-vars
+  429:32  error  'index' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/PinnedMessagesSheet.tsx
+  32:3  error  'roomId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/SubRoomsSheet.tsx
+  27:3  error  'parentRoomId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useBulkMessageActions.ts
+  217:6  error  React Hook useCallback has missing dependencies: 'handleDeleteForEveryone', 'handleEditSelected', and 'isSingleSelection'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useChatMessaging.ts
+    7:3  error  'useState' is defined but never used                                                                                                            @typescript-eslint/no-unused-vars
+   70:9  error  'typingTimerRef' is assigned a value but never used                                                                                             @typescript-eslint/no-unused-vars
+  663:5  error  React Hook useCallback has unnecessary dependencies: 'currentUserId' and 'currentUserName'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useChatPersistence.ts
+  198:10  error  'withStatus' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  342:6   error  React Hook useEffect has a missing dependency: 'currentUserId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useDraftState.ts
+  21:15  error  'prev' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/messagesUtils.ts
+  2:8   error  'React' is defined but never used  @typescript-eslint/no-unused-vars
+  3:22  error  'Text' is defined but never used   @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/Community/CommunityRoomPage.tsx
+  8:3  error  'ActivityIndicator' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/vieo/KISVideo.tsx
+  18:17  error  'msg' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/Module/vieo/utils.ts
+  13:12  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/api/insights/insights.api.ts
+  9:3  error  'InsightSeriesPoint' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/Bible/BibleLessonsPanel.tsx
+  63:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/Bible/TranslationPicker.tsx
+  2:58  error  'View' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/broadcast/BroadcastFeedCard.tsx
+  141:5   error  React Hook useCallback has a missing dependency: 'item'. Either include it or remove the dependency array                                                                                                                               react-hooks/exhaustive-deps
+  153:9   error  The 'attachments' conditional could make the dependencies of useMemo Hook (at line 159) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'attachments' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  407:21  error  'tokens' is defined but never used. Allowed unused args must match /^_/u                                                                                                                                                                @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/broadcast/FeedItemCard.tsx
+   1:17  error  'use' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+  55:5   error  React Hook useEffect has a missing dependency: 'item'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/feeds/CommentThreadPanel.tsx
+  138:6  error  React Hook useEffect has a missing dependency: 'postId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/feeds/composer/featuresRegistry.ts
+  17:16  error  'ctx' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/feeds/composer/pages/TextComposerPage.tsx
+  176:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  192:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  210:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/feeds/composer/richTextUtils.ts
+  2:15  error  'BlockMeta' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/healthcare/GlobalShell.tsx
+  29:3  error  'activeOrganizationId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerAppLaunchBar.tsx
+  1:17  error  'useMemo' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerCoursesPanel.tsx
+  167:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerOrganizationAppsPanel.tsx
+   60:9  error  The 'handleLaunchApp' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleLaunchApp' in its own useCallback() Hook  react-hooks/exhaustive-deps
+   76:9  error  The 'handleDelete' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleDelete' in its own useCallback() Hook        react-hooks/exhaustive-deps
+  120:9  error  The 'handleEditApp' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleEditApp' in its own useCallback() Hook      react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerOrganizationProfilePanel.tsx
+  111:6  error  React Hook useCallback has a missing dependency: 'fieldDefs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/center/PartnerCoursesSection.tsx
+  57:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/partnersStyles.ts
+  3:10  error  'LEFT_RAIL_WIDTH' is defined but never used  @typescript-eslint/no-unused-vars
+  4:10  error  'KIS_COLORS' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/partners/settings/partnerSettingsData.ts
+  42:7  error  'owners' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  46:7  error  'everyone' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/section-builder/DynamicSectionForm.tsx
+  44:3  error  'onPickSectionBackgroundImage' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/constants/KISTextInput.tsx
+  152:9  error  'inputPaddingVertical' is assigned a value but never used                                                                          @typescript-eslint/no-unused-vars
+  153:9  error  'inputPaddingHorizontal' is assigned a value but never used                                                                        @typescript-eslint/no-unused-vars
+  276:6  error  React Hook useMemo has missing dependencies: 'handleClear' and 'palette.text'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/network/cache.tsx
+  23:12  error  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/DeviceVerificationScreen.tsx
+    2:17  error  'useEffect' is defined but never used        @typescript-eslint/no-unused-vars
+  208:7   error  'styles' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/SplashScreen.tsx
+  237:9  error  'RING_SIZE' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  238:9  error  'ELECTRON_SIZE' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/EducationDiscoverPage.tsx
+  183:9  error  The 'educationProfilesList' logical expression could make the dependencies of useCallback Hook (at line 190) change on every render. Move it inside the useCallback callback. Alternatively, wrap the initialization of 'educationProfilesList' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/EducationV2DiscoverPage.tsx
+  79:9  error  The 'continueLearning' logical expression could make the dependencies of useMemo Hook (at line 86) change on every render. To fix this, wrap the initialization of 'continueLearning' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/sections/EducationReviewSection.tsx
+  1:17  error  'useMemo' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/sections/EducationWorkshopsSection.tsx
+  2:10  error  'Pressable' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/broadcast/feeds/FeedsDiscoverPage.tsx
+  7:8  error  'PromoEducationCard' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/broadcast/market/pages/MarketShopsPage.tsx
+  1:17  error  'useMemo' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/EmergencyDispatchManager.tsx
+  7:3  error  'TouchableOpacity' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/EngineModal.tsx
+  14:8  error  'KISButton' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/HomeLogisticsManager.tsx
+  2:45  error  'TouchableOpacity' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/NotificationReminderManager.tsx
+  7:3  error  'TouchableOpacity' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/VideoConsultationManager.tsx
+  7:3  error  'TouchableOpacity' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthEnginesDashboads/WellnessProgramManager.tsx
+  2:45  error  'TouchableOpacity' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/HealthInstitutionMembersScreen.tsx
+  264:6  error  React Hook useCallback has an unnecessary dependency: 'currentUserId'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/health/InstitutionLandingPreviewScreen.tsx
+  113:9  error  The 'draft' logical expression could make the dependencies of useMemo Hook (at line 124) change on every render. To fix this, wrap the initialization of 'draft' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  113:9  error  The 'draft' logical expression could make the dependencies of useMemo Hook (at line 139) change on every render. To fix this, wrap the initialization of 'draft' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/health/InstitutionOnboardingScreen.tsx
+   6:72  error  'SectionDefinition' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+  98:24  error  'setSelectedType' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/health/InstitutionProfileEditorScreen.tsx
+  55:29  error  'institutionType' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/insights/useInsightsHooks.ts
+   30:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+   65:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+   95:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  125:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  155:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/CommunitiesTab.tsx
+  29:7  error  'emptyArr' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/MessagesScreen.tsx
+  129:24  error  'setStatusByUserId' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+  611:4   error  React Hook useEffect has a missing dependency: 'queueMetaRefresh'. Either include it or remove the dependency array      react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/MesssagingSubTabs/CallsTab.tsx
+  9:3  error  'ActivityIndicator' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/MesssagingSubTabs/UpdatesTab.tsx
+    3:3  error  'Animated' is defined but never used                                                                                                                                                       @typescript-eslint/no-unused-vars
+  415:6  error  React Hook useCallback has missing dependencies: 'handleNext' and 'isMediaItem'. Either include them or remove the dependency array                                                        react-hooks/exhaustive-deps
+  457:6  error  React Hook React.useEffect has a missing dependency: 'openViewer'. Either include it or remove the dependency array                                                                        react-hooks/exhaustive-deps
+  473:3  error  The 'handleNext' function makes the dependencies of useCallback Hook (at line 440) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook  react-hooks/exhaustive-deps
+  514:6  error  React Hook React.useEffect has missing dependencies: 'isMediaItem', 'startMediaFallback', and 'stopMediaFallback'. Either include them or remove the dependency array                      react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/PartnersScreen.tsx
+    3:37  error  'View' is defined but never used                          @typescript-eslint/no-unused-vars
+   39:11  error  'palette' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  103:5   error  'animateMessagesPane' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/ProfileScreen.tsx
+    7:3   error  'Image' is defined but never used                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   19:8   error  'KISTextInput' is defined but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   27:10  error  'formatMoney' is defined but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+   28:8   error  'UpgradeSheet' is defined but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   29:10  error  'getAttachmentPreviewInfo' is defined but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   43:10  error  'isPartnerTier' is defined but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   71:3   error  'HEALTH_INSTITUTION_TYPES' is defined but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  230:9   error  'partnerLimitText' is assigned a value but never used                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  395:10  error  'selectedHealthInstitution' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u                                                                                                                                                 @typescript-eslint/no-unused-vars
+  395:37  error  'setSelectedHealthInstitution' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u                                                                                                                                              @typescript-eslint/no-unused-vars
+  405:6   error  React Hook useCallback has an unnecessary dependency: 'buildDefaultFeedMediaOptions'. Either exclude it or remove the dependency array. Outer scope values like 'buildDefaultFeedMediaOptions' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+  504:5   error  React Hook useCallback has an unnecessary dependency: 'buildDefaultFeedMediaOptions'. Either exclude it or remove the dependency array. Outer scope values like 'buildDefaultFeedMediaOptions' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+  770:9   error  'beginEducationEdit' is assigned a value but never used                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  841:9   error  'handlePlanLesson' is assigned a value but never used                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  845:9   error  'handleRecordSession' is assigned a value but never used                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/feeds/BroadcastDetailScreen.tsx
+  76:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/feeds/FeedsListScreen.tsx
+  50:16  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/partners/PartnerLayout.tsx
+    2:10  error  'Pressable' is defined but never used                                             @typescript-eslint/no-unused-vars
+    2:21  error  'Text' is defined but never used                                                  @typescript-eslint/no-unused-vars
+   10:10  error  'KISIcon' is defined but never used                                               @typescript-eslint/no-unused-vars
+  126:3   error  'onOpenInsights' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/partners/useMessagesPane.ts
+   4:3  error  'GestureResponderEvent' is defined but never used               @typescript-eslint/no-unused-vars
+   6:3  error  'PanResponderGestureState' is defined but never used            @typescript-eslint/no-unused-vars
+  10:7  error  'clamp' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+  22:9  error  'dragStartOffsetRef' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  78:9  error  'snapMessagesPaneToNearest' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/partners/usePartnersData.ts
+  178:6  error  React Hook useEffect has a missing dependency: 'communitiesForPartner'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile-screen-sections/LogoutSection.tsx
+  11:41  error  'palette' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile-screen/CompliancePanel.tsx
+  7:3  error  'ScrollView' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile-screen/FeedManagementModal.tsx
+  260:5  error  'textPreviewContent' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile-screen/FinancialPanel.tsx
+  87:6  error  React Hook useCallback has unnecessary dependencies: 'profileId' and 'refreshKey'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile/components/EducationCreatorConsole.tsx
+  2:17  error  'FlatList' is defined but never used         @typescript-eslint/no-unused-vars
+  7:15  error  'EducationCourse' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 150 problems (150 errors, 0 warnings)
+
+
+========== Frontend ESLint (phase-04 critical touched files) ==========

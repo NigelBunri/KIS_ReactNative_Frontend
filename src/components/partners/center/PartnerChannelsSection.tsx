@@ -1,0 +1,81 @@
+import React from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { useKISTheme } from '@/theme/useTheme';
+import styles from '@/components/partners/partnersStyles';
+import { PartnerChannel } from '@/components/partners/partnersTypes';
+
+type Props = {
+  rootChannels: PartnerChannel[];
+  selectedChannelId: string | null;
+  onChannelPress: (channelId: string) => void;
+  showHeader?: boolean;
+};
+
+export default function PartnerChannelsSection({
+  rootChannels,
+  selectedChannelId,
+  onChannelPress,
+  showHeader = true,
+}: Props) {
+  const { palette } = useKISTheme();
+
+  return (
+    <>
+      {showHeader ? (
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
+            Channels
+          </Text>
+          <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+            {rootChannels.length} channels
+          </Text>
+        </View>
+      ) : null}
+
+      {rootChannels.length === 0 ? (
+        <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 8 }}>
+          No standalone channels yet.
+        </Text>
+      ) : (
+        rootChannels.map((item) => {
+          const isSelected = item.id === selectedChannelId;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => onChannelPress(item.id)}
+              style={({ pressed }) => [
+                styles.groupRow,
+                {
+                  backgroundColor: isSelected
+                    ? palette.primarySoft
+                    : palette.surfaceElevated ?? palette.surface,
+                  borderColor: isSelected
+                    ? palette.primaryStrong
+                    : palette.borderMuted,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <View style={styles.groupHash}>
+                <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>
+                  📣
+                </Text>
+              </View>
+              <Text
+                style={{
+                  flex: 1,
+                  color: isSelected ? palette.primaryStrong : palette.text,
+                  fontSize: 14,
+                  fontWeight: isSelected ? '700' : '400',
+                }}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+            </Pressable>
+          );
+        })
+      )}
+    </>
+  );
+}

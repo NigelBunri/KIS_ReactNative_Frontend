@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "499510593214",
+    "project_id": "kispushnotification",
+    "storage_bucket": "kispushnotification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:499510593214:android:ad1f2c2b124606ada840ef",
+        "android_client_info": {
+          "package_name": "com.KIS.AndroidManifest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRKdfNbPi0AZIRusK7hAn9iNcwufBTLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

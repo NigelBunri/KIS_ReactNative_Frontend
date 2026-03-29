@@ -1,0 +1,22 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "jsx": "react-native",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/src/*": ["src/*"],
+      "@/SocketProvider": ["SocketProvider.tsx"]
+    },
+    "resolveJsonModule": true
+  },
+  "include": ["src", "index.js", "index.ts", "index.tsx"],
+  "exclude": ["**/node_modules", "**/Pods"]
+}

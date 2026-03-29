@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+  <!-- App identity -->
+  <key>CADisableMinimumFrameDurationOnPhone</key>
+  <true/>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>KIS</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>$(MARKETING_VERSION)</string>
+  <key>CFBundleSignature</key>
+  <string>????</string>
+  <key>CFBundleVersion</key>
+  <string>$(CURRENT_PROJECT_VERSION)</string>
+  <key>LSRequiresIPhoneOS</key>
+  <true/>
+
+  <!-- App Transport Security (HTTP video support for local dev only) -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsInMedia</key>
+    <true/>
+
+    <key>NSExceptionDomains</key>
+    <dict>
+      <key>localhost</key>
+      <dict>
+        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+        <true/>
+      </dict>
+
+      <key>127.0.0.1</key>
+      <dict>
+        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+        <true/>
+        <key>NSIncludesSubdomains</key>
+        <true/>
+      </dict>
+    </dict>
+  </dict>
+
+  <!-- Permissions -->
+
+  <!-- Location -->
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>KIS uses your location to improve recommendations and nearby content.</string>
+
+  <!-- Camera / Microphone / Photos -->
+  <key>NSCameraUsageDescription</key>
+  <string>KIS uses the camera to let you take photos and videos.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>KIS uses the microphone to record voice messages and calls.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>KIS needs access to your library so you can share existing photos and videos.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>KIS saves photos and videos you create into your library.</string>
+  <key>NSAppleMusicUsageDescription</key>
+  <string>KIS may access your media library to enhance your media experience.</string>
+
+  <!-- Contacts / Calendar / Reminders -->
+  <key>NSContactsUsageDescription</key>
+  <string>KIS may use your contacts to help you discover and connect with friends.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>KIS may use your calendar to help schedule events and activities.</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>KIS may create reminders for events and activities.</string>
+
+  <!-- Motion -->
+  <key>NSMotionUsageDescription</key>
+  <string>KIS uses motion data to offer motion-aware features.</string>
+
+  <!-- Bluetooth -->
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>KIS may use Bluetooth to detect and connect to nearby devices.</string>
+
+  <!-- Speech / Siri -->
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>KIS uses speech recognition to convert your voice to text.</string>
+  <key>NSSiriUsageDescription</key>
+  <string>KIS integrates with Siri to let you perform actions with your voice.</string>
+
+  <!-- Face ID -->
+  <key>NSFaceIDUsageDescription</key>
+  <string>KIS uses Face ID to securely authenticate you.</string>
+
+  <!-- React Native -->
+  <key>RCTNewArchEnabled</key>
+  <true/>
+  <key>UILaunchStoryboardName</key>
+  <string>LaunchScreen</string>
+  <key>UIRequiredDeviceCapabilities</key>
+  <array>
+    <string>arm64</string>
+  </array>
+  <key>UIAppFonts</key>
+  <array>
+    <string>Ionicons.ttf</string>
+  </array>
+  <key>UISupportedInterfaceOrientations</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+  <key>UIViewControllerBasedStatusBarAppearance</key>
+  <false/>
+
+</dict>
+</plist>

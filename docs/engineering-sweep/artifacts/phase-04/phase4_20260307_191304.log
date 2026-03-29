@@ -1,0 +1,112 @@
+# Phase 04 Frontend Architecture & Cleanup Sweep
+timestamp: 2026-03-07T18:13:04Z
+frontend_root: /Users/nigel/dev/KIS
+
+========== Frontend TypeScript ==========
+
+========== Frontend ESLint (quiet, full src) ==========
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/MessageTabs.tsx
+  168:6  error  React Hook useMemo has missing dependencies: 'communityByConversationId' and 'communityGroupConversationIds'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/componets/main/ForAttachments/AttachmentPreviewPage.tsx
+  131:24  error  The ref value 'audioPlayerRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'audioPlayerRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useBulkMessageActions.ts
+  217:6  error  React Hook useCallback has missing dependencies: 'handleDeleteForEveryone', 'handleEditSelected', and 'isSingleSelection'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useChatMessaging.ts
+    7:3  error  'useState' is defined but never used                                                                                                            @typescript-eslint/no-unused-vars
+   70:9  error  'typingTimerRef' is assigned a value but never used                                                                                             @typescript-eslint/no-unused-vars
+  663:5  error  React Hook useCallback has unnecessary dependencies: 'currentUserId' and 'currentUserName'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/Module/ChatRoom/hooks/useChatPersistence.ts
+  198:10  error  'withStatus' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  342:6   error  React Hook useEffect has a missing dependency: 'currentUserId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/Bible/BibleLessonsPanel.tsx
+  63:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/broadcast/BroadcastFeedCard.tsx
+  141:5   error  React Hook useCallback has a missing dependency: 'item'. Either include it or remove the dependency array                                                                                                                               react-hooks/exhaustive-deps
+  153:9   error  The 'attachments' conditional could make the dependencies of useMemo Hook (at line 159) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'attachments' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  407:21  error  'tokens' is defined but never used. Allowed unused args must match /^_/u                                                                                                                                                                @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/components/broadcast/FeedItemCard.tsx
+   1:17  error  'use' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+  55:5   error  React Hook useEffect has a missing dependency: 'item'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/feeds/CommentThreadPanel.tsx
+  138:6  error  React Hook useEffect has a missing dependency: 'postId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/feeds/composer/pages/TextComposerPage.tsx
+  176:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  192:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  210:6  error  React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerCoursesPanel.tsx
+  167:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerOrganizationAppsPanel.tsx
+   60:9  error  The 'handleLaunchApp' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleLaunchApp' in its own useCallback() Hook  react-hooks/exhaustive-deps
+   76:9  error  The 'handleDelete' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleDelete' in its own useCallback() Hook        react-hooks/exhaustive-deps
+  120:9  error  The 'handleEditApp' function makes the dependencies of useMemo Hook (at line 206) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleEditApp' in its own useCallback() Hook      react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/PartnerOrganizationProfilePanel.tsx
+  111:6  error  React Hook useCallback has a missing dependency: 'fieldDefs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/components/partners/center/PartnerCoursesSection.tsx
+  57:6  error  React Hook useEffect has a missing dependency: 'loadCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/constants/KISTextInput.tsx
+  152:9  error  'inputPaddingVertical' is assigned a value but never used                                                                          @typescript-eslint/no-unused-vars
+  153:9  error  'inputPaddingHorizontal' is assigned a value but never used                                                                        @typescript-eslint/no-unused-vars
+  276:6  error  React Hook useMemo has missing dependencies: 'handleClear' and 'palette.text'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/EducationDiscoverPage.tsx
+  183:9  error  The 'educationProfilesList' logical expression could make the dependencies of useCallback Hook (at line 190) change on every render. Move it inside the useCallback callback. Alternatively, wrap the initialization of 'educationProfilesList' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/broadcast/education/EducationV2DiscoverPage.tsx
+  79:9  error  The 'continueLearning' logical expression could make the dependencies of useMemo Hook (at line 86) change on every render. To fix this, wrap the initialization of 'continueLearning' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/health/HealthInstitutionMembersScreen.tsx
+  264:6  error  React Hook useCallback has an unnecessary dependency: 'currentUserId'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/health/InstitutionLandingPreviewScreen.tsx
+  113:9  error  The 'draft' logical expression could make the dependencies of useMemo Hook (at line 124) change on every render. To fix this, wrap the initialization of 'draft' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  113:9  error  The 'draft' logical expression could make the dependencies of useMemo Hook (at line 139) change on every render. To fix this, wrap the initialization of 'draft' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/MesssagingSubTabs/UpdatesTab.tsx
+    3:3  error  'Animated' is defined but never used                                                                                                                                                       @typescript-eslint/no-unused-vars
+  415:6  error  React Hook useCallback has missing dependencies: 'handleNext' and 'isMediaItem'. Either include them or remove the dependency array                                                        react-hooks/exhaustive-deps
+  457:6  error  React Hook React.useEffect has a missing dependency: 'openViewer'. Either include it or remove the dependency array                                                                        react-hooks/exhaustive-deps
+  473:3  error  The 'handleNext' function makes the dependencies of useCallback Hook (at line 440) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook  react-hooks/exhaustive-deps
+  514:6  error  React Hook React.useEffect has missing dependencies: 'isMediaItem', 'startMediaFallback', and 'stopMediaFallback'. Either include them or remove the dependency array                      react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/ProfileScreen.tsx
+    7:3   error  'Image' is defined but never used                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   19:8   error  'KISTextInput' is defined but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   27:10  error  'formatMoney' is defined but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+   28:8   error  'UpgradeSheet' is defined but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   29:10  error  'getAttachmentPreviewInfo' is defined but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   43:10  error  'isPartnerTier' is defined but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   71:3   error  'HEALTH_INSTITUTION_TYPES' is defined but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  230:9   error  'partnerLimitText' is assigned a value but never used                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  395:10  error  'selectedHealthInstitution' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u                                                                                                                                                 @typescript-eslint/no-unused-vars
+  395:37  error  'setSelectedHealthInstitution' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u                                                                                                                                              @typescript-eslint/no-unused-vars
+  405:6   error  React Hook useCallback has an unnecessary dependency: 'buildDefaultFeedMediaOptions'. Either exclude it or remove the dependency array. Outer scope values like 'buildDefaultFeedMediaOptions' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+  504:5   error  React Hook useCallback has an unnecessary dependency: 'buildDefaultFeedMediaOptions'. Either exclude it or remove the dependency array. Outer scope values like 'buildDefaultFeedMediaOptions' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+  770:9   error  'beginEducationEdit' is assigned a value but never used                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  841:9   error  'handlePlanLesson' is assigned a value but never used                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  845:9   error  'handleRecordSession' is assigned a value but never used                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+
+/Users/nigel/dev/KIS/src/screens/tabs/partners/usePartnersData.ts
+  178:6  error  React Hook useEffect has a missing dependency: 'communitiesForPartner'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/nigel/dev/KIS/src/screens/tabs/profile-screen/FinancialPanel.tsx
+  87:6  error  React Hook useCallback has unnecessary dependencies: 'profileId' and 'refreshKey'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 54 problems (54 errors, 0 warnings)
+
+
+========== Frontend ESLint (phase-04 critical touched files) ==========

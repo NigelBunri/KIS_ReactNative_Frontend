@@ -1,0 +1,52 @@
+{
+  "program": "kis_engineering_sweep",
+  "updated_at_utc": "2026-03-07T23:12:51Z",
+  "scope": {
+    "frontend": "/Users/nigel/dev/KIS",
+    "backend_django": "/Users/nigel/All other files/CC/KIS/main_kis_bakend/backend/kis",
+    "backend_nest": "excluded_for_now"
+  },
+  "phases": [
+    {
+      "id": "phase-01",
+      "name": "baseline_and_guardrails",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-01/phase1_20260307_172920.log"
+    },
+    {
+      "id": "phase-02",
+      "name": "critical_security_hardening",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-02/phase2_20260307_170858.log",
+      "report": "docs/engineering-sweep/phase-02-security-hardening.md"
+    },
+    {
+      "id": "phase-03",
+      "name": "backend_architecture_and_data_integrity",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-03/phase3_20260307_183028.log",
+      "report": "docs/engineering-sweep/phase-03-backend-architecture-data-integrity.md"
+    },
+    {
+      "id": "phase-04",
+      "name": "frontend_architecture_and_cleanup",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-04/phase4_20260307_194616.log",
+      "report": "docs/engineering-sweep/phase-04-frontend-architecture-and-cleanup.md"
+    },
+    {
+      "id": "phase-05",
+      "name": "e2e_tier_billing_profile_reliability",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-05/phase5_20260307_235649.log",
+      "report": "docs/engineering-sweep/phase-05-e2e-tier-billing-profile-reliability.md"
+    },
+    {
+      "id": "phase-06",
+      "name": "release_readiness",
+      "status": "completed",
+      "artifact_log": "docs/engineering-sweep/artifacts/phase-06/phase6_20260308_000930.log",
+      "report": "docs/engineering-sweep/phase-06-release-readiness.md"
+    }
+  ]
+}

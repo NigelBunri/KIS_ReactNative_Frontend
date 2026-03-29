@@ -1,0 +1,339 @@
+# Phase 05 E2E Tier/Billing/Profile Reliability Sweep
+timestamp: 2026-03-07T22:22:24Z
+frontend_root: /Users/nigel/dev/KIS
+backend_root: /Users/nigel/All other files/CC/KIS/main_kis_bakend/backend/kis
+
+========== Frontend TypeScript ==========
+
+========== Frontend ESLint (quiet, full src) ==========
+
+========== Frontend Contract Checks (wallet + profile-phone) ==========
+src/screens/tabs/ProfileScreen.tsx:1416:                verifyWalletRecipient={c.verifyWalletRecipient}
+src/screens/tabs/profile/useProfileController.ts:764:      const phoneChanged =
+src/screens/tabs/profile/useProfileController.ts:823:      if (phoneChanged) {
+src/screens/tabs/profile/useProfileController.ts:826:          'Please log in again with your new phone number.',
+src/screens/tabs/profile/useProfileController.ts:1123:  const verifyWalletRecipient = useCallback(async () => {
+src/screens/tabs/profile/useProfileController.ts:1386:    verifyWalletRecipient,
+src/screens/tabs/profile-screen/WalletModal.tsx:22:  verifyWalletRecipient?: () => Promise<void>;
+src/screens/tabs/profile-screen/WalletModal.tsx:35:    verifyWalletRecipient,
+src/screens/tabs/profile-screen/WalletModal.tsx:42:  const submitDisabled = saving || (transferMode && !walletRecipientVerification?.verified);
+src/screens/tabs/profile-screen/WalletModal.tsx:142:            onPress={verifyWalletRecipient}
+src/screens/tabs/profile-screen/WalletModal.tsx:148:                Receiver: {walletRecipientVerification.recipientName}
+src/screens/tabs/profile-screen/WalletModal.tsx:151:                Number: {walletRecipientVerification.recipientPhoneDisplay}
+
+========== Backend Billing Reliability Tests ==========
+Creating test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+Found 18 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: django_extensions, django_filters, drf_spectacular, messages, rest_framework, staticfiles
+  Apply all migrations: Moderation, accounts, admin, admin_control, ai_integration, analytics, auth, background_removal, bible, billing, bridge, broadcasts, channels, chat, commerce, communities, content, contenttypes, core, django_celery_beat, django_celery_results, events, feed_personalization, groups, health_dashboard, health_ops, media, notifications, otp, partners, sessions, statuses, surveys, tiers
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying Moderation.0001_initial... OK
+  Applying Moderation.0002_userblock... OK
+  Applying Moderation.0003_rename_moderation_blocker_blocked_idx_moderation__blocker_4526d5_idx_and_more... OK
+  Applying accounts.0002_alter_user_phone_alter_user_username... OK
+  Applying accounts.0003_remove_user_accounts_us_usernam_c0ea66_idx_and_more... OK
+  Applying accounts.0004_remove_user_accounts_us_name_f6626a_idx_and_more... OK
+  Applying accounts.0005_remove_user_accounts_us_email_74c8d6_idx_and_more... OK
+  Applying accounts.0006_alter_user_email... OK
+  Applying accounts.0007_user_country... OK
+  Applying accounts.0008_alter_user_country... OK
+  Applying accounts.0009_device_binding_fields... OK
+  Applying accounts.0010_e2ee_keys... OK
+  Applying accounts.0011_rename_accounts_de_user_id_1c2e42_idx_accounts_de_user_id_180a57_idx_and_more... OK
+  Applying accounts.0002_profile_privacy_articles_tiers... OK
+  Applying accounts.0012_merge_20260106_0957... OK
+  Applying accounts.0003_profile_media_fields... OK
+  Applying accounts.0013_merge_20260106_1056... OK
+  Applying accounts.0004_profile_showcase_preferences... OK
+  Applying accounts.0014_merge_20260106_1119... OK
+  Applying accounts.0015_alter_profilearticle_options_and_more... OK
+  Applying accounts.0013_subscription_lifecycle_fields... OK
+  Applying accounts.0016_merge_20260110_0329... OK
+  Applying accounts.0017_partner_pro_tier... OK
+  Applying accounts.0018_privacy_features_business... OK
+  Applying accounts.0019_shop_limits... OK
+  Applying accounts.0020_privacy_everywhere... OK
+  Applying accounts.0021_profile_language... OK
+  Applying accounts.0022_user_phone_parts... OK
+  Applying accounts.0023_normalize_phone_parts... OK
+  Applying accounts.0024_tier_system_rollout... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin_control.0001_initial... OK
+  Applying admin_control.0002_activity_audit... OK
+  Applying admin_control.0003_rbac... OK
+  Applying admin_control.0004_alter_adminauditentry_actor_and_more... OK
+  Applying ai_integration.0001_initial... OK
+  Applying ai_integration.0002_auto_sync... OK
+  Applying ai_integration.0003_department_organization_staffprofile_patientmaster_and_more... OK
+  Applying ai_integration.0004_department_organization_staffprofile_patientmaster_and_more... OK
+  Applying core.0001_initial... OK
+  Applying core.0002_healthcareorganization_medicalprofile_department_and_more... OK
+  Applying core.0003_patientmasterrecord_patientfamilyprofile_and_more... OK
+  Applying analytics.0001_initial... OK
+  Applying analytics.0002_health_analytics_phase3... OK
+  Applying background_removal.0001_initial... OK
+  Applying chat.0001_initial... OK
+  Applying chat.0002_conversation_avatar_url_conversation_description_and_more... OK
+  Applying partners.0001_initial... OK
+  Applying partners.0002_partnerpost... OK
+  Applying partners.0003_rename_partner_po_partner_8e9d24_idx_partner_pos_partner_f8b11b_idx... OK
+  Applying partners.0004_partner_post_comments_reactions_broadcast... OK
+  Applying partners.0005_rename_partner_post_comment_post_created_idx_partner_pos_post_id_f5e8f9_idx_and_more... OK
+  Applying chat.0003_conversation_request_accepted_at_and_more... OK
+  Applying chat.0004_conversation_chat_conver_request_27e044_idx_and_more... OK
+  Applying chat.0005_conversation_archived_by_conversation_locked_by... OK
+  Applying chat.0006_conversation_last_message_seq... OK
+  Applying partners.0006_partnerpost_comment_conversation... OK
+  Applying partners.0007_partnerfeatureflag... OK
+  Applying partners.0008_rename_partner_fe_partner_8a9a25_idx_partner_fea_partner_e5ede0_idx_and_more... OK
+  Applying partners.0008_partner_join_flow... OK
+  Applying partners.0009_merge_0008_partner_join_flow... OK
+  Applying partners.0010_rename_partner_ap_partner_4fd7c2_idx_partner_app_partner_3fd062_idx_and_more... OK
+  Applying partners.0010_partner_job_posts... OK
+  Applying partners.0011_merge_0010_partner_job_posts... OK
+  Applying partners.0012_rename_partner_jo_partner_0a9a8f_idx_partner_job_partner_3a3139_idx... OK
+  Applying partners.0013_partnerrole_partnerpolicy_partnerauditevent_and_more... OK
+  Applying partners.0014_partnerwebhook_partnerintegration... OK
+  Applying partners.0015_partner_automation_reports_exports... OK
+  Applying partners.0016_partner_access_and_schedule... OK
+  Applying partners.0017_webhook_delivery_and_retry... OK
+  Applying partners.0017_rename_partner_acc_partner_45d167_idx_partner_acc_partner_f672b5_idx_and_more... OK
+  Applying partners.0018_merge_0017_webhook_and_rename... OK
+  Applying partners.0019_rename_partner_web_status_7b7cb3_idx_partner_web_status_8cfcc7_idx_and_more... OK
+  Applying partners.0019_partner_setting... OK
+  Applying partners.0020_merge_0019_partner_setting_and_webhook_rename... OK
+  Applying partners.0021_rename_partner_set_partner_0b9a64_idx_partner_set_partner_87251f_idx... OK
+  Applying partners.0021_partner_organization_profile... OK
+  Applying partners.0022_merge_0021_org_profile_and_setting_rename... OK
+  Applying partners.0023_partner_org_profile_public_fields... OK
+  Applying bible.0001_initial... OK
+  Applying bible.0002_seed_data... OK
+  Applying bible.0003_courses... OK
+  Applying bible.0004_seed_courses... OK
+  Applying bible.0005_lesson_attachments... OK
+  Applying bible.0006_course_social... OK
+  Applying bible.0007_course_visibility... OK
+  Applying bible.0008_lesson_social... OK
+  Applying bible.0009_course_assessments... OK
+  Applying bible.0010_submission_plagiarism... OK
+  Applying bible.0011_lesson_accessibility... OK
+  Applying bible.0012_course_community_live... OK
+  Applying bible.0013_marketplace_credentials... OK
+  Applying bible.0014_bible_preferences_public_prayers... OK
+  Applying core.0004_healthcare_location_ward_service_equipment... OK
+  Applying core.0005_staff_audit_log... OK
+  Applying core.0006_telemedicinesession_alter_equipment_id_and_more... OK
+  Applying core.0007_telemed_reminder_fields... OK
+  Applying core.0008_clinical_ops_features... OK
+  Applying core.0009_medical_resources_phase2... OK
+  Applying core.0010_remove_clinicaleventlog_is_deleted_and_more... OK
+  Applying core.0010_compliance_governance... OK
+  Applying core.0011_merge_20260209_1403... OK
+  Applying billing.0001_initial... OK
+  Applying billing.0002_rename_billing_ca_user_9ee7d2_idx_billing_cre_user_id_70b1bb_idx_and_more... OK
+  Applying billing.0003_financial_workflows... OK
+  Applying billing.0004_rename_billing_br_status_idx_billing_bil_status_fa3c2f_idx_and_more... OK
+  Applying bridge.0001_initial... OK
+  Applying partners.0024_lesson_access... OK
+  Applying communities.0001_initial... OK
+  Applying communities.0002_alter_community_partner... OK
+  Applying communities.0003_alter_community_unique_together_and_more... OK
+  Applying communities.0004_community_advanced... OK
+  Applying communities.0005_rename_community_ba_community_5dbd6d_idx_community_b_communi_5b27df_idx_and_more... OK
+  Applying communities.0005_membership_group_access... OK
+  Applying communities.0006_merge_20260105_0733... OK
+  Applying communities.0007_communitypost_is_broadcast... OK
+  Applying communities.0008_communitypost_comment_conversation... OK
+  Applying communities.0009_lesson_access... OK
+  Applying channels.0001_initial... OK
+  Applying broadcasts.0001_initial... OK
+  Applying broadcasts.0002_rename_broadcast_item_source_t_2c0f87_idx_broadcast_i_source__17f53d_idx_and_more... OK
+  Applying broadcasts.0003_broadcast_features_and_videos... OK
+  Applying broadcasts.0004_rename_broadcast_feature_flag_feature_channel_idx_broadcast_f_feature_b65c9e_idx... OK
+  Applying broadcasts.0005_broadcast_lessons... OK
+  Applying broadcasts.0006_rename_broadcast_lesson_les_type_idx_broadcast_l_lesson__2b4344_idx_and_more... OK
+  Applying broadcasts.0007_broadcast_extra_features... OK
+  Applying broadcasts.0008_broadcastvideo_mime_type_broadcastvideo_storage_path_and_more... OK
+  Applying broadcasts.0009_alter_broadcastvideo_mime_type_and_more... OK
+  Applying broadcasts.0010_add_metadata_to_broadcastitem... OK
+  Applying broadcasts.0011_alter_broadcastitem_source_type... OK
+  Applying broadcasts.0012_alter_broadcastitem_source_type... OK
+  Applying broadcasts.0013_educationprofile_educationprofilerole_and_more... OK
+  Applying broadcasts.0014_alter_broadcastitem_source_type... OK
+  Applying broadcasts.0015_broadcast_profile_tables_and_links... OK
+  Applying broadcasts.0016_medium_service_servicemediummap_and_more... OK
+  Applying broadcasts.0017_broadcast_health_profile_tables... OK
+  Applying channels.0002_channel_invite_messages... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_product_image... OK
+  Applying commerce.0003_alter_product_image_url... OK
+  Applying commerce.0004_shop_product_images... OK
+  Applying commerce.0005_remove_productshare_platform_and_more... OK
+  Applying communities.0010_communitypost_rich_text... OK
+  Applying communities.0011_alter_communitypost_text_and_more... OK
+  Applying communities.0012_community_settings_fields... OK
+  Applying communities.0013_community_broadcast_settings... OK
+  Applying communities.0014_alter_community_allow_join_link_and_more... OK
+  Applying media.0001_initial... OK
+  Applying content.0001_initial... OK
+  Applying core.0012_rename_core_compliance_a_actor_action_idx_core_compli_actor_i_bc364e_idx_and_more... OK
+  Applying core.0013_onboarding_metadata... OK
+  Applying core.0014_rename_compliance_documents_medicalprofile_compliance_documents_metadata_and_more... OK
+  Applying django_celery_beat.0001_initial... OK
+  Applying django_celery_beat.0002_auto_20161118_0346... OK
+  Applying django_celery_beat.0003_auto_20161209_0049... OK
+  Applying django_celery_beat.0004_auto_20170221_0000... OK
+  Applying django_celery_beat.0005_add_solarschedule_events_choices... OK
+  Applying django_celery_beat.0006_auto_20180322_0932... OK
+  Applying django_celery_beat.0007_auto_20180521_0826... OK
+  Applying django_celery_beat.0008_auto_20180914_1922... OK
+  Applying django_celery_beat.0006_auto_20180210_1226... OK
+  Applying django_celery_beat.0006_periodictask_priority... OK
+  Applying django_celery_beat.0009_periodictask_headers... OK
+  Applying django_celery_beat.0010_auto_20190429_0326... OK
+  Applying django_celery_beat.0011_auto_20190508_0153... OK
+  Applying django_celery_beat.0012_periodictask_expire_seconds... OK
+  Applying django_celery_beat.0013_auto_20200609_0727... OK
+  Applying django_celery_beat.0014_remove_clockedschedule_enabled... OK
+  Applying django_celery_beat.0015_edit_solarschedule_events_choices... OK
+  Applying django_celery_beat.0016_alter_crontabschedule_timezone... OK
+  Applying django_celery_beat.0017_alter_crontabschedule_month_of_year... OK
+  Applying django_celery_beat.0018_improve_crontab_helptext... OK
+  Applying django_celery_beat.0019_alter_periodictasks_options... OK
+  Applying django_celery_results.0001_initial... OK
+  Applying django_celery_results.0002_add_task_name_args_kwargs... OK
+  Applying django_celery_results.0003_auto_20181106_1101... OK
+  Applying django_celery_results.0004_auto_20190516_0412... OK
+  Applying django_celery_results.0005_taskresult_worker... OK
+  Applying django_celery_results.0006_taskresult_date_created... OK
+  Applying django_celery_results.0007_remove_taskresult_hidden... OK
+  Applying django_celery_results.0008_chordcounter... OK
+  Applying django_celery_results.0009_groupresult... OK
+  Applying django_celery_results.0010_remove_duplicate_indices... OK
+  Applying django_celery_results.0011_taskresult_periodic_task_name... OK
+  Applying django_celery_results.0012_taskresult_date_started... OK
+  Applying django_celery_results.0013_taskresult_django_cele_periodi_1993cf_idx... OK
+  Applying django_celery_results.0014_alter_taskresult_status... OK
+  Applying events.0001_initial... OK
+  Applying feed_personalization.0001_initial... OK
+  Applying groups.0001_initial... OK
+  Applying groups.0002_group_advanced... OK
+  Applying groups.0003_rename_group_ban_group_i_8f2d9b_idx_group_ban_group_i_ecec29_idx_and_more... OK
+  Applying groups.0003_group_channel... OK
+  Applying groups.0004_merge_20260103_2008... OK
+  Applying health_dashboard.0001_initial... OK
+  Applying health_ops.0001_initial... OK
+  Applying health_ops.0002_appointmentbooking... OK
+  Applying health_ops.0003_videoconsultationsession... OK
+  Applying health_ops.0004_securemessagingsession_securemessage_and_more... OK
+  Applying health_ops.0005_emergencydispatchsession_admissionbedsession... OK
+  Applying health_ops.0006_pharmacyfulfillmentsession_paymentbillingsession_and_more... OK
+  Applying health_ops.0007_wellnessprogramsession_notificationremindersession... OK
+  Applying health_ops.0008_remove_health_ops_billing_wallet... OK
+  Applying notifications.0001_initial... OK
+  Applying otp.0001_initial... OK
+  Applying partners.0022_partner_deactivation... OK
+  Applying partners.0025_merge_0022_partner_deactivation_0024_lesson_access... OK
+  Applying partners.0026_partnerpost_rich_text... OK
+  Applying partners.0027_alter_partnerpost_text_alter_partnerpost_text_plain_and_more... OK
+  Applying partners.0028_partner_profile_link... OK
+  Applying partners.0029_partner_organization_app... OK
+  Applying partners.0030_partner_organization_app_visibility... OK
+  Applying partners.0031_partner_organization_app_group... OK
+  Applying partners.0032_rename_partner_org_app_partner_type_idx_partner_org_partner_cacc3f_idx_and_more... OK
+  Applying partners.0033_partner_organization_app_module_metadata... OK
+  Applying partners.0034_partner_organization_app_access_log... OK
+  Applying partners.0035_rename_partner_org_partner_cacc3f_idx_partner_org_app_pt_idx_and_more... OK
+  Applying sessions.0001_initial... OK
+  Applying statuses.0001_initial... OK
+  Applying statuses.0002_statusitem_style... OK
+  Applying statuses.0002_rename_statuses_st_user_i_4ef6f1_idx_statuses_st_user_id_ba9de4_idx_and_more... OK
+  Applying statuses.0003_merge_20260105_2000... OK
+  Applying statuses.0004_statusitem_view... OK
+  Applying statuses.0005_rename_statuses_st_status__8c4b0c_idx_statuses_st_status__9bf5c8_idx_and_more... OK
+  Applying surveys.0001_initial... OK
+  Applying tiers.0001_initial... OK
+System check identified no issues (0 silenced).
+test_upgrade_with_credits_deducts_balance_and_creates_active_subscription (apps.billing.tests.BillingTierUpgradeFlowTests.test_upgrade_with_credits_deducts_balance_and_creates_active_subscription) ... ok
+test_upgrade_with_credits_rejects_when_balance_insufficient (apps.billing.tests.BillingTierUpgradeFlowTests.test_upgrade_with_credits_rejects_when_balance_insufficient) ... ok
+test_transfer_endpoint_accepts_local_phone_without_country_code (apps.billing.tests.BillingWalletFlowTests.test_transfer_endpoint_accepts_local_phone_without_country_code) ... DEBUG 2026-03-07 22:23:50,805 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:50,815 common.middleware REQ END POST /api/v1/wallet/transfer/ 200 10.21ms
+ok
+test_transfer_endpoint_rejects_self_transfer (apps.billing.tests.BillingWalletFlowTests.test_transfer_endpoint_rejects_self_transfer) ... DEBUG 2026-03-07 22:23:51,037 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:51,040 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 2.93ms
+WARNING 2026-03-07 22:23:51,042 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_transfer_endpoint_rejects_unverified_phone (apps.billing.tests.BillingWalletFlowTests.test_transfer_endpoint_rejects_unverified_phone) ... DEBUG 2026-03-07 22:23:51,263 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:51,269 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 5.63ms
+WARNING 2026-03-07 22:23:51,269 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_transfer_service_moves_value_one_way (apps.billing.tests.BillingWalletFlowTests.test_transfer_service_moves_value_one_way) ... ok
+test_check_contact_finds_user_with_local_phone_digits (apps.billing.tests.CheckContactApiTests.test_check_contact_finds_user_with_local_phone_digits) ... DEBUG 2026-03-07 22:23:51,708 common.middleware REQ START GET /api/v1/contacts/check?phone=690222222&country=CM
+DEBUG 2026-03-07 22:23:51,710 common.middleware REQ END GET /api/v1/contacts/check?phone=690222222&country=CM 200 2.00ms
+ok
+test_subscription_cancel_immediate_marks_cancelled_and_sets_user_tier_free (apps.billing.tests.WalletSubscriptionLifecycleApiTests.test_subscription_cancel_immediate_marks_cancelled_and_sets_user_tier_free) ... DEBUG 2026-03-07 22:23:51,822 common.middleware REQ START POST /api/v1/wallet/subscription-cancel/
+DEBUG 2026-03-07 22:23:51,828 common.middleware REQ END POST /api/v1/wallet/subscription-cancel/ 200 5.78ms
+ok
+test_subscription_cancel_sets_period_end_flags (apps.billing.tests.WalletSubscriptionLifecycleApiTests.test_subscription_cancel_sets_period_end_flags) ... DEBUG 2026-03-07 22:23:51,966 common.middleware REQ START POST /api/v1/wallet/subscription-cancel/
+DEBUG 2026-03-07 22:23:51,970 common.middleware REQ END POST /api/v1/wallet/subscription-cancel/ 200 3.44ms
+ok
+test_subscription_downgrade_rejects_non_lower_target (apps.billing.tests.WalletSubscriptionLifecycleApiTests.test_subscription_downgrade_rejects_non_lower_target) ... DEBUG 2026-03-07 22:23:52,082 common.middleware REQ START POST /api/v1/wallet/subscription-downgrade/
+DEBUG 2026-03-07 22:23:52,086 common.middleware REQ END POST /api/v1/wallet/subscription-downgrade/ 400 3.37ms
+WARNING 2026-03-07 22:23:52,086 django.request Bad Request: /api/v1/wallet/subscription-downgrade/
+ok
+test_subscription_downgrade_sets_pending_tier (apps.billing.tests.WalletSubscriptionLifecycleApiTests.test_subscription_downgrade_sets_pending_tier) ... DEBUG 2026-03-07 22:23:52,198 common.middleware REQ START POST /api/v1/wallet/subscription-downgrade/
+DEBUG 2026-03-07 22:23:52,205 common.middleware REQ END POST /api/v1/wallet/subscription-downgrade/ 200 6.38ms
+ok
+test_subscription_resume_clears_cancellation_flags (apps.billing.tests.WalletSubscriptionLifecycleApiTests.test_subscription_resume_clears_cancellation_flags) ... DEBUG 2026-03-07 22:23:52,318 common.middleware REQ START POST /api/v1/wallet/subscription-resume/
+DEBUG 2026-03-07 22:23:52,323 common.middleware REQ END POST /api/v1/wallet/subscription-resume/ 200 4.64ms
+ok
+test_transfer_rejects_amount_and_credits_together (apps.billing.tests.WalletTransferPayloadValidationTests.test_transfer_rejects_amount_and_credits_together) ... DEBUG 2026-03-07 22:23:52,646 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:52,648 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 2.03ms
+WARNING 2026-03-07 22:23:52,648 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_transfer_rejects_invalid_numeric_field (apps.billing.tests.WalletTransferPayloadValidationTests.test_transfer_rejects_invalid_numeric_field) ... DEBUG 2026-03-07 22:23:52,971 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:52,972 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 1.60ms
+WARNING 2026-03-07 22:23:52,973 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_transfer_rejects_mismatched_recipient_id_and_phone (apps.billing.tests.WalletTransferPayloadValidationTests.test_transfer_rejects_mismatched_recipient_id_and_phone) ... DEBUG 2026-03-07 22:23:53,295 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:53,298 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 3.40ms
+WARNING 2026-03-07 22:23:53,298 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_transfer_requires_recipient_reference (apps.billing.tests.WalletTransferPayloadValidationTests.test_transfer_requires_recipient_reference) ... DEBUG 2026-03-07 22:23:53,625 common.middleware REQ START POST /api/v1/wallet/transfer/
+DEBUG 2026-03-07 22:23:53,628 common.middleware REQ END POST /api/v1/wallet/transfer/ 400 2.70ms
+WARNING 2026-03-07 22:23:53,628 django.request Bad Request: /api/v1/wallet/transfer/
+ok
+test_upgrade_endpoint_rejects_same_or_lower_tier (apps.billing.tests.WalletUpgradeApiTests.test_upgrade_endpoint_rejects_same_or_lower_tier) ... DEBUG 2026-03-07 22:23:53,742 common.middleware REQ START POST /api/v1/wallet/upgrade/
+DEBUG 2026-03-07 22:23:53,745 common.middleware REQ END POST /api/v1/wallet/upgrade/ 400 3.20ms
+WARNING 2026-03-07 22:23:53,745 django.request Bad Request: /api/v1/wallet/upgrade/
+ok
+test_upgrade_endpoint_succeeds_with_credits (apps.billing.tests.WalletUpgradeApiTests.test_upgrade_endpoint_succeeds_with_credits) ... DEBUG 2026-03-07 22:23:53,856 common.middleware REQ START POST /api/v1/wallet/upgrade/
+DEBUG 2026-03-07 22:23:53,862 common.middleware REQ END POST /api/v1/wallet/upgrade/ 200 6.12ms
+ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 3.662s
+
+OK
+Destroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...

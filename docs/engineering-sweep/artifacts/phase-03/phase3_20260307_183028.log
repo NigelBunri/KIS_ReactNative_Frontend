@@ -1,0 +1,123 @@
+# Phase 03 Backend Architecture & Data Integrity Sweep
+timestamp: 2026-03-07T17:30:28Z
+frontend_root: /Users/nigel/dev/KIS
+backend_root: /Users/nigel/All other files/CC/KIS/main_kis_bakend/backend/kis
+backend_python: /Users/nigel/All other files/CC/KIS/main_kis_bakend/backend/env/bin/python
+
+========== Backend Django check ==========
+System check identified no issues (0 silenced).
+
+========== Backend targeted tests ==========
+Creating test database for alias 'default'...
+Found 6 test(s).
+System check identified no issues (0 silenced).
+.DEBUG 2026-03-07 17:31:31,172 celery.utils.functional 
+def process_background_removal_job(job_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,173 celery.utils.functional 
+def compute_recommendations(user_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,173 celery.utils.functional 
+def enqueue_outbound_message(message_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,174 celery.utils.functional 
+def sync_bridge_account(account_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,174 celery.utils.functional 
+def reconcile_subscription(subscription_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,174 celery.utils.functional 
+def chunks(task, it, n):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,175 celery.utils.functional 
+def backend_cleanup():
+    return 1
+
+DEBUG 2026-03-07 17:31:31,175 celery.utils.functional 
+def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,175 celery.utils.functional 
+def enqueue_shop_verification(self, request_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,175 celery.utils.functional 
+def notify_nest_conversation_created_task(self, conversation_id, user_ids):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,176 celery.utils.functional 
+def accumulate(self, *args, **kwargs):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,176 celery.utils.functional 
+def compute_predictive_metrics(metric_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,176 celery.utils.functional 
+def chain(*args, **kwargs):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,176 celery.utils.functional 
+def evaluate_fraud_score(order_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,177 celery.utils.functional 
+def generate_clinical_analytics_report(profile_id=0):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,177 celery.utils.functional 
+def process_inbound_message(payload):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,177 celery.utils.functional 
+def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,178 celery.utils.functional 
+def compute_bridge_analytics(account_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,178 celery.utils.functional 
+def generate_invoice(payload):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,178 celery.utils.functional 
+def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,178 celery.utils.functional 
+def compute_engagement_for_target(target_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,179 celery.utils.functional 
+def compute_risk_stratification():
+    return 1
+
+DEBUG 2026-03-07 17:31:31,179 celery.utils.functional 
+def xmap(task, it):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,179 celery.utils.functional 
+def enqueue_product_auth_check(self, check_id):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,179 celery.utils.functional 
+def xstarmap(task, it):
+    return 1
+
+DEBUG 2026-03-07 17:31:31,180 celery.utils.functional 
+def process_event_stream(event_id):
+    return 1
+
+.....
+----------------------------------------------------------------------
+Ran 6 tests in 0.383s
+
+OK
+Destroying test database for alias 'default'...
