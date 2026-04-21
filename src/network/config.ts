@@ -5,14 +5,16 @@ import { Platform } from 'react-native';
  * can derive the same base URLs without duplicating logic.
  */
 const USE_EMULATOR = true;
-const LAN_IP = '192.168.110.62'; // update when running on a device over LAN
-const API_PORT = 8000;
-const CHAT_PORT = 4000;
+// Change only this value when your backend LAN IP changes.
+export const DEV_BACKEND_HOST = '10.112.162.99';
+export const API_PORT = 8000;
+export const CHAT_PORT = 4000;
 
-const emulatorHost = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
-const host = USE_EMULATOR ? emulatorHost : LAN_IP;
+const emulatorHost = Platform.OS === 'android' ? '10.0.2.2' : DEV_BACKEND_HOST;
+const host = USE_EMULATOR ? emulatorHost : DEV_BACKEND_HOST;
 
 export const API_BASE_URL = `http://${host}:${API_PORT}`;
+export const MEDIA_FALLBACK_API_BASE_URL = `http://${DEV_BACKEND_HOST}:${API_PORT}`;
 export const CHAT_BASE_URL = `http://${host}:${CHAT_PORT}`;
 
 export const CHAT_WS_URL = CHAT_BASE_URL;

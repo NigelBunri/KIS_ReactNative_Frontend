@@ -1,11 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, DeviceEventEmitter, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import ROUTES from '@/network';
+import { postRequest } from '@/network/post';
+import type { RootStackParamList } from '@/navigation/types';
 
 import FeedsMainListSection from '@/screens/broadcast/feeds/sections/FeedsMainListSection';
 import TrendingClipsSection from '@/screens/broadcast/feeds/sections/TrendingClipsSection';
 
 import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
+import type { BroadcastFeedItem } from '@/screens/broadcast/feeds/api/feeds.types';
 
 type Props = {
   searchTerm?: string;
@@ -21,6 +28,7 @@ export default function FeedsDiscoverPage({
   onTrendingSeeAll,
 }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   const styles = useMemo(() => makeStyles(), []);
 
@@ -34,6 +42,10 @@ export default function FeedsDiscoverPage({
     refreshAll,
     loadMore,
     toggleSubscribe,
+    reactToItem,
+    recordShare,
+    hideItem,
+    toggleSaved,
   } = useFeedsData({ q: searchTerm, code });
 
   const filteredFeed = useMemo(() => {
@@ -59,7 +71,7 @@ export default function FeedsDiscoverPage({
     }
 
     if (context === 'saved') {
-      return nonHealthcare.filter((item) => Boolean(item.source?.is_subscribed));
+      return nonHealthcare.filter((item) => Boolean(item.viewer_saved));
     }
 
     if (context === 'trending') {
@@ -81,7 +93,158 @@ export default function FeedsDiscoverPage({
   };
 
   const activeFeedItems = showTrendingOnly ? trendingFeeds : displayItems;
-  console.log('FeedsDiscoverPage render: items count:',activeFeedItems);
+  const buildBroadcastPermalink = useCallback((item: BroadcastFeedItem) => {
+    return (item as any).permalink ?? (item as any).link ?? (item as any).url ?? `https://kis.app/broadcasts/${item.id}`;
+  }, []);
+
+  const handleOpenItem = useCallback(
+    (item: BroadcastFeedItem) => {
+      navigation.navigate('BroadcastDetail', { id: item.id, item });
+    },
+    [navigation],
+  );
+
+  const handleLike = useCallback(
+    async (item: BroadcastFeedItem) => {
+      const result = await reactToItem(item.id);
+      if (!result?.ok) {
+        Alert.alert('Reaction', 'Unable to react to this broadcast right now.');
+      }
+    },
+    [reactToItem],
+  );
+
+  const handleShare = useCallback(
+    async (item: BroadcastFeedItem) => {
+      const permalink = buildBroadcastPermalink(item);
+      const message = [item.title?.trim(), item.text_plain?.trim() || item.text?.trim(), permalink]
+        .filter(Boolean)
+        .join('\n\n');
+      const result = await recordShare(item.id);
+      if (!result?.ok) {
+        Alert.alert('Share', 'Unable to log this share right now.');
+      }
+      await Share.share({
+        message,
+        url: permalink,
+        title: item.title ?? 'Broadcast',
+      });
+    },
+    [buildBroadcastPermalink, recordShare],
+  );
+
+  const handleOpenComments = useCallback(
+    async (item: BroadcastFeedItem) => {
+      const res = await postRequest(
+        ROUTES.broadcasts.commentRoom(item.id),
+        {},
+        { errorMessage: 'Unable to load comments.' },
+      );
+      const conversationId =
+        res?.data?.conversation_id ??
+        res?.data?.conversationId ??
+        res?.data?.id ??
+        null;
+      if (!conversationId) {
+        Alert.alert('Comments', 'Unable to open the comment room for this broadcast.');
+        return;
+      }
+      DeviceEventEmitter.emit('chat.open', {
+        conversationId,
+        name: item.title ?? item.source?.name ?? 'Broadcast comments',
+        kind: 'broadcast_comments',
+      });
+    },
+    [],
+  );
+
+  const handleMenu = useCallback(
+    (item: BroadcastFeedItem) => {
+      const authorId = item.author?.id ? String(item.author.id) : null;
+      const permalink = buildBroadcastPermalink(item);
+      const saveLabel = item.viewer_saved ? 'Remove saved post' : 'Save post';
+      Alert.alert(item.title ?? 'Broadcast actions', undefined, [
+        {
+          text: 'Open',
+          onPress: () => handleOpenItem(item),
+        },
+        {
+          text: 'Comments',
+          onPress: () => {
+            void handleOpenComments(item);
+          },
+        },
+        {
+          text: saveLabel,
+          onPress: async () => {
+            const res = await toggleSaved(item.id, Boolean(item.viewer_saved));
+            if (!res?.ok) {
+              Alert.alert('Saved posts', 'Unable to update this saved post right now.');
+            }
+          },
+        },
+        {
+          text: 'Copy link',
+          onPress: () => {
+            Clipboard.setString(permalink);
+            Alert.alert('Link copied', 'Broadcast link saved to clipboard.');
+          },
+        },
+        {
+          text: 'Report',
+          onPress: async () => {
+            const res = await postRequest(
+              ROUTES.moderation.flags,
+              {
+                source: 'USER',
+                target_type: 'POST',
+                target_id: item.id,
+                reason: 'Inappropriate broadcast content',
+                severity: 'MEDIUM',
+              },
+              { errorMessage: 'Unable to report broadcast.' },
+            );
+            if (!res?.success) {
+              Alert.alert('Report', res?.message || 'Unable to submit report.');
+            }
+          },
+        },
+        {
+          text: 'Mute broadcaster',
+          onPress: async () => {
+            if (!authorId) {
+              Alert.alert('Mute', 'Unable to find broadcaster.');
+              return;
+            }
+            const res = await postRequest(
+              ROUTES.moderation.userBlocks,
+              { blocked: authorId },
+              { errorMessage: 'Unable to mute broadcaster.' },
+            );
+            if (!res?.success) {
+              Alert.alert('Mute', res?.message || 'Unable to mute broadcaster.');
+            } else {
+              Alert.alert('Muted', 'You will no longer see broadcasts from this broadcaster.');
+            }
+          },
+        },
+        {
+          text: 'Hide',
+          onPress: async () => {
+            const res = await hideItem(item.id);
+            if (!res?.ok) {
+              Alert.alert('Hide', 'Unable to hide this broadcast right now.');
+            }
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]);
+    },
+    [buildBroadcastPermalink, handleOpenComments, handleOpenItem, hideItem, toggleSaved],
+  );
 
   return (
     <ScrollView
@@ -127,11 +290,52 @@ export default function FeedsDiscoverPage({
           loading={loading}
           loadingMore={loadingMore}
           onRefresh={refreshAll}
-          onOpenItem={() => {}}
-          onShare={() => {}}
-          onLike={() => {}}
+          onOpenItem={handleOpenItem}
+          onShare={(item) => {
+            void handleShare(item);
+          }}
+          onLike={(item) => {
+            void handleLike(item);
+          }}
+          onSave={(item) => {
+            void toggleSaved(item.id, Boolean(item.viewer_saved));
+          }}
+          onComment={(item) => {
+            void handleOpenComments(item);
+          }}
+          onMenu={handleMenu}
           onSubscribe={async (source, isSubscribed) => {
-            await toggleSubscribe(source, isSubscribed);
+            const runToggle = async () => {
+              const result = await toggleSubscribe(source, isSubscribed);
+              if (!result?.ok) {
+                Alert.alert(
+                  isSubscribed ? 'Unsubscribe' : 'Subscribe',
+                  isSubscribed
+                    ? 'Unable to update this subscription right now.'
+                    : 'Unable to subscribe to this source right now.',
+                );
+              }
+            };
+
+            if (isSubscribed) {
+              Alert.alert(
+                'Unsubscribe',
+                `Stop following ${source.name ?? 'this source'}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Unsubscribe',
+                    style: 'destructive',
+                    onPress: () => {
+                      void runToggle();
+                    },
+                  },
+                ],
+              );
+              return;
+            }
+
+            await runToggle();
           }}
         />
       </View>

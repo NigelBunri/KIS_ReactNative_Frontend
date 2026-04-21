@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   DeviceEventEmitter,
   Image,
   Pressable,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,11 +17,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { resolveBackendAssetUrl } from '@/network';
-import { BroadcastItem } from '@/types/broadcast';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
-
-import type { FeedsStackParamList } from './FeedsNavigator';
+import type { RootStackParamList } from '@/navigation/types';
+import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
+import { isVideoAttachment } from '@/components/broadcast/attachmentPreview';
 
 const REACTION_EVENT = 'broadcast.reaction';
 
@@ -38,27 +40,48 @@ const pickAttachmentUrl = (attachment: any): string | undefined => {
 };
 
 export default function BroadcastDetailScreen() {
-  const route = useRoute<RouteProp<FeedsStackParamList, 'BroadcastDetail'>>();
-  const navigation = useNavigation<NativeStackNavigationProp<FeedsStackParamList, 'BroadcastDetail'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'BroadcastDetail'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'BroadcastDetail'>>();
   const { palette } = useKISTheme();
 
   const initialItem = route.params?.item ?? null;
-  const [broadcastItem, setBroadcastItem] = useState<BroadcastItem | null>(initialItem);
+  const [broadcastItem, setBroadcastItem] = useState<any | null>(initialItem);
   const [loading] = useState(false);
   const [error, setError] = useState<string | null>(
     initialItem ? null : 'Broadcast details are only available when navigating from the feed list.',
   );
   const broadcastId = broadcastItem?.id ?? route.params?.id;
+  const reactionCount = Number(broadcastItem?.reaction_count ?? broadcastItem?.engagement?.reactions ?? 0);
+  const commentCount = Number(broadcastItem?.comment_count ?? broadcastItem?.engagement?.comments ?? 0);
+  const viewerReaction = broadcastItem?.viewer_reaction ?? null;
+  const viewerSaved = Boolean(broadcastItem?.viewer_saved);
+  const shareCount = Number(broadcastItem?.share_count ?? 0);
+  const title = broadcastItem?.title ?? broadcastItem?.source?.name ?? 'Broadcast';
+  const body = broadcastItem?.text_plain ?? broadcastItem?.text ?? broadcastItem?.body ?? '';
 
   const handleReact = useCallback(async () => {
     if (!broadcastItem) return;
-    setBroadcastItem((prev) =>
+    const previousCount = Number(broadcastItem?.reaction_count ?? broadcastItem?.engagement?.reactions ?? 0);
+    const previousReaction = broadcastItem?.viewer_reaction ?? null;
+    const hadSameReaction = previousReaction === '❤️';
+    const hadDifferentReaction = Boolean(previousReaction && previousReaction !== '❤️');
+    setBroadcastItem((prev: any) =>
       prev
         ? {
             ...prev,
+            reaction_count: hadSameReaction
+              ? Math.max(previousCount - 1, 0)
+              : hadDifferentReaction
+                ? previousCount
+                : previousCount + 1,
+            viewer_reaction: hadSameReaction ? null : '❤️',
             engagement: {
-              ...prev.engagement,
-              reactions: prev.engagement.reactions + 1,
+              ...(prev.engagement ?? {}),
+              reactions: hadSameReaction
+                ? Math.max(previousCount - 1, 0)
+                : hadDifferentReaction
+                  ? previousCount
+                  : previousCount + 1,
             },
           }
         : prev,
@@ -66,21 +89,43 @@ export default function BroadcastDetailScreen() {
     try {
       const response = await postRequest(
         ROUTES.broadcasts.react(broadcastId ?? ''),
-        { type: 'like' },
+        { emoji: '❤️' },
         { errorMessage: 'Unable to register reaction.' },
       );
       if (!response?.success) {
         throw new Error(response?.message ?? 'Could not react');
       }
-      DeviceEventEmitter.emit(REACTION_EVENT, { id: broadcastId, delta: 1 });
-    } catch {
-      setBroadcastItem((prev) =>
+      const count = Number(response?.data?.count ?? response?.count ?? previousCount);
+      const reacted = Boolean(response?.data?.reacted ?? response?.reacted);
+      setBroadcastItem((prev: any) =>
         prev
           ? {
               ...prev,
+              reaction_count: count,
+              viewer_reaction: reacted ? '❤️' : null,
               engagement: {
-                ...prev.engagement,
-                reactions: Math.max(prev.engagement.reactions - 1, 0),
+                ...(prev.engagement ?? {}),
+                reactions: count,
+              },
+            }
+          : prev,
+      );
+      DeviceEventEmitter.emit(REACTION_EVENT, {
+        id: broadcastId,
+        count,
+        reacted,
+        emoji: reacted ? '❤️' : null,
+      });
+    } catch {
+      setBroadcastItem((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              reaction_count: previousCount,
+              viewer_reaction: previousReaction,
+              engagement: {
+                ...(prev.engagement ?? {}),
+                reactions: previousCount,
               },
             }
           : prev,
@@ -88,14 +133,73 @@ export default function BroadcastDetailScreen() {
     }
   }, [broadcastId, broadcastItem]);
 
+  const handleOpenComments = useCallback(async () => {
+    if (!broadcastId) return;
+    const res = await postRequest(
+      ROUTES.broadcasts.commentRoom(broadcastId),
+      {},
+      { errorMessage: 'Unable to load comments.' },
+    );
+    const conversationId =
+      res?.data?.conversation_id ??
+      res?.data?.conversationId ??
+      res?.data?.id ??
+      null;
+    if (!conversationId) {
+      Alert.alert('Comments', 'Unable to open the comment room for this broadcast.');
+      return;
+    }
+    DeviceEventEmitter.emit('chat.open', {
+      conversationId,
+      name: title,
+      kind: 'broadcast_comments',
+    });
+  }, [broadcastId, title]);
+
+  const handleToggleSaved = useCallback(async () => {
+    if (!broadcastId) return;
+    const previousSaved = Boolean(broadcastItem?.viewer_saved);
+    setBroadcastItem((prev: any) => (prev ? { ...prev, viewer_saved: !previousSaved } : prev));
+    const endpoint = ROUTES.broadcasts.save(broadcastId);
+    const res = previousSaved
+      ? await postRequest(`${endpoint}?action=unsave`, {}, { errorMessage: 'Unable to remove saved broadcast.' })
+      : await postRequest(endpoint, {}, { errorMessage: 'Unable to save broadcast.' });
+    if (!res?.success) {
+      setBroadcastItem((prev: any) => (prev ? { ...prev, viewer_saved: previousSaved } : prev));
+      Alert.alert('Saved posts', 'Unable to update this saved post right now.');
+    }
+  }, [broadcastId, broadcastItem?.viewer_saved]);
+
+  const handleShare = useCallback(async () => {
+    if (!broadcastId) return;
+    const previousShareCount = Number(broadcastItem?.share_count ?? 0);
+    setBroadcastItem((prev: any) => (prev ? { ...prev, share_count: previousShareCount + 1 } : prev));
+    const res = await postRequest(
+      ROUTES.broadcasts.share(broadcastId),
+      { platform: 'app' },
+      { errorMessage: 'Unable to log share.' },
+    );
+    if (!res?.success) {
+      setBroadcastItem((prev: any) => (prev ? { ...prev, share_count: previousShareCount } : prev));
+      Alert.alert('Share', 'Unable to log this share right now.');
+    }
+    await Share.share({
+      title,
+      message: [title?.trim(), body?.trim()].filter(Boolean).join('\n\n'),
+    });
+  }, [body, broadcastId, broadcastItem?.share_count, title]);
+
+  const attachments = useMemo(
+    () => (Array.isArray(broadcastItem?.attachments) ? broadcastItem.attachments.filter(Boolean) : []),
+    [broadcastItem?.attachments],
+  );
   const attachmentUrls = useMemo(() => {
-    const rawAttachments = Array.isArray(broadcastItem?.attachments) ? broadcastItem.attachments : [];
-    return rawAttachments
-      .map((attachment) => pickAttachmentUrl(attachment))
+    return attachments
+      .map((attachment: any) => pickAttachmentUrl(attachment))
       .filter(Boolean)
-      .map((url) => resolveBackendAssetUrl(url!))
+      .map((url: string) => resolveBackendAssetUrl(url))
       .filter(Boolean);
-  }, [broadcastItem?.attachments]);
+  }, [attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
   useEffect(() => {
@@ -103,6 +207,8 @@ export default function BroadcastDetailScreen() {
   }, [attachmentUrls.length]);
 
   const attachmentUrl = attachmentUrls[activeAttachmentIndex] ?? null;
+  const activeAttachment = attachments[activeAttachmentIndex] ?? null;
+  const activeAttachmentIsVideo = isVideoAttachment(activeAttachment);
   const showCarousel = attachmentUrls.length > 0;
   const showControls = attachmentUrls.length > 1;
   const handlePrevAttachment = () => {
@@ -154,10 +260,17 @@ export default function BroadcastDetailScreen() {
         <KISIcon name="arrow-left" size={24} color={palette.text} />
         <Text style={[styles.backLabel, { color: palette.text }]}>Back</Text>
       </Pressable>
-      <Text style={[styles.heading, { color: palette.text }]}>{broadcastItem.title ?? 'Community broadcast'}</Text>
+      <Text style={[styles.heading, { color: palette.text }]}>{title}</Text>
       {showCarousel ? (
         <View style={[styles.slideshowWrap, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
-          {attachmentUrl ? (
+          {activeAttachmentIsVideo && activeAttachment ? (
+            <BroadcastFeedVideoPreview
+              attachment={activeAttachment}
+              palette={palette as any}
+              containerStyle={styles.videoWrap}
+              videoStyle={styles.image}
+            />
+          ) : attachmentUrl ? (
             <Image source={{ uri: attachmentUrl }} style={styles.image} resizeMode="cover" />
           ) : (
             <View style={[styles.image, { backgroundColor: palette.bar }]} />
@@ -172,7 +285,7 @@ export default function BroadcastDetailScreen() {
                 <Text style={[styles.navButtonText, { color: palette.primaryStrong }]}>{'›'}</Text>
               </Pressable>
               <View style={styles.dotRow}>
-                {attachmentUrls.map((_, dotIndex) => (
+                {attachmentUrls.map((_: string, dotIndex: number) => (
                   <View
                     key={`dot-${dotIndex}`}
                     style={[
@@ -190,21 +303,47 @@ export default function BroadcastDetailScreen() {
           ) : null}
         </View>
       ) : null}
-      {broadcastItem.body ? (
-        <Text style={[styles.body, { color: palette.text }]}>{broadcastItem.body}</Text>
+      {body ? (
+        <Text style={[styles.body, { color: palette.text }]}>{body}</Text>
       ) : null}
-      <View style={styles.footer}>
-        <Pressable onPress={handleReact} style={[styles.reactButton, { borderColor: palette.primary }]}>
-          <KISIcon name="heart" size={20} color={palette.primary} />
-          <Text style={[styles.reactText, { color: palette.primary }]}>React</Text>
+      <View style={[styles.actionRow, { borderTopColor: palette.divider }]}>
+        <Pressable onPress={handleToggleSaved} style={styles.actionItem}>
+          <KISIcon name="bookmark" size={20} color={viewerSaved ? palette.primaryStrong : palette.subtext} />
+          <Text style={[styles.actionText, { color: viewerSaved ? palette.primaryStrong : palette.subtext }]}>
+            {viewerSaved ? 'Saved' : 'Save'}
+          </Text>
         </Pressable>
+        <Pressable onPress={handleReact} style={styles.actionItem}>
+          <KISIcon name="heart" size={20} color={viewerReaction ? palette.primaryStrong : palette.subtext} />
+          <Text style={[styles.actionText, { color: viewerReaction ? palette.primaryStrong : palette.subtext }]}>
+            React{reactionCount > 0 ? ` ${reactionCount}` : ''}
+          </Text>
+        </Pressable>
+        <Pressable onPress={handleOpenComments} style={styles.actionItem}>
+          <KISIcon name="comment" size={20} color={palette.subtext} />
+          <Text style={[styles.actionText, { color: palette.subtext }]}>
+            Comment{commentCount > 0 ? ` ${commentCount}` : ''}
+          </Text>
+        </Pressable>
+        <Pressable onPress={handleShare} style={styles.actionItem}>
+          <KISIcon name="share" size={20} color={palette.subtext} />
+          <Text style={[styles.actionText, { color: palette.subtext }]}>
+            Share{shareCount > 0 ? ` ${shareCount}` : ''}
+          </Text>
+        </Pressable>
+      </View>
+      <View style={styles.footer}>
         <Text style={[styles.counter, { color: palette.subtext }]}>
-          {broadcastItem.engagement.reactions} reaction
-          {broadcastItem.engagement.reactions === 1 ? '' : 's'}
+          {reactionCount} reaction
+          {reactionCount === 1 ? '' : 's'}
         </Text>
         <Text style={[styles.counter, { color: palette.subtext }]}>
-          {broadcastItem.engagement.comments} comment
-          {broadcastItem.engagement.comments === 1 ? '' : 's'}
+          {commentCount} comment
+          {commentCount === 1 ? '' : 's'}
+        </Text>
+        <Text style={[styles.counter, { color: palette.subtext }]}>
+          {shareCount} share
+          {shareCount === 1 ? '' : 's'}
         </Text>
       </View>
     </ScrollView>
@@ -233,6 +372,11 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 14,
     backgroundColor: '#000',
+  },
+  videoWrap: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   slideshowWrap: {
     position: 'relative',
@@ -290,23 +434,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: 12,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 12,
-  },
-  reactButton: {
-    borderWidth: 2,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  reactText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   counter: {
     fontSize: 13,

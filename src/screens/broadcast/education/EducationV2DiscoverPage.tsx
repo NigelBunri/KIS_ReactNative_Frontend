@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,9 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
+import ROUTES from '@/network';
+import { postRequest } from '@/network/post';
+import { getRequest } from '@/network/get';
 import EducationContentCard from '@/screens/broadcast/education/components/EducationContentCard';
 import EducationContinueLearning from '@/screens/broadcast/education/components/EducationContinueLearning';
 import EducationDetailSheet from '@/screens/broadcast/education/components/EducationDetailSheet';
@@ -23,6 +26,7 @@ import type {
   EducationContentItem,
   EducationContentType,
   EducationProgress,
+  EducationInstitutionSpotlight,
 } from '@/screens/broadcast/education/api/education.models';
 
 type Props = {
@@ -70,12 +74,14 @@ export default function EducationV2DiscoverPage({
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<EducationContentItem | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [enrollmentVisible, setEnrollmentVisible] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<EducationContentItem | null>(null);
   const [paymentState, setPaymentState] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
 
   const heroContent = data?.heroCourse ?? null;
+  const institutionSpotlights = useMemo(() => data?.institutionSpotlights ?? [], [data?.institutionSpotlights]);
   const continueLearning = useMemo(
     () => data?.continueLearning ?? [],
     [data?.continueLearning],
@@ -96,10 +102,62 @@ export default function EducationV2DiscoverPage({
     return parts.length ? parts.join(' · ') : 'All filters';
   }, [filters]);
 
-  const openDetails = (item: EducationContentItem) => {
+  const learningStats = useMemo(() => {
+    const total = continueLearning.length;
+    const certificateReady = continueLearning.filter((row) => row.isCompleted).length;
+    const upcomingLive = (data?.sections ?? []).flatMap((section: any) => section.items || []).filter((item: any) => item?.startsAt).length;
+    return { total, certificateReady, upcomingLive };
+  }, [continueLearning, data?.sections]);
+
+  const hydrateDetail = useCallback(async (contentId: string, seed?: Partial<EducationContentItem>) => {
+    setDetailLoading(true);
+    try {
+      const response = await getRequest(ROUTES.education.detail(contentId), {
+        errorMessage: 'Unable to load education details.',
+      });
+      if (response?.success === false) {
+        throw new Error(response?.message || 'Unable to load education details.');
+      }
+      const payload = response?.data ?? response ?? {};
+      const content = payload?.content;
+      if (content && typeof content === 'object') {
+        setDetailItem((prev) => ({
+          ...((prev || seed || { id: contentId }) as EducationContentItem),
+          ...content,
+          progress: payload?.progress ?? null,
+          insights: payload?.insights ?? null,
+          currentItem: payload?.current_item ?? null,
+          currentModule: payload?.current_module ?? null,
+          nextItem: payload?.next_item ?? null,
+          certificate: payload?.certificate ?? null,
+          faqs: payload?.faqs ?? [],
+        } as EducationContentItem));
+      }
+    } catch (error: any) {
+      Alert.alert('Education', error?.message || 'Unable to load education details.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const openDetails = useCallback(async (item: EducationContentItem) => {
     setDetailItem(item);
     setDetailVisible(true);
-  };
+    await hydrateDetail(item.id, item);
+  }, [hydrateDetail]);
+
+  const resumeLearning = useCallback(async (progress: EducationProgress) => {
+    const seed = {
+      id: progress.contentId,
+      type: progress.contentType,
+      title: progress.contentTitle || progress.lastLessonTitle || 'Learning item',
+      summary: progress.currentModule?.summary || 'Resume where you left off.',
+      durationMinutes: progress.currentItem?.duration_minutes || 0,
+    } as EducationContentItem;
+    setDetailItem(seed);
+    setDetailVisible(true);
+    await hydrateDetail(progress.contentId, seed);
+  }, [hydrateDetail]);
 
   const enrollCourse = (item: EducationContentItem) => {
     setSelectedCourse(item);
@@ -112,23 +170,45 @@ export default function EducationV2DiscoverPage({
     Alert.alert('Preview lesson', `Playing preview for “${item.title}”.`);
   };
 
-  const freeEnroll = (item: EducationContentItem) => {
+  const handleEnrollmentRequest = useCallback(async (item: EducationContentItem) => {
     setPaymentState('processing');
-    setTimeout(() => {
-      setPaymentState('success');
-      setReceiptUrl(`https://receipts.kis/${item.id}`);
-      Alert.alert('Enrollment', `${item.title} added to your library.`);
-    }, 1400);
-  };
+    setReceiptUrl(null);
+    const response = await postRequest(ROUTES.education.enroll(item.id), {}, {
+      errorMessage: 'Unable to complete this education action.',
+    });
+    if (!response?.success) {
+      setPaymentState('error');
+      Alert.alert('Education', response?.message || 'Unable to complete this education action.');
+      return;
+    }
+    const payload = response?.data ?? {};
+    setPaymentState('success');
+    setReceiptUrl(payload?.receiptUrl ?? null);
+    setEnrollmentVisible(false);
+    await refresh();
+    const booking = payload?.booking;
+    if (booking?.status === 'awaiting_satisfaction') {
+      Alert.alert('Booked', 'Payment is held in KISC escrow until you confirm satisfaction or auto-release after 3 days.');
+      return;
+    }
+    if (booking?.status === 'confirmed') {
+      Alert.alert('Booked', 'Payment received in KISC and held until the provider marks this completed.');
+      return;
+    }
+    if (payload?.enrollment) {
+      Alert.alert('Enrollment', `${item.title} added to your learning flow.`);
+      return;
+    }
+    Alert.alert('Education', 'Action completed successfully.');
+  }, [refresh]);
 
-  const checkout = (item: EducationContentItem) => {
-    setPaymentState('processing');
-    setTimeout(() => {
-      setPaymentState('success');
-      setReceiptUrl(`https://receipts.kis/${item.id}`);
-      Alert.alert('Checkout', 'Payment confirmed. Enjoy the course!');
-    }, 1800);
-  };
+  const freeEnroll = useCallback(async (item: EducationContentItem) => {
+    await handleEnrollmentRequest(item);
+  }, [handleEnrollmentRequest]);
+
+  const checkout = useCallback(async (item: EducationContentItem) => {
+    await handleEnrollmentRequest(item);
+  }, [handleEnrollmentRequest]);
 
   const downloadContent = (item: EducationContentItem) => {
     scheduleDownload({
@@ -138,6 +218,72 @@ export default function EducationV2DiscoverPage({
       downloaded: true,
     });
     Alert.alert('Offline', `${item.title} queued for offline sync.`);
+  };
+
+  const renderLearningOverview = () => (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={{ color: palette.text, fontWeight: '800', marginBottom: 10 }}>Your learning hub</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {[
+          { label: 'Active learning', value: String(learningStats.total), hint: 'Courses or programs in progress' },
+          { label: 'Ready certificates', value: String(learningStats.certificateReady), hint: 'Completion-ready achievements' },
+          { label: 'Live & scheduled', value: String(learningStats.upcomingLive), hint: 'Sessions and events to watch' },
+        ].map((card) => (
+          <View
+            key={card.label}
+            style={{
+              flexGrow: 1,
+              minWidth: 150,
+              borderRadius: 18,
+              padding: 14,
+              backgroundColor: palette.card,
+              borderWidth: 1,
+              borderColor: palette.divider,
+            }}
+          >
+            <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700' }}>{card.label}</Text>
+            <Text style={{ color: palette.text, fontSize: 22, fontWeight: '900', marginTop: 6 }}>{card.value}</Text>
+            <Text style={{ color: palette.subtext, marginTop: 6, lineHeight: 17 }}>{card.hint}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderInstitutionSpotlights = () => {
+    if (!institutionSpotlights.length) return null;
+    return (
+      <View style={{ marginBottom: 22 }}>
+        <Text style={{ color: palette.text, fontWeight: '800', marginBottom: 10 }}>Institutions to learn from</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {institutionSpotlights.map((institution: EducationInstitutionSpotlight) => (
+            <View
+              key={institution.id}
+              style={{
+                width: 240,
+                marginRight: 12,
+                borderRadius: 20,
+                padding: 14,
+                backgroundColor: palette.card,
+                borderWidth: 1,
+                borderColor: palette.divider,
+              }}
+            >
+              <Text style={{ color: palette.primaryStrong, fontSize: 11, fontWeight: '700' }}>{String(institution.institutionType || 'Institution').replace(/_/g, ' ')}</Text>
+              <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17, marginTop: 6 }}>{institution.name}</Text>
+              {institution.description ? (
+                <Text style={{ color: palette.subtext, marginTop: 6, lineHeight: 18 }} numberOfLines={3}>{institution.description}</Text>
+              ) : null}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>{institution.courseCount ?? 0} courses</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>{institution.programCount ?? 0} programs</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>{institution.eventCount ?? 0} events</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
   };
 
   const renderHero = () => {
@@ -271,13 +417,15 @@ export default function EducationV2DiscoverPage({
           ))}
         </ScrollView>
 
+        {renderLearningOverview()}
         {renderHero()}
+        {renderInstitutionSpotlights()}
 
         <View style={{ marginBottom: 24 }}>
           <Text style={{ color: palette.text, fontWeight: '800', marginBottom: 8 }}>Continue learning</Text>
           <EducationContinueLearning
             items={continueLearning}
-            onResume={(item) => Alert.alert('Resume', `Opening latest lesson for ${item.contentId}.`)}
+            onResume={resumeLearning}
           />
         </View>
 
@@ -318,10 +466,11 @@ export default function EducationV2DiscoverPage({
 
       <EducationDetailSheet
         visible={detailVisible}
-        item={detailItem}
-        onClose={() => setDetailVisible(false)}
+        item={detailItem ? ({ ...detailItem, detailLoading } as EducationContentItem & { detailLoading?: boolean }) : null}
+        onClose={() => { setDetailVisible(false); setDetailLoading(false); }}
         onEnroll={(item) => enrollCourse(item)}
         onPreview={(item) => previewCourse(item)}
+        onRefreshProgress={refresh}
       />
 
       <EducationEnrollmentSheet

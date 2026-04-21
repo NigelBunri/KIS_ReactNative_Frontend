@@ -6,33 +6,17 @@ import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 
-import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
-
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import {
   MarketProduct,
-  MarketProductCategory,
   MarketShop,
 } from '@/screens/broadcast/market/api/market.types';
-import { KIS_COIN_CODE, KIS_COIN_LABEL, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import MarketProductCard from '@/screens/broadcast/market/components/MarketProductCard';
+import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import { useCatalogCategories } from '@/screens/market/useCatalogCategories';
+import { collectProductImageUris } from '@/utils/productImages';
 
 type PickedImage = { uri: string; name: string; type: string };
-
-type CategoryType = 'product' | 'service' | 'both';
-
-type CategoryFormState = {
-  name: string;
-  type: CategoryType;
-};
-
-const CATEGORY_TYPES: CategoryType[] = ['product', 'service', 'both'];
-const CATEGORY_LABELS: Record<CategoryType, string> = {
-  product: 'Product',
-  service: 'Service',
-  both: 'Product + Service',
-};
 
 const DEFAULT_PRODUCT_FORM = {
   name: '',
@@ -40,12 +24,6 @@ const DEFAULT_PRODUCT_FORM = {
   description: '',
   stock_qty: '0',
   categoryId: '',
-};
-
-const normalizeList = (payload: any) => {
-  const source = payload?.data ?? payload ?? {};
-  const list = source?.results ?? source;
-  return Array.isArray(list) ? list : [];
 };
 
 const sanitizeDecimalInput = (value: string) => value.replace(/[^0-9.]/g, '');
@@ -82,10 +60,11 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   const [editing, setEditing] = useState<MarketProduct | null>(null);
   const [productImages, setProductImages] = useState<PickedImage[]>([]);
   const [form, setForm] = useState({ ...DEFAULT_PRODUCT_FORM });
-  const [shopCategories, setShopCategories] = useState<Record<string, MarketProductCategory[]>>({});
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [categoryForm, setCategoryForm] = useState<CategoryFormState>({ name: '', type: 'product' });
-  const [categorySaving, setCategorySaving] = useState(false);
+  const { categories: catalogCategories, loading: catalogLoading } = useCatalogCategories();
+  const productCatalogCategories = useMemo(
+    () => catalogCategories.filter((category) => category.category_type !== 'service'),
+    [catalogCategories],
+  );
 
   const activeShop: MarketShop | null = useMemo(() => {
     if (!myShops.length) return null;
@@ -93,10 +72,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     return myShops.find((shop) => shop.id === activeShopId) ?? myShops[0] ?? null;
   }, [myShops, activeShopId]);
 
-  const categoriesForActiveShop = useMemo(() => {
-    if (!activeShop?.id) return [];
-    return shopCategories[String(activeShop.id)] ?? [];
-  }, [activeShop?.id, shopCategories]);
+  const categoriesForActiveShop = productCatalogCategories;
 
   const selectedCategory = useMemo(
     () => categoriesForActiveShop.find((category) => category.id === form.categoryId) ?? null,
@@ -126,30 +102,10 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     return `Price ${currency} ${priceValue}`;
   };
 
-  const loadCategories = useCallback(async (shopId: string) => {
-    setCategoriesLoading(true);
-    try {
-      const res = await getRequest(`${ROUTES.commerce.productCategories}?shop=${shopId}`, {
-        errorMessage: 'Unable to load categories.',
-      });
-      const next = normalizeList(res);
-      setShopCategories((prev) => ({ ...prev, [shopId]: next }));
-    } catch (error: any) {
-      Alert.alert('Categories', error?.message || 'Unable to load categories.');
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!activeShop?.id) return;
-    loadCategories(activeShop.id);
-  }, [activeShop?.id, loadCategories]);
-
   useEffect(() => {
     if (editing) return;
-    if (!form.categoryId && categoriesForActiveShop.length) {
-      setForm((prev) => ({ ...prev, categoryId: categoriesForActiveShop[0].id }));
+    if (!form.categoryId && productCatalogCategories.length) {
+      setForm((prev) => ({ ...prev, categoryId: productCatalogCategories[0].id }));
     }
   }, [categoriesForActiveShop, editing, form.categoryId]);
 
@@ -194,51 +150,13 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
           product.price !== undefined && product.price !== null ? String(product.price) : '',
         description: product.description ?? '',
         stock_qty: String(product.stock_qty ?? 0),
-        categoryId: product.category?.id ?? '',
+        categoryId: Array.isArray(product.catalog_categories)
+          ? product.catalog_categories[0]?.id ?? ''
+          : '',
       });
     },
     [activeShop?.id],
   );
-
-  const handleCreateCategory = useCallback(async () => {
-    if (!activeShop?.id) {
-      Alert.alert('Categories', 'Create or select a shop before adding categories.');
-      return;
-    }
-    const name = categoryForm.name.trim();
-    if (!name) {
-      Alert.alert('Categories', 'Provide a name for the category.');
-      return;
-    }
-    setCategorySaving(true);
-    try {
-      const res = await postRequest(
-        ROUTES.commerce.productCategories,
-        {
-          shop: activeShop.id,
-          name,
-          category_type: categoryForm.type,
-        },
-        { errorMessage: 'Unable to add category.' },
-      );
-      if (!res?.success) {
-        Alert.alert('Categories', res?.message || 'Unable to add category.');
-        return;
-      }
-      const created = res.data ?? {};
-      const createdId = created?.id ?? '';
-      await loadCategories(activeShop.id);
-      setCategoryForm((prev) => ({ ...prev, name: '' }));
-      if (createdId) {
-        setForm((prev) => ({ ...prev, categoryId: createdId }));
-      }
-      Alert.alert('Categories', 'Category added.');
-    } catch (error: any) {
-      Alert.alert('Categories', error?.message || 'Unable to add category.');
-    } finally {
-      setCategorySaving(false);
-    }
-  }, [activeShop?.id, categoryForm.name, categoryForm.type, loadCategories]);
 
   const submit = useCallback(async () => {
     const trimmedName = form.name.trim();
@@ -348,9 +266,9 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                   <MarketProductCard
                     key={`broadcast-${product.id}`}
                     title={product.name ?? 'Product'}
-                    subtitle={product.description ?? product.category?.name ?? ''}
+                    subtitle={product.description ?? product.catalog_categories?.[0]?.name ?? ''}
                     priceLabel={formatBroadcastPriceLabel(product)}
-                    coverUrl={product.image_url ?? null}
+                    coverUrl={collectProductImageUris(product)[0] ?? product.image_url ?? null}
                     badgeText="BROADCAST"
                     ctaLabel="Remove broadcast"
                     onCTA={async () => {
@@ -373,91 +291,51 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
           </View>
 
           <View style={{ gap: 10 }}>
-            <View style={{ gap: 6 }}>
-              <Text style={{ color: palette.text, fontWeight: '700' }}>Categories</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {categoriesForActiveShop.map((category) => {
-                  const isActive = category.id === form.categoryId;
-                  return (
-                    <Pressable
-                      key={category.id}
-                      onPress={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: palette.text, fontWeight: '700' }}>Categories</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {productCatalogCategories.map((category) => {
+                const isActive = category.id === form.categoryId;
+                return (
+                  <Pressable
+                    key={category.id}
+                    onPress={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
+                    style={{
+                      borderWidth: 2,
+                      borderColor: isActive ? palette.primary : palette.divider,
+                      borderRadius: 999,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      backgroundColor: isActive ? palette.primarySoft : palette.surface,
+                    }}
+                  >
+                    <Text
                       style={{
-                        borderWidth: 2,
-                        borderColor: isActive ? palette.primary : palette.divider,
-                        borderRadius: 999,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        backgroundColor: isActive ? palette.primarySoft : palette.surface,
+                        color: isActive ? palette.primaryStrong : palette.text,
+                        fontWeight: '900',
+                        fontSize: 12,
                       }}
                     >
-                      <Text
-                        style={{
-                          color: isActive ? palette.primaryStrong : palette.text,
-                          fontWeight: '900',
-                          fontSize: 12,
-                        }}
-                      >
-                        {category.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-                {!categoriesLoading && categoriesForActiveShop.length === 0 ? (
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No categories yet.</Text>
-                ) : null}
-              </View>
-              {categoriesLoading && (
-                <Text style={{ color: palette.subtext, fontSize: 12 }}>Loading categories…</Text>
-              )}
-              <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                Selected: {selectedCategory?.name ?? 'None'}
-              </Text>
+                      {category.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {!catalogLoading && productCatalogCategories.length === 0 ? (
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>No categories yet.</Text>
+              ) : null}
             </View>
+            {catalogLoading && (
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>Loading categories…</Text>
+            )}
+            <Text style={{ color: palette.subtext, fontSize: 12 }}>
+              Selected: {selectedCategory?.name ?? 'None'}
+            </Text>
+          </View>
 
-            <View style={{ gap: 6 }}>
-              <Text style={{ color: palette.text, fontWeight: '700' }}>Add a category</Text>
-              <KISTextInput
-                label="Category name"
-                value={categoryForm.name}
-                onChangeText={(value) => setCategoryForm((prev) => ({ ...prev, name: value }))}
-              />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {CATEGORY_TYPES.map((type) => {
-                  const active = categoryForm.type === type;
-                  return (
-                    <Pressable
-                      key={type}
-                      onPress={() => setCategoryForm((prev) => ({ ...prev, type }))}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: active ? palette.primary : palette.divider,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 999,
-                        backgroundColor: active ? palette.primarySoft : palette.surface,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: active ? palette.primaryStrong : palette.text,
-                          fontWeight: '900',
-                          fontSize: 12,
-                        }}
-                      >
-                        {CATEGORY_LABELS[type]}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <KISButton
-                title="Create category"
-                size="sm"
-                onPress={handleCreateCategory}
-                disabled={!activeShop?.id || !categoryForm.name.trim() || categorySaving}
-              />
-            </View>
+          <Text style={{ color: palette.subtext, fontSize: 12 }}>
+            Categories are predefined by the platform. Pick one from the list above when adding products.
+          </Text>
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
@@ -580,9 +458,9 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>
                           {product.price ?? ''} {product.currency ?? ''} · Stock: {product.stock_qty ?? 0}
                         </Text>
-                        {product.category?.name ? (
+                        {product.catalog_categories?.[0]?.name ? (
                           <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                            Category: {product.category.name}
+                            Category: {product.catalog_categories[0].name}
                           </Text>
                         ) : null}
                       </View>

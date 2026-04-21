@@ -95,10 +95,10 @@ export default function BibleLessonsPanel() {
   };
 
   const handleRequireBilling = (course: Course) => {
-    DeviceEventEmitter.emit('wallet.open', {
-      mode: 'cash_to_credits',
-      amount: course.price_amount ?? '',
-    });
+      DeviceEventEmitter.emit('wallet.open', {
+        mode: 'add_kisc',
+        amount: course.price_amount ?? '',
+      });
     navigation.navigate('Profile' as never);
   };
 

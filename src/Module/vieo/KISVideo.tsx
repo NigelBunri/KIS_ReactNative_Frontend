@@ -15,9 +15,7 @@ export default function KISVideo({ muted = false, loop = false, ...rest }: Props
       showControls
       containerStyle={{ ...rest.containerStyle }}
       videoStyle={{ ...rest.videoStyle }}
-      onError={(_msg) => {
-        // no-op (VideoPlayer already surfaces)
-      }}
+      onError={rest.onError}
     />
   );
 }

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './App';
 import ROUTES, { CHAT_WS_URL, CHAT_WS_PATH } from '@/network';
 import { getCache } from '@/network/cache';
+import { getAccessToken } from '@/security/authStorage';
 import { getRequest } from '@/network/get';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 
@@ -93,10 +94,7 @@ export const SocketProvider: React.FC<{
     mountedRef.current = true;
 
     const connect = async () => {
-      let token =
-        await AsyncStorage.getItem(
-          'access_token',
-        );
+      let token = await getAccessToken();
       const cached = await getCache(
         'AUTH_CACHE',
         'USER_KEY',

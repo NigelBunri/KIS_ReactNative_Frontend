@@ -21,7 +21,7 @@ const toKiscAmount = (amountCents: unknown, withSign = false) => {
   const cents = Number(amountCents);
   if (!Number.isFinite(cents)) return '0.000 KISC';
   const sign = withSign && cents < 0 ? '-' : '';
-  const kisc = (Math.abs(cents) / CENTS_PER_KISC).toFixed(3);
+  const kisc = (Math.abs(cents) / CENTS_PER_KISC).toFixed(2);
   return `${sign}${kisc} KISC`;
 };
 

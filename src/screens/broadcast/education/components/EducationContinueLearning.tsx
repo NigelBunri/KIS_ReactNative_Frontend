@@ -32,7 +32,7 @@ export default function EducationContinueLearning({ items, onResume }: Props) {
         renderItem={({ item }) => (
           <View
             style={{
-              width: 220,
+              width: 240,
               borderWidth: 2,
               borderColor: palette.divider,
               borderRadius: 18,
@@ -42,10 +42,10 @@ export default function EducationContinueLearning({ items, onResume }: Props) {
             }}
           >
             <Text style={{ color: palette.text, fontWeight: '800' }} numberOfLines={1}>
-              {item.contentId}
+              {item.contentTitle || item.lastLessonTitle || 'Learning item'}
             </Text>
             <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={2}>
-              {item.lastLessonTitle ?? 'Resume where you left off'}
+              {item.currentModule?.title || item.lastLessonTitle || 'Resume where you left off'}
             </Text>
             <View
               style={{

@@ -107,7 +107,15 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
   }, []);
 
   const onError = useCallback((error: any) => {
-    console.error('[KISVideo] onError', error);
+    if (__DEV__) {
+      try {
+        console.error('[KISVideo] onError', JSON.stringify(error));
+      } catch {
+        console.error('[KISVideo] onError', error);
+      }
+    } else {
+      console.error('[KISVideo] onError', error);
+    }
     const messagePayload =
       error?.error ?? error?.message ?? error ?? null;
     const errorMessage =

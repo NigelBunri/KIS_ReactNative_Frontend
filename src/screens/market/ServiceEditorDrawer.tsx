@@ -18,17 +18,18 @@ import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constant
 import { resolveBackendAssetUrl } from '@/network';
 import AvailabilityScheduler from './AvailabilityScheduler';
 import { createDefaultAvailability, normalizeAvailabilityPayload, ServiceAvailability } from './availabilityUtils';
-
-type CategoryOption = {
-  id: string;
-  name?: string;
-  category_type?: 'product' | 'service' | 'both';
-};
+import CategoryPickerModal from './CategoryPickerModal';
+import { useCatalogCategories } from './useCatalogCategories';
+import { CATEGORY_SELECTION_LIMIT } from '@/screens/market/market.constants';
 
 type PickedImage = {
   uri: string;
   name: string;
   type: string;
+};
+
+type PersistedMedia = PickedImage & {
+  id?: string;
 };
 
 type ServiceDeliveryMode = 'onsite' | 'remote' | 'instore' | 'pickup_dropoff';
@@ -85,6 +86,18 @@ const createRequirement = (): CustomerRequirement => ({
   required: false,
 });
 
+const SERVICE_CATEGORY_TYPES = new Set(['service', 'both']);
+
+const collectEditorCategoryIds = (categories: any[], allowedTypes: Set<string>) =>
+  (Array.isArray(categories) ? categories : [])
+    .map((category) => ({
+      id: category?.id,
+      type: String(category?.category_type ?? 'product').toLowerCase(),
+    }))
+    .filter((entry) => entry.id && allowedTypes.has(entry.type))
+    .map((entry) => String(entry.id))
+    .slice(0, CATEGORY_SELECTION_LIMIT);
+
 const buildPickedImage = (asset: Asset | undefined, prefix: string): PickedImage | null => {
   if (!asset?.uri) return null;
   const extension = (asset.type || 'image/jpeg').split('/')[1] || 'jpg';
@@ -101,14 +114,38 @@ const normalizeCommaList = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const normalizeEditorPackage = (pkg: any): ServicePackage => ({
+  id: String(pkg?.id ?? createId()),
+  name: String(pkg?.name ?? ''),
+  description: String(pkg?.description ?? ''),
+  price: String(pkg?.price ?? ''),
+  durationMinutes: String(pkg?.duration_minutes ?? pkg?.durationMinutes ?? ''),
+  revisions: String(pkg?.revisions ?? pkg?.sessions ?? ''),
+});
+
+const normalizeEditorAddon = (addon: any): ServiceAddon => ({
+  id: String(addon?.id ?? createId()),
+  name: String(addon?.name ?? ''),
+  price: String(addon?.price ?? ''),
+  description: String(addon?.description ?? ''),
+});
+
+const normalizeEditorRequirement = (req: any): CustomerRequirement => ({
+  id: String(req?.id ?? createId()),
+  label: String(req?.label ?? req?.name ?? ''),
+  type: (['text', 'long_text', 'phone', 'email', 'file', 'location', 'date'].includes(String(req?.type))
+    ? req?.type
+    : 'text') as CustomerRequirement['type'],
+  required: Boolean(req?.required),
+});
+
 
 const DEFAULT_SERVICE_FORM = {
   name: '',
   shortSummary: '',
   description: '',
-  category: '',
-  categoryId: '',
   tagsText: '',
+  categoryIds: [] as string[],
 
   serviceType: 'appointment' as ServiceFulfillmentType,
   deliveryModes: ['onsite'] as ServiceDeliveryMode[],
@@ -183,7 +220,6 @@ type ServiceEditorDrawerProps = {
   mode: 'create' | 'edit';
   shop?: any;
   service?: any | null;
-  categories?: CategoryOption[];
   loading?: boolean;
   onClose: () => void;
   onSave: (payload: any) => void;
@@ -226,7 +262,6 @@ export default function ServiceEditorDrawer({
   loading,
   onClose,
   onSave,
-  categories,
 }: ServiceEditorDrawerProps) {
   const { palette } = useKISTheme();
   const slide = useRef(new Animated.Value(marketLayout.drawerWidth)).current;
@@ -239,16 +274,20 @@ export default function ServiceEditorDrawer({
   } as const;
 
   const [form, setForm] = useState(() => ({ ...DEFAULT_SERVICE_FORM }));
-  const [galleryImages, setGalleryImages] = useState<PickedImage[]>([]);
+  const [featuredImageAsset, setFeaturedImageAsset] = useState<PersistedMedia | null>(null);
+  const [galleryImages, setGalleryImages] = useState<PersistedMedia[]>([]);
+  const [removedGalleryImageIds, setRemovedGalleryImageIds] = useState<string[]>([]);
+  const [removeFeaturedImage, setRemoveFeaturedImage] = useState(false);
 
-  const availableServiceCategories = useMemo(
-    () => (categories ?? []).filter((category) => category.category_type !== 'product'),
-    [categories],
+  const [serviceCategoryModalVisible, setServiceCategoryModalVisible] = useState(false);
+  const { categories: catalogCategories, loading: catalogLoading } = useCatalogCategories('service');
+  const serviceCatalogCategories = useMemo(
+    () => catalogCategories.filter((category) => category.category_type === 'service'),
+    [catalogCategories],
   );
-
-  const selectedServiceCategory = useMemo(
-    () => availableServiceCategories.find((category) => category.id === form.categoryId) ?? null,
-    [availableServiceCategories, form.categoryId],
+  const selectedServiceCategories = useMemo(
+    () => serviceCatalogCategories.filter((category) => form.categoryIds.includes(category.id)),
+    [serviceCatalogCategories, form.categoryIds],
   );
 
   const priceInUsd = useMemo(() => {
@@ -271,24 +310,26 @@ export default function ServiceEditorDrawer({
       const existingMedia = Array.isArray(service.images) ? service.images : [];
       const normalizedMedia = existingMedia
         .map((asset: any, index: number) => {
-          const uri = asset?.image_url || asset?.url || asset?.uri || '';
+          const uri = asset?.image_url || asset?.image_file || asset?.url || asset?.uri || '';
           if (!uri) return null;
           return {
+            id: asset?.id ? String(asset.id) : undefined,
             uri,
             name: asset?.name || `service-${index}.jpg`,
             type: 'image/jpeg',
           };
         })
-        .filter(Boolean) as PickedImage[];
+        .filter(Boolean) as PersistedMedia[];
 
       const fallbackImageUri = resolveBackendAssetUrl(service.image_url || service.image_file || '') ?? '';
-      const mediaList = normalizedMedia.length
-        ? normalizedMedia
-        : fallbackImageUri
-          ? [{ uri: fallbackImageUri, name: 'service-featured.jpg', type: 'image/jpeg' }]
-          : [];
-
-      setGalleryImages(mediaList);
+      setFeaturedImageAsset(
+        fallbackImageUri
+          ? { uri: fallbackImageUri, name: 'service-featured.jpg', type: 'image/jpeg' }
+          : null,
+      );
+      setGalleryImages(normalizedMedia);
+      setRemovedGalleryImageIds([]);
+      setRemoveFeaturedImage(false);
 
       setForm({
         ...DEFAULT_SERVICE_FORM,
@@ -296,7 +337,7 @@ export default function ServiceEditorDrawer({
         name: service.name ?? '',
         shortSummary: service.short_summary ?? '',
         description: service.description ?? '',
-        categoryId: service.category?.id ?? service.category_id ?? '',
+        categoryIds: collectEditorCategoryIds(service.catalog_categories, SERVICE_CATEGORY_TYPES),
         price: String(service.price ?? ''),
         compareAtPrice: String(service.compare_at_price ?? ''),
         otherShopsDiscount: String(service.other_shops_discount ?? ''),
@@ -321,25 +362,61 @@ export default function ServiceEditorDrawer({
         deliveryModes: Array.isArray(service.delivery_modes) && service.delivery_modes.length ? service.delivery_modes : ['onsite'],
         serviceType: service.service_type ?? 'appointment',
         pricingModel: service.pricing_model ?? 'fixed',
+        negotiable: Boolean(service.negotiable),
+        taxInclusive: Boolean(service.tax_inclusive),
+        quoteRequired: Boolean(service.quote_required),
+        groupBookingAllowed: Boolean(service.group_booking_allowed),
+        autoConfirmBooking: Boolean(service.auto_confirm_booking),
+        approvalRequired: Boolean(service.approval_required),
         visibility: service.visibility ?? 'public',
         status: service.status ?? 'draft',
-        featuredImage: mediaList[0]?.uri ?? '',
-        packages: Array.isArray(service.packages) ? service.packages : [],
-        addons: Array.isArray(service.addons) ? service.addons : [],
-        requirements: Array.isArray(service.requirements) ? service.requirements : [],
+        addressLine1: service.address_line1 ?? '',
+        addressLine2: service.address_line2 ?? '',
+        city: service.city ?? '',
+        state: service.state ?? '',
+        country: service.country ?? '',
+        postalCode: service.postal_code ?? '',
+        travelRadiusKm: String(service.travel_radius_km ?? ''),
+        timezone: service.timezone ?? 'Africa/Lagos',
+        featuredImage: fallbackImageUri,
+        packages: Array.isArray(service.packages) ? service.packages.map(normalizeEditorPackage) : [],
+        addons: Array.isArray(service.addons) ? service.addons.map(normalizeEditorAddon) : [],
+        requirements: Array.isArray(service.requirements) ? service.requirements.map(normalizeEditorRequirement) : [],
         availability: normalizeAvailabilityPayload(service.availability),
         availabilityRules: Array.isArray(service.availability_rules) ? service.availability_rules : [],
         allowMultipleAttendeesPerSlot: Boolean(service.allow_multiple_attendees_per_slot),
         remoteMeetingLink: service.remote_meeting_link ?? '',
+        refundPolicy: service.refund_policy ?? '',
+        warrantyPolicy: service.warranty_policy ?? '',
+        serviceTerms: service.service_terms ?? '',
+        seoTitle: service.seo_title ?? '',
+        seoDescription: service.seo_description ?? '',
+        featured: Boolean(service.featured ?? service.is_featured),
       });
     } else {
       setForm({ ...DEFAULT_SERVICE_FORM });
+      setFeaturedImageAsset(null);
       setGalleryImages([]);
+      setRemovedGalleryImageIds([]);
+      setRemoveFeaturedImage(false);
     }
   }, [visible, mode, service]);
 
   const updateField = (changes: Partial<typeof DEFAULT_SERVICE_FORM>) => {
     setForm((prev) => ({ ...prev, ...changes }));
+  };
+
+  const handleServiceCategorySelect = (categoryId: string) => {
+    setForm((prev) => {
+      const exists = prev.categoryIds.includes(categoryId);
+      if (exists) {
+        return { ...prev, categoryIds: prev.categoryIds.filter((id) => id !== categoryId) };
+      }
+      if (prev.categoryIds.length >= CATEGORY_SELECTION_LIMIT) {
+        return prev;
+      }
+      return { ...prev, categoryIds: [...prev.categoryIds, categoryId] };
+    });
   };
 
   const toggleDeliveryMode = (modeKey: ServiceDeliveryMode) => {
@@ -429,12 +506,9 @@ export default function ServiceEditorDrawer({
       const image = buildPickedImage(asset, 'service_featured');
       if (!image) return;
 
+      setFeaturedImageAsset(image);
+      setRemoveFeaturedImage(false);
       updateField({ featuredImage: image.uri });
-
-      setGalleryImages((prev) => {
-        const exists = prev.some((item) => item.uri === image.uri);
-        return exists ? prev : [image, ...prev];
-      });
     } catch (error) {
       console.error('Service image pick failed', error);
     }
@@ -455,26 +529,31 @@ export default function ServiceEditorDrawer({
         const additions = picked.filter((img) => !seen.has(img.uri));
         return [...prev, ...additions];
       });
-
-      if (!form.featuredImage && picked[0]) {
-        updateField({ featuredImage: picked[0].uri });
-      }
     } catch (error) {
       console.error('Service gallery pick failed', error);
     }
-  }, [form.featuredImage]);
+  }, []);
+
+  const handleClearFeaturedImage = useCallback(() => {
+    setRemoveFeaturedImage(Boolean(service?.image_url || service?.image_file));
+    setFeaturedImageAsset(null);
+    updateField({ featuredImage: '' });
+  }, [service]);
 
   const handleRemoveServiceImage = useCallback(
     (uri: string) => {
       setGalleryImages((prev) => {
-        const remaining = prev.filter((img) => img.uri !== uri);
-        if (form.featuredImage === uri) {
-          updateField({ featuredImage: remaining[0]?.uri ?? '' });
+        const removed = prev.find((img) => img.uri === uri);
+        if (removed?.id) {
+          setRemovedGalleryImageIds((existing) =>
+            existing.includes(removed.id as string) ? existing : [...existing, removed.id as string],
+          );
         }
+        const remaining = prev.filter((img) => img.uri !== uri);
         return remaining;
       });
     },
-    [form.featuredImage],
+    [],
   );
 
   const renderSectionHeader = (icon: string, title: string) => (
@@ -510,7 +589,10 @@ export default function ServiceEditorDrawer({
     id: service?.id,
     shopId: shop?.id,
     draft,
-    images: galleryImages,
+    featuredImageAsset,
+    gallery_images: galleryImages,
+    remove_featured_image: removeFeaturedImage,
+    remove_image_ids: removedGalleryImageIds,
     tags: normalizeCommaList(form.tagsText),
     coverage: normalizeCommaList(form.coverage),
     remoteRegions: normalizeCommaList(form.remoteRegionsText),
@@ -573,24 +655,54 @@ export default function ServiceEditorDrawer({
               />
 
               <View style={{ marginTop: 12 }}>
-                <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600' }}>Service category</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                  {availableServiceCategories.map((category) => {
-                    const active = category.id === form.categoryId;
-                    return (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => updateField({ categoryId: category.id })}
-                        style={chipStyle(active)}
-                      >
-                        <Text style={chipTextStyle(active)}>{category.name ?? 'Category'}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
-                  Selected: {selectedServiceCategory?.name ?? 'None'}
-                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600' }}>Service categories</Text>
+                {serviceCatalogCategories.length ? (
+                  <>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                      {selectedServiceCategories.map((category) => (
+                        <View
+                          key={category.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            borderRadius: 999,
+                            borderWidth: 1,
+                            borderColor: palette.divider,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            backgroundColor: palette.surface,
+                            gap: 6,
+                          }}
+                        >
+                          <Text style={{ color: palette.text, fontSize: 12, fontWeight: '600' }}>
+                            {category.name || 'Category'}
+                          </Text>
+                          <Pressable onPress={() => handleServiceCategorySelect(category.id)} style={{ padding: 4 }}>
+                            <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                          </Pressable>
+                        </View>
+                      ))}
+                      {!selectedServiceCategories.length && (
+                        <Text style={{ color: palette.subtext, fontSize: 12 }}>No categories selected yet.</Text>
+                      )}
+                    </View>
+                    <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+                      {form.categoryIds.length}/{CATEGORY_SELECTION_LIMIT} selected
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 8 }}>
+                    {catalogLoading ? 'Loading service categories…' : 'No service categories available yet.'}
+                  </Text>
+                )}
+                <KISButton
+                  title="Add service categories"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => setServiceCategoryModalVisible(true)}
+                  disabled={catalogLoading || !serviceCatalogCategories.length}
+                  style={{ marginTop: 8 }}
+                />
               </View>
             </View>
 
@@ -1011,7 +1123,7 @@ export default function ServiceEditorDrawer({
                     style={{ width: '100%', height: 140, borderRadius: 14 }}
                   />
                   <Pressable
-                    onPress={() => handleRemoveServiceImage(form.featuredImage)}
+                    onPress={handleClearFeaturedImage}
                     style={{
                       position: 'absolute',
                       top: 8,
@@ -1128,7 +1240,17 @@ export default function ServiceEditorDrawer({
               />
             </View>
           </View>
-        </Animated.View>
-      </>
+      </Animated.View>
+      <CategoryPickerModal
+        visible={serviceCategoryModalVisible}
+        title="Pick service categories"
+        description="Select up to five service categories or subcategories for this listing."
+        categories={serviceCatalogCategories}
+        selectedIds={form.categoryIds}
+        selectionLimit={CATEGORY_SELECTION_LIMIT}
+        onSelect={(categoryId) => handleServiceCategorySelect(categoryId)}
+        onClose={() => setServiceCategoryModalVisible(false)}
+      />
+    </>
   );
 }

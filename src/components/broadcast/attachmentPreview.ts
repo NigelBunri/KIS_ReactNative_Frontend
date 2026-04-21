@@ -25,6 +25,13 @@ export type AttachmentPreviewInfo = {
   url: string | null;
 };
 
+const buildAttachmentIdentity = (info: AttachmentPreviewInfo) => {
+  const primaryUrl = info.url ?? info.previewUri ?? '';
+  const previewUrl = info.previewUri ?? '';
+  const kind = info.isVideo ? 'video' : info.isImage ? 'image' : info.typeLabel;
+  return `${kind}::${primaryUrl}::${previewUrl}`;
+};
+
 export const getAttachmentPreviewInfo = (attachment: AttachmentSource): AttachmentPreviewInfo => {
   if (!attachment) {
     return {
@@ -85,4 +92,28 @@ export const getAttachmentPreviewInfo = (attachment: AttachmentSource): Attachme
     typeLabel,
     url: resolvedUrl,
   };
+};
+
+export const dedupeAttachmentPreviews = (previews: AttachmentPreviewInfo[]): AttachmentPreviewInfo[] => {
+  const seen = new Set<string>();
+  const unique: AttachmentPreviewInfo[] = [];
+  for (const preview of previews) {
+    const identity = buildAttachmentIdentity(preview);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    unique.push(preview);
+  }
+  return unique;
+};
+
+export const isVideoAttachment = (attachment: AttachmentSource): boolean => {
+  if (!attachment) return false;
+  const source =
+    typeof attachment === 'string'
+      ? { url: attachment }
+      : attachment;
+  const typeHint =
+    pickFirst(source, ['media_type', 'mime_type', 'kind', 'type']) ?? 'file';
+  const kind = String(typeHint).toLowerCase();
+  return kind.includes('video') || kind.includes('mp4');
 };

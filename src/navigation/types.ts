@@ -8,6 +8,10 @@ export type RootStackParamList = {
   Register: undefined;
   DeviceVerification: { phone?: string | null; email?: string | null } | undefined;
   MainTabs: undefined;
+  BroadcastDetail: {
+    id: string;
+    item?: any;
+  };
   PartnerInsights: undefined;
   AdminTools: undefined;
   AdminDashboard: { target: string; title: string };
@@ -92,12 +96,34 @@ export type RootStackParamList = {
   ServiceBookingDetails: {
     bookingId: string;
   };
+  ProductDetail: {
+    productId: string;
+    variantId?: string;
+  };
+  ShopProducts: {
+    shopId: string;
+    shopName?: string;
+  };
+  ShopServices: {
+    shopId: string;
+    shopName?: string;
+  };
+  CartsList: undefined;
+  CartDetail: {
+    shopId: string;
+    shopName?: string;
+  };
+  MarketplaceReceivedOrders: undefined;
+  MarketplaceOrders: undefined;
+  MarketplaceProviderOrders: undefined;
+  MarketplaceOrderDetail: { orderId: string; mode: 'buyer' | 'provider' };
   ProfileLandingEditor: {
     kind: 'market' | 'education' | 'partner';
     profileLabel?: string;
     partnerId?: string;
     shopId?: string;
     shopName?: string;
+    returnBroadcastProfileKey?: BroadcastProfileKey;
   };
 };
 

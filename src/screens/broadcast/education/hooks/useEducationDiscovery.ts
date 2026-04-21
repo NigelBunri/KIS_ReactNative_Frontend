@@ -42,6 +42,7 @@ const normalizePayload = (payload: any): EducationDiscoveryPayload => ({
   heroCourse: payload?.hero_course ?? null,
   sections: Array.isArray(payload?.sections) ? payload.sections : [],
   categories: Array.isArray(payload?.categories) ? payload.categories : [],
+  institutionSpotlights: Array.isArray(payload?.institution_spotlights) ? payload.institution_spotlights : [],
   continueLearning: Array.isArray(payload?.continue_learning) ? payload.continue_learning : [],
   filters: {
     languages: Array.isArray(payload?.filters?.languages) ? payload.filters.languages : [],

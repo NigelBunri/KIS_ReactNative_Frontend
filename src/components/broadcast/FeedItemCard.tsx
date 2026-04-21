@@ -8,22 +8,8 @@ import {
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
-import { resolveBackendAssetUrl } from '@/network';
 import type { BroadcastItem } from '@/types/broadcast';
-
-const pickAttachmentUrl = (attachment: any): string | undefined => {
-  if (!attachment) return undefined;
-  if (typeof attachment === 'string') return attachment;
-  return (
-    attachment.fileUrl ??
-    attachment.url ??
-    attachment.uri ??
-    attachment.file_url ??
-    attachment.path ??
-    attachment.previewUrl ??
-    attachment.preview_url
-  );
-};
+import { dedupeAttachmentPreviews, getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
 
 const formatDate = (value: string | undefined) => {
   if (!value) return 'Moments ago';
@@ -50,12 +36,14 @@ type Props = {
 export default function FeedItemCard({ item, onPress, onReact }: Props) {
   const { palette } = useKISTheme();
 
-  const normalizedAttachments = (item.attachments ?? [])
-    .filter(Boolean)
-    .map((att) => ({
-      url: resolveBackendAssetUrl(pickAttachmentUrl(att)),
-      label: att?.name ?? att?.title ?? att?.caption ?? undefined,
-    }));
+  const normalizedAttachments = dedupeAttachmentPreviews(
+    (item.attachments ?? [])
+      .filter(Boolean)
+      .map((att) => getAttachmentPreviewInfo(att)),
+  ).map((att) => ({
+    url: att.url,
+    label: att.label,
+  }));
 
   const attachments = normalizedAttachments.filter((att) => att.url);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
@@ -119,6 +107,7 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
               {attachments.map((_, dotIndex) => (
                 <View
                   key={`dot-${dotIndex}`}
+                  testID="feed-item-card-dot"
                   style={[
                     styles.dot,
                     dotIndex === activeAttachmentIndex ? styles.dotActive : null,

@@ -90,7 +90,7 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
 
   const handleRequireBilling = (course: any) => {
     DeviceEventEmitter.emit('wallet.open', {
-      mode: 'cash_to_credits',
+      mode: 'add_kisc',
       amount: course.price_amount ?? '',
     });
     navigation.navigate('Profile' as never);

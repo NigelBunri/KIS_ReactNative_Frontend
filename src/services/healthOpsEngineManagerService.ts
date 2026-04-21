@@ -4,7 +4,7 @@ import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 
-const MICROS_PER_KISC = 100000;
+const MICROS_PER_KISC = 1000;
 
 export const normalizeEngineKey = (value: string) =>
   String(value || '')
@@ -105,4 +105,3 @@ export const deleteInstitutionEngineManagedItem = (
     ROUTES.healthOps.managedItem(institutionId, normalizeEngineKey(engineKey), itemId),
     { errorMessage: 'Unable to delete managed item.' },
   );
-

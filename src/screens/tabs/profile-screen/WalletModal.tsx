@@ -106,24 +106,6 @@ export function WalletModal(props: WalletModalProps) {
         </>
       )}
 
-      {walletForm.mode === 'spend_kisc' && (
-        <>
-          <KISTextInput
-            label="Amount (KISC)"
-            value={walletForm.amount}
-            onChangeText={(t) => setWalletForm((s: any) => ({ ...s, amount: t }))}
-            keyboardType="decimal-pad"
-          />
-          <KISTextInput
-            label="Reference (optional)"
-            value={walletForm.reference}
-            onChangeText={(t) => setWalletForm((s: any) => ({ ...s, reference: t }))}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </>
-      )}
-
       {walletForm.mode === 'transfer' && (
         <>
           <KISTextInput

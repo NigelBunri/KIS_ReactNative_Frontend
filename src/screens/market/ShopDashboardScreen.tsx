@@ -25,9 +25,8 @@ import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
-import ROUTES, { resolveBackendAssetUrl } from '@/network';
-import { MarketProductCategory } from '@/screens/broadcast/market/api/market.types';
-import { KIS_COIN_CODE } from '@/screens/market/market.constants';
+import ROUTES from '@/network';
+import { CATEGORY_SELECTION_LIMIT, KIS_COIN_CODE } from '@/screens/market/market.constants';
 import type { KISPalette } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
@@ -35,6 +34,7 @@ import type { KISContact } from '@/Module/AddContacts/contactsService';
 import { getUserData } from '@/network/cache';
 import { resolveShopImageUri } from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
+import { collectProductImageUris } from '@/utils/productImages';
 
 type PickedImage = { uri: string; name: string; type: string };
 const toUploadFile = (picked: PickedImage) => ({
@@ -48,13 +48,6 @@ const isLocalImageUri = (uri?: string) => {
   if (!uri) return false;
   const lower = uri.toLowerCase();
   return LOCAL_IMAGE_SCHEMES.some((scheme) => lower.startsWith(scheme));
-};
-
-const resolveProductImageUri = (value?: string | null) => {
-  if (!value) return '';
-  const trimmed = String(value).trim();
-  if (!trimmed) return '';
-  return resolveBackendAssetUrl(trimmed) ?? trimmed;
 };
 
 const AVAILABILITY_RULE_SCOPES = ['year', 'month', 'week', 'day'] as const;
@@ -212,14 +205,6 @@ const getRoleLabel = (role?: string) => ROLE_LABELS[role ?? 'member'] ?? 'Member
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const normalizeCategoryList = (payload: any): MarketProductCategory[] => {
-  const source = payload?.data ?? payload ?? {};
-  const results = source?.results ?? source;
-  return Array.isArray(results)
-    ? results.map((entry) => (entry?.data ?? entry))
-    : [];
-};
-
 const normalizeList = (payload: any): any[] => {
   const source = payload?.data ?? payload ?? {};
   const results = source?.results ?? source;
@@ -328,26 +313,27 @@ const ProductCard = ({
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
-  const galleryImages = useMemo(() => {
-    const images = Array.isArray(product.images)
-      ? product.images.map((img: any) => img.image_url || img.url || img.uri).filter(Boolean)
-      : [];
-    const primarySource = product.featured_image ?? product.image_url ?? '';
-    const deduped = [...new Set([primarySource, ...images].filter(Boolean))];
-    return deduped.map((uri) => resolveProductImageUri(uri)).filter(Boolean);
-  }, [product]);
+  const galleryImages = useMemo(() => collectProductImageUris(product), [product]);
 
   useEffect(() => {
-    const resolvedMain = resolveProductImageUri(product.featured_image ?? product.image_url ?? '');
-    const defaultImage = (resolvedMain || galleryImages[0]) ?? '';
+    const defaultImage = galleryImages[0] ?? '';
     setActiveImage(defaultImage);
     setImageFailed(false);
-  }, [product.id, product.featured_image, product.image_url, galleryImages]);
+  }, [product.id, galleryImages]);
 
-  const price = normalizeNumber(product?.price ?? product?.sale_price ?? product?.list_price ?? 0);
+  const salePriceValue = Number(product?.sale_price ?? NaN);
+  const regularPriceValue = Number(product?.price ?? product?.list_price ?? 0);
+  const price = Number.isFinite(salePriceValue) ? salePriceValue : regularPriceValue;
+  const comparePriceValue = Number(product?.compare_at_price ?? product?.compareAtPrice ?? NaN);
   const rawStock =
     product?.stock_qty ?? product?.stock ?? product?.inventory ?? product?.quantity ?? 0;
   const stock = Number.isFinite(Number(rawStock)) ? Number(rawStock) : 0;
+  const durationMinutes = Number(product?.duration_minutes ?? 0);
+  const categoryLabel =
+    product?.catalog_categories?.[0]?.name ??
+    product?.category?.name ??
+    product?.service_type ??
+    (isService ? 'Service' : 'Product');
   const baseRating = Number.isFinite(Number(product?.rating_avg)) ? Number(product.rating_avg) : 0;
   const ratingCountFromData = Number.isFinite(Number(product?.rating_count)) ? Number(product.rating_count) : 0;
   const status = product?.status ?? 'Unpublished';
@@ -441,11 +427,32 @@ const ProductCard = ({
         <Text style={[styles.cardTitle, { color: palette.text }]}>{product.name ?? 'Untitled product'}</Text>
         <Text style={[styles.meta, { color: palette.primaryStrong }]}>{isBroadcasted ? 'Published' : status}</Text>
       </View>
+        <Text style={[styles.meta, { color: palette.subtext }]}>
+          {categoryLabel}
+        </Text>
         <Text style={[styles.productDescription, { color: palette.subtext }]} numberOfLines={2}>
-          {product.description ?? 'No description yet.'}
+          {isService
+            ? product.short_summary ?? product.description ?? 'No description yet.'
+            : product.description ?? 'No description yet.'}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={[styles.priceTag, { color: palette.primaryStrong }]}>{price.toLocaleString()} {KIS_COIN_CODE}</Text>
+          <View>
+            <Text style={[styles.priceTag, { color: palette.primaryStrong }]}>
+              {Number.isFinite(price) ? price.toLocaleString() : '0'} {KIS_COIN_CODE}
+            </Text>
+            {Number.isFinite(salePriceValue) && Number.isFinite(regularPriceValue) && salePriceValue < regularPriceValue ? (
+              <Text style={[styles.originalPrice, { color: palette.subtext }]}>
+                {regularPriceValue.toLocaleString()} {KIS_COIN_CODE}
+              </Text>
+            ) : null}
+            {!Number.isFinite(salePriceValue) &&
+            Number.isFinite(comparePriceValue) &&
+            comparePriceValue > price ? (
+              <Text style={[styles.originalPrice, { color: palette.subtext }]}>
+                {comparePriceValue.toLocaleString()} {KIS_COIN_CODE}
+              </Text>
+            ) : null}
+          </View>
           {memberDiscount ? (
             <View style={[styles.discountBadge, { borderColor: palette.primaryStrong }]}>
               <Text style={[styles.discountText, { color: palette.primaryStrong }]}>Members save {memberDiscount}%</Text>
@@ -454,8 +461,12 @@ const ProductCard = ({
         </View>
         <View style={styles.gridRow}>
           <View style={styles.gridItem}>
-            <Text style={[styles.statValue, { color: palette.text }]}>{stock}</Text>
-            <Text style={[styles.statLabel, { color: palette.subtext }]}>Stock</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {isService ? (durationMinutes > 0 ? durationMinutes : 'TBD') : stock}
+            </Text>
+            <Text style={[styles.statLabel, { color: palette.subtext }]}>
+              {isService ? 'Minutes' : 'Stock'}
+            </Text>
           </View>
           <View style={styles.gridItem}>
             <Text style={[styles.statValue, { color: palette.text }]}>{ratingAvg.toFixed(1)}</Text>
@@ -528,7 +539,9 @@ const ProductCard = ({
       <Modal visible={ratingModalVisible} transparent animationType="fade" onRequestClose={closeRatingSheet}>
         <Pressable style={styles.ratingModalOverlay} onPress={closeRatingSheet}>
           <View style={[styles.card, { width: '90%', maxWidth: 360, padding: 20 }]}>
-            <Text style={[styles.cardTitle, { marginBottom: 6 }]}>Rate this product</Text>
+            <Text style={[styles.cardTitle, { marginBottom: 6 }]}>
+              {isService ? 'Rate this service' : 'Rate this product'}
+            </Text>
             <Text style={[styles.meta, { color: palette.subtext }]}>
               Tap a star to set your rating.
             </Text>
@@ -588,7 +601,6 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const [serviceLoading, setServiceLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
   const [broadcastingProductId, setBroadcastingProductId] = useState<string | null>(null);
-  const [shopCategories, setShopCategories] = useState<MarketProductCategory[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [servicesList, setServicesList] = useState<any[]>([]);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
@@ -740,23 +752,6 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     setMemberDiscount(clampPercentage(shop?.membership_discount_pct ?? 5));
     setMembershipPublic(Boolean(shop?.membership_public));
   }, [shop?.membership_discount_pct, shop?.membership_public]);
-  const loadCategories = useCallback(async () => {
-    if (!shopId) {
-      setShopCategories([]);
-      return;
-    }
-    const res = await getRequest(ROUTES.commerce.productCategories, {
-      params: { shop: shopId },
-      errorMessage: 'Unable to load shop categories.',
-    });
-    if (res.success) {
-      setShopCategories(normalizeCategoryList(res.data));
-    } else {
-      console.warn('Unable to load shop categories:', res.message);
-      setShopCategories([]);
-    }
-  }, [shopId]);
-
   const loadShopServices = useCallback(async () => {
     if (!shopId) {
       setServicesList([]);
@@ -849,6 +844,42 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       });
     },
     [setProductsList, setServicesList, setShop],
+  );
+
+  const updateProductBroadcastStateLocal = useCallback(
+    (productId: string, broadcasted: boolean) => {
+      setProductsList((prev) =>
+        prev.map((entry) => {
+          if (entry?.id !== productId) return entry;
+          return {
+            ...entry,
+            isBroadcasted: broadcasted,
+            is_broadcasted: broadcasted,
+            broadcasted: broadcasted,
+            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+          };
+        }),
+      );
+      setShop((prev) => {
+        if (!prev) return prev;
+        const products = Array.isArray(prev.products) ? prev.products : [];
+        let changed = false;
+        const updatedProducts = products.map((entry) => {
+          if (entry?.id !== productId) return entry;
+          changed = true;
+          return {
+            ...entry,
+            isBroadcasted: broadcasted,
+            is_broadcasted: broadcasted,
+            broadcasted: broadcasted,
+            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+          };
+        });
+        if (!changed) return prev;
+        return { ...prev, products: updatedProducts };
+      });
+    },
+    [setProductsList, setShop],
   );
 
   const loadProducts = useCallback(async () => {
@@ -1063,11 +1094,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   );
 
   useEffect(() => {
-    loadCategories();
     loadProducts();
     loadShopServices();
     loadShopMembers();
-  }, [loadCategories, loadProducts, loadShopServices, loadShopMembers]);
+  }, [loadProducts, loadShopServices, loadShopMembers]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1175,15 +1205,6 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     () => safeServices.filter((service) => service?.status !== 'draft').length,
     [safeServices],
   );
-  const productCategoryOptions = useMemo(
-    () => shopCategories.filter((category) => category.category_type !== 'service'),
-    [shopCategories],
-  );
-  const serviceCategoryOptions = useMemo(
-    () => shopCategories.filter((category) => category.category_type !== 'product'),
-    [shopCategories],
-  );
-
   const activityFeed = useMemo(() => {
     if (Array.isArray(shop?.activity_feed) && shop.activity_feed.length) return shop.activity_feed;
     if (Array.isArray(shop?.recent_activity) && shop.recent_activity.length) return shop.recent_activity;
@@ -1293,6 +1314,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const toCategoryLabel = (value: any, fallback: string) => {
     if (!value) return fallback;
     if (typeof value === 'string') return value;
+    if (Array.isArray(value?.catalog_categories)) {
+      const first = value.catalog_categories[0];
+      if (first?.name) return first.name;
+    }
     if (typeof value === 'object' && value?.name) return value.name;
     return fallback;
   };
@@ -1322,7 +1347,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         return {
           id: service.id ?? service.slug ?? `${service?.category ?? 'service'}-${index}`,
           title: service.name ?? 'Service',
-          subtitle: toCategoryLabel(service.category, 'Services'),
+          subtitle: toCategoryLabel(service, 'Services'),
           metric: `${score} bookings`,
           score,
         };
@@ -1402,14 +1427,112 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         formData.append('description', String(payload.description ?? '').trim());
         const priceValue = String(payload.price ?? '').trim();
         formData.append('price', priceValue || '0');
-        const stockValue = String(payload.stock ?? '').trim();
+        const currencyValue = String(payload.currency ?? KIS_COIN_CODE).trim() || KIS_COIN_CODE;
+        formData.append('currency', currencyValue);
+        const stockValue = String(
+          payload.stock_qty ?? payload.stock ?? payload.stockQty ?? '',
+        ).trim();
         formData.append('stock_qty', stockValue || '0');
-        formData.append('inventory_type', 'PHYSICAL');
-        if (payload.categoryId) {
-          formData.append('category_id', payload.categoryId);
+        const inventoryTypeValue = String(
+          payload.inventory_type ?? payload.inventoryType ?? 'PHYSICAL',
+        ).trim() || 'PHYSICAL';
+        formData.append('inventory_type', inventoryTypeValue);
+        const normalizeIdList = (
+          value?: string | number | null | (string | number)[],
+        ) => {
+          if (value === undefined || value === null) {
+            return [];
+          }
+          const iterable = Array.isArray(value) ? value : [value];
+          return iterable
+            .map((entry) => String(entry ?? '').trim())
+            .filter(Boolean);
+        };
+        const candidateCategoryIds = [
+          ...normalizeIdList(payload.catalog_category_ids),
+          ...normalizeIdList(payload.category_ids),
+          ...normalizeIdList(payload.categoryIds),
+        ];
+        const normalizedCategoryIds = Array.from(
+          new Set(candidateCategoryIds),
+        ).slice(0, CATEGORY_SELECTION_LIMIT);
+        normalizedCategoryIds.forEach((categoryId: string) => {
+          formData.append('category_ids', categoryId);
+          formData.append('catalog_category_ids', categoryId);
+        });
+        const primaryCategoryId =
+          normalizedCategoryIds[0] ??
+          normalizeIdList(payload.category_id)[0] ??
+          normalizeIdList(payload.categoryId)[0];
+        if (primaryCategoryId) {
+          formData.append('category_id', primaryCategoryId);
         }
+        const appendIfValue = (field: string, value?: string | number | null) => {
+          const trimmed = value === undefined || value === null ? '' : String(value).trim();
+          if (trimmed) {
+            formData.append(field, trimmed);
+          }
+        };
+        const appendBoolean = (field: string, value?: boolean | null) => {
+          if (typeof value === 'boolean') {
+            formData.append(field, value ? 'true' : 'false');
+          }
+        };
+        const appendListField = (field: string, values?: string[] | null) => {
+          const normalized = (values ?? []).map((item) => String(item ?? '').trim()).filter(Boolean);
+          if (!normalized.length) {
+            return;
+          }
+          normalized.forEach((item) => formData.append(field, item));
+        };
+        appendIfValue('sku', payload.sku);
+        appendIfValue('slug', payload.slug);
+        appendIfValue('brand', payload.brand);
+        appendIfValue('condition', payload.condition);
+        appendIfValue('sale_price', payload.sale_price ?? payload.salePrice);
+        appendIfValue('compare_at_price', payload.compare_at_price ?? payload.compareAtPrice);
+        appendIfValue('material', payload.material);
+        appendIfValue('fit', payload.fit);
+        appendIfValue('size_guide', payload.size_guide ?? payload.sizeGuide);
+        appendListField(
+          'available_sizes',
+          payload.available_sizes ?? payload.availableSizes ?? payload.availableSizesList,
+        );
+        appendListField(
+          'available_colors',
+          payload.available_colors ?? payload.availableColors ?? payload.availableColorsList,
+        );
+        appendIfValue('weight', payload.weight);
+        appendIfValue('length', payload.length);
+        appendIfValue('width', payload.width);
+        appendIfValue('height', payload.height);
+        appendIfValue(
+          'low_stock_threshold',
+          payload.low_stock_threshold ?? payload.lowStockThreshold,
+        );
+        appendBoolean('is_active', payload.is_active ?? payload.isActive);
+        appendBoolean('is_featured', payload.is_featured ?? payload.isFeatured);
+        appendBoolean(
+          'requires_shipping',
+          payload.requires_shipping ?? payload.requiresShipping,
+        );
+        appendBoolean(
+          'pickup_available',
+          payload.pickup_available ?? payload.pickupAvailable,
+        );
+        appendBoolean(
+          'allow_backorder',
+          payload.allow_backorder ?? payload.allowBackorder,
+        );
+        formData.append('variants', JSON.stringify(payload.variants ?? []));
+        const attributesPayload = payload.attributes ?? {};
+        formData.append('attributes', JSON.stringify(attributesPayload));
 
-        const selectedImages: PickedImage[] = Array.isArray(payload.images) ? payload.images : [];
+        const selectedImages: PickedImage[] = Array.isArray(payload.images)
+          ? payload.images
+          : Array.isArray(payload.gallery_images)
+            ? payload.gallery_images
+            : [];
         const uploads = selectedImages.filter((image) => isLocalImageUri(image.uri));
         if (!payload.id && uploads.length === 0) {
           throw new Error('Please add at least one image for the product.');
@@ -1418,6 +1541,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           const [primary, ...rest] = uploads;
           formData.append('image_file', toUploadFile(primary) as any);
           rest.forEach((image) => formData.append('images', toUploadFile(image) as any));
+        }
+        if (payload.main_image && isLocalImageUri(payload.main_image.uri)) {
+          formData.append('main_image', toUploadFile(payload.main_image) as any);
         }
 
         const endpoint = payload.id
@@ -1472,8 +1598,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         if (!response?.success) {
           throw new Error(response?.message || 'Unable to update broadcast status.');
         }
+        const newBroadcastedState = !currentlyBroadcasted;
         if (isService) {
-          updateServiceBroadcastStateLocal(product.id, !currentlyBroadcasted);
+          updateServiceBroadcastStateLocal(product.id, newBroadcastedState);
+        } else {
+          updateProductBroadcastStateLocal(product.id, newBroadcastedState);
         }
         const refreshers = [loadProducts()];
         if (isService) {
@@ -1503,13 +1632,54 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         Alert.alert('Services', 'Provide a name for the service.');
         return;
       }
-      if (!payload.categoryId) {
+      const normalizedCategoryIds = (Array.isArray(payload.categoryIds) ? payload.categoryIds : [])
+        .map((id) => String(id ?? '').trim())
+        .filter(Boolean)
+        .slice(0, 5);
+      if (!normalizedCategoryIds.length) {
         Alert.alert('Services', 'Please select at least one category.');
         return;
       }
       setServiceLoading(true);
       try {
         const formData = new FormData();
+        const appendTrimmed = (field: string, value?: string | number | null) => {
+          const trimmed = value === undefined || value === null ? '' : String(value).trim();
+          if (trimmed) {
+            formData.append(field, trimmed);
+          }
+        };
+        const appendBoolean = (field: string, value?: boolean | null) => {
+          if (typeof value === 'boolean') {
+            formData.append(field, value ? 'true' : 'false');
+          }
+        };
+        const appendStringList = (field: string, value?: unknown) => {
+          const items = Array.isArray(value)
+            ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
+            : [];
+          items.forEach((item) => formData.append(field, item));
+        };
+        const toServicePackagePayload = (item: any) => ({
+          id: item?.id,
+          name: String(item?.name ?? '').trim(),
+          description: String(item?.description ?? '').trim(),
+          price: String(item?.price ?? '').trim(),
+          duration_minutes: Number(String(item?.durationMinutes ?? '').trim() || 0),
+          revisions: Number(String(item?.revisions ?? '').trim() || 0),
+        });
+        const toServiceAddonPayload = (item: any) => ({
+          id: item?.id,
+          name: String(item?.name ?? '').trim(),
+          description: String(item?.description ?? '').trim(),
+          price: String(item?.price ?? '').trim(),
+        });
+        const toServiceRequirementPayload = (item: any) => ({
+          id: item?.id,
+          label: String(item?.label ?? '').trim(),
+          type: String(item?.type ?? 'text').trim() || 'text',
+          required: Boolean(item?.required),
+        });
         formData.append('shop', shop.id);
         formData.append('name', trimmedName);
         const slugBase = trimmedName
@@ -1521,17 +1691,67 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         formData.append('description', description);
         const priceValue = String(payload.price ?? '').trim();
         formData.append('price', priceValue || '0');
-        if (payload.categoryId) {
-          formData.append('category_id', payload.categoryId);
+        appendTrimmed('short_summary', payload.shortSummary);
+        appendTrimmed('pricing_model', payload.pricingModel);
+        appendTrimmed('compare_at_price', payload.compareAtPrice);
+        appendTrimmed('deposit_amount', payload.depositAmount);
+        appendTrimmed('deposit_percent', payload.depositPercent);
+        appendTrimmed('minimum_charge', payload.minimumCharge);
+        appendTrimmed('duration_minutes', payload.durationMinutes);
+        appendTrimmed('prep_buffer_minutes', payload.prepBufferMinutes);
+        appendTrimmed('cleanup_buffer_minutes', payload.cleanupBufferMinutes);
+        appendTrimmed('turnaround_hours', payload.turnaroundHours);
+        appendTrimmed('max_bookings_per_slot', payload.maxBookingsPerSlot);
+        appendTrimmed('max_participants', payload.maxParticipants);
+        appendTrimmed('staff_required', payload.staffRequired);
+        appendTrimmed('min_notice_hours', payload.minNoticeHours);
+        appendTrimmed('max_advance_booking_days', payload.maxAdvanceBookingDays);
+        appendTrimmed('cancellation_window_hours', payload.cancellationWindowHours);
+        appendTrimmed('reschedule_window_hours', payload.rescheduleWindowHours);
+        appendTrimmed('remote_meeting_link', payload.remoteMeetingLink);
+        appendTrimmed('address_line1', payload.addressLine1);
+        appendTrimmed('address_line2', payload.addressLine2);
+        appendTrimmed('city', payload.city);
+        appendTrimmed('state', payload.state);
+        appendTrimmed('country', payload.country);
+        appendTrimmed('postal_code', payload.postalCode);
+        appendTrimmed('travel_radius_km', payload.travelRadiusKm);
+        appendTrimmed('timezone', payload.timezone);
+        appendTrimmed('refund_policy', payload.refundPolicy);
+        appendTrimmed('warranty_policy', payload.warrantyPolicy);
+        appendTrimmed('service_terms', payload.serviceTerms);
+        appendTrimmed('seo_title', payload.seoTitle);
+        appendTrimmed('seo_description', payload.seoDescription);
+        appendTrimmed('visibility', payload.visibility);
+        appendTrimmed('status', payload.draft ? 'draft' : payload.status);
+        appendBoolean('negotiable', payload.negotiable);
+        appendBoolean('tax_inclusive', payload.taxInclusive);
+        appendBoolean('quote_required', payload.quoteRequired);
+        appendBoolean('group_booking_allowed', payload.groupBookingAllowed);
+        appendBoolean('allow_multiple_attendees_per_slot', payload.allowMultipleAttendeesPerSlot);
+        appendBoolean('auto_confirm_booking', payload.autoConfirmBooking);
+        appendBoolean('approval_required', payload.approvalRequired);
+        appendBoolean('featured', payload.featured);
+        appendBoolean('is_featured', payload.featured);
+        appendBoolean('remove_featured_image', payload.remove_featured_image);
+        normalizedCategoryIds.forEach((categoryId) => {
+          formData.append('category_ids', categoryId);
+          formData.append('catalog_category_ids', categoryId);
+        });
+        const primaryCategoryId = normalizedCategoryIds[0];
+        if (primaryCategoryId) {
+          formData.append('category_id', primaryCategoryId);
         }
         const availabilityValue = serializeJsonField(payload.availability ?? '');
         if (availabilityValue) {
           formData.append('availability', availabilityValue);
         }
-        const coverageValue = String(payload.coverage ?? '').trim();
-        if (coverageValue) {
-          formData.append('coverage', coverageValue);
-        }
+        appendStringList('delivery_modes', payload.deliveryModes);
+        appendStringList('coverage', payload.coverage);
+        appendStringList('remote_regions', payload.remoteRegions);
+        appendStringList('tags', payload.tags);
+        appendStringList('blackout_dates', payload.blackoutDates);
+        appendStringList('remove_image_ids', payload.remove_image_ids);
         const serviceTypeValue = String(payload.serviceType ?? '').trim();
         if (serviceTypeValue) {
           formData.append('service_type', serviceTypeValue);
@@ -1548,17 +1768,53 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         if (percentageDiscount !== undefined) {
           formData.append('other_shops_discount', String(percentageDiscount));
         }
+        formData.append(
+          'packages',
+          JSON.stringify(
+            (Array.isArray(payload.packages) ? payload.packages : [])
+              .map(toServicePackagePayload)
+              .filter((item) => item.name),
+          ),
+        );
+        formData.append(
+          'addons',
+          JSON.stringify(
+            (Array.isArray(payload.addons) ? payload.addons : [])
+              .map(toServiceAddonPayload)
+              .filter((item) => item.name),
+          ),
+        );
+        formData.append(
+          'requirements',
+          JSON.stringify(
+            (Array.isArray(payload.requirements) ? payload.requirements : [])
+              .map(toServiceRequirementPayload)
+              .filter((item) => item.label),
+          ),
+        );
 
-        const selectedImages: PickedImage[] = Array.isArray(payload.images) ? payload.images : [];
-        const uploads = selectedImages.filter((image) => isLocalImageUri(image.uri));
-        if (!payload.id && uploads.length === 0) {
+        const featuredImage = payload.featuredImageAsset;
+        const featuredUpload =
+          featuredImage && isLocalImageUri(featuredImage.uri)
+            ? featuredImage
+            : null;
+        const selectedImages: PickedImage[] = Array.isArray(payload.gallery_images)
+          ? payload.gallery_images
+          : Array.isArray(payload.images)
+            ? payload.images
+            : [];
+        const galleryUploads = selectedImages.filter((image) => isLocalImageUri(image.uri));
+        const effectiveFeaturedUpload = featuredUpload ?? galleryUploads[0] ?? null;
+        const effectiveGalleryUploads = effectiveFeaturedUpload
+          ? galleryUploads.filter((image) => image.uri !== effectiveFeaturedUpload.uri)
+          : galleryUploads;
+        if (!payload.id && !effectiveFeaturedUpload && effectiveGalleryUploads.length === 0) {
           throw new Error('Please add at least one image for the service.');
         }
-        if (uploads.length) {
-          const [primary, ...rest] = uploads;
-          formData.append('image_file', toUploadFile(primary) as any);
-          rest.forEach((image) => formData.append('images', toUploadFile(image) as any));
+        if (effectiveFeaturedUpload) {
+          formData.append('image_file', toUploadFile(effectiveFeaturedUpload) as any);
         }
+        effectiveGalleryUploads.forEach((image) => formData.append('images', toUploadFile(image) as any));
 
         const endpoint = payload.id
           ? ROUTES.commerce.shopService(payload.id)
@@ -2155,7 +2411,6 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         onClose={closeProductEditor}
         onSave={handleProductSave}
         loading={productLoading}
-        categories={productCategoryOptions}
       />
       <ServiceEditorDrawer
         visible={serviceDrawerVisible}
@@ -2165,7 +2420,6 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         onClose={closeServiceEditor}
         onSave={handleServiceSave}
         loading={serviceLoading}
-        categories={serviceCategoryOptions}
       />
     </SafeAreaView>
   );
@@ -2354,6 +2608,12 @@ const styles = StyleSheet.create({
   priceTag: {
     fontSize: 22,
     fontWeight: '700',
+  },
+  originalPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
+    marginTop: 2,
   },
   discountBadge: {
     borderWidth: 1,

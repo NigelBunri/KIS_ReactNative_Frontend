@@ -5,35 +5,27 @@ import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { styles } from '../profile.styles';
 import coin from '../../../../assets/KIS-Coin.png';
-import { getRequest } from '@/network/get';
-import ROUTES from '@/network';
-
-const MICROS_PER_KISC = 100000;
-const CENTS_PER_KISC = 10000;
-
-const toKisc = (micro?: number) => {
-  const safe = Number.isFinite(Number(micro)) ? Number(micro) : 0;
-  return (safe / MICROS_PER_KISC).toFixed(3);
-};
+const MICROS_PER_KISC = 1000;
+const CENTS_PER_KISC = 100;
 
 const toKiscFromCents = (cents?: number) => {
   const safe = Number.isFinite(Number(cents)) ? Math.max(0, Number(cents)) : 0;
-  return (safe / CENTS_PER_KISC).toFixed(3);
+  return (safe / CENTS_PER_KISC).toFixed(2);
 };
 
 const toEntryAmount = (entry: any) => {
   const amountMicro = Number(entry?.amount_micro);
   if (Number.isFinite(amountMicro) && amountMicro !== 0) {
     const sign = String(entry?.transaction_type || '').toLowerCase() === 'debit' ? '-' : '+';
-    return `${sign}${toKisc(Math.abs(amountMicro))} KISC`;
+    return `${sign}${(Math.abs(amountMicro) / MICROS_PER_KISC).toFixed(2)} KISC`;
   }
   const amountCents = Number(entry?.amount_cents);
   if (Number.isFinite(amountCents) && amountCents !== 0) {
     const kisc = Math.abs(amountCents) / CENTS_PER_KISC;
     const sign = amountCents < 0 ? '-' : '+';
-    return `${sign}${kisc.toFixed(3)} KISC`;
+    return `${sign}${kisc.toFixed(2)} KISC`;
   }
-  return '0.000 KISC';
+  return '0.00 KISC';
 };
 
 const toCounterpartyLabel = (entry: any) => {
@@ -116,9 +108,9 @@ const renderPendingBookings = (
 export default function AccountCreditsCard({
   tierName,
   tierPriceCents,
-  kisBalanceMicro,
-  kisBalanceKisc,
-  kisBalanceUsd: _kisBalanceUsd,
+  walletBalanceMicro,
+  walletBalanceLabel,
+  walletUsdLabel,
   points,
   onWallet,
   onUpgrade,
@@ -137,9 +129,9 @@ export default function AccountCreditsCard({
 }: {
   tierName: string;
   tierPriceCents: number;
-  kisBalanceMicro: number;
-  kisBalanceKisc?: string;
-  kisBalanceUsd?: string;
+  walletBalanceMicro: number;
+  walletBalanceLabel?: string;
+  walletUsdLabel?: string;
   points: number;
   onWallet: () => void;
   onUpgrade: () => void;
@@ -185,9 +177,9 @@ export default function AccountCreditsCard({
     ? 'Unlimited partner orgs'
     : partnerProfilesLimitLabel ?? (partnerProfilesLimitValue ?? 0).toString();
 
-  const resolvedKisc = useMemo(
-    () => (kisBalanceKisc && kisBalanceKisc.trim() ? kisBalanceKisc : toKisc(kisBalanceMicro)),
-    [kisBalanceKisc, kisBalanceMicro],
+  const resolvedKiscLabel = useMemo(
+    () => (walletBalanceLabel && walletBalanceLabel.trim() ? walletBalanceLabel : '0.00 KISC'),
+    [walletBalanceLabel],
   );
 
   return (
@@ -248,13 +240,16 @@ export default function AccountCreditsCard({
               <Image source={coin} style={{ width: 130, height: 130, marginTop: 10 }} />
             </View>
             <Text style={[styles.statMeta, { color: palette.subtext, marginTop: 6 }]}>
-              {resolvedKisc} KISC
+              {resolvedKiscLabel}
             </Text>
           </View>
 
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={[styles.statLabel, { color: palette.subtext }]}>KIS Coin Balance</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>{resolvedKisc} KISC</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>{resolvedKiscLabel}</Text>
+            <Text style={[styles.statMeta, { color: palette.subtext }]}>
+              {walletUsdLabel ?? '$0.00'}
+            </Text>
             <Text style={[styles.statMeta, { color: palette.subtext }]}>Used for upgrades, transfers, and billing.</Text>
             <Text style={[styles.statMeta, { color: palette.subtext }]}>Top up anytime from the wallet section.</Text>
           </View>
@@ -264,7 +259,7 @@ export default function AccountCreditsCard({
       <View style={styles.statRow}>
         <View style={[styles.statChip, { backgroundColor: palette.surfaceElevated }]}>
           <Text style={[styles.statLabel, { color: palette.subtext }]}>Wallet Micro Units</Text>
-          <Text style={[styles.statValue, { color: palette.text }]}>{Math.max(0, Number(kisBalanceMicro || 0))}</Text>
+          <Text style={[styles.statValue, { color: palette.text }]}>{Math.max(0, Number(walletBalanceMicro || 0))}</Text>
         </View>
         <View style={[styles.statChip, { backgroundColor: palette.surfaceElevated }]}>
           <Text style={[styles.statLabel, { color: palette.subtext }]}>Points</Text>

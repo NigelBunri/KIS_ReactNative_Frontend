@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   SafeAreaView,
   ScrollView,
   Text,
@@ -230,7 +231,9 @@ const kindTitle = (kind: LandingTargetKind) => {
 export default function ProfileLandingEditorScreen({ navigation, route }: Props) {
   const kind = (route.params?.kind || 'market') as LandingTargetKind;
   const partnerId = route.params?.partnerId;
+  const shopId = route.params?.shopId;
   const profileLabel = route.params?.profileLabel || kindTitle(kind);
+  const returnBroadcastProfileKey = route.params?.returnBroadcastProfileKey;
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
@@ -239,8 +242,9 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
 
   const localBuilderCacheKey = useMemo(() => {
     if (kind === 'partner') return `kis_dynamic_section_builder_draft_v2:partner:${partnerId || 'self'}`;
+    if (kind === 'market') return `kis_dynamic_section_builder_draft_v2:market:${shopId || 'current'}`;
     return `kis_dynamic_section_builder_draft_v2:${kind}`;
-  }, [kind, partnerId]);
+  }, [kind, partnerId, shopId]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -268,6 +272,12 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
         const configRes = await getRequest(ROUTES.partners.settingsConfigDetail(partnerId, 'landing_page_builder'));
         const config = (configRes as any)?.data?.config ?? (configRes as any)?.config ?? {};
         loaded = extractDraft(config, profileLabel);
+      } else if (kind === 'market') {
+        if (!shopId) throw new Error('Shop id is required.');
+        const shopRes = await getRequest(`${ROUTES.commerce.shops}${shopId}/`);
+        const shopData = (shopRes as any)?.data ?? shopRes ?? {};
+        const landingPage = shopData?.landing_page ?? shopData?.landingPage ?? {};
+        loaded = extractDraft(landingPage, profileLabel);
       } else {
         const res = await getRequest(ROUTES.broadcasts.createProfile);
         const profile = res?.data?.profiles?.[kind] ?? {};
@@ -300,7 +310,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
     } finally {
       setLoading(false);
     }
-  }, [kind, localBuilderCacheKey, partnerId, profileLabel]);
+  }, [kind, localBuilderCacheKey, partnerId, profileLabel, shopId]);
 
   useEffect(() => {
     loadDraft().catch(() => {});
@@ -541,8 +551,17 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
           { errorMessage: 'Unable to save partner landing page.' },
         );
         if (!res?.success) throw new Error(res?.message || 'Unable to save partner landing page.');
+      } else if (kind === 'market') {
+        if (!shopId) throw new Error('Shop id is required.');
+        const res = await patchRequest(
+          `${ROUTES.commerce.shops}${shopId}/`,
+          { landing_page: payload },
+          { errorMessage: 'Unable to save shop landing page.' },
+        );
+        if (!res?.success) throw new Error(res?.message || 'Unable to save shop landing page.');
+        DeviceEventEmitter.emit('broadcast.refresh');
       } else {
-        const profileType = kind === 'market' ? 'market_profile' : 'education_profile';
+        const profileType = 'education_profile';
         const res = await postRequest(ROUTES.broadcasts.profileManage, {
           profile_type: profileType,
           updates: {
@@ -559,6 +578,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
       }
 
       setDraft(payload);
+      setSections(normalizeSections(payload));
       if (localBuilderCacheKey) {
         await AsyncStorage.removeItem(localBuilderCacheKey);
       }
@@ -568,7 +588,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
     } finally {
       setSaving(false);
     }
-  }, [draft, kind, localBuilderCacheKey, partnerId, sections]);
+  }, [draft, kind, localBuilderCacheKey, partnerId, sections, shopId]);
 
   if (loading || !draft) {
     return (
@@ -586,7 +606,12 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (returnBroadcastProfileKey) {
+                DeviceEventEmitter.emit('profile.reopenManagementPanel', returnBroadcastProfileKey);
+              }
+              navigation.goBack();
+            }}
             style={{
               borderWidth: 1,
               borderColor: palette.divider,

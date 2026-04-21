@@ -5,7 +5,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import KISText from '@/components/common/KISText';
 import { resolveBackendAssetUrl } from '@/network';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
-import { getAttachmentPreviewInfo } from './attachmentPreview';
+import { dedupeAttachmentPreviews, getAttachmentPreviewInfo } from './attachmentPreview';
 import {
   extractBroadcastAuthorBio,
   formatKisHandle,
@@ -53,6 +53,7 @@ export type BroadcastFeedItem = {
   broadcasted_at?: string;
   reaction_count?: number;
   viewer_reaction?: string | null;
+  viewer_saved?: boolean;
   comment_count?: number;
   comment_conversation_id?: string | null;
   share_count?: number;
@@ -171,9 +172,11 @@ export default function BroadcastFeedCard({
 
   const attachmentPreviews = useMemo(() => {
     const attachments = Array.isArray(item.attachments) ? item.attachments : [];
-    return attachments
-      .map((a) => getAttachmentPreviewInfo(a))
-      .filter((info) => Boolean(info.previewUri || info.url));
+    return dedupeAttachmentPreviews(
+      attachments
+        .map((a) => getAttachmentPreviewInfo(a))
+        .filter((info) => Boolean(info.previewUri || info.url)),
+    );
   }, [item.attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
@@ -276,6 +279,7 @@ export default function BroadcastFeedCard({
 
         <Pressable
           onPress={onMenuPress}
+          disabled={!onMenuPress}
           style={[styles.menuBtn, { backgroundColor: palette.surface, borderColor: palette.divider }]}
           hitSlop={10}
         >
@@ -348,6 +352,15 @@ export default function BroadcastFeedCard({
             </View>
           ) : null}
 
+          {activeAttachment?.isVideo ? (
+            <View style={styles.playOverlay} pointerEvents="none">
+              <View style={styles.playPill}>
+                <KISIcon name="play" size={18} color="#fff" />
+                <Text style={styles.playText}>Play video</Text>
+              </View>
+            </View>
+          ) : null}
+
           {attachmentPreviews.length > 1 ? (
             <>
               <Pressable style={[styles.navButton, styles.navLeft]} onPress={handlePrevAttachment}>
@@ -385,17 +398,17 @@ export default function BroadcastFeedCard({
             styles.subscribeBtn,
             {
               backgroundColor: isSubscribed ? palette.surface : palette.primarySoft,
-              borderColor: isSubscribed ? palette.divider : palette.primary,
+              borderColor: isSubscribed ? palette.danger : palette.primary,
             },
           ]}
         >
           <Text
             style={{
-              color: isSubscribed ? palette.subtext : palette.primaryStrong,
+              color: isSubscribed ? palette.danger : palette.primaryStrong,
               fontWeight: '900',
             }}
           >
-            {isSubscribed ? 'Subscribed' : 'Subscribe'}
+            {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
           </Text>
         </Pressable>
         ) : null}
@@ -418,44 +431,41 @@ export default function BroadcastFeedCard({
 
       {/* ───── Engagement row (icons + counts like mockup bottom bar) ───── */}
       <View style={[styles.engagementRow, { borderTopColor: palette.divider }]}>
-        <View style={styles.engItem}>
-          <KISIcon name="heart" size={18} color={palette.primaryStrong} />
-          <Text style={[styles.engText, { color: palette.subtext }]}>
+        {onSave ? (
+          <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
+            <KISIcon name="bookmark" size={18} color={item.viewer_saved ? palette.primaryStrong : palette.subtext} />
+            <Text style={[styles.engText, { color: item.viewer_saved ? palette.primaryStrong : palette.subtext }]}>
+              Save
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable onPress={onLike} style={styles.engItem} hitSlop={10}>
+          <KISIcon
+            name="heart"
+            size={18}
+            color={item.viewer_reaction ? palette.primaryStrong : palette.subtext}
+          />
+          <Text style={[styles.engText, { color: item.viewer_reaction ? palette.primaryStrong : palette.subtext }]}>
             {item.reaction_count ?? 0}
           </Text>
-        </View>
+        </Pressable>
 
-        <View style={styles.engItem}>
-          <KISIcon name="comment" size={18} color={palette.subtext} />
-          <Text style={[styles.engText, { color: palette.subtext }]}>
-            {item.comment_count ?? 0}
-          </Text>
-        </View>
+        {onToggleComments ? (
+          <Pressable onPress={onToggleComments} style={styles.engItem} hitSlop={10}>
+            <KISIcon name="comment" size={18} color={palette.subtext} />
+            <Text style={[styles.engText, { color: palette.subtext }]}>
+              {item.comment_count ?? 0}
+            </Text>
+          </Pressable>
+        ) : null}
 
-        <Pressable onPress={onShare} style={styles.engItem}>
+        <Pressable onPress={onShare} style={styles.engItem} hitSlop={10}>
           <KISIcon name="share" size={18} color={palette.subtext} />
           <Text style={[styles.engText, { color: palette.subtext }]}>
             {item.share_count ?? 0}
           </Text>
         </Pressable>
-
-        <View style={{ flex: 1 }} />
-
-        {onSave ? (
-          <Pressable onPress={onSave} style={styles.iconOnlyBtn} hitSlop={10}>
-            <KISIcon name="bookmark" size={18} color={palette.subtext} />
-          </Pressable>
-        ) : null}
-
-        <Pressable onPress={onLike} style={styles.iconOnlyBtn} hitSlop={10}>
-          <KISIcon name="heart" size={18} color={palette.primaryStrong} />
-        </Pressable>
-
-        {onToggleComments ? (
-          <Pressable onPress={onToggleComments} style={styles.iconOnlyBtn} hitSlop={10}>
-            <KISIcon name="comment" size={18} color={palette.subtext} />
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );
@@ -649,6 +659,29 @@ const makeStyles = (_tokens: any) =>
       borderRadius: 10,
       paddingHorizontal: 10,
       paddingVertical: 6,
+    },
+
+    playOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+
+    playPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: 'rgba(0,0,0,0.58)',
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+
+    playText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '900',
     },
 
     ctaRow: {

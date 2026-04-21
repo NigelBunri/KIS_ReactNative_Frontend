@@ -24,7 +24,19 @@ export type MarketProduct = {
   is_trending?: boolean;
   badge?: 'drop' | 'limited' | 'exclusive' | string;
   category?: MarketProductCategory;
+  catalog_categories?: MarketProductCategory[];
+  category_ids?: string[];
+  categories?: string[];
+  is_broadcasted?: boolean;
+  isBroadcasted?: boolean;
+  broadcast_item_id?: string;
+  broadcast_id?: string;
+  sale_price?: string | number | null;
+  compare_at_price?: string | number | null;
+  inventory_type?: string;
   images?: MarketProductImage[];
+  image_file?: string | null;
+  main_image_url?: string | null;
 };
 
 export type MarketProductImage = {

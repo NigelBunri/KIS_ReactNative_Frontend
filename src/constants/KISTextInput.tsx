@@ -11,6 +11,7 @@ import {
   GestureResponderEvent,
   ViewStyle,
   TextStyle,
+  KeyboardTypeOptions,
 } from 'react-native';
 import { getTypographyStyle } from '@/theme/foundations/typography';
 import { FONT_FAMILIES, FONT_WEIGHTS } from '@/theme/foundations/fonts';
@@ -52,6 +53,17 @@ type LayoutOverrides = {
   multilineMinHeight?: number;
 };
 
+type DynamicStyleProps = {
+  focused: boolean;
+  error?: boolean;
+  disabled?: boolean;
+  multiline?: boolean;
+};
+
+type StylePropType =
+  | ViewStyle
+  | ((state: DynamicStyleProps) => ViewStyle);
+
 type Props = TextInputProps & {
   label?: string;
   errorText?: string;
@@ -70,6 +82,10 @@ type Props = TextInputProps & {
 
   /** Layout overrides you can pass when calling */
   layout?: LayoutOverrides;
+
+  style?: StylePropType
+  multiline?: boolean;
+  keyboardType?: KeyboardTypeOptions;
 };
 
 const SIZE_PRESETS: Record<

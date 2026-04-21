@@ -63,6 +63,8 @@ export default function EducationContentCard({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${getTypeLabel(item.type)}: ${item.title}${progress ? `, ${progress.progressPercent}% complete` : ''}`}
       onPress={handlePrimary}
       style={{
         borderWidth: 2,

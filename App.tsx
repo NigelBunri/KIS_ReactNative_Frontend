@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RESULTS, openSettings, type PermissionStatus } from 'react-native-permissions';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -33,6 +34,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
 import { MainTabs } from '@/navigation/AppNavigator';
 import type { RootStackParamList } from '@/navigation/types';
+import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -59,12 +61,16 @@ import HealthServiceSessionScreen from './src/screens/health/HealthServiceSessio
 import ShopDashboardScreen from '@/screens/market/ShopDashboardScreen';
 import ServiceBookingDetailsPage from '@/screens/market/ServiceBookingDetailsPage';
 import ServiceBookingScreen from '@/screens/market/ServiceBookingScreen';
+import ProductDetailsPage from '@/screens/broadcast/market/ProductDetailsPage';
 import { getRequest } from '@/network/get';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { postRequest } from '@/network/post';
 import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
 import { initPushHandlers } from './src/push/notifications';
+import { getAccessToken } from './src/security/authStorage';
+import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
+import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
 import {
   DEFAULT_CALLING_CODE,
   DEFAULT_COUNTRY_ISO,
@@ -72,6 +78,13 @@ import {
   resolveLocationCountry,
 } from '@/services/locationCountryService';
 import { cleanIrrelevantStorage } from '@/utils/storageCleaner';
+import CartsListPage from '@/screens/market/cart/CartsListPage';
+import CartDetailPage from '@/screens/market/cart/CartDetailPage';
+import MyOrdersPage from '@/screens/market/orders/MyOrdersPage';
+import MarketplaceOrderDetailPage from '@/screens/market/orders/MarketplaceOrderDetailPage';
+import ProviderOrdersPage from '@/screens/market/orders/ProviderOrdersPage';
+import LanguageSwitcher from '@/languages/LanguageSwitcher';
+import { LanguageProvider, useLanguage } from '@/languages';
 
 type AuthCtx = {
   isAuth: boolean;
@@ -100,7 +113,8 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
 
-export default function App() {
+function AppContent() {
+  const { language } = useLanguage();
   const scheme = useColorScheme();
   const [booting, setBooting] = useState(true);
 
@@ -126,6 +140,17 @@ export default function App() {
       setLocationError('');
       return true;
     } catch (error: any) {
+      if (__DEV__ && Platform.OS === 'android') {
+        // Android emulators frequently have no working location provider.
+        // In local development, fall back to the default dialing context so
+        // auth/bootstrap can continue instead of blocking on geolocation.
+        setLocationStatus(error?.permissionStatus || null);
+        setLocationCountryISO(DEFAULT_COUNTRY_ISO);
+        setLocationCallingCode(DEFAULT_CALLING_CODE);
+        setLocationReady(true);
+        setLocationError('');
+        return true;
+      }
       if (error instanceof LocationCountryError) {
         setLocationStatus(error.permissionStatus || null);
         setLocationError(error.message || 'Location access is required to use KIS.');
@@ -146,7 +171,7 @@ export default function App() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('access_token');
+      const token = await getAccessToken();
       const storedPhone = await AsyncStorage.getItem('user_phone');
 
       console.log('checking login (token, phone):', token, storedPhone);
@@ -167,11 +192,22 @@ export default function App() {
 
       try {
         const qs = storedPhone ? `?phone=${encodeURIComponent(storedPhone)}` : '';
-        const res = await getRequest(`${ROUTES.auth.checkLogin}${qs}`, {
+        let res = await getRequest(`${ROUTES.auth.checkLogin}${qs}`, {
           errorMessage: 'Status check failed.',
           cacheType: 'AUTH_CACHE',
           forceNetwork: true,
         });
+
+        // Stored phone values can drift out of sync with backend formatting.
+        // If a token exists, retry the auth check without phone lookup before
+        // treating the session as logged out.
+        if (token && (Number(res?.status) === 404 || Number(res?.status) === 401) && storedPhone) {
+          res = await getRequest(ROUTES.auth.checkLogin, {
+            errorMessage: 'Status check failed.',
+            cacheType: 'AUTH_CACHE',
+            forceNetwork: true,
+          });
+        }
 
         console.log('checkLogin response:', res);
 
@@ -306,50 +342,58 @@ export default function App() {
 
   if (!locationReady) {
     return (
-      <View style={locationStyles.root}>
-        <Text style={locationStyles.title}>Location Required</Text>
-        <Text style={locationStyles.message}>
-          {locationError || 'Location access is required to use KIS.'}
-        </Text>
-
-        {locationChecking ? <ActivityIndicator size="small" /> : null}
-
-        <Pressable
-          style={locationStyles.primaryButton}
-          onPress={async () => {
-            if (locationStatus === RESULTS.BLOCKED) {
-              await openSettings().catch(() => undefined);
-              return;
-            }
-            await syncLocationCountry(true);
-          }}
-        >
-          <Text style={locationStyles.primaryText}>
-            {locationStatus === RESULTS.BLOCKED ? 'Open Settings' : 'Enable Location'}
+      <View key={`location-${language}`} style={{ flex: 1 }}>
+        <View style={locationStyles.root}>
+          <Text style={locationStyles.title}>Location Required</Text>
+          <Text style={locationStyles.message}>
+            {locationError || 'Location access is required to use KIS.'}
           </Text>
-        </Pressable>
 
-        <Pressable
-          style={locationStyles.secondaryButton}
-          onPress={async () => {
-            await syncLocationCountry(false);
-          }}
-        >
-          <Text style={locationStyles.secondaryText}>Retry</Text>
-        </Pressable>
+          {locationChecking ? <ActivityIndicator size="small" /> : null}
+
+          <Pressable
+            style={locationStyles.primaryButton}
+            onPress={async () => {
+              if (locationStatus === RESULTS.BLOCKED) {
+                await openSettings().catch(() => undefined);
+                return;
+              }
+              await syncLocationCountry(true);
+            }}
+          >
+            <Text style={locationStyles.primaryText}>
+              {locationStatus === RESULTS.BLOCKED ? 'Open Settings' : 'Enable Location'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={locationStyles.secondaryButton}
+            onPress={async () => {
+              await syncLocationCountry(false);
+            }}
+          >
+            <Text style={locationStyles.secondaryText}>Retry</Text>
+          </Pressable>
+        </View>
+        <LanguageSwitcher />
       </View>
     );
   }
 
   return (
-    <AuthContext.Provider value={ctx}>
+    <AuthContext.Provider key={`auth-${language}`} value={ctx}>
       <SocketProvider>
-        <NavigationContainer theme={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <GlobalProfilePreviewProvider>
+        <View key={`app-${language}`} style={{ flex: 1 }}>
+          <NavigationContainer
+            key={`nav-${language}`}
+            theme={scheme === 'dark' ? DarkTheme : DefaultTheme}
+          >
+            <GlobalProfilePreviewProvider>
             <RootStack.Navigator screenOptions={{ headerShown: false }}>
               {isAuth ? (
                 <>
                   <RootStack.Screen name="MainTabs" component={MainTabs} />
+                  <RootStack.Screen name="BroadcastDetail" component={BroadcastDetailScreen} />
                   <RootStack.Screen
                     name="PartnerInsights"
                     component={PartnerInsightsScreen}
@@ -421,6 +465,46 @@ export default function App() {
                     options={{ presentation: 'modal' }}
                   />
                   <RootStack.Screen
+                    name="ProductDetail"
+                    component={ProductDetailsPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="ShopProducts"
+                    component={ShopProductsPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="ShopServices"
+                    component={ShopServicesPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="CartsList"
+                    component={CartsListPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="CartDetail"
+                    component={CartDetailPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="MarketplaceOrders"
+                    component={MyOrdersPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="MarketplaceProviderOrders"
+                    component={ProviderOrdersPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
+                    name="MarketplaceOrderDetail"
+                    component={MarketplaceOrderDetailPage}
+                    options={{ presentation: 'modal' }}
+                  />
+                  <RootStack.Screen
                     name="ServiceBookingDetails"
                     component={ServiceBookingDetailsPage}
                     options={{ presentation: 'modal' }}
@@ -484,10 +568,22 @@ export default function App() {
                 </>
               )}
             </RootStack.Navigator>
-          </GlobalProfilePreviewProvider>
-        </NavigationContainer>
+            </GlobalProfilePreviewProvider>
+          </NavigationContainer>
+          <LanguageSwitcher />
+        </View>
       </SocketProvider>
     </AuthContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </SafeAreaProvider>
   );
 }
 

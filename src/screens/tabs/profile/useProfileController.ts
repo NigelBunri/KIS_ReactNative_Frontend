@@ -20,8 +20,8 @@ import { popularLanguages } from './profile.constants';
 import { tierMetaFor } from './profile/tierMeta';
 import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
 
-const MICROS_PER_KISC = 100000;
-const CENTS_PER_KISC = 10000;
+const MICROS_PER_KISC = 1000;
+const CENTS_PER_KISC = 100;
 const MICROS_PER_CENT = 10;
 const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 const DEFAULT_PROFILE_LANGUAGE = 'English';
@@ -271,6 +271,13 @@ const extractRequestErrorMessage = (result: any, fallback: string) => {
   return fallback;
 };
 
+const normalizePlanList = (payload: any): any[] => {
+  const source = payload?.data ?? payload ?? {};
+  const results = source?.results ?? source;
+  if (!Array.isArray(results)) return [];
+  return results.map((entry) => (entry?.data ?? entry));
+};
+
 export const useProfileController = (opts: {
   setAuth: (v: boolean) => void;
   setPhone?: (v: any) => void;
@@ -293,14 +300,15 @@ export const useProfileController = (opts: {
   const [partnerActionId, setPartnerActionId] = useState<string | null>(null);
   const [kisWallet, setKisWallet] = useState<{
     balance_micro: number;
-    balance_kisc: string;
-    balance_usd: string;
+    balance_label: string;
+    usd_label: string;
   }>({
     balance_micro: 0,
-    balance_kisc: '0.000',
-    balance_usd: '0.00',
+    balance_label: '0.00 KISC',
+    usd_label: '$0.00',
   });
   const [lastWalletPaymentUrl, setLastWalletPaymentUrl] = useState('');
+  const [tierCatalog, setTierCatalog] = useState<any[]>([]);
 
   const [draftProfile, setDraftProfile] = useState<DraftProfile>({
     display_name: '',
@@ -449,24 +457,31 @@ export const useProfileController = (opts: {
       const balanceCents = Number(wallet?.balance_cents ?? 0);
       const micro = Number.isFinite(balanceCents) ? Math.max(0, Math.floor(balanceCents * MICROS_PER_CENT)) : 0;
       const safeMicro = Number.isFinite(micro) ? Math.max(0, Math.floor(micro)) : 0;
-      const kisc = Number(wallet?.balance_kisc);
-      const usd = Number(wallet?.balance_usd);
       setKisWallet({
         balance_micro: safeMicro,
-        balance_kisc: Number.isFinite(kisc) ? kisc.toFixed(3) : (safeMicro / MICROS_PER_KISC).toFixed(3),
-        balance_usd: Number.isFinite(usd) ? usd.toFixed(2) : ((safeMicro / MICROS_PER_KISC) * 100).toFixed(2),
+        balance_label: String(wallet?.balance_kisc_label ?? '0.00 KISC'),
+        usd_label: String(wallet?.balance_usd_label ?? '$0.00'),
       });
-      return;
+      return {
+        balance_micro: safeMicro,
+        balance_cents: Math.floor(safeMicro / MICROS_PER_CENT),
+      };
     }
 
     const cents = Number(fallbackWalletBalanceCents ?? profile?.account?.wallet_balance_cents ?? 0);
     const safeCents = Number.isFinite(cents) ? Math.max(0, Math.floor(cents)) : 0;
     const fallbackMicro = safeCents * MICROS_PER_CENT;
+    const fallbackKisc = safeCents / (CENTS_PER_KISC ?? 100);
+    const fallbackUsd = fallbackKisc * 100;
     setKisWallet({
       balance_micro: fallbackMicro,
-      balance_kisc: (fallbackMicro / MICROS_PER_KISC).toFixed(3),
-      balance_usd: (safeCents / 100).toFixed(2),
+      balance_label: `${fallbackKisc.toFixed(3)} KISC`,
+      usd_label: `$${fallbackUsd.toFixed(2)}`,
     });
+    return {
+      balance_micro: fallbackMicro,
+      balance_cents: safeCents,
+    };
   }, [profile?.account?.wallet_balance_cents]);
 
   const loadWalletLedger = useCallback(async () => {
@@ -515,6 +530,25 @@ export const useProfileController = (opts: {
     const res = await getRequest(ROUTES.broadcasts.createProfile);
     if (res?.success) {
       setBroadcastProfiles(res.data?.profiles ?? {});
+    }
+  }, []);
+
+  const loadTierCatalog = useCallback(async () => {
+    try {
+      const response = await getRequest(ROUTES.tiers.plans, {
+        errorMessage: 'Unable to load upgrade tiers.',
+        forceNetwork: true,
+      });
+      if (!response?.success) {
+        console.warn('Unable to load upgrade tiers:', response?.message);
+        return;
+      }
+      const plans = normalizePlanList(response.data ?? response);
+      if (plans.length) {
+        setTierCatalog(plans);
+      }
+    } catch (error: any) {
+      console.warn('Unable to load upgrade tiers:', error);
     }
   }, []);
 
@@ -722,6 +756,10 @@ export const useProfileController = (opts: {
   }, [applyProfilePayload, loadKisWallet, loadWalletLedger, profile, loadBroadcastProfiles]);
 
   useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
+
+  useEffect(() => {
+    void loadTierCatalog();
+  }, [loadTierCatalog]);
 
   const logout = async () => {
     try {
@@ -1135,13 +1173,15 @@ export const useProfileController = (opts: {
     const tierName = String(tier?.name || tier?.code || tier?.slug || '').toLowerCase();
     const isPartnerTier = tierName.includes('partner');
     const priceCents = Number(tier?.price_cents || 0);
+    let latestWallet = { balance_cents: 0, balance_micro: 0 };
+    try {
+      latestWallet = (await loadKisWallet()) ?? latestWallet;
+    } catch (error) {
+      console.warn('Unable to refresh wallet before upgrade:', error);
+    }
     const walletBalanceCents = Math.max(
       0,
-      Number(
-        profile?.account?.credits_value_cents ??
-          profile?.account?.wallet_balance_cents ??
-          0,
-      ) || 0,
+      latestWallet?.balance_cents ?? 0,
     );
     const currentTier = profile?.tier || profile?.subscription?.tier;
     const currentRank = tierMetaFor(currentTier || {}).tierRank ?? 0;
@@ -1168,15 +1208,20 @@ export const useProfileController = (opts: {
     setSaving(true);
     const res = await postRequest(ROUTES.wallet.upgrade, {
       tier: tierId,
-      payment_method: 'credits',
+      payment_method: 'kisc',
     });
     setSaving(false);
 
     if (!res?.success) {
-      Alert.alert('Upgrade', res?.message || 'Could not upgrade');
+      const fallback = 'Could not upgrade';
+      const threshed = String(res?.message || fallback).trim();
+      const normalized = threshed.replace(/\s+/g, ' ');
+      const mentionWallet = /insufficient|balance|kisc/i.test(normalized.toLowerCase());
+      Alert.alert('Upgrade', mentionWallet ? 'Not enough KIS Coins in your wallet.' : normalized);
       return;
     }
 
+    await Promise.all([loadWalletLedger(), loadBillingHistory(), loadKisWallet()]);
     closeSheet();
     loadProfile();
     if (isPartnerTier) openCreatePartner();
@@ -1214,7 +1259,7 @@ export const useProfileController = (opts: {
       Alert.alert('Downgrade', res?.message || 'Unable to schedule downgrade.');
       return;
     }
-    loadBillingHistory();
+    await Promise.all([loadBillingHistory(), loadWalletLedger(), loadKisWallet()]);
   };
 
   const retryTransaction = async (txRef: string) => {
@@ -1391,7 +1436,7 @@ export const useProfileController = (opts: {
       return;
     }
 
-    if (mode === 'add_kisc' || mode === 'deposit') {
+    if (mode === 'add_kisc' || mode === 'deposit' || mode === 'cash_to_credits') {
       res = await postRequest(
         ROUTES.wallet.deposit,
         {
@@ -1400,17 +1445,6 @@ export const useProfileController = (opts: {
         },
         {
           errorMessage: 'Unable to top up KIS wallet.',
-        },
-      );
-    } else if (mode === 'spend_kisc' || mode === 'cash_to_credits') {
-      res = await postRequest(
-        ROUTES.wallet.convert,
-        {
-          direction: 'cash_to_credits',
-          amount_cents: amountCents,
-        },
-        {
-          errorMessage: 'Unable to convert KIS wallet balance.',
         },
       );
     } else if (mode === 'transfer') {
@@ -1508,6 +1542,7 @@ export const useProfileController = (opts: {
     lastWalletPaymentUrl,
     partnerActionId,
     broadcastProfiles,
+    tierCatalog,
 
     // setters
     setDraftProfile,

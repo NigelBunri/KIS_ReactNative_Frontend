@@ -26,10 +26,37 @@ export interface ContentTag {
   label: string;
 }
 
+export interface EducationInstitutionSpotlight {
+  id: string;
+  name: string;
+  description?: string;
+  institutionType?: string;
+  membershipPolicy?: string;
+  logoUrl?: string | null;
+  imageUrl?: string | null;
+  programCount?: number;
+  courseCount?: number;
+  eventCount?: number;
+  publishedBroadcastCount?: number;
+  memberCount?: number;
+}
+
+export interface EducationTrustSignals {
+  moduleCount?: number;
+  itemCount?: number;
+  enrollmentCount?: number;
+  bookingCount?: number;
+  liveSessionCount?: number;
+  assessmentCount?: number;
+  materialCount?: number;
+  previewItemCount?: number;
+}
+
 export interface EducationBase {
   id: string;
   title: string;
   summary?: string;
+  description?: string;
   coverUrl?: string | null;
   partnerId?: string | null;
   partnerName?: string | null;
@@ -39,7 +66,130 @@ export interface EducationBase {
   rating?: number;
   reviews?: number;
   durationMinutes?: number;
+  status?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  timezoneName?: string;
+  locationText?: string;
+  meetingUrl?: string;
+  deliveryMode?: string;
+  seatLimit?: number | null;
+  eventType?: string;
+  broadcastId?: string;
+  institutionId?: string;
+  broadcastKind?: string;
+  bookingEnabled?: boolean;
+  membershipPolicy?: string;
+  targetLabel?: string;
   type: EducationContentType;
+}
+
+export interface EducationLessonContentPayload {
+  lesson_id: string;
+  content?: string;
+  lesson_order?: number;
+  is_preview?: boolean;
+  materials?: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    resource_url?: string;
+    resource_name?: string;
+    resource_mime_type?: string;
+    is_downloadable?: boolean;
+  }>;
+}
+
+export interface EducationMaterialContentPayload {
+  material_id: string;
+  kind: string;
+  resource_url?: string;
+  resource_name?: string;
+  resource_mime_type?: string;
+  storage_path?: string;
+  is_downloadable?: boolean;
+}
+
+export interface EducationClassContentPayload {
+  class_session_id: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  timezone_name?: string;
+  delivery_mode?: string;
+  location_text?: string;
+  meeting_url?: string;
+  seat_limit?: number | null;
+  status?: string;
+}
+
+export interface EducationAssessmentContentPayload {
+  assessment_id: string;
+  instructions?: string;
+  assessment_type?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  duration_minutes?: number;
+  max_attempts?: number;
+  passing_score_percent?: number;
+  total_points?: number;
+  question_count?: number;
+  questions?: Array<{
+    id: string;
+    prompt: string;
+    question_type: string;
+    points?: number;
+    is_required?: boolean;
+    options?: Array<{ id: string; option_text: string; option_order?: number }>;
+  }>;
+}
+
+export interface EducationEventContentPayload {
+  event_id: string;
+  event_type?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  timezone_name?: string;
+  location_text?: string;
+  meeting_url?: string;
+  seat_limit?: number | null;
+  status?: string;
+}
+
+export interface EducationBroadcastContentPayload {
+  broadcast_id: string;
+  broadcast_kind?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  booking_enabled?: boolean;
+}
+
+export interface EducationCourseOutlineItem {
+  id: string;
+  title: string;
+  summary?: string;
+  type: string;
+  duration_minutes?: number;
+  module_id?: string;
+  module_title?: string;
+  target?: Record<string, string>;
+  is_preview?: boolean;
+  content?:
+    | EducationLessonContentPayload
+    | EducationMaterialContentPayload
+    | EducationClassContentPayload
+    | EducationAssessmentContentPayload
+    | EducationEventContentPayload
+    | EducationBroadcastContentPayload
+    | Record<string, any>;
+}
+
+export interface EducationCourseOutlineModule {
+  id: string;
+  title: string;
+  summary?: string;
+  item_count?: number;
+  duration_minutes?: number;
+  items?: EducationCourseOutlineItem[];
 }
 
 export interface EducationCourse extends EducationBase {
@@ -50,6 +200,10 @@ export interface EducationCourse extends EducationBase {
   requirements?: CourseRequirement[];
   price?: EducationPricing;
   previewLesson?: EducationLesson;
+  courseOutline?: EducationCourseOutlineModule[];
+  institutionSummary?: EducationInstitutionSpotlight;
+  trustSignals?: EducationTrustSignals;
+  instructors?: Array<{ id: string; name: string; role?: string }>;
 }
 
 export interface EducationLesson extends EducationBase {
@@ -123,10 +277,27 @@ export interface EducationEnrollment {
 export interface EducationProgress {
   contentId: string;
   contentType: EducationContentType;
+  contentTitle?: string;
   lastLessonTitle?: string;
   progressPercent: number;
   resumeUrl?: string;
   downloaded?: boolean;
+  currentModuleId?: string;
+  currentItemId?: string;
+  completedItemIds?: string[];
+  currentItem?: EducationCourseOutlineItem | null;
+  currentModule?: EducationCourseOutlineModule | null;
+  nextItem?: EducationCourseOutlineItem | null;
+  isCompleted?: boolean;
+}
+
+export interface EducationLearnerInsights {
+  attendanceCount: number;
+  assessmentSubmissionCount: number;
+  gradedAssessmentCount: number;
+  averageScorePercent: number;
+  certificateProgressPercent: number;
+  certificateReady: boolean;
 }
 
 export interface EducationReview {
@@ -165,6 +336,7 @@ export interface EducationDiscoveryPayload {
   heroCourse?: EducationCourse | EducationLesson | null;
   sections: EducationDiscoverySection[];
   categories: ContentTag[];
+  institutionSpotlights?: EducationInstitutionSpotlight[];
   continueLearning: EducationProgress[];
   filters: {
     languages: string[];

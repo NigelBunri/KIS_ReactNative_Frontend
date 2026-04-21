@@ -6,6 +6,7 @@
     "android": "react-native run-android",
     "ios": "bash ./scripts/run-ios-both.sh",
     "ios:both": "bash ./scripts/run-ios-both.sh",
+    "i18n:generate": "node scripts/generate-language-files.mjs",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
@@ -15,6 +16,7 @@
     "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
+    "@react-native-community/datetimepicker": "^9.1.0",
     "@react-native-community/image-editor": "^4.3.0",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-native-community/slider": "^5.1.2",

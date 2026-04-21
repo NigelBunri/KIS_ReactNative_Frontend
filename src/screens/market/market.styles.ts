@@ -228,6 +228,19 @@ export const marketStyles = StyleSheet.create({
     gap: 10,
     marginTop: 20,
   },
+  fieldRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  fieldHalf: {
+    flex: 1,
+    minWidth: 140,
+  },
+  fieldQuarter: {
+    flex: 1,
+    minWidth: 100,
+  },
   drawerRule: {
     borderWidth: 1,
     borderRadius: 16,
@@ -277,5 +290,47 @@ export const marketStyles = StyleSheet.create({
     flexDirection: 'column',
     gap: 8,
     flexWrap: 'wrap',
+  },
+  variantCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  variantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  variantRemove: {
+    padding: 4,
+  },
+  variantFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  variantImageButton: {
+    padding: 4,
+  },
+  variantImagePreview: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  toggleChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
 });

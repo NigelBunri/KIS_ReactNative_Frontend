@@ -47,24 +47,6 @@ const getTopTrendingFeeds = (items: BroadcastFeedItem[], limit = 20) => {
     .slice(0, limit);
 };
 
-const mergeById = (primary: BroadcastFeedItem[], secondary: BroadcastFeedItem[]) => {
-  const out: BroadcastFeedItem[] = [];
-  const seen = new Set<string>();
-  for (const row of primary) {
-    const id = String(row?.id ?? '').trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push(row);
-  }
-  for (const row of secondary) {
-    const id = String(row?.id ?? '').trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push(row);
-  }
-  return out;
-};
-
 const isHealthcareFeedItem = (item: BroadcastFeedItem | null | undefined) => {
   if (!item) return false;
   const sourceType = String(item.source_type ?? '').toLowerCase();
@@ -153,90 +135,8 @@ const normalizeAuthorFromItem = (item: any) => {
 const normalizeFeedItem = (item: BroadcastFeedItem): BroadcastFeedItem => ({
   ...item,
   author: normalizeAuthorFromItem(item),
+  viewer_saved: Boolean(item.viewer_saved),
 });
-
-const mapProfileFeedToBroadcastItem = (entry: any, owner?: any): BroadcastFeedItem => {
-  const attachments = ([] as any[])
-    .concat(entry.attachment ? [entry.attachment] : [])
-    .concat(Array.isArray(entry.attachments) ? entry.attachments : [])
-    .filter(Boolean);
-
-  const timestamp = entry.created_at ?? entry.updated_at ?? new Date().toISOString();
-  const authorIdRaw =
-    entry?.author?.id ??
-    entry?.author_id ??
-    entry?.user?.id ??
-    entry?.user_id ??
-    owner?.id ??
-    owner?.user_id ??
-    null;
-  const authorDisplayName =
-    entry?.author?.display_name ??
-    entry?.author_name ??
-    entry?.user?.display_name ??
-    entry?.user?.name ??
-    owner?.display_name ??
-    owner?.name ??
-    owner?.username ??
-    entry?.display_name ??
-    '';
-  const authorProfileId =
-    entry?.author?.profile_id ??
-    entry?.author?.profileId ??
-    entry?.profile?.id ??
-    entry?.profile_id ??
-    owner?.profile?.id ??
-    owner?.profile_id ??
-    null;
-  const authorAvatar =
-    entry?.author?.avatar_url ??
-    entry?.author?.avatarUrl ??
-    entry?.author?.avatar ??
-    entry?.user?.avatar_url ??
-    entry?.user?.avatarUrl ??
-    owner?.avatar_url ??
-    owner?.avatarUrl ??
-    owner?.avatar ??
-    entry?.avatar_url ??
-    entry?.avatarUrl ??
-    null;
-  const authorBio =
-    entry?.author?.bio ??
-    entry?.profile?.bio ??
-    entry?.user?.bio ??
-    owner?.bio ??
-    entry?.summary ??
-    '';
-
-  return {
-    id: `profile-${entry.id}`,
-    source_type: 'broadcast_profile',
-    source_id: String(entry.id),
-    title: entry.title,
-    text: entry.summary,
-    text_plain: entry.summary,
-    broadcasted_at: timestamp,
-    created_at: timestamp,
-    attachments,
-    reaction_count: entry.reaction_count ?? 0,
-    comment_count: entry.comment_count ?? 0,
-    author: {
-      id: authorIdRaw ? String(authorIdRaw) : undefined,
-      profile_id: authorProfileId ? String(authorProfileId) : undefined,
-      display_name: String(authorDisplayName || '').trim() || 'KIS user',
-      avatar_url: authorAvatar ? String(authorAvatar) : undefined,
-      bio: String(authorBio || '').trim() || undefined,
-    },
-    source: {
-      type: 'broadcast_profile',
-      id: String(entry?.profile_id ?? entry?.broadcast_profile_id ?? 'main'),
-      name: entry?.profile_name ?? entry?.broadcast_profile_name ?? 'Broadcast profile',
-      is_subscribed: true,
-      allow_subscribe: false,
-      can_open: true,
-    },
-  };
-};
 
 export default function useFeedsData({ q = '', code = null }: Params) {
   const [items, setItems] = useState<BroadcastFeedItem[]>([]);
@@ -251,60 +151,30 @@ export default function useFeedsData({ q = '', code = null }: Params) {
 
   const paramsKey = useMemo(() => `${q}::${code ?? ''}`, [q, code]);
 
-  const fetchDjangoBroadcastFeeds = useCallback(async () => {
-    try {
-      const res = await getRequest(ROUTES.broadcasts.list, {
-        errorMessage: 'Unable to load broadcast profiles.',
-      });
-      if (!res?.success) return [];
-
-      const apiPayload = res?.data ?? {};
-      const apiPage = normalizePaginated<BroadcastFeedItem>(apiPayload);
-      const apiResults = (apiPage.results ?? []).map((item) => normalizeFeedItem(item));
-
-      const profile = res.data?.profiles?.broadcast_feed;
-      const owner =
-        profile?.owner ??
-        profile?.user ??
-        res.data?.user ??
-        null;
-      const feeds = Array.isArray(profile?.feeds) ? profile.feeds : [];
-      const profileFeeds = feeds.map((entry: any) => mapProfileFeedToBroadcastItem(entry, owner));
-      return mergeById(apiResults, profileFeeds);
-    } catch (error) {
-      console.warn('[useFeedsData] django broadcasts failed', error);
-      return [];
-    }
+  const applyItems = useCallback((nextItems: BroadcastFeedItem[]) => {
+    setItems(nextItems);
+    const topTrending = getTopTrendingFeeds(nextItems);
+    setTrendingFeeds(topTrending);
+    setTrending(topTrending.map(toTrendingClipItem));
   }, []);
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
-    const url = `${FEEDS_ENDPOINT}${buildQuery({ q, code })}`;
+    const url = `${FEEDS_ENDPOINT}${buildQuery({ q, code, limit: 20, offset: 0 })}`;
     try {
-      const [res, djangoFeeds] = await Promise.all([
-        getRequest(url, { errorMessage: 'Unable to load feeds.' }),
-        fetchDjangoBroadcastFeeds(),
-      ]);
+      const res = await getRequest(url, { errorMessage: 'Unable to load feeds.' });
       if (!mountedRef.current) return;
       const payload = res?.data ?? res;
       const page = normalizePaginated<BroadcastFeedItem>(payload);
       const normalizedResults = (page.results ?? []).map((item) => normalizeFeedItem(item));
-      const nonHealthcareResults = normalizedResults.filter((item) => !isHealthcareFeedItem(item));
-      const nextItems = mergeById(
-        djangoFeeds.filter((item) => !isHealthcareFeedItem(item)),
-        nonHealthcareResults,
-      );
-      setItems(nextItems);
-      const topTrending = getTopTrendingFeeds(nextItems);
-      setTrendingFeeds(topTrending);
-      setTrending(topTrending.map(toTrendingClipItem));
+      applyItems(normalizedResults.filter((item) => !isHealthcareFeedItem(item)));
       nextUrlRef.current = page.next ?? null;
     } finally {
       if (mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [code, fetchDjangoBroadcastFeeds, q]);
+  }, [applyItems, code, q]);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -345,31 +215,144 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     setLoadingMore(false);
   }, [loadingMore]);
 
+  const reactToItem = useCallback(async (itemId: string, emoji: string = '❤️') => {
+    let previousReactionCount = 0;
+    let previousReaction: string | null = null;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? (() => {
+              previousReactionCount = Number(item.reaction_count ?? 0);
+              previousReaction = item.viewer_reaction ?? null;
+              const hadSameReaction = previousReaction === emoji;
+              const hadDifferentReaction = Boolean(previousReaction && previousReaction !== emoji);
+              return {
+                ...item,
+                reaction_count: hadSameReaction
+                  ? Math.max(previousReactionCount - 1, 0)
+                  : hadDifferentReaction
+                    ? previousReactionCount
+                    : previousReactionCount + 1,
+                viewer_reaction: hadSameReaction ? null : emoji,
+              };
+            })()
+          : item,
+      ),
+    );
+    try {
+      const res = await postRequest(
+        ROUTES.broadcasts.react(itemId),
+        { emoji },
+        { errorMessage: 'Unable to react.' },
+      );
+      if (res?.success === false) {
+        throw new Error(res?.message || 'Unable to react.');
+      }
+      const count = Number(res?.data?.count ?? res?.count ?? 0);
+      const reacted = Boolean(res?.data?.reacted ?? res?.reacted);
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                reaction_count: count,
+                viewer_reaction: reacted ? emoji : null,
+              }
+            : item,
+        ),
+      );
+      return { ok: true };
+    } catch (error) {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                reaction_count: previousReactionCount,
+                viewer_reaction: previousReaction,
+              }
+            : item,
+        ),
+      );
+      return { ok: false, error };
+    }
+  }, []);
+
+  const recordShare = useCallback(async (itemId: string) => {
+    const res = await postRequest(
+      ROUTES.broadcasts.share(itemId),
+      { platform: 'app' },
+      { errorMessage: 'Unable to log share.' },
+    );
+    if (res?.success === false) {
+      return { ok: false };
+    }
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              share_count: Number(item.share_count ?? 0) + 1,
+            }
+          : item,
+      ),
+    );
+    return { ok: true };
+  }, []);
+
+  const hideItem = useCallback(async (itemId: string) => {
+    const res = await postRequest(
+      ROUTES.broadcasts.hide(itemId),
+      {},
+      { errorMessage: 'Unable to hide broadcast.' },
+    );
+    if (res?.success === false) {
+      return { ok: false };
+    }
+    applyItems(items.filter((item) => item.id !== itemId));
+    return { ok: true };
+  }, [applyItems, items]);
+
+  const toggleSaved = useCallback(async (itemId: string, currentlySaved: boolean) => {
+    const endpoint = ROUTES.broadcasts.save(itemId);
+    const res = currentlySaved
+      ? await postRequest(
+          `${endpoint}?action=unsave`,
+          {},
+          { errorMessage: 'Unable to remove saved broadcast.' },
+        )
+      : await postRequest(
+          endpoint,
+          {},
+          { errorMessage: 'Unable to save broadcast.' },
+        );
+    if (res?.success === false) {
+      return { ok: false };
+    }
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              viewer_saved: !currentlySaved,
+            }
+          : item,
+      ),
+    );
+    return { ok: true, saved: !currentlySaved };
+  }, []);
+
   const toggleSubscribe = useCallback(
     async (source: BroadcastSourceMeta | undefined, currentlySubscribed: boolean) => {
       if (!source?.id || !source.allow_subscribe) {
-        return { ok: false };
+        if (!currentlySubscribed) {
+          return { ok: false };
+        }
       }
 
       const targetType = String(source.type ?? '').toLowerCase();
       if (!['partner', 'community', 'channel'].includes(targetType)) {
         return { ok: false };
-      }
-
-      if (currentlySubscribed) {
-        setItems((prev) =>
-          prev.map((it) => {
-            if (!it.source?.id || String(it.source.id) !== String(source.id)) return it;
-            return {
-              ...it,
-              source: {
-                ...it.source,
-                is_subscribed: false,
-              },
-            };
-          }),
-        );
-        return { ok: true };
       }
 
       const payload: Record<string, any> = {
@@ -381,7 +364,9 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       }
 
       const res = await postRequest(
-        ROUTES.broadcasts.subscribe,
+        currentlySubscribed
+          ? `${ROUTES.broadcasts.subscribe}?action=unsubscribe`
+          : ROUTES.broadcasts.subscribe,
         payload,
         { errorMessage: 'Unable to update subscription.' },
       );
@@ -395,14 +380,15 @@ export default function useFeedsData({ q = '', code = null }: Params) {
             ...it,
             source: {
               ...it.source,
-              is_subscribed: true,
+              is_subscribed: !currentlySubscribed,
+              can_open: !currentlySubscribed,
             },
           };
         }),
       );
 
       DeviceEventEmitter.emit('broadcast.refresh');
-      return { ok: true };
+      return { ok: true, subscribed: !currentlySubscribed };
     },
     [],
   );
@@ -433,5 +419,9 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     refreshAll,
     loadMore,
     toggleSubscribe,
+    reactToItem,
+    recordShare,
+    hideItem,
+    toggleSaved,
   };
 }

@@ -1,9 +1,7 @@
 import React, { useCallback } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import KISButton from '@/constants/KISButton';
-import EducationLegacyDiscoverPage from '@/screens/broadcast/education/EducationLegacyDiscoverPage';
 import EducationV2DiscoverPage from '@/screens/broadcast/education/EducationV2DiscoverPage';
 import useEducationAvailability from '@/screens/broadcast/education/hooks/useEducationAvailability';
 
@@ -13,14 +11,19 @@ type Props = {
 };
 
 export default function BroadcastEducationPage({ searchTerm, searchContext }: Props) {
+  const { palette } = useKISTheme();
   const availability = useEducationAvailability();
   const handleRetry = useCallback(async () => {
     await availability.markAvailable();
     await availability.refresh();
   }, [availability]);
 
-  if (!FEATURE_FLAGS.EDUCATION_V2 || availability.loading) {
-    return <EducationLegacyDiscoverPage searchTerm={searchTerm} searchContext={searchContext} />;
+  if (availability.loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.bg }}>
+        <ActivityIndicator color={palette.primary} />
+      </View>
+    );
   }
 
   if (!availability.available) {

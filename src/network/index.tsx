@@ -19,6 +19,7 @@ import {
   CHAT_UPLOAD_URL,
   CHAT_WS_PATH,
   CHAT_WS_URL,
+  DEV_BACKEND_HOST,
   EDUCATION_COURSES_ENDPOINT,
   EDUCATION_ENROLL_ENDPOINT,
   EDUCATION_HOME_ENDPOINT,
@@ -106,6 +107,7 @@ export const resolveBackendAssetUrl = (value?: string | null): string | undefine
       const parsed = new URL(trimmed);
       const pathAndSearch = `${parsed.pathname}${parsed.search}${parsed.hash}`;
       const hostIsLocal =
+        parsed.hostname === DEV_BACKEND_HOST ||
         parsed.hostname === '127.0.0.1' ||
         parsed.hostname === '::1' ||
         parsed.hostname === 'localhost';

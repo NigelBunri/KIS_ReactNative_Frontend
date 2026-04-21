@@ -32,7 +32,6 @@ export const visibilityOptions = [
 
 export const walletModes = [
   { value: 'add_kisc', label: 'Add KIS Coins' },
-  { value: 'spend_kisc', label: 'Use KIS Coins' },
   { value: 'transfer', label: 'Send KIS Coins' },
 ];
 

@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabsParamList, BroadcastProfileKey } from '@/navigation/types';
 
@@ -20,6 +20,13 @@ import BroadcastFeedsPage from '../broadcast/pages/BroadcastFeedsPage';
 import BroadcastEducationPage from '../broadcast/pages/BroadcastEducationPage';
 import BroadcastMarketPage from '../broadcast/pages/BroadcastMarketPage';
 import BroadcastHealthcarePage from '../broadcast/pages/BroadcastHealthcarePage';
+import { KISIcon } from '@/constants/kisIcons';
+import {
+  getShopCartState,
+  refreshShopCartFromBackend,
+  subscribeToShopCart,
+  type ShopCartState,
+} from '@/screens/market/cart/shopCartManager';
 
 const FILTER_OPTIONS: Record<BroadcastMainTabId, string[]> = {
   feeds: ['Latest', 'Trending', 'Saved'],
@@ -52,6 +59,7 @@ export default function BroadcastScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [cartState, setCartState] = useState<ShopCartState>(getShopCartState());
   const [selectedFilters, setSelectedFilters] = useState<Record<BroadcastMainTabId, string>>(() =>
     (Object.keys(FILTER_OPTIONS) as BroadcastMainTabId[]).reduce((acc, key) => {
       acc[key] = FILTER_OPTIONS[key][0];
@@ -82,6 +90,42 @@ export default function BroadcastScreen() {
       setRefreshing(false);
     }
   }, [activeMainTab, refreshing]);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeToShopCart(setCartState);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (activeMainTab !== 'market') return;
+    void refreshShopCartFromBackend();
+  }, [activeMainTab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeMainTab !== 'market') {
+        return () => {};
+      }
+      void refreshShopCartFromBackend();
+      return () => {};
+    }, [activeMainTab]),
+  );
+
+  const totalCartItems = useMemo(
+    () =>
+      Object.values(cartState.carts).reduce(
+        (sum, cart) =>
+          sum + cart.items.reduce((inner, item) => inner + Math.max(0, item.quantity), 0),
+        0,
+      ),
+    [cartState.carts],
+  );
+
+  const openCartList = useCallback(() => {
+    navigation.navigate('CartsList' as never);
+  }, [navigation]);
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -138,8 +182,6 @@ export default function BroadcastScreen() {
             </View>
           ) : null}
         </View>
-        {console.log('Rendering BroadcastScreen with activeMainTab:', activeMainTab, 'searchTerm:', searchTerm, 'currentFilter:', currentFilter)}
-
         <View style={{ paddingHorizontal: 12 }}>
           {activeMainTab === 'feeds' && (
             <BroadcastFeedsPage
@@ -162,6 +204,28 @@ export default function BroadcastScreen() {
           )}
         </View>
       </ScrollView>
+      {activeMainTab === 'market' ? (
+        <View pointerEvents="box-none" style={styles.cartOverlay}>
+          <Pressable
+            onPress={openCartList}
+            style={[
+              styles.cartButton,
+              {
+                backgroundColor: palette.primarySoft,
+                borderColor: palette.primary,
+                shadowColor: palette.shadow ?? '#000',
+              },
+            ]}
+          >
+            <KISIcon name="cart" size={22} color={palette.primaryStrong} />
+            {totalCartItems > 0 ? (
+              <View style={[styles.cartBadge, { backgroundColor: palette.primaryStrong }]}>
+                <Text style={{ color: palette.surface, fontWeight: '800' }}>{totalCartItems}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -195,5 +259,36 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingVertical: 8,
       marginRight: 8,
       marginBottom: 8,
+    },
+    cartOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      alignItems: 'flex-end',
+      paddingRight: 16,
+      paddingBottom: 24,
+      zIndex: 100,
+      elevation: 100,
+    },
+    cartButton: {
+      borderWidth: 1,
+      borderRadius: 999,
+      width: 56,
+      height: 56,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 8,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 6,
+    },
+    cartBadge: {
+      minWidth: 24,
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      paddingHorizontal: 6,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

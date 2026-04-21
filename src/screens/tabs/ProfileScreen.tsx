@@ -1,6 +1,7 @@
 // src/screens/tabs/profile/ProfileScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   DeviceEventEmitter,
@@ -106,6 +107,8 @@ import type {
 import { HealthManagementModal } from './profile-screen/HealthManagementModal';
 import ShopEditorDrawer from '@/screens/market/ShopEditorDrawer';
 import { resolveShopImageUri } from '@/utils/shopAssets';
+import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
+import { useLanguage } from '@/languages';
 
 const DEFAULT_MARKET_FORM: MarketFormState = {
   name: '',
@@ -121,11 +124,16 @@ const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 
 export default function ProfileScreen() {
   const { palette } = useKISTheme();
+  const { language, languages, setLanguage } = useLanguage();
   const { setAuth, setPhone, callingCode } = useAuth();
   const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
   const tabsNavigation = useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Profile'>>();
   const route = useRoute<RouteProp<MainTabsParamList, 'Profile'>>();
   const broadcastProfiles = c.broadcastProfiles;
+  const upgradeTiers = useMemo(
+    () => (c.tierCatalog && c.tierCatalog.length ? c.tierCatalog : c.profile?.tiers || []),
+    [c.tierCatalog, c.profile?.tiers],
+  );
   const requestedBroadcastProfileKey = route.params?.broadcastProfileKey ?? null;
   const [managementPanelKey, setManagementPanelKey] = useState<BroadcastProfileKey | null>(null);
   const [panelFeedItemTitle, setPanelFeedItemTitle] = useState('');
@@ -150,6 +158,9 @@ export default function ProfileScreen() {
   const [activeShop, setActiveShop] = useState<any | null>(null);
   const [commerceShops, setCommerceShops] = useState<any[]>([]);
   const [commerceShopsLoading, setCommerceShopsLoading] = useState(false);
+  const [marketplaceOrders, setMarketplaceOrders] = useState<any[]>([]);
+  const [marketplaceOrdersLoading, setMarketplaceOrdersLoading] = useState(false);
+  const [marketplaceOrdersError, setMarketplaceOrdersError] = useState<string | null>(null);
   const currentUserId = useMemo(() => {
     const userId = c.profile?.user?.id;
     return userId ? String(userId) : null;
@@ -311,8 +322,8 @@ export default function ProfileScreen() {
   const accountTier = c.profile?.account?.tier;
   const points = c.profile?.account?.points ?? 0;
   const kisWalletMicro = Number(c.kisWallet?.balance_micro ?? 0);
-  const kisWalletKisc = String(c.kisWallet?.balance_kisc ?? '0.000');
-  const kisWalletUsd = String(c.kisWallet?.balance_usd ?? '0.00');
+  const kisWalletLabel = String(c.kisWallet?.balance_label ?? '0.00 KISC');
+  const kisWalletUsdLabel = String(c.kisWallet?.usd_label ?? '$0.00');
   const currentTier = accountTier || c.profile?.tier || c.profile?.subscription?.tier;
   const tierLabel =
     currentTier?.name ??
@@ -440,12 +451,11 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('wallet.open', (payload: any) => {
-      const rawMode = String(payload?.mode || '').trim().toLowerCase();
+      const normalizedMode = String(payload?.mode || '').trim().toLowerCase();
       const mappedMode =
-        rawMode === 'deposit' || rawMode === 'cash_to_credits' ? 'add_kisc'
-        : rawMode === 'credits_to_cash' || rawMode === 'points_to_credits' ? 'spend_kisc'
-        : rawMode === 'transfer' ? 'transfer'
-        : 'add_kisc';
+        normalizedMode === 'transfer'
+          ? 'transfer'
+          : 'add_kisc';
       openWalletSheet('wallet');
       setWalletForm((prev: any) => ({
         ...prev,
@@ -677,6 +687,17 @@ export default function ProfileScreen() {
     tabsNavigation.setParams({ broadcastProfileKey: undefined });
   }, [tabsNavigation, managementPanelKey, openManagementPanel, requestedBroadcastProfileKey]);
 
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'profile.reopenManagementPanel',
+      (key?: BroadcastProfileKey | null) => {
+        if (!key) return;
+        openManagementPanel(key);
+      },
+    );
+    return () => subscription.remove();
+  }, [openManagementPanel]);
+
   const openMarketLandingBuilder = useCallback(
     (shop?: any) => {
       rootNavigation?.navigate('ProfileLandingEditor', {
@@ -697,10 +718,11 @@ export default function ProfileScreen() {
     [rootNavigation],
   );
 
-  const openEducationLandingBuilder = useCallback(() => {
+  const openEducationLandingBuilder = useCallback((institution?: any) => {
     rootNavigation?.navigate('ProfileLandingEditor', {
       kind: 'education',
-      profileLabel: 'Education Profile',
+      profileLabel: institution?.name || 'Education Profile',
+      returnBroadcastProfileKey: 'education',
     });
   }, [rootNavigation]);
 
@@ -850,6 +872,60 @@ export default function ProfileScreen() {
         console.warn('Unable to load commerce shops:', response.message);
       }
       if (shops.length) {
+        let revenueByShopId = new Map<string, number>();
+        try {
+          const providerOrdersRes = await getRequest(ROUTES.commerce.marketplaceProviderOrders, {
+            errorMessage: 'Unable to load shop revenue.',
+          });
+          const providerOrders = providerOrdersRes?.success ? unwrapList(providerOrdersRes.data) : [];
+          revenueByShopId = providerOrders.reduce((map: Map<string, number>, order: any) => {
+            const shopId =
+              order?.shop_info?.id ??
+              order?.shop?.id ??
+              order?.shop_id ??
+              null;
+            const status = String(order?.status ?? '').toLowerCase();
+            if (!shopId || status === 'cancelled' || status === 'canceled') {
+              return map;
+            }
+            const orderTotal = backendOrderTotalToFrontendKisc(order?.total_amount ?? order?.amount ?? 0);
+            map.set(String(shopId), (map.get(String(shopId)) ?? 0) + orderTotal);
+            return map;
+          }, new Map<string, number>());
+        } catch {
+          revenueByShopId = new Map<string, number>();
+        }
+        shops = await Promise.all(
+          shops.map(async (shop) => {
+            const shopId = shop?.id;
+            if (!shopId) return shop;
+            try {
+              const [productsRes, servicesRes] = await Promise.all([
+                getRequest(ROUTES.commerce.products, {
+                  params: { shop: shopId },
+                  errorMessage: 'Unable to load shop products.',
+                }),
+                getRequest(ROUTES.commerce.shopServices, {
+                  params: { shop: shopId },
+                  errorMessage: 'Unable to load shop services.',
+                }),
+              ]);
+              const products = productsRes?.success ? unwrapList(productsRes.data) : [];
+              const services = servicesRes?.success ? unwrapList(servicesRes.data) : [];
+              return {
+                ...shop,
+                products_count: products.length,
+                services_count: services.length,
+                revenue_total: revenueByShopId.get(String(shopId)) ?? Number(shop?.revenue_total ?? shop?.revenue ?? 0),
+              };
+            } catch {
+              return {
+                ...shop,
+                revenue_total: revenueByShopId.get(String(shopId)) ?? Number(shop?.revenue_total ?? shop?.revenue ?? 0),
+              };
+            }
+          }),
+        );
         console.log('[ProfileScreen] loaded shop example', shops[0]?.featuredImage ?? shops[0]?.image_url ?? 'no image');
       }
       setCommerceShops(shops);
@@ -871,6 +947,12 @@ export default function ProfileScreen() {
     useCallback(() => {
       void loadAppointments();
     }, [loadAppointments]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMarketplaceOrders();
+    }, [loadMarketplaceOrders]),
   );
 
   useEffect(() => {
@@ -1044,6 +1126,31 @@ export default function ProfileScreen() {
     }
   }, [unwrapList]);
 
+  const loadMarketplaceOrders = useCallback(async () => {
+    setMarketplaceOrdersLoading(true);
+    setMarketplaceOrdersError(null);
+    try {
+      const response = await getRequest(ROUTES.commerce.marketplaceOrders, {
+        errorMessage: 'Unable to load marketplace orders.',
+      });
+      if (response.success) {
+        const payload = response.data;
+        const orders = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+          ? payload.results
+          : [];
+        setMarketplaceOrders(orders);
+      } else {
+        setMarketplaceOrdersError(response.message ?? 'Unable to load your marketplace orders.');
+      }
+    } catch (loadError: any) {
+      setMarketplaceOrdersError(loadError?.message ?? 'Unable to load your marketplace orders.');
+    } finally {
+      setMarketplaceOrdersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (managementPanelKey === 'education') {
       void loadEducationAnalytics();
@@ -1071,6 +1178,16 @@ export default function ProfileScreen() {
   );
 
   const nextLesson = upcomingLessons[0] ?? null;
+
+  const recentMarketplaceOrders = useMemo(() => {
+    const sorted = [...marketplaceOrders];
+    sorted.sort((a, b) => {
+      const aDate = new Date(a?.created_at || a?.createdAt || '').getTime();
+      const bDate = new Date(b?.created_at || b?.createdAt || '').getTime();
+      return bDate - aDate;
+    });
+    return sorted.slice(0, 3);
+  }, [marketplaceOrders]);
 
   const handleEducationModuleSave = useCallback(async () => {
     const title = educationModuleForm.title.trim();
@@ -1428,29 +1545,64 @@ export default function ProfileScreen() {
               </View>
             </View>
 
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.divider,
+                  borderWidth: 1,
+                },
+              ]}
+            >
+              <View style={styles.headerRow}>
+                <Text style={[styles.title, { color: palette.text }]}>Language</Text>
+                <Text style={[styles.subtext, { color: palette.subtext }]}>
+                  {languages.find((entry) => entry.code === language)?.label ?? 'English'}
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 14, lineHeight: 20, color: palette.subtext }}>
+                Choose the language used for supported app text.
+              </Text>
+
+              <View style={styles.actionRow}>
+                {languages.map((entry) => (
+                  <KISButton
+                    key={entry.code}
+                    title={entry.label}
+                    variant={entry.code === language ? 'primary' : 'outline'}
+                    onPress={() => {
+                      setLanguage(entry.code).catch(() => undefined);
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+
             {/* ACCOUNT / WALLET / UPGRADE */}
-            <AccountCreditsCard
-              tierName={accountTier?.name || 'Free'}
-              tierPriceCents={accountTier?.price_cents || 0}
-              kisBalanceMicro={kisWalletMicro}
-              kisBalanceKisc={kisWalletKisc}
-              kisBalanceUsd={kisWalletUsd}
-              points={points}
-              onWallet={() => c.openSheet('wallet')}
-              onUpgrade={() => c.openSheet('upgrade')}
-              showCreatePartnerButton={showCreatePartnerButton}
-              onCreatePartner={c.openCreatePartner}
-              walletLedger={c.walletLedger}
-              onDeleteWalletEntry={handleDeleteWalletEntry}
-              deletingWalletEntryId={c.deletingWalletEntryId}
-              partnerProfilesCount={partnerProfilesCount}
-              partnerProfilesLimitLabel={partnerProfilesLimitLabel}
-              partnerProfilesLimitValue={partnerProfilesLimitValue}
-              partnerProfilesIsUnlimited={partnerProfilesIsUnlimited}
-              pendingServicePayments={pendingServicePayments}
-              pendingReceivePayments={pendingReceivePayments}
-              onOpenBookingDetails={openBookingDetails}
-            />
+          <AccountCreditsCard
+            tierName={accountTier?.name || 'Free'}
+            tierPriceCents={accountTier?.price_cents || 0}
+            walletBalanceMicro={kisWalletMicro}
+            walletBalanceLabel={kisWalletLabel}
+            walletUsdLabel={kisWalletUsdLabel}
+            points={points}
+            onWallet={() => c.openSheet('wallet')}
+            onUpgrade={() => c.openSheet('upgrade')}
+            showCreatePartnerButton={showCreatePartnerButton}
+            onCreatePartner={c.openCreatePartner}
+            walletLedger={c.walletLedger}
+            onDeleteWalletEntry={handleDeleteWalletEntry}
+            deletingWalletEntryId={c.deletingWalletEntryId}
+            partnerProfilesCount={partnerProfilesCount}
+            partnerProfilesLimitLabel={partnerProfilesLimitLabel}
+            partnerProfilesLimitValue={partnerProfilesLimitValue}
+            partnerProfilesIsUnlimited={partnerProfilesIsUnlimited}
+            pendingServicePayments={pendingServicePayments}
+            pendingReceivePayments={pendingReceivePayments}
+            onOpenBookingDetails={openBookingDetails}
+          />
 
             <View
               style={[
@@ -1638,6 +1790,46 @@ export default function ProfileScreen() {
               ]}
             />
 
+            <View
+              style={[
+                styles.marketOrdersSection,
+                { backgroundColor: palette.surface, borderColor: palette.divider },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>Marketplace orders</Text>
+              {marketplaceOrdersLoading ? (
+                <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 8 }} />
+              ) : marketplaceOrdersError ? (
+                <Text style={{ color: palette.error || '#E53935', marginTop: 8 }}>
+                  {marketplaceOrdersError}
+                </Text>
+              ) : (
+                <Text style={{ color: palette.subtext, marginTop: 6 }}>
+                  {marketplaceOrders.length
+                    ? `You have ${marketplaceOrders.length} marketplace order${
+                        marketplaceOrders.length === 1 ? '' : 's'
+                      }.`
+                    : 'No marketplace orders yet. Place one from your cart.'}
+                </Text>
+              )}
+              <View style={styles.marketOrderActions}>
+                <KISButton
+                  title="View orders"
+                  size="sm"
+                  variant="primary"
+                  onPress={() => rootNavigation?.navigate('MarketplaceOrders')}
+                  disabled={marketplaceOrdersLoading}
+                />
+                <KISButton
+                  title="Received orders"
+                  size="sm"
+                  variant="outline"
+                  onPress={() => rootNavigation?.navigate('MarketplaceProviderOrders')}
+                  disabled={marketplaceOrdersLoading}
+                />
+              </View>
+            </View>
+
             <LogoutSection palette={palette} onLogout={c.logout} />
           </>
         )}
@@ -1764,7 +1956,7 @@ export default function ProfileScreen() {
 
             {c.activeSheet === 'upgrade' && (
               <UpgradeModal
-                tiers={c.profile?.tiers || []}
+                tiers={upgradeTiers}
                 accountTier={accountTier}
                 saving={c.saving}
                 onUpgrade={c.upgradeTier}

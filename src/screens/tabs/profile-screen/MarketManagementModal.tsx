@@ -12,6 +12,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { KISPalette } from '@/theme/constants';
 import { marketStyles } from '@/screens/market/market.styles';
 import { resolveShopImageUri } from '@/utils/shopAssets';
+import { formatKiscAmount } from '@/utils/currency';
 
 type MarketManagementModalProps = {
   palette: KISPalette;
@@ -26,45 +27,90 @@ type MarketManagementModalProps = {
   onRefresh?: () => void;
 };
 
-const formatCurrency = (value: number, currency = 'USD') => {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return `${currency === 'USD' ? '$' : ''}${value.toFixed(0)}`;
+const pickNumeric = (...values: any[]) => {
+  for (const value of values) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
   }
+  return 0;
 };
+
+const countItems = (value: any) => (Array.isArray(value) ? value.length : pickNumeric(value));
 
 export function MarketManagementModal(props: MarketManagementModalProps) {
   const { palette, title, subtitle, shops, loading, onCreateShop, onEditShop, onViewDashboard, onOpenLandingBuilder, onRefresh } = props;
 
   const totalProducts = useMemo(
     () =>
-      shops.reduce((sum, shop) => {
-        const count = Array.isArray(shop?.products) ? shop.products.length : Number(shop?.products ?? 0);
-        return sum + (Number.isFinite(count) ? count : 0);
-      }, 0),
+      shops.reduce(
+        (sum, shop) =>
+          sum +
+          countItems(
+            shop?.products_count,
+            shop?.product_count,
+            shop?.products,
+            shop?.metrics?.products_count,
+            shop?.metrics?.product_count,
+            shop?.metrics?.products,
+          ),
+        0,
+      ),
     [shops],
   );
 
   const totalServices = useMemo(
     () =>
-      shops.reduce((sum, shop) => sum + Number(shop?.services?.length ?? shop?.service_slots ?? 0), 0),
+      shops.reduce(
+        (sum, shop) =>
+          sum +
+          countItems(
+            shop?.services_count,
+            shop?.service_count,
+            shop?.services,
+            shop?.service_slots,
+            shop?.metrics?.services_count,
+            shop?.metrics?.service_count,
+            shop?.metrics?.services,
+          ),
+        0,
+      ),
     [shops],
   );
 
   const totalMembers = useMemo(
     () =>
-      shops.reduce((sum, shop) => sum + Number(shop?.members_count ?? shop?.members ?? 0), 0),
+      shops.reduce(
+        (sum, shop) =>
+          sum +
+          countItems(
+            shop?.team_members,
+            shop?.members,
+            shop?.members_count,
+            shop?.member_count,
+            shop?.metrics?.members_count,
+            shop?.metrics?.member_count,
+            shop?.metrics?.members,
+          ),
+        0,
+      ),
     [shops],
   );
 
   const totalRevenue = useMemo(
     () =>
-      shops.reduce((sum, shop) => sum + Number(shop?.revenue_total ?? shop?.live_revenue ?? 0), 0),
+      shops.reduce(
+        (sum, shop) =>
+          sum +
+          pickNumeric(
+            shop?.revenue_total,
+            shop?.revenue,
+            shop?.live_revenue,
+            shop?.metrics?.revenue_total,
+            shop?.metrics?.revenue,
+            shop?.metrics?.gross_revenue,
+          ),
+        0,
+      ),
     [shops],
   );
 
@@ -74,7 +120,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
       { label: 'Products', value: totalProducts },
       { label: 'Services', value: totalServices },
       { label: 'Members', value: totalMembers },
-      { label: 'Revenue', value: formatCurrency(totalRevenue) },
+      { label: 'Revenue', value: formatKiscAmount(totalRevenue, { decimals: 2 }) },
     ],
     [shops.length, totalProducts, totalServices, totalMembers, totalRevenue],
   );

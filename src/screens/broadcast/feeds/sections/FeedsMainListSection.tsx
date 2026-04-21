@@ -47,6 +47,9 @@ type Props = {
   onOpenItem: (item: BroadcastFeedItem) => void;
   onShare: (item: BroadcastFeedItem) => void;
   onLike: (item: BroadcastFeedItem) => void;
+  onSave: (item: BroadcastFeedItem) => void;
+  onComment: (item: BroadcastFeedItem) => void;
+  onMenu: (item: BroadcastFeedItem) => void;
   onSubscribe: (source: BroadcastSourceMeta, isSubscribed: boolean) => Promise<void> | void;
 };
 
@@ -58,6 +61,9 @@ export default function FeedsMainListSection({
   onOpenItem,
   onShare,
   onLike,
+  onSave,
+  onComment,
+  onMenu,
   onSubscribe,
 }: Props) {
   const { palette } = useKISTheme();
@@ -143,9 +149,9 @@ export default function FeedsMainListSection({
                 onShare={() => onShare(item)}
                 onOpenSource={() => onOpenItem(item)}
                 onVideoPress={() => onOpenItem(item)}
-                onMenuPress={() => {}}
-                onSave={() => {}}
-                onToggleComments={() => {}}
+                onMenuPress={() => onMenu(item)}
+                onSave={() => onSave(item)}
+                onToggleComments={() => onComment(item)}
                 onOpenAuthorProfile={
                   isUserBroadcastSource(item)
                     ? () => {
@@ -154,7 +160,7 @@ export default function FeedsMainListSection({
                     : undefined
                 }
                 onSubscribe={
-                  canSubscribe
+                  canSubscribe || subscribed
                     ? async () => {
                         await onSubscribe(enrichedSource, subscribed);
                       }

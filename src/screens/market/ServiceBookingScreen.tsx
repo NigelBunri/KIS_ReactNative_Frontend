@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
@@ -18,6 +19,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import type { RouteProp } from '@react-navigation/native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
+import { backendCentsToFrontendKisc, formatKiscAmount } from '@/utils/currency';
 import {
   createDefaultAvailability,
   formatDateKey,
@@ -34,7 +36,7 @@ const FLOW_STEP = {
   SUCCESS: 2,
 } as const;
 
-const formatMoneyLabel = (cents: number) => `${(cents / 100).toFixed(2)} KISC`;
+const formatMoneyLabel = (value: number) => formatKiscAmount(value);
 
 const TIME_SLOT_START_HOUR = 8;
 const TIME_SLOT_END_HOUR = 20;
@@ -106,7 +108,7 @@ const buildDateOptions = (service: any, availability: ServiceAvailability) => {
   const maxAdvanceDays = Number(service?.max_advance_booking_days ?? 30);
   const windowDays = Math.min(Math.max(maxAdvanceDays > 0 ? maxAdvanceDays : 30, 3), 90);
   const blackoutDates = Array.isArray(service?.blackout_dates) ? service.blackout_dates : [];
-  const blackoutSet = new Set(blackoutDates.map((item) => normalizeDateKey(item)));
+  const blackoutSet = new Set(blackoutDates.map((item: any) => normalizeDateKey(item)));
   const earliestBoundary = new Date(earliest);
   earliestBoundary.setHours(0, 0, 0, 0);
   const latestAllowed = new Date(now);
@@ -197,6 +199,15 @@ const formatList = (value: unknown): string[] => {
   return [String(value)];
 };
 
+const sanitizeDecimalInput = (value: string) => value.replace(/[^0-9.]/g, '');
+const sanitizeIntegerInput = (value: string) => value.replace(/[^0-9]/g, '');
+const normalizeServiceOptionList = (value: unknown) =>
+  Array.isArray(value) ? value.filter((item) => item && typeof item === 'object') : [];
+const extractRequirementLabel = (entry: any) =>
+  String(entry?.label ?? entry?.name ?? '').trim();
+const extractOptionName = (entry: any) => String(entry?.name ?? '').trim();
+const extractOptionPrice = (entry: any) => Number(entry?.price ?? 0);
+
 const SectionCard = ({
   title,
   children,
@@ -238,6 +249,20 @@ const ServiceBookingScreen = () => {
   );
   const [slotModalVisible, setSlotModalVisible] = useState(false);
   const [instructions, setInstructions] = useState('');
+  const [selectedPackage, setSelectedPackage] = useState('');
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  const [requestedPrice, setRequestedPrice] = useState('');
+  const [participantCount, setParticipantCount] = useState('');
+  const [staffOnSite, setStaffOnSite] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationState, setLocationState] = useState('');
+  const [locationCountry, setLocationCountry] = useState('');
+  const [remoteRegion, setRemoteRegion] = useState('');
+  const [isRemote, setIsRemote] = useState(false);
+  const [acknowledgedRequirements, setAcknowledgedRequirements] = useState<string[]>([]);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingResult, setBookingResult] = useState<any>(null);
@@ -251,6 +276,28 @@ const ServiceBookingScreen = () => {
   const availabilityRangeLabel = useMemo(
     () => formatAvailabilityRangeLabel(availability.date_range),
     [availability.date_range],
+  );
+  const packageOptions = useMemo(() => normalizeServiceOptionList(service?.packages), [service?.packages]);
+  const addonOptions = useMemo(() => normalizeServiceOptionList(service?.addons), [service?.addons]);
+  const requirementOptions = useMemo(() => normalizeServiceOptionList(service?.requirements), [service?.requirements]);
+  const remoteSupported = useMemo(
+    () => Array.isArray(service?.delivery_modes) && service.delivery_modes.some((mode: string) => String(mode).toLowerCase() === 'remote'),
+    [service?.delivery_modes],
+  );
+  const quoteOrNegotiationFlow = Boolean(service?.quote_required || service?.negotiable);
+  const participantFieldsVisible =
+    Number(service?.max_participants ?? 0) > 1 || Number(service?.staff_required ?? 0) > 0;
+  const requiresAdvancedOptions = Boolean(
+    service?.quote_required || requirementOptions.length || service?.service_terms,
+  );
+  const hasAdvancedOptions = Boolean(
+    packageOptions.length ||
+      addonOptions.length ||
+      quoteOrNegotiationFlow ||
+      participantFieldsVisible ||
+      remoteSupported ||
+      requirementOptions.length ||
+      service?.service_terms,
   );
 
   useEffect(() => {
@@ -304,6 +351,23 @@ const ServiceBookingScreen = () => {
   }, [service]);
 
   useEffect(() => {
+    setSelectedPackage('');
+    setSelectedAddons([]);
+    setRequestedPrice('');
+    setParticipantCount('');
+    setStaffOnSite('');
+    setLocationAddress('');
+    setLocationCity('');
+    setLocationState('');
+    setLocationCountry('');
+    setRemoteRegion('');
+    setAcknowledgedRequirements([]);
+    setTermsAccepted(false);
+    setShowAdvancedOptions(requiresAdvancedOptions);
+    setIsRemote(remoteSupported && !(Array.isArray(service?.delivery_modes) && service.delivery_modes.includes('onsite')));
+  }, [service?.id, remoteSupported, requiresAdvancedOptions]);
+
+  useEffect(() => {
     if (!dateOptions.length) return;
     setSelectedDate((prev) => {
       if (prev) {
@@ -316,33 +380,75 @@ const ServiceBookingScreen = () => {
     });
   }, [dateOptions]);
 
-  const priceCents = useMemo(() => {
+  const basePriceValue = useMemo(() => {
     const value = Number(service?.price ?? 0);
-    if (!Number.isFinite(value)) return 0;
-    return Math.max(0, Math.round(value * 100));
-  }, [service]);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }, [service?.price]);
 
-  const depositCents = useMemo(() => {
-    if (priceCents <= 0) return 0;
+  const selectedPackageValue = useMemo(() => {
+    if (!selectedPackage) return 0;
+    const entry = packageOptions.find((item: any) => extractOptionName(item) === selectedPackage);
+    const value = extractOptionPrice(entry);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }, [packageOptions, selectedPackage]);
+
+  const selectedAddonsValue = useMemo(
+    () =>
+      addonOptions.reduce((total: number, addon: any) => {
+        const name = extractOptionName(addon);
+        if (!name || !selectedAddons.includes(name)) return total;
+        const value = extractOptionPrice(addon);
+        return total + (Number.isFinite(value) ? Math.max(0, value) : 0);
+      }, 0),
+    [addonOptions, selectedAddons],
+  );
+
+  const requestedPriceValue = useMemo(() => {
+    const value = Number(requestedPrice.trim());
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }, [requestedPrice]);
+
+  const estimatedTotalValue = useMemo(() => {
+    if (service?.negotiable && requestedPrice.trim()) {
+      return requestedPriceValue;
+    }
+    const minimumCharge = Number(service?.minimum_charge ?? 0);
+    const rawTotal = basePriceValue + selectedPackageValue + selectedAddonsValue;
+    if (Number.isFinite(minimumCharge) && minimumCharge > 0) {
+      return Math.max(rawTotal, minimumCharge);
+    }
+    return rawTotal;
+  }, [
+    basePriceValue,
+    requestedPrice.trim(),
+    requestedPriceValue,
+    selectedAddonsValue,
+    selectedPackageValue,
+    service?.minimum_charge,
+    service?.negotiable,
+  ]);
+
+  const estimatedDepositValue = useMemo(() => {
+    if (quoteOrNegotiationFlow) return 0;
+    if (estimatedTotalValue <= 0) return 0;
     const amount = Number(service?.deposit_amount ?? '');
     const percent = Number(service?.deposit_percent ?? '');
     let depositValue = Number.isFinite(amount) && amount > 0 ? amount : 0;
     if (!depositValue && Number.isFinite(percent) && percent > 0) {
-      depositValue = (priceCents / 100) * (percent / 100);
+      depositValue = estimatedTotalValue * (percent / 100);
     }
     if (!depositValue) {
-      depositValue = priceCents / 100;
+      depositValue = estimatedTotalValue;
     }
-    const cents = Math.min(priceCents, Math.max(0, Math.round(depositValue * 100)));
-    return cents || priceCents;
-  }, [priceCents, service]);
+    return Math.min(estimatedTotalValue, Math.max(0, depositValue)) || estimatedTotalValue;
+  }, [estimatedTotalValue, quoteOrNegotiationFlow, service?.deposit_amount, service?.deposit_percent]);
 
-  const balanceCents = Math.max(priceCents - depositCents, 0);
+  const estimatedBalanceValue = Math.max(estimatedTotalValue - estimatedDepositValue, 0);
 
   const summaryList = useMemo(() => {
     const details: Array<{ label: string; value?: string }> = [];
-    if (service?.category?.name) {
-      details.push({ label: 'Category', value: service.category.name });
+    if (service?.catalog_categories?.[0]?.name) {
+      details.push({ label: 'Category', value: service.catalog_categories[0].name });
     }
     if (service?.service_type) {
       details.push({ label: 'Type', value: service.service_type });
@@ -397,9 +503,35 @@ const ServiceBookingScreen = () => {
       </Text>
     ));
 
+  const toggleAddon = (name: string) => {
+    setSelectedAddons((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name],
+    );
+  };
+
+  const toggleRequirement = (label: string) => {
+    setAcknowledgedRequirements((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label],
+    );
+  };
+
   const handleProceedToReview = () => {
     if (!selectedSlot) {
       setBookingError('Please select a date and time.');
+      return;
+    }
+    if (requirementOptions.length) {
+      const missing = requirementOptions
+        .map(extractRequirementLabel)
+        .filter(Boolean)
+        .filter((label) => !acknowledgedRequirements.includes(label));
+      if (missing.length) {
+        setBookingError('Please acknowledge all service requirements before continuing.');
+        return;
+      }
+    }
+    if (service?.service_terms && !termsAccepted) {
+      setBookingError('Please accept the service terms before continuing.');
       return;
     }
     setBookingError(null);
@@ -411,11 +543,48 @@ const ServiceBookingScreen = () => {
     setBookingLoading(true);
     setBookingError(null);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         service_id: service.id,
         scheduled_at: selectedSlot.toISOString(),
         instructions: instructions.trim(),
       };
+      if (selectedPackage) {
+        payload.selected_package = selectedPackage;
+      }
+      if (selectedAddons.length) {
+        payload.selected_addons = selectedAddons;
+      }
+      if (quoteOrNegotiationFlow && requestedPrice.trim()) {
+        payload.requested_price = requestedPrice.trim();
+      }
+      if (participantCount.trim()) {
+        payload.participant_count = Number(participantCount);
+      }
+      if (staffOnSite.trim()) {
+        payload.staff_on_site = Number(staffOnSite);
+      }
+      if (acknowledgedRequirements.length) {
+        payload.requirements_acknowledged = acknowledgedRequirements;
+      }
+      if (service?.service_terms) {
+        payload.terms_accepted = termsAccepted;
+      }
+      if (remoteSupported) {
+        payload.is_remote = isRemote;
+        if (isRemote && remoteRegion.trim()) {
+          payload.remote_region = remoteRegion.trim();
+        }
+      }
+      if (!isRemote) {
+        const location: Record<string, string> = {};
+        if (locationAddress.trim()) location.address_line1 = locationAddress.trim();
+        if (locationCity.trim()) location.city = locationCity.trim();
+        if (locationState.trim()) location.state = locationState.trim();
+        if (locationCountry.trim()) location.country = locationCountry.trim();
+        if (Object.keys(location).length) {
+          payload.location = location;
+        }
+      }
       const response = await postRequest(ROUTES.commerce.serviceBookings, payload, {
         errorMessage: 'Unable to confirm booking.',
       });
@@ -430,6 +599,10 @@ const ServiceBookingScreen = () => {
         throw new Error(statusMessage);
       }
       setBookingResult(response?.data ?? response);
+      DeviceEventEmitter.emit('service-booking.refresh', {
+        serviceId: String(service.id),
+        booking: response?.data ?? response,
+      });
       setFlowStep(FLOW_STEP.SUCCESS);
     } catch (error: any) {
       const message = error?.message || 'Unable to confirm booking.';
@@ -473,6 +646,225 @@ const ServiceBookingScreen = () => {
             onChangeText={setInstructions}
             multiline
           />
+          {hasAdvancedOptions ? (
+            <View
+              style={{
+                gap: 12,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: 16,
+                padding: 12,
+                backgroundColor: palette.surface,
+              }}
+            >
+              <Pressable
+                onPress={() => setShowAdvancedOptions((prev) => !prev)}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ color: palette.text, fontWeight: '700' }}>
+                    {requiresAdvancedOptions ? 'Required booking details' : 'More booking options'}
+                  </Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
+                    {requiresAdvancedOptions
+                      ? 'Complete the required service-specific details before review.'
+                      : 'Add package, add-on, quote, delivery, or other optional details only if needed.'}
+                  </Text>
+                </View>
+                <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>
+                  {showAdvancedOptions ? 'Hide' : 'Show'}
+                </Text>
+              </Pressable>
+              {showAdvancedOptions ? (
+                <View style={{ gap: 12 }}>
+                  {packageOptions.length ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: palette.text, fontWeight: '600' }}>Choose a package</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {packageOptions.map((pkg: any) => {
+                          const name = extractOptionName(pkg);
+                          if (!name) return null;
+                          const active = selectedPackage === name;
+                          return (
+                            <Pressable
+                              key={name}
+                              onPress={() => setSelectedPackage(active ? '' : name)}
+                              style={{
+                                paddingVertical: 8,
+                                paddingHorizontal: 10,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: active ? palette.primaryStrong : palette.divider,
+                                backgroundColor: active ? `${palette.primaryStrong}18` : palette.surface,
+                              }}
+                            >
+                              <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '600' }}>
+                                {name} {extractOptionPrice(pkg) ? `· ${extractOptionPrice(pkg).toFixed(2)} KISC` : ''}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : null}
+                  {addonOptions.length ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: palette.text, fontWeight: '600' }}>Optional add-ons</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {addonOptions.map((addon: any) => {
+                          const name = extractOptionName(addon);
+                          if (!name) return null;
+                          const active = selectedAddons.includes(name);
+                          return (
+                            <Pressable
+                              key={name}
+                              onPress={() => toggleAddon(name)}
+                              style={{
+                                paddingVertical: 8,
+                                paddingHorizontal: 10,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: active ? palette.primaryStrong : palette.divider,
+                                backgroundColor: active ? `${palette.primaryStrong}18` : palette.surface,
+                              }}
+                            >
+                              <Text style={{ color: active ? palette.primaryStrong : palette.text }}>
+                                {name} {extractOptionPrice(addon) ? `· ${extractOptionPrice(addon).toFixed(2)} KISC` : ''}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : null}
+                  {quoteOrNegotiationFlow ? (
+                    <KISTextInput
+                      label={service?.quote_required ? 'Requested price / quote' : 'Your proposed price'}
+                      placeholder="Enter your proposed amount"
+                      value={requestedPrice}
+                      onChangeText={(value) => setRequestedPrice(sanitizeDecimalInput(value))}
+                      keyboardType="numeric"
+                    />
+                  ) : null}
+                  {participantFieldsVisible ? (
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <KISTextInput
+                          label="Participants"
+                          value={participantCount}
+                          onChangeText={(value) => setParticipantCount(sanitizeIntegerInput(value))}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <KISTextInput
+                          label="Staff on site"
+                          value={staffOnSite}
+                          onChangeText={(value) => setStaffOnSite(sanitizeIntegerInput(value))}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+                  {remoteSupported ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: palette.text, fontWeight: '600' }}>Delivery mode</Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {[
+                          { key: false, label: 'On-site' },
+                          { key: true, label: 'Remote' },
+                        ].map((option) => (
+                          <Pressable
+                            key={String(option.key)}
+                            onPress={() => setIsRemote(option.key)}
+                            style={{
+                              paddingVertical: 8,
+                              paddingHorizontal: 10,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: isRemote === option.key ? palette.primaryStrong : palette.divider,
+                              backgroundColor: isRemote === option.key ? `${palette.primaryStrong}18` : palette.surface,
+                            }}
+                          >
+                            <Text style={{ color: isRemote === option.key ? palette.primaryStrong : palette.text }}>{option.label}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                  {remoteSupported ? (
+                    isRemote ? (
+                      <KISTextInput
+                        label="Remote region"
+                        placeholder="Enter your region"
+                        value={remoteRegion}
+                        onChangeText={setRemoteRegion}
+                      />
+                    ) : (
+                      <View style={{ gap: 8 }}>
+                        <KISTextInput label="Location address" value={locationAddress} onChangeText={setLocationAddress} />
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            <KISTextInput label="City" value={locationCity} onChangeText={setLocationCity} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <KISTextInput label="State" value={locationState} onChangeText={setLocationState} />
+                          </View>
+                        </View>
+                        <KISTextInput label="Country" value={locationCountry} onChangeText={setLocationCountry} />
+                      </View>
+                    )
+                  ) : null}
+                  {requirementOptions.length ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: palette.text, fontWeight: '600' }}>Requirements acknowledgement</Text>
+                      {requirementOptions.map((entry: any) => {
+                        const label = extractRequirementLabel(entry);
+                        if (!label) return null;
+                        const active = acknowledgedRequirements.includes(label);
+                        return (
+                          <Pressable
+                            key={label}
+                            onPress={() => toggleRequirement(label)}
+                            style={{
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: active ? palette.primaryStrong : palette.divider,
+                              backgroundColor: active ? `${palette.primaryStrong}12` : palette.surface,
+                            }}
+                          >
+                            <Text style={{ color: active ? palette.primaryStrong : palette.text }}>
+                              {active ? 'Accepted' : 'Tap to accept'} · {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                  {service?.service_terms ? (
+                    <Pressable
+                      onPress={() => setTermsAccepted((prev) => !prev)}
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: termsAccepted ? palette.primaryStrong : palette.divider,
+                        backgroundColor: termsAccepted ? `${palette.primaryStrong}12` : palette.surface,
+                      }}
+                    >
+                      <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>Service terms</Text>
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>{service.service_terms}</Text>
+                      <Text style={{ color: termsAccepted ? palette.primaryStrong : palette.text, marginTop: 8 }}>
+                        {termsAccepted ? 'Terms accepted' : 'Tap to accept terms'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           {bookingError ? (
             <Text style={{ color: palette.primaryStrong, fontSize: 13 }}>{bookingError}</Text>
           ) : null}
@@ -494,20 +886,76 @@ const ServiceBookingScreen = () => {
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
               <Text style={{ color: palette.subtext }}>Total price</Text>
-              <Text style={{ color: palette.text }}>{formatMoneyLabel(priceCents)}</Text>
+              <Text style={{ color: palette.text }}>{formatMoneyLabel(estimatedTotalValue)}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-              <Text style={{ color: palette.subtext }}>Deposit (wallet)</Text>
-              <Text style={{ color: palette.text }}>{formatMoneyLabel(depositCents)}</Text>
+              <Text style={{ color: palette.subtext }}>{quoteOrNegotiationFlow ? 'Due now' : 'Deposit (wallet)'}</Text>
+              <Text style={{ color: palette.text }}>{formatMoneyLabel(estimatedDepositValue)}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
               <Text style={{ color: palette.subtext }}>Remaining</Text>
-              <Text style={{ color: palette.text }}>{formatMoneyLabel(balanceCents)}</Text>
+              <Text style={{ color: palette.text }}>{formatMoneyLabel(estimatedBalanceValue)}</Text>
             </View>
             {instructions ? (
               <View style={{ marginTop: 8 }}>
                 <Text style={{ color: palette.subtext, marginBottom: 4 }}>Instructions</Text>
                 <Text style={{ color: palette.text }}>{instructions}</Text>
+              </View>
+            ) : null}
+            {selectedPackage ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Package</Text>
+                <Text style={{ color: palette.text }}>{selectedPackage}</Text>
+              </View>
+            ) : null}
+            {selectedAddons.length ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Add-ons</Text>
+                <Text style={{ color: palette.text }}>{selectedAddons.join(', ')}</Text>
+              </View>
+            ) : null}
+            {requestedPrice ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Requested price</Text>
+                <Text style={{ color: palette.text }}>{formatMoneyLabel(requestedPriceValue)}</Text>
+              </View>
+            ) : null}
+            {participantCount ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Participants</Text>
+                <Text style={{ color: palette.text }}>{participantCount}</Text>
+              </View>
+            ) : null}
+            {staffOnSite ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Staff on site</Text>
+                <Text style={{ color: palette.text }}>{staffOnSite}</Text>
+              </View>
+            ) : null}
+            {isRemote && remoteRegion ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Remote region</Text>
+                <Text style={{ color: palette.text }}>{remoteRegion}</Text>
+              </View>
+            ) : null}
+            {!isRemote && (locationAddress || locationCity || locationState || locationCountry) ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Location</Text>
+                <Text style={{ color: palette.text }}>
+                  {[locationAddress, locationCity, locationState, locationCountry].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            ) : null}
+            {acknowledgedRequirements.length ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Requirements acknowledged</Text>
+                <Text style={{ color: palette.text }}>{acknowledgedRequirements.join(', ')}</Text>
+              </View>
+            ) : null}
+            {service?.service_terms ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.subtext, marginBottom: 4 }}>Terms</Text>
+                <Text style={{ color: palette.text }}>{termsAccepted ? 'Accepted' : 'Not accepted'}</Text>
               </View>
             ) : null}
           </SectionCard>
@@ -521,7 +969,7 @@ const ServiceBookingScreen = () => {
               onPress={() => setFlowStep(FLOW_STEP.SELECT_SLOT)}
             />
             <KISButton
-              title="Confirm & pay"
+              title={quoteOrNegotiationFlow ? 'Confirm request' : estimatedDepositValue > 0 ? 'Confirm & pay' : 'Confirm booking'}
               onPress={handleConfirmBooking}
               loading={bookingLoading}
               disabled={bookingLoading}
@@ -535,7 +983,11 @@ const ServiceBookingScreen = () => {
         <Text style={{ color: palette.primaryStrong, fontSize: 20, fontWeight: '700' }}>Booking confirmed</Text>
         <Text style={{ color: palette.text }}>{`Reference: ${bookingResult?.id ?? 'N/A'}`}</Text>
         <Text style={{ color: palette.subtext, textAlign: 'center', maxWidth: 260 }}>
-          Your KISC wallet has been charged and the shop owner has been notified.
+          {Number(bookingResult?.deposit_cents ?? 0) > 0
+            ? `Your wallet was charged ${formatKiscAmount(
+                backendCentsToFrontendKisc(bookingResult?.deposit_cents ?? 0),
+              )} and the shop owner has been notified.`
+            : 'Your booking request has been sent and the shop owner has been notified.'}
         </Text>
         <KISButton title="Done" onPress={() => navigation.goBack()} />
       </View>
@@ -672,7 +1124,7 @@ const ServiceBookingScreen = () => {
         <SectionCard title={service?.name ?? serviceName ?? 'Service booking'} palette={palette}>
           <Text style={{ color: palette.text }}>{service?.short_summary ?? service?.description ?? 'Booking details are shown below.'}</Text>
           <Text style={{ color: palette.primaryStrong, fontSize: 28, fontWeight: '700', marginTop: 8 }}>
-            {formatMoneyLabel(priceCents)}
+            {formatMoneyLabel(basePriceValue)}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
             {badges.map((text) => (
@@ -720,7 +1172,7 @@ const ServiceBookingScreen = () => {
             </Text>
           ) : null}
           {availabilityRules.length ? (
-            availabilityRules.map((rule) => (
+            availabilityRules.map((rule: string) => (
               <Text key={rule} style={{ color: palette.text, fontSize: 13 }}>
                 {rule}
               </Text>
@@ -737,20 +1189,41 @@ const ServiceBookingScreen = () => {
           )}
         </SectionCard>
         <SectionCard title="Add-ons & packages" palette={palette}>
-          {formatList(service?.packages).length ? (
-            renderListItems(formatList(service.packages))
+          {packageOptions.length ? (
+            packageOptions.map((pkg: any) => {
+              const name = extractOptionName(pkg);
+              return (
+                <Text key={name} style={{ color: palette.text, fontSize: 13 }}>
+                  {name} {extractOptionPrice(pkg) ? `· ${extractOptionPrice(pkg).toFixed(2)} KISC` : ''}
+                </Text>
+              );
+            })
           ) : (
             <Text style={{ color: palette.subtext }}>No packages yet.</Text>
           )}
-          {formatList(service?.addons).length ? (
-            renderListItems(formatList(service.addons))
+          {addonOptions.length ? (
+            addonOptions.map((addon: any) => {
+              const name = extractOptionName(addon);
+              return (
+                <Text key={name} style={{ color: palette.text, fontSize: 13 }}>
+                  {name} {extractOptionPrice(addon) ? `· ${extractOptionPrice(addon).toFixed(2)} KISC` : ''}
+                </Text>
+              );
+            })
           ) : (
             <Text style={{ color: palette.subtext }}>No add-ons yet.</Text>
           )}
         </SectionCard>
         <SectionCard title="Requirements" palette={palette}>
-          {formatList(service?.requirements).length ? (
-            renderListItems(formatList(service.requirements))
+          {requirementOptions.length ? (
+            requirementOptions.map((entry: any) => {
+              const label = extractRequirementLabel(entry);
+              return (
+                <Text key={label} style={{ color: palette.text, fontSize: 13 }}>
+                  {label}
+                </Text>
+              );
+            })
           ) : (
             <Text style={{ color: palette.subtext }}>No requirements specified.</Text>
           )}

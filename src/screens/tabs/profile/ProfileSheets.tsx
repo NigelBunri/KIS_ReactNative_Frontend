@@ -47,6 +47,7 @@ type Props = {
   resumeSubscription: () => void;
   downgradeTier: (tierId: string) => void;
   retryTransaction: (txRef: string) => void;
+  tiers?: any[];
 };
 
 export default function ProfileSheets(props: Props) {
@@ -81,6 +82,7 @@ export default function ProfileSheets(props: Props) {
     upgradeTier,
     billingHistory,
     subscription,
+    tiers = [],
     cancelSubscription,
     resumeSubscription,
     downgradeTier,
@@ -151,7 +153,7 @@ export default function ProfileSheets(props: Props) {
 
           {activeSheet === 'upgrade' && (
             <UpgradeModal
-              tiers={profile?.tiers || []}
+              tiers={tiers.length ? tiers : profile?.tiers || []}
               accountTier={accountTier}
               saving={saving}
               onUpgrade={upgradeTier}

@@ -76,7 +76,10 @@ const broadcastRoutes = {
     discovery: `${API_BASE_URL}/api/v1/education/discovery/`,
     search: `${API_BASE_URL}/api/v1/education/search/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/`,
+    certificate: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/certificate/`,
+    certificateShare: (token: string) => `${API_BASE_URL}/api/v1/education/certificates/share/${token}/`,
     enroll: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/enroll/`,
+    itemAction: (contentId: string, itemId: string) => `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
     progress: `${API_BASE_URL}/api/v1/education/progress/`,
     review: `${API_BASE_URL}/api/v1/education/reviews/`,
     contentReviews: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/reviews/`,
@@ -163,6 +166,7 @@ const broadcastRoutes = {
     list: `${API_BASE_URL}/api/v1/broadcasts/`,
     react: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/${id}/react/`,
     share: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/${id}/share/`,
+    save: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/${id}/save/`,
     hide: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/${id}/hide/`,
     commentRoom: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/${id}/comment-room/`,
     channelMessages: `${API_BASE_URL}/api/v1/broadcasts/channel-messages/`,
@@ -187,6 +191,84 @@ const broadcastRoutes = {
     profileManage: `${API_BASE_URL}/api/v1/broadcasts/profiles/manage/`,
     subscribe: `${API_BASE_URL}/api/v1/broadcasts/subscribe/`,
     educationCourseBroadcast: `${API_BASE_URL}/api/v1/broadcasts/education/courses/broadcast/`,
+    educationHub: `${API_BASE_URL}/api/v1/broadcasts/education/hub/`,
+    educationInstitutions: `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`,
+    educationInstitution: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/`,
+    educationInstitutionDashboard: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/dashboard/`,
+    educationInstitutionMemberships: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/memberships/`,
+    educationInstitutionMembershipAction: (institutionId: string, membershipId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/memberships/${membershipId}/action/`,
+    educationInstitutionStudentMembershipDetail: (institutionId: string, membershipId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/memberships/${membershipId}/student-detail/`,
+    educationInstitutionStaffMembershipDetail: (institutionId: string, membershipId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/memberships/${membershipId}/staff-detail/`,
+    educationInstitutionStaffAssignments: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/staff-assignments/`,
+    educationInstitutionStaffAssignment: (institutionId: string, assignmentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/staff-assignments/${assignmentId}/`,
+    educationInstitutionEnrollments: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/enrollments/`,
+    educationInstitutionEnrollmentDetail: (institutionId: string, enrollmentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/enrollments/${enrollmentId}/`,
+    educationInstitutionEnrollmentAction: (institutionId: string, enrollmentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/enrollments/${enrollmentId}/action/`,
+    educationInstitutionBookings: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/bookings/`,
+    educationInstitutionBookingDetail: (institutionId: string, bookingId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/bookings/${bookingId}/`,
+    educationInstitutionBookingAction: (institutionId: string, bookingId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/bookings/${bookingId}/action/`,
+    educationInstitutionPrograms: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/programs/`,
+    educationInstitutionProgram: (institutionId: string, programId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/programs/${programId}/`,
+    educationInstitutionProgramDetail: (institutionId: string, programId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/programs/${programId}/`,
+    educationInstitutionCourses: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/courses/`,
+    educationInstitutionCourse: (institutionId: string, courseId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/`,
+    educationInstitutionCourseDetail: (institutionId: string, courseId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/`,
+    educationInstitutionCourseModules: (institutionId: string, courseId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/modules/`,
+    educationInstitutionCourseModule: (institutionId: string, courseId: string, moduleId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/modules/${moduleId}/`,
+    educationInstitutionCourseModuleItems: (institutionId: string, courseId: string, moduleId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/modules/${moduleId}/items/`,
+    educationInstitutionCourseModuleItem: (institutionId: string, courseId: string, moduleId: string, itemId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/courses/${courseId}/modules/${moduleId}/items/${itemId}/`,
+    educationInstitutionLessons: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/lessons/`,
+    educationInstitutionLesson: (institutionId: string, lessonId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/lessons/${lessonId}/`,
+    educationInstitutionLessonDetail: (institutionId: string, lessonId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/lessons/${lessonId}/`,
+    educationInstitutionClassSessions: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/class-sessions/`,
+    educationInstitutionClassSession: (institutionId: string, sessionId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/class-sessions/${sessionId}/`,
+    educationInstitutionClassSessionDetail: (institutionId: string, sessionId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/class-sessions/${sessionId}/`,
+    educationInstitutionMaterials: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/materials/`,
+    educationInstitutionMaterial: (institutionId: string, materialId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/materials/${materialId}/`,
+    educationInstitutionEvents: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/events/`,
+    educationInstitutionEvent: (institutionId: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/events/${eventId}/`,
+    educationInstitutionBroadcasts: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/broadcasts/`,
+    educationInstitutionBroadcast: (institutionId: string, broadcastId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/broadcasts/${broadcastId}/`,
+    educationInstitutionAssessments: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/assessments/`,
+    educationInstitutionAssessment: (institutionId: string, assessmentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/`,
     educationProfiles: `${API_BASE_URL}/api/v1/broadcasts/education/profiles/`,
     educationProfile: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/profiles/${id}/`,
     educationProfileBroadcast: (id: string) =>
@@ -203,6 +285,9 @@ const broadcastRoutes = {
     upload: `${API_BASE_URL}/api/v1/broadcasts/upload/`,
   },
   commerce: {
+    carts: `${API_BASE_URL}/api/v1/commerce/carts/`,
+    cartCurrent: `${API_BASE_URL}/api/v1/commerce/carts/current/`,
+    cart: (id: string) => `${API_BASE_URL}/api/v1/commerce/carts/${id}/`,
     shops: `${API_BASE_URL}/api/v1/commerce/shops/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
     productBroadcast: (id: string) => `${API_BASE_URL}/api/v1/commerce/products/${id}/broadcast/`,
@@ -216,19 +301,32 @@ const broadcastRoutes = {
     shopService: (id: string) => `${API_BASE_URL}/api/v1/commerce/shop-services/${id}/`,
     serviceBooking: (id: string) => `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/`,
     serviceBookingReceipt: (id: string) => `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/receipt/`,
+    serviceBookingReceiptRegenerate: (id: string) => `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/receipt/regenerate/`,
     serviceBookingCancel: (id: string) => `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/cancel/`,
+    serviceBookingReschedule: (id: string) => `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/reschedule/`,
     serviceBookingPayRemaining: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/service-bookings/${id}/pay-remaining/`,
     payment: (id: string) => `${API_BASE_URL}/api/v1/commerce/payments/${id}/`,
     paymentSatisfy: (id: string) => `${API_BASE_URL}/api/v1/commerce/payments/${id}/satisfy/`,
     follows: `${API_BASE_URL}/api/v1/commerce/follows/`,
     productCategories: `${API_BASE_URL}/api/v1/commerce/product-categories/`,
+    catalogCategories: `${API_BASE_URL}/api/v1/commerce/product-categories/`,
     productCategoryDetail: (id: string) => `${API_BASE_URL}/api/v1/commerce/product-categories/${id}/`,
     productRatings: `${API_BASE_URL}/api/v1/commerce/product-ratings/`,
     serviceBookings: `${API_BASE_URL}/api/v1/commerce/service-bookings/`,
     serviceBookingComplaints: `${API_BASE_URL}/api/v1/commerce/service-booking-complaints/`,
     serviceBookingComplaint: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/service-booking-complaints/${id}/`,
+    cartItems: `${API_BASE_URL}/api/v1/commerce/cart-items/`,
+    cartItem: (id: string) => `${API_BASE_URL}/api/v1/commerce/cart-items/${id}/`,
+    marketplaceOrders: `${API_BASE_URL}/api/v1/commerce/marketplace-orders/`,
+    marketplaceProviderOrders: `${API_BASE_URL}/api/v1/commerce/marketplace-provider-orders/`,
+    marketplaceOrder: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/`,
+    marketplaceOrderCancel: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/cancel/`,
+    marketplaceOrderSatisfy: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/satisfy/`,
+    marketplaceOrderComplete: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/complete/`,
+    marketplaceOrderDelete: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/`,
+    marketplaceOrderReceipt: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/receipt/`,
   },
   feeds: {
     create: `${NEST_API_BASE_URL}/api/v1/feeds`,

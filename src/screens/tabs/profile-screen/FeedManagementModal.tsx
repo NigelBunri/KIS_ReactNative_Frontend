@@ -13,21 +13,14 @@ import {
 } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
-import { KISVideo } from '@/Module/vieo';
 import type { Asset } from 'react-native-image-picker';
 import type { KISPalette } from '@/theme/constants';
 import { styles } from '../profile/profile.styles';
 import { FEED_MEDIA_TYPES } from './types';
 import type { FeedMediaType, FeedMediaOptions } from './types';
 import { KISIcon } from '@/constants/kisIcons';
-
-const resolveAttachmentUrl = (attachment: any) =>
-  attachment?.stream_url ??
-  attachment?.url ??
-  attachment?.link ??
-  attachment?.resource_url ??
-  attachment?.source_url ??
-  attachment?.uri;
+import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
+import { getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
 
 const RemoveAttachment = ({palette, feed, attachment, onRemoveAttachment}:{onRemoveAttachment: (feed: any, attachment: any) => void; feed: any; attachment: any; palette: any}) => {
   return(
@@ -42,20 +35,18 @@ const RemoveAttachment = ({palette, feed, attachment, onRemoveAttachment}:{onRem
 }
 
 const AttachmentPreview: React.FC<{onRemoveAttachment:(feed: any, attachment: any)=>void ; feed: any; attachment: any; palette: KISPalette }> = ({ onRemoveAttachment, feed, attachment, palette }) => {
-  const url = resolveAttachmentUrl(attachment);
+  const preview = getAttachmentPreviewInfo(attachment);
+  const url = preview.url ?? preview.previewUri;
   if (!url) return null;
-  const type =
-    (attachment?.media_type ?? attachment?.mime_type ?? attachment?.type ?? '')
-      .toLowerCase();
+  const type = String(attachment?.media_type ?? attachment?.mime_type ?? attachment?.type ?? '').toLowerCase();
 
-  if (type.startsWith('video') && url.startsWith('http')) {
+  if (preview.isVideo && url.startsWith('http')) {
     return (
       <>
         <RemoveAttachment onRemoveAttachment={onRemoveAttachment} feed={feed} attachment={attachment} palette={palette} />
-        <KISVideo
-          sourceUrl={url}
-          autoPlay={false}
-          allowFullScreen
+        <BroadcastFeedVideoPreview
+          attachment={attachment}
+          palette={palette}
           videoStyle={{ borderRadius: 18, backgroundColor: palette.bar }}
           containerStyle={{ width: '100%', height: 200, borderRadius: 18 }}
         />
@@ -64,7 +55,7 @@ const AttachmentPreview: React.FC<{onRemoveAttachment:(feed: any, attachment: an
     );
   }
 
-  if (type.startsWith('image') || /\.(jpeg|jpg|gif|png|webp)$/i.test(url)) {
+  if (preview.isImage || /\.(jpeg|jpg|gif|png|webp)$/i.test(url)) {
     return (
       <>
         <RemoveAttachment onRemoveAttachment={onRemoveAttachment} feed={feed} attachment={attachment} palette={palette} />
@@ -266,14 +257,17 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
       ...panelFeedExistingAttachments,
       ...panelFeedAssets,
     ];
+    console.log('feeds items:', feeds);
     return attachments
       .map((attachment, index) => {
+        const preview = getAttachmentPreviewInfo(attachment);
         const key =
           attachment?.key ??
           attachment?.file_key ??
           attachment?.id ??
           attachment?.name ??
-          resolveAttachmentUrl(attachment) ??
+          preview.url ??
+          preview.previewUri ??
           attachment?.uri ??
           `attachment-${index}`;
         if (!key) {
@@ -281,7 +275,8 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         }
         const label =
           attachment?.name ??
-          resolveAttachmentUrl(attachment)?.split?.('/')?.pop() ??
+          preview.url?.split?.('/')?.pop() ??
+          preview.previewUri?.split?.('/')?.pop() ??
           `Attachment ${index + 1}`;
         return { key, label };
       })
@@ -598,6 +593,11 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
 }
 
 const COLOR_SWATCHES = ['transparent', '#FFB703', '#118AB2', '#06D6A0', '#EF476F'];
+
+const getColorLabel = (color: string) => {
+  if (color === 'transparent') return 'None';
+  return color.replace('#', '').toUpperCase();
+};
 
 type TypeSpecificFormProps = {
   mediaType: FeedMediaType;
@@ -930,14 +930,48 @@ const ColorDot: React.FC<{ color: string; active: boolean; onPress: () => void; 
   <Pressable
     onPress={onPress}
     style={[
-      modalStyles.colorDot,
+      modalStyles.colorOption,
       {
-        borderColor: palette.divider,
-        backgroundColor: color === 'transparent' ? palette.surface : color,
+        borderColor: active ? palette.primary : palette.divider,
+        backgroundColor: active ? palette.primarySoft : palette.surface,
       },
-      active && modalStyles.colorDotActive,
     ]}
-  />
+  >
+    <View
+      style={[
+        modalStyles.colorDot,
+        {
+          borderColor: active ? palette.primaryStrong : palette.divider,
+          backgroundColor: color === 'transparent' ? palette.surface : color,
+        },
+        color === 'transparent' ? modalStyles.colorDotTransparent : null,
+        active && modalStyles.colorDotActive,
+      ]}
+    >
+      {active ? (
+        <View
+          style={[
+            modalStyles.colorDotIndicator,
+            {
+              backgroundColor: color === 'transparent' ? palette.primaryStrong : 'rgba(255,255,255,0.92)',
+            },
+          ]}
+        />
+      ) : null}
+      {color === 'transparent' ? (
+        <Text style={[modalStyles.colorDotTransparentLabel, { color: palette.subtext }]}>/</Text>
+      ) : null}
+    </View>
+    <Text
+      style={[
+        modalStyles.colorOptionLabel,
+        { color: active ? palette.primaryStrong : palette.subtext },
+      ]}
+      numberOfLines={1}
+    >
+      {getColorLabel(color)}
+    </Text>
+  </Pressable>
 );
 
 const modalStyles = StyleSheet.create({
@@ -1190,17 +1224,48 @@ const modalStyles = StyleSheet.create({
   },
   colorRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginTop: 6,
   },
-  colorDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  colorOption: {
+    width: 64,
     borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 6,
+  },
+  colorDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorDotTransparent: {
+    borderStyle: 'dashed',
   },
   colorDotActive: {
     borderWidth: 2,
+  },
+  colorDotIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  colorDotTransparentLabel: {
+    position: 'absolute',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  colorOptionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   textPreviewWrapper: {
     marginTop: 12,

@@ -4,6 +4,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { TypographyPreset } from '@/theme/foundations/fonts';
 import { useGlobalProfilePreview } from '@/components/profile/GlobalProfilePreviewProvider';
 import { splitTextByKisHandles } from '@/utils/kisHandle';
+import { translateString } from '@/languages';
 
 type Props = TextProps & {
   preset?: TypographyPreset;
@@ -50,7 +51,7 @@ export default function KISText({
   const renderChildren = (value: any, keyPrefix: string): any => {
     if (!autoLinkHandles) return value;
     if (typeof value === 'string' || typeof value === 'number') {
-      return renderLinkedString(String(value), keyPrefix);
+      return renderLinkedString(translateString(String(value)), keyPrefix);
     }
     if (Array.isArray(value)) {
       return value.map((entry, index) => renderChildren(entry, `${keyPrefix}-${index}`));

@@ -23,10 +23,17 @@ import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import DocumentPicker from 'react-native-document-picker';
 import { getUserData } from '@/network/cache';
+import { backendCentsToFrontendKisc, formatKiscAmount } from '@/utils/currency';
+import {
+  createDefaultAvailability,
+  formatDateKey,
+  getDayKey,
+  normalizeAvailabilityPayload,
+  ServiceAvailability,
+} from './availabilityUtils';
 
 const formatKisc = (value: number | null | undefined) => {
-  const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
-  return `${(safe / 100).toFixed(2)} KISC`;
+  return formatKiscAmount(backendCentsToFrontendKisc(value));
 };
 
 const formatDurationLabel = (ms: number) => {
@@ -125,7 +132,131 @@ const isBookingCancelled = (booking?: any) => {
   return CANCELLED_STATUSES.has(status);
 };
 
-const CANCELLATION_WINDOW_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_CANCELLATION_WINDOW_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_RESCHEDULE_WINDOW_MS = 0;
+const TIME_SLOT_START_HOUR = 8;
+const TIME_SLOT_END_HOUR = 20;
+const TIME_SLOT_STEP_MINUTES = 30;
+const DEFAULT_DATE_WINDOW = 21;
+const MAX_RANGE_OPTIONS = 366;
+
+const generateTimeline = (slotDurationMinutes: number) => {
+  const duration = Math.max(5, slotDurationMinutes || TIME_SLOT_STEP_MINUTES);
+  const steps = Math.floor(((TIME_SLOT_END_HOUR - TIME_SLOT_START_HOUR) * 60) / duration);
+  const slots: string[] = [];
+  for (let index = 0; index <= steps; index += 1) {
+    const totalMinutes = TIME_SLOT_START_HOUR * 60 + index * duration;
+    if (totalMinutes > TIME_SLOT_END_HOUR * 60) break;
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  }
+  return slots;
+};
+
+const normalizeDateKey = (value: Date | string) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+};
+
+const parseDateOnly = (value?: string | null) => {
+  if (!value) return null;
+  const parts = value.split('-').map((part) => Number(part));
+  if (parts.length !== 3 || parts.some((segment) => !Number.isFinite(segment))) return null;
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const formatAvailabilityRangeLabel = (range?: ServiceAvailability['date_range']) => {
+  if (!range) return '';
+  const start = parseDateOnly(range.start_date);
+  const end = parseDateOnly(range.end_date);
+  if (!start || !end) return '';
+  const startLabel = start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  const endLabel = end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
+};
+
+const isDateWithinRange = (date: Date, range?: ServiceAvailability['date_range']) => {
+  if (!range) return true;
+  const start = parseDateOnly(range.start_date);
+  const end = parseDateOnly(range.end_date);
+  if (!start || !end) return true;
+  const candidate = new Date(date);
+  candidate.setHours(0, 0, 0, 0);
+  return candidate.getTime() >= start.getTime() && candidate.getTime() <= end.getTime();
+};
+
+const getAvailabilityEntry = (date: Date, availability: ServiceAvailability) => {
+  const key = formatDateKey(date);
+  return availability.specific_dates[key] ?? availability.days[getDayKey(date)];
+};
+
+const buildDateOptions = (serviceDetails: any, availability: ServiceAvailability) => {
+  const now = new Date();
+  const minNoticeHours = Math.max(0, Number(serviceDetails?.min_notice_hours ?? 24));
+  const earliest = new Date(now.getTime() + minNoticeHours * 60 * 60 * 1000);
+  const maxAdvanceDays = Number(serviceDetails?.max_advance_booking_days ?? 30);
+  const windowDays = Math.min(Math.max(maxAdvanceDays > 0 ? maxAdvanceDays : 30, 3), 90);
+  const blackoutDates = Array.isArray(serviceDetails?.blackout_dates) ? serviceDetails.blackout_dates : [];
+  const blackoutSet = new Set(blackoutDates.map((item: any) => normalizeDateKey(item)));
+  const earliestBoundary = new Date(earliest);
+  earliestBoundary.setHours(0, 0, 0, 0);
+  const latestAllowed = new Date(now);
+  if (maxAdvanceDays > 0) {
+    latestAllowed.setDate(latestAllowed.getDate() + maxAdvanceDays);
+  } else {
+    latestAllowed.setDate(latestAllowed.getDate() + windowDays);
+  }
+  latestAllowed.setHours(23, 59, 59, 999);
+  const rangeStart = parseDateOnly(availability.date_range?.start_date);
+  const rangeEnd = parseDateOnly(availability.date_range?.end_date);
+  const startBoundary = rangeStart && rangeStart.getTime() > earliestBoundary.getTime() ? rangeStart : earliestBoundary;
+  const proposedEnd = rangeEnd ? new Date(rangeEnd) : new Date(latestAllowed);
+  proposedEnd.setHours(23, 59, 59, 999);
+  const endBoundary = new Date(Math.min(proposedEnd.getTime(), latestAllowed.getTime()));
+  const maxOptions = availability.date_range ? MAX_RANGE_OPTIONS : DEFAULT_DATE_WINDOW;
+  if (endBoundary.getTime() < startBoundary.getTime()) return [];
+  const options: Date[] = [];
+  const cursor = new Date(startBoundary);
+  while (cursor.getTime() <= endBoundary.getTime() && options.length < Math.max(maxOptions, 1)) {
+    if (cursor.getTime() > now.getTime() && isDateWithinRange(cursor, availability.date_range)) {
+      const key = normalizeDateKey(cursor);
+      if (!blackoutSet.has(key)) {
+        const specificSlot = availability.specific_dates[key];
+        const weeklySlot = availability.days[getDayKey(cursor)];
+        const entry = specificSlot || weeklySlot;
+        if (entry?.enabled) options.push(new Date(cursor));
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return options;
+};
+
+const buildSlotsForDate = (date: Date | null, availability: ServiceAvailability) => {
+  if (!date) return [];
+  const entry = getAvailabilityEntry(date, availability);
+  if (!entry) return [];
+  const timeline = generateTimeline(availability.slot_duration_minutes);
+  const allowedTimes = entry.all_day ? new Set(timeline) : new Set(entry.times);
+  return timeline.map((time) => ({
+    time,
+    enabled: entry.enabled && (entry.all_day || allowedTimes.has(time)),
+  }));
+};
+
+const formatSlotLabel = (value: Date) =>
+  value.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
 const ServiceBookingDetailsPage = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'ServiceBookingDetails'>>();
@@ -175,16 +306,20 @@ const ServiceBookingDetailsPage = () => {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
-  const [receiptLinks, setReceiptLinks] = useState<{ pdf?: string; page?: string }>({});
+  const [receiptLinks, setReceiptLinks] = useState<{ pdf?: string; page?: string; receipt_id?: string }>({});
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [completingPayment, setCompletingPayment] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<Date | null>(null);
+  const [rescheduleTime, setRescheduleTime] = useState<string | null>(null);
   const cachedUserProfile = useMemo(
     () => cachedStorageUser?.user ?? cachedStorageUser ?? null,
     [cachedStorageUser],
   );
   const currentUserId = cachedUserProfile?.id ?? cachedUserProfile?.user_id ?? cachedUserProfile?.uuid ?? null;
   const serviceId = useMemo(() => getServiceIdentifier(booking), [booking]);
-  console.log("booking data: ", booking)
   const shopId = useMemo(() => getShopIdentifier(booking), [booking]);
   const rosterEntries = useMemo(() => {
     const map = new Map<
@@ -255,7 +390,6 @@ const ServiceBookingDetailsPage = () => {
         errorMessage: 'Unable to load shop team.',
         forceNetwork: true,
       });
-      console.log('ServiceBookingDetailsPage shopMembers response for shopId', shopId, response);
       if (response?.success) {
         const payload = response.data ?? response;
         const records = Array.isArray(payload)
@@ -277,9 +411,6 @@ const ServiceBookingDetailsPage = () => {
   }, [shopId]);
 
   useEffect(() => {
-    if (shopId) {
-      console.log('ServiceBookingDetailsPage loading shopMembers for shopId', shopId);
-    }
     void loadShopMembers();
   }, [loadShopMembers, shopId]);
 
@@ -290,10 +421,8 @@ const ServiceBookingDetailsPage = () => {
   }, [booking, currentUserId]);
   const isPayer = useMemo(() => {
     if (!booking || !currentUserId) return false;
-    return String(booking?.user) === String(currentUserId);
+    return String(getBookingUserId(booking)) === String(currentUserId);
   }, [booking, currentUserId]);
-
-   console.log("see the shope members now", shopMembers)
   const isShopTeamMember = useMemo(() => {
     if (!currentUserId || !shopMembers.length) return false;
     return shopMembers.some((member) => {
@@ -306,7 +435,6 @@ const ServiceBookingDetailsPage = () => {
   }, [currentUserId, shopMembers]);
   const hasRosterAccess = useMemo(() => Boolean(isProvider || isShopTeamMember), [isProvider, isShopTeamMember]);
   const canManageRosterActions = useMemo(() => Boolean(isShopTeamMember), [isShopTeamMember]);
-  console.log("now checking for the resent buttons: ", canManageRosterActions, "see now", isShopTeamMember)
   const loadBlockedUsers = useCallback(async () => {
     if (!hasRosterAccess) {
       setBlockedUsers({});
@@ -324,7 +452,7 @@ const ServiceBookingDetailsPage = () => {
           ? (payload as any).results
           : [];
         const map: Record<string, string> = {};
-        records.forEach((item) => {
+        records.forEach((item: any) => {
           const blockedId =
             item?.blocked_id ??
             (item?.blocked?.id ? String(item?.blocked?.id) : null) ??
@@ -358,8 +486,8 @@ const ServiceBookingDetailsPage = () => {
           : Array.isArray((payload as any).results)
           ? (payload as any).results
           : [];
-        const filtered = records.filter((entry) => getServiceIdentifier(entry) === serviceId);
-        if (booking && !filtered.some((entry) => String(entry?.id) === String(booking?.id))) {
+        const filtered = records.filter((entry: any) => getServiceIdentifier(entry) === serviceId);
+        if (booking && !filtered.some((entry: any) => String(entry?.id) === String(booking?.id))) {
           filtered.unshift(booking);
         }
         setServiceRoster(filtered);
@@ -487,21 +615,108 @@ const ServiceBookingDetailsPage = () => {
   );
 
   const scheduledAt = booking?.scheduled_at ? new Date(booking.scheduled_at) : null;
+  const serviceDetails = booking?.service_details ?? null;
+  const availability = useMemo(
+    () => normalizeAvailabilityPayload(serviceDetails?.availability ?? createDefaultAvailability({ timezone: 'UTC' })),
+    [serviceDetails?.availability],
+  );
+  const availabilityRangeLabel = useMemo(
+    () => formatAvailabilityRangeLabel(availability.date_range),
+    [availability.date_range],
+  );
+  const dateOptions = useMemo(() => buildDateOptions(serviceDetails, availability), [availability, serviceDetails]);
+  const availableSlots = useMemo(() => buildSlotsForDate(rescheduleDate, availability), [availability, rescheduleDate]);
+  const selectedRescheduleSlot = useMemo(() => {
+    if (!rescheduleDate || !rescheduleTime) return null;
+    const [hour, minute] = rescheduleTime.split(':').map(Number);
+    const slot = new Date(rescheduleDate);
+    slot.setHours(hour, minute, 0, 0);
+    return slot;
+  }, [rescheduleDate, rescheduleTime]);
   const scheduledMs = scheduledAt?.getTime() ?? null;
-  const cancellationWindowMs = CANCELLATION_WINDOW_MS;
+  const serviceCancellationHours = Number(booking?.service_details?.cancellation_window_hours ?? 2);
+  const normalizedCancellationHours =
+    Number.isFinite(serviceCancellationHours) && serviceCancellationHours > 0 ? serviceCancellationHours : 2;
+  const cancellationWindowMs = normalizedCancellationHours * 60 * 60 * 1000 || DEFAULT_CANCELLATION_WINDOW_MS;
+  const serviceRescheduleHours = Number(serviceDetails?.reschedule_window_hours ?? 0);
+  const normalizedRescheduleHours =
+    Number.isFinite(serviceRescheduleHours) && serviceRescheduleHours > 0 ? serviceRescheduleHours : 0;
+  const rescheduleWindowMs =
+    normalizedRescheduleHours > 0 ? normalizedRescheduleHours * 60 * 60 * 1000 : DEFAULT_RESCHEDULE_WINDOW_MS;
+  const refundPolicyText =
+    String(booking?.service_details?.refund_policy ?? '').trim() ||
+    `Cancel at least ${normalizedCancellationHours} hour${normalizedCancellationHours === 1 ? '' : 's'} before the scheduled time for a refund.`;
+  const bookingMetadata = booking?.metadata ?? {};
+  const packageSelection = bookingMetadata?.package_selection ?? null;
+  const addonSelection = Array.isArray(bookingMetadata?.addon_selection) ? bookingMetadata.addon_selection : [];
+  const acknowledgedRequirements = Array.isArray(bookingMetadata?.requirements_acknowledged)
+    ? bookingMetadata.requirements_acknowledged
+    : [];
+  const bookingLocation = bookingMetadata?.location ?? null;
+  const locationLabel = bookingLocation
+    ? [
+        bookingLocation.address_line1,
+        bookingLocation.city,
+        bookingLocation.state,
+        bookingLocation.region,
+        bookingLocation.country,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : '';
   const isScheduledInFuture = scheduledMs ? scheduledMs > currentTime : false;
   const meetsNoticeWindow = scheduledMs ? scheduledMs - currentTime >= cancellationWindowMs : false;
   const cancellableStatuses = ['pending', 'confirmed'];
   const hasCancellableStatus = cancellableStatuses.includes(booking?.status ?? '');
   const canCancelBooking = Boolean(isPayer && hasCancellableStatus && isScheduledInFuture && meetsNoticeWindow);
+  const canManageSchedule = Boolean(isPayer || isProvider || isShopTeamMember);
+  const meetsRescheduleWindow =
+    scheduledMs && rescheduleWindowMs > 0 ? scheduledMs - currentTime >= rescheduleWindowMs : true;
+  const canRescheduleBooking = Boolean(canManageSchedule && hasCancellableStatus && isScheduledInFuture && meetsRescheduleWindow);
   const cancellationDisabledReason = useMemo(() => {
     if (!isPayer) return null;
     if (!hasCancellableStatus) return 'Only pending or confirmed bookings can be canceled.';
     if (!scheduledAt) return 'Scheduled time is unavailable.';
     if (!isScheduledInFuture) return 'The service date/time has already passed.';
-    if (!meetsNoticeWindow) return 'Cancel at least two hours before the scheduled time for a refund.';
+    if (!meetsNoticeWindow) return refundPolicyText;
     return null;
-  }, [isPayer, hasCancellableStatus, scheduledAt, isScheduledInFuture, meetsNoticeWindow]);
+  }, [isPayer, hasCancellableStatus, scheduledAt, isScheduledInFuture, meetsNoticeWindow, refundPolicyText]);
+  const rescheduleDisabledReason = useMemo(() => {
+    if (!canManageSchedule) return 'Only the payer, provider, or shop managers can reschedule this booking.';
+    if (!hasCancellableStatus) return 'Only pending or confirmed bookings can be rescheduled.';
+    if (!scheduledAt) return 'Scheduled time is unavailable.';
+    if (!isScheduledInFuture) return 'The service date/time has already passed.';
+    if (!meetsRescheduleWindow) {
+      return `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${normalizedRescheduleHours === 1 ? '' : 's'} before the original slot.`;
+    }
+    return null;
+  }, [canManageSchedule, hasCancellableStatus, isScheduledInFuture, meetsRescheduleWindow, normalizedRescheduleHours, scheduledAt]);
+
+  useEffect(() => {
+    if (!dateOptions.length) return;
+    setRescheduleDate((prev) => {
+      if (prev) {
+        const match = dateOptions.find((option) => option.toDateString() === prev.toDateString());
+        if (match) return match;
+      }
+      return dateOptions[0];
+    });
+  }, [dateOptions]);
+
+  useEffect(() => {
+    if (!availableSlots.length) {
+      setRescheduleTime(null);
+      return;
+    }
+    setRescheduleTime((prev) => {
+      if (prev) {
+        const keep = availableSlots.find((slot) => slot.time === prev && slot.enabled);
+        if (keep) return prev;
+      }
+      const next = availableSlots.find((slot) => slot.enabled);
+      return next?.time ?? availableSlots[0].time;
+    });
+  }, [availableSlots]);
 
   const handleCancelBooking = useCallback(async () => {
     if (!bookingId || !canCancelBooking) return;
@@ -511,7 +726,7 @@ const ServiceBookingDetailsPage = () => {
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to cancel booking.');
       }
-      Alert.alert('Booking', 'Your booking is canceled and you will receive a 100% refund.');
+      Alert.alert('Booking', 'Your booking has been canceled.');
       loadBooking();
     } catch (e: any) {
       Alert.alert('Booking', e?.message || 'Unable to cancel booking.');
@@ -542,6 +757,31 @@ const ServiceBookingDetailsPage = () => {
       setActionLoading(false);
     }
   }, [bookingId, loadBooking]);
+
+  const handleRescheduleBooking = useCallback(async () => {
+    if (!bookingId || !selectedRescheduleSlot || !canRescheduleBooking) return;
+    setRescheduleLoading(true);
+    setRescheduleError(null);
+    try {
+      const res = await postRequest(
+        ROUTES.commerce.serviceBookingReschedule(bookingId),
+        { scheduled_at: selectedRescheduleSlot.toISOString() },
+        { errorMessage: 'Unable to reschedule booking.' },
+      );
+      if (!res?.success) {
+        const message =
+          res?.data?.message || res?.data?.detail || res?.message || 'Unable to reschedule booking.';
+        throw new Error(message);
+      }
+      Alert.alert('Booking', `Booking rescheduled to ${formatSlotLabel(selectedRescheduleSlot)}.`);
+      setRescheduleOpen(false);
+      loadBooking();
+    } catch (e: any) {
+      setRescheduleError(e?.message || 'Unable to reschedule booking.');
+    } finally {
+      setRescheduleLoading(false);
+    }
+  }, [bookingId, canRescheduleBooking, loadBooking, selectedRescheduleSlot]);
 
   const handleMarkSatisfied = useCallback(async () => {
     if (!booking?.payment?.id) {
@@ -735,16 +975,62 @@ const ServiceBookingDetailsPage = () => {
       const links = {
         pdf: data.receipt_pdf_url || undefined,
         page: data.receipt_url || undefined,
+        receipt_id: data.receipt_id || undefined,
       };
       if (!links.pdf && !links.page) {
         throw new Error('Booking receipt links are missing.');
       }
-      setReceiptLinks(links);
+      setReceiptLinks((prev) => ({
+        ...prev,
+        ...links,
+      }));
       return links;
     } finally {
       setLoadingReceipt(false);
     }
   }, [bookingId]);
+
+  const [regeneratingReceipt, setRegeneratingReceipt] = useState(false);
+
+  const handleRegenerateReceipt = useCallback(async () => {
+    if (!bookingId) {
+      Alert.alert('Receipt', 'Booking reference is missing.');
+      return;
+    }
+    setRegeneratingReceipt(true);
+    try {
+      const payload: Record<string, string> = {};
+      if (receiptLinks.receipt_id) {
+        payload.receipt_id = receiptLinks.receipt_id;
+      }
+      const response = await postRequest(
+        ROUTES.commerce.serviceBookingReceiptRegenerate(bookingId),
+        payload,
+        { errorMessage: 'Unable to regenerate receipt.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to regenerate receipt.');
+      }
+      const data = response.data ?? response ?? {};
+      const links = {
+        pdf: data.receipt_pdf_url ?? data.receipt_url,
+        page: data.receipt_url ?? data.receipt_pdf_url,
+      };
+      if (!links.pdf && !links.page) {
+        throw new Error('Receipt links are missing.');
+      }
+      setReceiptLinks((prev) => ({
+        ...prev,
+        ...links,
+        receipt_id: data.receipt_id ?? prev.receipt_id,
+      }));
+      Alert.alert('Receipt', 'Receipt regenerated. You can download it below.');
+    } catch (error: any) {
+      Alert.alert('Receipt', error?.message || 'Unable to regenerate receipt.');
+    } finally {
+      setRegeneratingReceipt(false);
+    }
+  }, [bookingId, receiptLinks.receipt_id]);
 
   const handleDownloadReceipt = useCallback(async () => {
     if (!bookingId) {
@@ -767,6 +1053,7 @@ const ServiceBookingDetailsPage = () => {
   const hasPaymentReference = Boolean(
     booking?.payment?.transaction_reference || booking?.payment_tx_ref,
   );
+  const showReceiptsSection = Boolean(bookingId);
   useEffect(() => {
     if (hasPaymentReference) {
       void fetchReceiptLinks();
@@ -796,7 +1083,11 @@ const ServiceBookingDetailsPage = () => {
 
   const showComplaintPrompt = useMemo(() => {
     return (
-      booking?.status === 'awaiting_satisfaction' && isPayer && booking?.provider_completed_at && !booking?.payer_satisfied_at
+      booking?.status === 'awaiting_satisfaction' &&
+      isPayer &&
+      booking?.provider_completed_at &&
+      !booking?.payer_satisfied_at &&
+      !booking?.has_open_complaint
     );
   }, [booking, isPayer]);
 
@@ -848,6 +1139,20 @@ const ServiceBookingDetailsPage = () => {
     isPayer &&
     balanceAmountCents <= 0 &&
     paymentStatusValue === 'paid';
+  const normalizedBookingStatus = String(booking?.status ?? '').toLowerCase();
+  const completionLockedStatuses = new Set([
+    'awaiting_satisfaction',
+    'completed',
+    'satisfied',
+    'cancelled',
+    'canceled',
+    'rejected',
+  ]);
+  const showMarkCompletedButton =
+    (isProvider || isShopTeamMember) &&
+    paymentStatusValue === 'paid' &&
+    !booking?.provider_completed_at &&
+    !completionLockedStatuses.has(normalizedBookingStatus);
   const cardStyle = {
     backgroundColor: palette.surfaceElevated,
     borderRadius: 14,
@@ -900,6 +1205,81 @@ const ServiceBookingDetailsPage = () => {
             <Text style={{ color: palette.text }}>Status</Text>
             <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>{bookingStatusLabel}</Text>
           </View>
+          {packageSelection?.name ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Package</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>{packageSelection.name}</Text>
+            </View>
+          ) : null}
+          {addonSelection.length ? (
+            <View style={{ marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Add-ons</Text>
+              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>
+                {addonSelection.map((entry: any) => entry?.name).filter(Boolean).join(', ')}
+              </Text>
+            </View>
+          ) : null}
+          {bookingMetadata?.requested_price ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Requested price</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {formatKiscAmount(Number(bookingMetadata.requested_price))}
+              </Text>
+            </View>
+          ) : null}
+          {bookingMetadata?.participant_count ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Participants</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.participant_count}</Text>
+            </View>
+          ) : null}
+          {bookingMetadata?.staff_on_site ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Staff on site</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.staff_on_site}</Text>
+            </View>
+          ) : null}
+          {locationLabel ? (
+            <View style={{ marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Location</Text>
+              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>{locationLabel}</Text>
+            </View>
+          ) : null}
+          {bookingMetadata?.remote_region ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Remote region</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.remote_region}</Text>
+            </View>
+          ) : null}
+          {acknowledgedRequirements.length ? (
+            <View style={{ marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Requirements acknowledged</Text>
+              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>
+                {acknowledgedRequirements.join(', ')}
+              </Text>
+            </View>
+          ) : null}
+          {bookingMetadata?.terms_accepted ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ color: palette.text }}>Terms</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>Accepted</Text>
+            </View>
+          ) : null}
+          {hasPaymentReference ? (
+            <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+              <KISButton
+                title="Regenerate receipt"
+                size="sm"
+                variant="outline"
+                onPress={handleRegenerateReceipt}
+                loading={regeneratingReceipt}
+                disabled={regeneratingReceipt}
+              />
+              <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
+                Regenerates the receipt stored in _/media/billing/receipts/_ so you can download the fresh PDF.
+              </Text>
+            </View>
+          ) : null}
           {meetingLink ? (
             <Pressable onPress={() => handleOpenLink(meetingLink)} style={{ marginTop: 12 }}>
               <Text style={{ color: palette.primaryStrong }}>Open meeting link</Text>
@@ -910,7 +1290,7 @@ const ServiceBookingDetailsPage = () => {
             <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.divider }}>
               <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Cancel booking</Text>
               <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}>
-                Cancel at least two hours before the scheduled time to receive a full refund.
+                {refundPolicyText}
               </Text>
               <KISButton
                 title="Cancel booking"
@@ -925,6 +1305,32 @@ const ServiceBookingDetailsPage = () => {
               ) : null}
             </View>
           )}
+          <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.divider }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Reschedule booking</Text>
+            <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}>
+              {normalizedRescheduleHours > 0
+                ? `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${normalizedRescheduleHours === 1 ? '' : 's'} before the original slot.`
+                : 'Pick a new slot and we will re-check availability before updating the booking.'}
+            </Text>
+            <KISButton
+              title="Reschedule booking"
+              variant="outline"
+              onPress={() => {
+                setRescheduleError(null);
+                setRescheduleOpen(true);
+              }}
+              disabled={!canRescheduleBooking}
+              style={{ marginTop: 8 }}
+            />
+            {rescheduleDisabledReason ? (
+              <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4 }}>{rescheduleDisabledReason}</Text>
+            ) : null}
+            {Array.isArray(bookingMetadata?.reschedules) && bookingMetadata.reschedules.length ? (
+              <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+                Last reschedule: {formatTimestamp(bookingMetadata.reschedules[bookingMetadata.reschedules.length - 1]?.to)}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         <View style={cardStyle}>
@@ -985,9 +1391,19 @@ const ServiceBookingDetailsPage = () => {
           </View>
         </View>
 
-        {hasPaymentReference ? (
+        {showReceiptsSection ? (
           <View style={[cardStyle, { gap: 10 }]}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Receipts</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Receipts</Text>
+              <KISButton
+                title="Regenerate receipt"
+                size="sm"
+                variant="ghost"
+                onPress={handleRegenerateReceipt}
+                loading={regeneratingReceipt}
+                disabled={regeneratingReceipt}
+              />
+            </View>
             <Text style={{ color: palette.subtext, fontSize: 13 }}>
               Download a copy of the receipt that matches the styling stored under /media/billing/receipts/.
             </Text>
@@ -1010,7 +1426,7 @@ const ServiceBookingDetailsPage = () => {
                 Tap the button below to generate the receipt and download whenever you need it.
               </Text>
             )}
-            <View style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
               <KISButton
                 title={receiptActions.length ? 'Download receipt' : 'Generate receipt'}
                 size="sm"
@@ -1100,13 +1516,17 @@ const ServiceBookingDetailsPage = () => {
           </View>
         ) : null}
 
-        {(isProvider && paymentStatusValue === 'paid') && (
+        {showMarkCompletedButton && (
           <KISButton title="Mark Completed" onPress={handleMarkCompleted} loading={actionLoading} />
         )}
         {showComplaintPrompt && (
           <View style={{ backgroundColor: palette.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: palette.warning }}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>Provider marked service as completed.</Text>
-            <Text style={{ color: palette.subtext, marginVertical: 8 }}>You have 3 days to send a receipt and personal statement if the service was unsatisfactory.</Text>
+            <Text style={{ color: palette.subtext, marginVertical: 8 }}>
+              {countdownLabel
+                ? `You can open a complaint during the current review window. ${countdownLabel}.`
+                : 'You can submit a complaint during the active review window if the service was unsatisfactory.'}
+            </Text>
             <KISButton title="Submit complaint" variant="secondary" onPress={() => setComplaintOpen(true)} />
           </View>
         )}
@@ -1142,7 +1562,7 @@ const ServiceBookingDetailsPage = () => {
                 const timeUntilScheduled =
                   scheduledAtForActive !== null ? scheduledAtForActive.getTime() - currentTime : null;
                 const withinCancellationWindow =
-                  typeof timeUntilScheduled === 'number' && timeUntilScheduled >= CANCELLATION_WINDOW_MS;
+                  typeof timeUntilScheduled === 'number' && timeUntilScheduled >= cancellationWindowMs;
                 const rosterActionsEnabled =
                   Boolean(activeBooking && !isBookingCancelled(activeBooking)) && withinCancellationWindow;
                 const actionContainerOpacity = rosterActionsEnabled ? 1 : 0.45;
@@ -1337,6 +1757,106 @@ const ServiceBookingDetailsPage = () => {
             onPress={handleSubmitComplaint}
             loading={submittingComplaint}
           />
+        </View>
+      </Modal>
+
+      <Modal visible={rescheduleOpen} transparent animationType="slide" onRequestClose={() => setRescheduleOpen(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setRescheduleOpen(false)}>
+          <View style={{ flex: 1 }} />
+        </Pressable>
+        <View style={{ backgroundColor: palette.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '85%' }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Reschedule booking</Text>
+          <Text style={{ color: palette.subtext, marginTop: 4 }}>
+            Choose a new date and time that fits the service availability rules.
+          </Text>
+          {availabilityRangeLabel ? (
+            <Text style={{ color: palette.subtext, marginTop: 8, fontSize: 12 }}>
+              Schedule window: {availabilityRangeLabel}
+            </Text>
+          ) : null}
+          <ScrollView style={{ maxHeight: 220, marginTop: 12 }}>
+            {dateOptions.length ? (
+              dateOptions.map((date) => (
+                <Pressable
+                  key={date.toISOString()}
+                  style={{
+                    paddingVertical: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: palette.divider,
+                  }}
+                  onPress={() => setRescheduleDate(date)}
+                >
+                  <Text
+                    style={{
+                      color:
+                        rescheduleDate?.toDateString() === date.toDateString()
+                          ? palette.primaryStrong
+                          : palette.text,
+                      fontWeight:
+                        rescheduleDate?.toDateString() === date.toDateString() ? '600' : '400',
+                    }}
+                  >
+                    {date.toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={{ color: palette.subtext }}>No valid dates available.</Text>
+            )}
+          </ScrollView>
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ color: palette.text, marginBottom: 8 }}>Choose a time</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {availableSlots.length ? (
+                availableSlots.map((slot) => {
+                  const isActive = slot.enabled && slot.time === rescheduleTime;
+                  return (
+                    <Pressable
+                      key={slot.time}
+                      style={{
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: isActive ? palette.primaryStrong : palette.divider,
+                        backgroundColor: isActive ? `${palette.primaryStrong}20` : palette.surface,
+                        marginBottom: 4,
+                        opacity: slot.enabled ? 1 : 0.35,
+                      }}
+                      onPress={() => slot.enabled && setRescheduleTime(slot.time)}
+                    >
+                      <Text
+                        style={{
+                          color: slot.enabled ? (isActive ? palette.primaryStrong : palette.text) : palette.subtext,
+                          fontSize: 12,
+                        }}
+                      >
+                        {slot.time}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <Text style={{ color: palette.subtext }}>No time slots available for this day.</Text>
+              )}
+            </View>
+          </View>
+          {rescheduleError ? (
+            <Text style={{ color: palette.warning, marginTop: 12 }}>{rescheduleError}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+            <KISButton title="Close" variant="ghost" onPress={() => setRescheduleOpen(false)} />
+            <KISButton
+              title="Confirm reschedule"
+              onPress={handleRescheduleBooking}
+              loading={rescheduleLoading}
+              disabled={!selectedRescheduleSlot || rescheduleLoading}
+            />
+          </View>
         </View>
       </Modal>
     </View>

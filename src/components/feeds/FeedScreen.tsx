@@ -35,6 +35,7 @@ import ShareRenderer, { type SharePayload } from './ShareRenderer';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
+import { DEV_BACKEND_HOST } from '@/network/config';
 import { useSocket } from '../../../SocketProvider';
 import CommentThreadPanel from './CommentThreadPanel';
 import { formatCompactCount } from './feedUtils';
@@ -1209,7 +1210,7 @@ export default function FeedScreen<T extends FeedPost>({
           {looksLikeLocalhost(currentVideoUrl) ? (
             <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
               <Text style={{ color: palette.subtext, fontSize: 12, textAlign: 'center' }}>
-                Note: This URL is localhost. On a real iPhone, replace 127.0.0.1 with your computer LAN IP.
+                Note: This URL is localhost. On a real iPhone, replace {DEV_BACKEND_HOST} with your computer LAN IP.
               </Text>
             </View>
           ) : null}

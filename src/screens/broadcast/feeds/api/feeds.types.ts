@@ -39,6 +39,7 @@ export type BroadcastFeedItem = {
   broadcasted_at?: string;
   reaction_count?: number;
   viewer_reaction?: string | null;
+  viewer_saved?: boolean;
   comment_count?: number;
   comment_conversation_id?: string | null;
   share_count?: number;

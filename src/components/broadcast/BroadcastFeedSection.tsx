@@ -23,6 +23,12 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, resolveBackendAssetUrl, useMediaHeaders } from '@/network';
+import {
+  getBroadcastFeedVideoPosterUrl,
+  getBroadcastFeedVideoRiskNote,
+  getBroadcastFeedVideoSourceLabel,
+  getBroadcastFeedVideoSources,
+} from '@/components/broadcast/feedVideoPlayback';
 import { logFeedEvent } from '@/network/personalization';
 
 import BroadcastFeedCard, { type BroadcastFeedItem } from './BroadcastFeedCard';
@@ -92,12 +98,11 @@ const normalizeAttachmentUrl = (attachment: any) => {
 const resolveVideoAttachment = (item: BroadcastFeedItem) => {
   const attachments = Array.isArray(item.attachments) ? item.attachments : [];
   for (const attachment of attachments) {
-    const url = normalizeAttachmentUrl(attachment);
-    if (!url) continue;
-
     const kind = String(
       attachment?.kind ??
+        attachment?.media_type ??
         attachment?.mimeType ??
+        attachment?.mime_type ??
         attachment?.mime ??
         attachment?.type ??
         '',
@@ -110,22 +115,17 @@ const resolveVideoAttachment = (item: BroadcastFeedItem) => {
       kind.includes('mp4');
     if (!isVideo) continue;
 
-    const thumb =
-      resolveBackendAssetUrl(
-        attachment?.thumbUrl ??
-          attachment?.thumb_url ??
-          attachment?.thumbnail ??
-          attachment?.thumb ??
-          attachment?.preview_url ??
-          attachment?.previewUrl ??
-          null,
-      ) ?? null;
+    const sources = getBroadcastFeedVideoSources(attachment);
+    const primarySource = sources[0];
+    if (!primarySource?.url) continue;
+    const thumb = getBroadcastFeedVideoPosterUrl(attachment);
 
     return {
       id: String(attachment?.id ?? `${item.id}-att0`),
-      url,
+      url: primarySource.url,
       thumbUrl: thumb,
       attachment,
+      sources,
     };
   }
   return null;
@@ -565,6 +565,7 @@ export default function BroadcastFeedSection({
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [videoQueue, setVideoQueue] = useState<BroadcastFeedItem[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [currentVideoSourceIndex, setCurrentVideoSourceIndex] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -574,6 +575,7 @@ export default function BroadcastFeedSection({
       if (index === -1) return;
       setVideoQueue(videoItems);
       setCurrentVideoIndex(index);
+      setCurrentVideoSourceIndex(0);
       setIsVideoPlaying(false);
       setVideoModalVisible(true);
     },
@@ -631,11 +633,13 @@ export default function BroadcastFeedSection({
     setVideoModalVisible(false);
     setVideoQueue([]);
     setCurrentVideoIndex(0);
+    setCurrentVideoSourceIndex(0);
   }, [translateY]);
 
   const goToNextVideo = useCallback(() => {
     if (currentVideoIndex < videoQueue.length - 1) {
       setCurrentVideoIndex((prev) => prev + 1);
+      setCurrentVideoSourceIndex(0);
       setIsVideoPlaying(true);
       return true;
     }
@@ -646,6 +650,7 @@ export default function BroadcastFeedSection({
   const goToPreviousVideo = useCallback(() => {
     if (currentVideoIndex > 0) {
       setCurrentVideoIndex((prev) => prev - 1);
+      setCurrentVideoSourceIndex(0);
       setIsVideoPlaying(true);
       return true;
     }
@@ -703,19 +708,56 @@ export default function BroadcastFeedSection({
 
   const currentVideoItem = videoQueue[currentVideoIndex];
   const currentVideoBundle = currentVideoItem ? resolveVideoAttachment(currentVideoItem) : null;
+  const currentVideoSource = currentVideoBundle?.sources?.[currentVideoSourceIndex] ?? null;
 
   const resolvedCurrentVideoUrl =
-    currentVideoBundle?.id && resolvedMediaUrls[currentVideoBundle.id]
+    currentVideoBundle?.id &&
+    currentVideoSourceIndex === 0 &&
+    currentVideoSource?.kind === 'stream_url' &&
+    resolvedMediaUrls[currentVideoBundle.id]
       ? resolvedMediaUrls[currentVideoBundle.id]
-      : currentVideoBundle?.url;
+      : currentVideoSource?.url ?? currentVideoBundle?.url;
 
-  const currentVideoSource =
+  const currentVideoPlaybackSource =
     resolvedCurrentVideoUrl
       ? buildMediaSource(
           resolvedCurrentVideoUrl,
           resolvedCurrentVideoUrl?.includes('/media/') ? undefined : mediaHeaders,
         )
       : undefined;
+
+  const handleLegacyVideoError = useCallback(
+    (error: any) => {
+      console.warn('Video playback error', error);
+      if (currentVideoBundle?.sources && currentVideoSourceIndex < currentVideoBundle.sources.length - 1) {
+        const fallbackIndex = currentVideoSourceIndex + 1;
+        const fallbackSource = currentVideoBundle.sources[fallbackIndex];
+        if (__DEV__) {
+          console.warn('[BroadcastFeedSection] falling back video source', {
+            from: currentVideoSource ? {
+              kind: currentVideoSource.kind,
+              host: currentVideoSource.host,
+              risk: getBroadcastFeedVideoRiskNote(currentVideoSource),
+            } : null,
+            to: fallbackSource ? {
+              kind: fallbackSource.kind,
+              host: fallbackSource.host,
+              risk: getBroadcastFeedVideoRiskNote(fallbackSource),
+            } : null,
+            videoId: currentVideoBundle.id,
+          });
+        }
+        setCurrentVideoSourceIndex(fallbackIndex);
+        setIsVideoPlaying(false);
+        return;
+      }
+      Alert.alert(
+        'Playback error',
+        `Unable to play this broadcast video (${getBroadcastFeedVideoSourceLabel(currentVideoSource)}).`,
+      );
+    },
+    [currentVideoBundle, currentVideoSource, currentVideoSourceIndex],
+  );
 
   /* ─────────────────────────
    * Share flow
@@ -1220,7 +1262,7 @@ export default function BroadcastFeedSection({
                 <Video
                   ref={videoPlayerRef}
                   key={videoQueue[currentVideoIndex]?.id}
-                  source={currentVideoSource ?? { uri: currentVideoBundle?.url ?? '' }}
+                  source={currentVideoPlaybackSource ?? { uri: resolvedCurrentVideoUrl ?? '' }}
                   style={styles.videoPlayer}
                   paused={!isVideoPlaying}
                   controls={false}
@@ -1228,10 +1270,7 @@ export default function BroadcastFeedSection({
                   poster={currentVideoBundle?.thumbUrl ?? currentVideoBundle?.url ?? undefined}
                   posterResizeMode="cover"
                   onEnd={handleVideoEnd}
-                  onError={(error) => {
-                    console.warn('Video playback error', error);
-                    Alert.alert('Playback error', 'Unable to play this broadcast.');
-                  }}
+                  onError={handleLegacyVideoError}
                 />
 
                 {!isVideoPlaying && (
