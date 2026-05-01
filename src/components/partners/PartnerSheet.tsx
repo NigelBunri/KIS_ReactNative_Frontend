@@ -47,6 +47,12 @@ export default function PartnerSheet({
   animatePartnerSheet,
 }: Props) {
   const { palette } = useKISTheme();
+  const statCards = [
+    { label: 'Groups', value: groupsCount },
+    { label: 'Communities', value: communitiesCount },
+    { label: 'Channels', value: channelsCount },
+    { label: 'Admins', value: selectedPartner?.admins?.length || 0 },
+  ];
 
   return (
     <View
@@ -61,7 +67,10 @@ export default function PartnerSheet({
         ]}
         pointerEvents={isOpen ? 'auto' : 'none'}
       >
-        <Pressable style={{ flex: 1 }} onPress={() => animatePartnerSheet(false)} />
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => animatePartnerSheet(false)}
+        />
       </Animated.View>
 
       {/* draggable sheet itself */}
@@ -70,74 +79,146 @@ export default function PartnerSheet({
           styles.sheetContainer,
           {
             height: sheetHeight,
-            backgroundColor: palette.surfaceElevated,
+            backgroundColor: palette.surface,
             borderTopColor: palette.divider,
+            shadowColor: palette.shadow ?? '#000',
             transform: [{ translateY: sheetOffsetAnim }],
           },
         ]}
-        {...sheetPanHandlers}
       >
-        <View
-          style={[
-            styles.sheetHandle,
-            { backgroundColor: palette.borderMuted },
-          ]}
-        />
+        <View style={styles.sheetDragZone} {...sheetPanHandlers}>
+          <View
+            style={[
+              styles.sheetHandle,
+              { backgroundColor: palette.borderMuted },
+            ]}
+          />
+        </View>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={styles.settingsScrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.settingsSheetHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.settingsTitle, { color: palette.text, flex: 1 }]}>
-                {(selectedPartner?.name ?? 'Partner')} settings
-              </Text>
+            <View style={styles.settingsHeroTopRow}>
+              <View style={styles.settingsHeroTitleWrap}>
+                <Text
+                  style={[
+                    styles.settingsEyebrow,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
+                  Partner control room
+                </Text>
+                <Text
+                  style={[styles.settingsTitle, { color: palette.text }]}
+                  numberOfLines={2}
+                >
+                  {selectedPartner?.name ?? 'Partner'} settings
+                </Text>
+              </View>
               <Pressable
                 onPress={() => animatePartnerSheet(false)}
                 style={({ pressed }) => [
+                  styles.settingsCloseButton,
                   {
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 14,
-                    borderWidth: 2,
                     borderColor: palette.borderMuted,
                     backgroundColor: palette.surface,
-                    opacity: pressed ? 0.75 : 1,
+                    opacity: pressed ? 0.72 : 1,
                   },
                 ]}
               >
-                <Text style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}>
-                  CLOSE
+                <Text
+                  style={[styles.settingsCloseText, { color: palette.text }]}
+                >
+                  Close
                 </Text>
               </Pressable>
             </View>
-            <Text style={[styles.settingsSubtitle, { color: palette.subtext }]}>
+            <Text
+              style={[styles.settingsSubtitle, { color: palette.subtext }]}
+              numberOfLines={2}
+            >
               Configure communities, roles, analytics, and organizational tools.
             </Text>
-            <View
-              style={[
-                styles.settingsRoleBadge,
-                { backgroundColor: palette.primarySoft },
-              ]}
-            >
-              <Text style={[styles.settingsRoleText, { color: palette.primaryStrong }]}>
-                ROLE: {partnerRole.toUpperCase()}
-              </Text>
+
+            <View style={styles.settingsHeroMetaRow}>
+              <View
+                style={[
+                  styles.settingsRoleBadge,
+                  { backgroundColor: palette.primarySoft },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.settingsRoleText,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
+                  ROLE: {partnerRole.toUpperCase()}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.settingsRoleBadge,
+                  {
+                    backgroundColor: palette.surface,
+                    borderColor: palette.borderMuted,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.settingsRoleText, { color: palette.text }]}
+                >
+                  {sections.length} AREAS
+                </Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.sheetSection}>
+          <View style={styles.settingsStatsGrid}>
+            {statCards.map(card => (
+              <View
+                key={card.label}
+                style={[
+                  styles.settingsStatCard,
+                  {
+                    backgroundColor: palette.surfaceElevated,
+                    borderColor: palette.borderMuted,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.settingsStatValue, { color: palette.text }]}
+                >
+                  {card.value}
+                </Text>
+                <Text
+                  style={[styles.settingsStatLabel, { color: palette.subtext }]}
+                >
+                  {card.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View
+            style={[
+              styles.sheetSection,
+              styles.settingsQuickActionPanel,
+              {
+                backgroundColor: palette.surfaceElevated,
+                borderColor: palette.borderMuted,
+              },
+            ]}
+          >
             <Text style={[styles.sheetSectionTitle, { color: palette.text }]}>
               Quick actions
             </Text>
             <Text style={[styles.sheetSectionText, { color: palette.subtext }]}>
-              Groups: {groupsCount}
-              {'\n'}Communities: {communitiesCount}
-              {'\n'}Channels: {channelsCount}
-              {'\n'}Admins: {selectedPartner?.admins?.length || 0}
+              Create spaces or connect this partner to public profiles.
             </Text>
-            <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+            <View style={styles.settingsActionGrid}>
               <KISButton
                 title="New community"
                 size="sm"
@@ -149,16 +230,12 @@ export default function PartnerSheet({
                 variant="outline"
                 onPress={() => onOpenCreate('group')}
               />
-            </View>
-            <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
               <KISButton
                 title="New channel"
                 size="sm"
                 variant="outline"
                 onPress={() => onOpenCreate('channel')}
               />
-            </View>
-            <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
               <KISButton
                 title="Link profiles"
                 size="sm"
@@ -171,7 +248,7 @@ export default function PartnerSheet({
             </View>
           </View>
 
-          <View style={styles.sheetSection}>
+          <View style={styles.settingsAreasHeader}>
             <Text style={[styles.sheetSectionTitle, { color: palette.text }]}>
               Settings areas
             </Text>
@@ -180,9 +257,10 @@ export default function PartnerSheet({
             </Text>
           </View>
 
-          {sections.map((section) => {
-            const allowedCount = section.features.filter((feature) =>
-              feature.allowed ?? canAccessFeature(partnerRole, feature),
+          {sections.map(section => {
+            const allowedCount = section.features.filter(
+              feature =>
+                feature.allowed ?? canAccessFeature(partnerRole, feature),
             ).length;
             return (
               <View
@@ -190,16 +268,30 @@ export default function PartnerSheet({
                 style={[
                   styles.settingsSectionCard,
                   {
-                    backgroundColor: palette.surface,
+                    backgroundColor: palette.surfaceElevated,
                     borderColor: palette.borderMuted,
+                    shadowColor: palette.shadow ?? '#000',
                   },
                 ]}
               >
                 <View style={styles.settingsSectionHeader}>
-                  <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>
+                  <Text
+                    style={[
+                      styles.settingsSectionTitle,
+                      { color: palette.text },
+                    ]}
+                  >
                     {section.title}
                   </Text>
-                  <Text style={[styles.settingsSectionMeta, { color: palette.subtext }]}>
+                  <Text
+                    style={[
+                      styles.settingsSectionMeta,
+                      {
+                        color: palette.primaryStrong,
+                        backgroundColor: palette.primarySoft,
+                      },
+                    ]}
+                  >
                     {allowedCount}/{section.features.length}
                   </Text>
                 </View>

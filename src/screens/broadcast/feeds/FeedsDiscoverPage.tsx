@@ -1,5 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, DeviceEventEmitter, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  DeviceEventEmitter,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,12 +17,14 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
+import { wasNativeShareCompleted } from '@/utils/shareCompletion';
 
 import FeedsMainListSection from '@/screens/broadcast/feeds/sections/FeedsMainListSection';
 import TrendingClipsSection from '@/screens/broadcast/feeds/sections/TrendingClipsSection';
 
 import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
 import type { BroadcastFeedItem } from '@/screens/broadcast/feeds/api/feeds.types';
+import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroadcastPosterId';
 
 type Props = {
   searchTerm?: string;
@@ -28,7 +40,8 @@ export default function FeedsDiscoverPage({
   onTrendingSeeAll,
 }: Props) {
   const { palette } = useKISTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   const styles = useMemo(() => makeStyles(), []);
 
@@ -52,16 +65,17 @@ export default function FeedsDiscoverPage({
     // backend already filters by q, but keep safety for local quick filtering
     const q = searchTerm.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((it) => {
-      const hay =
-        `${it.title ?? ''} ${it.text_plain ?? ''} ${it.source?.name ?? ''} ${it.author?.display_name ?? ''}`.toLowerCase();
+    return items.filter(it => {
+      const hay = `${it.title ?? ''} ${it.text_plain ?? ''} ${
+        it.source?.name ?? ''
+      } ${it.author?.display_name ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
   }, [items, searchTerm]);
 
   const displayItems = useMemo(() => {
     const nonHealthcare = filteredFeed.filter(
-      (item) =>
+      item =>
         String(item.source_type || '').toLowerCase() !== 'healthcare' &&
         String(item.source?.type || '').toLowerCase() !== 'healthcare',
     );
@@ -71,11 +85,13 @@ export default function FeedsDiscoverPage({
     }
 
     if (context === 'saved') {
-      return nonHealthcare.filter((item) => Boolean(item.viewer_saved));
+      return nonHealthcare.filter(item => Boolean(item.viewer_saved));
     }
 
     if (context === 'trending') {
-      return [...nonHealthcare].sort((a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0));
+      return [...nonHealthcare].sort(
+        (a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0),
+      );
     }
 
     return nonHealthcare;
@@ -94,14 +110,24 @@ export default function FeedsDiscoverPage({
 
   const activeFeedItems = showTrendingOnly ? trendingFeeds : displayItems;
   const buildBroadcastPermalink = useCallback((item: BroadcastFeedItem) => {
-    return (item as any).permalink ?? (item as any).link ?? (item as any).url ?? `https://kis.app/broadcasts/${item.id}`;
+    return (
+      (item as any).permalink ??
+      (item as any).link ??
+      (item as any).url ??
+      `https://kis.app/broadcasts/${item.id}`
+    );
   }, []);
 
   const handleOpenItem = useCallback(
     (item: BroadcastFeedItem) => {
-      navigation.navigate('BroadcastDetail', { id: item.id, item });
+      navigation.navigate('BroadcastDetail', {
+        id: item.id,
+        item,
+        items: activeFeedItems,
+        index: activeFeedItems.findIndex(feed => feed.id === item.id),
+      });
     },
-    [navigation],
+    [activeFeedItems, navigation],
   );
 
   const handleLike = useCallback(
@@ -117,50 +143,55 @@ export default function FeedsDiscoverPage({
   const handleShare = useCallback(
     async (item: BroadcastFeedItem) => {
       const permalink = buildBroadcastPermalink(item);
-      const message = [item.title?.trim(), item.text_plain?.trim() || item.text?.trim(), permalink]
+      const message = [
+        item.title?.trim(),
+        item.text_plain?.trim() || item.text?.trim(),
+        permalink,
+      ]
         .filter(Boolean)
         .join('\n\n');
-      const result = await recordShare(item.id);
-      if (!result?.ok) {
-        Alert.alert('Share', 'Unable to log this share right now.');
-      }
-      await Share.share({
+      const shareResult = await Share.share({
         message,
         url: permalink,
         title: item.title ?? 'Broadcast',
       });
+      if (!wasNativeShareCompleted(shareResult)) return;
+      const result = await recordShare(item.id);
+      if (!result?.ok) {
+        Alert.alert('Share', 'Unable to log this share right now.');
+      }
     },
     [buildBroadcastPermalink, recordShare],
   );
 
-  const handleOpenComments = useCallback(
-    async (item: BroadcastFeedItem) => {
-      const res = await postRequest(
-        ROUTES.broadcasts.commentRoom(item.id),
-        {},
-        { errorMessage: 'Unable to load comments.' },
+  const handleOpenComments = useCallback(async (item: BroadcastFeedItem) => {
+    const res = await postRequest(
+      ROUTES.broadcasts.commentRoom(item.id),
+      {},
+      { errorMessage: 'Unable to load comments.' },
+    );
+    const conversationId =
+      res?.data?.conversation_id ??
+      res?.data?.conversationId ??
+      res?.data?.id ??
+      null;
+    if (!conversationId) {
+      Alert.alert(
+        'Comments',
+        'Unable to open the comment room for this broadcast.',
       );
-      const conversationId =
-        res?.data?.conversation_id ??
-        res?.data?.conversationId ??
-        res?.data?.id ??
-        null;
-      if (!conversationId) {
-        Alert.alert('Comments', 'Unable to open the comment room for this broadcast.');
-        return;
-      }
-      DeviceEventEmitter.emit('chat.open', {
-        conversationId,
-        name: item.title ?? item.source?.name ?? 'Broadcast comments',
-        kind: 'broadcast_comments',
-      });
-    },
-    [],
-  );
+      return;
+    }
+    DeviceEventEmitter.emit('chat.open', {
+      conversationId,
+      name: item.title ?? item.source?.name ?? 'Broadcast comments',
+      kind: 'broadcast_comments',
+    });
+  }, []);
 
   const handleMenu = useCallback(
     (item: BroadcastFeedItem) => {
-      const authorId = item.author?.id ? String(item.author.id) : null;
+      const authorId = resolveBroadcastPosterUserId(item);
       const permalink = buildBroadcastPermalink(item);
       const saveLabel = item.viewer_saved ? 'Remove saved post' : 'Save post';
       Alert.alert(item.title ?? 'Broadcast actions', undefined, [
@@ -179,7 +210,10 @@ export default function FeedsDiscoverPage({
           onPress: async () => {
             const res = await toggleSaved(item.id, Boolean(item.viewer_saved));
             if (!res?.ok) {
-              Alert.alert('Saved posts', 'Unable to update this saved post right now.');
+              Alert.alert(
+                'Saved posts',
+                'Unable to update this saved post right now.',
+              );
             }
           },
         },
@@ -211,30 +245,62 @@ export default function FeedsDiscoverPage({
         },
         {
           text: 'Mute broadcaster',
-          onPress: async () => {
+          onPress: () => {
             if (!authorId) {
-              Alert.alert('Mute', 'Unable to find broadcaster.');
+              Alert.alert('Mute poster', 'Unable to find this poster.');
               return;
             }
-            const res = await postRequest(
-              ROUTES.moderation.userBlocks,
-              { blocked: authorId },
-              { errorMessage: 'Unable to mute broadcaster.' },
+            Alert.alert(
+              'Mute poster',
+              'You will never see posts from this poster again.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, mute',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const res = await postRequest(
+                      ROUTES.moderation.userBlocks,
+                      { blocked: authorId, reason: 'broadcast_mute' },
+                      { errorMessage: 'Unable to mute poster.' },
+                    );
+                    if (!res?.success) {
+                      Alert.alert(
+                        'Mute poster',
+                        res?.message || 'Unable to mute this poster.',
+                      );
+                      return;
+                    }
+                    Alert.alert(
+                      'Muted',
+                      'You will no longer see posts from this poster.',
+                    );
+                    void refreshAll();
+                  },
+                },
+              ],
             );
-            if (!res?.success) {
-              Alert.alert('Mute', res?.message || 'Unable to mute broadcaster.');
-            } else {
-              Alert.alert('Muted', 'You will no longer see broadcasts from this broadcaster.');
-            }
           },
         },
         {
           text: 'Hide',
-          onPress: async () => {
-            const res = await hideItem(item.id);
-            if (!res?.ok) {
-              Alert.alert('Hide', 'Unable to hide this broadcast right now.');
-            }
+          onPress: () => {
+            Alert.alert('Hide post', 'You will never see this post again.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Yes, hide',
+                style: 'destructive',
+                onPress: async () => {
+                  const res = await hideItem(item.id);
+                  if (!res?.ok) {
+                    Alert.alert(
+                      'Hide post',
+                      'Unable to hide this post right now.',
+                    );
+                  }
+                },
+              },
+            ]);
           },
         },
         {
@@ -243,7 +309,14 @@ export default function FeedsDiscoverPage({
         },
       ]);
     },
-    [buildBroadcastPermalink, handleOpenComments, handleOpenItem, hideItem, toggleSaved],
+    [
+      buildBroadcastPermalink,
+      handleOpenComments,
+      handleOpenItem,
+      hideItem,
+      refreshAll,
+      toggleSaved,
+    ],
   );
 
   return (
@@ -260,30 +333,41 @@ export default function FeedsDiscoverPage({
       onScroll={({ nativeEvent }) => {
         const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
         const pad = 220;
-        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - pad) {
+        if (
+          layoutMeasurement.height + contentOffset.y >=
+          contentSize.height - pad
+        ) {
           loadMore();
         }
       }}
       scrollEventThrottle={16}
     >
       <View style={{ paddingHorizontal: 12, gap: 12 }}>
-          {!showTrendingOnly ? (
-            <TrendingClipsSection
-              items={trending}
-              onSeeAll={handleTrendingSeeAll}
-              onOpen={() => {}}
-              onReact={() => {}}
-            />
-          ) : (
-            <View style={styles.trendingButtonRow}>
-              <Pressable
-                onPress={handleTrendingBack}
-                style={[styles.trendingButton, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}
-              >
-                <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Trending feeds</Text>
-              </Pressable>
-            </View>
-          )}
+        {!showTrendingOnly ? (
+          <TrendingClipsSection
+            items={trending}
+            onSeeAll={handleTrendingSeeAll}
+            onOpen={() => {}}
+            onReact={() => {}}
+          />
+        ) : (
+          <View style={styles.trendingButtonRow}>
+            <Pressable
+              onPress={handleTrendingBack}
+              style={[
+                styles.trendingButton,
+                {
+                  backgroundColor: palette.primarySoft,
+                  borderColor: palette.primary,
+                },
+              ]}
+            >
+              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
+                Trending feeds
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         <FeedsMainListSection
           items={activeFeedItems}
@@ -291,16 +375,16 @@ export default function FeedsDiscoverPage({
           loadingMore={loadingMore}
           onRefresh={refreshAll}
           onOpenItem={handleOpenItem}
-          onShare={(item) => {
+          onShare={item => {
             void handleShare(item);
           }}
-          onLike={(item) => {
+          onLike={item => {
             void handleLike(item);
           }}
-          onSave={(item) => {
+          onSave={item => {
             void toggleSaved(item.id, Boolean(item.viewer_saved));
           }}
-          onComment={(item) => {
+          onComment={item => {
             void handleOpenComments(item);
           }}
           onMenu={handleMenu}

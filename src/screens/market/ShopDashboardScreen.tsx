@@ -17,7 +17,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
-import { LineChart, BarChart, DonutChart, TopItemsList } from '@/components/insights';
+import {
+  LineChart,
+  BarChart,
+  DonutChart,
+  TopItemsList,
+} from '@/components/insights';
 import type { RootStackParamList } from '@/navigation/types';
 import ProductEditorDrawer from './ProductEditorDrawer';
 import ServiceEditorDrawer from './ServiceEditorDrawer';
@@ -26,7 +31,10 @@ import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
-import { CATEGORY_SELECTION_LIMIT, KIS_COIN_CODE } from '@/screens/market/market.constants';
+import {
+  CATEGORY_SELECTION_LIMIT,
+  KIS_COIN_CODE,
+} from '@/screens/market/market.constants';
 import type { KISPalette } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
@@ -43,15 +51,22 @@ const toUploadFile = (picked: PickedImage) => ({
   type: picked.type,
 });
 
-const LOCAL_IMAGE_SCHEMES = ['file://', 'content://', 'assets-library://', 'ph://', 'blob://', 'data:'];
+const LOCAL_IMAGE_SCHEMES = [
+  'file://',
+  'content://',
+  'assets-library://',
+  'ph://',
+  'blob://',
+  'data:',
+];
 const isLocalImageUri = (uri?: string) => {
   if (!uri) return false;
   const lower = uri.toLowerCase();
-  return LOCAL_IMAGE_SCHEMES.some((scheme) => lower.startsWith(scheme));
+  return LOCAL_IMAGE_SCHEMES.some(scheme => lower.startsWith(scheme));
 };
 
 const AVAILABILITY_RULE_SCOPES = ['year', 'month', 'week', 'day'] as const;
-type AvailabilityRuleScope = typeof AVAILABILITY_RULE_SCOPES[number];
+type AvailabilityRuleScope = (typeof AVAILABILITY_RULE_SCOPES)[number];
 const normalizeAvailabilityTime = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return '';
@@ -64,12 +79,12 @@ const normalizeAvailabilityTime = (value: string) => {
 };
 const parseAvailabilityList = (value: unknown) => {
   if (Array.isArray(value)) {
-    return value.map((item) => String(item || '').trim()).filter(Boolean);
+    return value.map(item => String(item || '').trim()).filter(Boolean);
   }
   if (typeof value === 'string') {
     return value
       .split(',')
-      .map((item) => item.trim())
+      .map(item => item.trim())
       .filter(Boolean);
   }
   return [];
@@ -77,7 +92,7 @@ const parseAvailabilityList = (value: unknown) => {
 const normalizeAvailabilityRulesPayload = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   return value
-    .map((rule) => {
+    .map(rule => {
       if (!rule || typeof rule !== 'object') return null;
       const scopeCandidate = String((rule as any).scope ?? 'day').toLowerCase();
       const scope: AvailabilityRuleScope = AVAILABILITY_RULE_SCOPES.includes(
@@ -111,7 +126,10 @@ const serializeJsonField = (value: unknown) => {
   }
 };
 
-const stripCountryCodePrefix = (digits: string, countryCode?: string | null) => {
+const stripCountryCodePrefix = (
+  digits: string,
+  countryCode?: string | null,
+) => {
   const prefix = extractDigits(countryCode);
   if (prefix && digits.startsWith(prefix)) {
     const stripped = digits.slice(prefix.length);
@@ -134,7 +152,10 @@ const resolvePhoneNumber = (
   if (fromPhoneNumber) return fromPhoneNumber;
   const fromPhone = extractDigits(source.phone) ?? extractDigits(source.mobile);
   if (!fromPhone) return null;
-  return stripCountryCodePrefix(fromPhone, source.phone_country_code ?? source.country_code);
+  return stripCountryCodePrefix(
+    fromPhone,
+    source.phone_country_code ?? source.country_code,
+  );
 };
 
 const PHONE_SEQUENCE_MATCH_LENGTH = 7;
@@ -149,7 +170,11 @@ const buildDigitSequences = (digits: string, length: number) => {
   return sequences;
 };
 
-const phoneNumbersMatch = (first?: string | null, second?: string | null, matchLength = PHONE_SEQUENCE_MATCH_LENGTH) => {
+const phoneNumbersMatch = (
+  first?: string | null,
+  second?: string | null,
+  matchLength = PHONE_SEQUENCE_MATCH_LENGTH,
+) => {
   if (!first || !second) return false;
   const left = first.trim();
   const right = second.trim();
@@ -165,7 +190,8 @@ const phoneNumbersMatch = (first?: string | null, second?: string | null, matchL
   return false;
 };
 
-const unwrapMemberUser = (member?: any) => member?.user_details ?? member?.user ?? member ?? null;
+const unwrapMemberUser = (member?: any) =>
+  member?.user_details ?? member?.user ?? member ?? null;
 
 const TAB_DEFINITIONS = [
   { key: 'overview', label: 'Overview' },
@@ -196,14 +222,16 @@ const ROLE_OPTIONS = [
   { value: 'member', label: 'Member' },
 ];
 
-const ROLE_LABELS = ROLE_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {});
+const ROLE_LABELS = ROLE_OPTIONS.reduce<Record<string, string>>(
+  (acc, option) => {
+    acc[option.value] = option.label;
+    return acc;
+  },
+  {},
+);
 
-const getRoleLabel = (role?: string) => ROLE_LABELS[role ?? 'member'] ?? 'Member';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const getRoleLabel = (role?: string) =>
+  ROLE_LABELS[role ?? 'member'] ?? 'Member';
 
 const normalizeList = (payload: any): any[] => {
   const source = payload?.data ?? payload ?? {};
@@ -211,7 +239,7 @@ const normalizeList = (payload: any): any[] => {
   if (!Array.isArray(results)) {
     return [];
   }
-  return results.map((entry) => {
+  return results.map(entry => {
     if (entry?.data) return entry.data;
     if (entry?.service) return entry.service;
     return entry;
@@ -220,7 +248,8 @@ const normalizeList = (payload: any): any[] => {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShopDashboard'>;
 
-const clampPercentage = (value: number) => Math.max(5, Math.min(100, Math.round(value)));
+const clampPercentage = (value: number) =>
+  Math.max(5, Math.min(100, Math.round(value)));
 const normalizeNumber = (value: any) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
@@ -228,9 +257,12 @@ const normalizeNumber = (value: any) => {
 
 const isProductBroadcasted = (product: any) => {
   if (!product) return false;
-  if (product.isBroadcasted || product.is_broadcasted || product.broadcasted) return true;
+  if (product.isBroadcasted || product.is_broadcasted || product.broadcasted)
+    return true;
   if (product.broadcast_item_id || product.broadcast_id) return true;
-  const status = String(product?.status ?? '').trim().toLowerCase();
+  const status = String(product?.status ?? '')
+    .trim()
+    .toLowerCase();
   if (!status) return false;
   return status !== 'unpublished';
 };
@@ -271,7 +303,7 @@ const resolveLandingVisibility = (shop?: any) => {
     shop?.landingPublic,
     shop?.landingPublished,
   ];
-  return candidates.some((value) => toBooleanValue(value));
+  return candidates.some(value => toBooleanValue(value));
 };
 
 const ProductCard = ({
@@ -297,7 +329,11 @@ const ProductCard = ({
   onEdit: () => void;
   onDelete: () => void;
   onRate: (score: number) => Promise<void>;
-  onBroadcast?: (product: any, currentlyBroadcasted: boolean) => void;
+  onBroadcast?: (
+    product: any,
+    currentlyBroadcasted: boolean,
+    isService?: boolean,
+  ) => void;
   memberDiscount?: number;
   isBroadcasted?: boolean;
   broadcastLoading?: boolean;
@@ -313,7 +349,10 @@ const ProductCard = ({
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
-  const galleryImages = useMemo(() => collectProductImageUris(product), [product]);
+  const galleryImages = useMemo(
+    () => collectProductImageUris(product),
+    [product],
+  );
 
   useEffect(() => {
     const defaultImage = galleryImages[0] ?? '';
@@ -323,10 +362,18 @@ const ProductCard = ({
 
   const salePriceValue = Number(product?.sale_price ?? NaN);
   const regularPriceValue = Number(product?.price ?? product?.list_price ?? 0);
-  const price = Number.isFinite(salePriceValue) ? salePriceValue : regularPriceValue;
-  const comparePriceValue = Number(product?.compare_at_price ?? product?.compareAtPrice ?? NaN);
+  const price = Number.isFinite(salePriceValue)
+    ? salePriceValue
+    : regularPriceValue;
+  const comparePriceValue = Number(
+    product?.compare_at_price ?? product?.compareAtPrice ?? NaN,
+  );
   const rawStock =
-    product?.stock_qty ?? product?.stock ?? product?.inventory ?? product?.quantity ?? 0;
+    product?.stock_qty ??
+    product?.stock ??
+    product?.inventory ??
+    product?.quantity ??
+    0;
   const stock = Number.isFinite(Number(rawStock)) ? Number(rawStock) : 0;
   const durationMinutes = Number(product?.duration_minutes ?? 0);
   const categoryLabel =
@@ -334,8 +381,12 @@ const ProductCard = ({
     product?.category?.name ??
     product?.service_type ??
     (isService ? 'Service' : 'Product');
-  const baseRating = Number.isFinite(Number(product?.rating_avg)) ? Number(product.rating_avg) : 0;
-  const ratingCountFromData = Number.isFinite(Number(product?.rating_count)) ? Number(product.rating_count) : 0;
+  const baseRating = Number.isFinite(Number(product?.rating_avg))
+    ? Number(product.rating_avg)
+    : 0;
+  const ratingCountFromData = Number.isFinite(Number(product?.rating_count))
+    ? Number(product.rating_count)
+    : 0;
   const status = product?.status ?? 'Unpublished';
   const [ratingAvg, setRatingAvg] = useState(baseRating);
   const [ratingCount, setRatingCount] = useState(ratingCountFromData);
@@ -370,14 +421,31 @@ const ProductCard = ({
   };
 
   return (
-    <View style={[styles.productCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
+    <View
+      style={[
+        styles.productCard,
+        { backgroundColor: palette.surface, borderColor: palette.divider },
+      ]}
+    >
       {landingPublic && shopName && onOpenLanding ? (
         <Pressable
-          style={[styles.broadcastShopBadgeLarge, { borderColor: palette.divider, backgroundColor: `${palette.primaryStrong}10` }]}
+          style={[
+            styles.broadcastShopBadgeLarge,
+            {
+              borderColor: palette.divider,
+              backgroundColor: `${palette.primaryStrong}10`,
+            },
+          ]}
           onPress={onOpenLanding}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         >
-          <Text style={[styles.broadcastShopLabelLarge, { color: palette.primaryStrong }]} numberOfLines={1}>
+          <Text
+            style={[
+              styles.broadcastShopLabelLarge,
+              { color: palette.primaryStrong },
+            ]}
+            numberOfLines={1}
+          >
             {shopName}
           </Text>
         </Pressable>
@@ -390,26 +458,44 @@ const ProductCard = ({
           {activeImage && !imageFailed ? (
             <Image
               source={{ uri: activeImage }}
-              style={[styles.productMainImage, { backgroundColor: palette.surface }]}
+              style={[
+                styles.productMainImage,
+                { backgroundColor: palette.surface },
+              ]}
               resizeMode="cover"
               onError={() => setImageFailed(true)}
               onLoad={() => setImageFailed(false)}
             />
           ) : (
-            <View style={[styles.productMainImage, { backgroundColor: palette.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
+            <View
+              style={[
+                styles.productMainImage,
+                {
+                  backgroundColor: palette.surfaceElevated,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                },
+              ]}
+            >
               <Text style={{ color: palette.subtext }}>No image yet</Text>
             </View>
           )}
         </Pressable>
         {galleryImages.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailRow}>
-            {galleryImages.map((uri) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailRow}
+          >
+            {galleryImages.map(uri => (
               <Pressable
                 key={uri}
                 onPress={() => setActiveImage(uri)}
                 style={[
                   styles.thumbnailWrapper,
-                  activeImage === uri ? { borderColor: palette.primaryStrong } : { borderColor: palette.divider },
+                  activeImage === uri
+                    ? { borderColor: palette.primaryStrong }
+                    : { borderColor: palette.divider },
                 ]}
               >
                 <Image
@@ -423,24 +509,36 @@ const ProductCard = ({
         ) : null}
       </View>
       <View style={styles.productInfo}>
-      <View style={styles.productMetaRow}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>{product.name ?? 'Untitled product'}</Text>
-        <Text style={[styles.meta, { color: palette.primaryStrong }]}>{isBroadcasted ? 'Published' : status}</Text>
-      </View>
+        <View style={styles.productMetaRow}>
+          <Text style={[styles.cardTitle, { color: palette.text }]}>
+            {product.name ?? 'Untitled product'}
+          </Text>
+          <Text style={[styles.meta, { color: palette.primaryStrong }]}>
+            {isBroadcasted ? 'Published' : status}
+          </Text>
+        </View>
         <Text style={[styles.meta, { color: palette.subtext }]}>
           {categoryLabel}
         </Text>
-        <Text style={[styles.productDescription, { color: palette.subtext }]} numberOfLines={2}>
+        <Text
+          style={[styles.productDescription, { color: palette.subtext }]}
+          numberOfLines={2}
+        >
           {isService
-            ? product.short_summary ?? product.description ?? 'No description yet.'
+            ? product.short_summary ??
+              product.description ??
+              'No description yet.'
             : product.description ?? 'No description yet.'}
         </Text>
         <View style={styles.priceRow}>
           <View>
             <Text style={[styles.priceTag, { color: palette.primaryStrong }]}>
-              {Number.isFinite(price) ? price.toLocaleString() : '0'} {KIS_COIN_CODE}
+              {Number.isFinite(price) ? price.toLocaleString() : '0'}{' '}
+              {KIS_COIN_CODE}
             </Text>
-            {Number.isFinite(salePriceValue) && Number.isFinite(regularPriceValue) && salePriceValue < regularPriceValue ? (
+            {Number.isFinite(salePriceValue) &&
+            Number.isFinite(regularPriceValue) &&
+            salePriceValue < regularPriceValue ? (
               <Text style={[styles.originalPrice, { color: palette.subtext }]}>
                 {regularPriceValue.toLocaleString()} {KIS_COIN_CODE}
               </Text>
@@ -454,30 +552,50 @@ const ProductCard = ({
             ) : null}
           </View>
           {memberDiscount ? (
-            <View style={[styles.discountBadge, { borderColor: palette.primaryStrong }]}>
-              <Text style={[styles.discountText, { color: palette.primaryStrong }]}>Members save {memberDiscount}%</Text>
+            <View
+              style={[
+                styles.discountBadge,
+                { borderColor: palette.primaryStrong },
+              ]}
+            >
+              <Text
+                style={[styles.discountText, { color: palette.primaryStrong }]}
+              >
+                Members save {memberDiscount}%
+              </Text>
             </View>
           ) : null}
         </View>
         <View style={styles.gridRow}>
           <View style={styles.gridItem}>
             <Text style={[styles.statValue, { color: palette.text }]}>
-              {isService ? (durationMinutes > 0 ? durationMinutes : 'TBD') : stock}
+              {isService
+                ? durationMinutes > 0
+                  ? durationMinutes
+                  : 'TBD'
+                : stock}
             </Text>
             <Text style={[styles.statLabel, { color: palette.subtext }]}>
               {isService ? 'Minutes' : 'Stock'}
             </Text>
           </View>
           <View style={styles.gridItem}>
-            <Text style={[styles.statValue, { color: palette.text }]}>{ratingAvg.toFixed(1)}</Text>
-            <Text style={[styles.statLabel, { color: palette.subtext }]}>Rating</Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {ratingAvg.toFixed(1)}
+            </Text>
+            <Text style={[styles.statLabel, { color: palette.subtext }]}>
+              Rating
+            </Text>
           </View>
         </View>
         <View style={styles.ratingRow}>
           <Pressable
             style={[
               styles.ratingIcon,
-              { borderColor: palette.primaryStrong, backgroundColor: `${palette.primaryStrong}22` },
+              {
+                borderColor: palette.primaryStrong,
+                backgroundColor: `${palette.primaryStrong}22`,
+              },
             ]}
             onPress={() => setRatingModalVisible(true)}
           >
@@ -489,44 +607,89 @@ const ProductCard = ({
                 key={index}
                 style={[
                   styles.star,
-                  index < Math.round(ratingAvg) ? { color: palette.primaryStrong } : { color: palette.subtext },
+                  index < Math.round(ratingAvg)
+                    ? { color: palette.primaryStrong }
+                    : { color: palette.subtext },
                 ]}
               >
                 ★
               </Text>
             ))}
           </View>
-          <Text style={[styles.meta, { color: palette.subtext, marginLeft: 6 }]}>({ratingCount} reviews)</Text>
+          <Text
+            style={[styles.meta, { color: palette.subtext, marginLeft: 6 }]}
+          >
+            ({ratingCount} reviews)
+          </Text>
         </View>
-        <View style={[styles.actionRow, { justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 12 }]}>  
+        <View
+          style={[
+            styles.actionRow,
+            {
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              marginTop: 12,
+            },
+          ]}
+        >
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             {existingBooking && existingBooking.id ? (
               <KISButton
                 title="Details"
                 size="xs"
                 variant="outline"
-                onPress={() => onOpenBookingDetails?.(String(existingBooking.id))}
+                onPress={() =>
+                  onOpenBookingDetails?.(String(existingBooking.id))
+                }
               />
             ) : onBook ? (
-              <KISButton title="Book service" size="xs" variant="secondary" onPress={onBook} />
+              <KISButton
+                title="Book service"
+                size="xs"
+                variant="secondary"
+                onPress={onBook}
+              />
             ) : null}
             <KISButton
               title={isBroadcasted ? 'Remove broadcast' : 'Broadcast'}
               size="xs"
               variant={isBroadcasted ? 'outline' : 'secondary'}
-              onPress={() => onBroadcast?.(product, Boolean(isBroadcasted), Boolean(isService))}
+              onPress={() =>
+                onBroadcast?.(
+                  product,
+                  Boolean(isBroadcasted),
+                  Boolean(isService),
+                )
+              }
               loading={broadcastLoading}
               disabled={broadcastLoading}
             />
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <KISButton title="Edit" size="xs" variant="outline" onPress={onEdit} />
-            <KISButton title="Delete" size="xs" variant="danger" onPress={onDelete} />
+            <KISButton
+              title="Edit"
+              size="xs"
+              variant="outline"
+              onPress={onEdit}
+            />
+            <KISButton
+              title="Delete"
+              size="xs"
+              variant="danger"
+              onPress={onDelete}
+            />
           </View>
         </View>
       </View>
-      <Modal visible={Boolean(fullScreenImage)} transparent onRequestClose={() => setFullScreenImage(null)}>
-        <Pressable style={styles.fullscreenOverlay} onPress={() => setFullScreenImage(null)}>
+      <Modal
+        visible={Boolean(fullScreenImage)}
+        transparent
+        onRequestClose={() => setFullScreenImage(null)}
+      >
+        <Pressable
+          style={styles.fullscreenOverlay}
+          onPress={() => setFullScreenImage(null)}
+        >
           {fullScreenImage ? (
             <Image
               source={{ uri: fullScreenImage }}
@@ -536,16 +699,28 @@ const ProductCard = ({
           ) : null}
         </Pressable>
       </Modal>
-      <Modal visible={ratingModalVisible} transparent animationType="fade" onRequestClose={closeRatingSheet}>
+      <Modal
+        visible={ratingModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRatingSheet}
+      >
         <Pressable style={styles.ratingModalOverlay} onPress={closeRatingSheet}>
-          <View style={[styles.card, { width: '90%', maxWidth: 360, padding: 20 }]}>
+          <View
+            style={[styles.card, { width: '90%', maxWidth: 360, padding: 20 }]}
+          >
             <Text style={[styles.cardTitle, { marginBottom: 6 }]}>
               {isService ? 'Rate this service' : 'Rate this product'}
             </Text>
             <Text style={[styles.meta, { color: palette.subtext }]}>
               Tap a star to set your rating.
             </Text>
-            <View style={[styles.ratingRow, { justifyContent: 'center', marginTop: 12 }]}>
+            <View
+              style={[
+                styles.ratingRow,
+                { justifyContent: 'center', marginTop: 12 },
+              ]}
+            >
               {Array.from({ length: 5 }).map((_, index) => (
                 <Pressable
                   key={`modal-star-${index}`}
@@ -556,7 +731,9 @@ const ProductCard = ({
                     style={[
                       styles.star,
                       { fontSize: 32 },
-                      index < Number(ratingDraft) ? { color: palette.primaryStrong } : { color: palette.subtext },
+                      index < Number(ratingDraft)
+                        ? { color: palette.primaryStrong }
+                        : { color: palette.subtext },
                     ]}
                   >
                     ★
@@ -565,8 +742,18 @@ const ProductCard = ({
               ))}
             </View>
             <View style={[styles.actionRow, styles.ratingModalActions]}>
-              <KISButton title="Submit" size="sm" loading={ratingSaving} onPress={handleRatingSave} />
-              <KISButton title="Cancel" size="sm" variant="ghost" onPress={closeRatingSheet} />
+              <KISButton
+                title="Submit"
+                size="sm"
+                loading={ratingSaving}
+                onPress={handleRatingSave}
+              />
+              <KISButton
+                title="Cancel"
+                size="sm"
+                variant="ghost"
+                onPress={closeRatingSheet}
+              />
             </View>
           </View>
         </Pressable>
@@ -580,7 +767,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const initialShop = route.params.shop;
   const [shop, setShop] = useState(initialShop);
   const shopId = shop?.id;
-  const landingVisibilityFlag = useMemo(() => resolveLandingVisibility(shop), [shop]);
+  const landingVisibilityFlag = useMemo(
+    () => resolveLandingVisibility(shop),
+    [shop],
+  );
   const [landingPublic, setLandingPublic] = useState(landingVisibilityFlag);
   useEffect(() => {
     setLandingPublic(landingVisibilityFlag);
@@ -588,19 +778,29 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const heroImageUri = useMemo(() => resolveShopImageUri(shop), [shop]);
   const [landingVisibilitySaving, setLandingVisibilitySaving] = useState(false);
   const [activeTab, setActiveTab] = useState(TAB_DEFINITIONS[0].key);
-  const [memberDiscount, setMemberDiscount] = useState(() => clampPercentage(initialShop?.membership_discount_pct ?? 5));
-  const [membershipPublic, setMembershipPublic] = useState(() => Boolean(initialShop?.membership_public));
+  const [memberDiscount, setMemberDiscount] = useState(() =>
+    clampPercentage(initialShop?.membership_discount_pct ?? 5),
+  );
+  const [membershipPublic, setMembershipPublic] = useState(() =>
+    Boolean(initialShop?.membership_public),
+  );
   const [membershipPublicSaving, setMembershipPublicSaving] = useState(false);
   const [discountSaving, setDiscountSaving] = useState(false);
   const [productDrawerVisible, setProductDrawerVisible] = useState(false);
-  const [productEditorMode, setProductEditorMode] = useState<'create' | 'edit'>('create');
+  const [productEditorMode, setProductEditorMode] = useState<'create' | 'edit'>(
+    'create',
+  );
   const [activeProduct, setActiveProduct] = useState<any | null>(null);
   const [serviceDrawerVisible, setServiceDrawerVisible] = useState(false);
-  const [serviceEditorMode, setServiceEditorMode] = useState<'create' | 'edit'>('create');
+  const [serviceEditorMode, setServiceEditorMode] = useState<'create' | 'edit'>(
+    'create',
+  );
   const [activeService, setActiveService] = useState<any | null>(null);
   const [serviceLoading, setServiceLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
-  const [broadcastingProductId, setBroadcastingProductId] = useState<string | null>(null);
+  const [broadcastingProductId, setBroadcastingProductId] = useState<
+    string | null
+  >(null);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [servicesList, setServicesList] = useState<any[]>([]);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
@@ -610,28 +810,46 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const [membersLoading, setMembersLoading] = useState(false);
   const [contactsPickerOpen, setContactsPickerOpen] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
-  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [, setUpdatingMemberId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
-  const [roleSliderValues, setRoleSliderValues] = useState<Record<string, number>>({});
+  const [roleSliderValues, setRoleSliderValues] = useState<
+    Record<string, number>
+  >({});
 
   const safeMembers = useMemo(() => shopMembers, [shopMembers]);
-  const owner = useMemo(() => safeMembers.find((member) => member?.role === 'owner'), [safeMembers]);
-  const ownerPhone = useMemo(() => resolvePhoneNumber(unwrapMemberUser(owner)), [owner]);
+  const owner = useMemo(
+    () => safeMembers.find(member => member?.role === 'owner'),
+    [safeMembers],
+  );
+  const ownerPhone = useMemo(
+    () => resolvePhoneNumber(unwrapMemberUser(owner)),
+    [owner],
+  );
   const ownerId = shop?.owner?.id ?? shop?.owner_id ?? shop?.owner;
-  const managers = useMemo(() => safeMembers.filter((member) => member?.role === 'manager'), [safeMembers]);
-  const admins = useMemo(() => safeMembers.filter((member) => member?.role === 'admin'), [safeMembers]);
-  const members = useMemo(() => safeMembers.filter((member) => member?.role === 'member'), [safeMembers]);
+  const managers = useMemo(
+    () => safeMembers.filter(member => member?.role === 'manager'),
+    [safeMembers],
+  );
+  const admins = useMemo(
+    () => safeMembers.filter(member => member?.role === 'admin'),
+    [safeMembers],
+  );
+  const members = useMemo(
+    () => safeMembers.filter(member => member?.role === 'member'),
+    [safeMembers],
+  );
   const fallbackUserProfile = useMemo(() => {
     const ownerUser = unwrapMemberUser(owner);
-    const fallbackPhone =
-      resolvePhoneNumber(ownerUser) ?? ownerPhone ?? null;
+    const fallbackPhone = resolvePhoneNumber(ownerUser) ?? ownerPhone ?? null;
     return {
       id: ownerUser?.id ?? owner?.user_id ?? ownerId ?? null,
       phone: fallbackPhone,
       phone_number: fallbackPhone,
     } as any;
   }, [owner, ownerPhone, ownerId]);
-  const [cachedStorageUser, setCachedStorageUser] = useState<any | null>(fallbackUserProfile);
+  const [cachedStorageUser, setCachedStorageUser] = useState<any | null>(
+    fallbackUserProfile,
+  );
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -647,37 +865,55 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       mounted = false;
     };
   }, [fallbackUserProfile]);
- 
-  const cachedUserProfile = useMemo(() => cachedStorageUser?.user ?? cachedStorageUser ?? null, [cachedStorageUser]);
+
+  const cachedUserProfile = useMemo(
+    () => cachedStorageUser?.user ?? cachedStorageUser ?? null,
+    [cachedStorageUser],
+  );
   const formatMemberTitle = useCallback((member: any) => {
     const user = member?.user_details ?? member?.user ?? {};
     return user.display_name ?? user.phone ?? 'Member';
   }, []);
-  const currentUserPhone = useMemo(() => resolvePhoneNumber(cachedUserProfile), [cachedUserProfile]);
+  const currentUserPhone = useMemo(
+    () => resolvePhoneNumber(cachedUserProfile),
+    [cachedUserProfile],
+  );
   const currentUserId = cachedUserProfile?.id ?? cachedUserProfile?.user_id;
   const currentUserRole = useMemo(() => {
     if (currentUserId && ownerId && currentUserId === ownerId) {
       return 'owner';
     }
-    if (ownerPhone && currentUserPhone && phoneNumbersMatch(ownerPhone, currentUserPhone)) {
+    if (
+      ownerPhone &&
+      currentUserPhone &&
+      phoneNumbersMatch(ownerPhone, currentUserPhone)
+    ) {
       return 'owner';
     }
-    const membership = safeMembers.find((member) => {
+    const membership = safeMembers.find(member => {
       const memberPhone = resolvePhoneNumber(unwrapMemberUser(member));
-      const memberUserId = member?.user_details?.id ?? member?.user?.id ?? member?.user_id;
+      const memberUserId =
+        member?.user_details?.id ?? member?.user?.id ?? member?.user_id;
       if (memberUserId && currentUserId && memberUserId === currentUserId) {
         return true;
       }
-      return memberPhone && currentUserPhone && phoneNumbersMatch(memberPhone, currentUserPhone);
+      return (
+        memberPhone &&
+        currentUserPhone &&
+        phoneNumbersMatch(memberPhone, currentUserPhone)
+      );
     });
     return membership?.role ?? null;
   }, [safeMembers, ownerPhone, currentUserPhone, currentUserId, ownerId]);
 
-  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'manager';
-  const canToggleLandingVisibility = currentUserRole === 'owner' && Boolean(shopId);
+  const canManageMembers =
+    currentUserRole === 'owner' || currentUserRole === 'manager';
+  const canToggleLandingVisibility =
+    currentUserRole === 'owner' && Boolean(shopId);
   const openShopLandingPage = useCallback(() => {
     if (!shopId || !shop) return;
-    const { landingDraft, heroImage, previewGalleryImageUris } = buildShopLandingPreview(shop);
+    const { landingDraft, heroImage, previewGalleryImageUris } =
+      buildShopLandingPreview(shop);
     navigation.navigate('InstitutionLandingPreview', {
       institutionId: shopId,
       institutionName: shop?.name ?? 'Shop',
@@ -693,6 +929,23 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     },
     [navigation],
   );
+  const loadShopDetails = useCallback(async () => {
+    if (!shopId) {
+      return;
+    }
+    try {
+      const response = await getRequest(`${ROUTES.commerce.shops}${shopId}/`, {
+        forceNetwork: true,
+        errorMessage: 'Unable to refresh shop details.',
+      });
+      if (response?.success && response.data) {
+        setShop(prev => ({ ...prev, ...response.data }));
+      }
+    } catch (error: any) {
+      console.warn('Unable to refresh shop details:', error?.message ?? error);
+    }
+  }, [shopId]);
+
   const toggleLandingVisibility = useCallback(async () => {
     if (!shopId) return;
     const nextValue = !landingPublic;
@@ -710,14 +963,20 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           public: nextValue,
         },
       };
-      const response = await patchRequest(`${ROUTES.commerce.shops}${shopId}/`, payload, {
-        errorMessage: 'Unable to update landing visibility.',
-      });
+      const response = await patchRequest(
+        `${ROUTES.commerce.shops}${shopId}/`,
+        payload,
+        {
+          errorMessage: 'Unable to update landing visibility.',
+        },
+      );
       if (!response?.success) {
-        throw new Error(response?.message || 'Unable to update landing visibility.');
+        throw new Error(
+          response?.message || 'Unable to update landing visibility.',
+        );
       }
       setLandingPublic(nextValue);
-      setShop((prev) => ({
+      setShop(prev => ({
         ...prev,
         landing_page: {
           ...(prev?.landing_page ?? {}),
@@ -733,14 +992,17 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         nextValue ? 'Landing page is now public.' : 'Landing page is private.',
       );
     } catch (error: any) {
-      Alert.alert('Landing page', error?.message || 'Unable to update landing visibility.');
+      Alert.alert(
+        'Landing page',
+        error?.message || 'Unable to update landing visibility.',
+      );
     } finally {
       setLandingVisibilitySaving(false);
     }
   }, [landingPublic, shopId, shop, setShop, loadShopDetails]);
   useEffect(() => {
     const map: Record<string, number> = {};
-    safeMembers.forEach((member) => {
+    safeMembers.forEach(member => {
       const key = member?.id;
       if (!key) return;
       const role = member?.role ?? 'member';
@@ -799,36 +1061,40 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
 
   const updateServiceBroadcastStateLocal = useCallback(
     (serviceId: string, broadcasted: boolean) => {
-      setServicesList((prev) =>
-        prev.map((entry) => {
+      setServicesList(prev =>
+        prev.map(entry => {
           if (entry?.id !== serviceId) return entry;
           const nextEntry = {
             ...entry,
             isBroadcasted: broadcasted,
             is_broadcasted: broadcasted,
             broadcasted: broadcasted,
-            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+            broadcast_item_id: broadcasted
+              ? entry.broadcast_item_id ?? entry.id
+              : null,
           };
           return nextEntry;
         }),
       );
-      setProductsList((prev) =>
-        prev.map((entry) => {
+      setProductsList(prev =>
+        prev.map(entry => {
           if (entry?.id !== serviceId) return entry;
           return {
             ...entry,
             isBroadcasted: broadcasted,
             is_broadcasted: broadcasted,
             broadcasted: broadcasted,
-            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+            broadcast_item_id: broadcasted
+              ? entry.broadcast_item_id ?? entry.id
+              : null,
           };
         }),
       );
-      setShop((prev) => {
+      setShop(prev => {
         if (!prev) return prev;
         const services = Array.isArray(prev.services) ? prev.services : [];
         let changed = false;
-        const updatedServices = services.map((entry) => {
+        const updatedServices = services.map(entry => {
           if (entry?.id !== serviceId) return entry;
           changed = true;
           return {
@@ -836,7 +1102,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             isBroadcasted: broadcasted,
             is_broadcasted: broadcasted,
             broadcasted: broadcasted,
-            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+            broadcast_item_id: broadcasted
+              ? entry.broadcast_item_id ?? entry.id
+              : null,
           };
         });
         if (!changed) return prev;
@@ -848,23 +1116,25 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
 
   const updateProductBroadcastStateLocal = useCallback(
     (productId: string, broadcasted: boolean) => {
-      setProductsList((prev) =>
-        prev.map((entry) => {
+      setProductsList(prev =>
+        prev.map(entry => {
           if (entry?.id !== productId) return entry;
           return {
             ...entry,
             isBroadcasted: broadcasted,
             is_broadcasted: broadcasted,
             broadcasted: broadcasted,
-            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+            broadcast_item_id: broadcasted
+              ? entry.broadcast_item_id ?? entry.id
+              : null,
           };
         }),
       );
-      setShop((prev) => {
+      setShop(prev => {
         if (!prev) return prev;
         const products = Array.isArray(prev.products) ? prev.products : [];
         let changed = false;
-        const updatedProducts = products.map((entry) => {
+        const updatedProducts = products.map(entry => {
           if (entry?.id !== productId) return entry;
           changed = true;
           return {
@@ -872,7 +1142,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             isBroadcasted: broadcasted,
             is_broadcasted: broadcasted,
             broadcasted: broadcasted,
-            broadcast_item_id: broadcasted ? entry.broadcast_item_id ?? entry.id : null,
+            broadcast_item_id: broadcasted
+              ? entry.broadcast_item_id ?? entry.id
+              : null,
           };
         });
         if (!changed) return prev;
@@ -911,7 +1183,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         errorMessage: 'Unable to load shop members.',
       });
       if (response?.success) {
-        const members = normalizeList(response.data).filter((member) => member?.is_active);
+        const members = normalizeList(response.data).filter(
+          member => member?.is_active,
+        );
         setShopMembers(members);
       } else {
         console.warn('Unable to load shop members:', response?.message);
@@ -929,7 +1203,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     async (contact: KISContact) => {
       setContactsPickerOpen(false);
       if (!contact?.userId) {
-        Alert.alert('Members', 'This contact is not registered yet. Ask them to join KIS first.');
+        Alert.alert(
+          'Members',
+          'This contact is not registered yet. Ask them to join KIS first.',
+        );
         return;
       }
       if (!shopId) {
@@ -958,18 +1235,21 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         setAddingMember(false);
       }
     },
-    [loadShopMembers, shopId],
+    [canManageMembers, loadShopMembers, shopId],
   );
 
   const handleUpdateMemberRole = useCallback(
     async (memberId: string, role: string) => {
       if (!shopId || !memberId || !role) return;
       if (!canManageMembers) {
-        Alert.alert('Roles', 'Only owners or managers can change member roles.');
+        Alert.alert(
+          'Roles',
+          'Only owners or managers can change member roles.',
+        );
         return;
       }
       const position = ROLE_POSITION_MAP[role] ?? 100;
-      setRoleSliderValues((prev) => ({ ...prev, [memberId]: position }));
+      setRoleSliderValues(prev => ({ ...prev, [memberId]: position }));
       setUpdatingMemberId(memberId);
       try {
         const response = await patchRequest(
@@ -988,7 +1268,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         setUpdatingMemberId(null);
       }
     },
-    [loadShopMembers, shopId],
+    [canManageMembers, loadShopMembers, shopId],
   );
 
   const handleRemoveMember = useCallback(
@@ -1015,29 +1295,15 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         setRemovingMemberId(null);
       }
     },
-    [loadShopMembers, shopId],
+    [canManageMembers, loadShopMembers, shopId],
   );
-
-  const loadShopDetails = useCallback(async () => {
-    if (!shopId) {
-      return;
-    }
-    try {
-      const response = await getRequest(`${ROUTES.commerce.shops}${shopId}/`, {
-        forceNetwork: true,
-        errorMessage: 'Unable to refresh shop details.',
-      });
-      if (response?.success && response.data) {
-        setShop((prev) => ({ ...prev, ...response.data }));
-      }
-    } catch (error: any) {
-      console.warn('Unable to refresh shop details:', error?.message ?? error);
-    }
-  }, [shopId]);
 
   const toggleMembershipVisibility = useCallback(async () => {
     if (!shopId) {
-      Alert.alert('Membership', 'Select a shop before updating membership visibility.');
+      Alert.alert(
+        'Membership',
+        'Select a shop before updating membership visibility.',
+      );
       return;
     }
     const nextValue = !membershipPublic;
@@ -1049,15 +1315,27 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         { errorMessage: 'Unable to update membership visibility.' },
       );
       if (!response?.success) {
-        throw new Error(response?.message || 'Unable to update membership settings.');
+        throw new Error(
+          response?.message || 'Unable to update membership settings.',
+        );
       }
       const updatedData = response?.data ?? {};
       setMembershipPublic(nextValue);
-      setShop((prev) => ({ ...prev, ...updatedData, membership_public: nextValue }));
-      Alert.alert('Membership', `Membership is now ${nextValue ? 'public' : 'private'}.`);
+      setShop(prev => ({
+        ...prev,
+        ...updatedData,
+        membership_public: nextValue,
+      }));
+      Alert.alert(
+        'Membership',
+        `Membership is now ${nextValue ? 'public' : 'private'}.`,
+      );
       await loadShopDetails();
     } catch (error: any) {
-      Alert.alert('Membership', error?.message || 'Unable to update membership settings.');
+      Alert.alert(
+        'Membership',
+        error?.message || 'Unable to update membership settings.',
+      );
     } finally {
       setMembershipPublicSaving(false);
     }
@@ -1081,7 +1359,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         }
         const updatedData = response?.data ?? {};
         setMemberDiscount(value);
-        setShop((prev) => ({ ...prev, ...updatedData, membership_discount_pct: value }));
+        setShop(prev => ({
+          ...prev,
+          ...updatedData,
+          membership_discount_pct: value,
+        }));
         Alert.alert('Members', `Discount floor set to ${value}%.`);
         await loadShopDetails();
       } catch (error: any) {
@@ -1105,12 +1387,17 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       void loadShopMembers();
       void loadShopServices();
       void loadServiceBookings();
-    }, [loadShopDetails, loadShopMembers, loadShopServices, loadServiceBookings]),
+    }, [
+      loadShopDetails,
+      loadShopMembers,
+      loadShopServices,
+      loadServiceBookings,
+    ]),
   );
 
   const bookingByService = useMemo(() => {
     const map: Record<string, any> = {};
-    serviceBookings.forEach((booking) => {
+    serviceBookings.forEach(booking => {
       const serviceId =
         booking?.service_details?.id ||
         (booking?.service ? String(booking.service) : null) ||
@@ -1144,7 +1431,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       growth: parsePercentage(raw.growth_rate ?? raw.growth ?? 0),
       conversion: parsePercentage(raw.conversion_rate ?? raw.conversion ?? 0),
       repeat: normalizeNumber(raw.repeat_buyers ?? raw.repeat ?? 0),
-      landing: normalizeNumber(raw.landing_page_visits ?? raw.landing_visits ?? 0),
+      landing: normalizeNumber(
+        raw.landing_page_visits ?? raw.landing_visits ?? 0,
+      ),
     };
   }, [shop]);
 
@@ -1153,11 +1442,17 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     return Array.isArray(shop?.products) ? shop.products : [];
   }, [productsList, shop?.products]);
   const derivedServiceProducts = useMemo(
-    () => shopProductsSource.filter((product) => (product?.inventory_type ?? 'PHYSICAL') === 'SERVICE'),
+    () =>
+      shopProductsSource.filter(
+        product => (product?.inventory_type ?? 'PHYSICAL') === 'SERVICE',
+      ),
     [shopProductsSource],
   );
   const filteredProductEntries = useMemo(
-    () => shopProductsSource.filter((product) => (product?.inventory_type ?? 'PHYSICAL') !== 'SERVICE'),
+    () =>
+      shopProductsSource.filter(
+        product => (product?.inventory_type ?? 'PHYSICAL') !== 'SERVICE',
+      ),
     [shopProductsSource],
   );
   const backendServiceEntries = useMemo(() => {
@@ -1174,7 +1469,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     const combined: any[] = [];
     backendServiceEntries.forEach((service, index) => {
       const key = String(
-        service?.id ?? service?.slug ?? service?.sku ?? service?.name ?? `backend-service-${index}`,
+        service?.id ??
+          service?.slug ??
+          service?.sku ??
+          service?.name ??
+          `backend-service-${index}`,
       );
       if (!seen.has(key)) {
         seen.add(key);
@@ -1183,7 +1482,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     });
     derivedServiceProducts.forEach((service, index) => {
       const key = String(
-        service?.id ?? service?.slug ?? service?.sku ?? service?.name ?? `derived-service-${index}`,
+        service?.id ??
+          service?.slug ??
+          service?.sku ??
+          service?.name ??
+          `derived-service-${index}`,
       );
       if (!seen.has(key)) {
         seen.add(key);
@@ -1196,22 +1499,41 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const lowStockCount = useMemo(
     () =>
       safeProducts.reduce((sum, product) => {
-        const stock = normalizeNumber(product?.stock ?? product?.inventory ?? 0);
+        const stock = normalizeNumber(
+          product?.stock ?? product?.inventory ?? 0,
+        );
         return sum + (stock < 10 ? 1 : 0);
       }, 0),
     [safeProducts],
   );
   const readyServicesCount = useMemo(
-    () => safeServices.filter((service) => service?.status !== 'draft').length,
+    () => safeServices.filter(service => service?.status !== 'draft').length,
     [safeServices],
   );
   const activityFeed = useMemo(() => {
-    if (Array.isArray(shop?.activity_feed) && shop.activity_feed.length) return shop.activity_feed;
-    if (Array.isArray(shop?.recent_activity) && shop.recent_activity.length) return shop.recent_activity;
+    if (Array.isArray(shop?.activity_feed) && shop.activity_feed.length)
+      return shop.activity_feed;
+    if (Array.isArray(shop?.recent_activity) && shop.recent_activity.length)
+      return shop.recent_activity;
     return [
-      { id: 'act-safe-1', title: 'Shop synchronized', detail: 'All settings mirrored to the storefront', time: 'Just now' },
-      { id: 'act-safe-2', title: 'Members growing', detail: 'You gained +12 members this week', time: '2h ago' },
-      { id: 'act-safe-3', title: 'Landing page refreshed', detail: 'Hero CTA updated automatically', time: 'Yesterday' },
+      {
+        id: 'act-safe-1',
+        title: 'Shop synchronized',
+        detail: 'All settings mirrored to the storefront',
+        time: 'Just now',
+      },
+      {
+        id: 'act-safe-2',
+        title: 'Members growing',
+        detail: 'You gained +12 members this week',
+        time: '2h ago',
+      },
+      {
+        id: 'act-safe-3',
+        title: 'Landing page refreshed',
+        detail: 'Hero CTA updated automatically',
+        time: 'Yesterday',
+      },
     ];
   }, [shop]);
 
@@ -1220,19 +1542,25 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       {
         title: 'Stock health',
         detail: lowStockCount
-          ? `${lowStockCount} item${lowStockCount > 1 ? 's' : ''} are under 10 units — restock recommended.`
+          ? `${lowStockCount} item${
+              lowStockCount > 1 ? 's' : ''
+            } are under 10 units — restock recommended.`
           : 'All featured products have healthy inventory.',
       },
       {
         title: 'Service availability',
         detail: readyServicesCount
-          ? `${readyServicesCount} live service${readyServicesCount > 1 ? 's' : ''} with booking open.`
+          ? `${readyServicesCount} live service${
+              readyServicesCount > 1 ? 's' : ''
+            } with booking open.`
           : 'No services published yet.',
       },
       {
         title: 'Member retention',
         detail: safeMembers.length
-          ? `${safeMembers.length} member${safeMembers.length > 1 ? 's' : ''} engaged this month.`
+          ? `${safeMembers.length} member${
+              safeMembers.length > 1 ? 's' : ''
+            } engaged this month.`
           : 'Invite members to unlock discounts.',
       },
       {
@@ -1260,7 +1588,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     () => [
       { label: 'Active orders', value: metrics.orders },
       { label: 'Bookings', value: metrics.bookings },
-      { label: 'Avg order value', value: metrics.orders ? `$${Math.round(metrics.revenue / metrics.orders).toLocaleString()}` : '$0' },
+      {
+        label: 'Avg order value',
+        value: metrics.orders
+          ? `$${Math.round(metrics.revenue / metrics.orders).toLocaleString()}`
+          : '$0',
+      },
       { label: 'Conversion', value: `${metrics.conversion}%` },
     ],
     [metrics],
@@ -1296,7 +1629,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     () => [
       { label: 'Orders', value: metrics.orders, color: palette.primaryStrong },
       { label: 'Bookings', value: metrics.bookings, color: '#EF4444' },
-      { label: 'Testimonials', value: normalizeNumber(shop?.landing_page?.testimonials?.length ?? 0), color: '#F59E0B' },
+      {
+        label: 'Testimonials',
+        value: normalizeNumber(shop?.landing_page?.testimonials?.length ?? 0),
+        color: '#F59E0B',
+      },
     ],
     [metrics, palette.primaryStrong, shop],
   );
@@ -1325,9 +1662,14 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const topProductItems = useMemo(() => {
     const enriched = safeProducts
       .map((product, index) => {
-        const score = normalizeNumber(product?.sales ?? product?.orders ?? product?.units_sold ?? 0);
+        const score = normalizeNumber(
+          product?.sales ?? product?.orders ?? product?.units_sold ?? 0,
+        );
         return {
-          id: product.id ?? product.sku ?? `${product?.category ?? 'product'}-${index}`,
+          id:
+            product.id ??
+            product.sku ??
+            `${product?.category ?? 'product'}-${index}`,
           title: product.name ?? 'Product',
           subtitle: toCategoryLabel(product.category, 'Product'),
           metric: `${score} sold`,
@@ -1336,16 +1678,21 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-      .map(({ score, ...rest }) => rest);
+      .map(({ score: _score, ...rest }) => rest);
     return enriched;
   }, [safeProducts]);
 
   const topServiceItems = useMemo(() => {
     const enriched = safeServices
       .map((service, index) => {
-        const score = normalizeNumber(service?.bookings ?? service?.reservations ?? service?.orders ?? 0);
+        const score = normalizeNumber(
+          service?.bookings ?? service?.reservations ?? service?.orders ?? 0,
+        );
         return {
-          id: service.id ?? service.slug ?? `${service?.category ?? 'service'}-${index}`,
+          id:
+            service.id ??
+            service.slug ??
+            `${service?.category ?? 'service'}-${index}`,
           title: service.name ?? 'Service',
           subtitle: toCategoryLabel(service, 'Services'),
           metric: `${score} bookings`,
@@ -1354,7 +1701,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-      .map(({ score, ...rest }) => rest);
+      .map(({ score: _score, ...rest }) => rest);
     return enriched;
   }, [safeServices]);
 
@@ -1362,51 +1709,54 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     const languages = Array.isArray(shop?.languages)
       ? shop.languages
       : shop?.language
-        ? [shop.language]
-        : ['English'];
+      ? [shop.language]
+      : ['English'];
     const currencies = Array.isArray(shop?.currencies)
       ? shop.currencies
       : shop?.currency
-        ? [shop.currency]
-        : [KIS_COIN_CODE];
+      ? [shop.currency]
+      : [KIS_COIN_CODE];
     const regions =
-      Array.isArray(shop?.regions) && shop.regions.length ? shop.regions : shop?.region ? [shop.region] : ['Global'];
+      Array.isArray(shop?.regions) && shop.regions.length
+        ? shop.regions
+        : shop?.region
+        ? [shop.region]
+        : ['Global'];
     const timezones =
       Array.isArray(shop?.timezones) && shop.timezones.length
         ? shop.timezones
         : shop?.timezone
-          ? [shop.timezone]
-          : shop?.timezone_offset
-            ? [shop.timezone_offset]
-            : ['UTC'];
+        ? [shop.timezone]
+        : shop?.timezone_offset
+        ? [shop.timezone_offset]
+        : ['UTC'];
     const deliveryModes = Array.isArray(shop?.delivery_modes)
       ? shop.delivery_modes
       : shop?.delivery_mode
-        ? [shop.delivery_mode]
-        : ['Standard'];
+      ? [shop.delivery_mode]
+      : ['Standard'];
     return { languages, currencies, regions, timezones, deliveryModes };
   }, [shop]);
-
 
   const openProductEditor = (mode: 'create' | 'edit', product?: any | null) => {
     setProductEditorMode(mode);
     setActiveProduct(product ?? null);
     setProductDrawerVisible(true);
   };
-  const closeProductEditor = () => {
+  const closeProductEditor = useCallback(() => {
     setProductDrawerVisible(false);
     setActiveProduct(null);
-  };
+  }, []);
 
   const openServiceEditor = (mode: 'create' | 'edit', service?: any | null) => {
     setServiceEditorMode(mode);
     setActiveService(service ?? null);
     setServiceDrawerVisible(true);
   };
-  const closeServiceEditor = () => {
+  const closeServiceEditor = useCallback(() => {
     setServiceDrawerVisible(false);
     setActiveService(null);
-  };
+  }, []);
 
   const handleProductSave = useCallback(
     async (payload: any) => {
@@ -1424,18 +1774,23 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         const formData = new FormData();
         formData.append('shop', shop.id);
         formData.append('name', trimmedName);
-        formData.append('description', String(payload.description ?? '').trim());
+        formData.append(
+          'description',
+          String(payload.description ?? '').trim(),
+        );
         const priceValue = String(payload.price ?? '').trim();
         formData.append('price', priceValue || '0');
-        const currencyValue = String(payload.currency ?? KIS_COIN_CODE).trim() || KIS_COIN_CODE;
+        const currencyValue =
+          String(payload.currency ?? KIS_COIN_CODE).trim() || KIS_COIN_CODE;
         formData.append('currency', currencyValue);
         const stockValue = String(
           payload.stock_qty ?? payload.stock ?? payload.stockQty ?? '',
         ).trim();
         formData.append('stock_qty', stockValue || '0');
-        const inventoryTypeValue = String(
-          payload.inventory_type ?? payload.inventoryType ?? 'PHYSICAL',
-        ).trim() || 'PHYSICAL';
+        const inventoryTypeValue =
+          String(
+            payload.inventory_type ?? payload.inventoryType ?? 'PHYSICAL',
+          ).trim() || 'PHYSICAL';
         formData.append('inventory_type', inventoryTypeValue);
         const normalizeIdList = (
           value?: string | number | null | (string | number)[],
@@ -1445,7 +1800,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           }
           const iterable = Array.isArray(value) ? value : [value];
           return iterable
-            .map((entry) => String(entry ?? '').trim())
+            .map(entry => String(entry ?? '').trim())
             .filter(Boolean);
         };
         const candidateCategoryIds = [
@@ -1467,8 +1822,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         if (primaryCategoryId) {
           formData.append('category_id', primaryCategoryId);
         }
-        const appendIfValue = (field: string, value?: string | number | null) => {
-          const trimmed = value === undefined || value === null ? '' : String(value).trim();
+        const appendIfValue = (
+          field: string,
+          value?: string | number | null,
+        ) => {
+          const trimmed =
+            value === undefined || value === null ? '' : String(value).trim();
           if (trimmed) {
             formData.append(field, trimmed);
           }
@@ -1479,28 +1838,37 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           }
         };
         const appendListField = (field: string, values?: string[] | null) => {
-          const normalized = (values ?? []).map((item) => String(item ?? '').trim()).filter(Boolean);
+          const normalized = (values ?? [])
+            .map(item => String(item ?? '').trim())
+            .filter(Boolean);
           if (!normalized.length) {
             return;
           }
-          normalized.forEach((item) => formData.append(field, item));
+          normalized.forEach(item => formData.append(field, item));
         };
         appendIfValue('sku', payload.sku);
         appendIfValue('slug', payload.slug);
         appendIfValue('brand', payload.brand);
         appendIfValue('condition', payload.condition);
         appendIfValue('sale_price', payload.sale_price ?? payload.salePrice);
-        appendIfValue('compare_at_price', payload.compare_at_price ?? payload.compareAtPrice);
+        appendIfValue(
+          'compare_at_price',
+          payload.compare_at_price ?? payload.compareAtPrice,
+        );
         appendIfValue('material', payload.material);
         appendIfValue('fit', payload.fit);
         appendIfValue('size_guide', payload.size_guide ?? payload.sizeGuide);
         appendListField(
           'available_sizes',
-          payload.available_sizes ?? payload.availableSizes ?? payload.availableSizesList,
+          payload.available_sizes ??
+            payload.availableSizes ??
+            payload.availableSizesList,
         );
         appendListField(
           'available_colors',
-          payload.available_colors ?? payload.availableColors ?? payload.availableColorsList,
+          payload.available_colors ??
+            payload.availableColors ??
+            payload.availableColorsList,
         );
         appendIfValue('weight', payload.weight);
         appendIfValue('length', payload.length);
@@ -1531,40 +1899,57 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         const selectedImages: PickedImage[] = Array.isArray(payload.images)
           ? payload.images
           : Array.isArray(payload.gallery_images)
-            ? payload.gallery_images
-            : [];
-        const uploads = selectedImages.filter((image) => isLocalImageUri(image.uri));
+          ? payload.gallery_images
+          : [];
+        const uploads = selectedImages.filter(image =>
+          isLocalImageUri(image.uri),
+        );
         if (!payload.id && uploads.length === 0) {
           throw new Error('Please add at least one image for the product.');
         }
         if (uploads.length) {
           const [primary, ...rest] = uploads;
           formData.append('image_file', toUploadFile(primary) as any);
-          rest.forEach((image) => formData.append('images', toUploadFile(image) as any));
+          rest.forEach(image =>
+            formData.append('images', toUploadFile(image) as any),
+          );
         }
         if (payload.main_image && isLocalImageUri(payload.main_image.uri)) {
-          formData.append('main_image', toUploadFile(payload.main_image) as any);
+          formData.append(
+            'main_image',
+            toUploadFile(payload.main_image) as any,
+          );
         }
 
         const endpoint = payload.id
           ? `${ROUTES.commerce.products}${payload.id}/`
           : ROUTES.commerce.products;
         const response = payload.id
-          ? await patchRequest(endpoint, formData, { errorMessage: 'Unable to update product.' })
-          : await postRequest(endpoint, formData, { errorMessage: 'Unable to add product.' });
+          ? await patchRequest(endpoint, formData, {
+              errorMessage: 'Unable to update product.',
+            })
+          : await postRequest(endpoint, formData, {
+              errorMessage: 'Unable to add product.',
+            });
         if (!response?.success) {
           throw new Error(response?.message || 'Unable to save product.');
         }
         await loadProducts();
-        Alert.alert('Products', payload.id ? 'Product updated.' : 'Product created.');
+        Alert.alert(
+          'Products',
+          payload.id ? 'Product updated.' : 'Product created.',
+        );
         closeProductEditor();
       } catch (error: any) {
-        Alert.alert('Products', error?.message || 'Unable to save product listing.');
+        Alert.alert(
+          'Products',
+          error?.message || 'Unable to save product listing.',
+        );
       } finally {
         setProductLoading(false);
       }
     },
-    [closeProductEditor, shop?.id],
+    [closeProductEditor, loadProducts, shop?.id],
   );
 
   const handleProductRating = useCallback(
@@ -1591,12 +1976,22 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           ? ROUTES.commerce.shopServiceBroadcast(product.id)
           : ROUTES.commerce.productBroadcast(product.id);
         const response = currentlyBroadcasted
-          ? await deleteRequest(endpoint, { errorMessage: 'Unable to remove broadcast.' })
-          : await postRequest(endpoint, {}, {
-              errorMessage: isService ? 'Unable to broadcast service.' : 'Unable to broadcast product.',
-            });
+          ? await deleteRequest(endpoint, {
+              errorMessage: 'Unable to remove broadcast.',
+            })
+          : await postRequest(
+              endpoint,
+              {},
+              {
+                errorMessage: isService
+                  ? 'Unable to broadcast service.'
+                  : 'Unable to broadcast product.',
+              },
+            );
         if (!response?.success) {
-          throw new Error(response?.message || 'Unable to update broadcast status.');
+          throw new Error(
+            response?.message || 'Unable to update broadcast status.',
+          );
         }
         const newBroadcastedState = !currentlyBroadcasted;
         if (isService) {
@@ -1610,15 +2005,27 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         }
         await Promise.all(refreshers);
         DeviceEventEmitter.emit('broadcast.refresh');
-        const message = currentlyBroadcasted ? 'Broadcast removed.' : isService ? 'Service broadcasted.' : 'Product broadcasted.';
+        const message = currentlyBroadcasted
+          ? 'Broadcast removed.'
+          : isService
+          ? 'Service broadcasted.'
+          : 'Product broadcasted.';
         Alert.alert(isService ? 'Services' : 'Products', message);
       } catch (error: any) {
-        Alert.alert(isService ? 'Services' : 'Products', error?.message || 'Unable to update broadcast status.');
+        Alert.alert(
+          isService ? 'Services' : 'Products',
+          error?.message || 'Unable to update broadcast status.',
+        );
       } finally {
         setBroadcastingProductId(null);
       }
     },
-    [loadProducts, loadShopServices, updateServiceBroadcastStateLocal],
+    [
+      loadProducts,
+      loadShopServices,
+      updateProductBroadcastStateLocal,
+      updateServiceBroadcastStateLocal,
+    ],
   );
 
   const handleServiceSave = useCallback(
@@ -1632,8 +2039,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         Alert.alert('Services', 'Provide a name for the service.');
         return;
       }
-      const normalizedCategoryIds = (Array.isArray(payload.categoryIds) ? payload.categoryIds : [])
-        .map((id) => String(id ?? '').trim())
+      const normalizedCategoryIds = (
+        Array.isArray(payload.categoryIds) ? payload.categoryIds : []
+      )
+        .map((id: unknown) => String(id ?? '').trim())
         .filter(Boolean)
         .slice(0, 5);
       if (!normalizedCategoryIds.length) {
@@ -1643,8 +2052,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       setServiceLoading(true);
       try {
         const formData = new FormData();
-        const appendTrimmed = (field: string, value?: string | number | null) => {
-          const trimmed = value === undefined || value === null ? '' : String(value).trim();
+        const appendTrimmed = (
+          field: string,
+          value?: string | number | null,
+        ) => {
+          const trimmed =
+            value === undefined || value === null ? '' : String(value).trim();
           if (trimmed) {
             formData.append(field, trimmed);
           }
@@ -1656,16 +2069,18 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         };
         const appendStringList = (field: string, value?: unknown) => {
           const items = Array.isArray(value)
-            ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
+            ? value.map(item => String(item ?? '').trim()).filter(Boolean)
             : [];
-          items.forEach((item) => formData.append(field, item));
+          items.forEach(item => formData.append(field, item));
         };
         const toServicePackagePayload = (item: any) => ({
           id: item?.id,
           name: String(item?.name ?? '').trim(),
           description: String(item?.description ?? '').trim(),
           price: String(item?.price ?? '').trim(),
-          duration_minutes: Number(String(item?.durationMinutes ?? '').trim() || 0),
+          duration_minutes: Number(
+            String(item?.durationMinutes ?? '').trim() || 0,
+          ),
           revisions: Number(String(item?.revisions ?? '').trim() || 0),
         });
         const toServiceAddonPayload = (item: any) => ({
@@ -1682,10 +2097,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         });
         formData.append('shop', shop.id);
         formData.append('name', trimmedName);
-        const slugBase = trimmedName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '') || `service-${Date.now()}`;
+        const slugBase =
+          trimmedName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || `service-${Date.now()}`;
         formData.append('slug', slugBase);
         const description = String(payload.description ?? '').trim();
         formData.append('description', description);
@@ -1705,8 +2121,14 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         appendTrimmed('max_participants', payload.maxParticipants);
         appendTrimmed('staff_required', payload.staffRequired);
         appendTrimmed('min_notice_hours', payload.minNoticeHours);
-        appendTrimmed('max_advance_booking_days', payload.maxAdvanceBookingDays);
-        appendTrimmed('cancellation_window_hours', payload.cancellationWindowHours);
+        appendTrimmed(
+          'max_advance_booking_days',
+          payload.maxAdvanceBookingDays,
+        );
+        appendTrimmed(
+          'cancellation_window_hours',
+          payload.cancellationWindowHours,
+        );
         appendTrimmed('reschedule_window_hours', payload.rescheduleWindowHours);
         appendTrimmed('remote_meeting_link', payload.remoteMeetingLink);
         appendTrimmed('address_line1', payload.addressLine1);
@@ -1728,13 +2150,16 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         appendBoolean('tax_inclusive', payload.taxInclusive);
         appendBoolean('quote_required', payload.quoteRequired);
         appendBoolean('group_booking_allowed', payload.groupBookingAllowed);
-        appendBoolean('allow_multiple_attendees_per_slot', payload.allowMultipleAttendeesPerSlot);
+        appendBoolean(
+          'allow_multiple_attendees_per_slot',
+          payload.allowMultipleAttendeesPerSlot,
+        );
         appendBoolean('auto_confirm_booking', payload.autoConfirmBooking);
         appendBoolean('approval_required', payload.approvalRequired);
         appendBoolean('featured', payload.featured);
         appendBoolean('is_featured', payload.featured);
         appendBoolean('remove_featured_image', payload.remove_featured_image);
-        normalizedCategoryIds.forEach((categoryId) => {
+        normalizedCategoryIds.forEach((categoryId: string) => {
           formData.append('category_ids', categoryId);
           formData.append('catalog_category_ids', categoryId);
         });
@@ -1742,7 +2167,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         if (primaryCategoryId) {
           formData.append('category_id', primaryCategoryId);
         }
-        const availabilityValue = serializeJsonField(payload.availability ?? '');
+        const availabilityValue = serializeJsonField(
+          payload.availability ?? '',
+        );
         if (availabilityValue) {
           formData.append('availability', availabilityValue);
         }
@@ -1756,10 +2183,16 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         if (serviceTypeValue) {
           formData.append('service_type', serviceTypeValue);
         }
-        const normalizedAvailabilityRules = normalizeAvailabilityRulesPayload(payload.availabilityRules);
-        formData.append('availability_rules', JSON.stringify(normalizedAvailabilityRules));
+        const normalizedAvailabilityRules = normalizeAvailabilityRulesPayload(
+          payload.availabilityRules,
+        );
+        formData.append(
+          'availability_rules',
+          JSON.stringify(normalizedAvailabilityRules),
+        );
         const parsePercentage = (value: string | number | null | undefined) => {
-          if (value === null || value === undefined || value === '') return undefined;
+          if (value === null || value === undefined || value === '')
+            return undefined;
           const candidate = Number(String(value).trim());
           if (!Number.isFinite(candidate)) return undefined;
           return Math.min(100, Math.max(0, candidate));
@@ -1773,7 +2206,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           JSON.stringify(
             (Array.isArray(payload.packages) ? payload.packages : [])
               .map(toServicePackagePayload)
-              .filter((item) => item.name),
+              .filter(
+                (item: ReturnType<typeof toServicePackagePayload>) => item.name,
+              ),
           ),
         );
         formData.append(
@@ -1781,7 +2216,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           JSON.stringify(
             (Array.isArray(payload.addons) ? payload.addons : [])
               .map(toServiceAddonPayload)
-              .filter((item) => item.name),
+              .filter(
+                (item: ReturnType<typeof toServiceAddonPayload>) => item.name,
+              ),
           ),
         );
         formData.append(
@@ -1789,7 +2226,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           JSON.stringify(
             (Array.isArray(payload.requirements) ? payload.requirements : [])
               .map(toServiceRequirementPayload)
-              .filter((item) => item.label),
+              .filter(
+                (item: ReturnType<typeof toServiceRequirementPayload>) =>
+                  item.label,
+              ),
           ),
         );
 
@@ -1798,38 +2238,64 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           featuredImage && isLocalImageUri(featuredImage.uri)
             ? featuredImage
             : null;
-        const selectedImages: PickedImage[] = Array.isArray(payload.gallery_images)
+        const selectedImages: PickedImage[] = Array.isArray(
+          payload.gallery_images,
+        )
           ? payload.gallery_images
           : Array.isArray(payload.images)
-            ? payload.images
-            : [];
-        const galleryUploads = selectedImages.filter((image) => isLocalImageUri(image.uri));
-        const effectiveFeaturedUpload = featuredUpload ?? galleryUploads[0] ?? null;
+          ? payload.images
+          : [];
+        const galleryUploads = selectedImages.filter(image =>
+          isLocalImageUri(image.uri),
+        );
+        const effectiveFeaturedUpload =
+          featuredUpload ?? galleryUploads[0] ?? null;
         const effectiveGalleryUploads = effectiveFeaturedUpload
-          ? galleryUploads.filter((image) => image.uri !== effectiveFeaturedUpload.uri)
+          ? galleryUploads.filter(
+              image => image.uri !== effectiveFeaturedUpload.uri,
+            )
           : galleryUploads;
-        if (!payload.id && !effectiveFeaturedUpload && effectiveGalleryUploads.length === 0) {
+        if (
+          !payload.id &&
+          !effectiveFeaturedUpload &&
+          effectiveGalleryUploads.length === 0
+        ) {
           throw new Error('Please add at least one image for the service.');
         }
         if (effectiveFeaturedUpload) {
-          formData.append('image_file', toUploadFile(effectiveFeaturedUpload) as any);
+          formData.append(
+            'image_file',
+            toUploadFile(effectiveFeaturedUpload) as any,
+          );
         }
-        effectiveGalleryUploads.forEach((image) => formData.append('images', toUploadFile(image) as any));
+        effectiveGalleryUploads.forEach(image =>
+          formData.append('images', toUploadFile(image) as any),
+        );
 
         const endpoint = payload.id
           ? ROUTES.commerce.shopService(payload.id)
           : ROUTES.commerce.shopServices;
         const response = payload.id
-          ? await patchRequest(endpoint, formData, { errorMessage: 'Unable to update service.' })
-          : await postRequest(endpoint, formData, { errorMessage: 'Unable to add service.' });
+          ? await patchRequest(endpoint, formData, {
+              errorMessage: 'Unable to update service.',
+            })
+          : await postRequest(endpoint, formData, {
+              errorMessage: 'Unable to add service.',
+            });
         if (!response?.success) {
           throw new Error(response?.message || 'Unable to save service.');
         }
         await Promise.all([loadShopServices(), loadShopDetails()]);
-        Alert.alert('Services', `${trimmedName ? 'Saved' : 'Draft saved'} service listing.`);
+        Alert.alert(
+          'Services',
+          `${trimmedName ? 'Saved' : 'Draft saved'} service listing.`,
+        );
         closeServiceEditor();
       } catch (error: any) {
-        Alert.alert('Services', error?.message || 'Unable to save service listing.');
+        Alert.alert(
+          'Services',
+          error?.message || 'Unable to save service listing.',
+        );
       } finally {
         setServiceLoading(false);
       }
@@ -1842,9 +2308,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       if (!serviceId) return;
       setServiceLoading(true);
       try {
-        const response = await deleteRequest(ROUTES.commerce.shopService(serviceId), {
-          errorMessage: 'Unable to delete service.',
-        });
+        const response = await deleteRequest(
+          ROUTES.commerce.shopService(serviceId),
+          {
+            errorMessage: 'Unable to delete service.',
+          },
+        );
         if (!response?.success) {
           throw new Error(response?.message || 'Unable to delete service.');
         }
@@ -1864,10 +2333,16 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       if (!serviceId) return;
       Alert.alert(
         'Delete service',
-        `Are you sure you want to delete ${serviceName ? `${serviceName}` : 'this service'}?`,
+        `Are you sure you want to delete ${
+          serviceName ? `${serviceName}` : 'this service'
+        }?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => handleServiceDelete(serviceId) },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => handleServiceDelete(serviceId),
+          },
         ],
       );
     },
@@ -1886,49 +2361,82 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const renderOverviewTab = () => (
     <View style={{ gap: 14 }}>
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Overview</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Overview
+        </Text>
         <Text style={[styles.meta, { color: palette.subtext }]}>
           Operate with clarity, insight, and confidence.
         </Text>
         <View style={styles.statRow}>
-          {overviewStats.map((stat) => (
+          {overviewStats.map(stat => (
             <View key={stat.label} style={styles.statItem}>
-              <Text style={[styles.statValue, { color: palette.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: palette.subtext }]}>{stat.label}</Text>
+              <Text style={[styles.statValue, { color: palette.text }]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.statLabel, { color: palette.subtext }]}>
+                {stat.label}
+              </Text>
             </View>
           ))}
         </View>
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Orders & bookings summary</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Orders & bookings summary
+        </Text>
         <View style={styles.gridRow}>
-          {orderSummary.map((stat) => (
+          {orderSummary.map(stat => (
             <View key={stat.label} style={styles.gridItem}>
-              <Text style={[styles.statValue, { color: palette.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: palette.subtext }]}>{stat.label}</Text>
+              <Text style={[styles.statValue, { color: palette.text }]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.statLabel, { color: palette.subtext }]}>
+                {stat.label}
+              </Text>
             </View>
           ))}
         </View>
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Activity feed</Text>
-        {activityFeed.slice(0, 4).map((item) => (
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Activity feed
+        </Text>
+        {activityFeed.slice(0, 4).map(item => (
           <View key={item.id} style={styles.activityItem}>
-            <Text style={[styles.cardTitle, { fontSize: 16, color: palette.text }]}>{item.title}</Text>
-            <Text style={[styles.meta, { color: palette.subtext }]}>{item.detail}</Text>
-            <Text style={[styles.meta, { color: palette.primaryStrong, fontSize: 12 }]}>{item.time}</Text>
+            <Text
+              style={[styles.cardTitle, { fontSize: 16, color: palette.text }]}
+            >
+              {item.title}
+            </Text>
+            <Text style={[styles.meta, { color: palette.subtext }]}>
+              {item.detail}
+            </Text>
+            <Text
+              style={[
+                styles.meta,
+                { color: palette.primaryStrong, fontSize: 12 },
+              ]}
+            >
+              {item.time}
+            </Text>
           </View>
         ))}
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Smart insights</Text>
-        {insights.map((insight) => (
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Smart insights
+        </Text>
+        {insights.map(insight => (
           <View key={insight.title} style={styles.insightRow}>
-            <Text style={[styles.statLabel, { color: palette.text }]}>{insight.title}</Text>
-            <Text style={[styles.meta, { color: palette.subtext }]}>{insight.detail}</Text>
+            <Text style={[styles.statLabel, { color: palette.text }]}>
+              {insight.title}
+            </Text>
+            <Text style={[styles.meta, { color: palette.subtext }]}>
+              {insight.detail}
+            </Text>
           </View>
         ))}
       </View>
@@ -1939,7 +2447,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     <View style={{ gap: 12 }}>
       {/** Ensure we show shop landing link only when landing page is public */}
       {safeProducts.length ? (
-        safeProducts.map((product) => {
+        safeProducts.map(product => {
           const broadcasted = isProductBroadcasted(product);
           return (
             <ProductCard
@@ -1947,8 +2455,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
               product={product}
               palette={palette}
               onEdit={() => openProductEditor('edit', product)}
-              onDelete={() => Alert.alert('Products', 'Delete flow coming soon.')}
-              onRate={(score) => {
+              onDelete={() =>
+                Alert.alert('Products', 'Delete flow coming soon.')
+              }
+              onRate={score => {
                 if (!product.id) {
                   return Promise.reject(new Error('Invalid product'));
                 }
@@ -1965,58 +2475,90 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           );
         })
       ) : (
-        <View style={[styles.emptyCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
-          <Text style={[styles.emptyLabel, { color: palette.subtext }]}>No products yet.</Text>
-          <KISButton title="Add product" onPress={() => openProductEditor('create')} />
+        <View
+          style={[
+            styles.emptyCard,
+            { borderColor: palette.divider, backgroundColor: palette.card },
+          ]}
+        >
+          <Text style={[styles.emptyLabel, { color: palette.subtext }]}>
+            No products yet.
+          </Text>
+          <KISButton
+            title="Add product"
+            onPress={() => openProductEditor('create')}
+          />
         </View>
       )}
       <View style={{ alignItems: 'center' }}>
-        <KISButton title="Add product" size="sm" variant="outline" onPress={() => openProductEditor('create')} />
+        <KISButton
+          title="Add product"
+          size="sm"
+          variant="outline"
+          onPress={() => openProductEditor('create')}
+        />
       </View>
     </View>
   );
 
   const renderServicesTab = () => (
     <View style={{ gap: 12 }}>
-        {safeServices.length ? (
-          safeServices.map((service) => {
-            const serviceId = service?.id ? String(service.id) : '';
-            const existingBooking = serviceId ? bookingByService[serviceId] : null;
-            return (
-              <ProductCard
-                key={service.id ?? service.slug ?? service.name}
-                product={service}
-                palette={palette}
-                onEdit={() => openServiceEditor('edit', service)}
-                onDelete={() => confirmServiceDelete(service.id, service.name)}
-                onRate={(score) => {
-                  if (!service?.id) {
-                    return Promise.reject(new Error('Invalid service'));
-                  }
-                  return handleProductRating(service.id, score);
-                }}
-                onBroadcast={handleProductBroadcast}
-                memberDiscount={memberDiscount}
-                isBroadcasted={isServiceBroadcasted(service)}
-                broadcastLoading={broadcastingProductId === service.id}
-                landingPublic={landingPublic}
-                shopName={shop?.name ?? 'Shop'}
-                onOpenLanding={openShopLandingPage}
-                isService
-                onBook={() => openServiceBooking(service.id, service.name)}
-                existingBooking={existingBooking}
-                onOpenBookingDetails={openBookingDetails}
-              />
-            );
-          })
+      {safeServices.length ? (
+        safeServices.map(service => {
+          const serviceId = service?.id ? String(service.id) : '';
+          const existingBooking = serviceId
+            ? bookingByService[serviceId]
+            : null;
+          return (
+            <ProductCard
+              key={service.id ?? service.slug ?? service.name}
+              product={service}
+              palette={palette}
+              onEdit={() => openServiceEditor('edit', service)}
+              onDelete={() => confirmServiceDelete(service.id, service.name)}
+              onRate={score => {
+                if (!service?.id) {
+                  return Promise.reject(new Error('Invalid service'));
+                }
+                return handleProductRating(service.id, score);
+              }}
+              onBroadcast={handleProductBroadcast}
+              memberDiscount={memberDiscount}
+              isBroadcasted={isServiceBroadcasted(service)}
+              broadcastLoading={broadcastingProductId === service.id}
+              landingPublic={landingPublic}
+              shopName={shop?.name ?? 'Shop'}
+              onOpenLanding={openShopLandingPage}
+              isService
+              onBook={() => openServiceBooking(service.id, service.name)}
+              existingBooking={existingBooking}
+              onOpenBookingDetails={openBookingDetails}
+            />
+          );
+        })
       ) : (
-        <View style={[styles.emptyCard, { borderColor: palette.divider, backgroundColor: palette.card }]}> 
-          <Text style={[styles.emptyLabel, { color: palette.subtext }]}>No services yet.</Text>
-          <KISButton title="Add service" onPress={() => openServiceEditor('create')} />
+        <View
+          style={[
+            styles.emptyCard,
+            { borderColor: palette.divider, backgroundColor: palette.card },
+          ]}
+        >
+          <Text style={[styles.emptyLabel, { color: palette.subtext }]}>
+            No services yet.
+          </Text>
+          <KISButton
+            title="Add service"
+            onPress={() => openServiceEditor('create')}
+          />
         </View>
       )}
       <View style={{ alignItems: 'center' }}>
-        <KISButton title="Add service" size="sm" variant="outline" onPress={() => openServiceEditor('create')} />
+        <KISButton
+          title="Add service"
+          size="sm"
+          variant="outline"
+          onPress={() => openServiceEditor('create')}
+        />
       </View>
     </View>
   );
@@ -2024,8 +2566,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const renderMembersTab = () => (
     <View style={{ gap: 16 }}>
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Member discount rule</Text>
-        <Text style={[styles.meta, { color: palette.subtext }]}>Members always receive at least 5% off.</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Member discount rule
+        </Text>
+        <Text style={[styles.meta, { color: palette.subtext }]}>
+          Members always receive at least 5% off.
+        </Text>
         <Slider
           style={{ width: '100%', height: 40 }}
           minimumValue={5}
@@ -2034,9 +2580,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           value={memberDiscount}
           minimumTrackTintColor={palette.primaryStrong}
           maximumTrackTintColor={palette.inputBorder}
-          onValueChange={(value) => setMemberDiscount(clampPercentage(value))}
+          onValueChange={value => setMemberDiscount(clampPercentage(value))}
         />
-        <Text style={[styles.meta, { color: palette.subtext }]}>Current discount: {memberDiscount}%</Text>
+        <Text style={[styles.meta, { color: palette.subtext }]}>
+          Current discount: {memberDiscount}%
+        </Text>
         <KISButton
           title="Save discount"
           size="sm"
@@ -2044,7 +2592,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           onPress={() => handleSaveDiscount(clampPercentage(memberDiscount))}
         />
         <KISButton
-          title={membershipPublic ? 'Set membership private' : 'Make membership public'}
+          title={
+            membershipPublic
+              ? 'Set membership private'
+              : 'Make membership public'
+          }
           size="sm"
           variant={membershipPublic ? 'outline' : 'secondary'}
           loading={membershipPublicSaving}
@@ -2053,19 +2605,39 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Member perks</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Member perks
+        </Text>
         <View style={styles.sectionRow}>
-          {['Priority offers', 'Free delivery', 'Service slots', 'Exclusive buys'].map((perk) => (
-            <View key={perk} style={[styles.sectionPill, { borderColor: palette.divider }]}>
+          {[
+            'Priority offers',
+            'Free delivery',
+            'Service slots',
+            'Exclusive buys',
+          ].map(perk => (
+            <View
+              key={perk}
+              style={[styles.sectionPill, { borderColor: palette.divider }]}
+            >
               <Text style={{ color: palette.text, fontSize: 12 }}>{perk}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      <View style={[styles.card, { backgroundColor: palette.surface }]}> 
+      <View style={[styles.card, { backgroundColor: palette.surface }]}>
         <Text style={[styles.cardTitle, { color: palette.text }]}>Members</Text>
-        <View style={[styles.sectionRow, { justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 12 }]}> 
+        <View
+          style={[
+            styles.sectionRow,
+            {
+              justifyContent: 'space-between',
+              marginTop: 10,
+              flexWrap: 'wrap',
+              gap: 12,
+            },
+          ]}
+        >
           <View>
             <Text style={[styles.meta, { color: palette.subtext }]}>Owner</Text>
             <Text style={[styles.cardTitle, { color: palette.text }]}>
@@ -2073,16 +2645,28 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             </Text>
           </View>
           <View>
-            <Text style={[styles.meta, { color: palette.subtext }]}>Managers</Text>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>{managers.length}</Text>
+            <Text style={[styles.meta, { color: palette.subtext }]}>
+              Managers
+            </Text>
+            <Text style={[styles.cardTitle, { color: palette.text }]}>
+              {managers.length}
+            </Text>
           </View>
           <View>
-            <Text style={[styles.meta, { color: palette.subtext }]}>Admins</Text>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>{admins.length}</Text>
+            <Text style={[styles.meta, { color: palette.subtext }]}>
+              Admins
+            </Text>
+            <Text style={[styles.cardTitle, { color: palette.text }]}>
+              {admins.length}
+            </Text>
           </View>
           <View>
-            <Text style={[styles.meta, { color: palette.subtext }]}>Members</Text>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>{members.length}</Text>
+            <Text style={[styles.meta, { color: palette.subtext }]}>
+              Members
+            </Text>
+            <Text style={[styles.cardTitle, { color: palette.text }]}>
+              {members.length}
+            </Text>
           </View>
         </View>
         <View style={[styles.actionRow, styles.memberActionRow]}>
@@ -2101,13 +2685,19 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           )}
         </View>
         {membersLoading ? (
-          <ActivityIndicator size="small" color={palette.primaryStrong} style={{ marginTop: 12 }} />
+          <ActivityIndicator
+            size="small"
+            color={palette.primaryStrong}
+            style={{ marginTop: 12 }}
+          />
         ) : safeMembers.length ? (
-          safeMembers.map((member) => {
+          safeMembers.map(member => {
             const user = member?.user_details ?? member?.user ?? {};
             const memberId = member?.id ?? '';
             const sliderValue = memberId
-              ? roleSliderValues[memberId] ?? ROLE_POSITION_MAP[member?.role ?? 'member'] ?? 100
+              ? roleSliderValues[memberId] ??
+                ROLE_POSITION_MAP[member?.role ?? 'member'] ??
+                100
               : ROLE_POSITION_MAP[member?.role ?? 'member'] ?? 100;
             const isOwner = member?.role === 'owner';
             return (
@@ -2116,7 +2706,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
                 style={[styles.memberRow, { marginTop: 12 }]}
               >
                 <View>
-                  <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.cardTitle, { color: palette.text }]}
+                    numberOfLines={1}
+                  >
                     {user.display_name ?? 'Member'}
                   </Text>
                   <Text style={[styles.meta, { color: palette.subtext }]}>
@@ -2132,14 +2725,18 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
                     minimumTrackTintColor={palette.primaryStrong}
                     maximumTrackTintColor={palette.inputBorder}
                     thumbTintColor={palette.primaryStrong}
-                    onValueChange={(value) => {
+                    onValueChange={value => {
                       if (!memberId) return;
-                      setRoleSliderValues((prev) => ({ ...prev, [memberId]: value }));
+                      setRoleSliderValues(prev => ({
+                        ...prev,
+                        [memberId]: value,
+                      }));
                     }}
-                    onSlidingComplete={(value) => {
+                    onSlidingComplete={value => {
                       if (!memberId) return;
                       const normalized = Math.round(value / 50) * 50;
-                      const targetRole = POSITION_ROLE_MAP[normalized] ?? 'member';
+                      const targetRole =
+                        POSITION_ROLE_MAP[normalized] ?? 'member';
                       if (targetRole !== member?.role) {
                         handleUpdateMemberRole(memberId, targetRole);
                       }
@@ -2148,9 +2745,21 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
                     style={{ width: 160 }}
                   />
                   <View style={styles.sliderLabelsRow}>
-                    <Text style={[styles.sliderLabel, { color: palette.subtext }]}>Manager</Text>
-                    <Text style={[styles.sliderLabel, { color: palette.subtext }]}>Admin</Text>
-                    <Text style={[styles.sliderLabel, { color: palette.subtext }]}>Member</Text>
+                    <Text
+                      style={[styles.sliderLabel, { color: palette.subtext }]}
+                    >
+                      Manager
+                    </Text>
+                    <Text
+                      style={[styles.sliderLabel, { color: palette.subtext }]}
+                    >
+                      Admin
+                    </Text>
+                    <Text
+                      style={[styles.sliderLabel, { color: palette.subtext }]}
+                    >
+                      Member
+                    </Text>
                   </View>
                   <Text style={[styles.meta, { color: palette.subtext }]}>
                     {isOwner ? 'Owner' : getRoleLabel(member?.role)}
@@ -2187,34 +2796,51 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   const renderAnalyticsTab = () => (
     <View style={{ gap: 14 }}>
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Analytics snapshot</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Analytics snapshot
+        </Text>
         <View style={styles.statRow}>
           {[
             { label: 'Landing visits', value: metrics.landing },
             { label: 'Conversion', value: `${metrics.conversion}%` },
             { label: 'Repeat buyers', value: metrics.repeat },
             { label: 'Members online', value: safeMembers.length },
-          ].map((stat) => (
+          ].map(stat => (
             <View key={stat.label} style={styles.statItem}>
-              <Text style={[styles.statValue, { color: palette.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: palette.subtext }]}>{stat.label}</Text>
+              <Text style={[styles.statValue, { color: palette.text }]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.statLabel, { color: palette.subtext }]}>
+                {stat.label}
+              </Text>
             </View>
           ))}
         </View>
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.chartTitle, { color: palette.text }]}>Revenue trend</Text>
+        <Text style={[styles.chartTitle, { color: palette.text }]}>
+          Revenue trend
+        </Text>
         <LineChart series={trendSeries} height={140} />
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.chartTitle, { color: palette.text }]}>Engagement breakdown</Text>
+        <Text style={[styles.chartTitle, { color: palette.text }]}>
+          Engagement breakdown
+        </Text>
         <BarChart data={breakdownData} width={300} height={140} />
       </View>
 
-      <View style={[styles.card, { backgroundColor: palette.surface, alignItems: 'center' }]}>
-        <Text style={[styles.chartTitle, { color: palette.text }]}>Customer mix</Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, alignItems: 'center' },
+        ]}
+      >
+        <Text style={[styles.chartTitle, { color: palette.text }]}>
+          Customer mix
+        </Text>
         <DonutChart data={distributionData} size={150} />
       </View>
 
@@ -2226,52 +2852,94 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       ) : null}
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Global readiness</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Global readiness
+        </Text>
         <View style={styles.globalRow}>
-          <Text style={[styles.globalLabel, { color: palette.subtext }]}>Languages</Text>
-          <Text style={[styles.globalValue, { color: palette.text }]}>{globalReadiness.languages.join(', ')}</Text>
+          <Text style={[styles.globalLabel, { color: palette.subtext }]}>
+            Languages
+          </Text>
+          <Text style={[styles.globalValue, { color: palette.text }]}>
+            {globalReadiness.languages.join(', ')}
+          </Text>
         </View>
         <View style={styles.globalRow}>
-          <Text style={[styles.globalLabel, { color: palette.subtext }]}>Currencies</Text>
-          <Text style={[styles.globalValue, { color: palette.text }]}>{globalReadiness.currencies.join(', ')}</Text>
+          <Text style={[styles.globalLabel, { color: palette.subtext }]}>
+            Currencies
+          </Text>
+          <Text style={[styles.globalValue, { color: palette.text }]}>
+            {globalReadiness.currencies.join(', ')}
+          </Text>
         </View>
         <View style={styles.globalRow}>
-          <Text style={[styles.globalLabel, { color: palette.subtext }]}>Regions</Text>
-          <Text style={[styles.globalValue, { color: palette.text }]}>{globalReadiness.regions.join(', ')}</Text>
+          <Text style={[styles.globalLabel, { color: palette.subtext }]}>
+            Regions
+          </Text>
+          <Text style={[styles.globalValue, { color: palette.text }]}>
+            {globalReadiness.regions.join(', ')}
+          </Text>
         </View>
         <View style={styles.globalRow}>
-          <Text style={[styles.globalLabel, { color: palette.subtext }]}>Timezones</Text>
-          <Text style={[styles.globalValue, { color: palette.text }]}>{globalReadiness.timezones.join(', ')}</Text>
+          <Text style={[styles.globalLabel, { color: palette.subtext }]}>
+            Timezones
+          </Text>
+          <Text style={[styles.globalValue, { color: palette.text }]}>
+            {globalReadiness.timezones.join(', ')}
+          </Text>
         </View>
         <View style={styles.globalRow}>
-          <Text style={[styles.globalLabel, { color: palette.subtext }]}>Delivery</Text>
-          <Text style={[styles.globalValue, { color: palette.text }]}>{globalReadiness.deliveryModes.join(', ')}</Text>
+          <Text style={[styles.globalLabel, { color: palette.subtext }]}>
+            Delivery
+          </Text>
+          <Text style={[styles.globalValue, { color: palette.text }]}>
+            {globalReadiness.deliveryModes.join(', ')}
+          </Text>
         </View>
       </View>
-
     </View>
   );
 
   const renderLandingTab = () => (
     <View style={{ gap: 14 }}>
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Landing page hero</Text>
-        <Text style={[styles.meta, { color: palette.subtext }]}>
-          {shop?.landing_page?.headline || 'Feature your most trusted offerings.'}
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Landing page hero
         </Text>
         <Text style={[styles.meta, { color: palette.subtext }]}>
-          {shop?.landing_page?.subheadline || 'Add testimonials, highlights, and member-exclusive perks without code.'}
+          {shop?.landing_page?.headline ||
+            'Feature your most trusted offerings.'}
         </Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+        <Text style={[styles.meta, { color: palette.subtext }]}>
+          {shop?.landing_page?.subheadline ||
+            'Add testimonials, highlights, and member-exclusive perks without code.'}
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 12,
+          }}
+        >
           <View>
-            <Text style={[styles.cardTitle, { color: palette.text, fontSize: 14 }]}>Landing visibility</Text>
-            <Text style={[styles.meta, { color: palette.subtext, fontSize: 12 }]}>
-              {landingPublic ? 'Landing page is visible to shoppers.' : 'Landing page is currently private.'}
+            <Text
+              style={[styles.cardTitle, { color: palette.text, fontSize: 14 }]}
+            >
+              Landing visibility
+            </Text>
+            <Text
+              style={[styles.meta, { color: palette.subtext, fontSize: 12 }]}
+            >
+              {landingPublic
+                ? 'Landing page is visible to shoppers.'
+                : 'Landing page is currently private.'}
             </Text>
           </View>
           {canToggleLandingVisibility ? (
             <KISButton
-              title={landingPublic ? 'Set landing private' : 'Make landing public'}
+              title={
+                landingPublic ? 'Set landing private' : 'Make landing public'
+              }
               size="sm"
               variant={landingPublic ? 'outline' : 'secondary'}
               loading={landingVisibilitySaving}
@@ -2279,20 +2947,43 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
               disabled={landingVisibilitySaving}
             />
           ) : (
-            <Text style={[styles.meta, { color: palette.subtext, fontSize: 12 }]}>
+            <Text
+              style={[styles.meta, { color: palette.subtext, fontSize: 12 }]}
+            >
               Only the owner can set visibility.
             </Text>
           )}
         </View>
-        <KISButton title="Edit landing page" variant="outline" onPress={handleOpenLandingPage} />
+        <KISButton
+          title="Edit landing page"
+          variant="outline"
+          onPress={handleOpenLandingPage}
+        />
       </View>
 
       <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Landing page sections</Text>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>
+          Landing page sections
+        </Text>
         <View style={styles.sectionRow}>
-          {['Hero', 'Products', 'Services', 'Testimonials', 'Contact', 'FAQs'].map((section) => (
-            <View key={section} style={[styles.sectionPill, { borderColor: palette.primaryStrong }]}>
-              <Text style={{ color: palette.primaryStrong, fontSize: 12 }}>{section}</Text>
+          {[
+            'Hero',
+            'Products',
+            'Services',
+            'Testimonials',
+            'Contact',
+            'FAQs',
+          ].map(section => (
+            <View
+              key={section}
+              style={[
+                styles.sectionPill,
+                { borderColor: palette.primaryStrong },
+              ]}
+            >
+              <Text style={{ color: palette.primaryStrong, fontSize: 12 }}>
+                {section}
+              </Text>
             </View>
           ))}
         </View>
@@ -2327,12 +3018,15 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         <View style={[styles.hero, { backgroundColor: palette.surface }]}>
           <View style={styles.heroRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.heroTitle, { color: palette.text }]}>{shop?.name}</Text>
+              <Text style={[styles.heroTitle, { color: palette.text }]}>
+                {shop?.name}
+              </Text>
               <Text style={[styles.meta, { color: palette.subtext }]}>
                 {shop?.tagline || 'Build a premium global storefront.'}
               </Text>
               <Text style={[styles.meta, { color: palette.subtext }]}>
-                {shop?.category || 'Global commerce'} · {(shop?.business_type ?? 'products').toString().toUpperCase()}
+                {shop?.category || 'Global commerce'} ·{' '}
+                {(shop?.business_type ?? 'products').toString().toUpperCase()}
               </Text>
             </View>
             {heroImageUri ? (
@@ -2340,7 +3034,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
                 source={{ uri: heroImageUri }}
                 style={[
                   styles.heroImage,
-                  { borderColor: palette.divider, backgroundColor: palette.inputBg },
+                  {
+                    borderColor: palette.divider,
+                    backgroundColor: palette.inputBg,
+                  },
                 ]}
                 resizeMode="cover"
               />
@@ -2348,7 +3045,10 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
               <View
                 style={[
                   styles.heroImageFallback,
-                  { borderColor: palette.divider, backgroundColor: palette.inputBg },
+                  {
+                    borderColor: palette.divider,
+                    backgroundColor: palette.inputBg,
+                  },
                 ]}
               >
                 <KISIcon name="cart" size={32} color={palette.primaryStrong} />
@@ -2358,26 +3058,47 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         </View>
 
         <View style={styles.kpiRow}>
-          {kpiCards.map((item) => (
-            <View key={item.label} style={[styles.kpiCard, { backgroundColor: palette.card }]}>
-              <Text style={[styles.kpiValue, { color: palette.text }]}>{item.value}</Text>
-              <Text style={[styles.kpiLabel, { color: palette.subtext }]}>{item.label}</Text>
+          {kpiCards.map(item => (
+            <View
+              key={item.label}
+              style={[styles.kpiCard, { backgroundColor: palette.card }]}
+            >
+              <Text style={[styles.kpiValue, { color: palette.text }]}>
+                {item.value}
+              </Text>
+              <Text style={[styles.kpiLabel, { color: palette.subtext }]}>
+                {item.label}
+              </Text>
             </View>
           ))}
         </View>
 
         <View style={[styles.tabBar, { backgroundColor: palette.surface }]}>
-          {TAB_DEFINITIONS.map((tab) => (
-            <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)} style={styles.tabButton}>
+          {TAB_DEFINITIONS.map(tab => (
+            <Pressable
+              key={tab.key}
+              onPress={() => setActiveTab(tab.key)}
+              style={styles.tabButton}
+            >
               <Text
                 style={{
-                  color: activeTab === tab.key ? palette.primaryStrong : palette.subtext,
+                  color:
+                    activeTab === tab.key
+                      ? palette.primaryStrong
+                      : palette.subtext,
                   fontWeight: activeTab === tab.key ? '700' : '500',
                 }}
               >
                 {tab.label}
               </Text>
-              {activeTab === tab.key && <View style={[styles.tabUnderline, { backgroundColor: palette.primaryStrong }]} />}
+              {activeTab === tab.key && (
+                <View
+                  style={[
+                    styles.tabUnderline,
+                    { backgroundColor: palette.primaryStrong },
+                  ]}
+                />
+              )}
             </Pressable>
           ))}
         </View>

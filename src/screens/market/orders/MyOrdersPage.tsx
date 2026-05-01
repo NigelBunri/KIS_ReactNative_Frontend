@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,14 +20,16 @@ import { postRequest } from '@/network/post';
 import RNFS from 'react-native-fs';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
-import { KISIcon } from '@/constants/kisIcons';
 import { getAccessToken } from '@/security/authStorage';
 import type { RootStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteShopCart } from '@/screens/market/cart/shopCartManager';
 import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
 
-type MyOrdersNavigation = NativeStackNavigationProp<RootStackParamList, 'MarketplaceOrders'>;
+type MyOrdersNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'MarketplaceOrders'
+>;
 
 type MarketplaceOrder = {
   id: string;
@@ -37,7 +39,7 @@ type MarketplaceOrder = {
   created_at?: string;
   shop_info?: { id?: string; name?: string } | null;
   shop?: { name?: string } | string;
-  items?: Array<{ id?: string }>; 
+  items?: Array<{ id?: string }>;
 };
 
 export default function MyOrdersPage() {
@@ -47,7 +49,9 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, string>>(
+    {},
+  );
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -90,8 +94,14 @@ export default function MyOrdersPage() {
   }, []);
 
   const handleAction = useCallback(
-    async (orderId: string, endpoint: string, key: string, message: string, method: 'post' | 'delete' = 'post') => {
-      setActionLoading((prev) => ({ ...prev, [orderId]: key }));
+    async (
+      orderId: string,
+      endpoint: string,
+      key: string,
+      message: string,
+      method: 'post' | 'delete' = 'post',
+    ) => {
+      setActionLoading(prev => ({ ...prev, [orderId]: key }));
       try {
         const response =
           method === 'post'
@@ -100,12 +110,15 @@ export default function MyOrdersPage() {
         if (!response.success) {
           throw new Error(response.message || message);
         }
-        Alert.alert('Order updated', response.message || 'Order status updated.');
+        Alert.alert(
+          'Order updated',
+          response.message || 'Order status updated.',
+        );
         await loadOrders();
       } catch (err: any) {
         Alert.alert('Order action failed', err?.message || message);
       } finally {
-        setActionLoading((prev) => {
+        setActionLoading(prev => {
           const next = { ...prev };
           delete next[orderId];
           return next;
@@ -116,7 +129,7 @@ export default function MyOrdersPage() {
   );
 
   const downloadReceipt = useCallback(async (orderId: string) => {
-    setActionLoading((prev) => ({ ...prev, [orderId]: 'receipt' }));
+    setActionLoading(prev => ({ ...prev, [orderId]: 'receipt' }));
     try {
       const token = await getAccessToken();
       const deviceId = await AsyncStorage.getItem('device_id');
@@ -138,7 +151,7 @@ export default function MyOrdersPage() {
     } catch (err: any) {
       Alert.alert('Receipt', err?.message || 'Unable to download receipt.');
     } finally {
-      setActionLoading((prev) => {
+      setActionLoading(prev => {
         const next = { ...prev };
         delete next[orderId];
         return next;
@@ -151,164 +164,237 @@ export default function MyOrdersPage() {
     const currency = item.currency ?? 'KISC';
     const status = statusLabel(item);
     const canCancel = item.status === 'temporal';
-    const canSatisfy = item.status === 'temporal' || item.status === 'awaiting_satisfaction';
-    const canDelete = item.status === 'cancelled' || item.status === 'satisfied';
+    const canSatisfy =
+      item.status === 'temporal' || item.status === 'awaiting_satisfaction';
+    const canDelete =
+      item.status === 'cancelled' || item.status === 'satisfied';
     const isAwaitingSatisfaction = item.status === 'awaiting_satisfaction';
 
     const loadingKey = actionLoading[item.id];
 
-  return (
-        <View style={[styles.card, { borderColor: palette.surfaceDark, backgroundColor: palette.surfaceElevated }]}> 
-          <Pressable
-            onPress={() =>
-              navigation.navigate('MarketplaceOrderDetail', { orderId: item.id, mode: 'buyer' })
-            }
-          >
-            {isAwaitingSatisfaction ? (
-              <View style={[styles.awaitingBanner, { borderColor: palette.primaryLight }]}>
-                <Text style={[styles.awaitingBannerText, { color: palette.primaryStrong }]}>
-                  Provider marked this order complete. You have 3 days to confirm satisfaction or file a complaint.
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.cardHeader}> 
-              <View style={styles.shopBadge}> 
-                <Text style={[styles.shopName, { color: palette.text }]} numberOfLines={1}>
-              {item.shop_info?.name ?? (typeof item.shop === 'string' ? item.shop : item.shop?.name) ?? 'Your shop'}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { borderColor: palette.primaryLight }]}> 
-            <Text style={[styles.statusText, { color: palette.primaryStrong }]}>{status}</Text>
-          </View>
-        </View>
-        <View style={styles.orderMetaRow}> 
-          <Text style={[styles.metaLabel, { color: palette.subtext }]} numberOfLines={1}>Order · {item.id.slice(0, 8)}</Text>
-          <Text style={[styles.metaLabel, { color: palette.subtext }]}>
-            {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
-          </Text>
-        </View>
-        <View style={styles.amountRow}> 
-          <View>
-            <Text style={[styles.amountLabel, { color: palette.subtext }]}>Total</Text>
-            <Text style={[styles.amountValue, { color: palette.primaryStrong }]}>
-              {total.toFixed(2)} {currency}
-            </Text>
-          </View>
-          <View style={styles.itemCount}> 
-            <Text style={[styles.itemCountText, { color: palette.subtext }]}>Items</Text>
-            <Text style={[styles.itemCountValue, { color: palette.text }]}>
-              {item.items?.length ?? 0}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
-      <View style={styles.cardFooter}> 
-        <KISButton
-          title="View items"
-          size="xs"
-          variant="ghost"
+    return (
+      <View
+        style={[
+          styles.card,
+          {
+            borderColor: palette.surfaceDark,
+            backgroundColor: palette.surfaceElevated,
+          },
+        ]}
+      >
+        <Pressable
           onPress={() =>
-            navigation.navigate('MarketplaceOrderDetail', { orderId: item.id, mode: 'buyer' })
+            navigation.navigate('MarketplaceOrderDetail', {
+              orderId: item.id,
+              mode: 'buyer',
+            })
           }
-        />
-        {canCancel ? (
+        >
+          {isAwaitingSatisfaction ? (
+            <View
+              style={[
+                styles.awaitingBanner,
+                { borderColor: palette.primaryLight },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.awaitingBannerText,
+                  { color: palette.primaryStrong },
+                ]}
+              >
+                Provider marked this order complete. You have 3 days to confirm
+                satisfaction or file a complaint.
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.cardHeader}>
+            <View style={styles.shopBadge}>
+              <Text
+                style={[styles.shopName, { color: palette.text }]}
+                numberOfLines={1}
+              >
+                {item.shop_info?.name ??
+                  (typeof item.shop === 'string'
+                    ? item.shop
+                    : item.shop?.name) ??
+                  'Your shop'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.statusBadge,
+                { borderColor: palette.primaryLight },
+              ]}
+            >
+              <Text
+                style={[styles.statusText, { color: palette.primaryStrong }]}
+              >
+                {status}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.orderMetaRow}>
+            <Text
+              style={[styles.metaLabel, { color: palette.subtext }]}
+              numberOfLines={1}
+            >
+              Order · {item.id.slice(0, 8)}
+            </Text>
+            <Text style={[styles.metaLabel, { color: palette.subtext }]}>
+              {item.created_at
+                ? new Date(item.created_at).toLocaleString()
+                : '—'}
+            </Text>
+          </View>
+          <View style={styles.amountRow}>
+            <View>
+              <Text style={[styles.amountLabel, { color: palette.subtext }]}>
+                Total
+              </Text>
+              <Text
+                style={[styles.amountValue, { color: palette.primaryStrong }]}
+              >
+                {total.toFixed(2)} {currency}
+              </Text>
+            </View>
+            <View style={styles.itemCount}>
+              <Text style={[styles.itemCountText, { color: palette.subtext }]}>
+                Items
+              </Text>
+              <Text style={[styles.itemCountValue, { color: palette.text }]}>
+                {item.items?.length ?? 0}
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+        <View style={styles.cardFooter}>
           <KISButton
-            title={loadingKey === 'cancel' ? 'Cancelling…' : 'Cancel'}
-            size="xs"
-            variant="outline"
-            onPress={() =>
-              handleAction(
-                item.id,
-                ROUTES.commerce.marketplaceOrderCancel(item.id),
-                'cancel',
-                'Unable to cancel order.',
-              )
-            }
-            disabled={Boolean(loadingKey)}
-          />
-        ) : null}
-        {canSatisfy ? (
-          <KISButton
-            title={loadingKey === 'satisfy' ? 'Confirming…' : 'Satisfied'}
-            size="xs"
-            variant="secondary"
-            onPress={() =>
-              (async () => {
-                await handleAction(
-                  item.id,
-                  ROUTES.commerce.marketplaceOrderSatisfy(item.id),
-                  'satisfy',
-                  'Unable to mark satisfied.',
-                );
-                if (item.shop_info?.id) {
-                  await deleteShopCart(item.shop_info.id);
-                }
-              })()
-            }
-            disabled={Boolean(loadingKey)}
-          />
-        ) : null}
-        {canDelete ? (
-          <KISButton
-            title={loadingKey === 'delete' ? 'Deleting…' : 'Delete'}
+            title="View items"
             size="xs"
             variant="ghost"
-      onPress={() =>
-        (async () => {
-          await handleAction(
-            item.id,
-            ROUTES.commerce.marketplaceOrderDelete(item.id),
-            'delete',
-            'Unable to delete order.',
-            'delete',
-          );
-          if (item.shop_info?.id) {
-            await deleteShopCart(item.shop_info.id);
-          }
-        })()
-      }
+            onPress={() =>
+              navigation.navigate('MarketplaceOrderDetail', {
+                orderId: item.id,
+                mode: 'buyer',
+              })
+            }
+          />
+          {canCancel ? (
+            <KISButton
+              title={loadingKey === 'cancel' ? 'Cancelling…' : 'Cancel'}
+              size="xs"
+              variant="outline"
+              onPress={() =>
+                handleAction(
+                  item.id,
+                  ROUTES.commerce.marketplaceOrderCancel(item.id),
+                  'cancel',
+                  'Unable to cancel order.',
+                )
+              }
+              disabled={Boolean(loadingKey)}
+            />
+          ) : null}
+          {canSatisfy ? (
+            <KISButton
+              title={loadingKey === 'satisfy' ? 'Confirming…' : 'Satisfied'}
+              size="xs"
+              variant="secondary"
+              onPress={() =>
+                (async () => {
+                  await handleAction(
+                    item.id,
+                    ROUTES.commerce.marketplaceOrderSatisfy(item.id),
+                    'satisfy',
+                    'Unable to mark satisfied.',
+                  );
+                  if (item.shop_info?.id) {
+                    await deleteShopCart(item.shop_info.id);
+                  }
+                })()
+              }
+              disabled={Boolean(loadingKey)}
+            />
+          ) : null}
+          {canDelete ? (
+            <KISButton
+              title={loadingKey === 'delete' ? 'Deleting…' : 'Delete'}
+              size="xs"
+              variant="ghost"
+              onPress={() =>
+                (async () => {
+                  await handleAction(
+                    item.id,
+                    ROUTES.commerce.marketplaceOrderDelete(item.id),
+                    'delete',
+                    'Unable to delete order.',
+                    'delete',
+                  );
+                  if (item.shop_info?.id) {
+                    await deleteShopCart(item.shop_info.id);
+                  }
+                })()
+              }
+              disabled={Boolean(loadingKey)}
+            />
+          ) : null}
+          <KISButton
+            title={loadingKey === 'receipt' ? 'Downloading…' : 'Receipt'}
+            size="xs"
+            variant="ghost"
+            onPress={() => downloadReceipt(item.id)}
             disabled={Boolean(loadingKey)}
           />
-        ) : null}
-        <KISButton
-          title={loadingKey === 'receipt' ? 'Downloading…' : 'Receipt'}
-          size="xs"
-          variant="ghost"
-          onPress={() => downloadReceipt(item.id)}
-          disabled={Boolean(loadingKey)}
-        />
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: palette.surface, borderColor: palette.divider },
+        ]}
+      >
         <View>
           <Text style={[styles.title, { color: palette.text }]}>My orders</Text>
-          <Text style={[styles.subtitle, { color: palette.subtext }]}>All marketplace orders</Text>
+          <Text style={[styles.subtitle, { color: palette.subtext }]}>
+            All marketplace orders
+          </Text>
         </View>
-        <KISButton title="Refresh" size="sm" variant="ghost" onPress={handleRefresh} disabled={loading} />
+        <KISButton
+          title="Refresh"
+          size="sm"
+          variant="ghost"
+          onPress={handleRefresh}
+          disabled={loading}
+        />
       </View>
       {loading ? (
-        <View style={styles.loader}> 
+        <View style={styles.loader}>
           <ActivityIndicator color={palette.primaryStrong} />
         </View>
       ) : error ? (
-        <View style={styles.loader}> 
+        <View style={styles.loader}>
           <Text style={{ color: palette.error || '#E53935' }}>{error}</Text>
         </View>
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={renderOrder}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           ListEmptyComponent={() => (
             <View style={styles.loader}>
-              <Text style={{ color: palette.subtext }}>No marketplace orders yet.</Text>
+              <Text style={{ color: palette.subtext }}>
+                No marketplace orders yet.
+              </Text>
             </View>
           )}
         />

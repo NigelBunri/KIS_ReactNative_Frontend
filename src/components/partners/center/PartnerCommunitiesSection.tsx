@@ -2,7 +2,10 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
-import { PartnerCommunity, PartnerGroup } from '@/components/partners/partnersTypes';
+import {
+  PartnerCommunity,
+  PartnerGroup,
+} from '@/components/partners/partnersTypes';
 
 type Props = {
   communities: PartnerCommunity[];
@@ -42,9 +45,11 @@ export default function PartnerCommunitiesSection({
         </View>
       ) : null}
 
-      {communities.map((community) => {
+      {communities.map(community => {
         const isExpanded = expandedCommunities[community.id] ?? true;
-        const communityGroups = groups.filter((g) => g.community === community.id);
+        const communityGroups = groups.filter(
+          g => g.community === community.id,
+        );
 
         return (
           <View
@@ -54,6 +59,7 @@ export default function PartnerCommunitiesSection({
               {
                 backgroundColor: palette.surface,
                 borderColor: palette.borderMuted,
+                shadowColor: palette.shadow ?? '#000',
               },
             ]}
           >
@@ -88,8 +94,15 @@ export default function PartnerCommunitiesSection({
                   </Text>
                 ) : null}
               </View>
-              <Text style={{ color: palette.subtext, fontSize: 16, marginLeft: 8 }}>
-                {isExpanded ? '⌄' : '›'}
+              <Text
+                style={{
+                  color: palette.primaryStrong,
+                  fontSize: 18,
+                  marginLeft: 8,
+                  fontWeight: '900',
+                }}
+              >
+                {isExpanded ? 'v' : '>'}
               </Text>
             </Pressable>
 
@@ -100,22 +113,43 @@ export default function PartnerCommunitiesSection({
                   style={({ pressed }) => [
                     styles.communityGroupRow,
                     {
-                      backgroundColor: palette.surfaceElevated ?? palette.surface,
+                      backgroundColor:
+                        palette.surfaceElevated ?? palette.surface,
                       borderColor: palette.borderMuted,
                       opacity: pressed ? 0.8 : 1,
+                      transform: [{ scale: pressed ? 0.985 : 1 }],
                     },
                   ]}
                 >
-                  <View style={styles.groupHash}>
-                    <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>
-                      📰
+                  <View
+                    style={[
+                      styles.groupHash,
+                      { backgroundColor: palette.primarySoft },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: palette.primaryStrong,
+                        fontSize: 13,
+                        fontWeight: '900',
+                      }}
+                    >
+                      FE
                     </Text>
                   </View>
-                  <Text style={{ flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: palette.text,
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}
+                    numberOfLines={1}
+                  >
                     Feed
                   </Text>
                 </Pressable>
-                {communityGroups.map((group) => {
+                {communityGroups.map(group => {
                   const isSelected = group.id === selectedGroupId;
                   return (
                     <Pressable
@@ -131,18 +165,38 @@ export default function PartnerCommunitiesSection({
                             ? palette.primaryStrong
                             : palette.borderMuted,
                           opacity: pressed ? 0.8 : 1,
+                          transform: [{ scale: pressed ? 0.985 : 1 }],
                         },
                       ]}
                     >
-                      <View style={styles.groupHash}>
-                        <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>
+                      <View
+                        style={[
+                          styles.groupHash,
+                          {
+                            backgroundColor: isSelected
+                              ? palette.primaryStrong
+                              : palette.primarySoft,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: isSelected
+                              ? palette.onPrimary
+                              : palette.primaryStrong,
+                            fontSize: 15,
+                            fontWeight: '900',
+                          }}
+                        >
                           #
                         </Text>
                       </View>
                       <Text
                         style={{
                           flex: 1,
-                          color: isSelected ? palette.primaryStrong : palette.text,
+                          color: isSelected
+                            ? palette.primaryStrong
+                            : palette.text,
                           fontSize: 14,
                           fontWeight: isSelected ? '700' : '400',
                         }}

@@ -38,8 +38,9 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
-  const rootNavigation =
-    navigation.getParent?.() as NativeStackNavigationProp<RootStackParamList> | undefined;
+  const rootNavigation = navigation.getParent?.() as
+    | NativeStackNavigationProp<RootStackParamList>
+    | undefined;
   const openInsights = useCallback(() => {
     rootNavigation?.navigate('PartnerInsights');
   }, [rootNavigation]);
@@ -85,14 +86,16 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     refresh: refreshLinks,
   } = usePartnerProfileLinks(selectedPartner?.id);
   const partnerRole = normalizePartnerRole(
-    selectedPartner?.role ?? selectedPartner?.member_role ?? selectedPartner?.access_level,
+    selectedPartner?.role ??
+      selectedPartner?.member_role ??
+      selectedPartner?.access_level,
     'member',
   );
-  const {
-    sections: settingsSections,
-    role: settingsRole,
-  } = usePartnerSettingsCatalog(selectedPartner?.id, partnerRole);
-  const canManageOrganizationApps = ['owner', 'admin', 'manager'].includes(settingsRole);
+  const { sections: settingsSections, role: settingsRole } =
+    usePartnerSettingsCatalog(selectedPartner?.id, partnerRole);
+  const canManageOrganizationApps = ['owner', 'admin', 'manager'].includes(
+    settingsRole,
+  );
   const {
     messagesOffsetAnim,
     isMessagesExpanded,
@@ -100,18 +103,22 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     closeMessagesPane,
     openMessagesPane,
     panHandlers,
+    messagePanHandlers,
   } = useMessagesPane(width, setHidNav);
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('partner.open', (payload: any) => {
-      const partnerId = String(payload?.partnerId ?? '');
-      if (!partnerId) return;
-      setSelectedPartnerId(partnerId);
-      setSelectedGroupId(null);
-      setSelectedChannelId(null);
-      setSelectedFeed((payload?.feed ?? 'general') as any);
-      setSelectedCommunityFeedId(null);
-      openMessagesPane();
-    });
+    const sub = DeviceEventEmitter.addListener(
+      'partner.open',
+      (payload: any) => {
+        const partnerId = String(payload?.partnerId ?? '');
+        if (!partnerId) return;
+        setSelectedPartnerId(partnerId);
+        setSelectedGroupId(null);
+        setSelectedChannelId(null);
+        setSelectedFeed((payload?.feed ?? 'general') as any);
+        setSelectedCommunityFeedId(null);
+        openMessagesPane();
+      },
+    );
     return () => sub.remove();
   }, [
     openMessagesPane,
@@ -239,20 +246,16 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeLinksPanel,
   } = usePartnerLinksPanel(width);
   const complaintsPanel = usePartnerComplaintsPanel(width);
-  const {
-    onGroupPress,
-    onFeedPress,
-    onCommunityFeedPress,
-    onChannelPress,
-  } = usePartnerNavigationActions({
-    selectedPartner: selectedPartner as any,
-    isMessagesExpanded,
-    setSelectedGroupId,
-    setSelectedChannelId,
-    setSelectedFeed: (value: string | null) => setSelectedFeed(value as any),
-    setSelectedCommunityFeedId,
-    openMessagesPane,
-  });
+  const { onGroupPress, onFeedPress, onCommunityFeedPress, onChannelPress } =
+    usePartnerNavigationActions({
+      selectedPartner: selectedPartner as any,
+      isMessagesExpanded,
+      setSelectedGroupId,
+      setSelectedChannelId,
+      setSelectedFeed: (value: string | null) => setSelectedFeed(value as any),
+      setSelectedCommunityFeedId,
+      openMessagesPane,
+    });
   const {
     handleOpenRecruitment,
     handleOpenAudit,
@@ -281,9 +284,20 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     }, 240);
   }, [closePanel, openOrgAppsPanel]);
 
-  const handleOpenFeature = (feature: { key: string; title: string; description?: string }) => {
+  const handleOpenFeature = (feature: {
+    key: string;
+    title: string;
+    description?: string;
+  }) => {
     closePanel();
-    if (['course_builder', 'lesson_library', 'course_pricing', 'course_enrollments'].includes(feature.key)) {
+    if (
+      [
+        'course_builder',
+        'lesson_library',
+        'course_pricing',
+        'course_enrollments',
+      ].includes(feature.key)
+    ) {
       openCoursesPanel();
       return;
     }
@@ -334,7 +348,6 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   }, [onOpenInfo, rootNavigation, selectedPartner?.id, selectedPartner?.name]);
   const {
     rootPanHandlers,
-    onLogout,
     onAddPartnerPress,
     handleCloseMessages,
     onPartnerHeaderPress,
@@ -370,9 +383,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         rootPanHandlers={rootPanHandlers}
         partners={partners}
         selectedPartnerId={selectedPartnerId}
-        setSelectedPartnerId={(id) => setSelectedPartnerId(id as any)}
+        setSelectedPartnerId={id => setSelectedPartnerId(id as any)}
         onAddPartnerPress={onAddPartnerPress}
-        onLogout={onLogout}
         selectedPartner={selectedPartner}
         selectedGroupId={selectedGroupId}
         selectedChannelId={selectedChannelId}
@@ -392,6 +404,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         onPartnerHeaderPress={onPartnerHeaderPress}
         width={width}
         messagesOffsetAnim={messagesOffsetAnim}
+        messagePanHandlers={messagePanHandlers}
         isMessagesExpanded={isMessagesExpanded}
         toggleMessagesPane={toggleMessagesPane}
         handleCloseMessages={handleCloseMessages}
@@ -433,110 +446,110 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onOpenComplaints: handleOpenComplaints,
           },
           createPanel: {
-          isOpen: isCreatePanelOpen,
-          panelWidth: createPanelWidth,
-          panelTranslateX: createPanelTranslateX,
-          kind: createKind,
-          onClose: closeCreatePanel,
-          onSwitchKind: openCreatePanel,
-          onCreated: reloadSelectedPartner,
-        },
-        discoveryPanel: {
-          isOpen: isDiscoverPanelOpen,
-          panelWidth: discoverPanelWidth,
-          panelTranslateX: discoverPanelTranslateX,
-          onClose: closeDiscoverPanel,
-          onJoined: reloadPartners,
-        },
-        recruitmentPanel: {
-          isOpen: isRecruitmentPanelOpen,
-          panelWidth: recruitmentPanelWidth,
-          panelTranslateX: recruitmentPanelTranslateX,
-          onClose: closeRecruitmentPanel,
-        },
-        auditPanel: {
-          isOpen: isAuditPanelOpen,
-          panelWidth: auditPanelWidth,
-          panelTranslateX: auditPanelTranslateX,
-          onClose: closeAuditPanel,
-        },
-        policyPanel: {
-          isOpen: isPolicyPanelOpen,
-          panelWidth: policyPanelWidth,
-          panelTranslateX: policyPanelTranslateX,
-          onClose: closePolicyPanel,
-        },
-        integrationsPanel: {
-          isOpen: isIntegrationsPanelOpen,
-          panelWidth: integrationsPanelWidth,
-          panelTranslateX: integrationsPanelTranslateX,
-          onClose: closeIntegrationsPanel,
-        },
-        automationPanel: {
-          isOpen: isAutomationPanelOpen,
-          panelWidth: automationPanelWidth,
-          panelTranslateX: automationPanelTranslateX,
-          onClose: closeAutomationPanel,
-        },
-        reportsPanel: {
-          isOpen: isReportsPanelOpen,
-          panelWidth: reportsPanelWidth,
-          panelTranslateX: reportsPanelTranslateX,
-          onClose: closeReportsPanel,
-        },
-        governancePanel: {
-          isOpen: isGovernancePanelOpen,
-          panelWidth: governancePanelWidth,
-          panelTranslateX: governancePanelTranslateX,
-          onClose: closeGovernancePanel,
-        },
-        featurePanel: {
-          isOpen: isFeaturePanelOpen,
-          panelWidth: featurePanelWidth,
-          panelTranslateX: featurePanelTranslateX,
-          feature: activeFeature,
-          onClose: closeFeaturePanel,
-        },
-        orgProfilePanel: {
-          isOpen: isOrgProfilePanelOpen,
-          panelWidth: orgProfilePanelWidth,
-          panelTranslateX: orgProfilePanelTranslateX,
-          onClose: closeOrgProfilePanel,
-        },
-        appsPanel: {
-          isOpen: isOrgAppsPanelOpen,
-          panelWidth: orgAppsPanelWidth,
-          panelTranslateX: orgAppsPanelTranslateX,
-          onClose: closeOrgAppsPanel,
-          canManageApps: canManageOrganizationApps,
-          onLaunchApp: handleLaunchOrganizationApp,
-        },
-        coursesPanel: {
-          isOpen: isCoursesPanelOpen,
-          panelWidth: coursesPanelWidth,
-          panelTranslateX: coursesPanelTranslateX,
-          partnerName: selectedPartner?.name ?? null,
-          onClose: closeCoursesPanel,
-        },
-        linksPanel: {
-          isOpen: isLinksPanelOpen,
-          panelWidth: linksPanelWidth,
-          panelTranslateX: linksPanelTranslateX,
-          links,
-          loading: linksLoading,
-          error: linksError,
-          onClose: closeLinksPanel,
-          onToggleLink: toggleLink,
-          onSetRole: setRole,
-          onRefresh: refreshLinks,
-        },
-        complaintsPanel: {
-          isOpen: complaintsPanel.isOpen,
-          panelWidth: complaintsPanel.panelWidth,
-          panelTranslateX: complaintsPanel.panelTranslateX,
-          onClose: complaintsPanel.close,
-        },
-      }}
+            isOpen: isCreatePanelOpen,
+            panelWidth: createPanelWidth,
+            panelTranslateX: createPanelTranslateX,
+            kind: createKind,
+            onClose: closeCreatePanel,
+            onSwitchKind: openCreatePanel,
+            onCreated: reloadSelectedPartner,
+          },
+          discoveryPanel: {
+            isOpen: isDiscoverPanelOpen,
+            panelWidth: discoverPanelWidth,
+            panelTranslateX: discoverPanelTranslateX,
+            onClose: closeDiscoverPanel,
+            onJoined: reloadPartners,
+          },
+          recruitmentPanel: {
+            isOpen: isRecruitmentPanelOpen,
+            panelWidth: recruitmentPanelWidth,
+            panelTranslateX: recruitmentPanelTranslateX,
+            onClose: closeRecruitmentPanel,
+          },
+          auditPanel: {
+            isOpen: isAuditPanelOpen,
+            panelWidth: auditPanelWidth,
+            panelTranslateX: auditPanelTranslateX,
+            onClose: closeAuditPanel,
+          },
+          policyPanel: {
+            isOpen: isPolicyPanelOpen,
+            panelWidth: policyPanelWidth,
+            panelTranslateX: policyPanelTranslateX,
+            onClose: closePolicyPanel,
+          },
+          integrationsPanel: {
+            isOpen: isIntegrationsPanelOpen,
+            panelWidth: integrationsPanelWidth,
+            panelTranslateX: integrationsPanelTranslateX,
+            onClose: closeIntegrationsPanel,
+          },
+          automationPanel: {
+            isOpen: isAutomationPanelOpen,
+            panelWidth: automationPanelWidth,
+            panelTranslateX: automationPanelTranslateX,
+            onClose: closeAutomationPanel,
+          },
+          reportsPanel: {
+            isOpen: isReportsPanelOpen,
+            panelWidth: reportsPanelWidth,
+            panelTranslateX: reportsPanelTranslateX,
+            onClose: closeReportsPanel,
+          },
+          governancePanel: {
+            isOpen: isGovernancePanelOpen,
+            panelWidth: governancePanelWidth,
+            panelTranslateX: governancePanelTranslateX,
+            onClose: closeGovernancePanel,
+          },
+          featurePanel: {
+            isOpen: isFeaturePanelOpen,
+            panelWidth: featurePanelWidth,
+            panelTranslateX: featurePanelTranslateX,
+            feature: activeFeature,
+            onClose: closeFeaturePanel,
+          },
+          orgProfilePanel: {
+            isOpen: isOrgProfilePanelOpen,
+            panelWidth: orgProfilePanelWidth,
+            panelTranslateX: orgProfilePanelTranslateX,
+            onClose: closeOrgProfilePanel,
+          },
+          appsPanel: {
+            isOpen: isOrgAppsPanelOpen,
+            panelWidth: orgAppsPanelWidth,
+            panelTranslateX: orgAppsPanelTranslateX,
+            onClose: closeOrgAppsPanel,
+            canManageApps: canManageOrganizationApps,
+            onLaunchApp: handleLaunchOrganizationApp,
+          },
+          coursesPanel: {
+            isOpen: isCoursesPanelOpen,
+            panelWidth: coursesPanelWidth,
+            panelTranslateX: coursesPanelTranslateX,
+            partnerName: selectedPartner?.name ?? null,
+            onClose: closeCoursesPanel,
+          },
+          linksPanel: {
+            isOpen: isLinksPanelOpen,
+            panelWidth: linksPanelWidth,
+            panelTranslateX: linksPanelTranslateX,
+            links,
+            loading: linksLoading,
+            error: linksError,
+            onClose: closeLinksPanel,
+            onToggleLink: toggleLink,
+            onSetRole: setRole,
+            onRefresh: refreshLinks,
+          },
+          complaintsPanel: {
+            isOpen: complaintsPanel.isOpen,
+            panelWidth: complaintsPanel.panelWidth,
+            panelTranslateX: complaintsPanel.panelTranslateX,
+            onClose: complaintsPanel.close,
+          },
+        }}
       />
     </PartnerOrganizationAppsProvider>
   );

@@ -21,13 +21,20 @@ import type {
   MessageKind,
   MessageStatus,
 } from '../chatTypes';
+import { participantsToIds } from '../messagesUtils';
 
 import { useSocket } from '../../../../SocketProvider';
 import {
   ENCRYPTION_VERSION,
+  decryptConversationPayload,
   encryptConversationPayload,
   preloadConversationKey,
 } from '@/security/customE2EE';
+import {
+  decryptFromUser,
+  encryptPayloadForRecipients,
+  ensureDeviceId,
+} from '@/security/e2ee';
 
 /* ========================================================================
  * TYPES
@@ -113,12 +120,25 @@ export function useChatMessaging({
   const messagesRef: MutableRefObject<
     ChatMessage[]
   > = useRef(messages);
+  const deviceIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const conversationIdRef =
     useRef<string | null>(conversationId);
   useEffect(() => {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    ensureDeviceId()
+      .then((value) => {
+        deviceIdRef.current = value;
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -154,6 +174,106 @@ export function useChatMessaging({
     }
     return undefined;
   }, []);
+
+  const getRecipientUserIds = useCallback(() => {
+    const participantIds = participantsToIds(chat?.participants ?? []);
+    return participantIds.filter((id) => id && id !== currentUserId);
+  }, [chat?.participants, currentUserId]);
+
+  const patchDecryptedMessage = useCallback(
+    (messageId: string, patch: Partial<ChatMessage>) => {
+      const next = messagesRef.current.map((message) =>
+        message.serverId === messageId || message.id === messageId
+          ? { ...message, ...patch }
+          : message,
+      );
+      replaceMessages(next);
+    },
+    [replaceMessages],
+  );
+
+  const decryptChatMessage = useCallback(
+    async (mapped: ChatMessage) => {
+      const encMeta = mapped.encryptionMeta;
+      if (!encMeta) return;
+
+      try {
+        if (encMeta?.e2ee === 'signal') {
+          const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
+          const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : [];
+          const recipientCipher = recipients.find(
+            (item: any) =>
+              String(item?.userId) === String(currentUserId) &&
+              (!deviceIdRef.current || String(item?.deviceId) === String(deviceIdRef.current)),
+          ) ?? recipients.find((item: any) => String(item?.userId) === String(currentUserId));
+
+          const ciphertext = recipientCipher?.ciphertext ?? mapped.ciphertext;
+          const type = recipientCipher?.type ?? encMeta?.type ?? 1;
+          if (!mapped.senderId || !senderDeviceId || !ciphertext) return;
+
+          const plaintext = await decryptFromUser(
+            String(mapped.senderId),
+            String(senderDeviceId),
+            String(ciphertext),
+            Number(type),
+          );
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(plaintext);
+          } catch {}
+          patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
+            text: parsed?.text ?? plaintext,
+            styledText: parsed?.styledText ?? mapped.styledText,
+            attachments: parsed?.attachments ?? mapped.attachments,
+            contacts: parsed?.contacts ?? mapped.contacts,
+            poll: parsed?.poll ?? mapped.poll,
+            event: parsed?.event ?? mapped.event,
+            voice: parsed?.voice ?? mapped.voice,
+            sticker: parsed?.sticker ?? mapped.sticker,
+            replyToId: parsed?.replyToId ?? mapped.replyToId,
+            kind: parsed?.kind ?? mapped.kind,
+          });
+          return;
+        }
+
+        if (
+          mapped.encryptionVersion === ENCRYPTION_VERSION &&
+          mapped.ciphertext &&
+          mapped.iv &&
+          mapped.tag &&
+          mapped.conversationId
+        ) {
+          const plaintext = await decryptConversationPayload(
+            String(mapped.conversationId),
+            String(mapped.ciphertext),
+            String(mapped.iv),
+            String(mapped.tag),
+            mapped.aad,
+            mapped.encryptionKeyVersion,
+          );
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(plaintext);
+          } catch {}
+          patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
+            text: parsed?.text ?? plaintext,
+            styledText: parsed?.styledText ?? mapped.styledText,
+            attachments: parsed?.attachments ?? mapped.attachments,
+            contacts: parsed?.contacts ?? mapped.contacts,
+            poll: parsed?.poll ?? mapped.poll,
+            event: parsed?.event ?? mapped.event,
+            voice: parsed?.voice ?? mapped.voice,
+            sticker: parsed?.sticker ?? mapped.sticker,
+            replyToId: parsed?.replyToId ?? mapped.replyToId,
+            kind: parsed?.kind ?? mapped.kind,
+          });
+        }
+      } catch (error) {
+        console.warn('[useChatMessaging] decrypt failed', error);
+      }
+    },
+    [currentUserId, patchDecryptedMessage],
+  );
 
   const mapServerMessage = useCallback(
     (serverMsg: any): ChatMessage => {
@@ -245,7 +365,9 @@ export function useChatMessaging({
             }
           : undefined;
 
-      const text = serverMsg.text ?? '';
+      const rawCiphertext = serverMsg.ciphertext ?? undefined;
+      const hasEncryptedMeta = !!(serverMsg.encryptionMeta ?? serverMsg.encryption_meta);
+      const text = serverMsg.text ?? (rawCiphertext || hasEncryptedMeta ? 'Encrypted message' : '');
 
       return {
         id: serverMsg.id ?? serverMsg._id,
@@ -269,6 +391,13 @@ export function useChatMessaging({
         roomId: String(storageRoomId),
         fromMe: senderId !== '' && senderId === String(currentUserId),
         reactions: normalizeReactions(serverMsg.reactions),
+        ciphertext: rawCiphertext,
+        encryptionMeta: serverMsg.encryptionMeta ?? serverMsg.encryption_meta ?? undefined,
+        iv: serverMsg.iv ?? undefined,
+        tag: serverMsg.tag ?? undefined,
+        aad: serverMsg.aad ?? undefined,
+        encryptionVersion: serverMsg.encryptionVersion ?? undefined,
+        encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? undefined,
         styledText: styledText ?? undefined,
         contacts,
         poll,
@@ -322,10 +451,13 @@ export function useChatMessaging({
           if (!items.length) return;
           const mapped = items.map((m: any) => mapServerMessage(m));
           replaceMessages(mapped);
+          mapped.forEach((message: ChatMessage) => {
+            void decryptChatMessage(message);
+          });
         },
       );
     },
-    [socket, isConnected, conversationId, replaceMessages, mapServerMessage],
+    [socket, isConnected, conversationId, replaceMessages, mapServerMessage, decryptChatMessage],
   );
 
   const requestHistoryBatch = useCallback(
@@ -372,11 +504,14 @@ export function useChatMessaging({
       }
       if (all.length) {
         replaceMessages(all);
+        all.forEach((message: ChatMessage) => {
+          void decryptChatMessage(message);
+        });
       }
     } finally {
       historyLoadRef.current = false;
     }
-  }, [requestHistoryBatch, replaceMessages, mapServerMessage]);
+  }, [requestHistoryBatch, replaceMessages, mapServerMessage, decryptChatMessage]);
 
   const syncHistory = useCallback(() => {
     const now = Date.now();
@@ -595,21 +730,40 @@ export function useChatMessaging({
 
       let payloadToSend: any = basePayload;
       try {
-        const encrypted = await encryptConversationPayload(String(convId), basePayload);
+        const recipientUserIds = getRecipientUserIds();
+        if (!recipientUserIds.length) {
+          throw new Error('Missing recipient device inventory for signal fanout');
+        }
+        const signalEncrypted = await encryptPayloadForRecipients(
+          String(currentUserId),
+          recipientUserIds,
+          basePayload,
+        );
         payloadToSend = {
           conversationId: basePayload.conversationId,
           clientId,
           kind: basePayload.kind,
-          encrypted: true,
-          ciphertext: encrypted.ciphertext,
-          iv: encrypted.iv,
-          tag: encrypted.tag,
-          encryptionVersion: encrypted.encryptionVersion ?? ENCRYPTION_VERSION,
-          encryptionKeyVersion: encrypted.encryptionKeyVersion,
-          aad: encrypted.aad,
+          encryptionMeta: signalEncrypted.encryptionMeta,
         };
       } catch (err) {
-        console.warn('[customE2EE] encrypt failed, sending plaintext', err);
+        try {
+          const encrypted = await encryptConversationPayload(String(convId), basePayload);
+          payloadToSend = {
+            conversationId: basePayload.conversationId,
+            clientId,
+            kind: basePayload.kind,
+            encrypted: true,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            tag: encrypted.tag,
+            encryptionVersion: encrypted.encryptionVersion ?? ENCRYPTION_VERSION,
+            encryptionKeyVersion: encrypted.encryptionKeyVersion,
+            aad: encrypted.aad,
+          };
+        } catch (legacyErr) {
+          console.warn('[useChatMessaging] encryption failed', err, legacyErr);
+          return { ok: false };
+        }
       }
 
       return new Promise<SendOverNetworkResult>(
@@ -662,8 +816,10 @@ export function useChatMessaging({
       socket,
       isConnected,
       chat,
+      currentUserId,
       conversationId,
       storageRoomId,
+      getRecipientUserIds,
     ],
   );
 
@@ -777,6 +933,7 @@ export function useChatMessaging({
         ...messagesRef.current,
         msg,
       ]);
+      void decryptChatMessage(msg);
 
     };
 
@@ -845,12 +1002,20 @@ export function useChatMessaging({
           m.serverId === id || m.id === id
             ? {
                 ...m,
-                text:
-                  serverMsg.text ??
-                  m.text,
+                text: serverMsg.text ?? m.text,
                 styledText:
                   serverMsg.styledText ??
                   m.styledText,
+                ciphertext: serverMsg.ciphertext ?? m.ciphertext,
+                encryptionMeta:
+                  serverMsg.encryptionMeta ??
+                  serverMsg.encryption_meta ??
+                  m.encryptionMeta,
+                iv: serverMsg.iv ?? m.iv,
+                tag: serverMsg.tag ?? m.tag,
+                aad: serverMsg.aad ?? m.aad,
+                encryptionVersion: serverMsg.encryptionVersion ?? m.encryptionVersion,
+                encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? m.encryptionKeyVersion,
                 isEdited: true,
                 updatedAt:
                   serverMsg.updatedAt ??
@@ -860,6 +1025,10 @@ export function useChatMessaging({
       );
 
       replaceMessages(next);
+      const updated = next.find((m) => m.serverId === id || m.id === id);
+      if (updated) {
+        void decryptChatMessage(updated);
+      }
     };
 
     const onDelete = (serverMsg: any) => {
@@ -945,6 +1114,7 @@ export function useChatMessaging({
     conversationId,
     normalizeReactions,
     currentUserId,
+    decryptChatMessage,
   ]);
 
   /* ---------------------------------------------------------------------
@@ -1022,12 +1192,56 @@ export function useChatMessaging({
 
       const serverId = resolveServerId(messageId);
       if (!serverId) return;
-      socket.emit('chat.edit', {
+      const editPayload: any = {
         conversationId: String(convId),
         messageId: serverId,
         text: patch.text,
         styledText: patch.styledText,
-      });
+      };
+      if (patch.text != null || patch.styledText) {
+        try {
+          const recipientUserIds = getRecipientUserIds();
+          if (!recipientUserIds.length) {
+            throw new Error('Missing recipient device inventory for signal fanout');
+          }
+          const encrypted = await encryptPayloadForRecipients(
+            String(currentUserId),
+            recipientUserIds,
+            {
+              conversationId: String(convId),
+              kind: 'text',
+              clientId: String(serverId),
+              text: patch.text,
+              styledText: patch.styledText,
+            },
+          );
+          delete editPayload.text;
+          delete editPayload.styledText;
+          editPayload.encryptionMeta = encrypted.encryptionMeta;
+          editPayload.ciphertext = undefined;
+        } catch (err) {
+          try {
+            const encrypted = await encryptConversationPayload(String(convId), {
+              conversationId: String(convId),
+              kind: 'text',
+              clientId: String(serverId),
+              text: patch.text,
+              styledText: patch.styledText,
+            });
+            delete editPayload.text;
+            delete editPayload.styledText;
+            editPayload.ciphertext = encrypted.ciphertext;
+            editPayload.iv = encrypted.iv;
+            editPayload.tag = encrypted.tag;
+            editPayload.aad = encrypted.aad;
+            editPayload.encryptionVersion = encrypted.encryptionVersion ?? ENCRYPTION_VERSION;
+            editPayload.encryptionKeyVersion = encrypted.encryptionKeyVersion;
+          } catch (legacyErr) {
+            console.warn('[useChatMessaging] edit encryption failed', err, legacyErr);
+          }
+        }
+      }
+      socket.emit('chat.edit', editPayload);
     },
     softDeleteMessage: async (
       messageId: string,

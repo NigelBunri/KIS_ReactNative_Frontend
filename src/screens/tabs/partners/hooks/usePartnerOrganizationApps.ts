@@ -24,6 +24,39 @@ export type PartnerOrganizationApp = {
   visible_to?: string[];
   badge_label?: string;
   group?: string;
+  status?: string;
+  is_promoted_global?: boolean;
+  promoted_order?: number;
+  published_at?: string | null;
+  tabs?: PartnerOrganizationAppTab[];
+};
+
+export type PartnerOrganizationAppContentBlock = {
+  id: string;
+  tab?: string;
+  block_type: 'text' | 'rich_text' | 'video' | 'image' | 'link' | 'file' | 'embed' | string;
+  title?: string;
+  body?: string;
+  media_url?: string;
+  payload?: Record<string, any>;
+  order?: number;
+  status?: string;
+  is_active?: boolean;
+  published_at?: string | null;
+};
+
+export type PartnerOrganizationAppTab = {
+  id: string;
+  app?: string;
+  title: string;
+  slug?: string;
+  description?: string;
+  icon?: string;
+  order?: number;
+  is_active?: boolean;
+  visible_to?: string[];
+  config?: Record<string, any>;
+  content_blocks?: PartnerOrganizationAppContentBlock[];
 };
 
 export default function usePartnerOrganizationApps(partnerId?: string | null) {

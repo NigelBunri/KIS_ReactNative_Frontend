@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
   wrap: { flex: 1 },
 
   // Screen spacing matches mock (tighter than before)
-  scroll: { padding: 16, gap: 14, paddingBottom: 48 },
+  scroll: {gap: 14, paddingBottom: 48 },
 
   /** ─────────────────────────
    *  Cards (mock-like)

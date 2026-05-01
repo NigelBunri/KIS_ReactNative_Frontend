@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -17,12 +23,24 @@ import { getAccessToken } from '@/security/authStorage';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
-import FeedComposerSheet, { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
+import FeedComposerSheet, {
+  FeedComposerPayload,
+} from '@/components/feeds/FeedComposerSheet';
 import FeedPostActionsSheet from '@/components/feeds/FeedPostActionsSheet';
-import { InlineCommentSheet, formatCommentContextLabel } from '@/components/feeds/FeedScreen';
-import ShareRenderer, { type SharePayload } from '@/components/feeds/ShareRenderer';
+import {
+  InlineCommentSheet,
+  formatCommentContextLabel,
+} from '@/components/feeds/FeedScreen';
+import ShareRenderer, {
+  type SharePayload,
+} from '@/components/feeds/ShareRenderer';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { prepareBroadcastVideoPayload } from '@/components/feeds/videoAttachmentHelpers';
+import RichTextRenderer from '@/components/feeds/RichTextRenderer';
+import {
+  getFeedPlainText,
+  getFeedRichTextValue,
+} from '@/components/feeds/richTextValue';
 
 type Community = {
   id: string;
@@ -42,9 +60,7 @@ type Post = {
   author?: { display_name?: string; id?: string };
 };
 
-type FeedItem =
-  | { type: 'post'; data: Post }
-  | { type: 'ad'; id: string };
+type FeedItem = { type: 'post'; data: Post } | { type: 'ad'; id: string };
 
 type CommunityFeedPageProps = {
   community: Community;
@@ -62,10 +78,14 @@ export default function CommunityFeedPage({
   const [actionsVisible, setActionsVisible] = useState(false);
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [commentSheetVisible, setCommentSheetVisible] = useState(false);
-  const [commentThread, setCommentThread] = useState<
-    { post: Post; conversationId: string; context?: Record<string, any> } | null
-  >(null);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [commentThread, setCommentThread] = useState<{
+    post: Post;
+    conversationId: string;
+    context?: Record<string, any>;
+  } | null>(null);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
+    {},
+  );
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<Record<string, boolean>>({});
   const likedPostIdsRef = useRef<Record<string, boolean>>({});
@@ -74,7 +94,7 @@ export default function CommunityFeedPage({
     (count: number) => {
       const postId = commentThread?.post.id;
       if (!postId) return;
-      setCommentCounts((prev) => ({ ...prev, [postId]: count }));
+      setCommentCounts(prev => ({ ...prev, [postId]: count }));
     },
     [commentThread?.post?.id],
   );
@@ -85,9 +105,12 @@ export default function CommunityFeedPage({
   const loadFeed = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(`${ROUTES.community.posts}?community=${community.id}`, {
-        errorMessage: 'Failed to load posts',
-      });
+      const res = await getRequest(
+        `${ROUTES.community.posts}?community=${community.id}`,
+        {
+          errorMessage: 'Failed to load posts',
+        },
+      );
       const list = res?.data?.results ?? res?.data ?? res ?? [];
       setPosts(Array.isArray(list) ? list : []);
     } finally {
@@ -104,28 +127,31 @@ export default function CommunityFeedPage({
   }, [likedPostIds]);
 
   useEffect(() => {
-    setCommentCounts((prev) => {
+    setCommentCounts(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (next[post.id] == null && typeof post.comments_count === 'number') {
           next[post.id] = post.comments_count;
         }
       });
       return next;
     });
-    setLikeCounts((prev) => {
+    setLikeCounts(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (next[post.id] == null && Array.isArray(post.reactions)) {
-          const count = post.reactions.reduce((sum, r) => sum + (r?.count ?? 0), 0);
+          const count = post.reactions.reduce(
+            (sum, r) => sum + (r?.count ?? 0),
+            0,
+          );
           next[post.id] = count;
         }
       });
       return next;
     });
-    setLikedPostIds((prev) => {
+    setLikedPostIds(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (typeof post.has_reacted === 'boolean') {
           next[post.id] = post.has_reacted;
         }
@@ -154,8 +180,8 @@ export default function CommunityFeedPage({
   const handleReact = async (postId: string) => {
     const alreadyLiked = likedPostIdsRef.current[postId];
     const nextLiked = !alreadyLiked;
-    setLikedPostIds((prev) => ({ ...prev, [postId]: nextLiked }));
-    setLikeCounts((prev) => ({
+    setLikedPostIds(prev => ({ ...prev, [postId]: nextLiked }));
+    setLikeCounts(prev => ({
       ...prev,
       [postId]: Math.max(0, (prev[postId] ?? 0) + (nextLiked ? 1 : -1)),
     }));
@@ -166,14 +192,14 @@ export default function CommunityFeedPage({
     );
     if (res?.data?.has_reacted !== undefined) {
       const serverLiked = Boolean(res.data.has_reacted);
-      setLikedPostIds((prev) => ({ ...prev, [postId]: serverLiked }));
+      setLikedPostIds(prev => ({ ...prev, [postId]: serverLiked }));
     }
   };
 
   const captureShareImage = async (payload: SharePayload) => {
     setSharePayload(payload);
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(true)));
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise(resolve => requestAnimationFrame(() => resolve(true)));
+    await new Promise(resolve => setTimeout(resolve, 60));
     const uri = await shareShotRef.current?.capture?.();
     setSharePayload(null);
     return uri as string | undefined;
@@ -195,7 +221,9 @@ export default function CommunityFeedPage({
 
   const handleShare = async (post: Post) => {
     const text = post.text ?? post.styled_text?.text ?? '';
-    const attachment = Array.isArray(post.attachments) ? post.attachments[0] : null;
+    const attachment = Array.isArray(post.attachments)
+      ? post.attachments[0]
+      : null;
     const attachmentUrl = attachment?.url ?? attachment?.uri ?? null;
     const kind = attachment?.kind ?? attachment?.mimeType ?? '';
     const isImage = String(kind).includes('image');
@@ -236,7 +264,10 @@ export default function CommunityFeedPage({
     }
 
     if (attachmentUrl) {
-      await Share.share({ message: `KIS: ${attachmentUrl}`, url: attachmentUrl });
+      await Share.share({
+        message: `KIS: ${attachmentUrl}`,
+        url: attachmentUrl,
+      });
       return;
     }
 
@@ -279,7 +310,7 @@ export default function CommunityFeedPage({
       { errorMessage: 'Unable to delete post.' },
     );
     if (res?.success) {
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setPosts(prev => prev.filter(p => p.id !== postId));
     }
   };
 
@@ -302,7 +333,7 @@ export default function CommunityFeedPage({
       { errorMessage: 'Unable to block user.' },
     );
     if (res?.success) {
-      setPosts((prev) => prev.filter((p) => p.author?.id !== userId));
+      setPosts(prev => prev.filter(p => p.author?.id !== userId));
     }
   };
 
@@ -337,7 +368,7 @@ export default function CommunityFeedPage({
   const scrollToActivePost = useCallback(() => {
     if (!activePost) return;
     const index = feedItems.findIndex(
-      (item) => item.type === 'post' && item.data.id === activePost.id,
+      item => item.type === 'post' && item.data.id === activePost.id,
     );
     if (index < 0) return;
     setTimeout(() => {
@@ -354,17 +385,27 @@ export default function CommunityFeedPage({
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
-      <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: palette.divider, backgroundColor: palette.card },
+        ]}
+      >
         <Pressable onPress={onBack} style={styles.headerButton}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+        <Text
+          style={[styles.headerTitle, { color: palette.text }]}
+          numberOfLines={1}
+        >
           {community.name} Feed
         </Text>
       </View>
 
       <View style={styles.feedHeader}>
-        <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700' }}>Community Feed</Text>
+        <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700' }}>
+          Community Feed
+        </Text>
       </View>
 
       {loading ? (
@@ -372,17 +413,38 @@ export default function CommunityFeedPage({
           {Array.from({ length: 3 }).map((_, idx) => (
             <View
               key={`feed-skel-${idx}`}
-              style={[styles.postCard, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
+              style={[
+                styles.postCard,
+                {
+                  borderColor: palette.inputBorder,
+                  backgroundColor: palette.card,
+                },
+              ]}
             >
               <View style={styles.postHeader}>
                 <Skeleton width={36} height={36} radius={18} />
                 <View style={{ flex: 1 }}>
                   <Skeleton width="50%" height={12} radius={6} />
-                  <Skeleton width="30%" height={10} radius={6} style={{ marginTop: 6 }} />
+                  <Skeleton
+                    width="30%"
+                    height={10}
+                    radius={6}
+                    style={{ marginTop: 6 }}
+                  />
                 </View>
               </View>
-              <Skeleton width="100%" height={12} radius={6} style={{ marginTop: 10 }} />
-              <Skeleton width="80%" height={12} radius={6} style={{ marginTop: 6 }} />
+              <Skeleton
+                width="100%"
+                height={12}
+                radius={6}
+                style={{ marginTop: 10 }}
+              />
+              <Skeleton
+                width="80%"
+                height={12}
+                radius={6}
+                style={{ marginTop: 6 }}
+              />
             </View>
           ))}
         </View>
@@ -390,9 +452,11 @@ export default function CommunityFeedPage({
         <FlatList
           ref={listRef}
           data={feedItems}
-          keyExtractor={(item, idx) => (item.type === 'post' ? item.data.id : item.id ?? String(idx))}
+          keyExtractor={(item, idx) =>
+            item.type === 'post' ? item.data.id : item.id ?? String(idx)
+          }
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-          onScrollToIndexFailed={(info) => {
+          onScrollToIndexFailed={info => {
             listRef.current?.scrollToOffset({
               offset: info.averageItemLength * info.index,
               animated: true,
@@ -401,9 +465,26 @@ export default function CommunityFeedPage({
           renderItem={({ item }) => {
             if (item.type === 'ad') {
               return (
-                <View style={[styles.adCard, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Sponsored</Text>
-                  <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600', marginTop: 6 }}>
+                <View
+                  style={[
+                    styles.adCard,
+                    {
+                      borderColor: palette.inputBorder,
+                      backgroundColor: palette.card,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Sponsored
+                  </Text>
+                  <Text
+                    style={{
+                      color: palette.text,
+                      fontSize: 15,
+                      fontWeight: '600',
+                      marginTop: 6,
+                    }}
+                  >
                     Promote your ministry or product here
                   </Text>
                   <Text style={{ color: palette.subtext, marginTop: 6 }}>
@@ -413,7 +494,9 @@ export default function CommunityFeedPage({
               );
             }
             const post = item.data;
-            const attachment = Array.isArray(post.attachments) ? post.attachments[0] : null;
+            const attachment = Array.isArray(post.attachments)
+              ? post.attachments[0]
+              : null;
             const attachmentUrl =
               (typeof attachment === 'string' ? attachment : null) ??
               attachment?.url ??
@@ -430,18 +513,37 @@ export default function CommunityFeedPage({
               attachment?.preview_url ??
               attachment?.previewUrl ??
               null;
-            const kind = attachment?.kind ?? attachment?.mimeType ?? attachment?.type ?? '';
-            const isVideo = String(kind).includes('video') || String(kind).includes('mp4');
+            const kind =
+              attachment?.kind ??
+              attachment?.mimeType ??
+              attachment?.type ??
+              '';
+            const isVideo =
+              String(kind).includes('video') || String(kind).includes('mp4');
             return (
-              <View style={[styles.postCard, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
+              <View
+                style={[
+                  styles.postCard,
+                  {
+                    borderColor: palette.inputBorder,
+                    backgroundColor: palette.card,
+                  },
+                ]}
+              >
                 <View style={styles.postHeader}>
-                  <ImagePlaceholder size={36} radius={18} style={styles.avatar} />
+                  <ImagePlaceholder
+                    size={36}
+                    radius={18}
+                    style={styles.avatar}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: palette.text, fontWeight: '700' }}>
                       {post.author?.display_name ?? 'Member'}
                     </Text>
                     <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                      {post.created_at ? new Date(post.created_at).toLocaleString() : 'Just now'}
+                      {post.created_at
+                        ? new Date(post.created_at).toLocaleString()
+                        : 'Just now'}
                     </Text>
                   </View>
                   <Pressable
@@ -451,7 +553,11 @@ export default function CommunityFeedPage({
                     }}
                     style={styles.moreButton}
                   >
-                    <KISIcon name="more-vert" size={18} color={palette.subtext} />
+                    <KISIcon
+                      name="more-vert"
+                      size={18}
+                      color={palette.subtext}
+                    />
                   </Pressable>
                 </View>
                 {attachmentUrl ? (
@@ -459,36 +565,77 @@ export default function CommunityFeedPage({
                     {isVideo ? (
                       <>
                         {thumbUrl ? (
-                          <Image source={{ uri: thumbUrl }} style={styles.media} />
+                          <Image
+                            source={{ uri: thumbUrl }}
+                            style={styles.media}
+                          />
                         ) : (
-                          <View style={[styles.media, styles.mediaFallback, { borderColor: palette.inputBorder }]}>
-                            <KISIcon name="play" size={22} color={palette.subtext} />
-                            <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+                          <View
+                            style={[
+                              styles.media,
+                              styles.mediaFallback,
+                              { borderColor: palette.inputBorder },
+                            ]}
+                          >
+                            <KISIcon
+                              name="play"
+                              size={22}
+                              color={palette.subtext}
+                            />
+                            <Text
+                              style={{
+                                color: palette.subtext,
+                                fontSize: 12,
+                                marginTop: 6,
+                              }}
+                            >
                               Add a thumbnail
                             </Text>
                           </View>
                         )}
-                        <View style={[styles.playBadge, { backgroundColor: '#00000066' }]}>
+                        <View
+                          style={[
+                            styles.playBadge,
+                            { backgroundColor: '#00000066' },
+                          ]}
+                        >
                           <KISIcon name="play" size={14} color="#fff" />
                         </View>
                       </>
                     ) : (
-                      <Image source={{ uri: attachmentUrl }} style={styles.media} />
+                      <Image
+                        source={{ uri: attachmentUrl }}
+                        style={styles.media}
+                      />
                     )}
                   </View>
                 ) : null}
-                <Text style={{ color: palette.text, marginTop: 10 }}>
-                  {post.text ?? post.styled_text?.text ?? ''}
-                </Text>
+                <View style={{ marginTop: 10 }}>
+                  <RichTextRenderer
+                    value={getFeedRichTextValue(post)}
+                    fallback={getFeedPlainText(post)}
+                    style={{ maxHeight: 112, overflow: 'hidden' }}
+                  />
+                </View>
                 <View style={styles.postActions}>
-                  <Pressable style={styles.actionPill} onPress={() => handleReact(post.id)}>
+                  <Pressable
+                    style={styles.actionPill}
+                    onPress={() => handleReact(post.id)}
+                  >
                     <KISIcon
                       name="heart"
                       size={14}
-                      color={likedPostIds[post.id] ? palette.primary : palette.subtext}
+                      color={
+                        likedPostIds[post.id]
+                          ? palette.primary
+                          : palette.subtext
+                      }
                     />
                     <Text style={{ color: palette.subtext, marginLeft: 6 }}>
-                      Like{(likeCounts[post.id] ?? 0) ? ` (${likeCounts[post.id]})` : ''}
+                      Like
+                      {likeCounts[post.id] ?? 0
+                        ? ` (${likeCounts[post.id]})`
+                        : ''}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -500,14 +647,19 @@ export default function CommunityFeedPage({
                     <KISIcon name="comment" size={14} color={palette.subtext} />
                     <Text style={{ color: palette.subtext, marginLeft: 6 }}>
                       Comment
-                      {(commentCounts[post.id] ?? post.comments_count)
+                      {commentCounts[post.id] ?? post.comments_count
                         ? ` (${commentCounts[post.id] ?? post.comments_count})`
                         : ''}
                     </Text>
                   </Pressable>
-                  <Pressable style={styles.actionPill} onPress={() => handleShare(post)}>
+                  <Pressable
+                    style={styles.actionPill}
+                    onPress={() => handleShare(post)}
+                  >
                     <KISIcon name="share" size={14} color={palette.subtext} />
-                    <Text style={{ color: palette.subtext, marginLeft: 6 }}>Share</Text>
+                    <Text style={{ color: palette.subtext, marginLeft: 6 }}>
+                      Share
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -590,14 +742,16 @@ export default function CommunityFeedPage({
               if (activePost) handleDelete(activePost.id);
             },
           },
-        ].filter((action) => action.key !== 'delete' || activePost?.id)}
+        ].filter(action => action.key !== 'delete' || activePost?.id)}
       />
 
       <InlineCommentSheet
         visible={commentSheetVisible}
         conversationId={commentThread?.conversationId}
         headerLabel={`Feed: ${
-          commentThread?.post?.text ?? commentThread?.post?.styled_text?.text ?? community.name
+          commentThread?.post?.text ??
+          commentThread?.post?.styled_text?.text ??
+          community.name
         }`}
         contextLabel={formatCommentContextLabel(commentThread?.context)}
         onClose={() => {
@@ -627,13 +781,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
   postCard: { borderWidth: 2, borderRadius: 14, padding: 14, marginBottom: 14 },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   moreButton: { padding: 6 },
-  postActions: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  actionPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999 },
+  postActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    flexWrap: 'wrap',
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
   adCard: { borderWidth: 2, borderRadius: 14, padding: 14, marginBottom: 14 },
   mediaWrap: { marginTop: 10 },
   media: { width: '100%', height: 180, borderRadius: 12 },

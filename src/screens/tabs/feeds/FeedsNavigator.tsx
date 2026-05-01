@@ -7,7 +7,12 @@ import { BroadcastItem } from '@/types/broadcast';
 
 export type FeedsStackParamList = {
   FeedsList: undefined;
-  BroadcastDetail: { id: string; item?: BroadcastItem };
+  BroadcastDetail: {
+    id: string;
+    item?: BroadcastItem;
+    items?: BroadcastItem[];
+    index?: number;
+  };
 };
 
 const Stack = createNativeStackNavigator<FeedsStackParamList>();

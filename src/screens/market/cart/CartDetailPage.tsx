@@ -18,7 +18,6 @@ import {
   deleteShopCart,
   getShopCartState,
   removeShopCartItem,
-  ShopCart,
   ShopCartItem,
   subscribeToShopCart,
   updateShopCartItem,
@@ -28,7 +27,10 @@ import { getRequest } from '@/network/get';
 import { KIS_COIN_CODE } from '@/screens/market/market.constants';
 
 type CartDetailRoute = RouteProp<RootStackParamList, 'CartDetail'>;
-type CartDetailNavigation = NativeStackNavigationProp<RootStackParamList, 'CartDetail'>;
+type CartDetailNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'CartDetail'
+>;
 
 const CartDetailPage = () => {
   const { palette } = useKISTheme();
@@ -38,7 +40,8 @@ const CartDetailPage = () => {
   const shopName = route.params?.shopName;
 
   const [cartState, setCartState] = useState(getShopCartState());
-  const [shopAwaitingSatisfaction, setShopAwaitingSatisfaction] = useState(false);
+  const [shopAwaitingSatisfaction, setShopAwaitingSatisfaction] =
+    useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -69,9 +72,12 @@ const CartDetailPage = () => {
           : Array.isArray(payload?.results)
           ? payload.results
           : [];
-        const hasAwaiting = data.some((entry) => (entry?.status ?? '').toLowerCase() === 'awaiting_satisfaction');
+        const hasAwaiting = data.some(
+          (entry: any) =>
+            (entry?.status ?? '').toLowerCase() === 'awaiting_satisfaction',
+        );
         setShopAwaitingSatisfaction(Boolean(hasAwaiting));
-      } catch (error) {
+      } catch {
         if (active) {
           setShopAwaitingSatisfaction(false);
         }
@@ -82,14 +88,22 @@ const CartDetailPage = () => {
     };
   }, [shopId]);
 
-  const cart = useMemo(() => (shopId ? cartState.carts[shopId] : undefined), [cartState.carts, shopId]);
+  const cart = useMemo(
+    () => (shopId ? cartState.carts[shopId] : undefined),
+    [cartState.carts, shopId],
+  );
   const items = cart?.items ?? [];
-  const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalAmount = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
   const cartIsCheckedOut = cart?.status === 'checked_out';
 
   const handleQuantityChange = useCallback(
     (item: ShopCartItem, delta: number) => {
-      void updateShopCartItem(shopId ?? '', item.id, { quantity: item.quantity + delta });
+      void updateShopCartItem(shopId ?? '', item.id, {
+        quantity: item.quantity + delta,
+      });
     },
     [shopId],
   );
@@ -136,25 +150,45 @@ const CartDetailPage = () => {
     ]);
   }, [navigation, shopId]);
 
-  const renderOptionChips = (item: ShopCartItem, kind: 'size' | 'color', options?: string[]) => {
+  const renderOptionChips = (
+    item: ShopCartItem,
+    kind: 'size' | 'color',
+    options?: string[],
+  ) => {
     if (!options?.length) return null;
     return (
-      <View style={cartDetailStyles.optionRow}> 
-        <Text style={[cartDetailStyles.optionLabel, { color: palette.subtext }]}>
+      <View style={cartDetailStyles.optionRow}>
+        <Text
+          style={[cartDetailStyles.optionLabel, { color: palette.subtext }]}
+        >
           {kind === 'size' ? 'Size' : 'Color'}
         </Text>
         <View style={cartDetailStyles.chipRow}>
-          {options.map((value) => (
+          {options.map(value => (
             <Pressable
               key={value}
               style={
                 value === (kind === 'size' ? item.size : item.color)
-                  ? [cartDetailStyles.optionChip, { borderColor: palette.primaryStrong, backgroundColor: `${palette.primaryStrong}20` }]
-                  : [cartDetailStyles.optionChip, { borderColor: palette.divider, backgroundColor: palette.surface }]
+                  ? [
+                      cartDetailStyles.optionChip,
+                      {
+                        borderColor: palette.primaryStrong,
+                        backgroundColor: `${palette.primaryStrong}20`,
+                      },
+                    ]
+                  : [
+                      cartDetailStyles.optionChip,
+                      {
+                        borderColor: palette.divider,
+                        backgroundColor: palette.surface,
+                      },
+                    ]
               }
               onPress={() => handleUpdateOption(item, kind, value)}
             >
-              <Text style={{ color: palette.text, fontWeight: '700' }}>{value}</Text>
+              <Text style={{ color: palette.text, fontWeight: '700' }}>
+                {value}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -164,65 +198,157 @@ const CartDetailPage = () => {
 
   if (!shopId) {
     return (
-      <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, padding: 16 }]}> 
-        <Text style={[cartDetailStyles.errorText, { color: palette.error || '#E53935' }]}>Shop not found.</Text>
-        <KISButton title="Go back" size="sm" onPress={() => navigation.goBack()} />
+      <View
+        style={[
+          cartDetailStyles.root,
+          { backgroundColor: palette.bg, padding: 16 },
+        ]}
+      >
+        <Text
+          style={[
+            cartDetailStyles.errorText,
+            { color: palette.error || '#E53935' },
+          ]}
+        >
+          Shop not found.
+        </Text>
+        <KISButton
+          title="Go back"
+          size="sm"
+          onPress={() => navigation.goBack()}
+        />
       </View>
     );
   }
 
   return (
-    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[cartDetailStyles.header, { borderBottomColor: palette.divider }]}> 
-        <Text style={[cartDetailStyles.headerTitle, { color: palette.text }]}>Cart · {shopName ?? 'Shop'}</Text>
-        <Text style={[cartDetailStyles.headerSubtitle, { color: palette.subtext }]}>{`${items.length} items · ${totalAmount.toFixed(2)} ${KIS_COIN_CODE}`}</Text>
+    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          cartDetailStyles.header,
+          { borderBottomColor: palette.divider },
+        ]}
+      >
+        <Text style={[cartDetailStyles.headerTitle, { color: palette.text }]}>
+          Cart · {shopName ?? 'Shop'}
+        </Text>
+        <Text
+          style={[cartDetailStyles.headerSubtitle, { color: palette.subtext }]}
+        >{`${items.length} items · ${totalAmount.toFixed(
+          2,
+        )} ${KIS_COIN_CODE}`}</Text>
       </View>
       {shopAwaitingSatisfaction ? (
-        <View style={[cartDetailStyles.awaitingBanner, { borderColor: palette.primaryLight }]}>
-          <Text style={[cartDetailStyles.awaitingBannerText, { color: palette.primaryStrong }]}>
-            Provider marked this order complete. Confirm satisfaction within 3 days or file a complaint.
+        <View
+          style={[
+            cartDetailStyles.awaitingBanner,
+            { borderColor: palette.primaryLight },
+          ]}
+        >
+          <Text
+            style={[
+              cartDetailStyles.awaitingBannerText,
+              { color: palette.primaryStrong },
+            ]}
+          >
+            Provider marked this order complete. Confirm satisfaction within 3
+            days or file a complaint.
           </Text>
         </View>
       ) : null}
       {!items.length ? (
         <View style={cartDetailStyles.emptyState}>
-          <Text style={[cartDetailStyles.emptyText, { color: palette.subtext }]}>This cart is empty.</Text>
+          <Text
+            style={[cartDetailStyles.emptyText, { color: palette.subtext }]}
+          >
+            This cart is empty.
+          </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={cartDetailStyles.content}> 
-          {items.map((item) => (
+        <ScrollView contentContainerStyle={cartDetailStyles.content}>
+          {items.map(item => (
             <View
               key={item.id}
-              style={[cartDetailStyles.itemCard, { borderColor: palette.divider, backgroundColor: palette.surfaceElevated }]}
-            > 
+              style={[
+                cartDetailStyles.itemCard,
+                {
+                  borderColor: palette.divider,
+                  backgroundColor: palette.surfaceElevated,
+                },
+              ]}
+            >
               {item.imageUrl ? (
-                <Image source={{ uri: item.imageUrl }} style={cartDetailStyles.itemImage} />
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={cartDetailStyles.itemImage}
+                />
               ) : null}
               <View style={cartDetailStyles.itemBody}>
                 <View style={cartDetailStyles.itemHeader}>
-                  <Text style={[cartDetailStyles.itemTitle, { color: palette.text }]} numberOfLines={2}>{item.name ?? 'Product'}</Text>
-                  <Text style={[cartDetailStyles.itemPrice, { color: palette.primaryStrong }]}>
+                  <Text
+                    style={[
+                      cartDetailStyles.itemTitle,
+                      { color: palette.text },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {item.name ?? 'Product'}
+                  </Text>
+                  <Text
+                    style={[
+                      cartDetailStyles.itemPrice,
+                      { color: palette.primaryStrong },
+                    ]}
+                  >
                     {formatKiscAmount(item.price * item.quantity)}
                   </Text>
                 </View>
                 <View style={cartDetailStyles.quantityRow}>
                   {cartIsCheckedOut ? (
-                    <Text style={[cartDetailStyles.quantityValue, { color: palette.text }]}>
+                    <Text
+                      style={[
+                        cartDetailStyles.quantityValue,
+                        { color: palette.text },
+                      ]}
+                    >
                       Quantity · {item.quantity}
                     </Text>
                   ) : (
                     <>
-                      <KISButton title="-" size="xs" variant="outline" onPress={() => handleQuantityChange(item, -1)} />
-                      <Text style={[cartDetailStyles.quantityValue, { color: palette.text }]}>{item.quantity}</Text>
-                      <KISButton title="+" size="xs" onPress={() => handleQuantityChange(item, 1)} />
+                      <KISButton
+                        title="-"
+                        size="xs"
+                        variant="outline"
+                        onPress={() => handleQuantityChange(item, -1)}
+                      />
+                      <Text
+                        style={[
+                          cartDetailStyles.quantityValue,
+                          { color: palette.text },
+                        ]}
+                      >
+                        {item.quantity}
+                      </Text>
+                      <KISButton
+                        title="+"
+                        size="xs"
+                        onPress={() => handleQuantityChange(item, 1)}
+                      />
                     </>
                   )}
-                  <Text style={[cartDetailStyles.quantityMeta, { color: palette.subtext }]}>
+                  <Text
+                    style={[
+                      cartDetailStyles.quantityMeta,
+                      { color: palette.subtext },
+                    ]}
+                  >
                     {`${formatKiscAmount(item.price)} per item`}
                   </Text>
                 </View>
-                {!cartIsCheckedOut && renderOptionChips(item, 'size', item.availableSizes)}
-                {!cartIsCheckedOut && renderOptionChips(item, 'color', item.availableColors)}
+                {!cartIsCheckedOut &&
+                  renderOptionChips(item, 'size', item.availableSizes)}
+                {!cartIsCheckedOut &&
+                  renderOptionChips(item, 'color', item.availableColors)}
                 {!cartIsCheckedOut && (
                   <KISButton
                     title="Remove item"
@@ -244,11 +370,16 @@ const CartDetailPage = () => {
           ))}
         </ScrollView>
       )}
-      <View style={cartDetailStyles.footer}> 
+      <View style={cartDetailStyles.footer}>
         <Text style={[cartDetailStyles.footerText, { color: palette.text }]}>
           Total · {formatKiscAmount(totalAmount)}
         </Text>
-        <KISButton title="Delete cart" size="sm" variant="outline" onPress={handleDeleteCart} />
+        <KISButton
+          title="Delete cart"
+          size="sm"
+          variant="outline"
+          onPress={handleDeleteCart}
+        />
       </View>
     </View>
   );

@@ -12,7 +12,10 @@ import {
   MarketShop,
 } from '@/screens/broadcast/market/api/market.types';
 import MarketProductCard from '@/screens/broadcast/market/components/MarketProductCard';
-import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import {
+  KIS_COIN_CODE,
+  KIS_TO_USD_RATE,
+} from '@/screens/market/market.constants';
 import { useCatalogCategories } from '@/screens/market/useCatalogCategories';
 import { collectProductImageUris } from '@/utils/productImages';
 
@@ -29,14 +32,21 @@ const DEFAULT_PRODUCT_FORM = {
 const sanitizeDecimalInput = (value: string) => value.replace(/[^0-9.]/g, '');
 const sanitizeIntegerInput = (value: string) => value.replace(/[^0-9]/g, '');
 
-const buildPickedImage = (asset: Asset | undefined, prefix: string): PickedImage | null => {
+const buildPickedImage = (
+  asset: Asset | undefined,
+  prefix: string,
+): PickedImage | null => {
   if (!asset?.uri) return null;
   const extension = (asset.type || 'image/jpeg').split('/')[1] || 'jpg';
   const name = asset.fileName || `${prefix}_${Date.now()}.${extension}`;
   return { uri: asset.uri, name, type: asset.type || 'image/jpeg' };
 };
 
-const toUploadFile = (picked: PickedImage) => ({ uri: picked.uri, name: picked.name, type: picked.type });
+const toUploadFile = (picked: PickedImage) => ({
+  uri: picked.uri,
+  name: picked.name,
+  type: picked.type,
+});
 
 type Props = {
   ownerId?: string | null;
@@ -60,43 +70,53 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   const [editing, setEditing] = useState<MarketProduct | null>(null);
   const [productImages, setProductImages] = useState<PickedImage[]>([]);
   const [form, setForm] = useState({ ...DEFAULT_PRODUCT_FORM });
-  const { categories: catalogCategories, loading: catalogLoading } = useCatalogCategories();
+  const { categories: catalogCategories, loading: catalogLoading } =
+    useCatalogCategories();
   const productCatalogCategories = useMemo(
-    () => catalogCategories.filter((category) => category.category_type !== 'service'),
+    () =>
+      catalogCategories.filter(
+        category => category.category_type !== 'service',
+      ),
     [catalogCategories],
   );
 
   const activeShop: MarketShop | null = useMemo(() => {
     if (!myShops.length) return null;
     if (!activeShopId) return myShops[0] ?? null;
-    return myShops.find((shop) => shop.id === activeShopId) ?? myShops[0] ?? null;
+    return myShops.find(shop => shop.id === activeShopId) ?? myShops[0] ?? null;
   }, [myShops, activeShopId]);
 
   const categoriesForActiveShop = productCatalogCategories;
 
   const selectedCategory = useMemo(
-    () => categoriesForActiveShop.find((category) => category.id === form.categoryId) ?? null,
+    () =>
+      categoriesForActiveShop.find(
+        category => category.id === form.categoryId,
+      ) ?? null,
     [categoriesForActiveShop, form.categoryId],
   );
 
   const productsForActiveShop = useMemo(() => {
     if (!activeShop) return [];
-    return myProducts.filter((p) => String(p.shop) === String(activeShop.id));
+    return myProducts.filter(p => String(p.shop) === String(activeShop.id));
   }, [myProducts, activeShop]);
 
   const broadcastedProducts = useMemo(() => {
-    return productsForActiveShop.filter((product) => {
+    return productsForActiveShop.filter(product => {
       return Boolean(
         product?.is_broadcasted ||
-        product?.isBroadcasted ||
-        product?.broadcast_item_id ||
-        product?.broadcast_id,
+          product?.isBroadcasted ||
+          product?.broadcast_item_id ||
+          product?.broadcast_id,
       );
     });
   }, [productsForActiveShop]);
 
   const formatBroadcastPriceLabel = (product: MarketProduct) => {
-    const priceValue = product.price !== undefined && product.price !== null ? String(product.price) : '';
+    const priceValue =
+      product.price !== undefined && product.price !== null
+        ? String(product.price)
+        : '';
     if (!priceValue) return '';
     const currency = (product.currency ?? KIS_COIN_CODE).trim();
     return `Price ${currency} ${priceValue}`;
@@ -105,9 +125,12 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   useEffect(() => {
     if (editing) return;
     if (!form.categoryId && productCatalogCategories.length) {
-      setForm((prev) => ({ ...prev, categoryId: productCatalogCategories[0].id }));
+      setForm(prev => ({
+        ...prev,
+        categoryId: productCatalogCategories[0].id,
+      }));
     }
-  }, [categoriesForActiveShop, editing, form.categoryId]);
+  }, [editing, form.categoryId, productCatalogCategories]);
 
   useEffect(() => {
     if (!activeShop || !activeShop.id) return;
@@ -124,15 +147,23 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
 
   const priceInUsd = useMemo(() => {
     const parsed = Number(form.price);
-    return Number.isFinite(parsed) ? (parsed * KIS_TO_USD_RATE).toFixed(2) : '0.00';
+    return Number.isFinite(parsed)
+      ? (parsed * KIS_TO_USD_RATE).toFixed(2)
+      : '0.00';
   }, [form.price]);
 
   const pickImages = useCallback(async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 5 });
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 1,
+      selectionLimit: 5,
+    });
     if (result.didCancel) return;
     const assets = result.assets ?? [];
     const picked = assets
-      .map((asset, index) => buildPickedImage(asset, `product_${Date.now()}_${index}`))
+      .map((asset, index) =>
+        buildPickedImage(asset, `product_${Date.now()}_${index}`),
+      )
       .filter((item): item is PickedImage => item !== null);
     if (!picked.length) return;
     setProductImages(picked);
@@ -147,7 +178,9 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
       setForm({
         name: product.name ?? '',
         price:
-          product.price !== undefined && product.price !== null ? String(product.price) : '',
+          product.price !== undefined && product.price !== null
+            ? String(product.price)
+            : '',
         description: product.description ?? '',
         stock_qty: String(product.stock_qty ?? 0),
         categoryId: Array.isArray(product.catalog_categories)
@@ -183,7 +216,10 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     formData.append('price', trimmedPrice);
     formData.append('currency', KIS_COIN_CODE);
     const stockQty = Math.max(0, Number(form.stock_qty || 0));
-    formData.append('stock_qty', String(Number.isFinite(stockQty) ? Math.floor(stockQty) : 0));
+    formData.append(
+      'stock_qty',
+      String(Number.isFinite(stockQty) ? Math.floor(stockQty) : 0),
+    );
     if (form.categoryId) {
       formData.append('category_id', form.categoryId);
     }
@@ -191,28 +227,41 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     const selectedFiles = productImages;
     if (selectedFiles.length) {
       if (editing) {
-        selectedFiles.forEach((file) => {
+        selectedFiles.forEach(file => {
           formData.append('images', toUploadFile(file) as any);
         });
       } else {
         const [primary, ...rest] = selectedFiles;
         if (primary) {
           formData.append('image_file', toUploadFile(primary) as any);
-          rest.forEach((file) => formData.append('images', toUploadFile(file) as any));
+          rest.forEach(file =>
+            formData.append('images', toUploadFile(file) as any),
+          );
         }
       }
     }
 
-    const response = editing?.id ? await updateProduct(editing.id, formData) : await createProduct(formData);
+    const response = editing?.id
+      ? await updateProduct(editing.id, formData)
+      : await createProduct(formData);
     if (response?.ok) {
       reset();
       await reloadAll();
     }
-  }, [form, productImages, editing, activeShop?.id, createProduct, updateProduct, reloadAll, reset]);
+  }, [
+    form,
+    productImages,
+    editing,
+    activeShop?.id,
+    createProduct,
+    updateProduct,
+    reloadAll,
+    reset,
+  ]);
 
   const stagedImageUrls = useMemo(() => {
-    const urls = [...productImages.map((img) => img.uri)];
-    (editing?.images ?? []).forEach((img) => {
+    const urls = [...productImages.map(img => img.uri)];
+    (editing?.images ?? []).forEach(img => {
       if (img.image_url) urls.push(img.image_url);
     });
     if (!urls.length && editing?.image_url) {
@@ -234,8 +283,18 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
             gap: 10,
           }}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Products</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}
+            >
+              Products
+            </Text>
             <Text
               onPress={reloadAll}
               style={{ color: palette.subtext, fontWeight: '900' }}
@@ -245,7 +304,9 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
             </Text>
           </View>
 
-          <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}>
+          <Text
+            style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}
+          >
             Active shop: {activeShop?.name ?? 'None'}
           </Text>
 
@@ -259,22 +320,37 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
               gap: 10,
             }}
           >
-            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}>Broadcast</Text>
+            <Text
+              style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}
+            >
+              Broadcast
+            </Text>
             {broadcastedProducts.length ? (
               <View style={{ gap: 10 }}>
-                {broadcastedProducts.map((product) => (
+                {broadcastedProducts.map(product => (
                   <MarketProductCard
                     key={`broadcast-${product.id}`}
                     title={product.name ?? 'Product'}
-                    subtitle={product.description ?? product.catalog_categories?.[0]?.name ?? ''}
+                    subtitle={
+                      product.description ??
+                      product.catalog_categories?.[0]?.name ??
+                      ''
+                    }
                     priceLabel={formatBroadcastPriceLabel(product)}
-                    coverUrl={collectProductImageUris(product)[0] ?? product.image_url ?? null}
+                    coverUrl={
+                      collectProductImageUris(product)[0] ??
+                      product.image_url ??
+                      null
+                    }
                     badgeText="BROADCAST"
                     ctaLabel="Remove broadcast"
                     onCTA={async () => {
                       const res = await unpublishProduct(product.id);
                       if (res?.ok) {
-                        Alert.alert('Broadcast', 'Product removed from broadcasts.');
+                        Alert.alert(
+                          'Broadcast',
+                          'Product removed from broadcasts.',
+                        );
                       } else {
                         Alert.alert('Broadcast', 'Unable to remove broadcast.');
                       }
@@ -285,73 +361,117 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
               </View>
             ) : (
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                Broadcasted products appear here once you publish them from the shop dashboard.
+                Broadcasted products appear here once you publish them from the
+                shop dashboard.
               </Text>
             )}
           </View>
 
           <View style={{ gap: 10 }}>
-          <View style={{ gap: 6 }}>
-            <Text style={{ color: palette.text, fontWeight: '700' }}>Categories</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {productCatalogCategories.map((category) => {
-                const isActive = category.id === form.categoryId;
-                return (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
-                    style={{
-                      borderWidth: 2,
-                      borderColor: isActive ? palette.primary : palette.divider,
-                      borderRadius: 999,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      backgroundColor: isActive ? palette.primarySoft : palette.surface,
-                    }}
-                  >
-                    <Text
+            <View style={{ gap: 6 }}>
+              <Text style={{ color: palette.text, fontWeight: '700' }}>
+                Categories
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {productCatalogCategories.map(category => {
+                  const isActive = category.id === form.categoryId;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() =>
+                        setForm(prev => ({ ...prev, categoryId: category.id }))
+                      }
                       style={{
-                        color: isActive ? palette.primaryStrong : palette.text,
-                        fontWeight: '900',
-                        fontSize: 12,
+                        borderWidth: 2,
+                        borderColor: isActive
+                          ? palette.primary
+                          : palette.divider,
+                        borderRadius: 999,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: isActive
+                          ? palette.primarySoft
+                          : palette.surface,
                       }}
                     >
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {!catalogLoading && productCatalogCategories.length === 0 ? (
-                <Text style={{ color: palette.subtext, fontSize: 12 }}>No categories yet.</Text>
-              ) : null}
+                      <Text
+                        style={{
+                          color: isActive
+                            ? palette.primaryStrong
+                            : palette.text,
+                          fontWeight: '900',
+                          fontSize: 12,
+                        }}
+                      >
+                        {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {!catalogLoading && productCatalogCategories.length === 0 ? (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    No categories yet.
+                  </Text>
+                ) : null}
+              </View>
+              {catalogLoading && (
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Loading categories…
+                </Text>
+              )}
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Selected: {selectedCategory?.name ?? 'None'}
+              </Text>
             </View>
-            {catalogLoading && (
-              <Text style={{ color: palette.subtext, fontSize: 12 }}>Loading categories…</Text>
-            )}
+
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              Selected: {selectedCategory?.name ?? 'None'}
+              Categories are predefined by the platform. Pick one from the list
+              above when adding products.
             </Text>
           </View>
 
-          <Text style={{ color: palette.subtext, fontSize: 12 }}>
-            Categories are predefined by the platform. Pick one from the list above when adding products.
-          </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
-            <KISButton title="Select product images" size="sm" onPress={pickImages} />
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 12,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              marginTop: 6,
+            }}
+          >
+            <KISButton
+              title="Select product images"
+              size="sm"
+              onPress={pickImages}
+            />
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              {stagedImageUrls.length ? `${stagedImageUrls.length} image${stagedImageUrls.length === 1 ? '' : 's'} ready` : 'Image required'}
+              {stagedImageUrls.length
+                ? `${stagedImageUrls.length} image${
+                    stagedImageUrls.length === 1 ? '' : 's'
+                  } ready`
+                : 'Image required'}
             </Text>
           </View>
 
           {stagedImageUrls.length ? (
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginTop: 6,
+              }}
+            >
               {stagedImageUrls.slice(0, 4).map((uri, index) => (
                 <Image
                   key={`${uri}-${index}`}
                   source={{ uri }}
-                  style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: palette.surface }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 16,
+                    backgroundColor: palette.surface,
+                  }}
                 />
               ))}
               {stagedImageUrls.length > 4 && (
@@ -367,17 +487,25 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                     backgroundColor: palette.surfaceElevated,
                   }}
                 >
-                  <Text style={{ color: palette.subtext, fontWeight: '900' }}>+{stagedImageUrls.length - 4}</Text>
+                  <Text style={{ color: palette.subtext, fontWeight: '900' }}>
+                    +{stagedImageUrls.length - 4}
+                  </Text>
                 </View>
               )}
             </View>
           ) : null}
 
-          <KISTextInput label="Product name" value={form.name} onChangeText={(t) => setForm((prev) => ({ ...prev, name: t }))} />
+          <KISTextInput
+            label="Product name"
+            value={form.name}
+            onChangeText={t => setForm(prev => ({ ...prev, name: t }))}
+          />
           <KISTextInput
             label="Price"
             value={form.price}
-            onChangeText={(t) => setForm((prev) => ({ ...prev, price: sanitizeDecimalInput(t) }))}
+            onChangeText={t =>
+              setForm(prev => ({ ...prev, price: sanitizeDecimalInput(t) }))
+            }
             keyboardType="decimal-pad"
           />
           <View style={{ marginTop: 6 }}>
@@ -391,13 +519,15 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
           <KISTextInput
             label="Stock"
             value={form.stock_qty}
-            onChangeText={(t) => setForm((prev) => ({ ...prev, stock_qty: sanitizeIntegerInput(t) }))}
+            onChangeText={t =>
+              setForm(prev => ({ ...prev, stock_qty: sanitizeIntegerInput(t) }))
+            }
             keyboardType="number-pad"
           />
           <KISTextInput
             label="Description"
             value={form.description}
-            onChangeText={(t) => setForm((prev) => ({ ...prev, description: t }))}
+            onChangeText={t => setForm(prev => ({ ...prev, description: t }))}
             multiline
             style={{ minHeight: 80 }}
           />
@@ -407,12 +537,20 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
               title={editing ? 'Update product' : 'Add product'}
               onPress={submit}
             />
-            {editing ? <KISButton title="Cancel" variant="secondary" size="sm" onPress={reset} /> : null}
+            {editing ? (
+              <KISButton
+                title="Cancel"
+                variant="secondary"
+                size="sm"
+                onPress={reset}
+              />
+            ) : null}
           </View>
 
           {!editing && productsForActiveShop.length !== 0 && (
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              You can organize listings with categories per shop. Add or select one above.
+              You can organize listings with categories per shop. Add or select
+              one above.
             </Text>
           )}
         </View>
@@ -427,15 +565,21 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
             gap: 10,
           }}
         >
-          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Manage listings</Text>
+          <Text
+            style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}
+          >
+            Manage listings
+          </Text>
 
           {!productsForActiveShop.length ? (
-            <Text style={{ color: palette.subtext, fontWeight: '700' }}>No products for this shop yet.</Text>
+            <Text style={{ color: palette.subtext, fontWeight: '700' }}>
+              No products for this shop yet.
+            </Text>
           ) : (
             <View style={{ gap: 10 }}>
-              {productsForActiveShop.map((product) => {
+              {productsForActiveShop.map(product => {
                 const listingImages = (product.images ?? [])
-                  .map((img) => img.image_url)
+                  .map(img => img.image_url)
                   .filter((uri): uri is string => Boolean(uri));
                 if (!listingImages.length && product.image_url) {
                   listingImages.push(product.image_url);
@@ -452,42 +596,87 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                       gap: 8,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                      }}
+                    >
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: palette.text, fontWeight: '900' }}>{product.name}</Text>
+                        <Text
+                          style={{ color: palette.text, fontWeight: '900' }}
+                        >
+                          {product.name}
+                        </Text>
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                          {product.price ?? ''} {product.currency ?? ''} · Stock: {product.stock_qty ?? 0}
+                          {product.price ?? ''} {product.currency ?? ''} ·
+                          Stock: {product.stock_qty ?? 0}
                         </Text>
                         {product.catalog_categories?.[0]?.name ? (
-                          <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                          <Text
+                            style={{ color: palette.subtext, fontSize: 12 }}
+                          >
                             Category: {product.catalog_categories[0].name}
                           </Text>
                         ) : null}
                       </View>
 
-                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                        <KISButton title="Edit" size="sm" variant="secondary" onPress={() => beginEdit(product)} />
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <KISButton
+                          title="Edit"
+                          size="sm"
+                          variant="secondary"
+                          onPress={() => beginEdit(product)}
+                        />
                         <KISButton
                           title="Delete"
                           size="sm"
                           variant="secondary"
                           onPress={() =>
-                            Alert.alert('Delete product', 'Remove this listing?', [
-                              { text: 'Cancel', style: 'cancel' },
-                              { text: 'Delete', style: 'destructive', onPress: async () => { await deleteProduct(product.id); } },
-                            ])
+                            Alert.alert(
+                              'Delete product',
+                              'Remove this listing?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    await deleteProduct(product.id);
+                                  },
+                                },
+                              ],
+                            )
                           }
                         />
                       </View>
                     </View>
 
                     {listingImages.length ? (
-                      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          gap: 6,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         {listingImages.slice(0, 3).map((uri, index) => (
                           <Image
                             key={`${product.id}-thumb-${index}`}
                             source={{ uri }}
-                            style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: palette.surface }}
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: 12,
+                              backgroundColor: palette.surface,
+                            }}
                           />
                         ))}
                         {listingImages.length > 3 && (
@@ -503,23 +692,52 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                               backgroundColor: palette.surfaceElevated,
                             }}
                           >
-                            <Text style={{ color: palette.subtext, fontWeight: '900' }}>+{listingImages.length - 3}</Text>
+                            <Text
+                              style={{
+                                color: palette.subtext,
+                                fontWeight: '900',
+                              }}
+                            >
+                              +{listingImages.length - 3}
+                            </Text>
                           </View>
                         )}
                       </View>
                     ) : null}
 
-                    <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
                       <KISButton
                         title="Broadcast"
                         size="sm"
                         onPress={async () => {
                           const r = await broadcastProduct(product.id);
-                          if (r.ok) Alert.alert('Broadcast', 'Product added to broadcast.');
+                          if (r.ok)
+                            Alert.alert(
+                              'Broadcast',
+                              'Product added to broadcast.',
+                            );
                         }}
                       />
-                      <KISButton title="Schedule" size="sm" variant="secondary" onPress={() => Alert.alert('Schedule', 'Drop scheduling hook ready.')} />
-                      <KISButton title="Pin" size="sm" variant="secondary" onPress={() => Alert.alert('Pinned', 'Pin hook ready.')} />
+                      <KISButton
+                        title="Schedule"
+                        size="sm"
+                        variant="secondary"
+                        onPress={() =>
+                          Alert.alert('Schedule', 'Drop scheduling hook ready.')
+                        }
+                      />
+                      <KISButton
+                        title="Pin"
+                        size="sm"
+                        variant="secondary"
+                        onPress={() => Alert.alert('Pinned', 'Pin hook ready.')}
+                      />
                     </View>
                   </View>
                 );

@@ -23,11 +23,17 @@ import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
 import KISText from '@/components/common/KISText';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { refreshFromDeviceAndBackendWithOptions } from '@/Module/AddContacts/contactsService';
+import {
+  refreshFromDeviceAndBackendWithOptions,
+  type KISContact,
+} from '@/Module/AddContacts/contactsService';
 import { useSocket } from '../../../../SocketProvider';
 import Video from 'react-native-video';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
+
+type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
+type StatusReplyPermission = 'contacts' | 'nobody';
 
 type StatusItem = {
   id: string;
@@ -36,6 +42,9 @@ type StatusItem = {
   text?: string;
   durationMs?: number;
   viewed?: boolean;
+  visibility?: StatusVisibility;
+  replyPermission?: StatusReplyPermission;
+  replyAllowed?: boolean;
   style?: {
     bgColor?: string;
     textColor?: string;
@@ -51,47 +60,51 @@ type StatusUser = {
   items: StatusItem[];
   userId?: string;
   hasUnseen?: boolean;
+  isMuted?: boolean;
 };
 
 const SAMPLE_STATUSES: StatusUser[] = [];
 
 const itemDuration = (item: StatusItem) => item.durationMs ?? 5000;
+const STATUS_BG_COLORS = [
+  '#0B1220',
+  '#111827',
+  '#1F2937',
+  '#0F766E',
+  '#14532D',
+  '#1D4ED8',
+  '#4C1D95',
+  '#7C2D12',
+  '#7F1D1D',
+  '#0B3B5B',
+];
+const STATUS_TEXT_COLORS = [
+  '#FFFFFF',
+  '#F9FAFB',
+  '#E5E7EB',
+  '#FDE68A',
+  '#111827',
+  '#0F172A',
+];
+const STATUS_FONT_SIZES = [16, 18, 20, 24, 28];
+const STATUS_FONT_FAMILIES = [
+  'System',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+];
 
 type UpdatesTabProps = {
   searchTerm?: string;
   onOpenChat?: (chat: Chat) => void;
 };
 
-export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabProps) {
+export default function UpdatesTab({
+  searchTerm = '',
+  onOpenChat,
+}: UpdatesTabProps) {
   const { palette } = useKISTheme();
   const { currentUserId } = useSocket();
-  const STATUS_BG_COLORS = [
-    '#0B1220',
-    '#111827',
-    '#1F2937',
-    '#0F766E',
-    '#14532D',
-    '#1D4ED8',
-    '#4C1D95',
-    '#7C2D12',
-    '#7F1D1D',
-    '#0B3B5B',
-  ];
-  const STATUS_TEXT_COLORS = [
-    '#FFFFFF',
-    '#F9FAFB',
-    '#E5E7EB',
-    '#FDE68A',
-    '#111827',
-    '#0F172A',
-  ];
-  const STATUS_FONT_SIZES = [16, 18, 20, 24, 28];
-  const STATUS_FONT_FAMILIES = [
-    'System',
-    'Georgia',
-    'Times New Roman',
-    'Courier New',
-  ];
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
@@ -101,7 +114,19 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
   const [statusComposerOpen, setStatusComposerOpen] = useState(false);
   const [statusDraftText, setStatusDraftText] = useState('');
   const [statusDraftAssets, setStatusDraftAssets] = useState<any[]>([]);
-  const [statusDraftType, setStatusDraftType] = useState<'text' | 'image' | 'video' | 'audio'>('text');
+  const [statusDraftType, setStatusDraftType] = useState<
+    'text' | 'image' | 'video' | 'audio'
+  >('text');
+  const [statusDraftVisibility, setStatusDraftVisibility] =
+    useState<StatusVisibility>('contacts');
+  const [statusDraftReplyPermission, setStatusDraftReplyPermission] =
+    useState<StatusReplyPermission>('contacts');
+  const [statusDraftTargetUserIds, setStatusDraftTargetUserIds] = useState<
+    string[]
+  >([]);
+  const [statusAudienceContacts, setStatusAudienceContacts] = useState<
+    KISContact[]
+  >([]);
   const [suppressMyOpen, setSuppressMyOpen] = useState(false);
   const suppressMyOpenRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -122,7 +147,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerProgress, setViewerProgress] = useState(0);
-  const [pendingOpenUserId, setPendingOpenUserId] = useState<string | null>(null);
+  const [pendingOpenUserId, setPendingOpenUserId] = useState<string | null>(
+    null,
+  );
   const [viewedMap, setViewedMap] = useState<Record<string, number>>({});
   const [channelPreviewOpen, setChannelPreviewOpen] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<any | null>(null);
@@ -185,8 +212,8 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       setChannelSubscribing(false);
       return;
     }
-    setChannels((prev) =>
-      prev.map((ch) =>
+    setChannels(prev =>
+      prev.map(ch =>
         String(ch.id) === String(previewChannel.id)
           ? {
               ...ch,
@@ -229,6 +256,26 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     loadChannels();
   }, [loadChannels]);
 
+  const resetStatusDraft = useCallback(() => {
+    setStatusDraftType('text');
+    setStatusDraftText('');
+    setStatusDraftAssets([]);
+    setStatusDraftVisibility('contacts');
+    setStatusDraftReplyPermission('contacts');
+    setStatusDraftTargetUserIds([]);
+    setStatusDraftStyle({
+      bgColor: STATUS_BG_COLORS[0],
+      textColor: STATUS_TEXT_COLORS[0],
+      fontSize: STATUS_FONT_SIZES[2],
+      fontFamily: STATUS_FONT_FAMILIES[0],
+    });
+  }, []);
+
+  const openStatusComposer = useCallback(() => {
+    resetStatusDraft();
+    setStatusComposerOpen(true);
+  }, [resetStatusDraft]);
+
   const loadStatuses = useCallback(async () => {
     const now = Date.now();
     if (statusesLoadInFlightRef.current) return;
@@ -238,14 +285,12 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     setStatusesLoading(true);
     try {
       const contacts = await refreshFromDeviceAndBackendWithOptions({});
-      const visibleIds = contacts
-        .filter((c) => c.isRegistered && c.userId)
-        .map((c) => String(c.userId));
-
-      if (currentUserId) visibleIds.push(String(currentUserId));
-      const uniqueIds = Array.from(new Set(visibleIds));
-      const qs = uniqueIds.length ? `?userIds=${uniqueIds.join(',')}` : '';
-      const res = await getRequest(`${ROUTES.statuses.list}${qs}`);
+      setStatusAudienceContacts(
+        contacts.filter(contact =>
+          Boolean(contact.isRegistered && contact.userId),
+        ),
+      );
+      const res = await getRequest(ROUTES.statuses.list);
       if (!res?.success) {
         if (Number(res?.status) === 429) return;
         throw new Error(res?.message || 'Unable to load statuses');
@@ -268,13 +313,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                   durationMs: item.duration_ms ?? undefined,
                   style: item.style ?? undefined,
                   viewed: Boolean(item.viewed),
+                  visibility: item.visibility ?? 'contacts',
+                  replyPermission: item.reply_permission ?? 'contacts',
+                  replyAllowed: Boolean(item.reply_allowed),
                 }))
               : [],
+            isMuted: Boolean(entry?.is_muted),
           }))
         : [];
 
-      const myItems = mapped.find((u) => u.userId === String(currentUserId))?.items ?? [];
-      const otherUsers = mapped.filter((u) => u.userId !== String(currentUserId));
+      const myItems =
+        mapped.find(u => u.userId === String(currentUserId))?.items ?? [];
+      const otherUsers = mapped.filter(u => u.userId !== String(currentUserId));
 
       const merged: StatusUser[] = [
         {
@@ -300,28 +350,44 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
   }, [loadStatuses]);
 
   React.useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('status.open', (payload: any) => {
-      const userId = String(payload?.userId ?? '');
-      if (!userId) return;
-      setPendingOpenUserId(userId);
-    });
+    const sub = DeviceEventEmitter.addListener(
+      'status.open',
+      (payload: any) => {
+        const userId = String(payload?.userId ?? '');
+        if (!userId) return;
+        setPendingOpenUserId(userId);
+      },
+    );
     return () => {
       sub.remove();
     };
   }, []);
 
   const statuses = useMemo(() => {
-    if (!searchTerm.trim()) return statusUsers.length ? statusUsers : SAMPLE_STATUSES;
+    if (!searchTerm.trim())
+      return statusUsers.length ? statusUsers : SAMPLE_STATUSES;
     const q = searchTerm.trim().toLowerCase();
-    return (statusUsers.length ? statusUsers : SAMPLE_STATUSES).filter((s) => {
+    return (statusUsers.length ? statusUsers : SAMPLE_STATUSES).filter(s => {
       if (s.id === 'me') return true;
       return s.name.toLowerCase().includes(q);
     });
   }, [searchTerm, statusUsers]);
 
   const activeUser = useMemo(
-    () => statuses.find((u) => u.id === viewerUserId) ?? null,
+    () => statuses.find(u => u.id === viewerUserId) ?? null,
     [viewerUserId, statuses],
+  );
+
+  const availableAudienceContacts = useMemo(
+    () =>
+      statusAudienceContacts
+        .filter(
+          contact =>
+            contact.userId &&
+            String(contact.userId) !== String(currentUserId ?? ''),
+        )
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    [currentUserId, statusAudienceContacts],
   );
 
   const currentItem = activeUser?.items?.[viewerIndex] ?? null;
@@ -332,11 +398,14 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     fontSize: item?.style?.fontSize ?? 20,
     fontFamily: item?.style?.fontFamily ?? undefined,
   });
-  const isMediaItem = currentItem?.type === 'video' || currentItem?.type === 'audio';
+  const isMediaItem =
+    currentItem?.type === 'video' || currentItem?.type === 'audio';
 
   const ensureMicPermission = useCallback(async () => {
     const perm =
-      Platform.OS === 'ios' ? PERMISSIONS.IOS.MICROPHONE : PERMISSIONS.ANDROID.RECORD_AUDIO;
+      Platform.OS === 'ios'
+        ? PERMISSIONS.IOS.MICROPHONE
+        : PERMISSIONS.ANDROID.RECORD_AUDIO;
     let status = await check(perm);
     if (status === RESULTS.DENIED) status = await request(perm);
     return status === RESULTS.GRANTED || status === RESULTS.LIMITED;
@@ -345,13 +414,19 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
   const startRecording = useCallback(async () => {
     const ok = await ensureMicPermission();
     if (!ok) {
-      Alert.alert('Microphone', 'Please allow microphone access to record audio.');
+      Alert.alert(
+        'Microphone',
+        'Please allow microphone access to record audio.',
+      );
       return;
     }
     setRecordingMs(0);
     setIsRecording(true);
     const path = await recorderRef.current.startRecorder();
-    const uri = typeof path === 'string' && path.startsWith('file://') ? path : `file://${path}`;
+    const uri =
+      typeof path === 'string' && path.startsWith('file://')
+        ? path
+        : `file://${path}`;
     recorderRef.current.addRecordBackListener((e: any) => {
       setRecordingMs(e?.currentPosition ?? 0);
     });
@@ -371,7 +446,10 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       const path = await recorderRef.current.stopRecorder();
       recorderRef.current.removeRecordBackListener();
       setIsRecording(false);
-      const uri = typeof path === 'string' && path.startsWith('file://') ? path : `file://${path}`;
+      const uri =
+        typeof path === 'string' && path.startsWith('file://')
+          ? path
+          : `file://${path}`;
       setStatusDraftAssets([
         {
           uri,
@@ -401,19 +479,22 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     }
   }, []);
 
-  const openViewer = useCallback((userId: string) => {
-    const target = statuses.find((u) => u.id === userId);
-    if (!target || target.items.length === 0) return;
-    const lastViewed = viewedMap[userId] ?? 0;
-    setViewerUserId(userId);
-    setViewerIndex(Math.min(lastViewed, target.items.length - 1));
-    setViewerOpen(true);
-  }, [statuses, viewedMap]);
+  const openViewer = useCallback(
+    (userId: string) => {
+      const target = statuses.find(u => u.id === userId);
+      if (!target || target.items.length === 0) return;
+      const lastViewed = viewedMap[userId] ?? 0;
+      setViewerUserId(userId);
+      setViewerIndex(Math.min(lastViewed, target.items.length - 1));
+      setViewerOpen(true);
+    },
+    [statuses, viewedMap],
+  );
 
   const closeViewer = useCallback(() => {
     stopTimer();
     if (viewerUserId) {
-      setViewedMap((prev) => ({
+      setViewedMap(prev => ({
         ...prev,
         [viewerUserId]: viewerIndex,
       }));
@@ -424,12 +505,85 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     setViewerProgress(0);
   }, [stopTimer, viewerIndex, viewerUserId]);
 
+  const handleStatusAudienceToggle = useCallback((userId: string) => {
+    setStatusDraftTargetUserIds(prev =>
+      prev.includes(userId)
+        ? prev.filter(value => value !== userId)
+        : [...prev, userId],
+    );
+  }, []);
+
+  const handleStatusActionMenu = useCallback(() => {
+    if (
+      !activeUser?.userId ||
+      activeUser.userId === currentUserId ||
+      !currentItem?.id
+    )
+      return;
+    const statusAuthorId = String(activeUser.userId);
+    const muteLabel = activeUser.isMuted ? 'Unmute statuses' : 'Mute statuses';
+
+    Alert.alert('Status options', activeUser.name, [
+      {
+        text: muteLabel,
+        onPress: async () => {
+          const route = activeUser.isMuted
+            ? ROUTES.statuses.unmute
+            : ROUTES.statuses.mute;
+          const res = await postRequest(
+            route,
+            { user_id: statusAuthorId },
+            {
+              errorMessage: `Unable to ${
+                activeUser.isMuted ? 'unmute' : 'mute'
+              } statuses.`,
+            },
+          );
+          if (!res?.success) return;
+          await loadStatuses();
+          if (activeUser.isMuted) {
+            return;
+          }
+          closeViewer();
+        },
+      },
+      {
+        text: 'Report status',
+        onPress: async () => {
+          const res = await postRequest(
+            ROUTES.statuses.report(currentItem.id),
+            { reason: 'status_report' },
+            { errorMessage: 'Unable to report status.' },
+          );
+          if (res?.success) {
+            Alert.alert('Status', 'This status has been reported.');
+          }
+        },
+      },
+      {
+        text: 'Block user',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await postRequest(
+            ROUTES.moderation.userBlocks,
+            { blocked: statusAuthorId, reason: 'status_block' },
+            { errorMessage: 'Unable to block this user.' },
+          );
+          if (!res?.success) return;
+          closeViewer();
+          await loadStatuses();
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [activeUser, closeViewer, currentItem?.id, currentUserId, loadStatuses]);
+
   const handleNext = useCallback(() => {
     if (!activeUser) return;
     if (viewerIndex + 1 < activeUser.items.length) {
-      setViewerIndex((prev) => prev + 1);
+      setViewerIndex(prev => prev + 1);
     } else {
-      const currentIdx = statuses.findIndex((u) => u.id === activeUser.id);
+      const currentIdx = statuses.findIndex(u => u.id === activeUser.id);
       const nextUser = currentIdx >= 0 ? statuses[currentIdx + 1] : null;
       if (nextUser && nextUser.items.length > 0) {
         setViewerUserId(nextUser.id);
@@ -479,7 +633,7 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
 
   React.useEffect(() => {
     if (!pendingOpenUserId) return;
-    const target = statuses.find((u) => u.id === pendingOpenUserId);
+    const target = statuses.find(u => u.id === pendingOpenUserId);
     if (!target || target.items.length === 0) return;
     openViewer(pendingOpenUserId);
     setPendingOpenUserId(null);
@@ -488,9 +642,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
   const handlePrev = () => {
     if (!activeUser) return;
     if (viewerIndex > 0) {
-      setViewerIndex((prev) => prev - 1);
+      setViewerIndex(prev => prev - 1);
     } else {
-      const currentIdx = statuses.findIndex((u) => u.id === activeUser.id);
+      const currentIdx = statuses.findIndex(u => u.id === activeUser.id);
       const prevUser = currentIdx > 0 ? statuses[currentIdx - 1] : null;
       if (prevUser && prevUser.items.length > 0) {
         setViewerUserId(prevUser.id);
@@ -526,15 +680,15 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     const markViewed = async () => {
       if (!currentItem?.id) return;
       await postRequest(ROUTES.statuses.view(currentItem.id), {});
-      setStatusUsers((prev) =>
-        prev.map((u) => {
+      setStatusUsers(prev =>
+        prev.map(u => {
           if (u.id !== activeUser?.id) return u;
-          const nextItems = u.items.map((item) =>
-            item.id === currentItem.id ? { ...item, viewed: true } : item
+          const nextItems = u.items.map(item =>
+            item.id === currentItem.id ? { ...item, viewed: true } : item,
           );
-          const nextHasUnseen = nextItems.some((item) => !item.viewed);
+          const nextHasUnseen = nextItems.some(item => !item.viewed);
           return { ...u, items: nextItems, hasUnseen: nextHasUnseen };
-        })
+        }),
       );
     };
     markViewed();
@@ -546,25 +700,21 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       if (latest) {
         if (latest.type === 'image' && latest.uri) {
           return (
-            <View style={[styles.statusThumb, { borderColor: palette.divider }]}>
+            <View
+              style={[styles.statusThumb, { borderColor: palette.divider }]}
+            >
               <Image source={{ uri: latest.uri }} style={styles.statusThumb} />
               <Pressable
                 onPress={() => {
                   suppressMyOpenRef.current = true;
                   setSuppressMyOpen(true);
-                  setStatusDraftType('text');
-                  setStatusDraftText('');
-                  setStatusDraftAssets([]);
-                  setStatusDraftStyle({
-                    bgColor: STATUS_BG_COLORS[0],
-                    textColor: STATUS_TEXT_COLORS[0],
-                    fontSize: STATUS_FONT_SIZES[2],
-                    fontFamily: STATUS_FONT_FAMILIES[0],
-                  });
-                  setStatusComposerOpen(true);
+                  openStatusComposer();
                 }}
                 hitSlop={10}
-                style={[styles.statusAddBadge, { backgroundColor: palette.primarySoft }]}
+                style={[
+                  styles.statusAddBadge,
+                  { backgroundColor: palette.primarySoft },
+                ]}
               >
                 <KISIcon name="add" size={16} color={palette.primaryStrong} />
               </Pressable>
@@ -576,7 +726,10 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
           <View
             style={[
               styles.statusThumb,
-              { borderColor: palette.divider, backgroundColor: textStyle.bgColor },
+              {
+                borderColor: palette.divider,
+                backgroundColor: textStyle.bgColor,
+              },
             ]}
           >
             <Text
@@ -593,19 +746,13 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
               onPress={() => {
                 suppressMyOpenRef.current = true;
                 setSuppressMyOpen(true);
-                setStatusDraftType('text');
-                setStatusDraftText('');
-                setStatusDraftAssets([]);
-                setStatusDraftStyle({
-                  bgColor: STATUS_BG_COLORS[0],
-                  textColor: STATUS_TEXT_COLORS[0],
-                  fontSize: STATUS_FONT_SIZES[2],
-                  fontFamily: STATUS_FONT_FAMILIES[0],
-                });
-                setStatusComposerOpen(true);
+                openStatusComposer();
               }}
               hitSlop={10}
-              style={[styles.statusAddBadge, { backgroundColor: palette.primarySoft }]}
+              style={[
+                styles.statusAddBadge,
+                { backgroundColor: palette.primarySoft },
+              ]}
             >
               <KISIcon name="add" size={16} color={palette.primaryStrong} />
             </Pressable>
@@ -614,7 +761,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       }
       return (
         <View style={[styles.statusThumb, { borderColor: palette.divider }]}>
-          <View style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}>
+          <View
+            style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
+          >
             <KISIcon name="add" size={16} color={palette.primaryStrong} />
           </View>
         </View>
@@ -633,14 +782,24 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
     }
     if (item?.type === 'video') {
       return (
-        <View style={[styles.statusThumb, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+        <View
+          style={[
+            styles.statusThumb,
+            { borderColor: palette.divider, backgroundColor: palette.card },
+          ]}
+        >
           <KISIcon name="video" size={18} color={palette.text} />
         </View>
       );
     }
     if (item?.type === 'audio') {
       return (
-        <View style={[styles.statusThumb, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+        <View
+          style={[
+            styles.statusThumb,
+            { borderColor: palette.divider, backgroundColor: palette.card },
+          ]}
+        >
           <KISIcon name="mic" size={18} color={palette.text} />
         </View>
       );
@@ -682,9 +841,17 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
           ) : null}
         </View>
         {statusesLoading ? (
-          <View style={[styles.statusRow, { paddingHorizontal: 16, flexDirection: 'row', gap: 12 }]}>
+          <View
+            style={[
+              styles.statusRow,
+              { paddingHorizontal: 16, flexDirection: 'row', gap: 12 },
+            ]}
+          >
             {Array.from({ length: 5 }).map((_, idx) => (
-              <View key={`status-skel-${idx}`} style={{ width: 86, alignItems: 'center', gap: 6 }}>
+              <View
+                key={`status-skel-${idx}`}
+                style={{ width: 86, alignItems: 'center', gap: 6 }}
+              >
                 <Skeleton width={70} height={70} radius={18} />
                 <Skeleton width={60} height={10} radius={6} />
               </View>
@@ -694,7 +861,7 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
           <FlatList
             data={statuses}
             horizontal
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.statusRow}
             renderItem={({ item }) => (
@@ -709,16 +876,7 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                     if (item.items.length > 0) {
                       openViewer(item.id);
                     } else {
-                      setStatusDraftType('text');
-                      setStatusDraftText('');
-                      setStatusDraftAssets([]);
-                      setStatusDraftStyle({
-                        bgColor: STATUS_BG_COLORS[0],
-                        textColor: STATUS_TEXT_COLORS[0],
-                        fontSize: STATUS_FONT_SIZES[2],
-                        fontFamily: STATUS_FONT_FAMILIES[0],
-                      });
-                      setStatusComposerOpen(true);
+                      openStatusComposer();
                     }
                     return;
                   }
@@ -730,7 +888,10 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 ]}
               >
                 {renderStatusThumb(item)}
-                <Text style={{ color: palette.text, fontSize: 12 }} numberOfLines={1}>
+                <Text
+                  style={{ color: palette.text, fontSize: 12 }}
+                  numberOfLines={1}
+                >
                   {item.name}
                 </Text>
               </Pressable>
@@ -740,7 +901,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
 
         {/* Channels list */}
         <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-          <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>
+          <Text
+            style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}
+          >
             Channels
           </Text>
         </View>
@@ -751,14 +914,22 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 key={`channel-skel-${idx}`}
                 style={[
                   styles.channelCard,
-                  { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                  {
+                    borderColor: palette.inputBorder,
+                    backgroundColor: palette.card,
+                  },
                 ]}
               >
                 <View style={styles.channelRow}>
                   <Skeleton width={44} height={44} radius={22} />
                   <View style={styles.channelInfo}>
                     <Skeleton width="60%" height={12} radius={6} />
-                    <Skeleton width="90%" height={10} radius={6} style={{ marginTop: 8 }} />
+                    <Skeleton
+                      width="90%"
+                      height={10}
+                      radius={6}
+                      style={{ marginTop: 8 }}
+                    />
                   </View>
                 </View>
               </View>
@@ -766,46 +937,80 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
           </View>
         ) : (
           channels
-            .filter((ch) => {
+            .filter(ch => {
               if (!searchTerm.trim()) return true;
               const q = searchTerm.trim().toLowerCase();
               const name = String(ch.name ?? '').toLowerCase();
               const desc = String(ch.description ?? '').toLowerCase();
               return name.includes(q) || desc.includes(q);
             })
-            .map((ch) => (
+            .map(ch => (
               <Pressable
                 key={ch.id}
                 onPress={() => handleOpenChannel(ch)}
                 style={[
                   styles.channelCard,
-                  { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                  {
+                    borderColor: palette.inputBorder,
+                    backgroundColor: palette.card,
+                  },
                 ]}
               >
                 <View style={styles.channelRow}>
                   {ch.avatar_url ? (
-                    <Image source={{ uri: ch.avatar_url }} style={styles.channelAvatar} />
+                    <Image
+                      source={{ uri: ch.avatar_url }}
+                      style={styles.channelAvatar}
+                    />
                   ) : (
-                    <View style={[styles.channelAvatar, { backgroundColor: palette.surface }]}>
-                      <KISIcon name="megaphone" size={16} color={palette.text} />
+                    <View
+                      style={[
+                        styles.channelAvatar,
+                        { backgroundColor: palette.surface },
+                      ]}
+                    >
+                      <KISIcon
+                        name="megaphone"
+                        size={16}
+                        color={palette.text}
+                      />
                     </View>
                   )}
                   <View style={styles.channelInfo}>
                     <View style={styles.channelHeader}>
-                      <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
+                      <Text
+                        style={{
+                          color: palette.text,
+                          fontWeight: '700',
+                          fontSize: 15,
+                        }}
+                      >
                         {ch.name}
                       </Text>
                       {ch.partner ? (
-                        <Text style={{ color: palette.primaryStrong, fontSize: 11 }}>Partner</Text>
+                        <Text
+                          style={{ color: palette.primaryStrong, fontSize: 11 }}
+                        >
+                          Partner
+                        </Text>
                       ) : null}
                     </View>
                     {ch.description ? (
-                      <Text style={{ color: palette.subtext, marginTop: 6 }} numberOfLines={2}>
+                      <Text
+                        style={{ color: palette.subtext, marginTop: 6 }}
+                        numberOfLines={2}
+                      >
                         {ch.description}
                       </Text>
                     ) : null}
                     {ch.role || ch.membership_role || ch.access ? (
-                      <Text style={{ color: palette.subtext, marginTop: 6, fontSize: 11 }}>
+                      <Text
+                        style={{
+                          color: palette.subtext,
+                          marginTop: 6,
+                          fontSize: 11,
+                        }}
+                      >
                         {(ch.role ?? ch.membership_role ?? ch.access) as string}
                       </Text>
                     ) : null}
@@ -819,10 +1024,7 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       {/* Floating create channel button */}
       <Pressable
         onPress={() => setShowCreateChannel(true)}
-        style={[
-          styles.fab,
-          { backgroundColor: palette.primary },
-        ]}
+        style={[styles.fab, { backgroundColor: palette.primary }]}
       >
         <KISIcon name="add" size={18} color={palette.onPrimary} />
       </Pressable>
@@ -837,8 +1039,15 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
               setPreviewChannel(null);
             }}
           />
-          <View style={[styles.channelPreviewCard, { backgroundColor: palette.card }]}>
-            <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>
+          <View
+            style={[
+              styles.channelPreviewCard,
+              { backgroundColor: palette.card },
+            ]}
+          >
+            <Text
+              style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}
+            >
               {previewChannel?.name ?? 'Channel'}
             </Text>
             {previewChannel?.description ? (
@@ -849,17 +1058,19 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
             {Array.isArray(previewChannel?.invite_messages) &&
             previewChannel.invite_messages.length > 0 ? (
               <View style={{ marginTop: 12, gap: 8 }}>
-                {previewChannel.invite_messages.map((msg: string, idx: number) => (
-                  <View
-                    key={`${previewChannel?.id}-invite-${idx}`}
-                    style={[
-                      styles.inviteBubble,
-                      { backgroundColor: palette.surfaceElevated },
-                    ]}
-                  >
-                    <Text style={{ color: palette.text }}>{msg}</Text>
-                  </View>
-                ))}
+                {previewChannel.invite_messages.map(
+                  (msg: string, idx: number) => (
+                    <View
+                      key={`${previewChannel?.id}-invite-${idx}`}
+                      style={[
+                        styles.inviteBubble,
+                        { backgroundColor: palette.surfaceElevated },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text }}>{msg}</Text>
+                    </View>
+                  ),
+                )}
               </View>
             ) : null}
             <Pressable
@@ -872,7 +1083,12 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 },
               ]}
             >
-              <Text style={{ color: palette.onPrimary ?? '#fff', fontWeight: '700' }}>
+              <Text
+                style={{
+                  color: palette.onPrimary ?? '#fff',
+                  fontWeight: '700',
+                }}
+              >
                 {channelSubscribing ? 'Subscribing…' : 'Subscribe'}
               </Text>
             </Pressable>
@@ -882,15 +1098,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
 
       {/* Create channel modal */}
       <Modal visible={showCreateChannel} transparent animationType="fade">
-        <Pressable style={styles.modalBackdrop} onPress={() => setShowCreateChannel(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowCreateChannel(false)}
+        >
           <View />
         </Pressable>
         <View style={[styles.modalCard, { backgroundColor: palette.bg }]}>
           <NewChannelForm
             palette={palette}
-            onSuccess={(created) => {
+            onSuccess={created => {
               setShowCreateChannel(false);
-              setChannels((prev) => [created, ...prev]);
+              setChannels(prev => [created, ...prev]);
             }}
           />
         </View>
@@ -899,8 +1118,14 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
       {/* Status composer */}
       <Modal visible={statusComposerOpen} transparent animationType="slide">
         <View style={styles.composerBackdrop}>
-          <View style={[styles.composerCard, { backgroundColor: palette.card }]}>
-            <KISText preset="h3" color={palette.text} style={styles.composerTitle}>
+          <View
+            style={[styles.composerCard, { backgroundColor: palette.card }]}
+          >
+            <KISText
+              preset="h3"
+              color={palette.text}
+              style={styles.composerTitle}
+            >
               Create status
             </KISText>
 
@@ -911,15 +1136,21 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                     mediaType: 'mixed',
                     selectionLimit: 10,
                   });
-                  const assets = (picked?.assets ?? []).filter((a) => a?.uri);
+                  const assets = (picked?.assets ?? []).filter(a => a?.uri);
                   if (assets.length === 0) return;
-                  const type = assets[0].type?.startsWith('video') ? 'video' : 'image';
+                  const type = assets[0].type?.startsWith('video')
+                    ? 'video'
+                    : 'image';
                   setStatusDraftType(type);
                   setStatusDraftAssets(assets);
                 }}
                 style={({ pressed }) => [
                   styles.composerAction,
-                  { backgroundColor: pressed ? palette.surface : palette.surfaceElevated },
+                  {
+                    backgroundColor: pressed
+                      ? palette.surface
+                      : palette.surfaceElevated,
+                  },
                 ]}
               >
                 <KISIcon name="image" size={18} color={palette.text} />
@@ -937,10 +1168,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 }}
                 style={({ pressed }) => [
                   styles.composerAction,
-                  { backgroundColor: pressed ? palette.surface : palette.surfaceElevated },
+                  {
+                    backgroundColor: pressed
+                      ? palette.surface
+                      : palette.surfaceElevated,
+                  },
                 ]}
               >
-                <KISIcon name={isRecording ? 'stop' : 'mic'} size={18} color={palette.text} />
+                <KISIcon
+                  name={isRecording ? 'stop' : 'mic'}
+                  size={18}
+                  color={palette.text}
+                />
                 <KISText preset="helper" color={palette.text}>
                   {isRecording ? 'Stop' : 'Audio'}
                 </KISText>
@@ -952,7 +1191,11 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 }}
                 style={({ pressed }) => [
                   styles.composerAction,
-                  { backgroundColor: pressed ? palette.surface : palette.surfaceElevated },
+                  {
+                    backgroundColor: pressed
+                      ? palette.surface
+                      : palette.surfaceElevated,
+                  },
                 ]}
               >
                 <KISIcon name="edit" size={18} color={palette.text} />
@@ -982,13 +1225,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                   ]}
                 />
                 <View style={styles.optionRow}>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Background</Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Background
+                  </Text>
                   <View style={styles.colorRow}>
-                    {STATUS_BG_COLORS.map((color) => (
+                    {STATUS_BG_COLORS.map(color => (
                       <Pressable
                         key={color}
                         onPress={() =>
-                          setStatusDraftStyle((prev) => ({ ...prev, bgColor: color }))
+                          setStatusDraftStyle(prev => ({
+                            ...prev,
+                            bgColor: color,
+                          }))
                         }
                         style={[
                           styles.colorDot,
@@ -1005,13 +1253,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                   </View>
                 </View>
                 <View style={styles.optionRow}>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Text color</Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Text color
+                  </Text>
                   <View style={styles.colorRow}>
-                    {STATUS_TEXT_COLORS.map((color) => (
+                    {STATUS_TEXT_COLORS.map(color => (
                       <Pressable
                         key={color}
                         onPress={() =>
-                          setStatusDraftStyle((prev) => ({ ...prev, textColor: color }))
+                          setStatusDraftStyle(prev => ({
+                            ...prev,
+                            textColor: color,
+                          }))
                         }
                         style={[
                           styles.colorDot,
@@ -1028,13 +1281,18 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                   </View>
                 </View>
                 <View style={styles.optionRow}>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Font size</Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Font size
+                  </Text>
                   <View style={styles.choiceRow}>
-                    {STATUS_FONT_SIZES.map((size) => (
+                    {STATUS_FONT_SIZES.map(size => (
                       <Pressable
                         key={size}
                         onPress={() =>
-                          setStatusDraftStyle((prev) => ({ ...prev, fontSize: size }))
+                          setStatusDraftStyle(prev => ({
+                            ...prev,
+                            fontSize: size,
+                          }))
                         }
                         style={[
                           styles.choiceChip,
@@ -1047,19 +1305,26 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                           },
                         ]}
                       >
-                        <Text style={{ color: palette.text, fontSize: 12 }}>{size}px</Text>
+                        <Text style={{ color: palette.text, fontSize: 12 }}>
+                          {size}px
+                        </Text>
                       </Pressable>
                     ))}
                   </View>
                 </View>
                 <View style={styles.optionRow}>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Font</Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Font
+                  </Text>
                   <View style={styles.choiceRow}>
-                    {STATUS_FONT_FAMILIES.map((family) => (
+                    {STATUS_FONT_FAMILIES.map(family => (
                       <Pressable
                         key={family}
                         onPress={() =>
-                          setStatusDraftStyle((prev) => ({ ...prev, fontFamily: family }))
+                          setStatusDraftStyle(prev => ({
+                            ...prev,
+                            fontFamily: family,
+                          }))
                         }
                         style={[
                           styles.choiceChip,
@@ -1072,7 +1337,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                           },
                         ]}
                       >
-                        <Text style={{ color: palette.text, fontSize: 12 }}>{family}</Text>
+                        <Text style={{ color: palette.text, fontSize: 12 }}>
+                          {family}
+                        </Text>
                       </Pressable>
                     ))}
                   </View>
@@ -1092,39 +1359,51 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
               </View>
             ) : (
               <View style={styles.composerPreview}>
-                    {statusDraftAssets.length > 0 ? (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {statusDraftAssets.map((asset, idx) => {
-                          const assetVideoSource = buildMediaSource(asset.uri, mediaHeaders);
-                          return statusDraftType === 'video' ? (
-                            <Video
-                              key={`${asset.uri}_${idx}`}
-                              source={assetVideoSource ?? { uri: asset.uri }}
-                              style={styles.composerPreviewMedia}
-                              resizeMode="cover"
-                              paused
-                            />
-                          ) : (
-                            <Image
-                              key={`${asset.uri}_${idx}`}
-                              source={{ uri: asset.uri }}
-                              style={styles.composerPreviewMedia}
-                            />
-                          );
-                        })}
-                      </ScrollView>
-                    ) : (
-                  <Text style={{ color: palette.subtext }}>No media selected.</Text>
+                {statusDraftAssets.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {statusDraftAssets.map((asset, idx) => {
+                      const assetVideoSource = buildMediaSource(
+                        asset.uri,
+                        mediaHeaders,
+                      );
+                      return statusDraftType === 'video' ? (
+                        <Video
+                          key={`${asset.uri}_${idx}`}
+                          source={assetVideoSource ?? { uri: asset.uri }}
+                          style={styles.composerPreviewMedia}
+                          resizeMode="cover"
+                          paused
+                        />
+                      ) : (
+                        <Image
+                          key={`${asset.uri}_${idx}`}
+                          source={{ uri: asset.uri }}
+                          style={styles.composerPreviewMedia}
+                        />
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <Text style={{ color: palette.subtext }}>
+                    No media selected.
+                  </Text>
                 )}
               </View>
             )}
 
             <View style={styles.composerFooter}>
               <Pressable
-                onPress={() => setStatusComposerOpen(false)}
+                onPress={() => {
+                  setStatusComposerOpen(false);
+                  resetStatusDraft();
+                }}
                 style={({ pressed }) => [
                   styles.composerBtn,
-                  { backgroundColor: pressed ? palette.surface : palette.surfaceElevated },
+                  {
+                    backgroundColor: pressed
+                      ? palette.surface
+                      : palette.surfaceElevated,
+                  },
                 ]}
               >
                 <Text style={{ color: palette.text }}>Cancel</Text>
@@ -1135,8 +1414,21 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                     Alert.alert('Status', 'Please enter some text.');
                     return;
                   }
-                  if (statusDraftType !== 'text' && statusDraftAssets.length === 0) {
+                  if (
+                    statusDraftType !== 'text' &&
+                    statusDraftAssets.length === 0
+                  ) {
                     Alert.alert('Status', 'Please choose a photo or video.');
+                    return;
+                  }
+                  if (
+                    statusDraftVisibility !== 'contacts' &&
+                    statusDraftTargetUserIds.length === 0
+                  ) {
+                    Alert.alert(
+                      'Status',
+                      'Choose at least one contact for this audience.',
+                    );
                     return;
                   }
                   if (statusDraftType === 'text') {
@@ -1144,14 +1436,32 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                     form.append('type', statusDraftType);
                     form.append('text', statusDraftText.trim());
                     form.append('style', JSON.stringify(statusDraftStyle));
-                    const res = await postRequest(ROUTES.statuses.create, form, {
-                      errorMessage: 'Failed to create status',
-                    });
+                    form.append('visibility', statusDraftVisibility);
+                    form.append('reply_permission', statusDraftReplyPermission);
+                    if (statusDraftTargetUserIds.length > 0) {
+                      form.append(
+                        'target_user_ids',
+                        JSON.stringify(statusDraftTargetUserIds),
+                      );
+                    }
+                    const res = await postRequest(
+                      ROUTES.statuses.create,
+                      form,
+                      {
+                        errorMessage: 'Failed to create status',
+                      },
+                    );
                     if (!res.success) {
-                      console.warn('[UpdatesTab] status post failed', res.data ?? res.message);
+                      console.warn(
+                        '[UpdatesTab] status post failed',
+                        res.data ?? res.message,
+                      );
                     }
                     if (!res.success) {
-                      Alert.alert('Status', res.message || 'Failed to create status');
+                      Alert.alert(
+                        'Status',
+                        res.message || 'Failed to create status',
+                      );
                       return;
                     }
                   } else {
@@ -1159,7 +1469,10 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                       const form = new FormData();
                       const isVideo = asset.type?.startsWith('video');
                       const isAudio = asset.type?.startsWith('audio');
-                      form.append('type', isVideo ? 'video' : isAudio ? 'audio' : 'image');
+                      form.append(
+                        'type',
+                        isVideo ? 'video' : isAudio ? 'audio' : 'image',
+                      );
                       form.append('file', {
                         uri: asset.uri,
                         name: asset.fileName || 'status',
@@ -1173,35 +1486,180 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                             ? asset.duration
                             : Math.round(asset.duration * 1000)
                           : undefined;
-                      if (typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0) {
-                        form.append('duration_ms', String(Math.round(durationMs)));
+                      if (
+                        typeof durationMs === 'number' &&
+                        Number.isFinite(durationMs) &&
+                        durationMs > 0
+                      ) {
+                        form.append(
+                          'duration_ms',
+                          String(Math.round(durationMs)),
+                        );
                       }
-                      const res = await postRequest(ROUTES.statuses.create, form, {
-                        errorMessage: 'Failed to create status',
-                      });
+                      form.append('visibility', statusDraftVisibility);
+                      form.append(
+                        'reply_permission',
+                        statusDraftReplyPermission,
+                      );
+                      if (statusDraftTargetUserIds.length > 0) {
+                        form.append(
+                          'target_user_ids',
+                          JSON.stringify(statusDraftTargetUserIds),
+                        );
+                      }
+                      const res = await postRequest(
+                        ROUTES.statuses.create,
+                        form,
+                        {
+                          errorMessage: 'Failed to create status',
+                        },
+                      );
                       if (!res.success) {
-                        console.warn('[UpdatesTab] status post failed', res.data ?? res.message);
+                        console.warn(
+                          '[UpdatesTab] status post failed',
+                          res.data ?? res.message,
+                        );
                       }
                       if (!res.success) {
-                        Alert.alert('Status', res.message || 'Failed to create status');
+                        Alert.alert(
+                          'Status',
+                          res.message || 'Failed to create status',
+                        );
                         return;
                       }
                     }
                   }
                   setStatusComposerOpen(false);
-                  setStatusDraftText('');
-                  setStatusDraftAssets([]);
+                  resetStatusDraft();
                   await loadStatuses();
                   openViewer('me');
                 }}
                 style={({ pressed }) => [
                   styles.composerBtn,
-                  { backgroundColor: pressed ? palette.primarySoft : palette.primary },
+                  {
+                    backgroundColor: pressed
+                      ? palette.primarySoft
+                      : palette.primary,
+                  },
                 ]}
               >
-                <Text style={{ color: palette.inverseText ?? '#fff' }}>Post</Text>
+                <Text style={{ color: palette.inverseText ?? '#fff' }}>
+                  Post
+                </Text>
               </Pressable>
             </View>
+            <View style={styles.optionRow}>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Audience
+              </Text>
+              <View style={styles.choiceRow}>
+                {[
+                  ['contacts', 'My contacts'],
+                  ['contacts_except', 'Contacts except'],
+                  ['only_share_with', 'Only share with'],
+                ].map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => {
+                      setStatusDraftVisibility(value as StatusVisibility);
+                      setStatusDraftTargetUserIds([]);
+                    }}
+                    style={[
+                      styles.choiceChip,
+                      {
+                        borderColor:
+                          statusDraftVisibility === value
+                            ? palette.primary
+                            : palette.inputBorder,
+                        backgroundColor: palette.surfaceElevated,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: palette.text, fontSize: 12 }}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+            <View style={styles.optionRow}>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Replies
+              </Text>
+              <View style={styles.choiceRow}>
+                {[
+                  ['contacts', 'Contacts'],
+                  ['nobody', 'Nobody'],
+                ].map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() =>
+                      setStatusDraftReplyPermission(
+                        value as StatusReplyPermission,
+                      )
+                    }
+                    style={[
+                      styles.choiceChip,
+                      {
+                        borderColor:
+                          statusDraftReplyPermission === value
+                            ? palette.primary
+                            : palette.inputBorder,
+                        backgroundColor: palette.surfaceElevated,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: palette.text, fontSize: 12 }}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+            {statusDraftVisibility !== 'contacts' ? (
+              <View style={styles.optionRow}>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Selected contacts
+                </Text>
+                <View style={styles.choiceRow}>
+                  {availableAudienceContacts.length > 0 ? (
+                    availableAudienceContacts.map(contact => {
+                      const contactUserId = String(contact.userId);
+                      const selected =
+                        statusDraftTargetUserIds.includes(contactUserId);
+                      return (
+                        <Pressable
+                          key={contactUserId}
+                          onPress={() =>
+                            handleStatusAudienceToggle(contactUserId)
+                          }
+                          style={[
+                            styles.choiceChip,
+                            {
+                              borderColor: selected
+                                ? palette.primary
+                                : palette.inputBorder,
+                              backgroundColor: selected
+                                ? palette.primarySoft
+                                : palette.surfaceElevated,
+                            },
+                          ]}
+                        >
+                          <Text style={{ color: palette.text, fontSize: 12 }}>
+                            {contact.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })
+                  ) : (
+                    <Text style={{ color: palette.subtext }}>
+                      No registered contacts available for custom status
+                      audiences.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -1212,7 +1670,11 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
           <View style={styles.viewerProgressRow} pointerEvents="auto">
             {(activeUser?.items ?? []).map((item, idx) => {
               const fill =
-                idx < viewerIndex ? 1 : idx === viewerIndex ? viewerProgress : 0;
+                idx < viewerIndex
+                  ? 1
+                  : idx === viewerIndex
+                  ? viewerProgress
+                  : 0;
               return (
                 <Pressable
                   key={item.id}
@@ -1229,7 +1691,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                     style={[
                       styles.progressFill,
                       {
-                        width: `${Math.round(Math.max(0, Math.min(1, fill)) * 100)}%`,
+                        width: `${Math.round(
+                          Math.max(0, Math.min(1, fill)) * 100,
+                        )}%`,
                         backgroundColor: palette.text,
                       },
                     ]}
@@ -1239,12 +1703,37 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
             })}
           </View>
 
-          <Pressable style={styles.viewerClose} onPress={closeViewer} hitSlop={10}>
+          <Pressable
+            style={styles.viewerClose}
+            onPress={closeViewer}
+            hitSlop={10}
+          >
             <KISIcon name="close" size={18} color={palette.text} />
           </Pressable>
+          {activeUser?.userId && activeUser.userId !== currentUserId ? (
+            <Pressable
+              style={[
+                styles.viewerMenuButton,
+                {
+                  backgroundColor: palette.surfaceElevated,
+                  borderColor: palette.inputBorder,
+                },
+              ]}
+              onPress={handleStatusActionMenu}
+            >
+              <Text
+                style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}
+              >
+                More
+              </Text>
+            </Pressable>
+          ) : null}
 
           <Pressable style={styles.viewerTapZone} onPress={handlePrev} />
-          <Pressable style={[styles.viewerTapZone, { right: 0 }]} onPress={handleNext} />
+          <Pressable
+            style={[styles.viewerTapZone, { right: 0 }]}
+            onPress={handleNext}
+          />
 
           <View style={styles.viewerContent}>
             {currentItem?.type === 'text' ? (
@@ -1264,7 +1753,9 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 >
                   {currentItem?.text ?? 'Status'}
                 </Text>
-                <Text style={{ color: palette.subtext, marginTop: 12 }}>Text status</Text>
+                <Text style={{ color: palette.subtext, marginTop: 12 }}>
+                  Text status
+                </Text>
               </View>
             ) : currentItem?.type === 'video' && currentItem?.uri ? (
               <Video
@@ -1272,12 +1763,17 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                 style={styles.viewerImage}
                 resizeMode="cover"
                 paused={!viewerOpen || mediaPaused}
-                onLoad={(e) => {
+                onLoad={e => {
                   mediaDurationRef.current = e.duration ?? 0;
                 }}
-                onProgress={(e) => {
-                  const dur = mediaDurationRef.current || e.seekableDuration || e.playableDuration || 0;
-                  if (dur > 0) setViewerProgress(Math.min(1, e.currentTime / dur));
+                onProgress={e => {
+                  const dur =
+                    mediaDurationRef.current ||
+                    e.seekableDuration ||
+                    e.playableDuration ||
+                    0;
+                  if (dur > 0)
+                    setViewerProgress(Math.min(1, e.currentTime / dur));
                   lastMediaProgressRef.current = Date.now();
                 }}
                 onEnd={handleNext}
@@ -1291,37 +1787,59 @@ export default function UpdatesTab({ searchTerm = '', onOpenChat }: UpdatesTabPr
                   audioOnly
                   playInBackground
                   ignoreSilentSwitch="ignore"
-                  onLoad={(e) => {
+                  onLoad={e => {
                     mediaDurationRef.current = e.duration ?? 0;
                   }}
-                  onProgress={(e) => {
-                    const dur = mediaDurationRef.current || e.seekableDuration || e.playableDuration || 0;
-                    if (dur > 0) setViewerProgress(Math.min(1, e.currentTime / dur));
+                  onProgress={e => {
+                    const dur =
+                      mediaDurationRef.current ||
+                      e.seekableDuration ||
+                      e.playableDuration ||
+                      0;
+                    if (dur > 0)
+                      setViewerProgress(Math.min(1, e.currentTime / dur));
                     lastMediaProgressRef.current = Date.now();
                   }}
                   onEnd={handleNext}
                 />
                 <KISIcon name="mic" size={28} color={palette.text} />
-                <Text style={{ color: palette.text, fontSize: 16, marginTop: 8 }}>
+                <Text
+                  style={{ color: palette.text, fontSize: 16, marginTop: 8 }}
+                >
                   Audio status
                 </Text>
                 <Pressable
-                  onPress={() => setMediaPaused((prev) => !prev)}
+                  onPress={() => setMediaPaused(prev => !prev)}
                   style={[
                     styles.audioButton,
-                    { backgroundColor: palette.surfaceElevated, borderColor: palette.inputBorder },
+                    {
+                      backgroundColor: palette.surfaceElevated,
+                      borderColor: palette.inputBorder,
+                    },
                   ]}
                 >
-                  <KISIcon name={mediaPaused ? 'play' : 'pause'} size={18} color={palette.text} />
+                  <KISIcon
+                    name={mediaPaused ? 'play' : 'pause'}
+                    size={18}
+                    color={palette.text}
+                  />
                   <Text style={{ color: palette.text }}>
                     {mediaPaused ? 'Play' : 'Pause'}
                   </Text>
                 </Pressable>
               </View>
             ) : currentItem?.uri ? (
-              <Image source={{ uri: currentItem.uri }} style={styles.viewerImage} />
+              <Image
+                source={{ uri: currentItem.uri }}
+                style={styles.viewerImage}
+              />
             ) : (
-              <View style={[styles.viewerTextCard, { backgroundColor: palette.card }]}>
+              <View
+                style={[
+                  styles.viewerTextCard,
+                  { backgroundColor: palette.card },
+                ]}
+              >
                 <Text style={{ color: palette.subtext }}>No preview</Text>
               </View>
             )}
@@ -1507,7 +2025,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  composerFooter: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  composerFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   composerBtn: {
     flex: 1,
     borderRadius: 12,
@@ -1521,6 +2043,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: Platform.select({ ios: 64, android: 36, default: 36 }),
     zIndex: 20,
+  },
+  viewerMenuButton: {
+    position: 'absolute',
+    top: 42,
+    right: 56,
+    zIndex: 3,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   progressTrack: {
     flex: 1,

@@ -33,6 +33,10 @@ const toTrendingClipItem = (item: BroadcastFeedItem): TrendingClipItem => ({
   id: item.id,
   title: item.title ?? item.source?.name ?? 'Broadcast',
   body: item.text_plain ?? item.text ?? '',
+  text: item.text,
+  styled_text: item.styled_text,
+  text_doc: item.text_doc,
+  text_plain: item.text_plain,
   broadcastedAt: item.broadcasted_at ?? item.created_at ?? undefined,
   attachments: item.attachments ?? [],
   engagement: {
@@ -47,6 +51,18 @@ const getTopTrendingFeeds = (items: BroadcastFeedItem[], limit = 20) => {
     .slice(0, limit);
 };
 
+const shuffleFeedItems = <T>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+  return shuffled;
+};
+
 const isHealthcareFeedItem = (item: BroadcastFeedItem | null | undefined) => {
   if (!item) return false;
   const sourceType = String(item.source_type ?? '').toLowerCase();
@@ -55,13 +71,21 @@ const isHealthcareFeedItem = (item: BroadcastFeedItem | null | undefined) => {
 };
 
 const normalizeAuthorFromItem = (item: any) => {
-  const author = item?.author && typeof item.author === 'object' ? item.author : {};
-  const metadata = item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+  const author =
+    item?.author && typeof item.author === 'object' ? item.author : {};
+  const metadata =
+    item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
   const fallbackUser =
     (item?.user && typeof item.user === 'object' ? item.user : null) ??
-    (item?.broadcasted_by && typeof item.broadcasted_by === 'object' ? item.broadcasted_by : null) ??
-    (metadata?.author && typeof metadata.author === 'object' ? metadata.author : null) ??
-    (metadata?.user && typeof metadata.user === 'object' ? metadata.user : null) ??
+    (item?.broadcasted_by && typeof item.broadcasted_by === 'object'
+      ? item.broadcasted_by
+      : null) ??
+    (metadata?.author && typeof metadata.author === 'object'
+      ? metadata.author
+      : null) ??
+    (metadata?.user && typeof metadata.user === 'object'
+      ? metadata.user
+      : null) ??
     null;
 
   const authorId =
@@ -126,8 +150,10 @@ const normalizeAuthorFromItem = (item: any) => {
   };
   if (authorId) nextAuthor.id = String(authorId);
   if (authorProfileId) nextAuthor.profile_id = String(authorProfileId);
-  if (displayName && String(displayName).trim()) nextAuthor.display_name = String(displayName).trim();
-  if (avatarUrl && String(avatarUrl).trim()) nextAuthor.avatar_url = String(avatarUrl).trim();
+  if (displayName && String(displayName).trim())
+    nextAuthor.display_name = String(displayName).trim();
+  if (avatarUrl && String(avatarUrl).trim())
+    nextAuthor.avatar_url = String(avatarUrl).trim();
   if (bio && String(bio).trim()) nextAuthor.bio = String(bio).trim();
   return Object.keys(nextAuthor).length ? nextAuthor : undefined;
 };
@@ -160,14 +186,27 @@ export default function useFeedsData({ q = '', code = null }: Params) {
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
-    const url = `${FEEDS_ENDPOINT}${buildQuery({ q, code, limit: 20, offset: 0 })}`;
+    const url = `${FEEDS_ENDPOINT}${buildQuery({
+      q,
+      code,
+      limit: 20,
+      offset: 0,
+    })}`;
     try {
-      const res = await getRequest(url, { errorMessage: 'Unable to load feeds.' });
+      const res = await getRequest(url, {
+        errorMessage: 'Unable to load feeds.',
+      });
       if (!mountedRef.current) return;
       const payload = res?.data ?? res;
       const page = normalizePaginated<BroadcastFeedItem>(payload);
-      const normalizedResults = (page.results ?? []).map((item) => normalizeFeedItem(item));
-      applyItems(normalizedResults.filter((item) => !isHealthcareFeedItem(item)));
+      const normalizedResults = (page.results ?? []).map(item =>
+        normalizeFeedItem(item),
+      );
+      applyItems(
+        shuffleFeedItems(
+          normalizedResults.filter(item => !isHealthcareFeedItem(item)),
+        ),
+      );
       nextUrlRef.current = page.next ?? null;
     } finally {
       if (mountedRef.current) {
@@ -188,7 +227,9 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     if (!nextUrl || loadingMore) return;
 
     setLoadingMore(true);
-    const res = await getRequest(nextUrl, { errorMessage: 'Unable to load more.' });
+    const res = await getRequest(nextUrl, {
+      errorMessage: 'Unable to load more.',
+    });
     const payload = res?.data ?? res;
     const page = normalizePaginated<BroadcastFeedItem>(payload);
     if (!mountedRef.current) {
@@ -196,11 +237,15 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       return;
     }
 
-    setItems((prev) => {
-      const have = new Set(prev.map((x) => x.id));
+    setItems(prev => {
+      const have = new Set(prev.map(x => x.id));
       const merged = [...prev];
-      const normalizedResults = (page.results ?? []).map((item) => normalizeFeedItem(item));
-      const nonHealthcareResults = normalizedResults.filter((item) => !isHealthcareFeedItem(item));
+      const normalizedResults = (page.results ?? []).map(item =>
+        normalizeFeedItem(item),
+      );
+      const nonHealthcareResults = normalizedResults.filter(
+        item => !isHealthcareFeedItem(item),
+      );
       for (const it of nonHealthcareResults) {
         if (!have.has(it.id)) merged.push(it);
       }
@@ -215,68 +260,73 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     setLoadingMore(false);
   }, [loadingMore]);
 
-  const reactToItem = useCallback(async (itemId: string, emoji: string = '❤️') => {
-    let previousReactionCount = 0;
-    let previousReaction: string | null = null;
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? (() => {
-              previousReactionCount = Number(item.reaction_count ?? 0);
-              previousReaction = item.viewer_reaction ?? null;
-              const hadSameReaction = previousReaction === emoji;
-              const hadDifferentReaction = Boolean(previousReaction && previousReaction !== emoji);
-              return {
-                ...item,
-                reaction_count: hadSameReaction
-                  ? Math.max(previousReactionCount - 1, 0)
-                  : hadDifferentReaction
+  const reactToItem = useCallback(
+    async (itemId: string, emoji: string = '❤️') => {
+      let previousReactionCount = 0;
+      let previousReaction: string | null = null;
+      setItems(prev =>
+        prev.map(item =>
+          item.id === itemId
+            ? (() => {
+                previousReactionCount = Number(item.reaction_count ?? 0);
+                previousReaction = item.viewer_reaction ?? null;
+                const hadSameReaction = previousReaction === emoji;
+                const hadDifferentReaction = Boolean(
+                  previousReaction && previousReaction !== emoji,
+                );
+                return {
+                  ...item,
+                  reaction_count: hadSameReaction
+                    ? Math.max(previousReactionCount - 1, 0)
+                    : hadDifferentReaction
                     ? previousReactionCount
                     : previousReactionCount + 1,
-                viewer_reaction: hadSameReaction ? null : emoji,
-              };
-            })()
-          : item,
-      ),
-    );
-    try {
-      const res = await postRequest(
-        ROUTES.broadcasts.react(itemId),
-        { emoji },
-        { errorMessage: 'Unable to react.' },
+                  viewer_reaction: hadSameReaction ? null : emoji,
+                };
+              })()
+            : item,
+        ),
       );
-      if (res?.success === false) {
-        throw new Error(res?.message || 'Unable to react.');
+      try {
+        const res = await postRequest(
+          ROUTES.broadcasts.react(itemId),
+          { emoji },
+          { errorMessage: 'Unable to react.' },
+        );
+        if (res?.success === false) {
+          throw new Error(res?.message || 'Unable to react.');
+        }
+        const count = Number(res?.data?.count ?? res?.count ?? 0);
+        const reacted = Boolean(res?.data?.reacted ?? res?.reacted);
+        setItems(prev =>
+          prev.map(item =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  reaction_count: count,
+                  viewer_reaction: reacted ? emoji : null,
+                }
+              : item,
+          ),
+        );
+        return { ok: true };
+      } catch (error) {
+        setItems(prev =>
+          prev.map(item =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  reaction_count: previousReactionCount,
+                  viewer_reaction: previousReaction,
+                }
+              : item,
+          ),
+        );
+        return { ok: false, error };
       }
-      const count = Number(res?.data?.count ?? res?.count ?? 0);
-      const reacted = Boolean(res?.data?.reacted ?? res?.reacted);
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                reaction_count: count,
-                viewer_reaction: reacted ? emoji : null,
-              }
-            : item,
-        ),
-      );
-      return { ok: true };
-    } catch (error) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                reaction_count: previousReactionCount,
-                viewer_reaction: previousReaction,
-              }
-            : item,
-        ),
-      );
-      return { ok: false, error };
-    }
-  }, []);
+    },
+    [],
+  );
 
   const recordShare = useCallback(async (itemId: string) => {
     const res = await postRequest(
@@ -287,8 +337,8 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     if (res?.success === false) {
       return { ok: false };
     }
-    setItems((prev) =>
-      prev.map((item) =>
+    setItems(prev =>
+      prev.map(item =>
         item.id === itemId
           ? {
               ...item,
@@ -300,54 +350,64 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     return { ok: true };
   }, []);
 
-  const hideItem = useCallback(async (itemId: string) => {
-    const res = await postRequest(
-      ROUTES.broadcasts.hide(itemId),
-      {},
-      { errorMessage: 'Unable to hide broadcast.' },
-    );
-    if (res?.success === false) {
-      return { ok: false };
-    }
-    applyItems(items.filter((item) => item.id !== itemId));
-    return { ok: true };
-  }, [applyItems, items]);
+  const hideItem = useCallback(
+    async (itemId: string) => {
+      const res = await postRequest(
+        ROUTES.broadcasts.hide(itemId),
+        {},
+        { errorMessage: 'Unable to hide broadcast.' },
+      );
+      if (res?.success === false) {
+        return { ok: false };
+      }
+      applyItems(items.filter(item => item.id !== itemId));
+      return { ok: true };
+    },
+    [applyItems, items],
+  );
 
-  const toggleSaved = useCallback(async (itemId: string, currentlySaved: boolean) => {
-    const endpoint = ROUTES.broadcasts.save(itemId);
-    const res = currentlySaved
-      ? await postRequest(
-          `${endpoint}?action=unsave`,
-          {},
-          { errorMessage: 'Unable to remove saved broadcast.' },
-        )
-      : await postRequest(
-          endpoint,
-          {},
-          { errorMessage: 'Unable to save broadcast.' },
-        );
-    if (res?.success === false) {
-      return { ok: false };
-    }
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              viewer_saved: !currentlySaved,
-            }
-          : item,
-      ),
-    );
-    return { ok: true, saved: !currentlySaved };
-  }, []);
+  const toggleSaved = useCallback(
+    async (itemId: string, currentlySaved: boolean) => {
+      const endpoint = ROUTES.broadcasts.save(itemId);
+      const res = currentlySaved
+        ? await postRequest(
+            `${endpoint}?action=unsave`,
+            {},
+            { errorMessage: 'Unable to remove saved broadcast.' },
+          )
+        : await postRequest(
+            endpoint,
+            {},
+            { errorMessage: 'Unable to save broadcast.' },
+          );
+      if (res?.success === false) {
+        return { ok: false };
+      }
+      setItems(prev =>
+        prev.map(item =>
+          item.id === itemId
+            ? {
+                ...item,
+                viewer_saved: !currentlySaved,
+              }
+            : item,
+        ),
+      );
+      return { ok: true, saved: !currentlySaved };
+    },
+    [],
+  );
 
   const toggleSubscribe = useCallback(
-    async (source: BroadcastSourceMeta | undefined, currentlySubscribed: boolean) => {
-      if (!source?.id || !source.allow_subscribe) {
-        if (!currentlySubscribed) {
-          return { ok: false };
-        }
+    async (
+      source: BroadcastSourceMeta | undefined,
+      currentlySubscribed: boolean,
+    ) => {
+      if (!source?.id) {
+        return { ok: false };
+      }
+      if (!source.allow_subscribe && !currentlySubscribed) {
+        return { ok: false };
       }
 
       const targetType = String(source.type ?? '').toLowerCase();
@@ -372,9 +432,10 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       );
       if (res?.success === false) return { ok: false };
 
-      setItems((prev) =>
-        prev.map((it) => {
-          if (!it.source?.id || String(it.source.id) !== String(source.id)) return it;
+      setItems(prev =>
+        prev.map(it => {
+          if (!it.source?.id || String(it.source.id) !== String(source.id))
+            return it;
           if (String(it.source.type) !== targetType) return it;
           return {
             ...it,

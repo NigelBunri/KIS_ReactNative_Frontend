@@ -12,32 +12,18 @@ import DocumentPicker, {
 } from 'react-native-document-picker';
 
 import { KISIcon } from '@/constants/kisIcons';
-import {
-  KIS_TOKENS,
-  kisRadius,
-  KISPalette,
-} from '@/theme/constants';
+import { KIS_TOKENS, kisRadius, KISPalette } from '@/theme/constants';
 
-import {
-  ContactsModal,
-  SimpleContact,
-} from './ForAttachments/ContactsModal';
-import {
-  PollModal,
-  PollDraft,
-} from './ForAttachments/PollModal';
-import {
-  EventModal,
-  EventDraft,
-} from './ForAttachments/EventModal';
+import { ContactsModal, SimpleContact } from './ForAttachments/ContactsModal';
+import { PollModal, PollDraft } from './ForAttachments/PollModal';
+import { EventModal, EventDraft } from './ForAttachments/EventModal';
 import {
   AttachmentPreviewPage,
   PreviewKind,
 } from './ForAttachments/AttachmentPreviewPage';
 import type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 export type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
-
-
 
 type AttachmentSheetProps = {
   visible: boolean;
@@ -68,6 +54,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
 }) => {
   const cardRadius = kisRadius.xl ?? 20;
   const pickInProgressRef = useRef(false);
+  const { panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   const [contactsVisible, setContactsVisible] = useState(false);
   const [pollVisible, setPollVisible] = useState(false);
@@ -75,9 +65,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
 
   // Preview page state
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewItems, setPreviewItems] = useState<FilesType[]>(
-    [],
-  );
+  const [previewItems, setPreviewItems] = useState<FilesType[]>([]);
   const [previewKind, setPreviewKind] = useState<PreviewKind | null>(null);
 
   const handleBackdropPress = () => {
@@ -118,7 +106,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       return true;
     }
 
-    const filesToBeSent = previewItems.map((item) => ({
+    const filesToBeSent = previewItems.map(item => ({
       ...item,
     }));
 
@@ -182,17 +170,15 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         ? result
         : [result];
 
-      const rawPayload: FilesType[] = resultsArray.map(
-        (file) => ({
-          uri: file.uri,
-          name: file.name ?? 'file',
-          type: file.type ?? null,
-          size: file.size,
-        }),
-      );
+      const rawPayload: FilesType[] = resultsArray.map(file => ({
+        uri: file.uri,
+        name: file.name ?? 'file',
+        type: file.type ?? null,
+        size: file.size,
+      }));
 
       // filter out images/videos – they must come from CameraCaptureModal, not here
-      const payload = rawPayload.filter((f) => {
+      const payload = rawPayload.filter(f => {
         const type = f.type || '';
         if (type.startsWith('image/')) return false;
         if (type.startsWith('video/')) return false;
@@ -263,7 +249,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         ? result
         : [result];
 
-      const payload: FilesType[] = resultsArray.map((file) => ({
+      const payload: FilesType[] = resultsArray.map(file => ({
         uri: file.uri,
         name: file.name ?? 'audio',
         type: file.type ?? 'audio/*',
@@ -387,6 +373,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
           >
             {/* Grab handle */}
             <View
+              {...panHandlers}
               style={{
                 alignSelf: 'center',
                 width: 40,
@@ -405,11 +392,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                 marginBottom: KIS_TOKENS.spacing.sm,
               }}
             >
-              <KISIcon
-                name="add"
-                size={18}
-                color={palette.primary}
-              />
+              <KISIcon name="add" size={18} color={palette.primary} />
               <Text
                 style={{
                   marginLeft: 8,
@@ -454,9 +437,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                     marginBottom: KIS_TOKENS.spacing.md,
                     borderRadius: kisRadius.lg,
                     backgroundColor:
-                      index === 0
-                        ? palette.primarySoft
-                        : palette.surface,
+                      index === 0 ? palette.primarySoft : palette.surface,
                     paddingHorizontal: KIS_TOKENS.spacing.md,
                     paddingVertical: KIS_TOKENS.spacing.md,
                     ...KIS_TOKENS.elevation.popover,
@@ -525,7 +506,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         visible={contactsVisible}
         palette={palette}
         onClose={() => setContactsVisible(false)}
-        onSendContacts={(contacts) => {
+        onSendContacts={contacts => {
           if (onSendContacts) {
             onSendContacts(contacts);
           }
@@ -537,7 +518,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         visible={pollVisible}
         palette={palette}
         onClose={() => setPollVisible(false)}
-        onCreatePoll={(poll) => {
+        onCreatePoll={poll => {
           if (onCreatePoll) {
             onCreatePoll(poll);
           }
@@ -549,7 +530,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         visible={eventVisible}
         palette={palette}
         onClose={() => setEventVisible(false)}
-        onCreateEvent={(event) => {
+        onCreateEvent={event => {
           if (onCreateEvent) {
             onCreateEvent(event);
           }

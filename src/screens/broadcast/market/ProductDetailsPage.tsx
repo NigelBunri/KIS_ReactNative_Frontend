@@ -16,7 +16,10 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
-import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import {
+  KIS_COIN_CODE,
+  KIS_TO_USD_RATE,
+} from '@/screens/market/market.constants';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
@@ -32,19 +35,21 @@ import {
   ShopCartAddResult,
   ShopCartItemPayload,
   subscribeToShopCart,
-  ShopCartState,
 } from '@/screens/market/cart/shopCartManager';
 import { incrementProductViewCount } from '@/utils/productViewCounts';
-import { collectProductImageUris, resolveProductImageUri } from '@/utils/productImages';
+import {
+  collectProductImageUris,
+  resolveProductImageUri,
+} from '@/utils/productImages';
 
 const normalizeListInput = (value?: string[] | string | null) => {
   if (!value) return [];
   if (Array.isArray(value)) {
-    return value.map((item) => String(item || '').trim()).filter(Boolean);
+    return value.map(item => String(item || '').trim()).filter(Boolean);
   }
   return String(value)
     .split(',')
-    .map((item) => item.trim())
+    .map(item => item.trim())
     .filter(Boolean);
 };
 
@@ -65,7 +70,10 @@ type CatalogCategory = {
   name?: string;
 };
 
-type ProductAttributes = Record<string, string | number | boolean | string[] | null | undefined>;
+type ProductAttributes = Record<
+  string,
+  string | number | boolean | string[] | null | undefined
+>;
 
 type ProductDetail = {
   id?: string | number;
@@ -91,7 +99,10 @@ type ProductDetail = {
   available_sizes?: string[] | string | null;
   available_colors?: string[] | string | null;
   variants?: VariantRecord[];
-  images?: (string | { image_url?: string | null; image_file?: string | null })[];
+  images?: (
+    | string
+    | { image_url?: string | null; image_file?: string | null }
+  )[];
   featured_image?: string | null;
   image_url?: string | null;
   low_stock_threshold?: number | string | null;
@@ -107,7 +118,7 @@ const formatAttributeLabel = (key: string) =>
     .replace(/([A-Z])/g, ' $1')
     .replace(/[_\-]+/g, ' ')
     .trim()
-    .replace(/^./, (char) => char.toUpperCase());
+    .replace(/^./, char => char.toUpperCase());
 
 const resolveProductShopId = (product: ProductDetail | null): string => {
   if (!product) return '';
@@ -144,7 +155,10 @@ const resolveProductShopLabel = (product: ProductDetail | null): string => {
 };
 
 type ProductDetailRoute = RouteProp<RootStackParamList, 'ProductDetail'>;
-type ProductDetailNavigation = NativeStackNavigationProp<RootStackParamList, 'ProductDetail'>;
+type ProductDetailNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'ProductDetail'
+>;
 
 export default function ProductDetailsPage() {
   const { palette } = useKISTheme();
@@ -160,17 +174,20 @@ export default function ProductDetailsPage() {
   const [selectedColor, setSelectedColor] = useState('');
   const [activeImage, setActiveImage] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [cartSynced, setCartSynced] = useState(false);
-  const [selectedAttributeOptions, setSelectedAttributeOptions] = useState<Record<string, string[]>>({});
+  const [, setCartSynced] = useState(false);
+  const [selectedAttributeOptions, setSelectedAttributeOptions] = useState<
+    Record<string, string[]>
+  >({});
   const [customDescription, setCustomDescription] = useState('');
-  const [cartProductIndex, setCartProductIndex] = useState<CartProductVariantIndex>(() =>
-    buildCartProductIndex(getShopCartState()),
-  );
+  const [cartProductIndex, setCartProductIndex] =
+    useState<CartProductVariantIndex>(() =>
+      buildCartProductIndex(getShopCartState()),
+    );
   const [cartState, setCartState] = useState(getShopCartState());
 
   const variants = useMemo<VariantRecord[]>(
     () =>
-      (product?.variants ?? []).map((variant) => ({
+      (product?.variants ?? []).map(variant => ({
         ...variant,
         size: variant.size ?? '',
         color: variant.color ?? '',
@@ -193,7 +210,8 @@ export default function ProductDetailsPage() {
       if (
         selectedColor &&
         variant.color &&
-        variant.color.trim().toLowerCase() !== selectedColor.trim().toLowerCase()
+        variant.color.trim().toLowerCase() !==
+          selectedColor.trim().toLowerCase()
       ) {
         return false;
       }
@@ -202,7 +220,6 @@ export default function ProductDetailsPage() {
     },
     [selectedSize, selectedColor],
   );
-
 
   const metadataSizes = useMemo(
     () => normalizeListInput(product?.available_sizes ?? []),
@@ -219,7 +236,7 @@ export default function ProductDetailsPage() {
       Array.from(
         new Set(
           variants
-            .map((variant) => variant.size)
+            .map(variant => variant.size)
             .filter((value): value is string => Boolean(value)),
         ),
       ),
@@ -231,7 +248,7 @@ export default function ProductDetailsPage() {
       Array.from(
         new Set(
           variants
-            .map((variant) => variant.color)
+            .map(variant => variant.color)
             .filter((value): value is string => Boolean(value)),
         ),
       ),
@@ -249,9 +266,12 @@ export default function ProductDetailsPage() {
   );
 
   const productShopId = useMemo(() => resolveProductShopId(product), [product]);
-  const productShopLabel = useMemo(() => resolveProductShopLabel(product), [product]);
+  const productShopLabel = useMemo(
+    () => resolveProductShopLabel(product),
+    [product],
+  );
 
-    const selectedVariant = useMemo(() => {
+  const selectedVariant = useMemo(() => {
     return variants.find(variantMatchesSelection) ?? null;
   }, [variants, variantMatchesSelection]);
 
@@ -262,8 +282,11 @@ export default function ProductDetailsPage() {
   }, [selectedVariant, product]);
 
   const salePriceValue = Number(product?.sale_price ?? NaN);
-  const displayPrice = Number.isFinite(salePriceValue) ? salePriceValue : variantBasePrice;
-  const showSalePrice = Number.isFinite(salePriceValue) && salePriceValue < variantBasePrice;
+  const displayPrice = Number.isFinite(salePriceValue)
+    ? salePriceValue
+    : variantBasePrice;
+  const showSalePrice =
+    Number.isFinite(salePriceValue) && salePriceValue < variantBasePrice;
 
   const comparePrice = useMemo(() => {
     const raw = product?.compare_at_price ?? 0;
@@ -280,11 +303,17 @@ export default function ProductDetailsPage() {
 
   const variantAlreadyInCart =
     hasVariants && selectedVariantId
-      ? cartHasProductVariant(cartProductIndex, currentProductId, selectedVariantId)
+      ? cartHasProductVariant(
+          cartProductIndex,
+          currentProductId,
+          selectedVariantId,
+        )
       : false;
 
   const baseProductAlreadyInCart =
-    !hasVariants && currentProductId ? cartHasProduct(cartProductIndex, currentProductId) : false;
+    !hasVariants && currentProductId
+      ? cartHasProduct(cartProductIndex, currentProductId)
+      : false;
 
   const isInCart =
     (hasVariants && Boolean(variantAlreadyInCart)) ||
@@ -297,7 +326,7 @@ export default function ProductDetailsPage() {
   );
   const matchingCartItem = useMemo(() => {
     if (!activeCart || !currentProductId) return null;
-    return activeCart.items.find((item) => {
+    return activeCart.items.find(item => {
       if (item.productId !== currentProductId) return false;
       if (hasVariants) {
         return (item.variantId ?? null) === (selectedVariantId ?? null);
@@ -315,14 +344,14 @@ export default function ProductDetailsPage() {
     },
     [quantityLimit],
   );
-  
+
   const sizesForColor = useMemo(() => {
     if (!selectedColor) return availableSizes;
     return Array.from(
       new Set(
         variants
-          .filter((variant) => variant.color && variant.color === selectedColor)
-          .map((variant) => variant.size)
+          .filter(variant => variant.color && variant.color === selectedColor)
+          .map(variant => variant.size)
           .filter(Boolean),
       ),
     );
@@ -333,8 +362,8 @@ export default function ProductDetailsPage() {
     return Array.from(
       new Set(
         variants
-          .filter((variant) => variant.size && variant.size === selectedSize)
-          .map((variant) => variant.color)
+          .filter(variant => variant.size && variant.size === selectedSize)
+          .map(variant => variant.color)
           .filter(Boolean),
       ),
     );
@@ -345,7 +374,9 @@ export default function ProductDetailsPage() {
 
   const normalizedGallery = useMemo(() => {
     const urls = collectProductImageUris(product);
-    const featured = resolveProductImageUri(product?.featured_image ?? product?.image_url ?? '');
+    const featured = resolveProductImageUri(
+      product?.featured_image ?? product?.image_url ?? '',
+    );
     if (featured && !urls.includes(featured)) {
       return [featured, ...urls];
     }
@@ -362,7 +393,9 @@ export default function ProductDetailsPage() {
     const entries: Array<{ label: string; value: string }> = [];
 
     const categoryLabels = Array.isArray(product?.catalog_categories)
-      ? product.catalog_categories.map((category) => category?.name || '').filter(Boolean)
+      ? product.catalog_categories
+          .map(category => category?.name || '')
+          .filter(Boolean)
       : [];
 
     if (categoryLabels.length) {
@@ -385,8 +418,14 @@ export default function ProductDetailsPage() {
       entries.push({ label: 'Sale price', value: `${product.sale_price}` });
     }
 
-    if (product?.compare_at_price !== undefined && product?.compare_at_price !== null) {
-      entries.push({ label: 'Compare price', value: `${product.compare_at_price}` });
+    if (
+      product?.compare_at_price !== undefined &&
+      product?.compare_at_price !== null
+    ) {
+      entries.push({
+        label: 'Compare price',
+        value: `${product.compare_at_price}`,
+      });
     }
 
     entries.push({
@@ -402,7 +441,10 @@ export default function ProductDetailsPage() {
       value: formatBooleanLabel(product?.allow_backorder),
     });
 
-    if (product?.low_stock_threshold !== undefined && product?.low_stock_threshold !== null) {
+    if (
+      product?.low_stock_threshold !== undefined &&
+      product?.low_stock_threshold !== null
+    ) {
       entries.push({
         label: 'Low stock threshold',
         value: `${product.low_stock_threshold}`,
@@ -410,9 +452,12 @@ export default function ProductDetailsPage() {
     }
 
     const dims: string[] = [];
-    if (product?.length !== undefined && product?.length !== null) dims.push(`${product.length}L`);
-    if (product?.width !== undefined && product?.width !== null) dims.push(`${product.width}W`);
-    if (product?.height !== undefined && product?.height !== null) dims.push(`${product.height}H`);
+    if (product?.length !== undefined && product?.length !== null)
+      dims.push(`${product.length}L`);
+    if (product?.width !== undefined && product?.width !== null)
+      dims.push(`${product.width}W`);
+    if (product?.height !== undefined && product?.height !== null)
+      dims.push(`${product.height}H`);
 
     if (dims.length) {
       entries.push({ label: 'Dimensions', value: dims.join(' × ') });
@@ -423,11 +468,17 @@ export default function ProductDetailsPage() {
     }
 
     if (availableSizes.length) {
-      entries.push({ label: 'Available sizes', value: availableSizes.join(', ') });
+      entries.push({
+        label: 'Available sizes',
+        value: availableSizes.join(', '),
+      });
     }
 
     if (availableColors.length) {
-      entries.push({ label: 'Available colors', value: availableColors.join(', ') });
+      entries.push({
+        label: 'Available colors',
+        value: availableColors.join(', '),
+      });
     }
 
     return entries;
@@ -439,7 +490,13 @@ export default function ProductDetailsPage() {
 
     return Object.entries(attrs)
       .map(([key, val]) => {
-        if (val === undefined || val === null || val === '' || Array.isArray(val)) return null;
+        if (
+          val === undefined ||
+          val === null ||
+          val === '' ||
+          Array.isArray(val)
+        )
+          return null;
 
         const formattedValue = String(val);
 
@@ -460,7 +517,11 @@ export default function ProductDetailsPage() {
       'catalogCategories',
     ]);
 
-    const definitions: Array<{ key: string; label: string; options: string[] }> = [];
+    const definitions: Array<{
+      key: string;
+      label: string;
+      options: string[];
+    }> = [];
     const seenKeys = new Set<string>();
 
     const addDefinition = (key: string, value: unknown) => {
@@ -469,11 +530,17 @@ export default function ProductDetailsPage() {
       const normalized = normalizeListInput(value);
       if (!normalized.length) return;
       seenKeys.add(key);
-      definitions.push({ key, label: formatAttributeLabel(key), options: normalized });
+      definitions.push({
+        key,
+        label: formatAttributeLabel(key),
+        options: normalized,
+      });
     };
 
     if (product.attributes && typeof product.attributes === 'object') {
-      Object.entries(product.attributes).forEach(([key, val]) => addDefinition(key, val));
+      Object.entries(product.attributes).forEach(([key, val]) =>
+        addDefinition(key, val),
+      );
     }
 
     Object.entries(product).forEach(([key, val]) => {
@@ -486,10 +553,12 @@ export default function ProductDetailsPage() {
 
   useEffect(() => {
     if (matchingCartItem) return;
-    setSelectedAttributeOptions((prev) => {
+    setSelectedAttributeOptions(prev => {
       const next: Record<string, string[]> = {};
       multiSelectAttributes.forEach(({ key, options }) => {
-        const preserved = (prev[key] ?? []).filter((option) => options.includes(option));
+        const preserved = (prev[key] ?? []).filter(option =>
+          options.includes(option),
+        );
         if (preserved.length) {
           next[key] = preserved;
         }
@@ -516,9 +585,12 @@ export default function ProductDetailsPage() {
     setError(null);
 
     try {
-      const response = await getRequest(`${ROUTES.commerce.products}${detailProductId}/`, {
-        errorMessage: 'Unable to load product.',
-      });
+      const response = await getRequest(
+        `${ROUTES.commerce.products}${detailProductId}/`,
+        {
+          errorMessage: 'Unable to load product.',
+        },
+      );
 
       if (!response.success) {
         throw new Error(response.message || 'Unable to load product.');
@@ -561,11 +633,11 @@ export default function ProductDetailsPage() {
       setQuantity(0);
       return;
     }
-    setQuantity((prev) => clampQuantityValue(prev));
+    setQuantity(prev => clampQuantityValue(prev));
   }, [matchingCartItem, quantityLimit, clampQuantityValue]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToShopCart((nextState) => {
+    const unsubscribe = subscribeToShopCart(nextState => {
       setCartProductIndex(buildCartProductIndex(nextState));
       setCartState(nextState);
     });
@@ -612,7 +684,7 @@ export default function ProductDetailsPage() {
       setQuantity(0);
       return;
     }
-    setQuantity((prev) => {
+    setQuantity(prev => {
       if (prev < 1) return 1;
       if (prev > quantityLimit) return quantityLimit;
       return prev;
@@ -630,7 +702,9 @@ export default function ProductDetailsPage() {
 
     if (
       selectedColor &&
-      !variants.some((variant) => variant.size === size && variant.color === selectedColor)
+      !variants.some(
+        variant => variant.size === size && variant.color === selectedColor,
+      )
     ) {
       setSelectedColor('');
     }
@@ -646,7 +720,9 @@ export default function ProductDetailsPage() {
 
     if (
       selectedSize &&
-      !variants.some((variant) => variant.color === color && variant.size === selectedSize)
+      !variants.some(
+        variant => variant.color === color && variant.size === selectedSize,
+      )
     ) {
       setSelectedSize('');
     }
@@ -655,7 +731,7 @@ export default function ProductDetailsPage() {
   };
 
   const changeQuantityBy = (delta: number) => {
-    setQuantity((prev) => {
+    setQuantity(prev => {
       if (quantityLimit <= 0) return 0;
       const updated = prev + delta;
       if (updated < 1) return 1;
@@ -665,12 +741,15 @@ export default function ProductDetailsPage() {
   };
 
   const toggleAttributeOption = (key: string, option: string) => {
-    setSelectedAttributeOptions((prev) => {
+    setSelectedAttributeOptions(prev => {
       const existing = prev[key] ?? [];
       const exists = existing.includes(option);
-      const next = exists ? existing.filter((entry) => entry !== option) : [...existing, option];
+      const next = exists
+        ? existing.filter(entry => entry !== option)
+        : [...existing, option];
       if (!next.length) {
-        const { [key]: _, ...rest } = prev;
+        const rest = { ...prev };
+        delete rest[key];
         return rest;
       }
       return { ...prev, [key]: next };
@@ -678,53 +757,57 @@ export default function ProductDetailsPage() {
   };
 
   const emitCartFeedback = useCallback(
-    (payload: { productId: string; variantId?: string | null; name?: string; price: number }) => {
+    (payload: {
+      productId: string;
+      variantId?: string | null;
+      name?: string;
+      price: number;
+    }) => {
       DeviceEventEmitter.emit('cart.add', payload);
       Alert.alert('Cart', 'Product queued for cart review.');
     },
     [],
   );
 
-  const addCurrentProductToCart = useCallback(async (): Promise<ShopCartAddResult> => {
-    if (!product?.id || !productShopId) {
-      return { status: 'missingShop' };
-    }
+  const addCurrentProductToCart =
+    useCallback(async (): Promise<ShopCartAddResult> => {
+      if (!product?.id || !productShopId) {
+        return { status: 'missingShop' };
+      }
 
-    const payload: ShopCartItemPayload = {
-      shopId: productShopId,
-      shopName: productShopLabel,
-      productId: String(product.id),
-      variantId: selectedVariant?.id ?? null,
-      name: product.name,
-      price: displayPrice,
-      size: selectedSize || undefined,
-      color: selectedColor || undefined,
-      imageUrl: activeImage || undefined,
-      quantity: quantityLimit > 0 ? quantity : 0,
-      selectedAttributes:
-        Object.keys(selectedAttributeOptions).length > 0
-          ? selectedAttributeOptions
-          : undefined,
-      customDescription: customDescription.trim() || undefined,
-    };
+      const payload: ShopCartItemPayload = {
+        shopId: productShopId,
+        shopName: productShopLabel,
+        productId: String(product.id),
+        variantId: selectedVariant?.id ?? null,
+        name: product.name,
+        price: displayPrice,
+        size: selectedSize || undefined,
+        color: selectedColor || undefined,
+        imageUrl: activeImage || undefined,
+        quantity: quantityLimit > 0 ? quantity : 0,
+        selectedAttributes:
+          Object.keys(selectedAttributeOptions).length > 0
+            ? selectedAttributeOptions
+            : undefined,
+        customDescription: customDescription.trim() || undefined,
+      };
 
-  return addToShopCart(payload);
-  }, [
-    activeImage,
-    availableColors,
-    availableSizes,
-    displayPrice,
-    product,
-    productShopId,
-    productShopLabel,
-    selectedColor,
-    selectedSize,
-    selectedVariant?.id,
-    quantity,
-    quantityLimit,
-    selectedAttributeOptions,
-    customDescription,
-  ]);
+      return addToShopCart(payload);
+    }, [
+      activeImage,
+      displayPrice,
+      product,
+      productShopId,
+      productShopLabel,
+      selectedColor,
+      selectedSize,
+      selectedVariant?.id,
+      quantity,
+      quantityLimit,
+      selectedAttributeOptions,
+      customDescription,
+    ]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -741,12 +824,18 @@ export default function ProductDetailsPage() {
       }
 
       if (!selectedVariant) {
-        Alert.alert('Select a variant', 'Pick the combination that fits before adding to cart.');
+        Alert.alert(
+          'Select a variant',
+          'Pick the combination that fits before adding to cart.',
+        );
         return;
       }
 
       if ((selectedVariant.stock_qty ?? 0) <= 0) {
-        Alert.alert('Out of stock', 'That variant is sold out. Choose another one.');
+        Alert.alert(
+          'Out of stock',
+          'That variant is sold out. Choose another one.',
+        );
         return;
       }
     } else if ((product.stock_qty ?? 0) <= 0) {
@@ -765,7 +854,10 @@ export default function ProductDetailsPage() {
     }
 
     if (quantity > quantityLimit) {
-      Alert.alert('Quantity limit', `You can only add up to ${quantityLimit} units.`);
+      Alert.alert(
+        'Quantity limit',
+        `You can only add up to ${quantityLimit} units.`,
+      );
       return;
     }
 
@@ -786,19 +878,32 @@ export default function ProductDetailsPage() {
     }
 
     if (result.status === 'missingShop') {
-      Alert.alert('Cart', 'Unable to determine which shop this product belongs to.');
+      Alert.alert(
+        'Cart',
+        'Unable to determine which shop this product belongs to.',
+      );
       return;
     }
 
-    Alert.alert('Cart', result.message ?? 'Unable to add this product to your cart right now.');
+    Alert.alert(
+      'Cart',
+      result.message ?? 'Unable to add this product to your cart right now.',
+    );
   };
 
   if (loading) {
     return (
       <View style={[styles.root, { backgroundColor: palette.bg }]}>
-        <View style={[styles.loadingCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+        <View
+          style={[
+            styles.loadingCard,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <ActivityIndicator size="large" color={palette.primaryStrong} />
-          <Text style={[styles.loadingText, { color: palette.subtext }]}>Loading product...</Text>
+          <Text style={[styles.loadingText, { color: palette.subtext }]}>
+            Loading product...
+          </Text>
         </View>
       </View>
     );
@@ -807,12 +912,25 @@ export default function ProductDetailsPage() {
   if (error) {
     return (
       <View style={[styles.root, { backgroundColor: palette.bg, padding: 20 }]}>
-        <View style={[styles.errorCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-          <View style={[styles.errorIconWrap, { backgroundColor: palette.inputBg }]}>
+        <View
+          style={[
+            styles.errorCard,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
+          <View
+            style={[styles.errorIconWrap, { backgroundColor: palette.inputBg }]}
+          >
             <KISIcon name="info" size={20} color={palette.error || '#E53935'} />
           </View>
-          <Text style={[styles.errorTitle, { color: palette.text }]}>Something went wrong</Text>
-          <Text style={[styles.errorText, { color: palette.error || '#E53935' }]}>{error}</Text>
+          <Text style={[styles.errorTitle, { color: palette.text }]}>
+            Something went wrong
+          </Text>
+          <Text
+            style={[styles.errorText, { color: palette.error || '#E53935' }]}
+          >
+            {error}
+          </Text>
           <View style={styles.errorButtonWrap}>
             <KISButton title="Retry" onPress={loadProduct} />
           </View>
@@ -827,15 +945,26 @@ export default function ProductDetailsPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]}>
-      <View style={[styles.header, { backgroundColor: palette.bg, borderBottomColor: palette.divider }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: palette.bg, borderBottomColor: palette.divider },
+        ]}
+      >
         <Pressable
           onPress={() => navigation.goBack()}
-          style={[styles.headerIconButton, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+          style={[
+            styles.headerIconButton,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
         >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
 
-        <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+        <Text
+          style={[styles.headerTitle, { color: palette.text }]}
+          numberOfLines={1}
+        >
           Product details
         </Text>
 
@@ -848,21 +977,51 @@ export default function ProductDetailsPage() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroSection}>
-          <View style={[styles.galleryCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-            <View style={[styles.heroImageWrap, { backgroundColor: palette.inputBg }]}>
+          <View
+            style={[
+              styles.galleryCard,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.heroImageWrap,
+                { backgroundColor: palette.inputBg },
+              ]}
+            >
               {activeImage ? (
-                <Image source={{ uri: activeImage }} style={styles.heroImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: activeImage }}
+                  style={styles.heroImage}
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={[styles.heroImage, styles.emptyImage]}>
                   <KISIcon name="image" size={28} color={palette.subtext} />
-                  <Text style={[styles.emptyImageText, { color: palette.subtext }]}>No product image</Text>
+                  <Text
+                    style={[styles.emptyImageText, { color: palette.subtext }]}
+                  >
+                    No product image
+                  </Text>
                 </View>
               )}
 
               {normalizedGallery.length > 1 ? (
-                <View style={[styles.imageCountBadge, { backgroundColor: palette.surface }]}>
-                  <Text style={[styles.imageCountText, { color: palette.text }]}>
-                    {normalizedGallery.findIndex((img) => img === activeImage) + 1}/{normalizedGallery.length}
+                <View
+                  style={[
+                    styles.imageCountBadge,
+                    { backgroundColor: palette.surface },
+                  ]}
+                >
+                  <Text
+                    style={[styles.imageCountText, { color: palette.text }]}
+                  >
+                    {normalizedGallery.findIndex(img => img === activeImage) +
+                      1}
+                    /{normalizedGallery.length}
                   </Text>
                 </View>
               ) : null}
@@ -883,12 +1042,18 @@ export default function ProductDetailsPage() {
                       style={[
                         styles.thumbnail,
                         {
-                          borderColor: isActive ? palette.primaryStrong : palette.divider,
+                          borderColor: isActive
+                            ? palette.primaryStrong
+                            : palette.divider,
                           backgroundColor: palette.inputBg,
                         },
                       ]}
                     >
-                      <Image source={{ uri }} style={styles.thumbnailImage} resizeMode="cover" />
+                      <Image
+                        source={{ uri }}
+                        style={styles.thumbnailImage}
+                        resizeMode="cover"
+                      />
                     </Pressable>
                   );
                 })}
@@ -897,21 +1062,43 @@ export default function ProductDetailsPage() {
           </View>
         </View>
 
-        <View style={[styles.highlightCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+        <View
+          style={[
+            styles.highlightCard,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <View style={styles.titleRow}>
             <View style={styles.titleContent}>
-              <Text style={[styles.title, { color: palette.text }]} numberOfLines={2}>
+              <Text
+                style={[styles.title, { color: palette.text }]}
+                numberOfLines={2}
+              >
                 {product.name ?? 'Untitled product'}
               </Text>
 
               <Text style={[styles.category, { color: palette.subtext }]}>
-                {product.catalog_categories?.[0]?.name ?? product.inventory_type ?? 'Product'}
+                {product.catalog_categories?.[0]?.name ??
+                  product.inventory_type ??
+                  'Product'}
               </Text>
             </View>
 
             {showSalePrice || comparePrice > displayPrice ? (
-              <View style={[styles.salePill, { backgroundColor: palette.inputBg, borderColor: palette.primaryStrong }]}>
-                <Text style={[styles.saleBadge, { color: palette.primaryStrong }]}>Sale</Text>
+              <View
+                style={[
+                  styles.salePill,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.primaryStrong,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.saleBadge, { color: palette.primaryStrong }]}
+                >
+                  Sale
+                </Text>
               </View>
             ) : null}
           </View>
@@ -920,18 +1107,26 @@ export default function ProductDetailsPage() {
             <View style={styles.priceRow}>
               <View>
                 <Text style={[styles.price, { color: palette.primaryStrong }]}>
-                  {`${displayPrice.toFixed(2)} ${product.currency ?? KIS_COIN_CODE}`}
+                  {`${displayPrice.toFixed(2)} ${
+                    product.currency ?? KIS_COIN_CODE
+                  }`}
                 </Text>
                 {showSalePrice ? (
-                  <Text style={[styles.originalPrice, { color: palette.subtext }]}>
-                    {`${variantBasePrice.toFixed(2)} ${product.currency ?? KIS_COIN_CODE}`}
+                  <Text
+                    style={[styles.originalPrice, { color: palette.subtext }]}
+                  >
+                    {`${variantBasePrice.toFixed(2)} ${
+                      product.currency ?? KIS_COIN_CODE
+                    }`}
                   </Text>
                 ) : null}
               </View>
 
               {comparePrice > displayPrice ? (
                 <Text style={[styles.comparePrice, { color: palette.subtext }]}>
-                  {`${comparePrice.toFixed(2)} ${product.currency ?? KIS_COIN_CODE}`}
+                  {`${comparePrice.toFixed(2)} ${
+                    product.currency ?? KIS_COIN_CODE
+                  }`}
                 </Text>
               ) : null}
             </View>
@@ -942,62 +1137,141 @@ export default function ProductDetailsPage() {
           </View>
 
           {product.condition ? (
-            <View style={[styles.metaCard, { backgroundColor: palette.inputBg }]}>
-              <Text style={[styles.metaCardLabel, { color: palette.subtext }]}>Condition</Text>
-              <Text style={[styles.metaCardValue, { color: palette.text }]}>{product.condition}</Text>
+            <View
+              style={[styles.metaCard, { backgroundColor: palette.inputBg }]}
+            >
+              <Text style={[styles.metaCardLabel, { color: palette.subtext }]}>
+                Condition
+              </Text>
+              <Text style={[styles.metaCardValue, { color: palette.text }]}>
+                {product.condition}
+              </Text>
             </View>
           ) : null}
 
           <View style={styles.statusRow}>
-            <View style={[styles.statusChip, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}>
+            <View
+              style={[
+                styles.statusChip,
+                {
+                  backgroundColor: palette.inputBg,
+                  borderColor: palette.divider,
+                },
+              ]}
+            >
               <Text
                 style={[
                   styles.statusChipText,
-                  { color: effectiveStock > 0 ? palette.primaryStrong : palette.error || '#E53935' },
+                  {
+                    color:
+                      effectiveStock > 0
+                        ? palette.primaryStrong
+                        : palette.error || '#E53935',
+                  },
                 ]}
               >
-                {effectiveStock > 0 ? `In stock · ${effectiveStock}` : 'Out of stock'}
+                {effectiveStock > 0
+                  ? `In stock · ${effectiveStock}`
+                  : 'Out of stock'}
               </Text>
             </View>
 
             {product.requires_shipping === false ? (
-              <View style={[styles.statusChip, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}>
-                <Text style={[styles.statusChipText, { color: palette.text }]}>Pickup only</Text>
+              <View
+                style={[
+                  styles.statusChip,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.divider,
+                  },
+                ]}
+              >
+                <Text style={[styles.statusChipText, { color: palette.text }]}>
+                  Pickup only
+                </Text>
               </View>
             ) : null}
 
             {product.pickup_available ? (
-              <View style={[styles.statusChip, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}>
-                <Text style={[styles.statusChipText, { color: palette.text }]}>Pickup available</Text>
+              <View
+                style={[
+                  styles.statusChip,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.divider,
+                  },
+                ]}
+              >
+                <Text style={[styles.statusChipText, { color: palette.text }]}>
+                  Pickup available
+                </Text>
               </View>
             ) : null}
 
             {product.allow_backorder ? (
-              <View style={[styles.statusChip, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}>
-                <Text style={[styles.statusChipText, { color: palette.text }]}>Backorder allowed</Text>
+              <View
+                style={[
+                  styles.statusChip,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.divider,
+                  },
+                ]}
+              >
+                <Text style={[styles.statusChipText, { color: palette.text }]}>
+                  Backorder allowed
+                </Text>
               </View>
             ) : null}
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Description</Text>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            Description
+          </Text>
           <Text style={[styles.sectionBody, { color: palette.subtext }]}>
             {product.description || 'No description yet.'}
           </Text>
         </View>
 
         {specEntries.length > 0 ? (
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Product specs</Text>
+          <View
+            style={[
+              styles.section,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Product specs
+            </Text>
             <View style={styles.specGrid}>
-              {specEntries.map((entry) => (
+              {specEntries.map(entry => (
                 <View
                   key={`${entry.label}-${entry.value}`}
-                  style={[styles.specCard, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}
+                  style={[
+                    styles.specCard,
+                    {
+                      backgroundColor: palette.inputBg,
+                      borderColor: palette.divider,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.specLabel, { color: palette.subtext }]}>{entry.label}</Text>
-                  <Text style={[styles.specValue, { color: palette.text }]} numberOfLines={2}>
+                  <Text style={[styles.specLabel, { color: palette.subtext }]}>
+                    {entry.label}
+                  </Text>
+                  <Text
+                    style={[styles.specValue, { color: palette.text }]}
+                    numberOfLines={2}
+                  >
                     {entry.value}
                   </Text>
                 </View>
@@ -1007,8 +1281,18 @@ export default function ProductDetailsPage() {
         ) : null}
 
         {attributeEntries.length > 0 ? (
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Attributes</Text>
+          <View
+            style={[
+              styles.section,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Attributes
+            </Text>
             <View style={styles.attributeList}>
               {attributeEntries.map((entry, index) => (
                 <View
@@ -1017,12 +1301,22 @@ export default function ProductDetailsPage() {
                     styles.attributeRow,
                     {
                       borderBottomColor:
-                        index === attributeEntries.length - 1 ? 'transparent' : palette.divider,
+                        index === attributeEntries.length - 1
+                          ? 'transparent'
+                          : palette.divider,
                     },
                   ]}
                 >
-                  <Text style={[styles.attributeLabel, { color: palette.subtext }]}>{entry.label}</Text>
-                  <Text style={[styles.attributeValue, { color: palette.text }]}>{entry.value}</Text>
+                  <Text
+                    style={[styles.attributeLabel, { color: palette.subtext }]}
+                  >
+                    {entry.label}
+                  </Text>
+                  <Text
+                    style={[styles.attributeValue, { color: palette.text }]}
+                  >
+                    {entry.value}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -1030,36 +1324,69 @@ export default function ProductDetailsPage() {
         ) : null}
 
         {product.fit || product.size_guide ? (
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+          <View
+            style={[
+              styles.section,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
             {product.fit ? (
               <>
-                <Text style={[styles.sectionTitle, { color: palette.text }]}>Fit notes</Text>
-                <Text style={[styles.sectionBody, { color: palette.subtext }]}>{product.fit}</Text>
+                <Text style={[styles.sectionTitle, { color: palette.text }]}>
+                  Fit notes
+                </Text>
+                <Text style={[styles.sectionBody, { color: palette.subtext }]}>
+                  {product.fit}
+                </Text>
               </>
             ) : null}
 
             {product.size_guide ? (
               <>
-                <Text style={[styles.sectionTitle, { color: palette.text, marginTop: product.fit ? 18 : 0 }]}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: palette.text, marginTop: product.fit ? 18 : 0 },
+                  ]}
+                >
                   Size guide
                 </Text>
-                <Text style={[styles.sectionBody, { color: palette.subtext }]}>{product.size_guide}</Text>
+                <Text style={[styles.sectionBody, { color: palette.subtext }]}>
+                  {product.size_guide}
+                </Text>
               </>
             ) : null}
           </View>
         ) : null}
 
         {variants.length > 0 || hasVariantSizes || hasVariantColors ? (
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Variants</Text>
+          <View
+            style={[
+              styles.section,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Variants
+            </Text>
 
             {hasVariantSizes ? (
               <View style={styles.optionGroup}>
-                <Text style={[styles.optionLabel, { color: palette.subtext }]}>Size</Text>
+                <Text style={[styles.optionLabel, { color: palette.subtext }]}>
+                  Size
+                </Text>
                 <View style={styles.chipRow}>
-                  {availableSizes.map((size) => {
+                  {availableSizes.map(size => {
                     const disabled =
-                      hasVariantColors && selectedColor ? !sizesForColor.includes(size) : false;
+                      hasVariantColors && selectedColor
+                        ? !sizesForColor.includes(size)
+                        : false;
                     const selected = size === selectedSize;
 
                     return (
@@ -1072,15 +1399,21 @@ export default function ProductDetailsPage() {
                         style={[
                           styles.optionChip,
                           {
-                            borderColor: selected ? palette.primaryStrong : palette.divider,
-                            backgroundColor: selected ? palette.inputBg : palette.surface,
+                            borderColor: selected
+                              ? palette.primaryStrong
+                              : palette.divider,
+                            backgroundColor: selected
+                              ? palette.inputBg
+                              : palette.surface,
                             opacity: disabled ? 0.4 : 1,
                           },
                         ]}
                       >
                         <Text
                           style={{
-                            color: selected ? palette.primaryStrong : palette.text,
+                            color: selected
+                              ? palette.primaryStrong
+                              : palette.text,
                             fontWeight: selected ? '700' : '600',
                           }}
                         >
@@ -1095,11 +1428,15 @@ export default function ProductDetailsPage() {
 
             {hasVariantColors ? (
               <View style={styles.optionGroup}>
-                <Text style={[styles.optionLabel, { color: palette.subtext }]}>Color</Text>
+                <Text style={[styles.optionLabel, { color: palette.subtext }]}>
+                  Color
+                </Text>
                 <View style={styles.chipRow}>
-                  {availableColors.map((color) => {
+                  {availableColors.map(color => {
                     const disabled =
-                      hasVariantSizes && selectedSize ? !colorsForSize.includes(color) : false;
+                      hasVariantSizes && selectedSize
+                        ? !colorsForSize.includes(color)
+                        : false;
                     const selected = color === selectedColor;
 
                     return (
@@ -1112,15 +1449,21 @@ export default function ProductDetailsPage() {
                         style={[
                           styles.optionChip,
                           {
-                            borderColor: selected ? palette.primaryStrong : palette.divider,
-                            backgroundColor: selected ? palette.inputBg : palette.surface,
+                            borderColor: selected
+                              ? palette.primaryStrong
+                              : palette.divider,
+                            backgroundColor: selected
+                              ? palette.inputBg
+                              : palette.surface,
                             opacity: disabled ? 0.4 : 1,
                           },
                         ]}
                       >
                         <Text
                           style={{
-                            color: selected ? palette.primaryStrong : palette.text,
+                            color: selected
+                              ? palette.primaryStrong
+                              : palette.text,
                             fontWeight: selected ? '700' : '600',
                           }}
                         >
@@ -1134,13 +1477,39 @@ export default function ProductDetailsPage() {
             ) : null}
 
             {variants.length > 0 && selectedVariant ? (
-              <View style={[styles.variantSummary, { backgroundColor: palette.inputBg, borderColor: palette.divider }]}>
+              <View
+                style={[
+                  styles.variantSummary,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.divider,
+                  },
+                ]}
+              >
                 <View style={styles.variantSummaryLeft}>
-                  <Text style={[styles.variantSummaryTitle, { color: palette.text }]}>Selected variant</Text>
-                  <Text style={[styles.variantSummaryText, { color: palette.subtext }]}>
-                    {selectedVariant.size || '—'} / {selectedVariant.color || '—'}
+                  <Text
+                    style={[
+                      styles.variantSummaryTitle,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Selected variant
                   </Text>
-                  <Text style={[styles.variantSummaryMeta, { color: palette.subtext }]}>
+                  <Text
+                    style={[
+                      styles.variantSummaryText,
+                      { color: palette.subtext },
+                    ]}
+                  >
+                    {selectedVariant.size || '—'} /{' '}
+                    {selectedVariant.color || '—'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.variantSummaryMeta,
+                      { color: palette.subtext },
+                    ]}
+                  >
                     ID: {selectedVariant.sku || selectedVariant.id || 'N/A'}
                   </Text>
                 </View>
@@ -1165,15 +1534,18 @@ export default function ProductDetailsPage() {
 
             {variants.length > 0 && !selectedVariant ? (
               <Text style={[styles.variantHint, { color: palette.subtext }]}>
-                Select a size and color to choose the right variant before adding to cart.
+                Select a size and color to choose the right variant before
+                adding to cart.
               </Text>
             ) : null}
 
             {variants.length > 0 ? (
               <View style={styles.variantList}>
-                {variants.map((variant) => {
+                {variants.map(variant => {
                   const variantPrice = Number(variant.price ?? 0);
-                  const highlight = Boolean(selectedVariant?.id) && variant.id === selectedVariant?.id;
+                  const highlight =
+                    Boolean(selectedVariant?.id) &&
+                    variant.id === selectedVariant?.id;
 
                   return (
                     <View
@@ -1181,25 +1553,51 @@ export default function ProductDetailsPage() {
                       style={[
                         styles.variantRow,
                         {
-                          borderColor: highlight ? palette.primaryStrong : palette.divider,
-                          backgroundColor: highlight ? palette.inputBg : palette.surface,
+                          borderColor: highlight
+                            ? palette.primaryStrong
+                            : palette.divider,
+                          backgroundColor: highlight
+                            ? palette.inputBg
+                            : palette.surface,
                         },
                       ]}
                     >
                       <View style={styles.variantRowLeft}>
-                        <Text style={[styles.variantRowTitle, { color: palette.text }]}>
+                        <Text
+                          style={[
+                            styles.variantRowTitle,
+                            { color: palette.text },
+                          ]}
+                        >
                           {variant.size || '—'} / {variant.color || '—'}
                         </Text>
-                        <Text style={[styles.variantRowMeta, { color: palette.subtext }]}>
+                        <Text
+                          style={[
+                            styles.variantRowMeta,
+                            { color: palette.subtext },
+                          ]}
+                        >
                           SKU: {variant.sku || variant.id || 'N/A'}
                         </Text>
                       </View>
 
                       <View style={styles.variantRowRight}>
-                        <Text style={[styles.variantRowPrice, { color: palette.primaryStrong }]}>
-                          {`${variantPrice.toFixed(2)} ${product.currency ?? KIS_COIN_CODE}`}
+                        <Text
+                          style={[
+                            styles.variantRowPrice,
+                            { color: palette.primaryStrong },
+                          ]}
+                        >
+                          {`${variantPrice.toFixed(2)} ${
+                            product.currency ?? KIS_COIN_CODE
+                          }`}
                         </Text>
-                        <Text style={[styles.variantRowStock, { color: palette.subtext }]}>
+                        <Text
+                          style={[
+                            styles.variantRowStock,
+                            { color: palette.subtext },
+                          ]}
+                        >
                           {`Stock ${variant.stock_qty ?? 0}`}
                         </Text>
                       </View>
@@ -1211,10 +1609,19 @@ export default function ProductDetailsPage() {
           </View>
         ) : null}
 
-        <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Quantity</Text>
-            <Text style={[styles.sectionCaption, { color: palette.subtext }]}>How many units are you ordering?</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Quantity
+            </Text>
+            <Text style={[styles.sectionCaption, { color: palette.subtext }]}>
+              How many units are you ordering?
+            </Text>
           </View>
           <View style={styles.quantityRow}>
             <Pressable
@@ -1229,11 +1636,19 @@ export default function ProductDetailsPage() {
                 !canDecreaseQuantity && { opacity: 0.35 },
               ]}
             >
-              <Text style={[styles.quantityButtonLabel, { color: palette.text }]}>-</Text>
+              <Text
+                style={[styles.quantityButtonLabel, { color: palette.text }]}
+              >
+                -
+              </Text>
             </Pressable>
             <View style={styles.quantityValueWrap}>
-              <Text style={[styles.quantityValue, { color: palette.text }]}>{quantityLimit > 0 ? quantity : 0}</Text>
-              <Text style={[styles.quantitySubText, { color: palette.subtext }]}>
+              <Text style={[styles.quantityValue, { color: palette.text }]}>
+                {quantityLimit > 0 ? quantity : 0}
+              </Text>
+              <Text
+                style={[styles.quantitySubText, { color: palette.subtext }]}
+              >
                 {quantityLimit > 0
                   ? `${quantityLimit} available`
                   : 'Out of stock: restock soon'}
@@ -1251,7 +1666,11 @@ export default function ProductDetailsPage() {
                 !canIncreaseQuantity && { opacity: 0.35 },
               ]}
             >
-              <Text style={[styles.quantityButtonLabel, { color: palette.text }]}>+</Text>
+              <Text
+                style={[styles.quantityButtonLabel, { color: palette.text }]}
+              >
+                +
+              </Text>
             </Pressable>
           </View>
           <View style={styles.quantityInfoRow}>
@@ -1260,43 +1679,74 @@ export default function ProductDetailsPage() {
                 ? `Selected: ${quantity} · Max allowed: ${quantityLimit}`
                 : 'Sold out'}
             </Text>
-            <Text style={[styles.quantityInfoText, { color: palette.subtext }]}>Auto-limits based on inventory</Text>
+            <Text style={[styles.quantityInfoText, { color: palette.subtext }]}>
+              Auto-limits based on inventory
+            </Text>
           </View>
         </View>
 
-
         {multiSelectAttributes.length > 0 ? (
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
+          <View
+            style={[
+              styles.section,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
+          >
             <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>Attributes</Text>
-              <Text style={[styles.sectionCaption, { color: palette.subtext }]}>Choose or update your custom options</Text>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>
+                Attributes
+              </Text>
+              <Text style={[styles.sectionCaption, { color: palette.subtext }]}>
+                Choose or update your custom options
+              </Text>
             </View>
             {multiSelectAttributes.map((attribute, attrIndex) => {
               const selection = selectedAttributeOptions[attribute.key] ?? [];
               return (
-                <View key={attribute.key} style={attrIndex ? { marginTop: 18 } : { marginTop: 12 }}>
-                  <Text style={[styles.multiSelectLabel, { color: palette.subtext }]}>
+                <View
+                  key={attribute.key}
+                  style={attrIndex ? { marginTop: 18 } : { marginTop: 12 }}
+                >
+                  <Text
+                    style={[
+                      styles.multiSelectLabel,
+                      { color: palette.subtext },
+                    ]}
+                  >
                     Select one or more {attribute.label}
                   </Text>
                   <View style={styles.attributeChipRow}>
-                    {attribute.options.map((option) => {
+                    {attribute.options.map(option => {
                       const selected = selection.includes(option);
                       return (
                         <Pressable
                           key={`${attribute.key}-${option}`}
-                          onPress={() => toggleAttributeOption(attribute.key, option)}
+                          onPress={() =>
+                            toggleAttributeOption(attribute.key, option)
+                          }
                           style={[
                             styles.attributeOptionChip,
                             {
-                              borderColor: selected ? palette.primaryStrong : palette.divider,
-                              backgroundColor: selected ? palette.inputBg : palette.surface,
+                              borderColor: selected
+                                ? palette.primaryStrong
+                                : palette.divider,
+                              backgroundColor: selected
+                                ? palette.inputBg
+                                : palette.surface,
                             },
                           ]}
                         >
                           <Text
                             style={[
                               styles.attributeOptionText,
-                              { color: selected ? palette.primaryStrong : palette.text },
+                              {
+                                color: selected
+                                  ? palette.primaryStrong
+                                  : palette.text,
+                              },
                             ]}
                           >
                             {option}
@@ -1305,7 +1755,9 @@ export default function ProductDetailsPage() {
                       );
                     })}
                   </View>
-                  <Text style={[styles.attributeHelper, { color: palette.subtext }]}>
+                  <Text
+                    style={[styles.attributeHelper, { color: palette.subtext }]}
+                  >
                     {selection.length > 0
                       ? `${selection.length} selected`
                       : `Pick one or more ${attribute.label.toLowerCase()} options.`}
@@ -1316,39 +1768,53 @@ export default function ProductDetailsPage() {
           </View>
         ) : null}
 
-        {(
-          <View style={[styles.section, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            Special instructions / description
-          </Text>
-          <TextInput
+        {
+          <View
             style={[
-              styles.customDescriptionInput,
+              styles.section,
               {
+                backgroundColor: palette.surface,
                 borderColor: palette.divider,
-                backgroundColor: palette.inputBg,
-                color: palette.text,
               },
             ]}
-            placeholder="Tell us what you want"
-            placeholderTextColor={palette.subtext}
-            multiline
-            numberOfLines={4}
-            value={customDescription}
-            onChangeText={setCustomDescription}
-          />
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Special instructions / description
+            </Text>
+            <TextInput
+              style={[
+                styles.customDescriptionInput,
+                {
+                  borderColor: palette.divider,
+                  backgroundColor: palette.inputBg,
+                  color: palette.text,
+                },
+              ]}
+              placeholder="Tell us what you want"
+              placeholderTextColor={palette.subtext}
+              multiline
+              numberOfLines={4}
+              value={customDescription}
+              onChangeText={setCustomDescription}
+            />
           </View>
-        )}
+        }
 
         {isInCart ? (
-          <Text style={[styles.cartStatusText, { color: palette.primaryStrong }]}>
-            This product is already in your cart. Add more to adjust quantity or customization.
+          <Text
+            style={[styles.cartStatusText, { color: palette.primaryStrong }]}
+          >
+            This product is already in your cart. Add more to adjust quantity or
+            customization.
           </Text>
         ) : null}
 
         {showAddToCartButton ? (
           <View style={styles.addToCartWrap}>
-            <KISButton title={isInCart ? 'Update cart' : 'Add to cart'} onPress={handleAddToCart} />
+            <KISButton
+              title={isInCart ? 'Update cart' : 'Add to cart'}
+              onPress={handleAddToCart}
+            />
           </View>
         ) : null}
       </ScrollView>

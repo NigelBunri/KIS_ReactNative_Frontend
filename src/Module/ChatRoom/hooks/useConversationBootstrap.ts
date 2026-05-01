@@ -3,9 +3,103 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { getAccessToken } from '@/security/authStorage';
 import type { ChatRoomPageProps } from '../chatTypes';
 
 type ChatType = ChatRoomPageProps['chat'];
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isBackendConversationId = (value?: unknown): boolean =>
+  UUID_PATTERN.test(String(value ?? '').trim());
+
+const cleanPhone = (value?: unknown): string | null => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const cleaned = raw.startsWith('+')
+    ? `+${raw.slice(1).replace(/\D/g, '')}`
+    : raw.replace(/\D/g, '');
+  return cleaned.length >= 6 ? cleaned : null;
+};
+
+const pickPeerUserId = (chat: ChatType): string | null => {
+  const candidates = [
+    (chat as any)?.peer_user_id,
+    (chat as any)?.peerUserId,
+    (chat as any)?.contactUserId,
+    (chat as any)?.contact_user_id,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim();
+    if (value) return value;
+  }
+
+  for (const participant of ((chat as any)?.participants ?? []) as any[]) {
+    const user = participant?.user;
+    const value =
+      user && typeof user === 'object'
+        ? user.id
+        : participant?.user_id ?? participant?.userId;
+    const normalized = String(value ?? '').trim();
+    if (normalized) return normalized;
+  }
+
+  return null;
+};
+
+const collectParticipantPhones = (chat: ChatType): string[] => {
+  const phones: string[] = [];
+  const addPhone = (value?: unknown) => {
+    const phone = cleanPhone(value);
+    if (phone && !phones.includes(phone)) phones.push(phone);
+  };
+
+  addPhone((chat as any)?.contactPhone ?? (chat as any)?.contact_phone);
+
+  const id = String((chat as any)?.id ?? '');
+  if (id.startsWith('newContact-')) {
+    addPhone(id.replace(/^newContact-/, ''));
+  }
+
+  for (const participant of ((chat as any)?.participants ?? []) as any[]) {
+    if (typeof participant === 'string' || typeof participant === 'number') {
+      addPhone(participant);
+      continue;
+    }
+    addPhone(participant?.phone ?? participant?.contactPhone);
+    if (participant?.user && typeof participant.user === 'object') {
+      addPhone(participant.user.phone);
+    }
+  }
+
+  return phones;
+};
+
+const getRequestErrorMessage = (res: any): string => {
+  const data = res?.data;
+  const firstValue = (value: any): string | null => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && value.length) return firstValue(value[0]);
+    if (value && typeof value === 'object') {
+      for (const key of Object.keys(value)) {
+        const nested = firstValue(value[key]);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+
+  return (
+    firstValue(data?.detail) ||
+    firstValue(data?.participants) ||
+    firstValue(data?.peer_user_id) ||
+    firstValue(data) ||
+    res?.message ||
+    'Could not start conversation.'
+  );
+};
 
 export function useConversationBootstrap(
   chat: ChatType | undefined,
@@ -33,7 +127,7 @@ export function useConversationBootstrap(
       return String(chat.id);
     }
 
-    if (isDirectChat && chat.id && !String(chat.id).startsWith('newContact-')) {
+    if (isDirectChat && isBackendConversationId(chat.id)) {
       return String(chat.id);
     }
 
@@ -76,10 +170,11 @@ export function useConversationBootstrap(
       let currentConversationId: string | null =
         conversationId != null ? String(conversationId) : null;
 
-      console.log(
-        '[ChatRoomPage] ensureConversationId called:',
-        { reason, currentConversationId, isDirectChat },
-      );
+      console.log('[ChatRoomPage] ensureConversationId called:', {
+        reason,
+        currentConversationId,
+        isDirectChat,
+      });
 
       // ---------------- NON-DIRECT ----------------
       if (!isDirectChat) {
@@ -99,29 +194,34 @@ export function useConversationBootstrap(
       const chatIdStr = chat.id != null ? String(chat.id) : null;
       const isNewContact = chatIdStr?.startsWith('newContact-') ?? false;
 
-      // If chat.id exists and isn't temp, treat it as conversationId.
-      if (!isNewContact && chatIdStr) {
+      // If chat.id is already a backend UUID, treat it as conversationId.
+      if (!isNewContact && isBackendConversationId(chatIdStr)) {
         setConversationId(chatIdStr);
         return chatIdStr;
       }
 
-      if (!authToken) {
+      const storedToken = authToken || (await getAccessToken());
+      if (!storedToken) {
         Alert.alert('Not signed in', 'Please sign in again.');
         return null;
       }
 
-      const participantsPhones: string[] = (chat.participants ?? [])
-        .filter(Boolean)
-        .map((p) => String(p).trim())
-        .filter((p) => p.length > 0);
+      const peerUserId = pickPeerUserId(chat);
+      const participantPhones = collectParticipantPhones(chat);
 
-      if (!participantsPhones.length) {
-        Alert.alert('Cannot start chat', 'No participant phone numbers found.');
+      if (!peerUserId && !participantPhones.length) {
+        Alert.alert(
+          'Cannot start chat',
+          'No registered participant found for this contact.',
+        );
         return null;
       }
 
       const payload = {
-        participants: [participantsPhones[0]],
+        ...(peerUserId ? { peer_user_id: peerUserId } : {}),
+        ...(participantPhones.length
+          ? { participants: [participantPhones[0]] }
+          : {}),
         client_context: {
           temp_chat_id: String(chat.id),
           source: 'mobile',
@@ -136,7 +236,7 @@ export function useConversationBootstrap(
         });
 
         if (!res?.success) {
-          Alert.alert('Error', res?.message || 'Could not start conversation.');
+          Alert.alert('Error', getRequestErrorMessage(res));
           return null;
         }
 

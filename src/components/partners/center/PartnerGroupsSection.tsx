@@ -37,7 +37,7 @@ export default function PartnerGroupsSection({
           No standalone groups yet.
         </Text>
       ) : (
-        rootGroups.map((item) => {
+        rootGroups.map(item => {
           const isSelected = item.id === selectedGroupId;
           return (
             <Pressable
@@ -52,12 +52,31 @@ export default function PartnerGroupsSection({
                   borderColor: isSelected
                     ? palette.primaryStrong
                     : palette.borderMuted,
+                  shadowColor: palette.shadow ?? '#000',
                   opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.985 : 1 }],
                 },
               ]}
             >
-              <View style={styles.groupHash}>
-                <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>
+              <View
+                style={[
+                  styles.groupHash,
+                  {
+                    backgroundColor: isSelected
+                      ? palette.primaryStrong
+                      : palette.primarySoft,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: isSelected
+                      ? palette.onPrimary
+                      : palette.primaryStrong,
+                    fontSize: 15,
+                    fontWeight: '900',
+                  }}
+                >
                   #
                 </Text>
               </View>

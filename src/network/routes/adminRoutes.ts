@@ -57,6 +57,11 @@ const adminRoutes = {
     notifications: `${API_BASE_URL}/api/v1/notifications/`,
     templates: `${API_BASE_URL}/api/v1/notification-templates/`,
     rules: `${API_BASE_URL}/api/v1/notification-rules/`,
+    deviceTokens: `${API_BASE_URL}/api/v1/notification-device-tokens/`,
+    deviceTokenRegister: `${API_BASE_URL}/api/v1/notification-device-tokens/register/`,
+    deviceTokenUnregister: `${API_BASE_URL}/api/v1/notification-device-tokens/unregister/`,
+    unreadCount: `${API_BASE_URL}/api/v1/notifications/unread-count/`,
+    markAllRead: `${API_BASE_URL}/api/v1/notifications/mark-all-read/`,
   },
 };
 

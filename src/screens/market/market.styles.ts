@@ -49,6 +49,10 @@ export const marketStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  meta: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   quickActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

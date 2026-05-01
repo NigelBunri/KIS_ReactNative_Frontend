@@ -20,13 +20,14 @@ import { useKISTheme } from '../../theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import type { Chat, ParticipantWire, UserWire } from './messagesUtils';
-import { directConversationAvatar } from './messagesUtils';
+import { directConversationAvatar, participantsToIds } from './messagesUtils';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from './uploadFileToBackend';
 import Skeleton from '@/components/common/Skeleton';
 import { getAccessToken } from '@/security/authStorage';
+import { useSocket } from '../../../SocketProvider';
 
 type ChatInfoPageProps = {
   chat: Chat;
@@ -70,6 +71,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 }) => {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const { startCall } = useSocket();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(
     chat.avatarUrl ||
@@ -112,6 +114,27 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     if (!directContact?.user) return null;
     return resolveUserId(directContact.user);
   }, [directContact]);
+
+  const handleStartCall = async (media: 'voice' | 'video') => {
+    if (!startCall) {
+      Alert.alert('Call unavailable', 'Calling is not ready yet.');
+      return;
+    }
+    const conversationId = String(chat.conversationId ?? chat.id ?? '');
+    if (!conversationId) {
+      Alert.alert('Call unavailable', 'Conversation is not ready yet.');
+      return;
+    }
+    const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
+      (id) => String(id) !== String(currentUserId ?? ''),
+    );
+    await startCall({
+      conversationId,
+      title: chat.name ?? 'Call',
+      media,
+      inviteeUserIds,
+    });
+  };
 
   useEffect(() => {
     const nextAvatar = chat.avatarUrl ? String(chat.avatarUrl) : '';
@@ -878,13 +901,17 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   <KISIcon name="chat" size={20} color={palette.primary} />
                 </Pressable>
                 <Pressable
-                  onPress={() => Alert.alert('Coming up', 'Voice calls are coming soon.')}
+                  onPress={() => {
+                    void handleStartCall('voice');
+                  }}
                   style={styles.previewActionBtn}
                 >
                   <KISIcon name="phone" size={20} color={palette.text} />
                 </Pressable>
                 <Pressable
-                  onPress={() => Alert.alert('Coming up', 'Video calls are coming soon.')}
+                  onPress={() => {
+                    void handleStartCall('video');
+                  }}
                   style={styles.previewActionBtn}
                 >
                   <KISIcon name="video" size={20} color={palette.text} />

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import {
+  Animated,
   Modal,
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 
 export type EventDraft = {
   title: string;
@@ -42,6 +44,10 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [description, setDescription] = useState('');
   const [reminderMinutes, setReminderMinutes] = useState<number>(10);
   const [attempted, setAttempted] = useState(false);
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   const reminderOptions = [
     { label: 'None', value: 0 },
@@ -58,7 +64,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   const isValidTime = (value: string) => {
     if (!/^\d{2}:\d{2}$/.test(value)) return false;
-    const [h, m] = value.split(':').map((v) => Number(v));
+    const [h, m] = value.split(':').map(v => Number(v));
     return h >= 0 && h < 24 && m >= 0 && m < 60;
   };
 
@@ -135,15 +141,32 @@ export const EventModal: React.FC<EventModalProps> = ({
           justifyContent: 'flex-end',
         }}
       >
-        <View
+        <Animated.View
           style={{
             backgroundColor: palette.surfaceElevated,
             borderTopLeftRadius: kisRadius.xl,
             borderTopRightRadius: kisRadius.xl,
             padding: KIS_TOKENS.spacing.lg,
             maxHeight: '80%',
+            transform: [{ translateY: dragY }],
           }}
         >
+          <View
+            {...panHandlers}
+            style={{
+              alignItems: 'center',
+              marginBottom: KIS_TOKENS.spacing.sm,
+            }}
+          >
+            <View
+              style={{
+                width: 42,
+                height: 4,
+                borderRadius: 999,
+                backgroundColor: palette.divider,
+              }}
+            />
+          </View>
           <Text
             style={{
               fontSize: KIS_TOKENS.typography.title,
@@ -175,7 +198,9 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !isValidDate(startDate) && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Enter a valid start date (YYYY-MM-DD).
               </Text>
             )}
@@ -190,7 +215,9 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !isValidTime(startTime) && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Enter a valid start time (HH:MM).
               </Text>
             )}
@@ -205,7 +232,9 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !isValidDate(endDate) && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Enter a valid end date (YYYY-MM-DD).
               </Text>
             )}
@@ -220,13 +249,17 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !isValidTime(endTime) && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Enter a valid end time (HH:MM).
               </Text>
             )}
 
             {attempted && !endAfterStart && startValid && endValid && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 End time must be after start time.
               </Text>
             )}
@@ -241,7 +274,9 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !locationValid && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Location is required.
               </Text>
             )}
@@ -260,7 +295,9 @@ export const EventModal: React.FC<EventModalProps> = ({
             />
 
             {attempted && !descriptionValid && (
-              <Text style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}>
+              <Text
+                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+              >
                 Description is required.
               </Text>
             )}
@@ -276,7 +313,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                 marginBottom: KIS_TOKENS.spacing.md,
               }}
             >
-              {reminderOptions.map((opt) => {
+              {reminderOptions.map(opt => {
                 const active = reminderMinutes === opt.value;
                 return (
                   <Pressable
@@ -333,7 +370,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

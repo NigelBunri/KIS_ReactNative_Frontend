@@ -113,12 +113,10 @@
   <array>
     <string>Ionicons.ttf</string>
   </array>
-  <key>UISupportedInterfaceOrientations</key>
-  <array>
-    <string>UIInterfaceOrientationPortrait</string>
-    <string>UIInterfaceOrientationLandscapeLeft</string>
-    <string>UIInterfaceOrientationLandscapeRight</string>
-  </array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
   <key>UIViewControllerBasedStatusBarAppearance</key>
   <false/>
 

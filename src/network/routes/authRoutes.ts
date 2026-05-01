@@ -13,6 +13,9 @@ const authRoutes = {
     resetPassword: `${API_BASE_URL}/api/v1/auth/password/reset/`,
     e2eeRegisterKeys: `${API_BASE_URL}/api/v1/auth/e2ee/keys/`,
     e2eeFetchBundle: (userId: string) => `${API_BASE_URL}/api/v1/auth/e2ee/keys/${userId}/`,
+    e2eeFetchDeviceBundles: (userId: string) => `${API_BASE_URL}/api/v1/auth/e2ee/keys/${userId}/devices/`,
+    listDevices: `${API_BASE_URL}/api/v1/auth/devices/`,
+    revokeDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/`,
     checkContact: `${API_BASE_URL}/api/v1/users/check-contacts/`,
   },
   user: {

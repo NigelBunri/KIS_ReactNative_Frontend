@@ -1,18 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import React from 'react';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import KISTextInput from '@/constants/KISTextInput';
 import type { MarketFormState } from '@/screens/tabs/profile-screen/types';
 import { marketStyles } from './market.styles';
-import { Asset, launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 type ShopEditorDrawerProps = {
   visible: boolean;
@@ -42,12 +36,9 @@ export default function ShopEditorDrawer({
   onClose,
   onSave,
   onDelete,
-  activeShop,
   canDeleteShop,
 }: ShopEditorDrawerProps) {
   const { palette } = useKISTheme();
-  const shopId = marketForm.id ?? activeShop?.id ?? null;
-
   const handlePickShopImage = async () => {
     try {
       const result = await launchImageLibrary({
@@ -81,13 +72,28 @@ export default function ShopEditorDrawer({
           { backgroundColor: palette.surface },
         ]}
       >
-        <View style={[marketStyles.drawerContent, { backgroundColor: palette.card }]}>
-          <View style={[marketStyles.drawerHeader, { borderBottomColor: palette.divider }]}>
+        <View
+          style={[
+            marketStyles.drawerContent,
+            { backgroundColor: palette.card },
+          ]}
+        >
+          <View
+            style={[
+              marketStyles.drawerHeader,
+              { borderBottomColor: palette.divider },
+            ]}
+          >
             <View>
               <Text style={[marketStyles.drawerTitle, { color: palette.text }]}>
                 {mode === 'edit' ? 'Edit shop' : 'Create shop'}
               </Text>
-              <Text style={[marketStyles.drawerSubtitle, { color: palette.subtext }]}>
+              <Text
+                style={[
+                  marketStyles.drawerSubtitle,
+                  { color: palette.subtext },
+                ]}
+              >
                 Keep it short: name, description, employee slots, and image
               </Text>
             </View>
@@ -98,41 +104,58 @@ export default function ShopEditorDrawer({
 
           <ScrollView
             style={marketStyles.drawerScroll}
-            contentContainerStyle={[marketStyles.drawerBody, { paddingBottom: 0 }]}
+            contentContainerStyle={[
+              marketStyles.drawerBody,
+              { paddingBottom: 0 },
+            ]}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
             scrollEventThrottle={16}
           >
             <View style={marketStyles.drawerSection}>
               <View style={marketStyles.drawerSectionHeader}>
-                <Text style={[marketStyles.drawerSectionTitle, { color: palette.text }]}>
+                <Text
+                  style={[
+                    marketStyles.drawerSectionTitle,
+                    { color: palette.text },
+                  ]}
+                >
                   Shop details
                 </Text>
               </View>
-              <Text style={[marketStyles.drawerSectionHelper, { color: palette.subtext }]}>
+              <Text
+                style={[
+                  marketStyles.drawerSectionHelper,
+                  { color: palette.subtext },
+                ]}
+              >
                 What the shop is called, how it feels, and who can staff it.
               </Text>
               <KISTextInput
                 label="Shop name"
                 value={marketForm.name}
-                onChangeText={(value) => onChangeField({ name: value })}
+                onChangeText={value => onChangeField({ name: value })}
               />
               <KISTextInput
                 label="Description"
                 value={marketForm.description}
-                onChangeText={(value) => onChangeField({ description: value })}
+                onChangeText={value => onChangeField({ description: value })}
                 multiline
               />
               <KISTextInput
                 label="Employee slots"
                 value={marketForm.employeeSlots}
-                onChangeText={(value) =>
+                onChangeText={value =>
                   onChangeField({ employeeSlots: value.replace(/[^0-9]/g, '') })
                 }
                 keyboardType="numeric"
               />
               <KISButton
-                title={marketForm.featuredImage ? 'Change shop image' : 'Upload shop image'}
+                title={
+                  marketForm.featuredImage
+                    ? 'Change shop image'
+                    : 'Upload shop image'
+                }
                 onPress={handlePickShopImage}
               />
               {marketForm.featuredImage ? (
@@ -147,7 +170,9 @@ export default function ShopEditorDrawer({
                   }}
                 />
               ) : (
-                <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 8 }}>
+                <Text
+                  style={{ color: palette.subtext, fontSize: 12, marginTop: 8 }}
+                >
                   Adding an image helps shoppers trust your storefront.
                 </Text>
               )}
@@ -155,11 +180,20 @@ export default function ShopEditorDrawer({
             <View
               style={[
                 marketStyles.drawerFooter,
-                { borderTopColor: palette.divider, marginTop: 12, paddingTop: 12 },
+                {
+                  borderTopColor: palette.divider,
+                  marginTop: 12,
+                  paddingTop: 12,
+                },
               ]}
             >
               <View style={marketStyles.drawerFooterActions}>
-                <KISButton title="Cancel" variant="outline" size="sm" onPress={onClose} />
+                <KISButton
+                  title="Cancel"
+                  variant="outline"
+                  size="sm"
+                  onPress={onClose}
+                />
                 {mode === 'edit' && onDelete && canDeleteShop ? (
                   <KISButton
                     title="Delete shop"
@@ -180,8 +214,8 @@ export default function ShopEditorDrawer({
                 <KISButton
                   title={mode === 'edit' ? 'Save changes' : 'Publish shop'}
                   onPress={onSave}
-                   disabled={loading}
-                   size='sm'
+                  disabled={loading}
+                  size="sm"
                 />
               </View>
             </View>

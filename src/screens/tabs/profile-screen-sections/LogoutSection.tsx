@@ -10,7 +10,7 @@ type Props = {
 
 export default function LogoutSection({ palette: _palette, onLogout }: Props) {
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ paddingHorizontal: 18 }}>
       <KISButton title="Log Out" onPress={onLogout} variant="outline" />
     </View>
   );

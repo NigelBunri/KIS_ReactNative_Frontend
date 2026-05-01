@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Animated,
   Modal,
   Pressable,
   StyleSheet,
@@ -7,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 
 export type FeedPostAction = {
   key: string;
@@ -27,14 +29,35 @@ export default function FeedPostActionsSheet({
   actions,
 }: Props) {
   const { palette } = useKISTheme();
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: palette.card, borderColor: palette.divider }]}>
-        {actions.map((action) => (
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: palette.card,
+            borderColor: palette.divider,
+            transform: [{ translateY: dragY }],
+          },
+        ]}
+      >
+        <View {...panHandlers} style={styles.handleWrap}>
+          <View style={[styles.handle, { backgroundColor: palette.divider }]} />
+        </View>
+        {actions.map(action => (
           <Pressable
             key={action.key}
             onPress={() => {
@@ -48,7 +71,9 @@ export default function FeedPostActionsSheet({
           >
             <Text
               style={{
-                color: action.destructive ? palette.error ?? '#DC2626' : palette.text,
+                color: action.destructive
+                  ? palette.error ?? '#DC2626'
+                  : palette.text,
                 fontSize: 14,
               }}
             >
@@ -56,7 +81,7 @@ export default function FeedPostActionsSheet({
             </Text>
           </Pressable>
         ))}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
@@ -74,6 +99,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 38,
+    height: 4,
+    borderRadius: 999,
   },
   actionRow: {
     paddingVertical: 14,

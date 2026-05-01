@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextInput, Pressable } from 'react-native';
+import { Text } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
 import { WalletModal } from '../src/screens/tabs/profile-screen/WalletModal';
@@ -9,7 +9,11 @@ jest.mock('@/constants/KISButton', () => {
   const { Pressable, Text } = require('react-native');
   return function MockKISButton(props: any) {
     return (
-      <Pressable testID={`kis-button-${props.title}`} onPress={props.onPress} disabled={props.disabled}>
+      <Pressable
+        testID={`kis-button-${props.title}`}
+        onPress={props.onPress}
+        disabled={props.disabled}
+      >
         <Text>{props.title}</Text>
       </Pressable>
     );
@@ -48,7 +52,12 @@ describe('WalletModal transfer verification gating', () => {
       tree = ReactTestRenderer.create(
         <WalletModal
           palette={palette}
-          walletForm={{ mode: 'transfer', amount: '1', recipient: '699123456', reference: '' }}
+          walletForm={{
+            mode: 'transfer',
+            amount: '1',
+            recipient: '699123456',
+            reference: '',
+          }}
           setWalletForm={jest.fn()}
           saving={false}
           walletRecipientVerification={{
@@ -72,7 +81,12 @@ describe('WalletModal transfer verification gating', () => {
       tree = ReactTestRenderer.create(
         <WalletModal
           palette={palette}
-          walletForm={{ mode: 'transfer', amount: '1', recipient: '699123456', reference: '' }}
+          walletForm={{
+            mode: 'transfer',
+            amount: '1',
+            recipient: '699123456',
+            reference: '',
+          }}
           setWalletForm={jest.fn()}
           saving={false}
           walletRecipientVerification={{
@@ -89,11 +103,19 @@ describe('WalletModal transfer verification gating', () => {
     const submit = tree!.root.findByProps({ testID: 'kis-button-Submit' });
     expect(submit.props.disabled).toBe(false);
 
-    const texts = tree!.root.findAllByType(Text).map((node) => {
+    const texts = tree!.root.findAllByType(Text).map(node => {
       const value = node.props.children;
       return Array.isArray(value) ? value.join('') : String(value);
     });
-    expect(texts.some((value) => value.includes('Receiver:') && value.includes('Receiver Name'))).toBe(true);
-    expect(texts.some((value) => value.includes('Number:') && value.includes('+237699123456'))).toBe(true);
+    expect(
+      texts.some(
+        value => value.includes('Receiver:') && value.includes('Receiver Name'),
+      ),
+    ).toBe(true);
+    expect(
+      texts.some(
+        value => value.includes('Number:') && value.includes('+237699123456'),
+      ),
+    ).toBe(true);
   });
 });

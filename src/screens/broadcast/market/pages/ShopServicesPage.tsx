@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,13 +14,19 @@ import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
-import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import {
+  KIS_COIN_CODE,
+  KIS_TO_USD_RATE,
+} from '@/screens/market/market.constants';
 import { collectProductImageUris } from '@/utils/productImages';
 
 const fallbackCover = require('@/assets/logo-light.png');
 
 type ShopServicesRoute = RouteProp<RootStackParamList, 'ShopServices'>;
-type ShopServicesNavigation = NativeStackNavigationProp<RootStackParamList, 'ShopServices'>;
+type ShopServicesNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'ShopServices'
+>;
 
 type ShopService = {
   id?: string | number;
@@ -36,14 +42,25 @@ type ShopService = {
   delivery_modes?: string[];
   service_type?: string;
   catalog_categories?: Array<{ id?: string | number; name?: string }>;
-  images?: Array<string | { image_url?: string | null; image_file?: string | null; url?: string | null }>;
+  images?: Array<
+    | string
+    | {
+        image_url?: string | null;
+        image_file?: string | null;
+        url?: string | null;
+      }
+  >;
   image_url?: string | null;
   image_file?: string | null;
 };
 
-const titleForShop = (name?: string) => (name ? `${name} · services` : 'Shop services');
+const titleForShop = (name?: string) =>
+  name ? `${name} · services` : 'Shop services';
 
-const formatAvailabilityLabel = (rule?: { targets?: string[]; times?: string[] }) => {
+const formatAvailabilityLabel = (rule?: {
+  targets?: string[];
+  times?: string[];
+}) => {
   if (!rule) return 'Availability TBD';
   const target = rule.targets?.[0];
   const time = rule.times?.[0];
@@ -106,7 +123,9 @@ const ShopServicesPage = () => {
         }
         const payload = response.data ?? response ?? {};
         const normalized = normalizeListResponse(payload);
-        setServices((prev) => (reset ? normalized.items : [...prev, ...normalized.items]));
+        setServices(prev =>
+          reset ? normalized.items : [...prev, ...normalized.items],
+        );
         setNextPage(normalized.next || null);
         setError(null);
       } catch (loadError: any) {
@@ -155,12 +174,22 @@ const ShopServicesPage = () => {
       const currency = item.currency ?? KIS_COIN_CODE;
       const comparePrice = Number(item.compare_at_price ?? 0);
       const imageUri = collectProductImageUris(item)[0] ?? null;
-      const durationText = item.duration_minutes ? `${item.duration_minutes} min` : 'Duration TBD';
-      const availabilityLabel = formatAvailabilityLabel(item.availability_rules?.[0]);
+      const durationText = item.duration_minutes
+        ? `${item.duration_minutes} min`
+        : 'Duration TBD';
+      const availabilityLabel = formatAvailabilityLabel(
+        item.availability_rules?.[0],
+      );
       const coverageLabel = formatCoverageLabel(item.coverage);
-      const categoryLabel = item.catalog_categories?.[0]?.name ?? item.service_type ?? 'Service';
+      const categoryLabel =
+        item.catalog_categories?.[0]?.name ?? item.service_type ?? 'Service';
       return (
-        <View style={[serviceStyles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
+        <View
+          style={[
+            serviceStyles.card,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <View style={serviceStyles.cardBody}>
             <Image
               source={imageUri ? { uri: imageUri } : fallbackCover}
@@ -169,34 +198,77 @@ const ShopServicesPage = () => {
             />
             <View style={serviceStyles.cardContent}>
               <View>
-                <Text style={[serviceStyles.cardTitle, { color: palette.text }]} numberOfLines={2}>
+                <Text
+                  style={[serviceStyles.cardTitle, { color: palette.text }]}
+                  numberOfLines={2}
+                >
                   {item.name ?? 'Service'}
                 </Text>
-                <Text style={[serviceStyles.cardSubtitle, { color: palette.subtext }]} numberOfLines={2}>
-                  {item.short_summary ?? item.description ?? 'No description yet.'}
+                <Text
+                  style={[
+                    serviceStyles.cardSubtitle,
+                    { color: palette.subtext },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {item.short_summary ??
+                    item.description ??
+                    'No description yet.'}
                 </Text>
-                <Text style={[serviceStyles.secondaryText, { color: palette.subtext }]}>
+                <Text
+                  style={[
+                    serviceStyles.secondaryText,
+                    { color: palette.subtext },
+                  ]}
+                >
                   {categoryLabel}
                 </Text>
               </View>
               <View style={serviceStyles.priceRow}>
-                <Text style={[serviceStyles.priceTag, { color: palette.primaryStrong }]}>
+                <Text
+                  style={[
+                    serviceStyles.priceTag,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
                   {`${priceValue.toFixed(2)} ${currency}`}
                 </Text>
                 {comparePrice > priceValue ? (
-                  <Text style={[serviceStyles.secondaryText, { color: palette.subtext }]}>
+                  <Text
+                    style={[
+                      serviceStyles.secondaryText,
+                      { color: palette.subtext },
+                    ]}
+                  >
                     {`${comparePrice.toFixed(2)} ${currency}`}
                   </Text>
                 ) : null}
-                <Text style={[serviceStyles.secondaryText, { color: palette.subtext }]}>≈ ${(priceValue * KIS_TO_USD_RATE).toFixed(2)} USD</Text>
+                <Text
+                  style={[
+                    serviceStyles.secondaryText,
+                    { color: palette.subtext },
+                  ]}
+                >
+                  ≈ ${(priceValue * KIS_TO_USD_RATE).toFixed(2)} USD
+                </Text>
               </View>
-              <Text style={[serviceStyles.secondaryText, { color: palette.subtext }]}>{
-                `${durationText} · ${availabilityLabel}`
-              }</Text>
-              <Text style={[serviceStyles.secondaryText, { color: palette.subtext }]}>{coverageLabel}</Text>
+              <Text
+                style={[
+                  serviceStyles.secondaryText,
+                  { color: palette.subtext },
+                ]}
+              >{`${durationText} · ${availabilityLabel}`}</Text>
+              <Text
+                style={[
+                  serviceStyles.secondaryText,
+                  { color: palette.subtext },
+                ]}
+              >
+                {coverageLabel}
+              </Text>
             </View>
           </View>
-          <View style={serviceStyles.actionRow}> 
+          <View style={serviceStyles.actionRow}>
             <KISButton
               title="Book service"
               size="xs"
@@ -208,23 +280,42 @@ const ShopServicesPage = () => {
         </View>
       );
     },
-    [openServiceBooking, palette.primaryStrong, palette.surface, palette.subtext, palette.text, palette.divider],
+    [
+      openServiceBooking,
+      palette.primaryStrong,
+      palette.surface,
+      palette.subtext,
+      palette.text,
+      palette.divider,
+    ],
   );
+
+  const titleText = titleForShop(shopName);
 
   if (!shopId) {
     return (
-      <View style={[serviceStyles.root, { backgroundColor: palette.bg }]}> 
-        <Text style={[serviceStyles.errorText, { color: palette.error || '#E53935' }]}>Shop not specified.</Text>
+      <View style={[serviceStyles.root, { backgroundColor: palette.bg }]}>
+        <Text
+          style={[
+            serviceStyles.errorText,
+            { color: palette.error || '#E53935' },
+          ]}
+        >
+          Shop not specified.
+        </Text>
       </View>
     );
   }
 
-  const titleText = useMemo(() => titleForShop(shopName), [shopName]);
-
   return (
-    <View style={[serviceStyles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[serviceStyles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
-        <View style={serviceStyles.headerBack}> 
+    <View style={[serviceStyles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          serviceStyles.header,
+          { backgroundColor: palette.surface, borderColor: palette.divider },
+        ]}
+      >
+        <View style={serviceStyles.headerBack}>
           <KISButton
             title="Back"
             size="xs"
@@ -233,20 +324,38 @@ const ShopServicesPage = () => {
           />
         </View>
         <View style={serviceStyles.headerTitleWrap}>
-          <Text style={[serviceStyles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+          <Text
+            style={[serviceStyles.headerTitle, { color: palette.text }]}
+            numberOfLines={1}
+          >
             {titleText}
           </Text>
-          <Text style={[serviceStyles.headerSubtitle, { color: palette.subtext }]}>Services from this shop</Text>
+          <Text
+            style={[serviceStyles.headerSubtitle, { color: palette.subtext }]}
+          >
+            Services from this shop
+          </Text>
         </View>
       </View>
       {error ? (
         <View style={serviceStyles.errorBox}>
-          <Text style={[serviceStyles.errorText, { color: palette.error || '#E53935' }]}>{error}</Text>
-          <KISButton title="Retry" size="sm" onPress={() => loadServices(undefined, true)} />
+          <Text
+            style={[
+              serviceStyles.errorText,
+              { color: palette.error || '#E53935' },
+            ]}
+          >
+            {error}
+          </Text>
+          <KISButton
+            title="Retry"
+            size="sm"
+            onPress={() => loadServices(undefined, true)}
+          />
         </View>
       ) : null}
       {loading && !services.length ? (
-        <View style={serviceStyles.loader}> 
+        <View style={serviceStyles.loader}>
           <ActivityIndicator color={palette.primaryStrong} />
         </View>
       ) : (
@@ -259,16 +368,24 @@ const ShopServicesPage = () => {
           onRefresh={handleRefresh}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          ListEmptyComponent={!loading ? (
-            <View style={serviceStyles.emptyState}>
-              <Text style={[serviceStyles.emptyText, { color: palette.subtext }]}>No services published by this shop yet.</Text>
-            </View>
-          ) : null}
-          ListFooterComponent={loadingMore ? (
-            <View style={serviceStyles.footer}> 
-              <ActivityIndicator color={palette.primaryStrong} />
-            </View>
-          ) : null}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={serviceStyles.emptyState}>
+                <Text
+                  style={[serviceStyles.emptyText, { color: palette.subtext }]}
+                >
+                  No services published by this shop yet.
+                </Text>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={serviceStyles.footer}>
+                <ActivityIndicator color={palette.primaryStrong} />
+              </View>
+            ) : null
+          }
         />
       )}
     </View>

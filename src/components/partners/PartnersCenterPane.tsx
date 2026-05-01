@@ -1,6 +1,6 @@
 // src/screens/tabs/PartnersCenterPane.tsx
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import {
@@ -54,6 +54,7 @@ export default function PartnersCenterPane({
   onPartnerHeaderPress,
 }: Props) {
   const { palette } = useKISTheme();
+  const contentAnim = useRef(new Animated.Value(0)).current;
   const [collapsed, setCollapsed] = useState({
     feed: false,
     courses: false,
@@ -64,26 +65,55 @@ export default function PartnersCenterPane({
 
   const sectionHeaders = useMemo(
     () => ({
-      feed: { title: 'General feed', meta: isReadOnly ? 'Subscriber view' : null },
+      feed: {
+        title: 'General feed',
+        meta: isReadOnly ? 'Subscriber view' : null,
+      },
       courses: { title: 'Courses', meta: 'Lessons & enrollments' },
       channels: { title: 'Channels', meta: `${rootChannels.length} channels` },
       groups: { title: 'Groups', meta: `${rootGroups.length} groups` },
-      communities: { title: 'Communities', meta: `${communitiesForPartner.length} communities` },
+      communities: {
+        title: 'Communities',
+        meta: `${communitiesForPartner.length} communities`,
+      },
     }),
-    [communitiesForPartner.length, isReadOnly, rootChannels.length, rootGroups.length],
+    [
+      communitiesForPartner.length,
+      isReadOnly,
+      rootChannels.length,
+      rootGroups.length,
+    ],
   );
 
   const toggleSection = (key: keyof typeof collapsed) => {
-    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  useEffect(() => {
+    contentAnim.setValue(0);
+    Animated.timing(contentAnim, {
+      toValue: 1,
+      duration: 320,
+      useNativeDriver: true,
+    }).start();
+  }, [contentAnim, selectedPartner?.id]);
+
   return (
-    <View
+    <Animated.View
       style={[
         styles.centerPane,
         {
           marginRight: RIGHT_PEEK_WIDTH,
-          backgroundColor: palette.surface,
+          backgroundColor: 'transparent',
+          opacity: contentAnim,
+          transform: [
+            {
+              translateY: contentAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [10, 0],
+              }),
+            },
+          ],
         },
       ]}
     >
@@ -108,7 +138,9 @@ export default function PartnersCenterPane({
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {sectionHeaders.feed.meta ? (
-              <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+              <Text
+                style={[styles.sectionHeaderMeta, { color: palette.subtext }]}
+              >
                 {sectionHeaders.feed.meta}
               </Text>
             ) : null}
@@ -116,7 +148,9 @@ export default function PartnersCenterPane({
               name="chevron-down"
               size={16}
               color={palette.subtext}
-              style={{ transform: [{ rotate: collapsed.feed ? '180deg' : '0deg' }] }}
+              style={{
+                transform: [{ rotate: collapsed.feed ? '180deg' : '0deg' }],
+              }}
             />
           </View>
         </Pressable>
@@ -127,21 +161,28 @@ export default function PartnersCenterPane({
             style={({ pressed }) => [
               styles.groupRow,
               {
-                backgroundColor: palette.surfaceElevated ?? palette.surface,
-                borderColor: palette.borderMuted,
+                backgroundColor: palette.surface,
+                borderColor: 'rgba(255,138,51,0.24)',
+                shadowColor: palette.shadow ?? '#000',
                 opacity: pressed ? 0.8 : 1,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
               },
             ]}
           >
-            <View style={styles.groupHash}>
+            <View
+              style={[
+                styles.groupHash,
+                { backgroundColor: palette.primarySoft },
+              ]}
+            >
               <Text
                 style={{
-                  color: palette.subtext,
+                  color: palette.primaryStrong,
                   fontSize: 15,
                   fontWeight: '700',
                 }}
               >
-                📰
+                FE
               </Text>
             </View>
             <Text
@@ -166,14 +207,18 @@ export default function PartnersCenterPane({
             {sectionHeaders.courses.title}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+            <Text
+              style={[styles.sectionHeaderMeta, { color: palette.subtext }]}
+            >
               {sectionHeaders.courses.meta}
             </Text>
             <KISIcon
               name="chevron-down"
               size={16}
               color={palette.subtext}
-              style={{ transform: [{ rotate: collapsed.courses ? '180deg' : '0deg' }] }}
+              style={{
+                transform: [{ rotate: collapsed.courses ? '180deg' : '0deg' }],
+              }}
             />
           </View>
         </Pressable>
@@ -184,7 +229,8 @@ export default function PartnersCenterPane({
 
         {isReadOnly ? (
           <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 12 }}>
-            Subscribe-only accounts can follow feeds but cannot access groups or channels.
+            Subscribe-only accounts can follow feeds but cannot access groups or
+            channels.
           </Text>
         ) : (
           <>
@@ -195,15 +241,23 @@ export default function PartnersCenterPane({
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.channels.title}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Text
+                  style={[styles.sectionHeaderMeta, { color: palette.subtext }]}
+                >
                   {sectionHeaders.channels.meta}
                 </Text>
                 <KISIcon
                   name="chevron-down"
                   size={16}
                   color={palette.subtext}
-                  style={{ transform: [{ rotate: collapsed.channels ? '180deg' : '0deg' }] }}
+                  style={{
+                    transform: [
+                      { rotate: collapsed.channels ? '180deg' : '0deg' },
+                    ],
+                  }}
                 />
               </View>
             </Pressable>
@@ -224,15 +278,23 @@ export default function PartnersCenterPane({
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.groups.title}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Text
+                  style={[styles.sectionHeaderMeta, { color: palette.subtext }]}
+                >
                   {sectionHeaders.groups.meta}
                 </Text>
                 <KISIcon
                   name="chevron-down"
                   size={16}
                   color={palette.subtext}
-                  style={{ transform: [{ rotate: collapsed.groups ? '180deg' : '0deg' }] }}
+                  style={{
+                    transform: [
+                      { rotate: collapsed.groups ? '180deg' : '0deg' },
+                    ],
+                  }}
                 />
               </View>
             </Pressable>
@@ -253,15 +315,23 @@ export default function PartnersCenterPane({
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.communities.title}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.sectionHeaderMeta, { color: palette.subtext }]}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Text
+                  style={[styles.sectionHeaderMeta, { color: palette.subtext }]}
+                >
                   {sectionHeaders.communities.meta}
                 </Text>
                 <KISIcon
                   name="chevron-down"
                   size={16}
                   color={palette.subtext}
-                  style={{ transform: [{ rotate: collapsed.communities ? '180deg' : '0deg' }] }}
+                  style={{
+                    transform: [
+                      { rotate: collapsed.communities ? '180deg' : '0deg' },
+                    ],
+                  }}
                 />
               </View>
             </Pressable>
@@ -281,6 +351,6 @@ export default function PartnersCenterPane({
           </>
         )}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }

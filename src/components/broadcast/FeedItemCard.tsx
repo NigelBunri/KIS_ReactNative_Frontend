@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import type { BroadcastItem } from '@/types/broadcast';
-import { dedupeAttachmentPreviews, getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
+import {
+  dedupeAttachmentPreviews,
+  getAttachmentPreviewInfo,
+} from '@/components/broadcast/attachmentPreview';
+import RichTextRenderer from '@/components/feeds/RichTextRenderer';
+import {
+  getFeedPlainText,
+  getFeedRichTextValue,
+} from '@/components/feeds/richTextValue';
 
 const formatDate = (value: string | undefined) => {
   if (!value) return 'Moments ago';
@@ -35,17 +37,19 @@ type Props = {
 
 export default function FeedItemCard({ item, onPress, onReact }: Props) {
   const { palette } = useKISTheme();
+  const richTextValue = getFeedRichTextValue(item);
+  const plainText = getFeedPlainText(item);
 
   const normalizedAttachments = dedupeAttachmentPreviews(
     (item.attachments ?? [])
       .filter(Boolean)
-      .map((att) => getAttachmentPreviewInfo(att)),
-  ).map((att) => ({
+      .map(att => getAttachmentPreviewInfo(att)),
+  ).map(att => ({
     url: att.url,
     label: att.label,
   }));
 
-  const attachments = normalizedAttachments.filter((att) => att.url);
+  const attachments = normalizedAttachments.filter(att => att.url);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
   useEffect(() => {
@@ -53,19 +57,22 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
   }, [attachments.length]);
 
   const handlePrevAttachment = () => {
-    setActiveAttachmentIndex((prev) =>
+    setActiveAttachmentIndex(prev =>
       prev === 0 ? attachments.length - 1 : prev - 1,
     );
   };
 
   const handleNextAttachment = () => {
-    setActiveAttachmentIndex((prev) => (prev + 1) % attachments.length);
+    setActiveAttachmentIndex(prev => (prev + 1) % attachments.length);
   };
 
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}
+      style={[
+        styles.card,
+        { backgroundColor: palette.card, borderColor: palette.divider },
+      ]}
       accessibilityRole="button"
       accessibilityLabel="Open broadcast detail"
     >
@@ -74,22 +81,46 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
           {item.title ?? 'Community update'}
         </Text>
         <View style={styles.row}>
-          <Text style={[styles.time, { color: palette.subtext }]}>{formatDate(item.broadcastedAt)}</Text>
-          <View style={[styles.badge, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}>
-            <Text style={[styles.badgeText, { color: palette.primaryStrong }]}>Feed</Text>
+          <Text style={[styles.time, { color: palette.subtext }]}>
+            {formatDate(item.broadcastedAt)}
+          </Text>
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor: palette.primarySoft,
+                borderColor: palette.primary,
+              },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: palette.primaryStrong }]}>
+              Feed
+            </Text>
           </View>
         </View>
       </View>
 
-      {item.body ? (
+      {richTextValue ? (
+        <View style={styles.richBody}>
+          <RichTextRenderer
+            value={richTextValue}
+            fallback={plainText}
+            style={{ maxHeight: 96, overflow: 'hidden' }}
+          />
+        </View>
+      ) : plainText ? (
         <Text style={[styles.body, { color: palette.text }]} numberOfLines={3}>
-          {item.body}
+          {plainText}
         </Text>
       ) : null}
 
       {attachments.length > 0 ? (
         attachments.length === 1 ? (
-          <Image source={{ uri: attachments[0].url! }} style={styles.image} resizeMode="cover" />
+          <Image
+            source={{ uri: attachments[0].url! }}
+            style={styles.image}
+            resizeMode="cover"
+          />
         ) : (
           <View style={styles.slideshowWrap}>
             <Image
@@ -97,11 +128,25 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
               style={styles.slideshowImage}
               resizeMode="cover"
             />
-            <Pressable style={[styles.navButton, styles.navLeft]} onPress={handlePrevAttachment}>
-              <Text style={[styles.navButtonText, { color: palette.primaryStrong }]}>{'‹'}</Text>
+            <Pressable
+              style={[styles.navButton, styles.navLeft]}
+              onPress={handlePrevAttachment}
+            >
+              <Text
+                style={[styles.navButtonText, { color: palette.primaryStrong }]}
+              >
+                {'‹'}
+              </Text>
             </Pressable>
-            <Pressable style={[styles.navButton, styles.navRight]} onPress={handleNextAttachment}>
-              <Text style={[styles.navButtonText, { color: palette.primaryStrong }]}>{'›'}</Text>
+            <Pressable
+              style={[styles.navButton, styles.navRight]}
+              onPress={handleNextAttachment}
+            >
+              <Text
+                style={[styles.navButtonText, { color: palette.primaryStrong }]}
+              >
+                {'›'}
+              </Text>
             </Pressable>
             <View style={styles.dotRow}>
               {attachments.map((_, dotIndex) => (
@@ -110,8 +155,15 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
                   testID="feed-item-card-dot"
                   style={[
                     styles.dot,
-                    dotIndex === activeAttachmentIndex ? styles.dotActive : null,
-                    { backgroundColor: dotIndex === activeAttachmentIndex ? palette.primaryStrong : palette.surface },
+                    dotIndex === activeAttachmentIndex
+                      ? styles.dotActive
+                      : null,
+                    {
+                      backgroundColor:
+                        dotIndex === activeAttachmentIndex
+                          ? palette.primaryStrong
+                          : palette.surface,
+                    },
                   ]}
                 />
               ))}
@@ -181,6 +233,10 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  richBody: {
+    maxHeight: 96,
+    overflow: 'hidden',
   },
   image: {
     width: '100%',

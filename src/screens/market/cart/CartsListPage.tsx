@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -19,17 +26,26 @@ import { KIS_COIN_CODE } from '@/screens/market/market.constants';
 import { getRequest } from '@/network/get';
 import { frontendKiscMajorToBackendCents } from '@/utils/currency';
 
-type CartsListNavigation = NativeStackNavigationProp<RootStackParamList, 'CartsList'>;
+type CartsListNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'CartsList'
+>;
 
 const CartsListPage = () => {
   const { palette } = useKISTheme();
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const navigation = useNavigation<CartsListNavigation>();
   const [cartState, setCartState] = useState(getShopCartState());
-  const [orderLoadingShopId, setOrderLoadingShopId] = useState<string | null>(null);
-  const [orderFeedback, setOrderFeedback] = useState<Record<string, { type: 'success' | 'error'; message: string }>>({});
-  const [orderPlacedShops, setOrderPlacedShops] = useState<Record<string, boolean>>({});
-  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderLoadingShopId, setOrderLoadingShopId] = useState<string | null>(
+    null,
+  );
+  const [orderFeedback, setOrderFeedback] = useState<
+    Record<string, { type: 'success' | 'error'; message: string }>
+  >({});
+  const [orderPlacedShops, setOrderPlacedShops] = useState<
+    Record<string, boolean>
+  >({});
+  const [, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -38,7 +54,10 @@ const CartsListPage = () => {
     };
   }, []);
 
-  const carts = useMemo(() => Object.values(cartState.carts), [cartState.carts]);
+  const carts = useMemo(
+    () => Object.values(cartState.carts),
+    [cartState.carts],
+  );
 
   const loadMarketplaceOrders = useCallback(async () => {
     setOrdersLoading(true);
@@ -70,7 +89,7 @@ const CartsListPage = () => {
         });
         setOrderPlacedShops(shopsWithOrders);
       }
-    } catch (err) {
+    } catch {
       // ignore for now
     } finally {
       setOrdersLoading(false);
@@ -91,93 +110,102 @@ const CartsListPage = () => {
     });
   }, [cartState.carts, orderPlacedShops]);
 
-  const handlePlaceOrder = useCallback(
-    async (cart: ShopCart) => {
-      if (!cart?.items?.length) {
-        setOrderFeedback((prev) => ({
-          ...prev,
-          [cart.shopId]: { type: 'error', message: 'This cart is empty.' },
-        }));
-        return;
+  const handlePlaceOrder = useCallback(async (cart: ShopCart) => {
+    if (!cart?.items?.length) {
+      setOrderFeedback(prev => ({
+        ...prev,
+        [cart.shopId]: { type: 'error', message: 'This cart is empty.' },
+      }));
+      return;
+    }
+
+    const totalValue = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+    const normalizedItems = cart.items.map(item => {
+      const quantity = Math.max(1, Math.floor(item.quantity));
+      const unitPriceCents = Math.max(
+        1,
+        frontendKiscMajorToBackendCents(item.price),
+      );
+      return {
+        product_id: item.productId,
+        variant_id: item.variantId ?? '',
+        quantity,
+        unit_price_cents: unitPriceCents,
+        selected_attributes: item.selectedAttributes ?? {},
+        custom_description: item.customDescription ?? '',
+      };
+    });
+
+    setOrderLoadingShopId(cart.shopId);
+    setOrderFeedback(prev => ({
+      ...prev,
+      [cart.shopId]: { type: 'success', message: '' },
+    }));
+
+    try {
+      const metadata: Record<string, unknown> = {
+        source: 'cart_place_order',
+        shop_name: cart.shopName,
+        cart_items: cart.items.length,
+        cart_total_amount: Number(totalValue.toFixed(2)),
+      };
+      if (cart.remoteCartId) {
+        metadata.cart_id = cart.remoteCartId;
       }
-
-      const totalValue = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const normalizedItems = cart.items.map((item) => {
-        const quantity = Math.max(1, Math.floor(item.quantity));
-        const unitPriceCents = Math.max(1, frontendKiscMajorToBackendCents(item.price));
-        return {
-          product_id: item.productId,
-          variant_id: item.variantId ?? '',
-          quantity,
-          unit_price_cents: unitPriceCents,
-          selected_attributes: item.selectedAttributes ?? {},
-          custom_description: item.customDescription ?? '',
-        };
-      });
-
-      setOrderLoadingShopId(cart.shopId);
-        setOrderFeedback((prev) => ({ ...prev, [cart.shopId]: { type: 'success', message: '' } }));
-
-      try {
-        const metadata: Record<string, unknown> = {
-          source: 'cart_place_order',
-          shop_name: cart.shopName,
-          cart_items: cart.items.length,
-          cart_total_amount: Number(totalValue.toFixed(2)),
-        };
-        if (cart.remoteCartId) {
-          metadata.cart_id = cart.remoteCartId;
-        }
-        const response = await postRequest(
-          ROUTES.commerce.marketplaceOrders,
-          {
-            shop_id: cart.shopId,
-            items: normalizedItems,
-            metadata,
-          },
-          {
-            errorMessage: 'Unable to place this order.',
-          },
-        );
+      const response = await postRequest(
+        ROUTES.commerce.marketplaceOrders,
+        {
+          shop_id: cart.shopId,
+          items: normalizedItems,
+          metadata,
+        },
+        {
+          errorMessage: 'Unable to place this order.',
+        },
+      );
 
       if (response.success) {
-        setOrderFeedback((prev) => ({
+        setOrderFeedback(prev => ({
           ...prev,
           [cart.shopId]: {
             type: 'success',
             message: `Order placed for ${cart.shopName ?? 'your shop'}.`,
           },
         }));
-        setOrderPlacedShops((prev) => ({ ...prev, [cart.shopId]: true }));
+        setOrderPlacedShops(prev => ({ ...prev, [cart.shopId]: true }));
         void setShopCartStatus(cart.shopId, 'checked_out');
         void refreshShopCartForShop(cart.shopId);
       } else {
-          setOrderFeedback((prev) => ({
-            ...prev,
-            [cart.shopId]: {
-              type: 'error',
-              message: response.message || 'Unable to place this order.',
-            },
-          }));
-        }
-      } catch (orderError: any) {
-        setOrderFeedback((prev) => ({
+        setOrderFeedback(prev => ({
           ...prev,
           [cart.shopId]: {
             type: 'error',
-            message: orderError?.message || 'Unable to place this order.',
+            message: response.message || 'Unable to place this order.',
           },
         }));
-      } finally {
-        setOrderLoadingShopId(null);
       }
-    },
-    [],
-  );
+    } catch (orderError: any) {
+      setOrderFeedback(prev => ({
+        ...prev,
+        [cart.shopId]: {
+          type: 'error',
+          message: orderError?.message || 'Unable to place this order.',
+        },
+      }));
+    } finally {
+      setOrderLoadingShopId(null);
+    }
+  }, []);
 
   const renderCart = (cart: ShopCart) => {
     const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalValue = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalValue = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
     const formattedUsd = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -186,69 +214,99 @@ const CartsListPage = () => {
     return (
       <Pressable
         key={cart.shopId}
-        onPress={() => navigation.navigate('CartDetail', { shopId: cart.shopId, shopName: cart.shopName })}
+        onPress={() =>
+          navigation.navigate('CartDetail', {
+            shopId: cart.shopId,
+            shopName: cart.shopName,
+          })
+        }
         style={[styles.card, { backgroundColor: palette.surfaceElevated }]}
       >
         <View style={styles.cardHeader}>
           <View style={styles.shopInfo}>
             {cart.shopImage ? (
-              <Image source={{ uri: cart.shopImage }} style={styles.shopAvatar} />
+              <Image
+                source={{ uri: cart.shopImage }}
+                style={styles.shopAvatar}
+              />
             ) : (
               <View
-                style={[styles.shopAvatar, { backgroundColor: palette.inputBg, alignItems: 'center', justifyContent: 'center' }]}
+                style={[
+                  styles.shopAvatar,
+                  {
+                    backgroundColor: palette.inputBg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                ]}
               >
                 <KISIcon name="shop" size={22} color={palette.subtext} />
               </View>
             )}
             <View style={styles.shopTextWrap}>
-              <Text style={[styles.shopName, { color: palette.text }]} numberOfLines={1}>
+              <Text
+                style={[styles.shopName, { color: palette.text }]}
+                numberOfLines={1}
+              >
                 {cart.shopName ?? 'Shop cart'}
               </Text>
-              <Text style={[styles.shopSubtitle, { color: palette.subtext }]} numberOfLines={2}>
+              <Text
+                style={[styles.shopSubtitle, { color: palette.subtext }]}
+                numberOfLines={2}
+              >
                 {cart.shopDescription ?? 'Products you saved for later.'}
               </Text>
             </View>
           </View>
           <View style={styles.metaWrap}>
-            <Text style={[styles.shopMeta, { color: palette.subtext }]}>{`${itemCount} item${
-              itemCount === 1 ? '' : 's'
-            }`}</Text>
-            <Text style={[styles.shopMeta, { color: palette.subtext }]}>{formattedUsd}</Text>
+            <Text
+              style={[styles.shopMeta, { color: palette.subtext }]}
+            >{`${itemCount} item${itemCount === 1 ? '' : 's'}`}</Text>
+            <Text style={[styles.shopMeta, { color: palette.subtext }]}>
+              {formattedUsd}
+            </Text>
           </View>
         </View>
         <View style={styles.footerRow}>
-          <Text style={[styles.total, { color: palette.primaryStrong }]}>{`${totalValue.toFixed(2)} ${KIS_COIN_CODE}`}</Text>
+          <Text
+            style={[styles.total, { color: palette.primaryStrong }]}
+          >{`${totalValue.toFixed(2)} ${KIS_COIN_CODE}`}</Text>
           <View style={styles.footerButtons}>
             <KISButton
               size="xs"
               title="View items"
               variant="outline"
               style={styles.footerButton}
-              onPress={() => navigation.navigate('CartDetail', { shopId: cart.shopId, shopName: cart.shopName })}
+              onPress={() =>
+                navigation.navigate('CartDetail', {
+                  shopId: cart.shopId,
+                  shopName: cart.shopName,
+                })
+              }
             />
-          {!orderPlacedShops[cart.shopId] ? (
-            <KISButton
-              size="xs"
-              title="Place order"
-              variant="secondary"
-              style={styles.footerButton}
-              onPress={() => handlePlaceOrder(cart)}
-              loading={orderLoadingShopId === cart.shopId}
-            />
-          ) : (
-            <KISButton
-              size="xs"
-              title="View orders"
-              variant="ghost"
-              style={styles.footerButton}
-              onPress={() => navigation.navigate('MarketplaceOrders')}
-            />
-          )}
+            {!orderPlacedShops[cart.shopId] ? (
+              <KISButton
+                size="xs"
+                title="Place order"
+                variant="secondary"
+                style={styles.footerButton}
+                onPress={() => handlePlaceOrder(cart)}
+                loading={orderLoadingShopId === cart.shopId}
+              />
+            ) : (
+              <KISButton
+                size="xs"
+                title="View orders"
+                variant="ghost"
+                style={styles.footerButton}
+                onPress={() => navigation.navigate('MarketplaceOrders')}
+              />
+            )}
+          </View>
         </View>
-      </View>
-      {orderFeedback[cart.shopId] ? (
-        <Text
-          style={[
+        {orderFeedback[cart.shopId] ? (
+          <Text
+            style={[
               styles.feedbackText,
               {
                 color:
@@ -262,32 +320,49 @@ const CartsListPage = () => {
           </Text>
         ) : null}
         {orderPlacedShops[cart.shopId] ? (
-          <Text style={[styles.feedbackText, { color: palette.subtext }]}>Order placed—check My Orders for updates.</Text>
+          <Text style={[styles.feedbackText, { color: palette.subtext }]}>
+            Order placed—check My Orders for updates.
+          </Text>
         ) : null}
-        <Text style={[styles.previewLabel, { color: palette.subtext }]}>Tap the card to review its items.</Text>
+        <Text style={[styles.previewLabel, { color: palette.subtext }]}>
+          Tap the card to review its items.
+        </Text>
       </Pressable>
     );
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[styles.header, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          styles.header,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
         <View>
-          <Text style={[styles.headerTitle, { color: palette.text }]}>Your carts</Text>
-          <Text style={[styles.headerSubtitle, { color: palette.subtext }]}>Each shop keeps its own cart.</Text>
+          <Text style={[styles.headerTitle, { color: palette.text }]}>
+            Your carts
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: palette.subtext }]}>
+            Each shop keeps its own cart.
+          </Text>
         </View>
-        <Text style={[styles.headerCaption, { color: palette.subtext }]}>Tap a card to review its items.</Text>
+        <Text style={[styles.headerCaption, { color: palette.subtext }]}>
+          Tap a card to review its items.
+        </Text>
       </View>
       {carts.length ? (
         <FlatList
           data={carts}
-          keyExtractor={(item) => item.shopId}
+          keyExtractor={item => item.shopId}
           renderItem={({ item }) => renderCart(item)}
           contentContainerStyle={styles.list}
         />
       ) : (
         <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: palette.subtext }]}>You have no carts yet.</Text>
+          <Text style={[styles.emptyText, { color: palette.subtext }]}>
+            You have no carts yet.
+          </Text>
         </View>
       )}
     </View>
@@ -386,6 +461,10 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     previewLabel: {
       fontSize: 12,
       fontWeight: '600',
+    },
+    feedbackText: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     emptyState: {
       flex: 1,

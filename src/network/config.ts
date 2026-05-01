@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
  */
 const USE_EMULATOR = true;
 // Change only this value when your backend LAN IP changes.
-export const DEV_BACKEND_HOST = '10.112.162.99';
+export const DEV_BACKEND_HOST = '10.55.104.99';
 export const API_PORT = 8000;
 export const CHAT_PORT = 4000;
 

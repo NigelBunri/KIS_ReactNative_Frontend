@@ -72,7 +72,6 @@ export default function BibleCourseDetailSheet({
   const [lessonCommentDraft, setLessonCommentDraft] = useState('');
   const [certificateVisible, setCertificateVisible] = useState(false);
   const [certificateAuth, setCertificateAuth] = useState<string | null>(null);
-  const [certificateToken, setCertificateToken] = useState<string | null>(null);
   const [certificateLocalUri, setCertificateLocalUri] = useState<string | null>(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
@@ -150,25 +149,22 @@ export default function BibleCourseDetailSheet({
   useEffect(() => {
     if (!certificateVisible) return;
     getAccessToken().then((token) => {
-      setCertificateToken(token || null);
       setCertificateAuth(token ? `Bearer ${token}` : null);
     });
   }, [certificateVisible]);
 
   const courseId = courseState?.id;
   const certificateUrl = courseId ? ROUTES.bible.courseCertificate(courseId) : null;
-  const certificateFetchUrl =
-    certificateUrl && certificateToken ? `${certificateUrl}?token=${encodeURIComponent(certificateToken)}` : certificateUrl;
 
   useEffect(() => {
     const fetchCertificate = async () => {
-      if (!certificateVisible || !certificateFetchUrl) return;
+      if (!certificateVisible || !certificateUrl) return;
       setCertificateLoading(true);
       setCertificateLocalUri(null);
       try {
         const filePath = `${RNFS.DocumentDirectoryPath}/certificate-${courseId}.pdf`;
         await RNFS.downloadFile({
-          fromUrl: certificateFetchUrl,
+          fromUrl: certificateUrl,
           toFile: filePath,
           headers: certificateAuth ? { Authorization: certificateAuth } : undefined,
         }).promise;
@@ -180,7 +176,7 @@ export default function BibleCourseDetailSheet({
       }
     };
     fetchCertificate();
-  }, [certificateVisible, certificateFetchUrl, certificateAuth, courseId]);
+  }, [certificateVisible, certificateUrl, certificateAuth, courseId]);
 
   const loadLessons = useCallback(async () => {
     if (!courseId) return;
@@ -1285,7 +1281,7 @@ export default function BibleCourseDetailSheet({
                 <KISButton
                   title="Download PDF"
                   onPress={async () => {
-                    if (!certificateFetchUrl) return;
+                    if (!certificateUrl) return;
                     try {
                       if (certificateLocalUri) {
                         await Linking.openURL(certificateLocalUri);
@@ -1293,7 +1289,7 @@ export default function BibleCourseDetailSheet({
                       }
                       const filePath = `${RNFS.DocumentDirectoryPath}/certificate-${courseId}.pdf`;
                       await RNFS.downloadFile({
-                        fromUrl: certificateFetchUrl,
+                        fromUrl: certificateUrl,
                         toFile: filePath,
                         headers: certificateAuth ? { Authorization: certificateAuth } : undefined,
                       }).promise;

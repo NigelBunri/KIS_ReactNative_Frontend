@@ -6,11 +6,15 @@ export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
-  DeviceVerification: { phone?: string | null; email?: string | null } | undefined;
+  DeviceVerification:
+    | { phone?: string | null; email?: string | null }
+    | undefined;
   MainTabs: undefined;
   BroadcastDetail: {
     id: string;
     item?: any;
+    items?: any[];
+    index?: number;
   };
   PartnerInsights: undefined;
   AdminTools: undefined;
@@ -117,6 +121,13 @@ export type RootStackParamList = {
   MarketplaceOrders: undefined;
   MarketplaceProviderOrders: undefined;
   MarketplaceOrderDetail: { orderId: string; mode: 'buyer' | 'provider' };
+  ProfileRecentActivity: undefined;
+  ProfileImpactSnapshot: undefined;
+  ProfileNotifications: undefined;
+  ProfileNotificationDetail: {
+    notificationId: string;
+    notification?: any;
+  };
   ProfileLandingEditor: {
     kind: 'market' | 'education' | 'partner';
     profileLabel?: string;
@@ -128,9 +139,17 @@ export type RootStackParamList = {
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';
-export type BroadcastProfileKey = 'broadcast_feed' | 'health' | 'market' | 'education';
+export type BroadcastProfileKey =
+  | 'broadcast_feed'
+  | 'health'
+  | 'market'
+  | 'education';
 
-export type BroadcastCreationType = 'broadcast_feed' | 'health_profile' | 'market_profile' | 'education_profile';
+export type BroadcastCreationType =
+  | 'broadcast_feed'
+  | 'health_profile'
+  | 'market_profile'
+  | 'education_profile';
 
 export type BroadcastRouteParams = {
   focusTab?: BroadcastTabId;
@@ -145,5 +164,7 @@ export type MainTabsParamList = {
   Bible: undefined;
   Messages: undefined;
   Broadcast: BroadcastRouteParams | undefined;
-  Profile: { broadcastProfileKey?: BroadcastProfileKey; educationProfileId?: string } | undefined;
+  Profile:
+    | { broadcastProfileKey?: BroadcastProfileKey; educationProfileId?: string }
+    | undefined;
 };

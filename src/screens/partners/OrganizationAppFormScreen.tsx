@@ -32,7 +32,6 @@ const TYPE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: 'kis', label: 'KIS App' },
   { id: 'bible', label: 'Bible App' },
   { id: 'external', label: 'Embedded App' },
-  { id: 'ai', label: 'Assistant App' },
 ];
 
 const VISIBILITY_OPTIONS: Array<{ id: string; label: string }> = [

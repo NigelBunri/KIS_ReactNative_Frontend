@@ -15,7 +15,7 @@ const PARTNER_PRO_HIGHLIGHTS = [
   'Priority partner webhooks, automation rules, and fraud insights',
   'Partner-grade studio routing for broadcasts, lessons, and market drops',
 ];
-const CENTS_PER_KISC = 10000;
+const CENTS_PER_KISC = 100;
 
 const toKiscAmount = (amountCents: unknown, withSign = false) => {
   const cents = Number(amountCents);
@@ -37,8 +37,6 @@ export default function UpgradeSheet(props: {
   onResume?: () => void;
   onDowngrade?: (tierId: string) => void;
   onRetry?: (txRef: string) => void;
-  onDeleteTransaction?: (transactionId: string) => void;
-  deletingTransactionId?: string | null;
 }) {
   const { palette } = useKISTheme();
   const {
@@ -53,8 +51,6 @@ export default function UpgradeSheet(props: {
     onResume,
     onDowngrade,
     onRetry,
-    onDeleteTransaction,
-    deletingTransactionId,
   } = props;
 
   const currentKey = String(accountTier?.id ?? accountTier?.name ?? '');
@@ -211,19 +207,22 @@ export default function UpgradeSheet(props: {
             />
           ) : (
             <KISButton
-              title="Cancel at period end"
+              title="End this cycle"
               variant="outline"
               onPress={() => onCancel?.(false)}
               disabled={saving}
             />
           )}
           <KISButton
-            title="Cancel now"
+            title="Cancel immediately"
             variant="outline"
             onPress={() => onCancel?.(true)}
             disabled={saving}
           />
         </View>
+        <Text style={[styles.tierFeatureText, { color: palette.subtext, marginTop: 8 }]}>
+          Immediate cancellation moves the account back to the free tier right away. Ending this cycle keeps access until the current billing period finishes.
+        </Text>
       </View>
 
       {partnerProTier && (
@@ -470,15 +469,6 @@ export default function UpgradeSheet(props: {
                     size="xs"
                     variant="ghost"
                     onPress={() => onRetry?.(tx.tx_ref)}
-                  />
-                ) : null}
-                {tx.id && onDeleteTransaction ? (
-                  <KISButton
-                    title={deletingTransactionId === String(tx.id) ? 'Deleting...' : 'Delete'}
-                    size="xs"
-                    variant="ghost"
-                    onPress={() => onDeleteTransaction(String(tx.id))}
-                    disabled={deletingTransactionId === String(tx.id)}
                   />
                 ) : null}
               </View>

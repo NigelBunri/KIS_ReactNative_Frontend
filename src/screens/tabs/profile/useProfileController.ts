@@ -13,20 +13,29 @@ import ROUTES from '@/network';
 import { CacheConfig } from '@/network/cacheKeys';
 import { clearAuthTokens } from '@/security/authStorage';
 
-import { DraftProfile, ItemType, PickedImage, PrefsDraft, ProfilePayload, SheetType } from './profile.types';
+import {
+  DraftProfile,
+  ItemType,
+  PickedImage,
+  PrefsDraft,
+  ProfilePayload,
+  SheetType,
+} from './profile.types';
 import { makeUUID, parseCsv } from './profile.utils';
 import { profileLayout } from './profile.styles';
 import { popularLanguages } from './profile.constants';
 import { tierMetaFor } from './profile/tierMeta';
 import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
 
-const MICROS_PER_KISC = 1000;
 const CENTS_PER_KISC = 100;
 const MICROS_PER_CENT = 10;
 const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 const DEFAULT_PROFILE_LANGUAGE = 'English';
 const POPULAR_PROFILE_LANGUAGE_MAP = new Map(
-  popularLanguages.map((label) => [String(label).trim().toLowerCase(), String(label).trim()]),
+  popularLanguages.map(label => [
+    String(label).trim().toLowerCase(),
+    String(label).trim(),
+  ]),
 );
 const SHOWCASE_ITEM_TYPES = new Set<ItemType>([
   'portfolio',
@@ -66,7 +75,10 @@ const splitPhoneForDraft = (rawValue?: string | null) => {
   const digitsOnly = compact.replace(/[^\d]/g, '');
   if (digitsOnly.length > 1) {
     for (const dialCode of KNOWN_DIAL_CODES) {
-      if (digitsOnly.startsWith(dialCode) && digitsOnly.length > dialCode.length) {
+      if (
+        digitsOnly.startsWith(dialCode) &&
+        digitsOnly.length > dialCode.length
+      ) {
         return {
           country_code: `+${dialCode}`,
           phone_number: digitsOnly.slice(dialCode.length),
@@ -86,7 +98,10 @@ const splitPhoneForDraft = (rawValue?: string | null) => {
   return { country_code: '+', phone_number: compact.slice(1) };
 };
 
-const composePhoneForSave = (countryCodeValue: unknown, phoneNumberValue: unknown) => {
+const composePhoneForSave = (
+  countryCodeValue: unknown,
+  phoneNumberValue: unknown,
+) => {
   const phoneNumberRaw = String(phoneNumberValue || '').trim();
   if (!phoneNumberRaw) return '';
 
@@ -111,7 +126,8 @@ const normalizeDialCode = (value: unknown) => {
   return digits ? `+${digits}` : '';
 };
 
-const normalizeLocalPhoneNumber = (value: unknown) => String(value || '').replace(/[^\d]/g, '');
+const normalizeLocalPhoneNumber = (value: unknown) =>
+  String(value || '').replace(/[^\d]/g, '');
 
 const parseJsonLikeValue = (raw: string): unknown => {
   const text = String(raw || '').trim();
@@ -143,7 +159,7 @@ const extractLanguageLabel = (value: unknown): string => {
     const labels = Array.from(
       trimmed.matchAll(/label\s*[:=]\s*['"]?([^,'"\]}]+)['"]?/gi),
     )
-      .map((match) => String(match?.[1] || '').trim())
+      .map(match => String(match?.[1] || '').trim())
       .filter(Boolean);
     if (labels.length) return labels[0];
 
@@ -160,7 +176,12 @@ const extractLanguageLabel = (value: unknown): string => {
       } else if (parsed && typeof parsed === 'object') {
         const record = parsed as Record<string, unknown>;
         return extractLanguageLabel(
-          record.label ?? record.name ?? record.language ?? record.language_name ?? record.value ?? '',
+          record.label ??
+            record.name ??
+            record.language ??
+            record.language_name ??
+            record.value ??
+            '',
         );
       }
     }
@@ -170,7 +191,12 @@ const extractLanguageLabel = (value: unknown): string => {
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>;
     return extractLanguageLabel(
-      record.label ?? record.name ?? record.language ?? record.language_name ?? record.value ?? '',
+      record.label ??
+        record.name ??
+        record.language ??
+        record.language_name ??
+        record.value ??
+        '',
     );
   }
 
@@ -232,7 +258,8 @@ const splitPhoneFromUserPayload = (user: any) => {
   return fromRawPhone;
 };
 
-const normalizePhoneForCompare = (value?: string | null) => String(value || '').replace(/[^\d]/g, '');
+const normalizePhoneForCompare = (value?: string | null) =>
+  String(value || '').replace(/[^\d]/g, '');
 
 type WalletRecipientVerificationState = {
   checking: boolean;
@@ -275,7 +302,7 @@ const normalizePlanList = (payload: any): any[] => {
   const source = payload?.data ?? payload ?? {};
   const results = source?.results ?? source;
   if (!Array.isArray(results)) return [];
-  return results.map((entry) => (entry?.data ?? entry));
+  return results.map(entry => entry?.data ?? entry);
 };
 
 export const useProfileController = (opts: {
@@ -294,7 +321,10 @@ export const useProfileController = (opts: {
     subscription: null,
     usage: null,
   });
-  const [broadcastProfiles, setBroadcastProfiles] = useState<Record<string, any> | null>(null);
+  const [broadcastProfiles, setBroadcastProfiles] = useState<Record<
+    string,
+    any
+  > | null>(null);
   const [activeSheet, setActiveSheet] = useState<SheetType | null>(null);
   const [showCreatePartner, setShowCreatePartner] = useState(false);
   const [partnerActionId, setPartnerActionId] = useState<string | null>(null);
@@ -326,9 +356,6 @@ export const useProfileController = (opts: {
   const [draftPrivacy, setDraftPrivacy] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [addingGalleryMedia, setAddingGalleryMedia] = useState(false);
-  const [deletingWalletEntryId, setDeletingWalletEntryId] = useState<string | null>(null);
-  const [deletingBillingTransactionId, setDeletingBillingTransactionId] = useState<string | null>(null);
-
   const [prefsDraft, setPrefsDraft] = useState<PrefsDraft>({
     services: [],
     availability: {},
@@ -348,68 +375,81 @@ export const useProfileController = (opts: {
     recipient: '',
     reference: '',
   });
-  const [walletRecipientVerification, setWalletRecipientVerification] = useState<WalletRecipientVerificationState>(
-    EMPTY_WALLET_RECIPIENT_VERIFICATION,
-  );
+  const [walletRecipientVerification, setWalletRecipientVerification] =
+    useState<WalletRecipientVerificationState>(
+      EMPTY_WALLET_RECIPIENT_VERIFICATION,
+    );
 
   const slideX = useRef(new Animated.Value(profileLayout.SCREEN_WIDTH)).current;
-  const sheetY = useRef(new Animated.Value(profileLayout.SCREEN_HEIGHT)).current;
+  const sheetY = useRef(
+    new Animated.Value(profileLayout.SCREEN_HEIGHT),
+  ).current;
   const loadingRef = useRef(false);
   const lastFetchRef = useRef(0);
   const profileRateLimitedUntilRef = useRef(0);
   const profileNetworkFreshUntilRef = useRef(0);
 
-  const applyProfilePayload = useCallback((payload: ProfilePayload) => {
-    const phoneDraft = splitPhoneFromUserPayload(payload?.user);
-    const locationDialCode = normalizeDialCode(locationCallingCode);
-    const languages = normalizeLanguageList(payload?.preferences?.languages, true);
-    setProfile(payload);
+  const applyProfilePayload = useCallback(
+    (payload: ProfilePayload) => {
+      const phoneDraft = splitPhoneFromUserPayload(payload?.user);
+      const locationDialCode = normalizeDialCode(locationCallingCode);
+      const languages = normalizeLanguageList(
+        payload?.preferences?.languages,
+        true,
+      );
+      setProfile(payload);
 
-    setDraftProfile({
-      display_name: payload?.user?.display_name || '',
-      country_code: locationDialCode || phoneDraft.country_code,
-      phone_number: phoneDraft.phone_number,
-      languages,
-      headline: payload?.profile?.headline || '',
-      bio: payload?.profile?.bio || '',
-      industry: payload?.profile?.industry || '',
-      avatar_url: payload?.profile?.avatar_url || '',
-      cover_url: payload?.profile?.cover_url || '',
-      avatar_file: null,
-      cover_file: null,
-      avatar_preview: payload?.profile?.avatar_url || '',
-      cover_preview: payload?.profile?.cover_url || '',
-    });
+      setDraftProfile({
+        display_name: payload?.user?.display_name || '',
+        country_code: locationDialCode || phoneDraft.country_code,
+        phone_number: phoneDraft.phone_number,
+        languages,
+        headline: payload?.profile?.headline || '',
+        bio: payload?.profile?.bio || '',
+        industry: payload?.profile?.industry || '',
+        avatar_url: payload?.profile?.avatar_url || '',
+        cover_url: payload?.profile?.cover_url || '',
+        avatar_file: null,
+        cover_file: null,
+        avatar_preview: payload?.profile?.avatar_url || '',
+        cover_preview: payload?.profile?.cover_url || '',
+      });
 
-    const prefs = payload?.preferences || {};
-    setPrefsDraft({
-      services: prefs.services || [],
-      availability: prefs.availability || {},
-      skill_badges: prefs.skill_badges || [],
-      languages,
-      location: prefs.location || {},
-      compensation: prefs.compensation || {},
-      social_proof: prefs.social_proof || {},
-      ask_tags: prefs.ask_tags || [],
-      highlights: prefs.highlights || [],
-    });
+      const prefs = payload?.preferences || {};
+      setPrefsDraft({
+        services: prefs.services || [],
+        availability: prefs.availability || {},
+        skill_badges: prefs.skill_badges || [],
+        languages,
+        location: prefs.location || {},
+        compensation: prefs.compensation || {},
+        social_proof: prefs.social_proof || {},
+        ask_tags: prefs.ask_tags || [],
+        highlights: prefs.highlights || [],
+      });
 
-    const rules = payload?.privacy || [];
-    const mapped: Record<string, any> = {};
-    rules.forEach((rule: any) => (mapped[rule.field_key] = rule));
-    setDraftPrivacy(mapped);
-  }, [locationCallingCode]);
+      const rules = payload?.privacy || [];
+      const mapped: Record<string, any> = {};
+      rules.forEach((rule: any) => (mapped[rule.field_key] = rule));
+      setDraftPrivacy(mapped);
+    },
+    [locationCallingCode],
+  );
 
   useEffect(() => {
     const locationDialCode = normalizeDialCode(locationCallingCode);
     if (!locationDialCode) return;
-    setDraftProfile((prev) =>
-      prev.country_code === locationDialCode ? prev : { ...prev, country_code: locationDialCode },
+    setDraftProfile(prev =>
+      prev.country_code === locationDialCode
+        ? prev
+        : { ...prev, country_code: locationDialCode },
     );
   }, [locationCallingCode]);
 
   useEffect(() => {
-    const mode = String(walletForm.mode || '').trim().toLowerCase();
+    const mode = String(walletForm.mode || '')
+      .trim()
+      .toLowerCase();
     if (mode === 'transfer') return;
     if (
       walletRecipientVerification.verified ||
@@ -425,12 +465,20 @@ export const useProfileController = (opts: {
     if (type === 'wallet') {
       setWalletRecipientVerification(EMPTY_WALLET_RECIPIENT_VERIFICATION);
     }
-    Animated.timing(sheetY, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    Animated.timing(sheetY, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
     if (type === 'upgrade') loadBillingHistory();
   };
 
   const closeSheet = () => {
-    Animated.timing(sheetY, { toValue: profileLayout.SCREEN_HEIGHT, duration: 240, useNativeDriver: true }).start(() => {
+    Animated.timing(sheetY, {
+      toValue: profileLayout.SCREEN_HEIGHT,
+      duration: 240,
+      useNativeDriver: true,
+    }).start(() => {
       setActiveSheet(null);
       setDraftItem(null);
       setWalletRecipientVerification(EMPTY_WALLET_RECIPIENT_VERIFICATION);
@@ -439,50 +487,71 @@ export const useProfileController = (opts: {
 
   const openCreatePartner = () => {
     setShowCreatePartner(true);
-    Animated.timing(slideX, { toValue: 0, duration: 250, useNativeDriver: true }).start();
+    Animated.timing(slideX, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
   };
 
   const closeCreatePartner = () => {
-    Animated.timing(slideX, { toValue: profileLayout.SCREEN_WIDTH, duration: 250, useNativeDriver: true }).start(() => {
+    Animated.timing(slideX, {
+      toValue: profileLayout.SCREEN_WIDTH,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
       setShowCreatePartner(false);
     });
   };
 
-  const loadKisWallet = useCallback(async (fallbackWalletBalanceCents?: number) => {
-    const res = await getRequest(ROUTES.wallet.me, {
-      errorMessage: 'Unable to load KIS wallet.',
-    });
-    if (res?.success) {
-      const wallet = res?.data?.wallet || {};
-      const balanceCents = Number(wallet?.balance_cents ?? 0);
-      const micro = Number.isFinite(balanceCents) ? Math.max(0, Math.floor(balanceCents * MICROS_PER_CENT)) : 0;
-      const safeMicro = Number.isFinite(micro) ? Math.max(0, Math.floor(micro)) : 0;
+  const loadKisWallet = useCallback(
+    async (fallbackWalletBalanceCents?: number) => {
+      const res = await getRequest(ROUTES.wallet.me, {
+        errorMessage: 'Unable to load KIS wallet.',
+      });
+      if (res?.success) {
+        const wallet = res?.data?.wallet || {};
+        const balanceCents = Number(wallet?.balance_cents ?? 0);
+        const micro = Number.isFinite(balanceCents)
+          ? Math.max(0, Math.floor(balanceCents * MICROS_PER_CENT))
+          : 0;
+        const safeMicro = Number.isFinite(micro)
+          ? Math.max(0, Math.floor(micro))
+          : 0;
+        setKisWallet({
+          balance_micro: safeMicro,
+          balance_label: String(wallet?.balance_kisc_label ?? '0.00 KISC'),
+          usd_label: String(wallet?.balance_usd_label ?? '$0.00'),
+        });
+        return {
+          balance_micro: safeMicro,
+          balance_cents: Math.floor(safeMicro / MICROS_PER_CENT),
+        };
+      }
+
+      const cents = Number(
+        fallbackWalletBalanceCents ??
+          profile?.account?.wallet_balance_cents ??
+          0,
+      );
+      const safeCents = Number.isFinite(cents)
+        ? Math.max(0, Math.floor(cents))
+        : 0;
+      const fallbackMicro = safeCents * MICROS_PER_CENT;
+      const fallbackKisc = safeCents / (CENTS_PER_KISC ?? 100);
+      const fallbackUsd = fallbackKisc * 100;
       setKisWallet({
-        balance_micro: safeMicro,
-        balance_label: String(wallet?.balance_kisc_label ?? '0.00 KISC'),
-        usd_label: String(wallet?.balance_usd_label ?? '$0.00'),
+        balance_micro: fallbackMicro,
+        balance_label: `${fallbackKisc.toFixed(3)} KISC`,
+        usd_label: `$${fallbackUsd.toFixed(2)}`,
       });
       return {
-        balance_micro: safeMicro,
-        balance_cents: Math.floor(safeMicro / MICROS_PER_CENT),
+        balance_micro: fallbackMicro,
+        balance_cents: safeCents,
       };
-    }
-
-    const cents = Number(fallbackWalletBalanceCents ?? profile?.account?.wallet_balance_cents ?? 0);
-    const safeCents = Number.isFinite(cents) ? Math.max(0, Math.floor(cents)) : 0;
-    const fallbackMicro = safeCents * MICROS_PER_CENT;
-    const fallbackKisc = safeCents / (CENTS_PER_KISC ?? 100);
-    const fallbackUsd = fallbackKisc * 100;
-    setKisWallet({
-      balance_micro: fallbackMicro,
-      balance_label: `${fallbackKisc.toFixed(3)} KISC`,
-      usd_label: `$${fallbackUsd.toFixed(2)}`,
-    });
-    return {
-      balance_micro: fallbackMicro,
-      balance_cents: safeCents,
-    };
-  }, [profile?.account?.wallet_balance_cents]);
+    },
+    [profile?.account?.wallet_balance_cents],
+  );
 
   const loadWalletLedger = useCallback(async () => {
     const res = await getRequest(ROUTES.wallet.ledger, {
@@ -493,16 +562,26 @@ export const useProfileController = (opts: {
       const mapped = rows.map((row: any) => ({
         id: String(row?.id || ''),
         kind: String(row?.kind || row?.transaction_type || 'entry'),
-        transaction_type: Number(row?.amount_cents || 0) < 0 ? 'debit' : 'credit',
+        transaction_type:
+          Number(row?.amount_cents || 0) < 0 ? 'debit' : 'credit',
         amount_micro: Number(row?.amount_cents || 0) * MICROS_PER_CENT,
         reference: String(row?.reference || ''),
-        counterparty_name: String(row?.counterparty_name || row?.meta?.counterparty?.name || ''),
-        counterparty_phone: String(row?.counterparty_phone || row?.meta?.counterparty?.phone || ''),
-        counterparty_user_id: String(row?.counterparty_user_id || row?.meta?.counterparty?.user_id || ''),
+        counterparty_name: String(
+          row?.counterparty_name || row?.meta?.counterparty?.name || '',
+        ),
+        counterparty_phone: String(
+          row?.counterparty_phone || row?.meta?.counterparty?.phone || '',
+        ),
+        counterparty_user_id: String(
+          row?.counterparty_user_id || row?.meta?.counterparty?.user_id || '',
+        ),
         created_at: String(row?.created_at || new Date().toISOString()),
         metadata: row?.meta || row?.metadata || {},
         receipt_url: String(
-          row?.receipt_url || row?.meta?.receipt_url || row?.metadata?.receipt_url || '',
+          row?.receipt_url ||
+            row?.meta?.receipt_url ||
+            row?.metadata?.receipt_url ||
+            '',
         ),
         receipt_pdf_url: String(row?.receipt_pdf_url || ''),
       }));
@@ -571,25 +650,32 @@ export const useProfileController = (opts: {
 
   type BroadcastAttachmentPayload = { uri: string; name: string; type: string };
 
-  const appendBroadcastAttachments = useCallback((form: FormData, files?: BroadcastAttachmentPayload[]) => {
-    (files ?? []).forEach((file) => {
-      if (file?.uri) {
-        form.append('attachments', {
-          uri: file.uri,
-          name: file.name,
-          type: file.type,
-        } as any);
-      }
-    });
-  }, []);
+  const appendBroadcastAttachments = useCallback(
+    (form: FormData, files?: BroadcastAttachmentPayload[]) => {
+      (files ?? []).forEach(file => {
+        if (file?.uri) {
+          form.append('attachments', {
+            uri: file.uri,
+            name: file.name,
+            type: file.type,
+          } as any);
+        }
+      });
+    },
+    [],
+  );
 
   const manageProfileSection = useCallback(
-    async (profileType: 'health_profile' | 'market_profile' | 'education_profile', updates: Record<string, any>) => {
+    async (
+      profileType: 'health_profile' | 'market_profile' | 'education_profile',
+      updates: Record<string, any>,
+    ) => {
       const res = await postRequest(ROUTES.broadcasts.profileManage, {
         profile_type: profileType,
         updates,
       });
-      if (!res?.success) throw new Error(res?.message || 'Unable to update profile.');
+      if (!res?.success)
+        throw new Error(res?.message || 'Unable to update profile.');
       await loadBroadcastProfiles();
       return res.data?.profile ?? null;
     },
@@ -663,7 +749,9 @@ export const useProfileController = (opts: {
 
   const removeBroadcastFeedAttachment = useCallback(
     async (entryId: string, key: string) => {
-      const endpoint = `${ROUTES.broadcasts.feedEntryAttachment(entryId)}?key=${encodeURIComponent(key)}`;
+      const endpoint = `${ROUTES.broadcasts.feedEntryAttachment(
+        entryId,
+      )}?key=${encodeURIComponent(key)}`;
       const res = await deleteRequest(endpoint, {
         errorMessage: 'Unable to remove attachment.',
       });
@@ -678,7 +766,10 @@ export const useProfileController = (opts: {
 
   const broadcastFeedEntry = useCallback(
     async (id: string) => {
-      const res = await postRequest(ROUTES.broadcasts.feedEntryBroadcast(id), {});
+      const res = await postRequest(
+        ROUTES.broadcasts.feedEntryBroadcast(id),
+        {},
+      );
       if (res?.success) {
         await loadBroadcastProfiles();
         return res.data?.feed ?? null;
@@ -688,74 +779,86 @@ export const useProfileController = (opts: {
     [loadBroadcastProfiles],
   );
 
-  const loadProfile = useCallback(async (forceNetwork = false) => {
-    const now = Date.now();
-    if (!forceNetwork) {
-      if (loadingRef.current) return;
-      if (now < profileRateLimitedUntilRef.current) return;
-      if (now - lastFetchRef.current < 1200) return;
-    }
-
-    loadingRef.current = true;
-    lastFetchRef.current = now;
-
-    if (!profile) setLoading(true);
-    let hasCachedPayload = false;
-
-    try {
+  const loadProfile = useCallback(
+    async (forceNetwork = false) => {
+      const now = Date.now();
       if (!forceNetwork) {
-        const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-        if (cached) {
-          const cachedPayload = JSON.parse(cached) as ProfilePayload;
-          applyProfilePayload(cachedPayload);
-          loadKisWallet(cachedPayload?.account?.wallet_balance_cents);
-          loadWalletLedger();
-          loadBroadcastProfiles();
-          hasCachedPayload = true;
-          setLoading(false);
-        }
+        if (loadingRef.current) return;
+        if (now < profileRateLimitedUntilRef.current) return;
+        if (now - lastFetchRef.current < 1200) return;
       }
 
-      console.log('loading check - profile request start');
-      const startTime = Date.now();
-      const res = await getRequest(ROUTES.profiles.me, {
-        cacheKey: CacheConfig.userProfile.key,
-        cacheType: CacheConfig.userProfile.type,
-        forceNetwork,
-      });
+      loadingRef.current = true;
+      lastFetchRef.current = now;
 
-      console.log('loading check - profile request finished in', Date.now() - startTime, 'ms');
+      if (!profile) setLoading(true);
+      let hasCachedPayload = false;
 
-      if (res.success) {
-        const payload = res.data as ProfilePayload;
-        applyProfilePayload(payload);
-        profileNetworkFreshUntilRef.current = Date.now() + 60 * 1000;
-        loadKisWallet(payload?.account?.wallet_balance_cents);
-        loadWalletLedger();
-        void loadBroadcastProfiles();
-        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(payload));
-      } else {
-        if (Number(res?.status) === 429) {
-          profileRateLimitedUntilRef.current = Date.now() + 15000;
-          return;
+      try {
+        if (!forceNetwork) {
+          const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+          if (cached) {
+            const cachedPayload = JSON.parse(cached) as ProfilePayload;
+            applyProfilePayload(cachedPayload);
+            loadKisWallet(cachedPayload?.account?.wallet_balance_cents);
+            loadWalletLedger();
+            loadBroadcastProfiles();
+            hasCachedPayload = true;
+            setLoading(false);
+          }
         }
+
+        const res = await getRequest(ROUTES.profiles.me, {
+          cacheKey: CacheConfig.userProfile.key,
+          cacheType: CacheConfig.userProfile.type,
+          forceNetwork,
+        });
+
+        if (res.success) {
+          const payload = res.data as ProfilePayload;
+          applyProfilePayload(payload);
+          profileNetworkFreshUntilRef.current = Date.now() + 60 * 1000;
+          loadKisWallet(payload?.account?.wallet_balance_cents);
+          loadWalletLedger();
+          void loadBroadcastProfiles();
+          await AsyncStorage.setItem(
+            PROFILE_CACHE_KEY,
+            JSON.stringify(payload),
+          );
+        } else {
+          if (Number(res?.status) === 429) {
+            profileRateLimitedUntilRef.current = Date.now() + 15000;
+            return;
+          }
+          if (!hasCachedPayload) {
+            setProfile(null);
+            Alert.alert('Profile', res.message || 'Could not load profile');
+          }
+        }
+      } catch (e: any) {
         if (!hasCachedPayload) {
           setProfile(null);
-          Alert.alert('Profile', res.message || 'Could not load profile');
+          Alert.alert('Profile', e?.message ?? 'Could not load profile');
         }
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
       }
-    } catch (e: any) {
-      if (!hasCachedPayload) {
-        setProfile(null);
-        Alert.alert('Profile', e?.message ?? 'Could not load profile');
-      }
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }, [applyProfilePayload, loadKisWallet, loadWalletLedger, profile, loadBroadcastProfiles]);
+    },
+    [
+      applyProfilePayload,
+      loadKisWallet,
+      loadWalletLedger,
+      profile,
+      loadBroadcastProfiles,
+    ],
+  );
 
-  useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile]),
+  );
 
   useEffect(() => {
     void loadTierCatalog();
@@ -763,7 +866,11 @@ export const useProfileController = (opts: {
 
   const logout = async () => {
     try {
-      const server = await postRequest(ROUTES.auth.logout, {}, { errorMessage: 'Server logout failed.' });
+      const server = await postRequest(
+        ROUTES.auth.logout,
+        {},
+        { errorMessage: 'Server logout failed.' },
+      );
       if (!server?.success) {
         // Continue with local session cleanup even if server logout fails.
       }
@@ -777,7 +884,10 @@ export const useProfileController = (opts: {
   };
 
   const runPartnerAction = useCallback(
-    async (partnerId: string, action: 'deactivate' | 'reactivate' | 'delete') => {
+    async (
+      partnerId: string,
+      action: 'deactivate' | 'reactivate' | 'delete',
+    ) => {
       const endpoint =
         action === 'deactivate'
           ? ROUTES.partners.deactivate(partnerId)
@@ -792,7 +902,10 @@ export const useProfileController = (opts: {
         }
         await loadProfile();
       } catch (error: any) {
-        Alert.alert('Partner', error?.message || 'Unable to complete the action.');
+        Alert.alert(
+          'Partner',
+          error?.message || 'Unable to complete the action.',
+        );
       } finally {
         setPartnerActionId(null);
       }
@@ -803,8 +916,11 @@ export const useProfileController = (opts: {
   const openEditProfile = () => {
     const phoneDraft = splitPhoneFromUserPayload(profile?.user);
     const locationDialCode = normalizeDialCode(locationCallingCode);
-    const languages = normalizeLanguageList(profile?.preferences?.languages, true);
-    setDraftProfile((prev) => ({
+    const languages = normalizeLanguageList(
+      profile?.preferences?.languages,
+      true,
+    );
+    setDraftProfile(prev => ({
       ...prev,
       display_name: profile?.user?.display_name || '',
       country_code: locationDialCode || phoneDraft.country_code,
@@ -824,21 +940,44 @@ export const useProfileController = (opts: {
   };
 
   const pickImage = async (kind: 'avatar' | 'cover') => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 });
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 1,
+      selectionLimit: 1,
+    });
     if (result.didCancel) return;
 
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
 
-    const name = asset.fileName || `${kind}_${Date.now()}.${(asset.type || 'image/jpeg').split('/')[1] || 'jpg'}`;
-    const file: PickedImage = { uri: asset.uri, name, type: asset.type || 'image/jpeg' };
+    const name =
+      asset.fileName ||
+      `${kind}_${Date.now()}.${
+        (asset.type || 'image/jpeg').split('/')[1] || 'jpg'
+      }`;
+    const file: PickedImage = {
+      uri: asset.uri,
+      name,
+      type: asset.type || 'image/jpeg',
+    };
 
-    setDraftProfile((prev) => ({ ...prev, [`${kind}_file`]: file, [`${kind}_preview`]: asset.uri } as any));
+    setDraftProfile(
+      prev =>
+        ({
+          ...prev,
+          [`${kind}_file`]: file,
+          [`${kind}_preview`]: asset.uri,
+        } as any),
+    );
   };
 
   const pickShowcaseFile = async (type: ItemType) => {
     const isVideo = type === 'intro_video';
-    const result = await launchImageLibrary({ mediaType: isVideo ? 'video' : 'photo', quality: 1, selectionLimit: 1 });
+    const result = await launchImageLibrary({
+      mediaType: isVideo ? 'video' : 'photo',
+      quality: 1,
+      selectionLimit: 1,
+    });
     if (result.didCancel) return null;
 
     const asset = result.assets?.[0];
@@ -846,9 +985,16 @@ export const useProfileController = (opts: {
 
     const name =
       asset.fileName ||
-      `${type}_${Date.now()}.${(asset.type || (isVideo ? 'video/mp4' : 'image/jpeg')).split('/')[1] || 'bin'}`;
+      `${type}_${Date.now()}.${
+        (asset.type || (isVideo ? 'video/mp4' : 'image/jpeg')).split('/')[1] ||
+        'bin'
+      }`;
 
-    return { uri: asset.uri, name, type: asset.type || (isVideo ? 'video/mp4' : 'image/jpeg') } as PickedImage;
+    return {
+      uri: asset.uri,
+      name,
+      type: asset.type || (isVideo ? 'video/mp4' : 'image/jpeg'),
+    } as PickedImage;
   };
 
   const addGalleryMedia = async () => {
@@ -861,16 +1007,28 @@ export const useProfileController = (opts: {
       });
       if (result.didCancel || !result.assets?.length) return;
 
-      const assets = result.assets.filter((asset) => asset?.uri) as Asset[];
+      const assets = result.assets.filter(asset => asset?.uri) as Asset[];
       if (!assets.length) return;
 
       let failed = 0;
       for (const asset of assets) {
         const mime = String(asset.type || '').toLowerCase();
-        const name = asset.fileName || `gallery_${Date.now()}.${(asset.type || 'image/jpeg').split('/')[1] || 'bin'}`;
-        const normalizedMime = asset.type || (mime.startsWith('video/') ? 'video/mp4' : 'image/jpeg');
-        const showcaseType = mime.startsWith('video/') ? 'intro_video' : 'portfolio';
-        const title = name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Gallery item';
+        const name =
+          asset.fileName ||
+          `gallery_${Date.now()}.${
+            (asset.type || 'image/jpeg').split('/')[1] || 'bin'
+          }`;
+        const normalizedMime =
+          asset.type ||
+          (mime.startsWith('video/') ? 'video/mp4' : 'image/jpeg');
+        const showcaseType = mime.startsWith('video/')
+          ? 'intro_video'
+          : 'portfolio';
+        const title =
+          name
+            .replace(/\.[^.]+$/, '')
+            .replace(/[_-]+/g, ' ')
+            .trim() || 'Gallery item';
 
         const form = new FormData();
         form.append('type', showcaseType);
@@ -887,7 +1045,10 @@ export const useProfileController = (opts: {
       }
 
       if (failed > 0) {
-        Alert.alert('Gallery', `${failed} file(s) could not be added. Please retry those files.`);
+        Alert.alert(
+          'Gallery',
+          `${failed} file(s) could not be added. Please retry those files.`,
+        );
       }
     } catch (error: any) {
       Alert.alert('Gallery', error?.message || 'Unable to add gallery media.');
@@ -905,7 +1066,9 @@ export const useProfileController = (opts: {
       const userId = profile.user?.id;
       const profileId = profile?.profile?.id;
       const previousPhoneParts = splitPhoneFromUserPayload(profile?.user);
-      const previousPhoneNumber = normalizeLocalPhoneNumber(previousPhoneParts.phone_number);
+      const previousPhoneNumber = normalizeLocalPhoneNumber(
+        previousPhoneParts.phone_number,
+      );
 
       const userPayload: Record<string, any> = {
         display_name: draftProfile.display_name?.trim(),
@@ -914,7 +1077,9 @@ export const useProfileController = (opts: {
         normalizeDialCode(draftProfile.country_code) ||
         normalizeDialCode(locationCallingCode) ||
         normalizeDialCode(previousPhoneParts.country_code);
-      const normalizedPhoneNumber = normalizeLocalPhoneNumber(draftProfile.phone_number);
+      const normalizedPhoneNumber = normalizeLocalPhoneNumber(
+        draftProfile.phone_number,
+      );
       const phoneNumberChanged = normalizedPhoneNumber !== previousPhoneNumber;
       const composedPhone = phoneNumberChanged
         ? composePhoneForSave(normalizedCountryCode, normalizedPhoneNumber)
@@ -927,20 +1092,41 @@ export const useProfileController = (opts: {
       const phoneChanged = phoneNumberChanged && !!normalizedPhoneNumber;
 
       if (userId) {
-        const userUpdateRes = await patchRequest(ROUTES.user.detail(userId), userPayload, {
-          errorMessage: 'Unable to update account details.',
-        });
+        const userUpdateRes = await patchRequest(
+          ROUTES.user.detail(userId),
+          userPayload,
+          {
+            errorMessage: 'Unable to update account details.',
+          },
+        );
         if (!userUpdateRes?.success) {
-          throw new Error(extractRequestErrorMessage(userUpdateRes, 'Unable to update account details.'));
+          throw new Error(
+            extractRequestErrorMessage(
+              userUpdateRes,
+              'Unable to update account details.',
+            ),
+          );
         }
       }
 
-      const languagesPayload = normalizeLanguageList(draftProfile.languages, true);
-      const languageSyncRes = await postRequest(ROUTES.profileLanguages.sync, { languages: languagesPayload }, {
-        errorMessage: 'Unable to save profile languages.',
-      });
+      const languagesPayload = normalizeLanguageList(
+        draftProfile.languages,
+        true,
+      );
+      const languageSyncRes = await postRequest(
+        ROUTES.profileLanguages.sync,
+        { languages: languagesPayload },
+        {
+          errorMessage: 'Unable to save profile languages.',
+        },
+      );
       if (!languageSyncRes?.success) {
-        throw new Error(extractRequestErrorMessage(languageSyncRes, 'Unable to save profile languages.'));
+        throw new Error(
+          extractRequestErrorMessage(
+            languageSyncRes,
+            'Unable to save profile languages.',
+          ),
+        );
       }
 
       if (profileId) {
@@ -963,11 +1149,20 @@ export const useProfileController = (opts: {
             type: draftProfile.cover_file.type,
           } as any);
         }
-        const profileUpdateRes = await patchRequest(ROUTES.profiles.update(profileId), form, {
-          errorMessage: 'Unable to update profile details.',
-        });
+        const profileUpdateRes = await patchRequest(
+          ROUTES.profiles.update(profileId),
+          form,
+          {
+            errorMessage: 'Unable to update profile details.',
+          },
+        );
         if (!profileUpdateRes?.success) {
-          throw new Error(extractRequestErrorMessage(profileUpdateRes, 'Unable to update profile details.'));
+          throw new Error(
+            extractRequestErrorMessage(
+              profileUpdateRes,
+              'Unable to update profile details.',
+            ),
+          );
         }
       }
 
@@ -986,7 +1181,10 @@ export const useProfileController = (opts: {
 
       Alert.alert('Profile', 'Your profile changes were saved.');
     } catch (error: any) {
-      Alert.alert('Profile', error?.message || 'Unable to save profile changes.');
+      Alert.alert(
+        'Profile',
+        error?.message || 'Unable to save profile changes.',
+      );
     } finally {
       setSaving(false);
     }
@@ -996,14 +1194,42 @@ export const useProfileController = (opts: {
     setSaving(true);
     try {
       for (const [key, rule] of Object.entries(draftPrivacy)) {
-        const payload = { field_key: key, visibility: rule?.visibility || 'public', allow_user_ids: rule?.allow_user_ids || [] };
-        if (rule?.id) await patchRequest(ROUTES.profilePrivacy.detail(rule.id), payload);
-        else await postRequest(ROUTES.profilePrivacy.list, payload);
+        const visibility = rule?.visibility || 'public';
+        const allowUserIds = Array.isArray(rule?.allow_user_ids)
+          ? rule.allow_user_ids
+          : [];
+        const payload = {
+          field_key: key,
+          visibility,
+          allow_user_ids: allowUserIds,
+        };
+        const isDefaultPublicRule =
+          visibility === 'public' && allowUserIds.length === 0;
+
+        if (rule?.id && isDefaultPublicRule) {
+          await deleteRequest(ROUTES.profilePrivacy.detail(rule.id), {
+            errorMessage: `Unable to reset ${key} privacy.`,
+          });
+          continue;
+        }
+
+        if (isDefaultPublicRule) continue;
+
+        if (rule?.id) {
+          await patchRequest(ROUTES.profilePrivacy.detail(rule.id), payload);
+        } else {
+          await postRequest(ROUTES.profilePrivacy.list, payload);
+        }
       }
-    } finally {
-      setSaving(false);
       closeSheet();
       loadProfile();
+    } catch (error: any) {
+      Alert.alert(
+        'Privacy',
+        error?.message || 'Unable to save privacy settings.',
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1047,7 +1273,8 @@ export const useProfileController = (opts: {
       const payload = { ...data };
 
       if (type === 'skill' && !payload.skill_id) payload.skill_id = makeUUID();
-      if (type === 'project') payload.technologies = parseCsv(payload.technologies);
+      if (type === 'project')
+        payload.technologies = parseCsv(payload.technologies);
       if (type === 'article') payload.tags = parseCsv(payload.tags);
 
       const isPreference =
@@ -1063,13 +1290,18 @@ export const useProfileController = (opts: {
       if (isPreference) {
         const nextPrefs: PrefsDraft = { ...prefsDraft };
 
-        if (type === 'service') nextPrefs.services = [...nextPrefs.services, payload];
-        if (type === 'ask_tag') nextPrefs.ask_tags = [...nextPrefs.ask_tags, payload.label].filter(Boolean);
+        if (type === 'service')
+          nextPrefs.services = [...nextPrefs.services, payload];
+        if (type === 'ask_tag')
+          nextPrefs.ask_tags = [...nextPrefs.ask_tags, payload.label].filter(
+            Boolean,
+          );
         if (type === 'availability') nextPrefs.availability = payload;
         if (type === 'location') nextPrefs.location = payload;
         if (type === 'compensation') nextPrefs.compensation = payload;
         if (type === 'social_proof') nextPrefs.social_proof = payload;
-        if (type === 'skill_badge') nextPrefs.skill_badges = [...nextPrefs.skill_badges, payload];
+        if (type === 'skill_badge')
+          nextPrefs.skill_badges = [...nextPrefs.skill_badges, payload];
 
         if (type === 'language') {
           const normalizedLanguage = normalizeLanguageList(
@@ -1081,19 +1313,30 @@ export const useProfileController = (opts: {
           }
           const languageId = String(payload?.id || '').trim();
           if (languageId) {
-            await patchRequest(ROUTES.profileLanguages.detail(languageId), { name: normalizedLanguage });
+            await patchRequest(ROUTES.profileLanguages.detail(languageId), {
+              name: normalizedLanguage,
+            });
           } else {
-            await postRequest(ROUTES.profileLanguages.list, { name: normalizedLanguage });
+            await postRequest(ROUTES.profileLanguages.list, {
+              name: normalizedLanguage,
+            });
           }
           setPrefsDraft({
             ...nextPrefs,
-            languages: normalizeLanguageList([...(nextPrefs.languages || []), normalizedLanguage], true),
+            languages: normalizeLanguageList(
+              [...(nextPrefs.languages || []), normalizedLanguage],
+              true,
+            ),
           });
         } else {
           setPrefsDraft(nextPrefs);
 
           const prefId = profile?.preferences?.id;
-          if (prefId) await patchRequest(ROUTES.profilePreferences.detail(prefId), nextPrefs);
+          if (prefId)
+            await patchRequest(
+              ROUTES.profilePreferences.detail(prefId),
+              nextPrefs,
+            );
           else await postRequest(ROUTES.profilePreferences.list, nextPrefs);
         }
       } else {
@@ -1107,23 +1350,33 @@ export const useProfileController = (opts: {
             .replace(/\.[^.]+$/, '')
             .replace(/[_-]+/g, ' ')
             .trim();
-          payload.title = rawTitle || fallbackFromFile || `${String(type).replace(/_/g, ' ')} item`;
-          payload.summary = String(payload?.summary || payload?.description || '').trim();
+          payload.title =
+            rawTitle ||
+            fallbackFromFile ||
+            `${String(type).replace(/_/g, ' ')} item`;
+          payload.summary = String(
+            payload?.summary || payload?.description || '',
+          ).trim();
           delete payload.name;
           delete payload.description;
         }
 
         if (payload.file?.uri) {
           const form = new FormData();
-          Object.keys(payload).forEach((k) => {
+          Object.keys(payload).forEach(k => {
             if (k === 'file' || k === 'id') return;
             form.append(k, payload[k] ?? '');
           });
-          form.append('file', { uri: payload.file.uri, name: payload.file.name, type: payload.file.type } as any);
+          form.append('file', {
+            uri: payload.file.uri,
+            name: payload.file.name,
+            type: payload.file.type,
+          } as any);
           if (payload.id) await patchRequest(`${baseUrl}${payload.id}/`, form);
           else await postRequest(baseUrl, form);
         } else {
-          if (payload.id) await patchRequest(`${baseUrl}${payload.id}/`, payload);
+          if (payload.id)
+            await patchRequest(`${baseUrl}${payload.id}/`, payload);
           else await postRequest(baseUrl, payload);
         }
       }
@@ -1170,7 +1423,9 @@ export const useProfileController = (opts: {
   const upgradeTier = async (tierId: string) => {
     const tiers = profile?.tiers || [];
     const tier = tiers.find((t: any) => String(t?.id) === String(tierId));
-    const tierName = String(tier?.name || tier?.code || tier?.slug || '').toLowerCase();
+    const tierName = String(
+      tier?.name || tier?.code || tier?.slug || '',
+    ).toLowerCase();
     const isPartnerTier = tierName.includes('partner');
     const priceCents = Number(tier?.price_cents || 0);
     let latestWallet = { balance_cents: 0, balance_micro: 0 };
@@ -1179,10 +1434,7 @@ export const useProfileController = (opts: {
     } catch (error) {
       console.warn('Unable to refresh wallet before upgrade:', error);
     }
-    const walletBalanceCents = Math.max(
-      0,
-      latestWallet?.balance_cents ?? 0,
-    );
+    const walletBalanceCents = Math.max(0, latestWallet?.balance_cents ?? 0);
     const currentTier = profile?.tier || profile?.subscription?.tier;
     const currentRank = tierMetaFor(currentTier || {}).tierRank ?? 0;
     const targetRank = tierMetaFor(tier || {}).tierRank ?? 0;
@@ -1192,7 +1444,10 @@ export const useProfileController = (opts: {
       return;
     }
     if (targetRank === currentRank) {
-      Alert.alert('Upgrade', 'You already have this tier; no change necessary.');
+      Alert.alert(
+        'Upgrade',
+        'You already have this tier; no change necessary.',
+      );
       return;
     }
     if (priceCents > walletBalanceCents) {
@@ -1216,27 +1471,51 @@ export const useProfileController = (opts: {
       const fallback = 'Could not upgrade';
       const threshed = String(res?.message || fallback).trim();
       const normalized = threshed.replace(/\s+/g, ' ');
-      const mentionWallet = /insufficient|balance|kisc/i.test(normalized.toLowerCase());
-      Alert.alert('Upgrade', mentionWallet ? 'Not enough KIS Coins in your wallet.' : normalized);
+      const mentionWallet = /insufficient|balance|kisc/i.test(
+        normalized.toLowerCase(),
+      );
+      Alert.alert(
+        'Upgrade',
+        mentionWallet ? 'Not enough KIS Coins in your wallet.' : normalized,
+      );
       return;
     }
 
-    await Promise.all([loadWalletLedger(), loadBillingHistory(), loadKisWallet()]);
+    await Promise.all([
+      loadWalletLedger(),
+      loadBillingHistory(),
+      loadKisWallet(),
+    ]);
     closeSheet();
     loadProfile();
+    Alert.alert(
+      'Upgrade',
+      `Your account is now on ${tier?.name || 'the selected'} tier.`,
+    );
     if (isPartnerTier) openCreatePartner();
   };
 
   const cancelSubscription = async (immediate = false) => {
     setSaving(true);
-    const res = await postRequest(ROUTES.wallet.subscriptionCancel, { immediate });
+    const res = await postRequest(ROUTES.wallet.subscriptionCancel, {
+      immediate,
+    });
     setSaving(false);
     if (!res?.success) {
-      Alert.alert('Subscription', res?.message || 'Unable to cancel subscription.');
+      Alert.alert(
+        'Subscription',
+        res?.message || 'Unable to cancel subscription.',
+      );
       return;
     }
     loadBillingHistory();
     loadProfile();
+    Alert.alert(
+      'Subscription',
+      immediate
+        ? 'Your subscription was cancelled immediately and your account moved back to the free tier.'
+        : 'Your subscription will end at the close of the current billing cycle.',
+    );
   };
 
   const resumeSubscription = async () => {
@@ -1244,27 +1523,46 @@ export const useProfileController = (opts: {
     const res = await postRequest(ROUTES.wallet.subscriptionResume, {});
     setSaving(false);
     if (!res?.success) {
-      Alert.alert('Subscription', res?.message || 'Unable to resume subscription.');
+      Alert.alert(
+        'Subscription',
+        res?.message || 'Unable to resume subscription.',
+      );
       return;
     }
     loadBillingHistory();
     loadProfile();
+    Alert.alert(
+      'Subscription',
+      'Your subscription will continue without cancellation.',
+    );
   };
 
   const downgradeTier = async (tierId: string) => {
     setSaving(true);
-    const res = await postRequest(ROUTES.wallet.subscriptionDowngrade, { tier: tierId });
+    const res = await postRequest(ROUTES.wallet.subscriptionDowngrade, {
+      tier: tierId,
+    });
     setSaving(false);
     if (!res?.success) {
       Alert.alert('Downgrade', res?.message || 'Unable to schedule downgrade.');
       return;
     }
-    await Promise.all([loadBillingHistory(), loadWalletLedger(), loadKisWallet()]);
+    await Promise.all([
+      loadBillingHistory(),
+      loadWalletLedger(),
+      loadKisWallet(),
+    ]);
+    Alert.alert(
+      'Downgrade scheduled',
+      'Your account will move to the selected lower tier at the end of the current billing cycle.',
+    );
   };
 
   const retryTransaction = async (txRef: string) => {
     setSaving(true);
-    const res = await postRequest(ROUTES.wallet.transactionRetry, { tx_ref: txRef });
+    const res = await postRequest(ROUTES.wallet.transactionRetry, {
+      tx_ref: txRef,
+    });
     setSaving(false);
     if (!res?.success) {
       Alert.alert('Payment', res?.message || 'Unable to retry payment.');
@@ -1272,50 +1570,23 @@ export const useProfileController = (opts: {
     }
     const paymentUrl = res?.data?.payment_url;
     if (paymentUrl) {
-      Linking.openURL(paymentUrl);
+      Linking.openURL(paymentUrl).catch(() => {
+        Alert.alert(
+          'Payment',
+          'Payment retry was created, but the payment link could not be opened automatically.',
+        );
+      });
+      Alert.alert(
+        'Payment',
+        'A new payment link was created for this failed transaction.',
+      );
     }
   };
 
-  const deleteWalletLedgerEntry = useCallback(async (entryId: string) => {
-    const id = String(entryId || '').trim();
-    if (!id) return;
-    setDeletingWalletEntryId(id);
-    try {
-      const res = await deleteRequest(ROUTES.wallet.ledgerEntry(id), {
-        errorMessage: 'Unable to delete transaction history.',
-      });
-      if (!res?.success) {
-        Alert.alert('Wallet', res?.message || 'Unable to delete transaction history.');
-        return;
-      }
-      setWalletLedger((prev) => prev.filter((entry) => String(entry?.id || '') !== id));
-    } finally {
-      setDeletingWalletEntryId((prev) => (prev === id ? null : prev));
-    }
-  }, []);
-
-  const deleteBillingTransaction = useCallback(async (transactionId: string) => {
-    const id = String(transactionId || '').trim();
-    if (!id) return;
-    setDeletingBillingTransactionId(id);
-    try {
-      const res = await deleteRequest(ROUTES.wallet.transaction(id), {
-        errorMessage: 'Unable to delete billing transaction.',
-      });
-      if (!res?.success) {
-        Alert.alert('Billing', res?.message || 'Unable to delete billing transaction.');
-        return;
-      }
-      await loadBillingHistory();
-    } finally {
-      setDeletingBillingTransactionId((prev) => (prev === id ? null : prev));
-    }
-  }, [loadBillingHistory]);
-
   const setWalletRecipient = useCallback((value: string) => {
-    setWalletForm((prev) => ({ ...prev, recipient: value }));
+    setWalletForm(prev => ({ ...prev, recipient: value }));
     const nextDigits = normalizePhoneForCompare(value);
-    setWalletRecipientVerification((prev) => {
+    setWalletRecipientVerification(prev => {
       if (nextDigits && prev.recipientPhoneDigits === nextDigits) return prev;
       return EMPTY_WALLET_RECIPIENT_VERIFICATION;
     });
@@ -1338,7 +1609,9 @@ export const useProfileController = (opts: {
       recipientPhoneDigits: recipientDigits,
     });
 
-    const countryHint = String(profile?.user?.country || 'CM').trim().toUpperCase();
+    const countryHint = String(profile?.user?.country || 'CM')
+      .trim()
+      .toUpperCase();
     const lookupUrl = `${ROUTES.auth.checkContact}?phone=${encodeURIComponent(
       recipientPhone,
     )}&country=${encodeURIComponent(countryHint)}`;
@@ -1366,7 +1639,10 @@ export const useProfileController = (opts: {
     }
 
     const rawRecipientId =
-      lookupRes?.data?.userId ?? lookupRes?.data?.user_id ?? lookupRes?.data?.id ?? null;
+      lookupRes?.data?.userId ??
+      lookupRes?.data?.user_id ??
+      lookupRes?.data?.id ??
+      null;
     const recipientId = rawRecipientId != null ? String(rawRecipientId) : '';
     if (!recipientId) {
       setWalletRecipientVerification({
@@ -1406,7 +1682,9 @@ export const useProfileController = (opts: {
     ).trim();
     const recipientPhoneDisplay = String(
       userData?.phone ||
-        `${String(userData?.phone_country_code || '').trim()}${String(userData?.phone_number || '').trim()}` ||
+        `${String(userData?.phone_country_code || '').trim()}${String(
+          userData?.phone_number || '',
+        ).trim()}` ||
         recipientPhone,
     ).trim();
 
@@ -1423,8 +1701,12 @@ export const useProfileController = (opts: {
 
   const submitWalletAction = async () => {
     const amountKisc = Number(walletForm.amount || 0);
-    const amountCents = Number.isFinite(amountKisc) ? Math.round(amountKisc * CENTS_PER_KISC) : 0;
-    const mode = String(walletForm.mode || '').trim().toLowerCase();
+    const amountCents = Number.isFinite(amountKisc)
+      ? Math.round(amountKisc * CENTS_PER_KISC)
+      : 0;
+    const mode = String(walletForm.mode || '')
+      .trim()
+      .toLowerCase();
 
     setSaving(true);
     setLastWalletPaymentUrl('');
@@ -1436,12 +1718,18 @@ export const useProfileController = (opts: {
       return;
     }
 
-    if (mode === 'add_kisc' || mode === 'deposit' || mode === 'cash_to_credits') {
+    if (
+      mode === 'add_kisc' ||
+      mode === 'deposit' ||
+      mode === 'cash_to_credits'
+    ) {
       res = await postRequest(
         ROUTES.wallet.deposit,
         {
           amount_cents: amountCents,
-          provider: String(walletForm.provider || 'flutterwave').trim().toLowerCase(),
+          provider: String(walletForm.provider || 'flutterwave')
+            .trim()
+            .toLowerCase(),
         },
         {
           errorMessage: 'Unable to top up KIS wallet.',
@@ -1461,11 +1749,16 @@ export const useProfileController = (opts: {
         walletRecipientVerification.recipientPhoneDigits !== recipientDigits
       ) {
         setSaving(false);
-        Alert.alert('Wallet', 'Verify the recipient first before sending KIS Coins.');
+        Alert.alert(
+          'Wallet',
+          'Verify the recipient first before sending KIS Coins.',
+        );
         return;
       }
 
-      const countryHint = String(profile?.user?.country || 'CM').trim().toUpperCase();
+      const countryHint = String(profile?.user?.country || 'CM')
+        .trim()
+        .toUpperCase();
       res = await postRequest(
         ROUTES.wallet.transfer,
         {
@@ -1496,12 +1789,17 @@ export const useProfileController = (opts: {
     if (paymentUrl) {
       setLastWalletPaymentUrl(String(paymentUrl));
       Linking.openURL(String(paymentUrl)).catch(() => undefined);
+      Alert.alert('Wallet', 'Your top-up payment link is ready.');
+      return;
     }
 
     closeSheet();
     loadKisWallet();
     loadWalletLedger();
     loadProfile();
+    if (mode === 'transfer') {
+      Alert.alert('Wallet', 'Your transfer was completed successfully.');
+    }
   };
 
   const sectionList = useMemo(() => {
@@ -1511,12 +1809,36 @@ export const useProfileController = (opts: {
       { key: 'education', title: 'Education', items: s?.educations || [] },
       { key: 'project', title: 'Projects', items: s?.projects || [] },
       { key: 'skill', title: 'Skills', items: s?.skills || [] },
-      { key: 'portfolio', title: 'Portfolio Gallery', items: s?.showcases?.portfolio || [] },
-      { key: 'case_study', title: 'Case Studies', items: s?.showcases?.case_study || [] },
-      { key: 'testimonial', title: 'Testimonials', items: s?.showcases?.testimonial || [] },
-      { key: 'certification', title: 'Certifications', items: s?.showcases?.certification || [] },
-      { key: 'intro_video', title: 'Intro Video', items: s?.showcases?.intro_video || [] },
-      { key: 'highlight', title: 'Highlights', items: s?.showcases?.highlight || [] },
+      {
+        key: 'portfolio',
+        title: 'Portfolio Gallery',
+        items: s?.showcases?.portfolio || [],
+      },
+      {
+        key: 'case_study',
+        title: 'Case Studies',
+        items: s?.showcases?.case_study || [],
+      },
+      {
+        key: 'testimonial',
+        title: 'Testimonials',
+        items: s?.showcases?.testimonial || [],
+      },
+      {
+        key: 'certification',
+        title: 'Certifications',
+        items: s?.showcases?.certification || [],
+      },
+      {
+        key: 'intro_video',
+        title: 'Intro Video',
+        items: s?.showcases?.intro_video || [],
+      },
+      {
+        key: 'highlight',
+        title: 'Highlights',
+        items: s?.showcases?.highlight || [],
+      },
     ];
   }, [profile]);
 
@@ -1534,8 +1856,6 @@ export const useProfileController = (opts: {
     draftPrivacy,
     saving,
     addingGalleryMedia,
-    deletingWalletEntryId,
-    deletingBillingTransactionId,
     prefsDraft,
     walletForm,
     walletRecipientVerification,
@@ -1574,15 +1894,15 @@ export const useProfileController = (opts: {
     resumeSubscription,
     downgradeTier,
     retryTransaction,
-    deleteWalletLedgerEntry,
-    deleteBillingTransaction,
     refreshBroadcastProfiles: loadBroadcastProfiles,
     submitWalletAction,
     verifyWalletRecipient,
     openCreatePartner,
     closeCreatePartner,
-    deactivatePartnerProfile: (id: string) => runPartnerAction(id, 'deactivate'),
-    reactivatePartnerProfile: (id: string) => runPartnerAction(id, 'reactivate'),
+    deactivatePartnerProfile: (id: string) =>
+      runPartnerAction(id, 'deactivate'),
+    reactivatePartnerProfile: (id: string) =>
+      runPartnerAction(id, 'reactivate'),
     deletePartnerProfile: (id: string) => runPartnerAction(id, 'delete'),
     uploadProfileAttachment,
     manageProfileSection,

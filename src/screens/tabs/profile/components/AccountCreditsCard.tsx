@@ -1,5 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Linking, Text, TouchableOpacity, View, Image } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Linking,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
@@ -16,8 +24,13 @@ const toKiscFromCents = (cents?: number) => {
 const toEntryAmount = (entry: any) => {
   const amountMicro = Number(entry?.amount_micro);
   if (Number.isFinite(amountMicro) && amountMicro !== 0) {
-    const sign = String(entry?.transaction_type || '').toLowerCase() === 'debit' ? '-' : '+';
-    return `${sign}${(Math.abs(amountMicro) / MICROS_PER_KISC).toFixed(2)} KISC`;
+    const sign =
+      String(entry?.transaction_type || '').toLowerCase() === 'debit'
+        ? '-'
+        : '+';
+    return `${sign}${(Math.abs(amountMicro) / MICROS_PER_KISC).toFixed(
+      2,
+    )} KISC`;
   }
   const amountCents = Number(entry?.amount_cents);
   if (Number.isFinite(amountCents) && amountCents !== 0) {
@@ -60,9 +73,11 @@ const renderPendingBookings = (
         padding: 12,
       }}
     >
-      <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>{title}</Text>
+      <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>
+        {title}
+      </Text>
       {bookings.length ? (
-        bookings.slice(0, 3).map((booking) => (
+        bookings.slice(0, 3).map(booking => (
           <View
             key={booking.id || `${booking.service}-${booking.scheduled_at}`}
             style={{
@@ -85,7 +100,11 @@ const renderPendingBookings = (
                   : 'Schedule pending'}
               </Text>
               <Text style={{ color: palette.subtext, fontSize: 11 }}>
-                {`Payment: ${(booking.payment?.payment_status ? String(booking.payment.payment_status).replace(/_/g, ' ') : 'Pending')} • Escrow: ${booking.escrow_status || 'pending'}`}
+                {`Payment: ${
+                  booking.payment?.payment_status
+                    ? String(booking.payment.payment_status).replace(/_/g, ' ')
+                    : 'Pending'
+                } • Escrow: ${booking.escrow_status || 'pending'}`}
               </Text>
             </View>
             {onOpen && booking.id ? (
@@ -99,7 +118,9 @@ const renderPendingBookings = (
           </View>
         ))
       ) : (
-        <Text style={{ color: palette.subtext, marginTop: 6 }}>{emptyMessage}</Text>
+        <Text style={{ color: palette.subtext, marginTop: 6 }}>
+          {emptyMessage}
+        </Text>
       )}
     </View>
   );
@@ -108,7 +129,6 @@ const renderPendingBookings = (
 export default function AccountCreditsCard({
   tierName,
   tierPriceCents,
-  walletBalanceMicro,
   walletBalanceLabel,
   walletUsdLabel,
   points,
@@ -121,15 +141,12 @@ export default function AccountCreditsCard({
   partnerProfilesLimitLabel,
   partnerProfilesLimitValue,
   partnerProfilesIsUnlimited,
-  onDeleteWalletEntry,
-  deletingWalletEntryId,
   pendingServicePayments = [],
   pendingReceivePayments = [],
   onOpenBookingDetails,
 }: {
   tierName: string;
   tierPriceCents: number;
-  walletBalanceMicro: number;
   walletBalanceLabel?: string;
   walletUsdLabel?: string;
   points: number;
@@ -142,8 +159,6 @@ export default function AccountCreditsCard({
   partnerProfilesLimitLabel?: string | null;
   partnerProfilesLimitValue?: number | null;
   partnerProfilesIsUnlimited?: boolean;
-  onDeleteWalletEntry?: (entryId: string) => void;
-  deletingWalletEntryId?: string | null;
   pendingServicePayments?: any[];
   pendingReceivePayments?: any[];
   onOpenBookingDetails?: (bookingId: string) => void;
@@ -178,14 +193,24 @@ export default function AccountCreditsCard({
     : partnerProfilesLimitLabel ?? (partnerProfilesLimitValue ?? 0).toString();
 
   const resolvedKiscLabel = useMemo(
-    () => (walletBalanceLabel && walletBalanceLabel.trim() ? walletBalanceLabel : '0.00 KISC'),
+    () =>
+      walletBalanceLabel && walletBalanceLabel.trim()
+        ? walletBalanceLabel
+        : '0.00 KISC',
     [walletBalanceLabel],
   );
 
   return (
-    <View style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.divider }]}>
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: palette.card, borderColor: palette.divider },
+      ]}
+    >
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.text }]}>Account & KIS-Coins</Text>
+        <Text style={[styles.title, { color: palette.text }]}>
+          Account & KIS-Coins
+        </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Image source={coin} style={{ width: 14, height: 14 }} />
           <Text style={[styles.subtext, { color: palette.subtext }]}>
@@ -206,7 +231,11 @@ export default function AccountCreditsCard({
         }}
       >
         <LinearGradient
-          colors={['rgba(255,221,87,0.16)', 'rgba(255,255,255,0.02)', 'rgba(255,173,51,0.12)']}
+          colors={[
+            'rgba(255,221,87,0.16)',
+            'rgba(255,255,255,0.02)',
+            'rgba(255,173,51,0.12)',
+          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
@@ -214,7 +243,14 @@ export default function AccountCreditsCard({
 
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
           <View style={{ width: 120, alignItems: 'center' }}>
-            <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
+            <View
+              style={{
+                width: 120,
+                height: 120,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Animated.View
                 style={{
                   position: 'absolute',
@@ -237,47 +273,96 @@ export default function AccountCreditsCard({
                   }),
                 }}
               />
-              <Image source={coin} style={{ width: 130, height: 130, marginTop: 10 }} />
+              <Image
+                source={coin}
+                style={{ width: 130, height: 130, marginTop: 10 }}
+              />
             </View>
-            <Text style={[styles.statMeta, { color: palette.subtext, marginTop: 6 }]}>
+            <Text
+              style={[
+                styles.statMeta,
+                { color: palette.subtext, marginTop: 6 },
+              ]}
+            >
               {resolvedKiscLabel}
             </Text>
           </View>
 
           <View style={{ flex: 1, gap: 6 }}>
-            <Text style={[styles.statLabel, { color: palette.subtext }]}>KIS Coin Balance</Text>
-            <Text style={[styles.statValue, { color: palette.text }]}>{resolvedKiscLabel}</Text>
+            <Text style={[styles.statLabel, { color: palette.subtext }]}>
+              KIS Coin Balance
+            </Text>
+            <Text style={[styles.statValue, { color: palette.text }]}>
+              {resolvedKiscLabel}
+            </Text>
             <Text style={[styles.statMeta, { color: palette.subtext }]}>
               {walletUsdLabel ?? '$0.00'}
             </Text>
-            <Text style={[styles.statMeta, { color: palette.subtext }]}>Used for upgrades, transfers, and billing.</Text>
-            <Text style={[styles.statMeta, { color: palette.subtext }]}>Top up anytime from the wallet section.</Text>
+            <Text style={[styles.statMeta, { color: palette.subtext }]}>
+              Used for upgrades, transfers, and billing.
+            </Text>
+            <Text style={[styles.statMeta, { color: palette.subtext }]}>
+              Top up anytime from the wallet section.
+            </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.statRow}>
-        <View style={[styles.statChip, { backgroundColor: palette.surfaceElevated }]}>
-          <Text style={[styles.statLabel, { color: palette.subtext }]}>Wallet Micro Units</Text>
-          <Text style={[styles.statValue, { color: palette.text }]}>{Math.max(0, Number(walletBalanceMicro || 0))}</Text>
+        <View
+          style={[
+            styles.statChip,
+            { backgroundColor: palette.surfaceElevated },
+          ]}
+        >
+          <Text style={[styles.statLabel, { color: palette.subtext }]}>
+            Current plan
+          </Text>
+          <Text style={[styles.statValue, { color: palette.text }]}>
+            {tierName || 'Free'}
+          </Text>
         </View>
-        <View style={[styles.statChip, { backgroundColor: palette.surfaceElevated }]}>
-          <Text style={[styles.statLabel, { color: palette.subtext }]}>Points</Text>
-          <Text style={[styles.statValue, { color: palette.text }]}>{points}</Text>
+        <View
+          style={[
+            styles.statChip,
+            { backgroundColor: palette.surfaceElevated },
+          ]}
+        >
+          <Text style={[styles.statLabel, { color: palette.subtext }]}>
+            Points
+          </Text>
+          <Text style={[styles.statValue, { color: palette.text }]}>
+            {points}
+          </Text>
         </View>
       </View>
 
       <View style={{ gap: 10 }}>
-        <KISButton title="Add KIS Coins" variant="secondary" onPress={onWallet} />
-        <KISButton title={`Upgrade Account (${tierName})`} variant="outline" onPress={onUpgrade} style={{ borderColor: palette.border, borderWidth: 3 }} />
+        <KISButton
+          title="Add KIS Coins"
+          variant="secondary"
+          onPress={onWallet}
+        />
+        <KISButton
+          title={`Upgrade Account (${tierName})`}
+          variant="outline"
+          onPress={onUpgrade}
+          style={{ borderColor: palette.border, borderWidth: 3 }}
+        />
         {showCreatePartnerButton && onCreatePartner ? (
-          <KISButton title="Create partner" variant="primary" onPress={onCreatePartner} />
+          <KISButton
+            title="Create partner"
+            variant="primary"
+            onPress={onCreatePartner}
+          />
         ) : null}
       </View>
 
-      <View style={[styles.partnerRow, { justifyContent: 'space-between' }]}> 
-        <Text style={[styles.subtext, { color: palette.text }]}>Partner orgs</Text>
-        <Text style={[styles.statMeta, { color: palette.subtext }]}> 
+      <View style={[styles.partnerRow, { justifyContent: 'space-between' }]}>
+        <Text style={[styles.subtext, { color: palette.text }]}>
+          Partner orgs
+        </Text>
+        <Text style={[styles.statMeta, { color: palette.subtext }]}>
           {partnerProfilesCount ?? 0}/{partnerLimitText}
         </Text>
       </View>
@@ -300,19 +385,26 @@ export default function AccountCreditsCard({
       </View>
 
       <View style={{ marginTop: 10, gap: 8 }}>
-        <TouchableOpacity onPress={() => setShowHistory((prev) => !prev)}>
+        <TouchableOpacity onPress={() => setShowHistory(prev => !prev)}>
           <Text style={[styles.title, { color: palette.text, fontSize: 16 }]}>
             Transaction History {showHistory ? '▲' : '▼'}
           </Text>
         </TouchableOpacity>
         {!showHistory ? null : walletLedger.length === 0 ? (
-          <Text style={[styles.subtext, { color: palette.subtext }]}>No recent KIS wallet activity.</Text>
+          <Text style={[styles.subtext, { color: palette.subtext }]}>
+            No recent KIS wallet activity.
+          </Text>
         ) : (
           walletLedger.slice(0, 6).map((entry: any) => (
-            <View key={entry.id} style={[styles.itemRow, { borderBottomColor: palette.divider }]}>
+            <View
+              key={entry.id}
+              style={[styles.itemRow, { borderBottomColor: palette.divider }]}
+            >
               <View style={styles.itemInfo}>
                 <Text style={[styles.itemTitle, { color: palette.text }]}>
-                  {String(entry.transaction_type || entry.kind || 'entry').replace(/_/g, ' ')}
+                  {String(
+                    entry.transaction_type || entry.kind || 'entry',
+                  ).replace(/_/g, ' ')}
                 </Text>
                 <Text style={[styles.subtext, { color: palette.subtext }]}>
                   {toEntryAmount(entry)}
@@ -324,7 +416,7 @@ export default function AccountCreditsCard({
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <Text style={[styles.subtext, { color: palette.subtext }]}> 
+                <Text style={[styles.subtext, { color: palette.subtext }]}>
                   {new Date(entry.created_at).toLocaleDateString()}
                 </Text>
                 {(entry.receipt_pdf_url || entry.receipt_url) && (
@@ -341,16 +433,6 @@ export default function AccountCreditsCard({
                     }}
                   />
                 )}
-                {onDeleteWalletEntry ? (
-                  <TouchableOpacity
-                    onPress={() => onDeleteWalletEntry(String(entry.id || ''))}
-                    disabled={deletingWalletEntryId === String(entry.id || '')}
-                  >
-                    <Text style={{ fontSize: 12, color: palette.warning }}>
-                      {deletingWalletEntryId === String(entry.id || '') ? 'Deleting...' : 'Delete'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
               </View>
             </View>
           ))

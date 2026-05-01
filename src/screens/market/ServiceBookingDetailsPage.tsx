@@ -13,8 +13,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
-import { useAuth } from '../../../App';
-import ROUTES, { API_BASE_URL } from '@/network';
+import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
@@ -78,7 +77,7 @@ const getShopIdentifier = (booking?: any): string | null => {
     booking?.service?.shop ||
     booking?.shop_id ||
     booking?.shop?.id ||
-    booking?.shop||
+    booking?.shop ||
     booking?.shop?.shop_id ||
     booking?.provider_details?.shop_id ||
     booking?.provider_details?.shop?.id ||
@@ -88,7 +87,12 @@ const getShopIdentifier = (booking?: any): string | null => {
 };
 
 const getBookingCustomer = (booking?: any) => {
-  const userShape = booking?.user_details ?? booking?.payer_details ?? booking?.customer ?? booking?.user ?? {};
+  const userShape =
+    booking?.user_details ??
+    booking?.payer_details ??
+    booking?.customer ??
+    booking?.user ??
+    {};
   const displayName =
     userShape?.display_name ||
     userShape?.name ||
@@ -105,18 +109,32 @@ const getBookingCustomer = (booking?: any) => {
     booking?.phone ||
     null;
   const email =
-    userShape?.email || userShape?.email_address || booking?.user_email || booking?.payer_email || null;
+    userShape?.email ||
+    userShape?.email_address ||
+    booking?.user_email ||
+    booking?.payer_email ||
+    null;
   return { name: displayName, phone, email };
 };
 
-const CANCELLED_STATUSES = new Set(['cancelled', 'canceled', 'rejected', 'void']);
+const CANCELLED_STATUSES = new Set([
+  'cancelled',
+  'canceled',
+  'rejected',
+  'void',
+]);
 
 const getBookingUserId = (booking?: any): string | null => {
   if (!booking) return null;
   if (booking?.user && typeof booking.user !== 'object') {
     return String(booking.user);
   }
-  const userShape = booking?.user_details ?? booking?.payer_details ?? booking?.customer ?? booking?.user ?? {};
+  const userShape =
+    booking?.user_details ??
+    booking?.payer_details ??
+    booking?.customer ??
+    booking?.user ??
+    {};
   return (
     userShape?.id ??
     userShape?.user_id ??
@@ -142,14 +160,18 @@ const MAX_RANGE_OPTIONS = 366;
 
 const generateTimeline = (slotDurationMinutes: number) => {
   const duration = Math.max(5, slotDurationMinutes || TIME_SLOT_STEP_MINUTES);
-  const steps = Math.floor(((TIME_SLOT_END_HOUR - TIME_SLOT_START_HOUR) * 60) / duration);
+  const steps = Math.floor(
+    ((TIME_SLOT_END_HOUR - TIME_SLOT_START_HOUR) * 60) / duration,
+  );
   const slots: string[] = [];
   for (let index = 0; index <= steps; index += 1) {
     const totalMinutes = TIME_SLOT_START_HOUR * 60 + index * duration;
     if (totalMinutes > TIME_SLOT_END_HOUR * 60) break;
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;
-    slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+    slots.push(
+      `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+    );
   }
   return slots;
 };
@@ -162,47 +184,78 @@ const normalizeDateKey = (value: Date | string) => {
 
 const parseDateOnly = (value?: string | null) => {
   if (!value) return null;
-  const parts = value.split('-').map((part) => Number(part));
-  if (parts.length !== 3 || parts.some((segment) => !Number.isFinite(segment))) return null;
+  const parts = value.split('-').map(part => Number(part));
+  if (parts.length !== 3 || parts.some(segment => !Number.isFinite(segment)))
+    return null;
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   if (Number.isNaN(date.getTime())) return null;
   date.setHours(0, 0, 0, 0);
   return date;
 };
 
-const formatAvailabilityRangeLabel = (range?: ServiceAvailability['date_range']) => {
+const formatAvailabilityRangeLabel = (
+  range?: ServiceAvailability['date_range'],
+) => {
   if (!range) return '';
   const start = parseDateOnly(range.start_date);
   const end = parseDateOnly(range.end_date);
   if (!start || !end) return '';
-  const startLabel = start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-  const endLabel = end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  });
   return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
 };
 
-const isDateWithinRange = (date: Date, range?: ServiceAvailability['date_range']) => {
+const isDateWithinRange = (
+  date: Date,
+  range?: ServiceAvailability['date_range'],
+) => {
   if (!range) return true;
   const start = parseDateOnly(range.start_date);
   const end = parseDateOnly(range.end_date);
   if (!start || !end) return true;
   const candidate = new Date(date);
   candidate.setHours(0, 0, 0, 0);
-  return candidate.getTime() >= start.getTime() && candidate.getTime() <= end.getTime();
+  return (
+    candidate.getTime() >= start.getTime() &&
+    candidate.getTime() <= end.getTime()
+  );
 };
 
-const getAvailabilityEntry = (date: Date, availability: ServiceAvailability) => {
+const getAvailabilityEntry = (
+  date: Date,
+  availability: ServiceAvailability,
+) => {
   const key = formatDateKey(date);
   return availability.specific_dates[key] ?? availability.days[getDayKey(date)];
 };
 
-const buildDateOptions = (serviceDetails: any, availability: ServiceAvailability) => {
+const buildDateOptions = (
+  serviceDetails: any,
+  availability: ServiceAvailability,
+) => {
   const now = new Date();
-  const minNoticeHours = Math.max(0, Number(serviceDetails?.min_notice_hours ?? 24));
+  const minNoticeHours = Math.max(
+    0,
+    Number(serviceDetails?.min_notice_hours ?? 24),
+  );
   const earliest = new Date(now.getTime() + minNoticeHours * 60 * 60 * 1000);
   const maxAdvanceDays = Number(serviceDetails?.max_advance_booking_days ?? 30);
-  const windowDays = Math.min(Math.max(maxAdvanceDays > 0 ? maxAdvanceDays : 30, 3), 90);
-  const blackoutDates = Array.isArray(serviceDetails?.blackout_dates) ? serviceDetails.blackout_dates : [];
-  const blackoutSet = new Set(blackoutDates.map((item: any) => normalizeDateKey(item)));
+  const windowDays = Math.min(
+    Math.max(maxAdvanceDays > 0 ? maxAdvanceDays : 30, 3),
+    90,
+  );
+  const blackoutDates = Array.isArray(serviceDetails?.blackout_dates)
+    ? serviceDetails.blackout_dates
+    : [];
+  const blackoutSet = new Set(
+    blackoutDates.map((item: any) => normalizeDateKey(item)),
+  );
   const earliestBoundary = new Date(earliest);
   earliestBoundary.setHours(0, 0, 0, 0);
   const latestAllowed = new Date(now);
@@ -214,16 +267,29 @@ const buildDateOptions = (serviceDetails: any, availability: ServiceAvailability
   latestAllowed.setHours(23, 59, 59, 999);
   const rangeStart = parseDateOnly(availability.date_range?.start_date);
   const rangeEnd = parseDateOnly(availability.date_range?.end_date);
-  const startBoundary = rangeStart && rangeStart.getTime() > earliestBoundary.getTime() ? rangeStart : earliestBoundary;
+  const startBoundary =
+    rangeStart && rangeStart.getTime() > earliestBoundary.getTime()
+      ? rangeStart
+      : earliestBoundary;
   const proposedEnd = rangeEnd ? new Date(rangeEnd) : new Date(latestAllowed);
   proposedEnd.setHours(23, 59, 59, 999);
-  const endBoundary = new Date(Math.min(proposedEnd.getTime(), latestAllowed.getTime()));
-  const maxOptions = availability.date_range ? MAX_RANGE_OPTIONS : DEFAULT_DATE_WINDOW;
+  const endBoundary = new Date(
+    Math.min(proposedEnd.getTime(), latestAllowed.getTime()),
+  );
+  const maxOptions = availability.date_range
+    ? MAX_RANGE_OPTIONS
+    : DEFAULT_DATE_WINDOW;
   if (endBoundary.getTime() < startBoundary.getTime()) return [];
   const options: Date[] = [];
   const cursor = new Date(startBoundary);
-  while (cursor.getTime() <= endBoundary.getTime() && options.length < Math.max(maxOptions, 1)) {
-    if (cursor.getTime() > now.getTime() && isDateWithinRange(cursor, availability.date_range)) {
+  while (
+    cursor.getTime() <= endBoundary.getTime() &&
+    options.length < Math.max(maxOptions, 1)
+  ) {
+    if (
+      cursor.getTime() > now.getTime() &&
+      isDateWithinRange(cursor, availability.date_range)
+    ) {
       const key = normalizeDateKey(cursor);
       if (!blackoutSet.has(key)) {
         const specificSlot = availability.specific_dates[key];
@@ -237,13 +303,16 @@ const buildDateOptions = (serviceDetails: any, availability: ServiceAvailability
   return options;
 };
 
-const buildSlotsForDate = (date: Date | null, availability: ServiceAvailability) => {
+const buildSlotsForDate = (
+  date: Date | null,
+  availability: ServiceAvailability,
+) => {
   if (!date) return [];
   const entry = getAvailabilityEntry(date, availability);
   if (!entry) return [];
   const timeline = generateTimeline(availability.slot_duration_minutes);
   const allowedTimes = entry.all_day ? new Set(timeline) : new Set(entry.times);
-  return timeline.map((time) => ({
+  return timeline.map(time => ({
     time,
     enabled: entry.enabled && (entry.all_day || allowedTimes.has(time)),
   }));
@@ -259,11 +328,12 @@ const formatSlotLabel = (value: Date) =>
   });
 
 const ServiceBookingDetailsPage = () => {
-  const route = useRoute<RouteProp<RootStackParamList, 'ServiceBookingDetails'>>();
+  const route =
+    useRoute<RouteProp<RootStackParamList, 'ServiceBookingDetails'>>();
   const bookingId = route.params?.bookingId;
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { palette } = useKISTheme();
-  const { user } = useAuth();
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -286,7 +356,7 @@ const ServiceBookingDetailsPage = () => {
         if (!mounted) return;
         setCachedStorageUser(storedUser);
       } catch {
-        console.error("there is an error in getting user data!");
+        console.error('there is an error in getting user data!');
       }
     })();
     return () => {
@@ -294,19 +364,27 @@ const ServiceBookingDetailsPage = () => {
     };
   }, []);
   const [shopMembers, setShopMembers] = useState<any[]>([]);
-  const [shopMembersError, setShopMembersError] = useState<string | null>(null);
+  const [, setShopMembersError] = useState<string | null>(null);
   const [rosterModalOpen, setRosterModalOpen] = useState(false);
   const [serviceRoster, setServiceRoster] = useState<any[]>([]);
   const [serviceRosterLoading, setServiceRosterLoading] = useState(false);
   const [serviceRosterLoaded, setServiceRosterLoaded] = useState(false);
-  const [serviceRosterError, setServiceRosterError] = useState<string | null>(null);
-  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [serviceRosterError, setServiceRosterError] = useState<string | null>(
+    null,
+  );
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(
+    null,
+  );
   const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<Record<string, string>>({});
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
-  const [receiptLinks, setReceiptLinks] = useState<{ pdf?: string; page?: string; receipt_id?: string }>({});
+  const [receiptLinks, setReceiptLinks] = useState<{
+    pdf?: string;
+    page?: string;
+    receipt_id?: string;
+  }>({});
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [completingPayment, setCompletingPayment] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -318,7 +396,11 @@ const ServiceBookingDetailsPage = () => {
     () => cachedStorageUser?.user ?? cachedStorageUser ?? null,
     [cachedStorageUser],
   );
-  const currentUserId = cachedUserProfile?.id ?? cachedUserProfile?.user_id ?? cachedUserProfile?.uuid ?? null;
+  const currentUserId =
+    cachedUserProfile?.id ??
+    cachedUserProfile?.user_id ??
+    cachedUserProfile?.uuid ??
+    null;
   const serviceId = useMemo(() => getServiceIdentifier(booking), [booking]);
   const shopId = useMemo(() => getShopIdentifier(booking), [booking]);
   const rosterEntries = useMemo(() => {
@@ -330,7 +412,7 @@ const ServiceBookingDetailsPage = () => {
         activities: any[];
       }
     >();
-    serviceRoster.forEach((activity) => {
+    serviceRoster.forEach(activity => {
       const userId = getBookingUserId(activity);
       if (!userId) return;
       const existing = map.get(userId);
@@ -344,7 +426,7 @@ const ServiceBookingDetailsPage = () => {
         });
       }
     });
-    return Array.from(map.values()).map((entry) => ({
+    return Array.from(map.values()).map(entry => ({
       ...entry,
       activities: entry.activities
         .slice()
@@ -425,16 +507,32 @@ const ServiceBookingDetailsPage = () => {
   }, [booking, currentUserId]);
   const isShopTeamMember = useMemo(() => {
     if (!currentUserId || !shopMembers.length) return false;
-    return shopMembers.some((member) => {
+    return shopMembers.some(member => {
       const userShape = member?.user_details ?? member?.user ?? member ?? {};
       const memberId =
-        userShape?.id ?? userShape?.user_id ?? member?.user_id ?? member?.id ?? null;
-      const role = ((member?.role ?? userShape?.role ?? '') as string).toLowerCase();
-      return memberId && String(memberId) === String(currentUserId) && MANAGEABLE_ROLES.has(role);
+        userShape?.id ??
+        userShape?.user_id ??
+        member?.user_id ??
+        member?.id ??
+        null;
+      const role = (
+        (member?.role ?? userShape?.role ?? '') as string
+      ).toLowerCase();
+      return (
+        memberId &&
+        String(memberId) === String(currentUserId) &&
+        MANAGEABLE_ROLES.has(role)
+      );
     });
   }, [currentUserId, shopMembers]);
-  const hasRosterAccess = useMemo(() => Boolean(isProvider || isShopTeamMember), [isProvider, isShopTeamMember]);
-  const canManageRosterActions = useMemo(() => Boolean(isShopTeamMember), [isShopTeamMember]);
+  const hasRosterAccess = useMemo(
+    () => Boolean(isProvider || isShopTeamMember),
+    [isProvider, isShopTeamMember],
+  );
+  const canManageRosterActions = useMemo(
+    () => Boolean(isShopTeamMember),
+    [isShopTeamMember],
+  );
   const loadBlockedUsers = useCallback(async () => {
     if (!hasRosterAccess) {
       setBlockedUsers({});
@@ -486,8 +584,15 @@ const ServiceBookingDetailsPage = () => {
           : Array.isArray((payload as any).results)
           ? (payload as any).results
           : [];
-        const filtered = records.filter((entry: any) => getServiceIdentifier(entry) === serviceId);
-        if (booking && !filtered.some((entry: any) => String(entry?.id) === String(booking?.id))) {
+        const filtered = records.filter(
+          (entry: any) => getServiceIdentifier(entry) === serviceId,
+        );
+        if (
+          booking &&
+          !filtered.some(
+            (entry: any) => String(entry?.id) === String(booking?.id),
+          )
+        ) {
           filtered.unshift(booking);
         }
         setServiceRoster(filtered);
@@ -513,7 +618,13 @@ const ServiceBookingDetailsPage = () => {
       await loadBlockedUsers();
     }
     setRosterModalOpen(true);
-  }, [loadServiceRoster, serviceId, serviceRosterLoaded, loadBlockedUsers, hasRosterAccess]);
+  }, [
+    loadServiceRoster,
+    serviceId,
+    serviceRosterLoaded,
+    loadBlockedUsers,
+    hasRosterAccess,
+  ]);
 
   useEffect(() => {
     setServiceRoster([]);
@@ -539,19 +650,27 @@ const ServiceBookingDetailsPage = () => {
   const rosterSummaryText = serviceRosterLoading
     ? 'Loading booking list…'
     : totalRosterActivities
-      ? `${totalRosterActivities} booking${totalRosterActivities === 1 ? '' : 's'} across ${uniqueRosterUsers} user${uniqueRosterUsers === 1 ? '' : 's'}`
-      : 'Tap below to refresh the list.';
+    ? `${totalRosterActivities} booking${
+        totalRosterActivities === 1 ? '' : 's'
+      } across ${uniqueRosterUsers} user${uniqueRosterUsers === 1 ? '' : 's'}`
+    : 'Tap below to refresh the list.';
 
   const handleCancelRosterBooking = useCallback(
     async (bookingId: string) => {
       if (!bookingId) return;
       setCancellingBookingId(bookingId);
       try {
-        const res = await postRequest(ROUTES.commerce.serviceBookingCancel(bookingId), {});
+        const res = await postRequest(
+          ROUTES.commerce.serviceBookingCancel(bookingId),
+          {},
+        );
         if (!res?.success) {
           throw new Error(res?.message || 'Unable to cancel booking.');
         }
-        Alert.alert('Booking', 'Booking canceled and the payer will be refunded.');
+        Alert.alert(
+          'Booking',
+          'Booking canceled and the payer will be refunded.',
+        );
         await loadServiceRoster();
         loadBooking();
       } catch (error: any) {
@@ -570,18 +689,24 @@ const ServiceBookingDetailsPage = () => {
       setBlockingUserId(userId);
       try {
         if (existingBlock) {
-          const res = await deleteRequest(`${ROUTES.moderation.userBlocks}${existingBlock}/`, {
-            errorMessage: 'Unable to unblock user.',
-          });
+          const res = await deleteRequest(
+            `${ROUTES.moderation.userBlocks}${existingBlock}/`,
+            {
+              errorMessage: 'Unable to unblock user.',
+            },
+          );
           if (!res?.success) {
             throw new Error(res?.message || 'Unable to unblock user.');
           }
-          setBlockedUsers((prev) => {
+          setBlockedUsers(prev => {
             const next = { ...prev };
             delete next[userId];
             return next;
           });
-          Alert.alert('Users', 'User unblocked and can book this service again.');
+          Alert.alert(
+            'Users',
+            'User unblocked and can book this service again.',
+          );
           return;
         }
         const payload: Record<string, unknown> = {
@@ -603,10 +728,16 @@ const ServiceBookingDetailsPage = () => {
         if (!newBlockId) {
           throw new Error('Block response missing identifier.');
         }
-        setBlockedUsers((prev) => ({ ...prev, [userId]: newBlockId }));
+        setBlockedUsers(prev => ({ ...prev, [userId]: newBlockId }));
         Alert.alert('Users', 'User blocked from booking this service.');
       } catch (error: any) {
-        Alert.alert('Users', error?.message || (existingBlock ? 'Unable to unblock user.' : 'Unable to block user.'));
+        Alert.alert(
+          'Users',
+          error?.message ||
+            (existingBlock
+              ? 'Unable to unblock user.'
+              : 'Unable to block user.'),
+        );
       } finally {
         setBlockingUserId(null);
       }
@@ -614,18 +745,31 @@ const ServiceBookingDetailsPage = () => {
     [serviceId, shopId, blockedUsers],
   );
 
-  const scheduledAt = booking?.scheduled_at ? new Date(booking.scheduled_at) : null;
+  const scheduledAt = useMemo(
+    () => (booking?.scheduled_at ? new Date(booking.scheduled_at) : null),
+    [booking?.scheduled_at],
+  );
   const serviceDetails = booking?.service_details ?? null;
   const availability = useMemo(
-    () => normalizeAvailabilityPayload(serviceDetails?.availability ?? createDefaultAvailability({ timezone: 'UTC' })),
+    () =>
+      normalizeAvailabilityPayload(
+        serviceDetails?.availability ??
+          createDefaultAvailability({ timezone: 'UTC' }),
+      ),
     [serviceDetails?.availability],
   );
   const availabilityRangeLabel = useMemo(
     () => formatAvailabilityRangeLabel(availability.date_range),
     [availability.date_range],
   );
-  const dateOptions = useMemo(() => buildDateOptions(serviceDetails, availability), [availability, serviceDetails]);
-  const availableSlots = useMemo(() => buildSlotsForDate(rescheduleDate, availability), [availability, rescheduleDate]);
+  const dateOptions = useMemo(
+    () => buildDateOptions(serviceDetails, availability),
+    [availability, serviceDetails],
+  );
+  const availableSlots = useMemo(
+    () => buildSlotsForDate(rescheduleDate, availability),
+    [availability, rescheduleDate],
+  );
   const selectedRescheduleSlot = useMemo(() => {
     if (!rescheduleDate || !rescheduleTime) return null;
     const [hour, minute] = rescheduleTime.split(':').map(Number);
@@ -634,22 +778,40 @@ const ServiceBookingDetailsPage = () => {
     return slot;
   }, [rescheduleDate, rescheduleTime]);
   const scheduledMs = scheduledAt?.getTime() ?? null;
-  const serviceCancellationHours = Number(booking?.service_details?.cancellation_window_hours ?? 2);
+  const serviceCancellationHours = Number(
+    booking?.service_details?.cancellation_window_hours ?? 2,
+  );
   const normalizedCancellationHours =
-    Number.isFinite(serviceCancellationHours) && serviceCancellationHours > 0 ? serviceCancellationHours : 2;
-  const cancellationWindowMs = normalizedCancellationHours * 60 * 60 * 1000 || DEFAULT_CANCELLATION_WINDOW_MS;
-  const serviceRescheduleHours = Number(serviceDetails?.reschedule_window_hours ?? 0);
+    Number.isFinite(serviceCancellationHours) && serviceCancellationHours > 0
+      ? serviceCancellationHours
+      : 2;
+  const cancellationWindowMs =
+    normalizedCancellationHours * 60 * 60 * 1000 ||
+    DEFAULT_CANCELLATION_WINDOW_MS;
+  const serviceRescheduleHours = Number(
+    serviceDetails?.reschedule_window_hours ?? 0,
+  );
   const normalizedRescheduleHours =
-    Number.isFinite(serviceRescheduleHours) && serviceRescheduleHours > 0 ? serviceRescheduleHours : 0;
+    Number.isFinite(serviceRescheduleHours) && serviceRescheduleHours > 0
+      ? serviceRescheduleHours
+      : 0;
   const rescheduleWindowMs =
-    normalizedRescheduleHours > 0 ? normalizedRescheduleHours * 60 * 60 * 1000 : DEFAULT_RESCHEDULE_WINDOW_MS;
+    normalizedRescheduleHours > 0
+      ? normalizedRescheduleHours * 60 * 60 * 1000
+      : DEFAULT_RESCHEDULE_WINDOW_MS;
   const refundPolicyText =
     String(booking?.service_details?.refund_policy ?? '').trim() ||
-    `Cancel at least ${normalizedCancellationHours} hour${normalizedCancellationHours === 1 ? '' : 's'} before the scheduled time for a refund.`;
+    `Cancel at least ${normalizedCancellationHours} hour${
+      normalizedCancellationHours === 1 ? '' : 's'
+    } before the scheduled time for a refund.`;
   const bookingMetadata = booking?.metadata ?? {};
   const packageSelection = bookingMetadata?.package_selection ?? null;
-  const addonSelection = Array.isArray(bookingMetadata?.addon_selection) ? bookingMetadata.addon_selection : [];
-  const acknowledgedRequirements = Array.isArray(bookingMetadata?.requirements_acknowledged)
+  const addonSelection = Array.isArray(bookingMetadata?.addon_selection)
+    ? bookingMetadata.addon_selection
+    : [];
+  const acknowledgedRequirements = Array.isArray(
+    bookingMetadata?.requirements_acknowledged,
+  )
     ? bookingMetadata.requirements_acknowledged
     : [];
   const bookingLocation = bookingMetadata?.location ?? null;
@@ -665,38 +827,74 @@ const ServiceBookingDetailsPage = () => {
         .join(', ')
     : '';
   const isScheduledInFuture = scheduledMs ? scheduledMs > currentTime : false;
-  const meetsNoticeWindow = scheduledMs ? scheduledMs - currentTime >= cancellationWindowMs : false;
+  const meetsNoticeWindow = scheduledMs
+    ? scheduledMs - currentTime >= cancellationWindowMs
+    : false;
   const cancellableStatuses = ['pending', 'confirmed'];
-  const hasCancellableStatus = cancellableStatuses.includes(booking?.status ?? '');
-  const canCancelBooking = Boolean(isPayer && hasCancellableStatus && isScheduledInFuture && meetsNoticeWindow);
+  const hasCancellableStatus = cancellableStatuses.includes(
+    booking?.status ?? '',
+  );
+  const canCancelBooking = Boolean(
+    isPayer && hasCancellableStatus && isScheduledInFuture && meetsNoticeWindow,
+  );
   const canManageSchedule = Boolean(isPayer || isProvider || isShopTeamMember);
   const meetsRescheduleWindow =
-    scheduledMs && rescheduleWindowMs > 0 ? scheduledMs - currentTime >= rescheduleWindowMs : true;
-  const canRescheduleBooking = Boolean(canManageSchedule && hasCancellableStatus && isScheduledInFuture && meetsRescheduleWindow);
+    scheduledMs && rescheduleWindowMs > 0
+      ? scheduledMs - currentTime >= rescheduleWindowMs
+      : true;
+  const canRescheduleBooking = Boolean(
+    canManageSchedule &&
+      hasCancellableStatus &&
+      isScheduledInFuture &&
+      meetsRescheduleWindow,
+  );
   const cancellationDisabledReason = useMemo(() => {
     if (!isPayer) return null;
-    if (!hasCancellableStatus) return 'Only pending or confirmed bookings can be canceled.';
+    if (!hasCancellableStatus)
+      return 'Only pending or confirmed bookings can be canceled.';
     if (!scheduledAt) return 'Scheduled time is unavailable.';
-    if (!isScheduledInFuture) return 'The service date/time has already passed.';
+    if (!isScheduledInFuture)
+      return 'The service date/time has already passed.';
     if (!meetsNoticeWindow) return refundPolicyText;
     return null;
-  }, [isPayer, hasCancellableStatus, scheduledAt, isScheduledInFuture, meetsNoticeWindow, refundPolicyText]);
+  }, [
+    isPayer,
+    hasCancellableStatus,
+    scheduledAt,
+    isScheduledInFuture,
+    meetsNoticeWindow,
+    refundPolicyText,
+  ]);
   const rescheduleDisabledReason = useMemo(() => {
-    if (!canManageSchedule) return 'Only the payer, provider, or shop managers can reschedule this booking.';
-    if (!hasCancellableStatus) return 'Only pending or confirmed bookings can be rescheduled.';
+    if (!canManageSchedule)
+      return 'Only the payer, provider, or shop managers can reschedule this booking.';
+    if (!hasCancellableStatus)
+      return 'Only pending or confirmed bookings can be rescheduled.';
     if (!scheduledAt) return 'Scheduled time is unavailable.';
-    if (!isScheduledInFuture) return 'The service date/time has already passed.';
+    if (!isScheduledInFuture)
+      return 'The service date/time has already passed.';
     if (!meetsRescheduleWindow) {
-      return `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${normalizedRescheduleHours === 1 ? '' : 's'} before the original slot.`;
+      return `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${
+        normalizedRescheduleHours === 1 ? '' : 's'
+      } before the original slot.`;
     }
     return null;
-  }, [canManageSchedule, hasCancellableStatus, isScheduledInFuture, meetsRescheduleWindow, normalizedRescheduleHours, scheduledAt]);
+  }, [
+    canManageSchedule,
+    hasCancellableStatus,
+    isScheduledInFuture,
+    meetsRescheduleWindow,
+    normalizedRescheduleHours,
+    scheduledAt,
+  ]);
 
   useEffect(() => {
     if (!dateOptions.length) return;
-    setRescheduleDate((prev) => {
+    setRescheduleDate(prev => {
       if (prev) {
-        const match = dateOptions.find((option) => option.toDateString() === prev.toDateString());
+        const match = dateOptions.find(
+          option => option.toDateString() === prev.toDateString(),
+        );
         if (match) return match;
       }
       return dateOptions[0];
@@ -708,12 +906,14 @@ const ServiceBookingDetailsPage = () => {
       setRescheduleTime(null);
       return;
     }
-    setRescheduleTime((prev) => {
+    setRescheduleTime(prev => {
       if (prev) {
-        const keep = availableSlots.find((slot) => slot.time === prev && slot.enabled);
+        const keep = availableSlots.find(
+          slot => slot.time === prev && slot.enabled,
+        );
         if (keep) return prev;
       }
-      const next = availableSlots.find((slot) => slot.enabled);
+      const next = availableSlots.find(slot => slot.enabled);
       return next?.time ?? availableSlots[0].time;
     });
   }, [availableSlots]);
@@ -722,7 +922,10 @@ const ServiceBookingDetailsPage = () => {
     if (!bookingId || !canCancelBooking) return;
     setCancelLoading(true);
     try {
-      const res = await postRequest(ROUTES.commerce.serviceBookingCancel(bookingId), {});
+      const res = await postRequest(
+        ROUTES.commerce.serviceBookingCancel(bookingId),
+        {},
+      );
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to cancel booking.');
       }
@@ -745,11 +948,17 @@ const ServiceBookingDetailsPage = () => {
     if (!bookingId) return;
     setActionLoading(true);
     try {
-      const res = await postRequest(`${ROUTES.commerce.serviceBooking(bookingId)}mark-completed/`, {});
+      const res = await postRequest(
+        `${ROUTES.commerce.serviceBooking(bookingId)}mark-completed/`,
+        {},
+      );
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to mark completed.');
       }
-      Alert.alert('Booking', 'Marked as completed. The payer will confirm satisfaction.');
+      Alert.alert(
+        'Booking',
+        'Marked as completed. The payer will confirm satisfaction.',
+      );
       loadBooking();
     } catch (e: any) {
       Alert.alert('Booking', e?.message || 'Unable to mark completed.');
@@ -770,10 +979,16 @@ const ServiceBookingDetailsPage = () => {
       );
       if (!res?.success) {
         const message =
-          res?.data?.message || res?.data?.detail || res?.message || 'Unable to reschedule booking.';
+          res?.data?.message ||
+          res?.data?.detail ||
+          res?.message ||
+          'Unable to reschedule booking.';
         throw new Error(message);
       }
-      Alert.alert('Booking', `Booking rescheduled to ${formatSlotLabel(selectedRescheduleSlot)}.`);
+      Alert.alert(
+        'Booking',
+        `Booking rescheduled to ${formatSlotLabel(selectedRescheduleSlot)}.`,
+      );
       setRescheduleOpen(false);
       loadBooking();
     } catch (e: any) {
@@ -790,7 +1005,10 @@ const ServiceBookingDetailsPage = () => {
     }
     setActionLoading(true);
     try {
-      const res = await patchRequest(ROUTES.commerce.paymentSatisfy(booking.payment.id), {});
+      const res = await patchRequest(
+        ROUTES.commerce.paymentSatisfy(booking.payment.id),
+        {},
+      );
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to mark satisfied.');
       }
@@ -835,14 +1053,19 @@ const ServiceBookingDetailsPage = () => {
         name: result.name || `receipt-${Date.now()}.pdf`,
         type: result.type || 'application/pdf',
       } as any);
-      const uploadRes = await postRequest(ROUTES.broadcasts.profileAttachment, form);
+      const uploadRes = await postRequest(
+        ROUTES.broadcasts.profileAttachment,
+        form,
+      );
       if (!uploadRes?.success) {
         throw new Error(uploadRes?.message || 'Unable to upload receipt.');
       }
       const attachment = uploadRes.data?.attachment;
-      const receiptUrl = String(attachment?.url || attachment?.file || attachment?.file_url || '');
+      const receiptUrl = String(
+        attachment?.url || attachment?.file || attachment?.file_url || '',
+      );
       if (!receiptUrl) throw new Error('Uploaded receipt URL missing.');
-      setComplaintData((prev) => ({ ...prev, receiptUrl }));
+      setComplaintData(prev => ({ ...prev, receiptUrl }));
     } catch (e: any) {
       if (!DocumentPicker.isCancel(e)) {
         Alert.alert('Receipt', e?.message || 'Unable to upload receipt.');
@@ -854,8 +1077,14 @@ const ServiceBookingDetailsPage = () => {
 
   const handleSubmitComplaint = useCallback(async () => {
     if (!booking) return;
-    if (!complaintData.personalStatement.trim() || !complaintData.reason.trim()) {
-      Alert.alert('Complaint', 'Please explain your reason and personal statement.');
+    if (
+      !complaintData.personalStatement.trim() ||
+      !complaintData.reason.trim()
+    ) {
+      Alert.alert(
+        'Complaint',
+        'Please explain your reason and personal statement.',
+      );
       return;
     }
     setSubmittingComplaint(true);
@@ -868,9 +1097,13 @@ const ServiceBookingDetailsPage = () => {
         personal_statement: complaintData.personalStatement.trim(),
         reason: complaintData.reason.trim(),
       } as Record<string, unknown>;
-      const res = await postRequest(ROUTES.commerce.serviceBookingComplaints, payload, {
-        errorMessage: 'Unable to submit complaint.',
-      });
+      const res = await postRequest(
+        ROUTES.commerce.serviceBookingComplaints,
+        payload,
+        {
+          errorMessage: 'Unable to submit complaint.',
+        },
+      );
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to submit complaint.');
       }
@@ -886,17 +1119,18 @@ const ServiceBookingDetailsPage = () => {
   }, [booking, complaintData, loadBooking]);
 
   const payment = booking?.payment ?? null;
-  const paymentStatusValue = payment?.payment_status?.toLowerCase() || 'pending';
+  const paymentStatusValue =
+    payment?.payment_status?.toLowerCase() || 'pending';
   const paymentStatusLabel =
     paymentStatusValue === 'satisfied'
       ? 'Satisfied'
       : paymentStatusValue === 'paid'
-        ? 'Paid'
-        : paymentStatusValue === 'refunded'
-          ? 'Refunded'
-          : paymentStatusValue === 'failed'
-            ? 'Failed'
-            : 'Pending';
+      ? 'Paid'
+      : paymentStatusValue === 'refunded'
+      ? 'Refunded'
+      : paymentStatusValue === 'failed'
+      ? 'Failed'
+      : 'Pending';
   const depositAmountCents = Number.isFinite(Number(booking?.deposit_cents))
     ? booking?.deposit_cents ?? 0
     : payment?.amount_cents ?? 0;
@@ -904,26 +1138,37 @@ const ServiceBookingDetailsPage = () => {
     ? booking?.balance_cents ?? 0
     : Math.max((booking?.price_cents ?? 0) - depositAmountCents, 0);
   const remainingAmountLabel = formatKisc(balanceAmountCents);
-  const amount = formatKisc(booking?.price_cents ?? payment?.amount_cents ?? depositAmountCents);
+  const amount = formatKisc(
+    booking?.price_cents ?? payment?.amount_cents ?? depositAmountCents,
+  );
   const depositAmountLabel = formatKisc(depositAmountCents);
   const currency = payment?.currency ?? 'KISC';
   const durationText = booking?.service_details?.duration_minutes
     ? `${booking.service_details.duration_minutes} min`
     : 'Duration TBD';
-  const deliveryModes = (booking?.service_details?.delivery_modes || []).join(', ') || 'In-person';
+  const deliveryModes =
+    (booking?.service_details?.delivery_modes || []).join(', ') || 'In-person';
   const bookedDate = scheduledAt
-    ? scheduledAt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    ? scheduledAt.toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
     : 'Date TBD';
   const bookedTime = scheduledAt
-    ? scheduledAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    ? scheduledAt.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
     : 'Time TBD';
-  const bookingStatusLabel = String(booking?.status || '').replace(/_/g, ' ') || 'Status TBD';
+  const bookingStatusLabel =
+    String(booking?.status || '').replace(/_/g, ' ') || 'Status TBD';
   const paymentStatusColor =
     paymentStatusValue === 'pending'
       ? palette.warning
       : paymentStatusValue === 'failed' || paymentStatusValue === 'refunded'
-        ? palette.error ?? palette.warning
-        : palette.success;
+      ? palette.error ?? palette.warning
+      : palette.success;
 
   const handlePayRemaining = useCallback(() => {
     if (!bookingId || balanceAmountCents <= 0) return;
@@ -943,12 +1188,17 @@ const ServiceBookingDetailsPage = () => {
                 { errorMessage: 'Unable to complete the remaining payment.' },
               );
               if (!res?.success) {
-                throw new Error(res?.message || 'Unable to complete the remaining payment.');
+                throw new Error(
+                  res?.message || 'Unable to complete the remaining payment.',
+                );
               }
               Alert.alert('Booking', 'Remaining payment completed.');
               loadBooking();
             } catch (e: any) {
-              Alert.alert('Payment', e?.message || 'Unable to complete the remaining payment.');
+              Alert.alert(
+                'Payment',
+                e?.message || 'Unable to complete the remaining payment.',
+              );
             } finally {
               setCompletingPayment(false);
             }
@@ -964,10 +1214,13 @@ const ServiceBookingDetailsPage = () => {
     }
     setLoadingReceipt(true);
     try {
-      const response = await getRequest(ROUTES.commerce.serviceBookingReceipt(bookingId), {
-        errorMessage: 'Unable to load booking receipt.',
-        forceNetwork: true,
-      });
+      const response = await getRequest(
+        ROUTES.commerce.serviceBookingReceipt(bookingId),
+        {
+          errorMessage: 'Unable to load booking receipt.',
+          forceNetwork: true,
+        },
+      );
       if (!response?.success || !response?.data) {
         throw new Error(response?.message || 'Booking receipt unavailable.');
       }
@@ -980,7 +1233,7 @@ const ServiceBookingDetailsPage = () => {
       if (!links.pdf && !links.page) {
         throw new Error('Booking receipt links are missing.');
       }
-      setReceiptLinks((prev) => ({
+      setReceiptLinks(prev => ({
         ...prev,
         ...links,
       }));
@@ -1019,7 +1272,7 @@ const ServiceBookingDetailsPage = () => {
       if (!links.pdf && !links.page) {
         throw new Error('Receipt links are missing.');
       }
-      setReceiptLinks((prev) => ({
+      setReceiptLinks(prev => ({
         ...prev,
         ...links,
         receipt_id: data.receipt_id ?? prev.receipt_id,
@@ -1061,7 +1314,8 @@ const ServiceBookingDetailsPage = () => {
   }, [fetchReceiptLinks, hasPaymentReference]);
 
   const receiptActions = useMemo(() => {
-    const items: { key: string; label: string; hint: string; url: string }[] = [];
+    const items: { key: string; label: string; hint: string; url: string }[] =
+      [];
     if (receiptLinks.pdf) {
       items.push({
         key: 'pdf',
@@ -1102,11 +1356,14 @@ const ServiceBookingDetailsPage = () => {
     remainingMs === null
       ? null
       : remainingMs > 0
-        ? `Auto-release in ${formatDurationLabel(remainingMs)}`
-        : 'Auto-release overdue';
+      ? `Auto-release in ${formatDurationLabel(remainingMs)}`
+      : 'Auto-release overdue';
   const showCompletionNotice =
-    booking?.status === 'awaiting_satisfaction' && isPayer && !booking?.payer_satisfied_at;
-  const completionProviderName = booking?.provider_details?.display_name || booking?.shop_name || 'Provider';
+    booking?.status === 'awaiting_satisfaction' &&
+    isPayer &&
+    !booking?.payer_satisfied_at;
+  const completionProviderName =
+    booking?.provider_details?.display_name || booking?.shop_name || 'Provider';
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
@@ -1115,7 +1372,14 @@ const ServiceBookingDetailsPage = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: palette.bg,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
@@ -1123,8 +1387,18 @@ const ServiceBookingDetailsPage = () => {
 
   if (error || !booking) {
     return (
-      <View style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Text style={{ color: palette.text, marginBottom: 12 }}>{error || 'Booking not found.'}</Text>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: palette.bg,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
+        <Text style={{ color: palette.text, marginBottom: 12 }}>
+          {error || 'Booking not found.'}
+        </Text>
         <KISButton title="Close" onPress={() => navigation.goBack()} />
       </View>
     );
@@ -1134,11 +1408,10 @@ const ServiceBookingDetailsPage = () => {
     booking?.remote_meeting_link ||
     booking?.service_details?.remote_meeting_link ||
     booking?.service_details?.remote_meeting_link;
-  const showCompletePaymentButton = isPayer && !isProvider && balanceAmountCents > 0;
+  const showCompletePaymentButton =
+    isPayer && !isProvider && balanceAmountCents > 0;
   const showSatisfiedButton =
-    isPayer &&
-    balanceAmountCents <= 0 &&
-    paymentStatusValue === 'paid';
+    isPayer && balanceAmountCents <= 0 && paymentStatusValue === 'paid';
   const normalizedBookingStatus = String(booking?.status ?? '').toLowerCase();
   const completionLockedStatuses = new Set([
     'awaiting_satisfaction',
@@ -1162,65 +1435,141 @@ const ServiceBookingDetailsPage = () => {
   };
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
-      <View style={{
-        paddingTop: 20,
-        paddingHorizontal: 20,
-        paddingBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: palette.divider,
-        backgroundColor: palette.surface,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
+      <View
+        style={{
+          paddingTop: 20,
+          paddingHorizontal: 20,
+          paddingBottom: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: palette.divider,
+          backgroundColor: palette.surface,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Booking details</Text>
-          <Text style={{ color: palette.subtext, fontSize: 13 }}>{booking?.service_name}</Text>
+          <Text
+            style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+          >
+            Booking details
+          </Text>
+          <Text style={{ color: palette.subtext, fontSize: 13 }}>
+            {booking?.service_name}
+          </Text>
         </View>
         <Pressable onPress={() => navigation.goBack()}>
-          <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>Close</Text>
+          <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>
+            Close
+          </Text>
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
         <View style={cardStyle}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Booking details</Text>
-          <Text style={{ color: palette.subtext, marginTop: 4 }}>{booking?.service_details?.description || 'No additional description provided.'}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+          <Text
+            style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+          >
+            Booking details
+          </Text>
+          <Text style={{ color: palette.subtext, marginTop: 4 }}>
+            {booking?.service_details?.description ||
+              'No additional description provided.'}
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 12,
+            }}
+          >
             <Text style={{ color: palette.text }}>Date</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{bookedDate}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {bookedDate}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Time</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{bookedTime}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {bookedTime}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Duration</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{durationText}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {durationText}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Mode</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{deliveryModes}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {deliveryModes}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Status</Text>
-            <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>{bookingStatusLabel}</Text>
+            <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>
+              {bookingStatusLabel}
+            </Text>
           </View>
           {packageSelection?.name ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Package</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{packageSelection.name}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {packageSelection.name}
+              </Text>
             </View>
           ) : null}
           {addonSelection.length ? (
             <View style={{ marginTop: 6 }}>
               <Text style={{ color: palette.text }}>Add-ons</Text>
-              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>
-                {addonSelection.map((entry: any) => entry?.name).filter(Boolean).join(', ')}
+              <Text
+                style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}
+              >
+                {addonSelection
+                  .map((entry: any) => entry?.name)
+                  .filter(Boolean)
+                  .join(', ')}
               </Text>
             </View>
           ) : null}
           {bookingMetadata?.requested_price ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Requested price</Text>
               <Text style={{ color: palette.text, fontWeight: '600' }}>
                 {formatKiscAmount(Number(bookingMetadata.requested_price))}
@@ -1228,41 +1577,81 @@ const ServiceBookingDetailsPage = () => {
             </View>
           ) : null}
           {bookingMetadata?.participant_count ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Participants</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.participant_count}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {bookingMetadata.participant_count}
+              </Text>
             </View>
           ) : null}
           {bookingMetadata?.staff_on_site ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Staff on site</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.staff_on_site}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {bookingMetadata.staff_on_site}
+              </Text>
             </View>
           ) : null}
           {locationLabel ? (
             <View style={{ marginTop: 6 }}>
               <Text style={{ color: palette.text }}>Location</Text>
-              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>{locationLabel}</Text>
+              <Text
+                style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}
+              >
+                {locationLabel}
+              </Text>
             </View>
           ) : null}
           {bookingMetadata?.remote_region ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Remote region</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{bookingMetadata.remote_region}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {bookingMetadata.remote_region}
+              </Text>
             </View>
           ) : null}
           {acknowledgedRequirements.length ? (
             <View style={{ marginTop: 6 }}>
-              <Text style={{ color: palette.text }}>Requirements acknowledged</Text>
-              <Text style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}>
+              <Text style={{ color: palette.text }}>
+                Requirements acknowledged
+              </Text>
+              <Text
+                style={{ color: palette.text, fontWeight: '600', marginTop: 2 }}
+              >
                 {acknowledgedRequirements.join(', ')}
               </Text>
             </View>
           ) : null}
           {bookingMetadata?.terms_accepted ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Terms</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>Accepted</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                Accepted
+              </Text>
             </View>
           ) : null}
           {hasPaymentReference ? (
@@ -1275,21 +1664,44 @@ const ServiceBookingDetailsPage = () => {
                 loading={regeneratingReceipt}
                 disabled={regeneratingReceipt}
               />
-              <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
-                Regenerates the receipt stored in _/media/billing/receipts/_ so you can download the fresh PDF.
+              <Text
+                style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}
+              >
+                Regenerates the receipt stored in _/media/billing/receipts/_ so
+                you can download the fresh PDF.
               </Text>
             </View>
           ) : null}
           {meetingLink ? (
-            <Pressable onPress={() => handleOpenLink(meetingLink)} style={{ marginTop: 12 }}>
-              <Text style={{ color: palette.primaryStrong }}>Open meeting link</Text>
-              <Text style={{ color: palette.text, fontSize: 12 }}>{meetingLink}</Text>
+            <Pressable
+              onPress={() => handleOpenLink(meetingLink)}
+              style={{ marginTop: 12 }}
+            >
+              <Text style={{ color: palette.primaryStrong }}>
+                Open meeting link
+              </Text>
+              <Text style={{ color: palette.text, fontSize: 12 }}>
+                {meetingLink}
+              </Text>
             </Pressable>
           ) : null}
           {isPayer && (
-            <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.divider }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Cancel booking</Text>
-              <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}>
+            <View
+              style={{
+                marginTop: 16,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: palette.divider,
+              }}
+            >
+              <Text
+                style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+              >
+                Cancel booking
+              </Text>
+              <Text
+                style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}
+              >
                 {refundPolicyText}
               </Text>
               <KISButton
@@ -1301,15 +1713,34 @@ const ServiceBookingDetailsPage = () => {
                 style={{ marginTop: 8 }}
               />
               {cancellationDisabledReason ? (
-                <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4 }}>{cancellationDisabledReason}</Text>
+                <Text
+                  style={{ color: palette.warning, fontSize: 12, marginTop: 4 }}
+                >
+                  {cancellationDisabledReason}
+                </Text>
               ) : null}
             </View>
           )}
-          <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.divider }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Reschedule booking</Text>
-            <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}>
+          <View
+            style={{
+              marginTop: 16,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: palette.divider,
+            }}
+          >
+            <Text
+              style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+            >
+              Reschedule booking
+            </Text>
+            <Text
+              style={{ color: palette.subtext, fontSize: 13, marginTop: 4 }}
+            >
               {normalizedRescheduleHours > 0
-                ? `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${normalizedRescheduleHours === 1 ? '' : 's'} before the original slot.`
+                ? `Reschedule requests must be made at least ${normalizedRescheduleHours} hour${
+                    normalizedRescheduleHours === 1 ? '' : 's'
+                  } before the original slot.`
                 : 'Pick a new slot and we will re-check availability before updating the booking.'}
             </Text>
             <KISButton
@@ -1323,59 +1754,143 @@ const ServiceBookingDetailsPage = () => {
               style={{ marginTop: 8 }}
             />
             {rescheduleDisabledReason ? (
-              <Text style={{ color: palette.warning, fontSize: 12, marginTop: 4 }}>{rescheduleDisabledReason}</Text>
+              <Text
+                style={{ color: palette.warning, fontSize: 12, marginTop: 4 }}
+              >
+                {rescheduleDisabledReason}
+              </Text>
             ) : null}
-            {Array.isArray(bookingMetadata?.reschedules) && bookingMetadata.reschedules.length ? (
-              <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
-                Last reschedule: {formatTimestamp(bookingMetadata.reschedules[bookingMetadata.reschedules.length - 1]?.to)}
+            {Array.isArray(bookingMetadata?.reschedules) &&
+            bookingMetadata.reschedules.length ? (
+              <Text
+                style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}
+              >
+                Last reschedule:{' '}
+                {formatTimestamp(
+                  bookingMetadata.reschedules[
+                    bookingMetadata.reschedules.length - 1
+                  ]?.to,
+                )}
               </Text>
             ) : null}
           </View>
         </View>
 
         <View style={cardStyle}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Payment details</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+          <Text
+            style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+          >
+            Payment details
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 12,
+            }}
+          >
             <Text style={{ color: palette.text }}>Amount</Text>
-            <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>{amount}</Text>
+            <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>
+              {amount}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Deposit paid</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{depositAmountLabel}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {depositAmountLabel}
+            </Text>
           </View>
           {balanceAmountCents > 0 && (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Remaining</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{remainingAmountLabel}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {remainingAmountLabel}
+              </Text>
             </View>
           )}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Currency</Text>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>{currency}</Text>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              {currency}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 6,
+            }}
+          >
             <Text style={{ color: palette.text }}>Payment status</Text>
-            <Text style={{ color: paymentStatusColor, fontWeight: '600' }}>{paymentStatusLabel}</Text>
+            <Text style={{ color: paymentStatusColor, fontWeight: '600' }}>
+              {paymentStatusLabel}
+            </Text>
           </View>
           {payment?.paid_at ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Paid at</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{new Date(payment.paid_at).toLocaleString()}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {new Date(payment.paid_at).toLocaleString()}
+              </Text>
             </View>
           ) : null}
           {payment?.payment_method ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 6,
+              }}
+            >
               <Text style={{ color: palette.text }}>Method</Text>
-              <Text style={{ color: palette.text, fontWeight: '600' }}>{payment.payment_method}</Text>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                {payment.payment_method}
+              </Text>
             </View>
           ) : null}
           <View style={{ marginTop: 6 }}>
-            <Text style={{ color: palette.subtext, fontSize: 12 }}>Reference · {payment?.transaction_reference || booking?.payment_tx_ref || '—'}</Text>
+            <Text style={{ color: palette.subtext, fontSize: 12 }}>
+              Reference ·{' '}
+              {payment?.transaction_reference || booking?.payment_tx_ref || '—'}
+            </Text>
             {payment?.notes ? (
-              <Text style={{ color: palette.subtext, fontSize: 12 }}>Notes · {payment.notes}</Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Notes · {payment.notes}
+              </Text>
             ) : null}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 8,
+              marginTop: 12,
+              flexWrap: 'wrap',
+            }}
+          >
             {showCompletePaymentButton && (
               <KISButton
                 title="Complete payment"
@@ -1386,15 +1901,30 @@ const ServiceBookingDetailsPage = () => {
               />
             )}
             {showSatisfiedButton && (
-              <KISButton title="Mark Satisfied" size="sm" onPress={handleMarkSatisfied} loading={actionLoading} />
+              <KISButton
+                title="Mark Satisfied"
+                size="sm"
+                onPress={handleMarkSatisfied}
+                loading={actionLoading}
+              />
             )}
           </View>
         </View>
 
         {showReceiptsSection ? (
           <View style={[cardStyle, { gap: 10 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Receipts</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text
+                style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+              >
+                Receipts
+              </Text>
               <KISButton
                 title="Regenerate receipt"
                 size="sm"
@@ -1405,12 +1935,13 @@ const ServiceBookingDetailsPage = () => {
               />
             </View>
             <Text style={{ color: palette.subtext, fontSize: 13 }}>
-              Download a copy of the receipt that matches the styling stored under /media/billing/receipts/.
+              Download a copy of the receipt that matches the styling stored
+              under /media/billing/receipts/.
             </Text>
             {loadingReceipt && !receiptActions.length ? (
               <ActivityIndicator color={palette.primaryStrong} />
             ) : receiptActions.length ? (
-              receiptActions.map((action) => (
+              receiptActions.map(action => (
                 <View key={action.key} style={{ gap: 6 }}>
                   <KISButton
                     title={action.label}
@@ -1418,17 +1949,31 @@ const ServiceBookingDetailsPage = () => {
                     variant="ghost"
                     onPress={() => openReceipt(action.url)}
                   />
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>{action.hint}</Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    {action.hint}
+                  </Text>
                 </View>
               ))
             ) : (
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                Tap the button below to generate the receipt and download whenever you need it.
+                Tap the button below to generate the receipt and download
+                whenever you need it.
               </Text>
             )}
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginTop: 12,
+              }}
+            >
               <KISButton
-                title={receiptActions.length ? 'Download receipt' : 'Generate receipt'}
+                title={
+                  receiptActions.length
+                    ? 'Download receipt'
+                    : 'Generate receipt'
+                }
                 size="sm"
                 variant="outline"
                 onPress={handleDownloadReceipt}
@@ -1439,71 +1984,143 @@ const ServiceBookingDetailsPage = () => {
         ) : null}
 
         {showCompletionNotice ? (
-          <View style={[cardStyle, { borderWidth: 1.5, borderColor: palette.warning }]}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.warning }}>
+          <View
+            style={[
+              cardStyle,
+              { borderWidth: 1.5, borderColor: palette.warning },
+            ]}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '700',
+                color: palette.warning,
+              }}
+            >
               {completionProviderName} marked this service as completed.
             </Text>
             <Text style={{ color: palette.subtext, marginTop: 6 }}>
-              Please confirm satisfaction within the 3-day window so the payment can be released.
+              Please confirm satisfaction within the 3-day window so the payment
+              can be released.
             </Text>
             {countdownLabel ? (
-              <Text style={{ color: palette.subtext, marginTop: 8 }}>Countdown: {countdownLabel}</Text>
+              <Text style={{ color: palette.subtext, marginTop: 8 }}>
+                Countdown: {countdownLabel}
+              </Text>
             ) : null}
           </View>
         ) : null}
 
         <View style={cardStyle}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Provider</Text>
-          <Text style={{ color: palette.text, fontWeight: '600', marginTop: 6 }}>{booking?.provider_details?.display_name || booking?.shop_name}</Text>
+          <Text
+            style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+          >
+            Provider
+          </Text>
+          <Text
+            style={{ color: palette.text, fontWeight: '600', marginTop: 6 }}
+          >
+            {booking?.provider_details?.display_name || booking?.shop_name}
+          </Text>
           {booking?.provider_details?.phone ? (
-            <Text style={{ color: palette.subtext }}>{booking.provider_details.phone}</Text>
+            <Text style={{ color: palette.subtext }}>
+              {booking.provider_details.phone}
+            </Text>
           ) : null}
           {booking?.provider_details?.email ? (
-            <Text style={{ color: palette.subtext }}>{booking.provider_details.email}</Text>
+            <Text style={{ color: palette.subtext }}>
+              {booking.provider_details.email}
+            </Text>
           ) : null}
         </View>
 
         <View style={cardStyle}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Your instructions</Text>
-          <Text style={{ color: palette.subtext, marginTop: 4 }}>{booking?.instructions || 'No notes provided.'}</Text>
+          <Text
+            style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+          >
+            Your instructions
+          </Text>
+          <Text style={{ color: palette.subtext, marginTop: 4 }}>
+            {booking?.instructions || 'No notes provided.'}
+          </Text>
         </View>
 
         <View style={cardStyle}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Metadata</Text>
+          <Text
+            style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+          >
+            Metadata
+          </Text>
           <View style={{ marginTop: 8, gap: 6 }}>
-            <Text style={{ color: palette.subtext }}>Booking reference: {booking.payment_tx_ref || booking.id}</Text>
-            <Text style={{ color: palette.subtext }}>Created at: {booking?.created_at ? new Date(booking.created_at).toLocaleString() : '—'}</Text>
+            <Text style={{ color: palette.subtext }}>
+              Booking reference: {booking.payment_tx_ref || booking.id}
+            </Text>
+            <Text style={{ color: palette.subtext }}>
+              Created at:{' '}
+              {booking?.created_at
+                ? new Date(booking.created_at).toLocaleString()
+                : '—'}
+            </Text>
             {booking?.escrow_locked_at ? (
-              <Text style={{ color: palette.subtext }}>Escrow locked: {new Date(booking.escrow_locked_at).toLocaleString()}</Text>
+              <Text style={{ color: palette.subtext }}>
+                Escrow locked:{' '}
+                {new Date(booking.escrow_locked_at).toLocaleString()}
+              </Text>
             ) : null}
             {booking?.provider_completed_at ? (
-              <Text style={{ color: palette.subtext }}>Provider completed: {new Date(booking.provider_completed_at).toLocaleString()}</Text>
+              <Text style={{ color: palette.subtext }}>
+                Provider completed:{' '}
+                {new Date(booking.provider_completed_at).toLocaleString()}
+              </Text>
             ) : null}
             {booking?.payer_satisfied_at ? (
-              <Text style={{ color: palette.subtext }}>You marked satisfied: {new Date(booking.payer_satisfied_at).toLocaleString()}</Text>
+              <Text style={{ color: palette.subtext }}>
+                You marked satisfied:{' '}
+                {new Date(booking.payer_satisfied_at).toLocaleString()}
+              </Text>
             ) : null}
             {expiryLabel ? (
-              <Text style={{ color: palette.subtext }}>Satisfaction deadline: {expiryLabel}</Text>
+              <Text style={{ color: palette.subtext }}>
+                Satisfaction deadline: {expiryLabel}
+              </Text>
             ) : null}
             {payment?.satisfied_at ? (
-              <Text style={{ color: palette.subtext }}>Payment satisfied: {new Date(payment.satisfied_at).toLocaleString()}</Text>
+              <Text style={{ color: palette.subtext }}>
+                Payment satisfied:{' '}
+                {new Date(payment.satisfied_at).toLocaleString()}
+              </Text>
             ) : null}
           </View>
         </View>
 
         {hasRosterAccess && serviceId ? (
           <View style={cardStyle}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Service roster</Text>
+            <Text
+              style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
+            >
+              Service roster
+            </Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
-              {`View everyone who booked ${booking?.service_name || 'this service'}, along with their activities.`}
+              {`View everyone who booked ${
+                booking?.service_name || 'this service'
+              }, along with their activities.`}
             </Text>
             {serviceRosterError ? (
-              <Text style={{ color: palette.warning, marginTop: 6 }}>{serviceRosterError}</Text>
+              <Text style={{ color: palette.warning, marginTop: 6 }}>
+                {serviceRosterError}
+              </Text>
             ) : null}
-            <Text style={{ color: palette.subtext, marginTop: 8, fontSize: 12 }}>
-              Owners/managers can cancel or block from the roster modal before reloading the list.
+            <Text
+              style={{ color: palette.subtext, marginTop: 8, fontSize: 12 }}
+            >
+              Owners/managers can cancel or block from the roster modal before
+              reloading the list.
             </Text>
-            <Text style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}>{rosterSummaryText}</Text>
+            <Text
+              style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}
+            >
+              {rosterSummaryText}
+            </Text>
             <View style={{ marginTop: 12 }}>
               <KISButton
                 title="View bookings"
@@ -1517,66 +2134,115 @@ const ServiceBookingDetailsPage = () => {
         ) : null}
 
         {showMarkCompletedButton && (
-          <KISButton title="Mark Completed" onPress={handleMarkCompleted} loading={actionLoading} />
+          <KISButton
+            title="Mark Completed"
+            onPress={handleMarkCompleted}
+            loading={actionLoading}
+          />
         )}
         {showComplaintPrompt && (
-          <View style={{ backgroundColor: palette.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: palette.warning }}>
-            <Text style={{ color: palette.text, fontWeight: '600' }}>Provider marked service as completed.</Text>
+          <View
+            style={{
+              backgroundColor: palette.surface,
+              borderRadius: 12,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: palette.warning,
+            }}
+          >
+            <Text style={{ color: palette.text, fontWeight: '600' }}>
+              Provider marked service as completed.
+            </Text>
             <Text style={{ color: palette.subtext, marginVertical: 8 }}>
               {countdownLabel
                 ? `You can open a complaint during the current review window. ${countdownLabel}.`
                 : 'You can submit a complaint during the active review window if the service was unsatisfactory.'}
             </Text>
-            <KISButton title="Submit complaint" variant="secondary" onPress={() => setComplaintOpen(true)} />
+            <KISButton
+              title="Submit complaint"
+              variant="secondary"
+              onPress={() => setComplaintOpen(true)}
+            />
           </View>
         )}
       </ScrollView>
 
       <Modal visible={rosterModalOpen} transparent animationType="slide">
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setRosterModalOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onPress={() => setRosterModalOpen(false)}
+        >
           <View style={{ flex: 1 }} />
         </Pressable>
-        <View style={{ backgroundColor: palette.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '85%' }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Service bookings</Text>
+        <View
+          style={{
+            backgroundColor: palette.surface,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            padding: 20,
+            maxHeight: '85%',
+          }}
+        >
+          <Text
+            style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+          >
+            Service bookings
+          </Text>
           <Text style={{ color: palette.subtext, marginTop: 4 }}>
             {`All users who booked ${booking?.service_name || 'this service'}.`}
           </Text>
           {serviceRosterError ? (
-            <Text style={{ color: palette.warning, marginTop: 8 }}>{serviceRosterError}</Text>
+            <Text style={{ color: palette.warning, marginTop: 8 }}>
+              {serviceRosterError}
+            </Text>
           ) : null}
           {serviceRosterLoading && !rosterEntries.length ? (
-            <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 12 }} />
+            <ActivityIndicator
+              color={palette.primaryStrong}
+              style={{ marginTop: 12 }}
+            />
           ) : null}
           {rosterEntries.length ? (
             <ScrollView style={{ marginTop: 12, maxHeight: 360 }}>
               {rosterEntries.map((entry, index) => {
                 const isExpanded = expandedUserId === entry.userId;
-                const activeBooking = entry.activities.find((activity) => !isBookingCancelled(activity));
+                const activeBooking = entry.activities.find(
+                  activity => !isBookingCancelled(activity),
+                );
                 const summaryStatus = String(
-                  (activeBooking?.status ?? entry.activities[0]?.status ?? 'pending'),
+                  activeBooking?.status ??
+                    entry.activities[0]?.status ??
+                    'pending',
                 ).replace(/_/g, ' ');
                 const isUserBlocked = Boolean(blockedUsers[entry.userId]);
                 const scheduledAtForActive = activeBooking?.scheduled_at
                   ? new Date(activeBooking.scheduled_at)
                   : null;
                 const timeUntilScheduled =
-                  scheduledAtForActive !== null ? scheduledAtForActive.getTime() - currentTime : null;
+                  scheduledAtForActive !== null
+                    ? scheduledAtForActive.getTime() - currentTime
+                    : null;
                 const withinCancellationWindow =
-                  typeof timeUntilScheduled === 'number' && timeUntilScheduled >= cancellationWindowMs;
+                  typeof timeUntilScheduled === 'number' &&
+                  timeUntilScheduled >= cancellationWindowMs;
                 const rosterActionsEnabled =
-                  Boolean(activeBooking && !isBookingCancelled(activeBooking)) && withinCancellationWindow;
-                const actionContainerOpacity = rosterActionsEnabled ? 1 : 0.45;
+                  Boolean(
+                    activeBooking && !isBookingCancelled(activeBooking),
+                  ) && withinCancellationWindow;
                 return (
                   <View
                     key={`roster-user-${entry.userId}-${index}`}
                     style={{
                       paddingVertical: 12,
-                      borderBottomWidth: index === rosterEntries.length - 1 ? 0 : 1,
+                      borderBottomWidth:
+                        index === rosterEntries.length - 1 ? 0 : 1,
                       borderBottomColor: palette.divider,
                     }}
                   >
                     <Pressable
-                      onPress={() => setExpandedUserId(isExpanded ? null : entry.userId)}
+                      onPress={() =>
+                        setExpandedUserId(isExpanded ? null : entry.userId)
+                      }
                       style={{
                         flexDirection: 'row',
                         justifyContent: 'space-between',
@@ -1585,17 +2251,35 @@ const ServiceBookingDetailsPage = () => {
                       }}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: '600',
+                            color: palette.text,
+                          }}
+                        >
                           {entry.customer.name}
                         </Text>
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                          {entry.customer.phone || entry.customer.email || 'No contact info'}
+                          {entry.customer.phone ||
+                            entry.customer.email ||
+                            'No contact info'}
                         </Text>
-                        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
-                          {`${entry.activities.length} activity${entry.activities.length === 1 ? '' : 'ies'} · ${summaryStatus}`}
+                        <Text
+                          style={{
+                            color: palette.subtext,
+                            fontSize: 12,
+                            marginTop: 4,
+                          }}
+                        >
+                          {`${entry.activities.length} activity${
+                            entry.activities.length === 1 ? '' : 'ies'
+                          } · ${summaryStatus}`}
                         </Text>
                       </View>
-                      <Text style={{ color: palette.primaryStrong, fontSize: 12 }}>
+                      <Text
+                        style={{ color: palette.primaryStrong, fontSize: 12 }}
+                      >
                         {isExpanded ? 'Hide' : 'Show'}
                       </Text>
                     </Pressable>
@@ -1614,14 +2298,27 @@ const ServiceBookingDetailsPage = () => {
                             title="Cancel booking"
                             size="xs"
                             variant="outline"
-                            onPress={() => handleCancelRosterBooking(String(activeBooking.id))}
-                            loading={cancellingBookingId === String(activeBooking.id)}
+                            onPress={() =>
+                              handleCancelRosterBooking(
+                                String(activeBooking.id),
+                              )
+                            }
+                            loading={
+                              cancellingBookingId === String(activeBooking.id)
+                            }
                             disabled={
-                              cancellingBookingId === String(activeBooking.id) || !rosterActionsEnabled
+                              cancellingBookingId ===
+                                String(activeBooking.id) ||
+                              !rosterActionsEnabled
                             }
                           />
                         ) : (
-                          <KISButton title="Cancel booking" size="xs" variant="outline" disabled />
+                          <KISButton
+                            title="Cancel booking"
+                            size="xs"
+                            variant="outline"
+                            disabled
+                          />
                         )}
                         <KISButton
                           title={isUserBlocked ? 'Unblock user' : 'Block user'}
@@ -1629,16 +2326,25 @@ const ServiceBookingDetailsPage = () => {
                           variant={isUserBlocked ? 'outline' : 'secondary'}
                           onPress={() => handleBlockUser(entry.userId)}
                           loading={blockingUserId === entry.userId}
-                          disabled={blockingUserId === entry.userId || !rosterActionsEnabled}
+                          disabled={
+                            blockingUserId === entry.userId ||
+                            !rosterActionsEnabled
+                          }
                         />
                       </View>
                     ) : null}
                     {isExpanded && (
                       <View style={{ marginTop: 10, gap: 8 }}>
                         {entry.activities.map((activity, activityIndex) => {
-                          const scheduledLabel = formatTimestamp(activity?.scheduled_at);
-                          const createdLabel = formatTimestamp(activity?.created_at ?? activity?.booked_at);
-                          const statusLabel = String(activity?.status || 'pending').replace(/_/g, ' ');
+                          const scheduledLabel = formatTimestamp(
+                            activity?.scheduled_at,
+                          );
+                          const createdLabel = formatTimestamp(
+                            activity?.created_at ?? activity?.booked_at,
+                          );
+                          const statusLabel = String(
+                            activity?.status || 'pending',
+                          ).replace(/_/g, ' ');
                           const paymentStatus =
                             activity?.payment?.payment_status ??
                             activity?.payment_status ??
@@ -1648,22 +2354,45 @@ const ServiceBookingDetailsPage = () => {
                             <View
                               key={`activity-${activity?.id ?? activityIndex}`}
                               style={{
-                                paddingBottom: activityIndex === entry.activities.length - 1 ? 0 : 8,
-                                borderBottomWidth: activityIndex === entry.activities.length - 1 ? 0 : 1,
+                                paddingBottom:
+                                  activityIndex === entry.activities.length - 1
+                                    ? 0
+                                    : 8,
+                                borderBottomWidth:
+                                  activityIndex === entry.activities.length - 1
+                                    ? 0
+                                    : 1,
                                 borderBottomColor: palette.divider,
                               }}
                             >
-                              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                              <Text
+                                style={{
+                                  color: palette.text,
+                                  fontWeight: '600',
+                                }}
+                              >
                                 Activity {activityIndex + 1}
                               </Text>
-                              <Text style={{ color: palette.subtext, fontSize: 12 }}>Status · {statusLabel}</Text>
-                              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                              <Text
+                                style={{ color: palette.subtext, fontSize: 12 }}
+                              >
+                                Status · {statusLabel}
+                              </Text>
+                              <Text
+                                style={{ color: palette.subtext, fontSize: 12 }}
+                              >
                                 Scheduled for · {scheduledLabel}
                               </Text>
-                              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                              <Text
+                                style={{ color: palette.subtext, fontSize: 12 }}
+                              >
                                 Booked at · {createdLabel}
                               </Text>
-                              <Text style={{ color: palette.subtext, fontSize: 12 }}>Payment · {paymentStatus}</Text>
+                              <Text
+                                style={{ color: palette.subtext, fontSize: 12 }}
+                              >
+                                Payment · {paymentStatus}
+                              </Text>
                             </View>
                           );
                         })}
@@ -1675,28 +2404,42 @@ const ServiceBookingDetailsPage = () => {
                               opacity: rosterActionsEnabled ? 1 : 0.45,
                             }}
                           >
-                            {activeBooking && !isBookingCancelled(activeBooking) ? (
+                            {activeBooking &&
+                            !isBookingCancelled(activeBooking) ? (
                               <KISButton
                                 title="Cancel booking"
                                 size="xs"
                                 variant="outline"
-                                onPress={() => handleCancelRosterBooking(String(activeBooking.id))}
-                                loading={cancellingBookingId === String(activeBooking.id)}
+                                onPress={() =>
+                                  handleCancelRosterBooking(
+                                    String(activeBooking.id),
+                                  )
+                                }
+                                loading={
+                                  cancellingBookingId ===
+                                  String(activeBooking.id)
+                                }
                                 disabled={
-                                  cancellingBookingId === String(activeBooking.id) ||
+                                  cancellingBookingId ===
+                                    String(activeBooking.id) ||
                                   !rosterActionsEnabled
                                 }
                               />
                             ) : null}
                             <KISButton
-                              title={isUserBlocked ? 'User blocked' : 'Block user'}
+                              title={
+                                isUserBlocked ? 'User blocked' : 'Block user'
+                              }
                               size="xs"
                               variant={isUserBlocked ? 'outline' : 'secondary'}
                               onPress={() => handleBlockUser(entry.userId)}
                               loading={blockingUserId === entry.userId}
                               disabled={
                                 isUserBlocked ||
-                                Boolean(blockingUserId && blockingUserId !== entry.userId) ||
+                                Boolean(
+                                  blockingUserId &&
+                                    blockingUserId !== entry.userId,
+                                ) ||
                                 !rosterActionsEnabled
                               }
                             />
@@ -1709,25 +2452,50 @@ const ServiceBookingDetailsPage = () => {
               })}
             </ScrollView>
           ) : (
-            <Text style={{ color: palette.subtext, marginTop: 12 }}>No booking activity yet.</Text>
+            <Text style={{ color: palette.subtext, marginTop: 12 }}>
+              No booking activity yet.
+            </Text>
           )}
           <View style={{ marginTop: 16 }}>
-            <KISButton title="Close" size="sm" onPress={() => setRosterModalOpen(false)} />
+            <KISButton
+              title="Close"
+              size="sm"
+              onPress={() => setRosterModalOpen(false)}
+            />
           </View>
         </View>
       </Modal>
 
       <Modal visible={complaintOpen} transparent animationType="slide">
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setComplaintOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onPress={() => setComplaintOpen(false)}
+        >
           <View style={{ flex: 1 }} />
         </Pressable>
-        <View style={{ backgroundColor: palette.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '80%' }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Dispute booking</Text>
-          <Text style={{ color: palette.subtext, marginTop: 4 }}>Send your receipt, statement, and reason so KCNI can review.</Text>
+        <View
+          style={{
+            backgroundColor: palette.surface,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            padding: 20,
+            maxHeight: '80%',
+          }}
+        >
+          <Text
+            style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+          >
+            Dispute booking
+          </Text>
+          <Text style={{ color: palette.subtext, marginTop: 4 }}>
+            Send your receipt, statement, and reason so KCAN can review.
+          </Text>
           <KISTextInput
             label="Receipt link"
             value={complaintData.receiptUrl}
-            onChangeText={(text) => setComplaintData((prev) => ({ ...prev, receiptUrl: text }))}
+            onChangeText={text =>
+              setComplaintData(prev => ({ ...prev, receiptUrl: text }))
+            }
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -1741,14 +2509,18 @@ const ServiceBookingDetailsPage = () => {
           <KISTextInput
             label="Personal statement"
             value={complaintData.personalStatement}
-            onChangeText={(text) => setComplaintData((prev) => ({ ...prev, personalStatement: text }))}
+            onChangeText={text =>
+              setComplaintData(prev => ({ ...prev, personalStatement: text }))
+            }
             multiline
             numberOfLines={3}
           />
           <KISTextInput
             label="Reason for dissatisfaction"
             value={complaintData.reason}
-            onChangeText={(text) => setComplaintData((prev) => ({ ...prev, reason: text }))}
+            onChangeText={text =>
+              setComplaintData(prev => ({ ...prev, reason: text }))
+            }
             multiline
             numberOfLines={3}
           />
@@ -1760,23 +2532,45 @@ const ServiceBookingDetailsPage = () => {
         </View>
       </Modal>
 
-      <Modal visible={rescheduleOpen} transparent animationType="slide" onRequestClose={() => setRescheduleOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setRescheduleOpen(false)}>
+      <Modal
+        visible={rescheduleOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRescheduleOpen(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onPress={() => setRescheduleOpen(false)}
+        >
           <View style={{ flex: 1 }} />
         </Pressable>
-        <View style={{ backgroundColor: palette.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '85%' }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Reschedule booking</Text>
+        <View
+          style={{
+            backgroundColor: palette.surface,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            padding: 20,
+            maxHeight: '85%',
+          }}
+        >
+          <Text
+            style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+          >
+            Reschedule booking
+          </Text>
           <Text style={{ color: palette.subtext, marginTop: 4 }}>
             Choose a new date and time that fits the service availability rules.
           </Text>
           {availabilityRangeLabel ? (
-            <Text style={{ color: palette.subtext, marginTop: 8, fontSize: 12 }}>
+            <Text
+              style={{ color: palette.subtext, marginTop: 8, fontSize: 12 }}
+            >
               Schedule window: {availabilityRangeLabel}
             </Text>
           ) : null}
           <ScrollView style={{ maxHeight: 220, marginTop: 12 }}>
             {dateOptions.length ? (
-              dateOptions.map((date) => (
+              dateOptions.map(date => (
                 <Pressable
                   key={date.toISOString()}
                   style={{
@@ -1793,7 +2587,9 @@ const ServiceBookingDetailsPage = () => {
                           ? palette.primaryStrong
                           : palette.text,
                       fontWeight:
-                        rescheduleDate?.toDateString() === date.toDateString() ? '600' : '400',
+                        rescheduleDate?.toDateString() === date.toDateString()
+                          ? '600'
+                          : '400',
                     }}
                   >
                     {date.toLocaleDateString(undefined, {
@@ -1805,14 +2601,18 @@ const ServiceBookingDetailsPage = () => {
                 </Pressable>
               ))
             ) : (
-              <Text style={{ color: palette.subtext }}>No valid dates available.</Text>
+              <Text style={{ color: palette.subtext }}>
+                No valid dates available.
+              </Text>
             )}
           </ScrollView>
           <View style={{ marginTop: 12 }}>
-            <Text style={{ color: palette.text, marginBottom: 8 }}>Choose a time</Text>
+            <Text style={{ color: palette.text, marginBottom: 8 }}>
+              Choose a time
+            </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {availableSlots.length ? (
-                availableSlots.map((slot) => {
+                availableSlots.map(slot => {
                   const isActive = slot.enabled && slot.time === rescheduleTime;
                   return (
                     <Pressable
@@ -1822,16 +2622,26 @@ const ServiceBookingDetailsPage = () => {
                         paddingHorizontal: 10,
                         borderRadius: 10,
                         borderWidth: 1,
-                        borderColor: isActive ? palette.primaryStrong : palette.divider,
-                        backgroundColor: isActive ? `${palette.primaryStrong}20` : palette.surface,
+                        borderColor: isActive
+                          ? palette.primaryStrong
+                          : palette.divider,
+                        backgroundColor: isActive
+                          ? `${palette.primaryStrong}20`
+                          : palette.surface,
                         marginBottom: 4,
                         opacity: slot.enabled ? 1 : 0.35,
                       }}
-                      onPress={() => slot.enabled && setRescheduleTime(slot.time)}
+                      onPress={() =>
+                        slot.enabled && setRescheduleTime(slot.time)
+                      }
                     >
                       <Text
                         style={{
-                          color: slot.enabled ? (isActive ? palette.primaryStrong : palette.text) : palette.subtext,
+                          color: slot.enabled
+                            ? isActive
+                              ? palette.primaryStrong
+                              : palette.text
+                            : palette.subtext,
                           fontSize: 12,
                         }}
                       >
@@ -1841,15 +2651,23 @@ const ServiceBookingDetailsPage = () => {
                   );
                 })
               ) : (
-                <Text style={{ color: palette.subtext }}>No time slots available for this day.</Text>
+                <Text style={{ color: palette.subtext }}>
+                  No time slots available for this day.
+                </Text>
               )}
             </View>
           </View>
           {rescheduleError ? (
-            <Text style={{ color: palette.warning, marginTop: 12 }}>{rescheduleError}</Text>
+            <Text style={{ color: palette.warning, marginTop: 12 }}>
+              {rescheduleError}
+            </Text>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-            <KISButton title="Close" variant="ghost" onPress={() => setRescheduleOpen(false)} />
+            <KISButton
+              title="Close"
+              variant="ghost"
+              onPress={() => setRescheduleOpen(false)}
+            />
             <KISButton
               title="Confirm reschedule"
               onPress={handleRescheduleBooking}

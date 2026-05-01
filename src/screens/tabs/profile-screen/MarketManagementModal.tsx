@@ -35,10 +35,27 @@ const pickNumeric = (...values: any[]) => {
   return 0;
 };
 
-const countItems = (value: any) => (Array.isArray(value) ? value.length : pickNumeric(value));
+const countItems = (...values: any[]) => {
+  for (const value of values) {
+    if (Array.isArray(value)) return value.length;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return 0;
+};
 
 export function MarketManagementModal(props: MarketManagementModalProps) {
-  const { palette, title, subtitle, shops, loading, onCreateShop, onEditShop, onViewDashboard, onOpenLandingBuilder, onRefresh } = props;
+  const {
+    palette,
+    subtitle,
+    shops,
+    loading,
+    onCreateShop,
+    onEditShop,
+    onViewDashboard,
+    onOpenLandingBuilder,
+    onRefresh,
+  } = props;
 
   const totalProducts = useMemo(
     () =>
@@ -120,7 +137,10 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
       { label: 'Products', value: totalProducts },
       { label: 'Services', value: totalServices },
       { label: 'Members', value: totalMembers },
-      { label: 'Revenue', value: formatKiscAmount(totalRevenue, { decimals: 2 }) },
+      {
+        label: 'Revenue',
+        value: formatKiscAmount(totalRevenue, { decimals: 2 }),
+      },
     ],
     [shops.length, totalProducts, totalServices, totalMembers, totalRevenue],
   );
@@ -130,20 +150,34 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
       contentContainerStyle={{ padding: 20, gap: 16 }}
       refreshControl={
         onRefresh ? (
-          <RefreshControl refreshing={Boolean(loading)} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
+          <RefreshControl
+            refreshing={Boolean(loading)}
+            onRefresh={onRefresh}
+            tintColor={palette.primaryStrong}
+          />
         ) : undefined
       }
     >
       <View
         style={[
           marketStyles.heroCard,
-          { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong, borderWidth: 1 },
+          {
+            backgroundColor: palette.primarySoft,
+            borderColor: palette.primaryStrong,
+            borderWidth: 1,
+          },
         ]}
       >
         <View style={marketStyles.heroCTA}>
           <View>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: palette.text }}>Your Market Empire</Text>
-            <Text style={{ color: palette.subtext, marginTop: 4 }}>{subtitle}</Text>
+            <Text
+              style={{ fontSize: 24, fontWeight: '800', color: palette.text }}
+            >
+              Your Market Empire
+            </Text>
+            <Text style={{ color: palette.subtext, marginTop: 4 }}>
+              {subtitle}
+            </Text>
           </View>
           <KISButton title="Create shop" onPress={onCreateShop} />
         </View>
@@ -164,21 +198,34 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
           ]}
         >
           <ActivityIndicator size="small" color={palette.primaryStrong} />
-          <Text style={[marketStyles.meta, { color: palette.subtext }]}>Refreshing shops…</Text>
+          <Text style={[marketStyles.meta, { color: palette.subtext }]}>
+            Refreshing shops…
+          </Text>
         </View>
       )}
 
       <View style={marketStyles.analyticsRow}>
-        {heroAnalytics.map((metric) => (
+        {heroAnalytics.map(metric => (
           <View
             key={metric.label}
             style={[
               marketStyles.analyticsCard,
-              { borderColor: palette.divider, backgroundColor: palette.surface },
+              {
+                borderColor: palette.divider,
+                backgroundColor: palette.surface,
+              },
             ]}
           >
-            <Text style={[marketStyles.analyticsValue, { color: palette.text }]}>{metric.value}</Text>
-            <Text style={[marketStyles.analyticsLabel, { color: palette.subtext }]}>{metric.label}</Text>
+            <Text
+              style={[marketStyles.analyticsValue, { color: palette.text }]}
+            >
+              {metric.value}
+            </Text>
+            <Text
+              style={[marketStyles.analyticsLabel, { color: palette.subtext }]}
+            >
+              {metric.label}
+            </Text>
           </View>
         ))}
       </View>
@@ -187,19 +234,26 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
         <View
           style={[
             marketStyles.emptyState,
-            { borderColor: palette.divider, backgroundColor: palette.card, borderWidth: 1 },
+            {
+              borderColor: palette.divider,
+              backgroundColor: palette.card,
+              borderWidth: 1,
+            },
           ]}
         >
           <KISIcon name="sparkles" size={28} color={palette.primaryStrong} />
-          <Text style={[marketStyles.emptyTitle, { color: palette.text }]}>Build your first global shop</Text>
+          <Text style={[marketStyles.emptyTitle, { color: palette.text }]}>
+            Build your first global shop
+          </Text>
           <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-            Launch a storefront for products, services, or both—with advanced analytics, member discounts, and a public landing page.
+            Launch a storefront for products, services, or both—with advanced
+            analytics, member discounts, and a public landing page.
           </Text>
           <KISButton title="Create Shop" onPress={onCreateShop} />
         </View>
       ) : (
         <View style={marketStyles.shopGrid}>
-          {shops.map((shop) => {
+          {shops.map(shop => {
             const status = shop?.status ?? 'active';
             const tagline = shop?.tagline || 'Premium storefront';
             const category = shop?.category || 'Global commerce';
@@ -230,13 +284,23 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                   ]}
                 >
                   {bannerImageUri ? (
-                    <Image source={{ uri: bannerImageUri }} style={marketStyles.shopCardBannerImage} />
+                    <Image
+                      source={{ uri: bannerImageUri }}
+                      style={marketStyles.shopCardBannerImage}
+                    />
                   ) : null}
                   <View style={marketStyles.shopCardBannerContent}>
-                    <Text style={[marketStyles.shopCardBannerTitle, { color: palette.primaryStrong }]}>
+                    <Text
+                      style={[
+                        marketStyles.shopCardBannerTitle,
+                        { color: palette.primaryStrong },
+                      ]}
+                    >
                       {shop.name}
                     </Text>
-                    <Text style={{ color: 'white', fontSize: 12 }}>{category}</Text>
+                    <Text style={{ color: 'white', fontSize: 12 }}>
+                      {category}
+                    </Text>
                   </View>
                 </View>
                 <View style={marketStyles.shopCardBody}>
@@ -246,13 +310,26 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                         marketStyles.statusBadge,
                         {
                           borderColor: palette.primaryStrong,
-                          backgroundColor: status === 'active' ? `${palette.primaryStrong}22` : palette.inputBg,
+                          backgroundColor:
+                            status === 'active'
+                              ? `${palette.primaryStrong}22`
+                              : palette.inputBg,
                         },
                       ]}
                     >
-                      <Text style={{ color: palette.primaryStrong, fontSize: 12, fontWeight: '600' }}>{status}</Text>
+                      <Text
+                        style={{
+                          color: palette.primaryStrong,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {status}
+                      </Text>
                     </View>
-                    <Text style={{ color: palette.subtext, fontSize: 12 }}>{tagline}</Text>
+                    <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                      {tagline}
+                    </Text>
                   </View>
 
                   <View style={marketStyles.cardFooter}>
@@ -272,7 +349,11 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                   </View>
                   {onOpenLandingBuilder ? (
                     <Text
-                      style={{ color: palette.primaryStrong, fontSize: 12, marginTop: 4 }}
+                      style={{
+                        color: palette.primaryStrong,
+                        fontSize: 12,
+                        marginTop: 4,
+                      }}
                       onPress={() => onOpenLandingBuilder(shop)}
                     >
                       Manage landing page

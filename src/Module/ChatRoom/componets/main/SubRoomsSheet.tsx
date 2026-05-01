@@ -1,16 +1,11 @@
 // src/screens/chat/componets/SubRoomsSheet.tsx
 
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-  FlatList,
-} from 'react-native';
+import { Animated, Modal, View, Text, Pressable, FlatList } from 'react-native';
 
 import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 import { SubRoom } from '../../chatTypes';
 
 type SubRoomsSheetProps = {
@@ -29,6 +24,10 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
   palette,
 }) => {
   const count = subRooms.length;
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   const renderItem = ({ item }: { item: SubRoom }) => {
     const title =
@@ -52,11 +51,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <KISIcon
-            name="layers"
-            size={16}
-            color={palette.primary}
-          />
+          <KISIcon name="layers" size={16} color={palette.primary} />
           <View style={{ marginLeft: 8, flex: 1 }}>
             <Text
               numberOfLines={1}
@@ -94,17 +89,19 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
       <View style={styles.sheetOverlay}>
         <Pressable style={styles.sheetBackdrop} onPress={onClose} />
 
-        <View
+        <Animated.View
           style={[
             styles.sheetContainer,
             {
               backgroundColor: palette.card,
               borderTopColor: palette.divider,
+              transform: [{ translateY: dragY }],
             },
           ]}
         >
           {/* Header */}
           <View
+            {...panHandlers}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -126,11 +123,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
             </Text>
 
             <Pressable onPress={onClose}>
-              <KISIcon
-                name="close"
-                size={20}
-                color={palette.subtext}
-              />
+              <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>
 
@@ -164,12 +157,12 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
           ) : (
             <FlatList
               data={subRooms}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 24 }}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

@@ -33,17 +33,18 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 type ControllerRef = ReturnType<typeof useProfileController>;
 
-const ControllerHarness = React.forwardRef<ControllerRef, { setAuth: jest.Mock; setPhone: jest.Mock }>(
-  ({ setAuth, setPhone }, ref) => {
-    const controller = useProfileController({
-      setAuth,
-      setPhone,
-      locationCallingCode: '+237',
-    });
-    React.useImperativeHandle(ref, () => controller);
-    return null;
-  },
-);
+const ControllerHarness = React.forwardRef<
+  ControllerRef,
+  { setAuth: jest.Mock; setPhone: jest.Mock }
+>(({ setAuth, setPhone }, ref) => {
+  const controller = useProfileController({
+    setAuth,
+    setPhone,
+    locationCallingCode: '+237',
+  });
+  React.useImperativeHandle(ref, () => controller);
+  return null;
+});
 
 const profilePayload = {
   user: {
@@ -69,10 +70,18 @@ const profilePayload = {
 };
 
 const mockedGetRequest = getRequest as jest.MockedFunction<typeof getRequest>;
-const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
-const mockedPatchRequest = patchRequest as jest.MockedFunction<typeof patchRequest>;
-const mockedDeleteRequest = deleteRequest as jest.MockedFunction<typeof deleteRequest>;
-const mockedClearAuthTokens = clearAuthTokens as jest.MockedFunction<typeof clearAuthTokens>;
+const mockedPostRequest = postRequest as jest.MockedFunction<
+  typeof postRequest
+>;
+const mockedPatchRequest = patchRequest as jest.MockedFunction<
+  typeof patchRequest
+>;
+const mockedDeleteRequest = deleteRequest as jest.MockedFunction<
+  typeof deleteRequest
+>;
+const mockedClearAuthTokens = clearAuthTokens as jest.MockedFunction<
+  typeof clearAuthTokens
+>;
 
 const setupGetRequestMock = () => {
   mockedGetRequest.mockImplementation(async (url: string) => {
@@ -81,7 +90,11 @@ const setupGetRequestMock = () => {
       return { success: true, data: profilePayload, message: '' } as any;
     }
     if (target === ROUTES.wallet.me) {
-      return { success: true, data: { wallet: { balance_cents: 0, balance_kisc: 0, balance_usd: 0 } }, message: '' } as any;
+      return {
+        success: true,
+        data: { wallet: { balance_cents: 0, balance_kisc: 0, balance_usd: 0 } },
+        message: '',
+      } as any;
     }
     if (target === ROUTES.wallet.ledger) {
       return { success: true, data: { results: [] }, message: '' } as any;
@@ -90,7 +103,11 @@ const setupGetRequestMock = () => {
       return { success: true, data: { profiles: {} }, message: '' } as any;
     }
     if (target.startsWith(ROUTES.auth.checkContact)) {
-      return { success: true, data: { registered: true, userId: 'recipient-1' }, message: '' } as any;
+      return {
+        success: true,
+        data: { registered: true, userId: 'recipient-1' },
+        message: '',
+      } as any;
     }
     if (target === ROUTES.user.detail('recipient-1')) {
       return {
@@ -113,13 +130,24 @@ describe('useProfileController phase-05 runtime flows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupGetRequestMock();
-    mockedPatchRequest.mockResolvedValue({ success: true, data: {}, message: '' } as any);
-    mockedDeleteRequest.mockResolvedValue({ success: true, data: {}, message: '' } as any);
+    mockedPatchRequest.mockResolvedValue({
+      success: true,
+      data: {},
+      message: '',
+    } as any);
+    mockedDeleteRequest.mockResolvedValue({
+      success: true,
+      data: {},
+      message: '',
+    } as any);
     mockedPostRequest.mockImplementation(async (url: string) => {
       const target = String(url);
-      if (target === ROUTES.profileLanguages.sync) return { success: true, data: {}, message: '' } as any;
-      if (target === ROUTES.auth.logout) return { success: true, data: {}, message: '' } as any;
-      if (target === ROUTES.wallet.transfer) return { success: true, data: { ok: true }, message: '' } as any;
+      if (target === ROUTES.profileLanguages.sync)
+        return { success: true, data: {}, message: '' } as any;
+      if (target === ROUTES.auth.logout)
+        return { success: true, data: {}, message: '' } as any;
+      if (target === ROUTES.wallet.transfer)
+        return { success: true, data: { ok: true }, message: '' } as any;
       return { success: true, data: {}, message: '' } as any;
     });
     jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
@@ -131,7 +159,9 @@ describe('useProfileController phase-05 runtime flows', () => {
     const ref = React.createRef<ControllerRef>();
 
     await ReactTestRenderer.act(async () => {
-      ReactTestRenderer.create(<ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />);
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
     });
 
     await ReactTestRenderer.act(async () => {
@@ -139,7 +169,10 @@ describe('useProfileController phase-05 runtime flows', () => {
     });
 
     ReactTestRenderer.act(() => {
-      ref.current?.setDraftProfile((prev: any) => ({ ...prev, phone_number: '699000222' }));
+      ref.current?.setDraftProfile((prev: any) => ({
+        ...prev,
+        phone_number: '699000222',
+      }));
     });
 
     await ReactTestRenderer.act(async () => {
@@ -156,7 +189,9 @@ describe('useProfileController phase-05 runtime flows', () => {
       expect.any(Object),
     );
 
-    const promptCall = (Alert.alert as jest.Mock).mock.calls.find((call) => call[0] === 'Phone number updated');
+    const promptCall = (Alert.alert as jest.Mock).mock.calls.find(
+      call => call[0] === 'Phone number updated',
+    );
     expect(promptCall).toBeTruthy();
 
     const continueButton = promptCall?.[2]?.[0];
@@ -182,7 +217,9 @@ describe('useProfileController phase-05 runtime flows', () => {
     const ref = React.createRef<ControllerRef>();
 
     await ReactTestRenderer.act(async () => {
-      ReactTestRenderer.create(<ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />);
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
     });
 
     await ReactTestRenderer.act(async () => {
@@ -190,7 +227,10 @@ describe('useProfileController phase-05 runtime flows', () => {
     });
 
     ReactTestRenderer.act(() => {
-      ref.current?.setDraftProfile((prev: any) => ({ ...prev, display_name: 'Updated Name' }));
+      ref.current?.setDraftProfile((prev: any) => ({
+        ...prev,
+        display_name: 'Updated Name',
+      }));
     });
 
     await ReactTestRenderer.act(async () => {
@@ -198,8 +238,14 @@ describe('useProfileController phase-05 runtime flows', () => {
     });
 
     const calls = (Alert.alert as jest.Mock).mock.calls;
-    expect(calls.some((call) => call[0] === 'Phone number updated')).toBe(false);
-    expect(calls.some((call) => call[0] === 'Profile' && call[1] === 'Your profile changes were saved.')).toBe(true);
+    expect(calls.some(call => call[0] === 'Phone number updated')).toBe(false);
+    expect(
+      calls.some(
+        call =>
+          call[0] === 'Profile' &&
+          call[1] === 'Your profile changes were saved.',
+      ),
+    ).toBe(true);
     expect(mockedClearAuthTokens).not.toHaveBeenCalled();
     expect(setAuth).not.toHaveBeenCalledWith(false);
   });
@@ -210,7 +256,9 @@ describe('useProfileController phase-05 runtime flows', () => {
     const ref = React.createRef<ControllerRef>();
 
     await ReactTestRenderer.act(async () => {
-      ReactTestRenderer.create(<ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />);
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
     });
 
     await ReactTestRenderer.act(async () => {
@@ -230,9 +278,13 @@ describe('useProfileController phase-05 runtime flows', () => {
       await ref.current?.submitWalletAction();
     });
 
-    expect((Alert.alert as jest.Mock).mock.calls.some(
-      (call) => call[0] === 'Wallet' && call[1] === 'Verify the recipient first before sending KIS Coins.',
-    )).toBe(true);
+    expect(
+      (Alert.alert as jest.Mock).mock.calls.some(
+        call =>
+          call[0] === 'Wallet' &&
+          call[1] === 'Verify the recipient first before sending KIS Coins.',
+      ),
+    ).toBe(true);
 
     await ReactTestRenderer.act(async () => {
       await ref.current?.verifyWalletRecipient();
@@ -248,9 +300,11 @@ describe('useProfileController phase-05 runtime flows', () => {
         recipient_id: 'recipient-1',
         recipient_phone: '699123456',
         country: 'CM',
-        amount_cents: 10000,
+        amount_cents: 100,
       }),
-      expect.objectContaining({ errorMessage: 'Unable to transfer KIS wallet balance.' }),
+      expect.objectContaining({
+        errorMessage: 'Unable to transfer KIS wallet balance.',
+      }),
     );
   });
 });

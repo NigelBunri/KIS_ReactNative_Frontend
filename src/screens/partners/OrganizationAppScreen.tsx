@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -22,12 +23,15 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
+import type {
+  PartnerOrganizationAppContentBlock,
+  PartnerOrganizationAppTab,
+} from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 
 const TYPE_LABELS: Record<string, string> = {
   kis: 'KIS App',
   bible: 'Bible App',
   external: 'Embedded App',
-  ai: 'Assistant App',
 };
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'OrganizationApp'>;
@@ -62,6 +66,10 @@ export default function OrganizationAppScreen() {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [tabs, setTabs] = useState<PartnerOrganizationAppTab[]>(app.tabs ?? []);
+  const [activeTabId, setActiveTabId] = useState<string | null>(app.tabs?.[0]?.id ?? null);
+  const [tabsLoading, setTabsLoading] = useState(false);
+  const [tabsError, setTabsError] = useState<string | null>(null);
 
   const loadLogs = useCallback(async () => {
     if (!partnerId) return;
@@ -80,6 +88,34 @@ export default function OrganizationAppScreen() {
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
+
+  const loadTabs = useCallback(async () => {
+    if (!partnerId) {
+      setTabs(app.tabs ?? []);
+      setActiveTabId(app.tabs?.[0]?.id ?? null);
+      return;
+    }
+    setTabsLoading(true);
+    setTabsError(null);
+    const res = await getRequest(ROUTES.partners.organizationAppTabs(partnerId, app.id), {
+      errorMessage: 'Unable to load app tabs.',
+      forceNetwork: true,
+    });
+    if (res?.success) {
+      const nextTabs = Array.isArray(res.data?.tabs) ? res.data.tabs : Array.isArray(res.data) ? res.data : [];
+      setTabs(nextTabs);
+      setActiveTabId((current) => current ?? nextTabs[0]?.id ?? null);
+    } else {
+      setTabsError(res?.message || 'Unable to load app tabs.');
+      setTabs(app.tabs ?? []);
+      setActiveTabId(app.tabs?.[0]?.id ?? null);
+    }
+    setTabsLoading(false);
+  }, [app.id, app.tabs, partnerId]);
+
+  useEffect(() => {
+    loadTabs();
+  }, [loadTabs]);
   const metadataRows = useMemo(
     () =>
       Object.entries(app.metadata || {}).filter(
@@ -97,6 +133,105 @@ export default function OrganizationAppScreen() {
   }, [resolvedLink]);
 
   const typeLabel = TYPE_LABELS[String(app.type ?? '')] ?? 'Organization app';
+
+  const renderBlock = (block: PartnerOrganizationAppContentBlock) => {
+    const blockType = block.block_type || 'text';
+    const payloadUrl = block.payload?.url || block.payload?.href || block.payload?.file;
+    const url = block.media_url || payloadUrl;
+    return (
+      <View key={block.id} style={[styles.blockCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+        {block.title ? <Text style={[styles.bodyTitle, { color: palette.text }]}>{block.title}</Text> : null}
+        {blockType === 'image' && url ? (
+          <Image source={{ uri: resolveBackendAssetUrl(String(url)) || String(url) }} style={styles.blockImage} resizeMode="cover" />
+        ) : null}
+        {blockType === 'video' || blockType === 'file' || blockType === 'link' || blockType === 'embed' ? (
+          <View style={styles.blockActionRow}>
+            <Text style={[styles.bodyText, { color: palette.subtext, flex: 1 }]}>
+              {blockType.toUpperCase()} {url ? String(url) : 'No URL configured'}
+            </Text>
+            {url ? (
+              <KISButton title="Open" size="xs" variant="outline" onPress={() => Linking.openURL(String(url))} />
+            ) : null}
+          </View>
+        ) : null}
+        {block.body ? <Text style={[styles.bodyText, { color: palette.text }]}>{block.body}</Text> : null}
+        {block.status ? (
+          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}>
+            Status: {block.status} · Active: {block.is_active ? 'yes' : 'no'}
+          </Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderConfiguredTabs = () => {
+    if (tabsLoading) {
+      return (
+        <View style={styles.section}>
+          <ActivityIndicator color={palette.primaryStrong} />
+          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}>Loading app tabs...</Text>
+        </View>
+      );
+    }
+    if (tabsError) {
+      return (
+        <View style={styles.section}>
+          <Text style={[styles.subtext, { color: palette.danger }]}>{tabsError}</Text>
+        </View>
+      );
+    }
+    if (!tabs.length) {
+      return (
+        <View style={styles.section}>
+          <Text style={[styles.bodyTitle, { color: palette.text }]}>App content</Text>
+          <Text style={[styles.bodyText, { color: palette.subtext }]}>
+            This partner app has no configured tabs yet.
+          </Text>
+        </View>
+      );
+    }
+    const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+    const blocks = activeTab?.content_blocks ?? [];
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.bodyTitle, { color: palette.text }]}>App tabs</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRail}>
+          {tabs.map((tab) => {
+            const active = tab.id === activeTab?.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveTabId(tab.id)}
+                style={[
+                  styles.tabChip,
+                  {
+                    borderColor: palette.divider,
+                    backgroundColor: active ? palette.primarySoft : palette.surface,
+                  },
+                ]}
+              >
+                <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '700' }}>
+                  {tab.title}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {activeTab?.description ? (
+          <Text style={[styles.bodyText, { color: palette.subtext, marginBottom: 10 }]}>
+            {activeTab.description}
+          </Text>
+        ) : null}
+        {blocks.length ? (
+          blocks.map(renderBlock)
+        ) : (
+          <Text style={[styles.bodyText, { color: palette.subtext }]}>
+            No published content blocks in this tab yet.
+          </Text>
+        )}
+      </View>
+    );
+  };
 
   const renderContent = () => {
     if (app.type === 'external') {
@@ -117,23 +252,6 @@ export default function OrganizationAppScreen() {
           {resolvedLink ? (
             <KISButton title="Open externally" onPress={handleOpenExternal} size="sm" />
           ) : null}
-        </View>
-      );
-    }
-
-    if (app.type === 'ai' || app.metadata?.kind === 'ai') {
-      return (
-        <View style={styles.embedPreview}>
-          <Text style={[styles.subtext, { color: palette.subtext }]}>
-            Assistant experiences are rendered securely through our in-app SDK. Review the data scope
-            and app metadata before launching.
-          </Text>
-          {app.metadata?.dataAccess ? (
-            <Text style={[styles.bodyText, { color: palette.text, marginTop: 10 }]}>
-              Data access: {String(app.metadata.dataAccess)}
-            </Text>
-          ) : null}
-          <KISButton title="Open app" onPress={handleOpenExternal} size="sm" disabled={!resolvedLink} />
         </View>
       );
     }
@@ -210,6 +328,20 @@ export default function OrganizationAppScreen() {
         <View style={styles.section}>
           <Text style={[styles.bodyTitle, { color: palette.text }]}>About</Text>
           <Text style={[styles.bodyText, { color: palette.subtext }]}>{app.description || 'No description yet.'}</Text>
+          <View style={styles.statusRow}>
+            <Text style={[styles.statusPill, { color: palette.text, borderColor: palette.divider }]}>
+              {app.status || 'draft'}
+            </Text>
+            {app.is_promoted_global ? (
+              <Text style={[styles.statusPill, { color: palette.primaryStrong, borderColor: palette.primaryStrong }]}>
+                Global promoted
+              </Text>
+            ) : (
+              <Text style={[styles.statusPill, { color: palette.subtext, borderColor: palette.divider }]}>
+                Partner-scoped
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.section}>
           <Text style={[styles.bodyTitle, { color: palette.text }]}>Data access</Text>
@@ -226,6 +358,7 @@ export default function OrganizationAppScreen() {
           />
         </View>
         {renderContent()}
+        {renderConfiguredTabs()}
         {metadataRows.length ? (
           <View style={[styles.section, { marginTop: 10 }]}>
             <Text style={[styles.bodyTitle, { color: palette.text }]}>Metadata</Text>
@@ -246,7 +379,8 @@ export default function OrganizationAppScreen() {
         <View style={styles.section}>
           <Text style={[styles.bodyTitle, { color: palette.text }]}>Configuration</Text>
           <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            Order: {app.order} · Active: {app.is_active ? 'yes' : 'no'}
+            Order: {app.order} · Active: {app.is_active ? 'yes' : 'no'} · Published:{' '}
+            {app.published_at ? new Date(app.published_at).toLocaleString() : 'not published'}
           </Text>
         </View>
         <View style={styles.section}>
@@ -329,5 +463,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 6,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontSize: 12,
+    fontWeight: '700',
+    overflow: 'hidden',
+  },
+  tabRail: {
+    gap: 8,
+    paddingVertical: 8,
+  },
+  tabChip: {
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  blockCard: {
+    borderWidth: 2,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  blockImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+  },
+  blockActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

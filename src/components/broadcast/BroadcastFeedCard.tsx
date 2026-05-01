@@ -5,7 +5,14 @@ import { KISIcon } from '@/constants/kisIcons';
 import KISText from '@/components/common/KISText';
 import { resolveBackendAssetUrl } from '@/network';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
-import { dedupeAttachmentPreviews, getAttachmentPreviewInfo } from './attachmentPreview';
+import {
+  getFeedPlainText,
+  getFeedRichTextValue,
+} from '@/components/feeds/richTextValue';
+import {
+  dedupeAttachmentPreviews,
+  getAttachmentPreviewInfo,
+} from './attachmentPreview';
 import {
   extractBroadcastAuthorBio,
   formatKisHandle,
@@ -14,7 +21,14 @@ import {
 } from '@/components/broadcast/authorProfileUtils';
 
 type BroadcastSourceMeta = {
-  type: 'community' | 'partner' | 'channel' | 'market' | 'lesson' | 'live' | string;
+  type:
+    | 'community'
+    | 'partner'
+    | 'channel'
+    | 'market'
+    | 'lesson'
+    | 'live'
+    | string;
   id?: string | null;
   name?: string;
   conversation_id?: string;
@@ -27,7 +41,7 @@ type BroadcastSourceMeta = {
   is_subscribed?: boolean;
   can_open?: boolean;
   verified?: boolean;
-  tier?: 'free' | 'pro' | 'business' | 'education';
+  tier?: 'free' | 'pro' | 'business' | 'education' | string;
   followers_count?: number;
 };
 
@@ -102,7 +116,9 @@ type Props = {
 const fallbackAvatar = require('@/assets/logo-light.png');
 
 const formatDuration = (seconds: number) => {
-  const safe = Number.isFinite(Number(seconds)) ? Math.max(0, Math.floor(Number(seconds))) : 0;
+  const safe = Number.isFinite(Number(seconds))
+    ? Math.max(0, Math.floor(Number(seconds)))
+    : 0;
   const mins = Math.floor(safe / 60);
   const secs = safe % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -124,12 +140,7 @@ const safeTimeLabel = (iso?: string) => {
 };
 
 const getTextExcerpt = (item: BroadcastFeedItem) => {
-  const raw =
-    item.text_plain ??
-    item.styled_text?.text ??
-    (typeof item.text === 'string' ? item.text : '') ??
-    '';
-  return String(raw).replace(/\s+/g, ' ').trim();
+  return getFeedPlainText(item).replace(/\s+/g, ' ').trim();
 };
 
 export default function BroadcastFeedCard({
@@ -154,7 +165,9 @@ export default function BroadcastFeedCard({
   const when = safeTimeLabel(item.broadcasted_at ?? item.created_at);
   const sourceName =
     item.source?.name ||
-    (item.source?.type ? item.source.type.charAt(0).toUpperCase() + item.source.type.slice(1) : '') ||
+    (item.source?.type
+      ? item.source.type.charAt(0).toUpperCase() + item.source.type.slice(1)
+      : '') ||
     '';
   const isUserSource = isUserBroadcastSource(item);
   const authorDisplayName = String(item.author?.display_name ?? '').trim();
@@ -163,10 +176,16 @@ export default function BroadcastFeedCard({
     : authorDisplayName || sourceName || 'Broadcast';
   const headerName = isUserSource ? formatKisHandle(authorName) : authorName;
   const authorBio = isUserSource ? extractBroadcastAuthorBio(item) : '';
-  const truncatedAuthorBio = useMemo(() => truncateWords(authorBio, 18), [authorBio]);
-  const metaSource = isUserSource ? sourceName || 'Broadcast profile' : sourceName;
+  const truncatedAuthorBio = useMemo(
+    () => truncateWords(authorBio, 18),
+    [authorBio],
+  );
+  const metaSource = isUserSource
+    ? sourceName || 'Broadcast profile'
+    : sourceName;
 
   const excerpt = getTextExcerpt(item);
+  const richTextValue = getFeedRichTextValue(item);
   const showTitle = Boolean(item.title && item.title.trim().length);
   const showExcerpt = Boolean(excerpt && excerpt.length);
 
@@ -174,22 +193,22 @@ export default function BroadcastFeedCard({
     const attachments = Array.isArray(item.attachments) ? item.attachments : [];
     return dedupeAttachmentPreviews(
       attachments
-        .map((a) => getAttachmentPreviewInfo(a))
-        .filter((info) => Boolean(info.previewUri || info.url)),
+        .map(a => getAttachmentPreviewInfo(a))
+        .filter(info => Boolean(info.previewUri || info.url)),
     );
   }, [item.attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
   const handlePrevAttachment = useCallback(() => {
     if (attachmentPreviews.length === 0) return;
-    setActiveAttachmentIndex((prev) =>
+    setActiveAttachmentIndex(prev =>
       prev === 0 ? attachmentPreviews.length - 1 : prev - 1,
     );
   }, [attachmentPreviews.length]);
 
   const handleNextAttachment = useCallback(() => {
     if (attachmentPreviews.length === 0) return;
-    setActiveAttachmentIndex((prev) => (prev + 1) % attachmentPreviews.length);
+    setActiveAttachmentIndex(prev => (prev + 1) % attachmentPreviews.length);
   }, [attachmentPreviews.length]);
 
   useEffect(() => {
@@ -202,7 +221,9 @@ export default function BroadcastFeedCard({
 
   const activeAttachment = attachmentPreviews[activeAttachmentIndex];
   const durationLabel =
-    typeof item.video_duration_seconds === 'number' ? formatDuration(item.video_duration_seconds) : null;
+    typeof item.video_duration_seconds === 'number'
+      ? formatDuration(item.video_duration_seconds)
+      : null;
 
   const canSubscribe = Boolean(item.source?.allow_subscribe);
   const isSubscribed = Boolean(item.source?.is_subscribed);
@@ -219,15 +240,16 @@ export default function BroadcastFeedCard({
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.primaryStrong }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: palette.card, borderColor: palette.primaryStrong },
+      ]}
+    >
       {/* ───── Header (avatar + source + time + menu) ───── */}
       <View style={styles.headerRow}>
         <Image
-          source={
-            authorAvatarUri
-              ? { uri: authorAvatarUri }
-              : fallbackAvatar
-          }
+          source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
           style={[styles.avatar, { backgroundColor: palette.bar }]}
         />
 
@@ -239,24 +261,40 @@ export default function BroadcastFeedCard({
                 onPress={onOpenAuthorProfile}
                 style={styles.authorTapTarget}
               >
-                <KISText autoLinkHandles={false} style={[styles.headerName, { color: palette.text }]} numberOfLines={1}>
+                <KISText
+                  autoLinkHandles={false}
+                  style={[styles.headerName, { color: palette.text }]}
+                  numberOfLines={1}
+                >
                   {headerName}
                 </KISText>
               </Pressable>
             ) : (
-              <KISText autoLinkHandles={false} style={[styles.headerName, { color: palette.text }]} numberOfLines={1}>
+              <KISText
+                autoLinkHandles={false}
+                style={[styles.headerName, { color: palette.text }]}
+                numberOfLines={1}
+              >
                 {headerName}
               </KISText>
             )}
 
             {item.source?.verified ? (
-              <View style={[styles.verifiedDot, { backgroundColor: palette.primaryStrong }]}>
+              <View
+                style={[
+                  styles.verifiedDot,
+                  { backgroundColor: palette.primaryStrong },
+                ]}
+              >
                 <KISIcon name="check" size={12} color="#fff" />
               </View>
             ) : null}
           </View>
 
-          <Text style={[styles.headerMeta, { color: palette.subtext }]} numberOfLines={1}>
+          <Text
+            style={[styles.headerMeta, { color: palette.subtext }]}
+            numberOfLines={1}
+          >
             {metaSource ? `${metaSource}${when ? ' • ' : ''}` : ''}
             {when}
           </Text>
@@ -270,7 +308,14 @@ export default function BroadcastFeedCard({
               </KISText>
               {!authorBioExpanded && truncatedAuthorBio.truncated ? (
                 <Pressable onPress={() => setAuthorBioExpanded(true)}>
-                  <Text style={[styles.authorBioMore, { color: palette.primaryStrong }]}>more</Text>
+                  <Text
+                    style={[
+                      styles.authorBioMore,
+                      { color: palette.primaryStrong },
+                    ]}
+                  >
+                    more
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -280,7 +325,10 @@ export default function BroadcastFeedCard({
         <Pressable
           onPress={onMenuPress}
           disabled={!onMenuPress}
-          style={[styles.menuBtn, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+          style={[
+            styles.menuBtn,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
           hitSlop={10}
         >
           <KISIcon name="menu" size={18} color={palette.subtext} />
@@ -289,12 +337,36 @@ export default function BroadcastFeedCard({
 
       {/* ───── Title + body (mockup-style) ───── */}
       {showTitle ? (
-        <KISText style={[styles.title, { color: palette.text }]} numberOfLines={2}>
+        <KISText
+          style={[styles.title, { color: palette.text }]}
+          numberOfLines={2}
+        >
           {item.title}
         </KISText>
       ) : null}
 
-      {showExcerpt ? (
+      {richTextValue ? (
+        <View style={{ marginTop: 4 }}>
+          <RichTextRenderer
+            value={richTextValue}
+            fallback={excerpt}
+            style={{
+              maxHeight: excerptExpanded ? undefined : 76,
+              overflow: 'hidden',
+            }}
+          />
+          {!excerptExpanded ? (
+            <Pressable
+              onPress={() => setExcerptExpanded(true)}
+              style={{ marginTop: 2 }}
+            >
+              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
+                Read more
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : showExcerpt ? (
         <View style={{ marginTop: 4 }}>
           <KISText
             style={[styles.bodyText, { color: palette.subtext }]}
@@ -303,8 +375,13 @@ export default function BroadcastFeedCard({
             {excerpt}
           </KISText>
           {!excerptExpanded ? (
-            <Pressable onPress={() => setExcerptExpanded(true)} style={{ marginTop: 2 }}>
-              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Read more</Text>
+            <Pressable
+              onPress={() => setExcerptExpanded(true)}
+              style={{ marginTop: 2 }}
+            >
+              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
+                Read more
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -332,23 +409,39 @@ export default function BroadcastFeedCard({
           <Pressable onPress={onPressPrimary} style={styles.slideshowPressable}>
             {activeAttachment.previewUri || activeAttachment.url ? (
               <Image
-                source={{ uri: activeAttachment.previewUri ?? activeAttachment.url! }}
+                source={{
+                  uri: activeAttachment.previewUri ?? activeAttachment.url!,
+                }}
                 style={styles.slideshowImage}
               />
             ) : (
-              <View style={[styles.slideshowImage, { backgroundColor: palette.bar }]} />
+              <View
+                style={[
+                  styles.slideshowImage,
+                  { backgroundColor: palette.bar },
+                ]}
+              />
             )}
           </Pressable>
 
           {Boolean(item.is_live) ? (
-            <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}>
+            <View
+              style={[styles.liveBadge, { backgroundColor: palette.danger }]}
+            >
               <Text style={styles.liveText}>LIVE</Text>
             </View>
           ) : null}
 
           {durationLabel ? (
-            <View style={[styles.durationPill, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>{durationLabel}</Text>
+            <View
+              style={[
+                styles.durationPill,
+                { backgroundColor: 'rgba(0,0,0,0.6)' },
+              ]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                {durationLabel}
+              </Text>
             </View>
           ) : null}
 
@@ -363,11 +456,31 @@ export default function BroadcastFeedCard({
 
           {attachmentPreviews.length > 1 ? (
             <>
-              <Pressable style={[styles.navButton, styles.navLeft]} onPress={handlePrevAttachment}>
-                <Text style={[styles.navButtonText, { color: palette.primaryStrong }]}>{'‹'}</Text>
+              <Pressable
+                style={[styles.navButton, styles.navLeft]}
+                onPress={handlePrevAttachment}
+              >
+                <Text
+                  style={[
+                    styles.navButtonText,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
+                  {'‹'}
+                </Text>
               </Pressable>
-              <Pressable style={[styles.navButton, styles.navRight]} onPress={handleNextAttachment}>
-                <Text style={[styles.navButtonText, { color: palette.primaryStrong }]}>{'›'}</Text>
+              <Pressable
+                style={[styles.navButton, styles.navRight]}
+                onPress={handleNextAttachment}
+              >
+                <Text
+                  style={[
+                    styles.navButtonText,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
+                  {'›'}
+                </Text>
               </Pressable>
               <View style={styles.dotRow}>
                 {attachmentPreviews.map((_, dotIndex) => (
@@ -375,10 +488,14 @@ export default function BroadcastFeedCard({
                     key={`dot-${dotIndex}`}
                     style={[
                       styles.dot,
-                      dotIndex === activeAttachmentIndex ? styles.dotActive : null,
+                      dotIndex === activeAttachmentIndex
+                        ? styles.dotActive
+                        : null,
                       {
                         backgroundColor:
-                          dotIndex === activeAttachmentIndex ? palette.primaryStrong : palette.surface,
+                          dotIndex === activeAttachmentIndex
+                            ? palette.primaryStrong
+                            : palette.surface,
                       },
                     ]}
                   />
@@ -392,38 +509,49 @@ export default function BroadcastFeedCard({
       {/* ───── Subscribe row (like mockup buttons under media) ───── */}
       <View style={styles.ctaRow}>
         {canSubscribe ? (
-        <Pressable
-          onPress={onSubscribe ?? onOpenSource}
-          style={[
-            styles.subscribeBtn,
-            {
-              backgroundColor: isSubscribed ? palette.surface : palette.primarySoft,
-              borderColor: isSubscribed ? palette.danger : palette.primary,
-            },
-          ]}
-        >
-          <Text
-            style={{
-              color: isSubscribed ? palette.danger : palette.primaryStrong,
-              fontWeight: '900',
-            }}
+          <Pressable
+            onPress={onSubscribe ?? onOpenSource}
+            style={[
+              styles.subscribeBtn,
+              {
+                backgroundColor: isSubscribed
+                  ? palette.surface
+                  : palette.primarySoft,
+                borderColor: isSubscribed ? palette.danger : palette.primary,
+              },
+            ]}
           >
-            {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
-          </Text>
-        </Pressable>
+            <Text
+              style={{
+                color: isSubscribed ? palette.danger : palette.primaryStrong,
+                fontWeight: '900',
+              }}
+            >
+              {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+            </Text>
+          </Pressable>
         ) : null}
 
         {item.is_lesson && onJoinLesson ? (
           <Pressable
             onPress={onJoinLesson}
-            style={[styles.primaryPill, { backgroundColor: palette.primaryStrong }]}
+            style={[
+              styles.primaryPill,
+              { backgroundColor: palette.primaryStrong },
+            ]}
           >
             <Text style={{ color: '#fff', fontWeight: '900' }}>Enroll</Text>
           </Pressable>
         ) : null}
 
         {item.product && onOpenMarket ? (
-          <Pressable onPress={onOpenMarket} style={[styles.primaryPill, { backgroundColor: palette.primaryStrong }]}>
+          <Pressable
+            onPress={onOpenMarket}
+            style={[
+              styles.primaryPill,
+              { backgroundColor: palette.primaryStrong },
+            ]}
+          >
             <Text style={{ color: '#fff', fontWeight: '900' }}>Shop</Text>
           </Pressable>
         ) : null}
@@ -433,8 +561,23 @@ export default function BroadcastFeedCard({
       <View style={[styles.engagementRow, { borderTopColor: palette.divider }]}>
         {onSave ? (
           <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
-            <KISIcon name="bookmark" size={18} color={item.viewer_saved ? palette.primaryStrong : palette.subtext} />
-            <Text style={[styles.engText, { color: item.viewer_saved ? palette.primaryStrong : palette.subtext }]}>
+            <KISIcon
+              name="bookmark"
+              size={18}
+              color={
+                item.viewer_saved ? palette.primaryStrong : palette.subtext
+              }
+            />
+            <Text
+              style={[
+                styles.engText,
+                {
+                  color: item.viewer_saved
+                    ? palette.primaryStrong
+                    : palette.subtext,
+                },
+              ]}
+            >
               Save
             </Text>
           </Pressable>
@@ -444,15 +587,30 @@ export default function BroadcastFeedCard({
           <KISIcon
             name="heart"
             size={18}
-            color={item.viewer_reaction ? palette.primaryStrong : palette.subtext}
+            color={
+              item.viewer_reaction ? palette.primaryStrong : palette.subtext
+            }
           />
-          <Text style={[styles.engText, { color: item.viewer_reaction ? palette.primaryStrong : palette.subtext }]}>
+          <Text
+            style={[
+              styles.engText,
+              {
+                color: item.viewer_reaction
+                  ? palette.primaryStrong
+                  : palette.subtext,
+              },
+            ]}
+          >
             {item.reaction_count ?? 0}
           </Text>
         </Pressable>
 
         {onToggleComments ? (
-          <Pressable onPress={onToggleComments} style={styles.engItem} hitSlop={10}>
+          <Pressable
+            onPress={onToggleComments}
+            style={styles.engItem}
+            hitSlop={10}
+          >
             <KISIcon name="comment" size={18} color={palette.subtext} />
             <Text style={[styles.engText, { color: palette.subtext }]}>
               {item.comment_count ?? 0}

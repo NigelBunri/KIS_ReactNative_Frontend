@@ -1,4 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ROUTES from '@/network';
+import { postRequest } from '@/network/post';
+
+const registerPushToken = async (payload: {
+  pushToken?: string | null;
+  apnsToken?: string | null;
+}) => {
+  const pushToken = payload.pushToken || '';
+  if (!pushToken) return;
+  const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+  const platform = (await AsyncStorage.getItem('device_platform')) || '';
+  await postRequest(
+    ROUTES.notifications.deviceTokenRegister,
+    {
+      device_id: deviceId,
+      platform,
+      push_token: pushToken,
+      token_type: 'fcm',
+      apns_token: payload.apnsToken || '',
+      metadata: { source: 'react-native-firebase' },
+    },
+    { errorMessage: 'Unable to register push token.' },
+  );
+};
 
 export async function initPushHandlers() {
   try {
@@ -47,14 +71,12 @@ export async function initPushHandlers() {
         await AsyncStorage.setItem('fcm_token', fcmToken);
         await AsyncStorage.setItem('push_token', fcmToken);
       }
-    } catch {}
-
-    try {
       const apnsToken =
         typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
       if (apnsToken) {
         await AsyncStorage.setItem('apns_token', apnsToken);
       }
+      await registerPushToken({ pushToken: fcmToken, apnsToken });
     } catch {}
 
     if (typeof setBackgroundMessageHandler === 'function') {

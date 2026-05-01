@@ -1,5 +1,5 @@
 // src/screens/tabs/BibleScreen.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKISTheme } from '../../theme/useTheme';
 import { useBibleData } from './bible/useBibleData';
@@ -7,17 +7,15 @@ import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
 import MeditationPanel from '../../components/Bible/MeditationPanel';
 import BiblePlansPanel from '../../components/Bible/BiblePlansPanel';
-import BibleStatsPanel from '../../components/Bible/BibleStatsPanel';
-import StudyToolsPanel from '../../components/Bible/StudyToolsPanel';
-import BibleCommunityPanel from '../../components/Bible/BibleCommunityPanel';
 import PrayerPanel from '../../components/Bible/PrayerPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
-import BibleFeatureVaultPanel from '../../components/Bible/BibleFeatureVaultPanel';
+import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
 import { KISIcon } from '../../constants/kisIcons';
 
 export default function BibleScreen() {
   const { palette } = useKISTheme();
-  const [activeTab, setActiveTab] = useState('today');
+  const [activeTab, setActiveTab] = useState('read');
+  const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
   const {
     translations,
     books,
@@ -25,29 +23,30 @@ export default function BibleScreen() {
     devotionals,
     meditations,
     loadingReader,
+    loadingDaily,
+    loadingMeditations,
     loadReader,
   } = useBibleData();
 
   const tabs = useMemo(
     () => [
-      { key: 'today', label: 'Today', icon: 'calendar' },
       { key: 'read', label: 'Read', icon: 'book' },
-      { key: 'meditate', label: 'Meditate', icon: 'sparkles' },
-      { key: 'prayer', label: 'Prayer', icon: 'heart' },
-      { key: 'plans', label: 'Plans', icon: 'list' },
-      { key: 'stats', label: 'Stats', icon: 'poll' },
-      { key: 'study', label: 'Study', icon: 'school' },
-      { key: 'community', label: 'Community', icon: 'people' },
+      { key: 'daily', label: 'Daily', icon: 'calendar' },
+      { key: 'meditations', label: 'Meditations', icon: 'sparkles' },
+      { key: 'prayer-calendar', label: 'Prayer Calendar', icon: 'heart' },
+      { key: 'reading-planner', label: 'Reading Planner', icon: 'list' },
       { key: 'lessons', label: 'Lessons', icon: 'layers' },
-      { key: 'features', label: 'Features', icon: 'settings' },
+      { key: 'settings', label: 'Settings', icon: 'settings' },
     ],
     [],
   );
 
+  const registerReadFilterOpener = useCallback((open: () => void) => {
+    setOpenReadFilters(() => open);
+  }, []);
+
   const renderTab = () => {
     switch (activeTab) {
-      case 'today':
-        return <DailyDevotionsPanel devotionals={devotionals} />;
       case 'read':
         return (
           <BibleReaderPanel
@@ -56,24 +55,21 @@ export default function BibleScreen() {
             reader={reader}
             loading={loadingReader}
             onLoad={loadReader}
+            onRegisterFilterOpener={registerReadFilterOpener}
           />
         );
-      case 'meditate':
-        return <MeditationPanel meditations={meditations} />;
-      case 'prayer':
+      case 'daily':
+        return <DailyDevotionsPanel devotionals={devotionals} loading={loadingDaily} />;
+      case 'meditations':
+        return <MeditationPanel meditations={meditations} loading={loadingMeditations} />;
+      case 'prayer-calendar':
         return <PrayerPanel />;
-      case 'plans':
+      case 'reading-planner':
         return <BiblePlansPanel />;
-      case 'stats':
-        return <BibleStatsPanel />;
-      case 'study':
-        return <StudyToolsPanel />;
-      case 'community':
-        return <BibleCommunityPanel />;
       case 'lessons':
         return <BibleLessonsPanel />;
-      case 'features':
-        return <BibleFeatureVaultPanel />;
+      case 'settings':
+        return <BibleSettingsPanel translations={translations} />;
       default:
         return null;
     }
@@ -84,7 +80,7 @@ export default function BibleScreen() {
       <View style={styles.header}>
         <Text style={{ color: palette.text, fontSize: 28, fontWeight: '900' }}>Bible</Text>
         <Text style={{ color: palette.subtext, marginTop: 6 }}>
-          Read, listen, and grow with daily devotionals, meditations, and guided study tools.
+          Official KCAN Bible section for reading, daily passages, prayers, lessons, and personal reading plans.
         </Text>
       </View>
 
@@ -124,14 +120,28 @@ export default function BibleScreen() {
       </View>
 
       <View style={styles.contentWrap}>
-        <ScrollView
-          style={styles.contentScroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderTab()}
-        </ScrollView>
+        {activeTab === 'read' ? (
+          <View style={styles.readContent}>{renderTab()}</View>
+        ) : (
+          <ScrollView
+            style={styles.contentScroll}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {renderTab()}
+          </ScrollView>
+        )}
       </View>
+
+      {activeTab === 'read' && openReadFilters ? (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={openReadFilters}
+          style={[styles.floatingFilter, { backgroundColor: palette.primaryStrong }]}
+        >
+          <KISIcon name="filter" size={22} color="#fff" />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -151,6 +161,23 @@ const styles = StyleSheet.create({
   },
   tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   contentWrap: { flex: 1, minHeight: 0 },
+  readContent: { flex: 1, minHeight: 0 },
   contentScroll: { flex: 1 },
   content: { paddingVertical: 16, gap: 16, paddingBottom: 40 },
+  floatingFilter: {
+    position: 'absolute',
+    right: 22,
+    bottom: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 14,
+    elevation: 8,
+    zIndex: 20,
+  },
 });

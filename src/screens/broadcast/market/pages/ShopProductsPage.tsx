@@ -17,7 +17,10 @@ import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
-import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
+import {
+  KIS_COIN_CODE,
+  KIS_TO_USD_RATE,
+} from '@/screens/market/market.constants';
 import {
   buildCartProductIndex,
   cartHasProduct,
@@ -29,7 +32,10 @@ import {
 const fallbackCover = require('@/assets/logo-light.png');
 
 type ShopProductsRoute = RouteProp<RootStackParamList, 'ShopProducts'>;
-type ShopProductsNavigation = NativeStackNavigationProp<RootStackParamList, 'ShopProducts'>;
+type ShopProductsNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  'ShopProducts'
+>;
 
 type ShopProduct = {
   id?: string;
@@ -60,20 +66,26 @@ const ShopProductsPage = () => {
   const [nextPage, setNextPage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [cartProductIndex, setCartProductIndex] = useState<CartProductVariantIndex>(() =>
-    buildCartProductIndex(getShopCartState()),
-  );
+  const [cartProductIndex, setCartProductIndex] =
+    useState<CartProductVariantIndex>(() =>
+      buildCartProductIndex(getShopCartState()),
+    );
 
   const resolveImageUri = useCallback((product: ShopProduct) => {
-    const candidate = Array.isArray(product.images) && product.images.length
-      ? product.images[0]
-      : product.image_url;
+    const candidate =
+      Array.isArray(product.images) && product.images.length
+        ? product.images[0]
+        : product.image_url;
     if (!candidate) return '';
     if (typeof candidate === 'string') {
       return resolveBackendAssetUrl(candidate) ?? candidate;
     }
     if (candidate && typeof candidate === 'object') {
-      return resolveBackendAssetUrl(candidate.image_url ?? '') ?? candidate.image_url ?? '';
+      return (
+        resolveBackendAssetUrl(candidate.image_url ?? '') ??
+        candidate.image_url ??
+        ''
+      );
     }
     return '';
   }, []);
@@ -83,10 +95,10 @@ const ShopProductsPage = () => {
     const fromData = Array.isArray(payload)
       ? payload
       : Array.isArray(payload.results)
-        ? payload.results
-        : Array.isArray(payload.data?.results)
-          ? payload.data.results
-          : [];
+      ? payload.results
+      : Array.isArray(payload.data?.results)
+      ? payload.data.results
+      : [];
     const next = payload.next ?? payload?.data?.next ?? null;
     return { items: fromData, next };
   };
@@ -100,7 +112,9 @@ const ShopProductsPage = () => {
       if (reset) setLoading(true);
       else setLoadingMore(true);
       try {
-        const url = targetUrl ?? `${ROUTES.commerce.products}?shop=${encodeURIComponent(shopId)}`;
+        const url =
+          targetUrl ??
+          `${ROUTES.commerce.products}?shop=${encodeURIComponent(shopId)}`;
         const response = await getRequest(url, {
           forceNetwork: true,
           errorMessage: 'Unable to load shop products.',
@@ -110,7 +124,9 @@ const ShopProductsPage = () => {
         }
         const payload = response.data ?? response ?? {};
         const normalized = normalizeListResponse(payload);
-        setProducts((prev) => (reset ? normalized.items : [...prev, ...normalized.items]));
+        setProducts(prev =>
+          reset ? normalized.items : [...prev, ...normalized.items],
+        );
         setNextPage(normalized.next || null);
         setError(null);
       } catch (loadError: any) {
@@ -133,7 +149,7 @@ const ShopProductsPage = () => {
   }, [shopId, loadProducts]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToShopCart((next) => {
+    const unsubscribe = subscribeToShopCart(next => {
       setCartProductIndex(buildCartProductIndex(next));
     });
     return () => {
@@ -163,13 +179,22 @@ const ShopProductsPage = () => {
     ({ item }: { item: ShopProduct }) => {
       const imageUri = resolveImageUri(item);
       const price = Number(item.price ?? 0);
-      const comparePrice = Number(item.compare_at_price ?? item.sale_price ?? 0);
+      const comparePrice = Number(
+        item.compare_at_price ?? item.sale_price ?? 0,
+      );
       const stockQty = Number(item.stock_qty ?? item.stock ?? 0);
       const isInStock = stockQty > 0;
       const productId = item.id ? String(item.id) : '';
-      const alreadyInCart = Boolean(productId && cartHasProduct(cartProductIndex, productId));
+      const alreadyInCart = Boolean(
+        productId && cartHasProduct(cartProductIndex, productId),
+      );
       return (
-        <View style={[productStyles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
+        <View
+          style={[
+            productStyles.card,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <View style={productStyles.cardBody}>
             <Image
               source={imageUri ? { uri: imageUri } : fallbackCover}
@@ -177,31 +202,59 @@ const ShopProductsPage = () => {
               resizeMode="cover"
             />
             <View style={productStyles.cardContent}>
-              <Text style={[productStyles.cardTitle, { color: palette.text }]} numberOfLines={2}>
+              <Text
+                style={[productStyles.cardTitle, { color: palette.text }]}
+                numberOfLines={2}
+              >
                 {item.name ?? 'Untitled product'}
               </Text>
-              <Text style={[productStyles.cardSubtitle, { color: palette.subtext }]} numberOfLines={2}>
+              <Text
+                style={[productStyles.cardSubtitle, { color: palette.subtext }]}
+                numberOfLines={2}
+              >
                 {item.inventory_type ?? 'Product'}
               </Text>
               <View style={productStyles.priceRow}>
-                <Text style={[productStyles.priceTag, { color: palette.primaryStrong }]}> 
+                <Text
+                  style={[
+                    productStyles.priceTag,
+                    { color: palette.primaryStrong },
+                  ]}
+                >
                   {`${price.toFixed(2)} ${item.currency ?? KIS_COIN_CODE}`}
                 </Text>
                 {comparePrice > price ? (
-                  <Text style={[productStyles.comparePrice, { color: palette.subtext }]}> 
-                    {`${comparePrice.toFixed(2)} ${item.currency ?? KIS_COIN_CODE}`}
+                  <Text
+                    style={[
+                      productStyles.comparePrice,
+                      { color: palette.subtext },
+                    ]}
+                  >
+                    {`${comparePrice.toFixed(2)} ${
+                      item.currency ?? KIS_COIN_CODE
+                    }`}
                   </Text>
                 ) : null}
               </View>
-              <Text style={[productStyles.secondaryText, { color: palette.subtext }]}> 
+              <Text
+                style={[
+                  productStyles.secondaryText,
+                  { color: palette.subtext },
+                ]}
+              >
                 ≈ ${(price * KIS_TO_USD_RATE).toFixed(2)} USD
               </Text>
-              <Text style={[productStyles.secondaryText, { color: palette.text, marginTop: 4 }]}> 
+              <Text
+                style={[
+                  productStyles.secondaryText,
+                  { color: palette.text, marginTop: 4 },
+                ]}
+              >
                 {isInStock ? `In stock · ${stockQty}` : 'Out of stock'}
               </Text>
             </View>
           </View>
-          <View style={productStyles.actionRow}> 
+          <View style={productStyles.actionRow}>
             <KISButton
               title="View details"
               size="xs"
@@ -222,46 +275,90 @@ const ShopProductsPage = () => {
         </View>
       );
     },
-    [palette.primaryStrong, palette.subtext, palette.surface, palette.divider, palette.text, cartProductIndex, openProductDetail],
+    [
+      palette.primaryStrong,
+      palette.subtext,
+      palette.surface,
+      palette.divider,
+      palette.text,
+      cartProductIndex,
+      openProductDetail,
+      resolveImageUri,
+    ],
   );
 
   const titleText = shopName ? `${shopName} · Products` : 'Shop products';
 
   if (!shopId) {
     return (
-      <View style={[productStyles.root, { backgroundColor: palette.bg }]}> 
-        <Text style={[productStyles.errorText, { color: palette.error || '#E53935' }]}>Shop not specified.</Text>
+      <View style={[productStyles.root, { backgroundColor: palette.bg }]}>
+        <Text
+          style={[
+            productStyles.errorText,
+            { color: palette.error || '#E53935' },
+          ]}
+        >
+          Shop not specified.
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={[productStyles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[productStyles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
-        <Pressable onPress={() => navigation.goBack()} style={productStyles.headerBack}> 
+    <View style={[productStyles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          productStyles.header,
+          { backgroundColor: palette.surface, borderColor: palette.divider },
+        ]}
+      >
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={productStyles.headerBack}
+        >
           <KISIcon name="arrow-left" size={20} color={palette.primaryStrong} />
         </Pressable>
         <View style={productStyles.headerTitleWrap}>
-          <Text style={[productStyles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+          <Text
+            style={[productStyles.headerTitle, { color: palette.text }]}
+            numberOfLines={1}
+          >
             {titleText}
           </Text>
-          <Text style={[productStyles.headerSubtitle, { color: palette.subtext }]}>Products from this shop</Text>
+          <Text
+            style={[productStyles.headerSubtitle, { color: palette.subtext }]}
+          >
+            Products from this shop
+          </Text>
         </View>
       </View>
       {error ? (
         <View style={productStyles.errorBox}>
-          <Text style={[productStyles.errorText, { color: palette.error || '#E53935' }]}>{error}</Text>
-          <KISButton title="Retry" size="sm" onPress={() => loadProducts(undefined, true)} />
+          <Text
+            style={[
+              productStyles.errorText,
+              { color: palette.error || '#E53935' },
+            ]}
+          >
+            {error}
+          </Text>
+          <KISButton
+            title="Retry"
+            size="sm"
+            onPress={() => loadProducts(undefined, true)}
+          />
         </View>
       ) : null}
       {loading && !products.length ? (
-        <View style={productStyles.loader}> 
+        <View style={productStyles.loader}>
           <ActivityIndicator color={palette.primaryStrong} />
         </View>
       ) : (
         <FlatList
           data={products}
-          keyExtractor={(item, index) => String(item.id ?? `shop-product-${index}`)}
+          keyExtractor={(item, index) =>
+            String(item.id ?? `shop-product-${index}`)
+          }
           renderItem={renderProductItem}
           contentContainerStyle={productStyles.listContent}
           onEndReached={handleLoadMore}
@@ -270,16 +367,22 @@ const ShopProductsPage = () => {
           onRefresh={handleRefresh}
           ListFooterComponent={
             loadingMore ? (
-              <View style={productStyles.footer}> 
+              <View style={productStyles.footer}>
                 <ActivityIndicator color={palette.primaryStrong} />
               </View>
             ) : null
           }
-          ListEmptyComponent={!loading ? (
-            <View style={productStyles.emptyState}>
-              <Text style={[productStyles.emptyText, { color: palette.subtext }]}>No products published by this shop yet.</Text>
-            </View>
-          ) : null}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={productStyles.emptyState}>
+                <Text
+                  style={[productStyles.emptyText, { color: palette.subtext }]}
+                >
+                  No products published by this shop yet.
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>

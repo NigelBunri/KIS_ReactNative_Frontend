@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
 import PartnersLeftRail from '@/components/partners/PartnersLeftRail';
 import PartnersCenterPane from '@/components/partners/PartnersCenterPane';
@@ -17,7 +18,6 @@ type Props = {
   selectedPartnerId: string;
   setSelectedPartnerId: (id: string) => void;
   onAddPartnerPress: () => void;
-  onLogout: () => void;
   selectedPartner: any | null;
   selectedGroupId: string | null;
   selectedChannelId: string | null;
@@ -37,6 +37,7 @@ type Props = {
   onPartnerHeaderPress: () => void;
   width: number;
   messagesOffsetAnim: any;
+  messagePanHandlers: Record<string, any>;
   isMessagesExpanded: boolean;
   toggleMessagesPane: () => void;
   handleCloseMessages: () => void;
@@ -84,7 +85,6 @@ export default function PartnerLayout({
   selectedPartnerId,
   setSelectedPartnerId,
   onAddPartnerPress,
-  onLogout,
   selectedPartner,
   selectedGroupId,
   selectedChannelId,
@@ -104,6 +104,7 @@ export default function PartnerLayout({
   onPartnerHeaderPress,
   width,
   messagesOffsetAnim,
+  messagePanHandlers,
   isMessagesExpanded,
   toggleMessagesPane,
   handleCloseMessages,
@@ -136,15 +137,30 @@ export default function PartnerLayout({
   } = usePartnerOrganizationAppsContext();
   return (
     <View
-      style={[styles.root, { backgroundColor: palette.bg }]}
+      style={[styles.root, { backgroundColor: palette.chrome }]}
       {...rootPanHandlers}
     >
+      <LinearGradient
+        colors={[palette.chrome, palette.surface, palette.chrome]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.rootGradient}
+      />
+      <View
+        style={[styles.rootGlowTop, { backgroundColor: palette.primaryStrong }]}
+      />
+      <View
+        style={[
+          styles.rootGlowBottom,
+          { backgroundColor: palette.secondary ?? palette.primaryStrong },
+        ]}
+      />
+
       <PartnersLeftRail
         partners={partners}
         selectedPartnerId={selectedPartnerId}
         onSelectPartner={setSelectedPartnerId}
         onAddPartnerPress={onAddPartnerPress}
-        onLogout={onLogout}
       />
 
       <PartnersCenterPane
@@ -165,16 +181,19 @@ export default function PartnerLayout({
         onPartnerHeaderPress={onPartnerHeaderPress}
       />
 
-      <PartnerAppLaunchBar
-        apps={organizationApps}
-        loading={organizationAppsLoading}
-        onLaunchApp={onLaunchOrganizationApp}
-        onOpenMore={onOpenOrganizationApps}
-      />
+      {!isMessagesExpanded ? (
+        <PartnerAppLaunchBar
+          apps={organizationApps}
+          loading={organizationAppsLoading}
+          onLaunchApp={onLaunchOrganizationApp}
+          onOpenMore={onOpenOrganizationApps}
+        />
+      ) : null}
 
       <PartnersMessagesPane
         width={width}
         messagesOffsetAnim={messagesOffsetAnim}
+        messagePanHandlers={messagePanHandlers}
         isMessagesExpanded={isMessagesExpanded}
         toggleMessagesPane={toggleMessagesPane}
         closeMessagesPane={handleCloseMessages}

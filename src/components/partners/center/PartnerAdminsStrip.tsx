@@ -1,5 +1,6 @@
 import React from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Image, Text, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
 import { PartnerAdmin } from '@/components/partners/partnersTypes';
@@ -16,11 +17,11 @@ export default function PartnerAdminsStrip({ admins }: Props) {
   return (
     <View style={styles.adminsSection}>
       <Text style={[styles.adminsLabel, { color: palette.subtext }]}>
-        Admins
+        Executive admins
       </Text>
       <FlatList
         data={admins}
-        keyExtractor={(a) => a.id}
+        keyExtractor={a => a.id}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.adminsList}
@@ -39,19 +40,39 @@ export default function PartnerAdminsStrip({ admins }: Props) {
               },
             ]}
           >
-            <View
+            <LinearGradient
+              colors={[
+                palette.primarySoft,
+                palette.surface,
+                palette.secondary ?? palette.primarySoft,
+              ]}
               style={[
                 styles.adminAvatar,
                 {
                   backgroundColor: palette.avatarBg,
                   borderColor: palette.borderMuted,
+                  overflow: 'hidden',
                 },
               ]}
             >
-              <Text style={{ color: palette.onAvatar, fontSize: 13, fontWeight: '700' }}>
-                {item.initials}
-              </Text>
-            </View>
+              {item.avatarUrl ? (
+                <Image
+                  source={{ uri: item.avatarUrl }}
+                  style={styles.partnerAvatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text
+                  style={{
+                    color: palette.text,
+                    fontSize: 13,
+                    fontWeight: '900',
+                  }}
+                >
+                  {item.initials}
+                </Text>
+              )}
+            </LinearGradient>
             <Text
               numberOfLines={1}
               style={{

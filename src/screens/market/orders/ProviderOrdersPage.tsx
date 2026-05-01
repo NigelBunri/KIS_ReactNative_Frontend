@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -49,9 +49,12 @@ export default function ProviderOrdersPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getRequest(ROUTES.commerce.marketplaceProviderOrders, {
-        errorMessage: 'Unable to load received orders.',
-      });
+      const response = await getRequest(
+        ROUTES.commerce.marketplaceProviderOrders,
+        {
+          errorMessage: 'Unable to load received orders.',
+        },
+      );
       if (response.success) {
         const payload = response.data;
         const data = Array.isArray(payload)
@@ -97,10 +100,16 @@ export default function ProviderOrdersPage() {
         if (!response.success) {
           throw new Error(response.message || 'Unable to mark order complete.');
         }
-        Alert.alert('Order completed', response.message || 'Order marked as completed.');
+        Alert.alert(
+          'Order completed',
+          response.message || 'Order marked as completed.',
+        );
         await loadOrders();
       } catch (err: any) {
-        Alert.alert('Complete order', err?.message || 'Unable to complete order.');
+        Alert.alert(
+          'Complete order',
+          err?.message || 'Unable to complete order.',
+        );
       } finally {
         setActionLoading(null);
       }
@@ -110,30 +119,52 @@ export default function ProviderOrdersPage() {
 
   const renderOrder = ({ item }: { item: MarketplaceOrderSummary }) => {
     const total = backendOrderTotalToFrontendKisc(item.total_amount);
-    const buyerName = typeof item.buyer === 'string' ? item.buyer : item.buyer?.username ?? 'Buyer';
+    const buyerName =
+      typeof item.buyer === 'string'
+        ? item.buyer
+        : item.buyer?.username ?? 'Buyer';
     const status = labelStatus(item.status);
-    const canComplete = item.status !== 'completed' && item.status !== 'cancelled';
+    const canComplete =
+      item.status !== 'completed' && item.status !== 'cancelled';
     const loading = actionLoading === item.id;
 
     return (
-      <View style={[styles.card, { borderColor: palette.divider, backgroundColor: palette.surfaceElevated }]}> 
+      <View
+        style={[
+          styles.card,
+          {
+            borderColor: palette.divider,
+            backgroundColor: palette.surfaceElevated,
+          },
+        ]}
+      >
         <Pressable
           onPress={() =>
-            navigation.navigate('MarketplaceOrderDetail', { orderId: item.id, mode: 'provider' })
+            navigation.navigate('MarketplaceOrderDetail', {
+              orderId: item.id,
+              mode: 'provider',
+            })
           }
         >
           <View style={styles.header}>
-            <Text style={[styles.shopName, { color: palette.text }]} numberOfLines={1}>
-              {typeof item.shop === 'string' ? item.shop : item.shop?.name ?? 'Shop'}
+            <Text
+              style={[styles.shopName, { color: palette.text }]}
+              numberOfLines={1}
+            >
+              {typeof item.shop === 'string'
+                ? item.shop
+                : item.shop?.name ?? 'Shop'}
             </Text>
             <KISIcon name="arrow-right" size={16} color={palette.subtext} />
           </View>
-          <Text style={[styles.meta, { color: palette.subtext }]}>Buyer · {buyerName}</Text>
+          <Text style={[styles.meta, { color: palette.subtext }]}>
+            Buyer · {buyerName}
+          </Text>
           <Text style={[styles.meta, { color: palette.subtext }]}>
             {status} · {total.toFixed(2)} {item.currency ?? 'KISC'}
           </Text>
         </Pressable>
-        <View style={styles.actions}> 
+        <View style={styles.actions}>
           {canComplete ? (
             <KISButton
               title={loading ? 'Completing…' : 'Mark completed'}
@@ -147,7 +178,10 @@ export default function ProviderOrdersPage() {
             size="xs"
             variant="ghost"
             onPress={() =>
-              navigation.navigate('MarketplaceOrderDetail', { orderId: item.id, mode: 'provider' })
+              navigation.navigate('MarketplaceOrderDetail', {
+                orderId: item.id,
+                mode: 'provider',
+              })
             }
           />
         </View>
@@ -156,10 +190,22 @@ export default function ProviderOrdersPage() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[styles.headerSection, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
-        <Text style={[styles.title, { color: palette.text }]}>Received orders</Text>
-        <KISButton title="Refresh" size="sm" variant="ghost" onPress={handleRefresh} />
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          styles.headerSection,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Text style={[styles.title, { color: palette.text }]}>
+          Received orders
+        </Text>
+        <KISButton
+          title="Refresh"
+          size="sm"
+          variant="ghost"
+          onPress={handleRefresh}
+        />
       </View>
       {loading ? (
         <View style={styles.loader}>
@@ -172,13 +218,17 @@ export default function ProviderOrdersPage() {
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={renderOrder}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           ListEmptyComponent={() => (
             <View style={styles.loader}>
-              <Text style={{ color: palette.subtext }}>No orders received yet.</Text>
+              <Text style={{ color: palette.subtext }}>
+                No orders received yet.
+              </Text>
             </View>
           )}
         />

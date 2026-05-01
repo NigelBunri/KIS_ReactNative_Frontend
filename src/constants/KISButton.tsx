@@ -12,7 +12,7 @@ import {
 import { createButtonStyles } from '@/theme/foundations/buttons';
 import { useKISTheme } from '@/theme/useTheme';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type Size = 'xs' | 'sm' | 'md' | 'lg';
 
 type Props = {
@@ -76,11 +76,7 @@ export default function KISButton({
     >
       {left ? <View style={{ marginRight: 6 }}>{left}</View> : null}
 
-      {title ? (
-        <Text style={titleStyles}>{title}</Text>
-      ) : (
-        children
-      )}
+      {title ? <Text style={titleStyles}>{title}</Text> : children}
 
       {loading ? (
         <ActivityIndicator

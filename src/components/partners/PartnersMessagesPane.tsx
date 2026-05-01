@@ -3,7 +3,12 @@ import React, { useMemo } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
-import { Partner, PartnerChannel, PartnerCommunity, PartnerGroup } from './partnersTypes';
+import {
+  Partner,
+  PartnerChannel,
+  PartnerCommunity,
+  PartnerGroup,
+} from './partnersTypes';
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
@@ -15,6 +20,7 @@ type Props = {
   isMessagesExpanded: boolean;
   toggleMessagesPane: () => void;
   closeMessagesPane: () => void;
+  messagePanHandlers?: Record<string, any>;
   selectedGroupId: string | null;
   selectedChannelId: string | null;
   selectedFeed: 'general' | null;
@@ -32,6 +38,7 @@ export default function PartnersMessagesPane({
   isMessagesExpanded, // kept for future, even if not used directly now
   toggleMessagesPane,
   closeMessagesPane,
+  messagePanHandlers,
   selectedGroupId,
   selectedChannelId,
   selectedFeed,
@@ -47,7 +54,7 @@ export default function PartnersMessagesPane({
   const selectedGroup = useMemo(
     () =>
       selectedGroupId
-        ? groupsForPartner.find((g) => g.id === selectedGroupId) || null
+        ? groupsForPartner.find(g => g.id === selectedGroupId) || null
         : null,
     [selectedGroupId, groupsForPartner],
   );
@@ -55,7 +62,7 @@ export default function PartnersMessagesPane({
   const selectedChannel = useMemo(
     () =>
       selectedChannelId
-        ? channelsForPartner.find((c) => c.id === selectedChannelId) || null
+        ? channelsForPartner.find(c => c.id === selectedChannelId) || null
         : null,
     [selectedChannelId, channelsForPartner],
   );
@@ -63,7 +70,8 @@ export default function PartnersMessagesPane({
   const selectedCommunity = useMemo(
     () =>
       selectedCommunityFeedId
-        ? communitiesForPartner.find((c) => c.id === selectedCommunityFeedId) || null
+        ? communitiesForPartner.find(c => c.id === selectedCommunityFeedId) ||
+          null
         : null,
     [selectedCommunityFeedId, communitiesForPartner],
   );
@@ -94,10 +102,7 @@ export default function PartnersMessagesPane({
   }, [selectedChannel, selectedPartner]);
 
   const hasDestination = Boolean(
-    selectedFeed ||
-      selectedCommunity ||
-      selectedGroupId ||
-      selectedChannelId,
+    selectedFeed || selectedCommunity || selectedGroupId || selectedChannelId,
   );
 
   return (
@@ -111,37 +116,65 @@ export default function PartnersMessagesPane({
           transform: [{ translateX: messagesOffsetAnim }],
         },
       ]}
+      {...messagePanHandlers}
     >
-      {!hasDestination ? (
-        <View style={[styles.messagesHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable
-            onPress={() =>
-              isMessagesExpanded ? closeMessagesPane() : toggleMessagesPane()
+      <View
+        style={[styles.messagesHeader, { borderBottomColor: palette.divider }]}
+      >
+        <Pressable
+          onPress={() =>
+            isMessagesExpanded ? closeMessagesPane() : toggleMessagesPane()
+          }
+          style={({ pressed }) => [
+            styles.toggleButton,
+            !isMessagesExpanded ? styles.messagesPeekToggle : null,
+            { backgroundColor: palette.surface, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <KISIcon
+            name="arrow-left"
+            size={18}
+            color={palette.text}
+            style={
+              isMessagesExpanded
+                ? { transform: [{ rotate: '180deg' }] }
+                : undefined
             }
-            style={({ pressed }) => [
-              styles.toggleButton,
-              { backgroundColor: palette.surface, opacity: pressed ? 0.7 : 1 },
-            ]}
+          />
+        </Pressable>
+        <View style={styles.messagesTitleWrap}>
+          <Text style={[styles.messagesTitle, { color: palette.text }]}>
+            {selectedChannel?.name ||
+              selectedGroup?.name ||
+              selectedCommunity?.name ||
+              (selectedFeed
+                ? `${selectedPartner?.name ?? 'Partner'} feed`
+                : 'Messages')}
+          </Text>
+          <Text style={[styles.messagesSubtitle, { color: palette.subtext }]}>
+            Swipe right to close
+          </Text>
+        </View>
+      </View>
+      {!hasDestination ? (
+        <View style={[styles.messagesBody, { paddingHorizontal: 10 }]}>
+          <Text
+            style={[styles.messagesPlaceholderTitle, { color: palette.text }]}
           >
-            <KISIcon
-              name="arrow-left"
-              size={18}
-              color={palette.text}
-              style={isMessagesExpanded ? { transform: [{ rotate: '180deg' }] } : undefined}
-            />
-          </Pressable>
-          <View style={styles.messagesTitleWrap}>
-            <Text style={[styles.messagesTitle, { color: palette.text }]}>
-              Messages
-            </Text>
-            <Text style={[styles.messagesSubtitle, { color: palette.subtext }]}>
-              Tap the arrow to toggle
-            </Text>
-          </View>
+            No destination selected
+          </Text>
+          <Text
+            style={[styles.messagesPlaceholderText, { color: palette.subtext }]}
+          >
+            Choose the partner feed, a group, or a channel to open it here.
+          </Text>
         </View>
       ) : null}
       {selectedFeed && selectedPartner ? (
-        <PartnerFeedScreen partner={selectedPartner} onBack={closeMessagesPane} />
+        <PartnerFeedScreen
+          partner={selectedPartner}
+          onBack={closeMessagesPane}
+        />
       ) : selectedCommunity ? (
         <CommunityFeedScreen
           community={{ id: selectedCommunity.id, name: selectedCommunity.name }}
@@ -161,26 +194,7 @@ export default function PartnersMessagesPane({
           allChats={[]}
           onOpenInfo={onOpenInfo}
         />
-      ) : (
-        <View style={[styles.messagesBody, { paddingHorizontal: 10 }]}>
-          <Text
-            style={[
-              styles.messagesPlaceholderTitle,
-              { color: palette.text },
-            ]}
-          >
-            No destination selected
-          </Text>
-          <Text
-            style={[
-              styles.messagesPlaceholderText,
-              { color: palette.subtext },
-            ]}
-          >
-            Choose the partner feed, a group, or a channel to open it here.
-          </Text>
-        </View>
-      )}
+      ) : null}
     </Animated.View>
   );
 }

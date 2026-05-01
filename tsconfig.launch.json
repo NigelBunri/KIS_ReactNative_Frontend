@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/security/authStorage.ts",
+    "src/security/customE2EE.ts",
+    "src/services/apiService.ts",
+    "src/services/complianceService.ts",
+    "src/services/financialService.ts",
+    "src/services/inAppNotificationService.ts",
+    "src/services/locationCountryService.ts",
+    "src/services/networkMonitor.ts",
+    "src/services/staffService.ts"
+  ],
+  "exclude": ["**/node_modules", "**/Pods"]
+}

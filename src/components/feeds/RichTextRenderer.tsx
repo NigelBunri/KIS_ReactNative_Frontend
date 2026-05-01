@@ -1,5 +1,12 @@
 import React from 'react';
-import { Text, View, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
+import {
+  Text,
+  View,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+} from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useGlobalProfilePreview } from '@/components/profile/GlobalProfilePreviewProvider';
 import { splitTextByKisHandles } from '@/utils/kisHandle';
@@ -29,6 +36,24 @@ type Props = {
   style?: StyleProp<ViewStyle | TextStyle>;
 };
 
+const parseRichTextDoc = (value?: RichTextDoc | string | null) => {
+  if (value && typeof value === 'object' && value.type === 'doc') {
+    return value;
+  }
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{')) return undefined;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && parsed.type === 'doc') {
+      return parsed as RichTextDoc;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+};
+
 const HEADING_SIZES: Record<number, number> = {
   1: 24,
   2: 22,
@@ -42,7 +67,7 @@ const computeMarkStyle = (marks: RichTextMark[] = []): TextStyle => {
   const style: TextStyle = {};
   let underline = false;
   let strikethrough = false;
-  marks.forEach((mark) => {
+  marks.forEach(mark => {
     switch (mark.type) {
       case 'bold':
         style.fontWeight = '700';
@@ -117,7 +142,10 @@ const computeMarkStyle = (marks: RichTextMark[] = []): TextStyle => {
 
 const renderInline = (
   nodes: RichTextNode[] = [],
-  options: { openProfileByHandle: (handle: string) => Promise<boolean>; linkColor: string },
+  options: {
+    openProfileByHandle: (handle: string) => Promise<boolean>;
+    linkColor: string;
+  },
 ) =>
   nodes.map((node, index) => {
     if (node.type === 'text') {
@@ -162,11 +190,16 @@ const renderListItem = (
   item: RichTextNode,
   index: number,
   bullet: string,
-  options: { openProfileByHandle: (handle: string) => Promise<boolean>; linkColor: string },
+  options: {
+    openProfileByHandle: (handle: string) => Promise<boolean>;
+    linkColor: string;
+  },
   align?: TextStyle['textAlign'],
 ) => (
   <View key={`list-item-${index}`} style={styles.listItem}>
-    <Text style={[styles.listBullet, align ? { textAlign: align } : {}]}>{bullet}</Text>
+    <Text style={[styles.listBullet, align ? { textAlign: align } : {}]}>
+      {bullet}
+    </Text>
     <View style={{ flex: 1 }}>{renderInline(item.content ?? [], options)}</View>
   </View>
 );
@@ -175,10 +208,12 @@ const renderBlock = (
   node: RichTextNode,
   index: number,
   theme: ReturnType<typeof useKISTheme>,
-  options: { openProfileByHandle: (handle: string) => Promise<boolean>; linkColor: string },
+  options: {
+    openProfileByHandle: (handle: string) => Promise<boolean>;
+    linkColor: string;
+  },
 ) => {
-  const textAlign =
-    (node.attrs?.textAlign as TextStyle['textAlign']) ?? 'left';
+  const textAlign = (node.attrs?.textAlign as TextStyle['textAlign']) ?? 'left';
   const blockStyle: TextStyle = { textAlign };
   if (node.attrs?.lineHeight) {
     blockStyle.lineHeight = Number(node.attrs.lineHeight);
@@ -199,7 +234,10 @@ const renderBlock = (
   switch (node.type) {
     case 'paragraph':
       return (
-        <Text key={`block-${index}`} style={[styles.paragraph, blockStyle, { color: theme.palette.text }]}>
+        <Text
+          key={`block-${index}`}
+          style={[styles.paragraph, { color: theme.palette.text }, blockStyle]}
+        >
           {renderInline(node.content ?? [], options)}
         </Text>
       );
@@ -222,17 +260,26 @@ const renderBlock = (
     case 'blockquote':
       return (
         <View key={`block-${index}`} style={styles.blockquote}>
-          <Text style={[styles.blockquoteText, blockStyle]}>{renderInline(node.content ?? [], options)}</Text>
+          <Text style={[styles.blockquoteText, blockStyle]}>
+            {renderInline(node.content ?? [], options)}
+          </Text>
         </View>
       );
     case 'code_block':
       return (
         <View key={`block-${index}`} style={styles.codeBlock}>
-          <Text style={styles.codeText}>{renderInline(node.content ?? [], options)}</Text>
+          <Text style={styles.codeText}>
+            {renderInline(node.content ?? [], options)}
+          </Text>
         </View>
       );
     case 'horizontal_rule':
-      return <View key={`block-${index}`} style={[styles.horizontalRule, { borderColor: theme.palette.border }]} />;
+      return (
+        <View
+          key={`block-${index}`}
+          style={[styles.horizontalRule, { borderColor: theme.palette.border }]}
+        />
+      );
     case 'ordered_list':
       return (
         <View key={`block-${index}`} style={styles.list}>
@@ -244,7 +291,9 @@ const renderBlock = (
     case 'bullet_list':
       return (
         <View key={`block-${index}`} style={styles.list}>
-          {(node.content ?? []).map((item, idx) => renderListItem(item, idx, '•', options, textAlign))}
+          {(node.content ?? []).map((item, idx) =>
+            renderListItem(item, idx, '•', options, textAlign),
+          )}
         </View>
       );
     case 'task_list':
@@ -253,14 +302,19 @@ const renderBlock = (
           {(node.content ?? []).map((item, idx) => (
             <View key={`task-${idx}`} style={styles.taskItem}>
               <Text style={styles.taskBullet}>◻</Text>
-              <View style={{ flex: 1 }}>{renderInline(item.content ?? [], options)}</View>
+              <View style={{ flex: 1 }}>
+                {renderInline(item.content ?? [], options)}
+              </View>
             </View>
           ))}
         </View>
       );
     default:
       return (
-        <Text key={`block-${index}`} style={[styles.paragraph, blockStyle, { color: theme.palette.text }]}>
+        <Text
+          key={`block-${index}`}
+          style={[styles.paragraph, { color: theme.palette.text }, blockStyle]}
+        >
           {renderInline(node.content ?? [], options)}
         </Text>
       );
@@ -270,23 +324,32 @@ const renderBlock = (
 const renderDoc = (
   doc: RichTextDoc | undefined,
   theme: ReturnType<typeof useKISTheme>,
-  options: { openProfileByHandle: (handle: string) => Promise<boolean>; linkColor: string },
+  options: {
+    openProfileByHandle: (handle: string) => Promise<boolean>;
+    linkColor: string;
+  },
 ) => {
   if (!doc || doc.type !== 'doc') {
     return null;
   }
-  return doc.content?.map((node, index) => renderBlock(node, index, theme, options)) ?? null;
+  return (
+    doc.content?.map((node, index) =>
+      renderBlock(node, index, theme, options),
+    ) ?? null
+  );
 };
 
-export default function RichTextRenderer({ doc, value, fallback, style }: Props) {
+export default function RichTextRenderer({
+  doc,
+  value,
+  fallback,
+  style,
+}: Props) {
   const theme = useKISTheme();
   const { openProfileByHandle } = useGlobalProfilePreview();
-  const normalizedDoc =
-    doc ??
-    (value && typeof value === 'object' && (value as RichTextDoc).type === 'doc'
-      ? (value as RichTextDoc)
-      : undefined);
-  const fallbackText = fallback ?? (typeof value === 'string' ? value : undefined);
+  const normalizedDoc = doc ?? parseRichTextDoc(value);
+  const fallbackText =
+    fallback ?? (typeof value === 'string' ? value : undefined);
   const rendererOptions = {
     openProfileByHandle,
     linkColor: theme.palette.primaryStrong,

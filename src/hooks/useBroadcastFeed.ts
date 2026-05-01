@@ -10,6 +10,18 @@ const STORAGE_KEY = 'broadcast.feed.v1';
 const EVENT_CREATED = 'broadcast.created';
 const EVENT_REACTION = 'broadcast.reaction';
 
+const shuffleFeedItems = <T>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+  return shuffled;
+};
+
 type FetchOptions = {
   cursor?: string | null;
   append?: boolean;
@@ -23,7 +35,10 @@ export type UseBroadcastFeedResult = {
   hasMore: boolean;
   refresh: () => Promise<void>;
   loadMore: () => Promise<void>;
-  updateItem: (id: string, updater: (item: BroadcastItem) => BroadcastItem) => void;
+  updateItem: (
+    id: string,
+    updater: (item: BroadcastItem) => BroadcastItem,
+  ) => void;
 };
 
 export const useBroadcastFeed = (): UseBroadcastFeedResult => {
@@ -70,20 +85,19 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
 
   const updateItem = useCallback(
     (id: string, updater: (item: BroadcastItem) => BroadcastItem) => {
-      setItems((prev) => prev.map((item) => (item.id === id ? updater(item) : item)));
+      setItems(prev =>
+        prev.map(item => (item.id === id ? updater(item) : item)),
+      );
     },
     [],
   );
 
-  const prependItem = useCallback(
-    (incoming: BroadcastItem) => {
-      setItems((prev) => {
-        if (prev.some((item) => item.id === incoming.id)) return prev;
-        return [incoming, ...prev];
-      });
-    },
-    [],
-  );
+  const prependItem = useCallback((incoming: BroadcastItem) => {
+    setItems(prev => {
+      if (prev.some(item => item.id === incoming.id)) return prev;
+      return [incoming, ...prev];
+    });
+  }, []);
 
   const handleBroadcastCreated = useCallback(
     (payload: any) => {
@@ -101,7 +115,7 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
         return;
       }
       const delta = payload.delta;
-      updateItem(payload.id, (item) => ({
+      updateItem(payload.id, item => ({
         ...item,
         engagement: {
           ...item.engagement,
@@ -113,8 +127,14 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
   );
 
   useEffect(() => {
-    const createdListener = DeviceEventEmitter.addListener(EVENT_CREATED, handleBroadcastCreated);
-    const reactionListener = DeviceEventEmitter.addListener(EVENT_REACTION, handleReactionEvent);
+    const createdListener = DeviceEventEmitter.addListener(
+      EVENT_CREATED,
+      handleBroadcastCreated,
+    );
+    const reactionListener = DeviceEventEmitter.addListener(
+      EVENT_REACTION,
+      handleReactionEvent,
+    );
     return () => {
       createdListener.remove();
       reactionListener.remove();
@@ -144,10 +164,16 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
           ? payload.data
           : [];
         const normalized = rawList
-          .map((item: any): BroadcastItem | null => normalizeBroadcastItem(item))
-          .filter((item: BroadcastItem | null): item is BroadcastItem => Boolean(item));
-        setItems((prev) => {
-          const merged = append ? [...prev, ...normalized] : normalized;
+          .map((item: any): BroadcastItem | null =>
+            normalizeBroadcastItem(item),
+          )
+          .filter((item: BroadcastItem | null): item is BroadcastItem =>
+            Boolean(item),
+          );
+        setItems(prev => {
+          const merged = append
+            ? [...prev, ...normalized]
+            : shuffleFeedItems(normalized);
           const seen = new Set<string>();
           const deduped: BroadcastItem[] = [];
           for (const item of merged) {

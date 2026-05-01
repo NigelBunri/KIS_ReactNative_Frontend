@@ -158,7 +158,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const { authToken, currentUserId, currentUserName } =
     useChatAuth(chat);
-  const { typingByConversation, presenceByUser, socket } = useSocket();
+  const { typingByConversation, presenceByUser, socket, startCall } = useSocket();
 
   /* ------------------------------------------------------------------------ */
   /*                         CONVERSATION BOOTSTRAP                            */
@@ -928,6 +928,39 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     onOpenInfo?.({ chat, currentUserId });
   }, [chat, currentUserId, onOpenInfo]);
 
+  const handleStartCall = useCallback(
+    async (media: 'voice' | 'video') => {
+      if (!chat || !startCall) {
+        Alert.alert('Call unavailable', 'Calling is not ready yet.');
+        return;
+      }
+
+      const resolvedConversationId =
+        conversationId ??
+        (await ensureConversationId().catch(() => null)) ??
+        chat.conversationId ??
+        chat.id ??
+        null;
+
+      if (!resolvedConversationId) {
+        Alert.alert('Call unavailable', 'Conversation is not ready yet.');
+        return;
+      }
+
+      const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
+        (id) => String(id) !== String(currentUserId ?? ''),
+      );
+
+      await startCall({
+        conversationId: String(resolvedConversationId),
+        title: chat.name ?? 'Call',
+        media,
+        inviteeUserIds,
+      });
+    },
+    [chat, startCall, conversationId, ensureConversationId, currentUserId],
+  );
+
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat.openInfo', (payload: any) => {
       const targetId = String(payload?.chatId ?? '');
@@ -954,6 +987,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onBack={selectionMode ? exitSelectionMode : onBack}
           palette={palette}
           onOpenInfo={selectionMode ? undefined : handleOpenInfo}
+          onStartVoiceCall={selectionMode ? undefined : () => void handleStartCall('voice')}
+          onStartVideoCall={selectionMode ? undefined : () => void handleStartCall('video')}
           currentUserId={currentUserId}
           statusText={statusTextFinal}
           contextLabel={headerContextLabel}

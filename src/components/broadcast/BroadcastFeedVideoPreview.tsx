@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 
 import { KISVideo } from '@/Module/vieo';
 import type { KISPalette } from '@/theme/constants';
@@ -26,14 +34,20 @@ export default function BroadcastFeedVideoPreview({
   containerStyle,
   videoStyle,
 }: Props) {
-  const sources = useMemo(() => getBroadcastFeedVideoSources(attachment), [attachment]);
-  const poster = useMemo(() => getBroadcastFeedVideoPosterUrl(attachment), [attachment]);
+  const sources = useMemo(
+    () => getBroadcastFeedVideoSources(attachment),
+    [attachment],
+  );
+  const poster = useMemo(
+    () => getBroadcastFeedVideoPosterUrl(attachment),
+    [attachment],
+  );
   const [sourceIndex, setSourceIndex] = useState(0);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [finalFailure, setFinalFailure] = useState(false);
   const activeSource = sources[sourceIndex] ?? null;
   const sourceSignature = useMemo(
-    () => sources.map((source) => `${source.kind}:${source.url}`).join('|'),
+    () => sources.map(source => `${source.kind}:${source.url}`).join('|'),
     [sources],
   );
 
@@ -85,7 +99,7 @@ export default function BroadcastFeedVideoPreview({
       setPlaybackError(nextMessage);
       setFinalFailure(true);
     },
-    [activeSource, attachment, sourceIndex, sources.length],
+    [activeSource, attachment, sourceIndex, sources],
   );
 
   const handleRetry = useCallback(() => {
@@ -102,8 +116,16 @@ export default function BroadcastFeedVideoPreview({
 
   if (!activeSource) {
     return (
-      <View style={[styles.unavailableWrap, { backgroundColor: palette.bar }, containerStyle]}>
-        <Text style={[styles.title, { color: palette.text }]}>Video unavailable</Text>
+      <View
+        style={[
+          styles.unavailableWrap,
+          { backgroundColor: palette.bar },
+          containerStyle,
+        ]}
+      >
+        <Text style={[styles.title, { color: palette.text }]}>
+          Video unavailable
+        </Text>
         <Text style={[styles.message, { color: palette.subtext }]}>
           No playable video source was found for this attachment.
         </Text>
@@ -113,25 +135,44 @@ export default function BroadcastFeedVideoPreview({
 
   if (finalFailure) {
     return (
-      <View style={[styles.unavailableWrap, { backgroundColor: palette.bar }, containerStyle]}>
-        <Text style={[styles.title, { color: palette.danger }]}>Playback failed</Text>
+      <View
+        style={[
+          styles.unavailableWrap,
+          { backgroundColor: palette.bar },
+          containerStyle,
+        ]}
+      >
+        <Text style={[styles.title, { color: palette.danger }]}>
+          Playback failed
+        </Text>
         <Text style={[styles.message, { color: palette.subtext }]}>
           {playbackError || basePlaybackMessage}
         </Text>
         <View style={styles.buttonRow}>
-          <Pressable onPress={handleRetry} style={[styles.button, { borderColor: palette.primaryStrong }]}>
+          <Pressable
+            onPress={handleRetry}
+            style={[styles.button, { borderColor: palette.primaryStrong }]}
+          >
             <Text style={{ color: palette.primaryStrong }}>Retry</Text>
           </Pressable>
-          <Pressable onPress={openExternal} style={[styles.button, { borderColor: palette.divider }]}>
+          <Pressable
+            onPress={openExternal}
+            style={[styles.button, { borderColor: palette.divider }]}
+          >
             <Text style={{ color: palette.text }}>Open source</Text>
           </Pressable>
         </View>
         <Text style={[styles.note, { color: palette.subtext }]}>
-          Tried {sources.map((source) => getBroadcastFeedVideoSourceLabel(source)).join(' then ')}.
+          Tried{' '}
+          {sources
+            .map(source => getBroadcastFeedVideoSourceLabel(source))
+            .join(' then ')}
+          .
         </Text>
         {__DEV__ ? (
           <Text style={[styles.devNote, { color: palette.subtext }]}>
-            host={activeSource.host || 'unknown'} risk={getBroadcastFeedVideoRiskNote(activeSource) || 'none'}
+            host={activeSource.host || 'unknown'} risk=
+            {getBroadcastFeedVideoRiskNote(activeSource) || 'none'}
           </Text>
         ) : null}
       </View>
@@ -150,16 +191,25 @@ export default function BroadcastFeedVideoPreview({
         videoStyle={videoStyle}
       />
       {playbackError && sourceIndex > 0 ? (
-        <View style={[styles.fallbackPill, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+        <View
+          style={[
+            styles.fallbackPill,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
           <Text style={{ color: palette.subtext, fontSize: 12 }}>
-            Using fallback source: {getBroadcastFeedVideoSourceLabel(activeSource)}
+            Using fallback source:{' '}
+            {getBroadcastFeedVideoSourceLabel(activeSource)}
           </Text>
         </View>
       ) : null}
       {__DEV__ ? (
         <Text style={[styles.devNote, { color: palette.subtext }]}>
-          source={getBroadcastFeedVideoSourceLabel(activeSource)} host={activeSource.host || 'unknown'}
-          {getBroadcastFeedVideoRiskNote(activeSource) ? ` risk=${getBroadcastFeedVideoRiskNote(activeSource)}` : ''}
+          source={getBroadcastFeedVideoSourceLabel(activeSource)} host=
+          {activeSource.host || 'unknown'}
+          {getBroadcastFeedVideoRiskNote(activeSource)
+            ? ` risk=${getBroadcastFeedVideoRiskNote(activeSource)}`
+            : ''}
         </Text>
       ) : null}
     </View>

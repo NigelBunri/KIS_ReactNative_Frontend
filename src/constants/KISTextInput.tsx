@@ -60,9 +60,7 @@ type DynamicStyleProps = {
   multiline?: boolean;
 };
 
-type StylePropType =
-  | ViewStyle
-  | ((state: DynamicStyleProps) => ViewStyle);
+type StylePropType = ViewStyle | ((state: DynamicStyleProps) => ViewStyle);
 
 type Props = TextInputProps & {
   label?: string;
@@ -83,7 +81,7 @@ type Props = TextInputProps & {
   /** Layout overrides you can pass when calling */
   layout?: LayoutOverrides;
 
-  style?: StylePropType
+  style?: StylePropType;
   multiline?: boolean;
   keyboardType?: KeyboardTypeOptions;
 };
@@ -122,10 +120,6 @@ export default function KISTextInput({
 
   const labelStyle = useMemo(
     () => getTypographyStyle('label', palette.subtext),
-    [palette.subtext],
-  );
-  const helperStyle = useMemo(
-    () => getTypographyStyle('helper', palette.subtext),
     [palette.subtext],
   );
   const errorStyle = useMemo(
@@ -177,7 +171,12 @@ export default function KISTextInput({
 
     // default multiline minHeight follows the chosen size preset
     return baseControlHeight;
-  }, [multiline, layout?.multilineMinHeight, layout?.minHeight, baseControlHeight]);
+  }, [
+    multiline,
+    layout?.multilineMinHeight,
+    layout?.minHeight,
+    baseControlHeight,
+  ]);
 
   const computedWrapStyle: ViewStyle = useMemo(
     () => ({
@@ -221,12 +220,15 @@ export default function KISTextInput({
     !right &&
     (rest.editable ?? true) !== false;
 
-  const handleClear = useCallback((e: GestureResponderEvent) => {
-    if (typeof onChangeText === 'function' && !(rest as any).readOnly) {
-      onChangeText('');
-    }
-    if (typeof onClear === 'function') onClear(e);
-  }, [onChangeText, onClear, rest]);
+  const handleClear = useCallback(
+    (e: GestureResponderEvent) => {
+      if (typeof onChangeText === 'function' && !(rest as any).readOnly) {
+        onChangeText('');
+      }
+      if (typeof onClear === 'function') onClear(e);
+    },
+    [onChangeText, onClear, rest],
+  );
 
   const RightAdornment = useMemo(() => {
     if (loading) {
@@ -236,7 +238,7 @@ export default function KISTextInput({
     if (secureTextEntry) {
       return (
         <TouchableOpacity
-          onPress={() => setSecure((s) => !s)}
+          onPress={() => setSecure(s => !s)}
           style={styles.adornmentHitbox}
           accessibilityRole="button"
           accessibilityLabel={secure ? 'Show password' : 'Hide password'}
@@ -298,10 +300,24 @@ export default function KISTextInput({
   const resolvedPlaceholderTextColor = placeholderTextColor ?? palette.subtext;
 
   return (
-    <View style={[{ marginBottom: 40,position: 'relative', height: 40 }, containerStyle]}>
-      {label ? <Text style={[labelStyle, { marginBottom: 6 }]}>{label}</Text> : null}
+    <View
+      style={[
+        { marginBottom: 40, position: 'relative', height: 40 },
+        containerStyle,
+      ]}
+    >
+      {label ? (
+        <Text style={[labelStyle, { marginBottom: 6 }]}>{label}</Text>
+      ) : null}
 
-      <View style={[styles.inputWrap, computedWrapStyle, layout?.wrapStyle, { minWidth: "90%", justifyContent: 'center',marginBottom: 20}]}>
+      <View
+        style={[
+          styles.inputWrap,
+          computedWrapStyle,
+          layout?.wrapStyle,
+          { minWidth: '90%', justifyContent: 'center', marginBottom: 20 },
+        ]}
+      >
         {left ? (
           <View style={[styles.adornment, { marginLeft: 2 }]}>
             {typeof left === 'function' ? left(palette.subtext) : left}
@@ -315,7 +331,9 @@ export default function KISTextInput({
           onChangeText={onChangeText}
           secureTextEntry={secure}
           placeholderTextColor={resolvedPlaceholderTextColor}
-          textAlignVertical={multiline ? 'top' : (rest as any).textAlignVertical}
+          textAlignVertical={
+            multiline ? 'top' : (rest as any).textAlignVertical
+          }
           style={[
             styles.input,
             inputTextStyle,
@@ -330,9 +348,9 @@ export default function KISTextInput({
         {RightAdornment}
       </View>
 
-      {!!errorText ? <Text style={[errorStyle, { marginTop: 6 }]}>{errorText}</Text> : null}
-
-      
+      {!!errorText ? (
+        <Text style={[errorStyle, { marginTop: 6 }]}>{errorText}</Text>
+      ) : null}
     </View>
   );
 }

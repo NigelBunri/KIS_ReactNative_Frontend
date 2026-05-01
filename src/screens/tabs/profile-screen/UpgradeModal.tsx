@@ -13,8 +13,6 @@ type UpgradeModalProps = {
   onResume?: () => void;
   onDowngrade?: (tierId: string) => void;
   onRetry?: (txRef: string) => void;
-  onDeleteTransaction?: (transactionId: string) => void;
-  deletingTransactionId?: string | null;
 };
 
 export function UpgradeModal(props: UpgradeModalProps) {

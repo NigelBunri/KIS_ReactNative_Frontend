@@ -70,6 +70,7 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
       lastAt: '',
       unreadCount: 0,
       hasMention: false,
+      readStateAuthoritative: false,
       participants: [],
       kind: undefined,
       isGroup: false,
@@ -118,6 +119,8 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
 
     unreadCount: raw.unread_count ?? raw.unreadCount ?? 0,
     hasMention: raw.has_mention ?? raw.hasMention ?? false,
+    readStateAuthoritative:
+      raw.read_state_authoritative ?? raw.readStateAuthoritative ?? false,
 
     participants: raw.participants ?? [],
 

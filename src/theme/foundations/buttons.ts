@@ -2,7 +2,12 @@ import { TextStyle, ViewStyle } from 'react-native';
 import { KIS_TOKENS, KISTone, KISPalette } from '../constants';
 import { FONT_FAMILIES } from './fonts';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'danger';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 type ButtonRecipe = {
@@ -64,6 +69,13 @@ export const createButtonStyles = (
     ghost: {
       container: { ...baseContainer, backgroundColor: 'transparent' },
       text: { ...textBase, color: palette.primaryStrong },
+    },
+    danger: {
+      container: {
+        ...baseContainer,
+        backgroundColor: palette.error,
+      },
+      text: { ...textBase, color: palette.onPrimary },
     },
     sizes: {
       xs: {

@@ -60,12 +60,19 @@ const socialRoutes = {
   },
   statuses: {
     list: `${API_BASE_URL}/api/v1/statuses/`,
+    search: `${API_BASE_URL}/api/v1/statuses/search/`,
     create: `${API_BASE_URL}/api/v1/statuses/`,
     mine: `${API_BASE_URL}/api/v1/statuses/mine/`,
     view: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/view/`,
+    viewers: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/viewers/`,
+    report: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/report/`,
+    mute: `${API_BASE_URL}/api/v1/statuses/mute/`,
+    unmute: `${API_BASE_URL}/api/v1/statuses/unmute/`,
   },
   chat: {
     listConversations: `${API_BASE_URL}/api/v1/chats/conversations/`,
+    searchConversations: `${API_BASE_URL}/api/v1/chats/conversations/search/`,
+    searchParticipants: `${API_BASE_URL}/api/v1/chats/conversations/participant-search/`,
     directConversation: `${API_BASE_URL}/api/v1/chats/conversations/direct/`,
   },
   e2ee: {

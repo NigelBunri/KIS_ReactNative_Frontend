@@ -29,8 +29,10 @@ export default function BroadcastProfilesSection({
       ]}
     >
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.text }]}>Broadcast profiles</Text>
-        <Text style={[styles.subtext, { color: palette.subtext }]}>Tap any profile type to open its broadcast workspace.</Text>
+        <Text style={[styles.title, { color: palette.text }]}>Broadcast and workspace launchers</Text>
+        <Text style={[styles.subtext, { color: palette.subtext }]}>
+          Open the real domain workspace for health, market, or education. Only the broadcast feed is fully broadcast-owned.
+        </Text>
       </View>
       <View style={{ gap: 10 }}>
         {definitions.map((def) => {
@@ -59,11 +61,16 @@ export default function BroadcastProfilesSection({
                 <View style={styles.broadcastProfileInfo}>
                   <Text style={[styles.broadcastProfileTitle, { color: palette.text }]}>{def.label}</Text>
                   <Text style={[styles.broadcastProfileSubtitle, { color: palette.subtext }]}>{def.helper}</Text>
+                  {def.ownershipLabel ? (
+                    <Text style={[styles.broadcastProfileSubtitle, { color: palette.subtext }]}>
+                      {def.ownershipLabel}
+                    </Text>
+                  ) : null}
                   <Text style={[styles.broadcastProfileSubtitle, { color: palette.subtext }]}>{nameLabel}</Text>
                   <Text style={[styles.broadcastProfileMeta, { color: palette.subtext }]}>{summaryText}</Text>
                 </View>
                 <KISButton
-                  title={profileData ? 'Manage' : 'Create'}
+                  title={profileData ? def.managementLabel || 'Open' : 'Open'}
                   size="xs"
                   variant={profileData ? 'primary' : 'secondary'}
                   onPress={() => onProfileAction(def)}

@@ -9,6 +9,10 @@ export type TrendingClipItem = {
   id: string;
   title?: string;
   body?: string;
+  text?: any;
+  styled_text?: any;
+  text_doc?: any;
+  text_plain?: string;
   broadcastedAt?: string;
   attachments?: any[];
   engagement?: { reactions?: number; comments?: number };
@@ -21,14 +25,23 @@ type Props = {
   onReact: (item: TrendingClipItem) => void;
 };
 
-export default function TrendingClipsSection({ items, onSeeAll, onOpen, onReact }: Props) {
+export default function TrendingClipsSection({
+  items,
+  onSeeAll,
+  onOpen,
+  onReact,
+}: Props) {
   const { palette } = useKISTheme();
 
   const mapped = useMemo(() => {
-    return items.map((it) => ({
+    return items.map(it => ({
       id: it.id,
       title: it.title,
       body: it.body,
+      text: it.text,
+      styled_text: it.styled_text,
+      text_doc: it.text_doc,
+      text_plain: it.text_plain,
       broadcastedAt: it.broadcastedAt,
       attachments: it.attachments ?? [],
       engagement: it.engagement ?? { reactions: 0, comments: 0 },
@@ -46,14 +59,26 @@ export default function TrendingClipsSection({ items, onSeeAll, onOpen, onReact 
       }}
     >
       <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
-        <SectionHeader title="Trending Clips" rightLabel="See All" onRightPress={onSeeAll} />
+        <SectionHeader
+          title="Trending Clips"
+          rightLabel="See All"
+          onRightPress={onSeeAll}
+        />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 6 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 6 }}
+      >
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {mapped.map((it) => (
+          {mapped.map(it => (
             <View key={it.id} style={{ width: 300 }}>
-              <FeedItemCard item={it as any} onPress={() => onOpen(it)} onReact={() => onReact(it)} />
+              <FeedItemCard
+                item={it as any}
+                onPress={() => onOpen(it)}
+                onReact={() => onReact(it)}
+              />
             </View>
           ))}
         </View>

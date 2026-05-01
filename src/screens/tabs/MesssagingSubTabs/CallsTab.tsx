@@ -6,6 +6,7 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
+  DeviceEventEmitter,
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import Skeleton from '@/components/common/Skeleton';
@@ -52,6 +53,15 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   }, [loadCalls]);
 
   useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('calls.refresh', () => {
+      loadCalls();
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [loadCalls]);
+
+  useEffect(() => {
     const loadConversations = async () => {
       const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined);
       const map: Record<string, string> = {};
@@ -87,6 +97,8 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
     const statusLabel =
       item.status === 'ended'
         ? 'Ended'
+        : item.status === 'missed'
+        ? 'Missed'
         : item.status === 'active'
         ? 'Active'
         : 'Ringing';

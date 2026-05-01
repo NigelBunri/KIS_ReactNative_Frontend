@@ -243,6 +243,11 @@ export type ChatMessage = {
   text?: string;
   ciphertext?: string;
   encryptionMeta?: Record<string, any>;
+  iv?: string;
+  tag?: string;
+  aad?: string;
+  encryptionVersion?: string;
+  encryptionKeyVersion?: string;
 
   voice?: {
     uri: string;

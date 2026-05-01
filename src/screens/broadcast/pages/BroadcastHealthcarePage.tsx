@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
@@ -94,20 +102,27 @@ const BOOKING_ENGINE_TO_FLOW_KEY: Record<string, string> = {
   logistics: 'home_logistics',
 };
 
-const resolveConfiguredEngineFlowKeys = (engines: Array<{ key?: string }>): string[] =>
+const resolveConfiguredEngineFlowKeys = (
+  engines: Array<{ key?: string }>,
+): string[] =>
   Array.from(
     new Set(
       engines
-        .map((engine) => BOOKING_ENGINE_TO_FLOW_KEY[String(engine?.key || '').trim().toLowerCase()])
+        .map(
+          engine =>
+            BOOKING_ENGINE_TO_FLOW_KEY[
+              String(engine?.key || '')
+                .trim()
+                .toLowerCase()
+            ],
+        )
         .filter((value): value is string => !!value),
     ),
   );
 
 const normalizeStringList = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
+  return value.map(item => String(item || '').trim()).filter(Boolean);
 };
 
 const extractServiceEngineTokens = (service: any, card: any): string[] => {
@@ -137,7 +152,9 @@ const extractServiceEngineTokens = (service: any, card: any): string[] => {
 };
 
 const toDateLabel = (value?: string) => {
-  const [y, m, d] = String(value || '').split('-').map((part) => Number(part));
+  const [y, m, d] = String(value || '')
+    .split('-')
+    .map(part => Number(part));
   if (!y || !m || !d) return value || '';
   return new Date(y, m - 1, d).toDateString();
 };
@@ -145,11 +162,6 @@ const toDateLabel = (value?: string) => {
 const toMoney = (cents?: number) => {
   if (!Number.isFinite(Number(cents))) return 'Not set';
   return `$${(Number(cents) / 100).toLocaleString()}`;
-};
-
-const toKisc = (micro?: number) => {
-  if (!Number.isFinite(Number(micro))) return '0.000';
-  return (Number(micro) / 100000).toFixed(3);
 };
 
 const clampDiscount = (value: unknown) => {
@@ -162,9 +174,12 @@ const clampDiscount = (value: unknown) => {
 const resolveLandingDraft = (institution: any) => {
   const fromEditor = institution?.profile_editor ?? institution?.profileEditor;
   if (fromEditor && typeof fromEditor === 'object') return fromEditor;
-  const fromPreview = institution?.landing_preview ?? institution?.landingPreview;
+  const fromPreview =
+    institution?.landing_preview ?? institution?.landingPreview;
   if (fromPreview && typeof fromPreview === 'object') return fromPreview;
-  const fromDashboard = institution?.dashboard?.profile_editor ?? institution?.dashboard?.profileEditor;
+  const fromDashboard =
+    institution?.dashboard?.profile_editor ??
+    institution?.dashboard?.profileEditor;
   if (fromDashboard && typeof fromDashboard === 'object') return fromDashboard;
   return {};
 };
@@ -175,8 +190,10 @@ const resolveLandingPublished = (...values: unknown[]) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value !== 0;
     if (typeof value === 'string') {
       const normalized = value.trim().toLowerCase();
-      if (['true', '1', 'yes', 'published', 'active'].includes(normalized)) return true;
-      if (['false', '0', 'no', 'unpublished', 'inactive'].includes(normalized)) return false;
+      if (['true', '1', 'yes', 'published', 'active'].includes(normalized))
+        return true;
+      if (['false', '0', 'no', 'unpublished', 'inactive'].includes(normalized))
+        return false;
     }
   }
   return false;
@@ -184,7 +201,7 @@ const resolveLandingPublished = (...values: unknown[]) => {
 
 const buildRatingsByService = (ratings: any[]): Record<string, RatingStats> => {
   const buckets: Record<string, { total: number; count: number }> = {};
-  ratings.forEach((row) => {
+  ratings.forEach(row => {
     const serviceId = String(row?.serviceId ?? row?.service_id ?? '').trim();
     const rating = Number(row?.rating);
     if (!serviceId || !Number.isFinite(rating)) return;
@@ -205,7 +222,8 @@ const buildRatingsByService = (ratings: any[]): Record<string, RatingStats> => {
 const normalizeInstitutionId = (value: unknown) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
-  if (raw.startsWith('health:')) return String(raw.slice('health:'.length)).trim();
+  if (raw.startsWith('health:'))
+    return String(raw.slice('health:'.length)).trim();
   if (raw.startsWith('health-card:')) {
     const parts = raw.split(':');
     return String(parts[1] || '').trim();
@@ -219,21 +237,39 @@ const resolveInstitutionIdFromBroadcast = (row: any) => {
   return normalizeInstitutionId(row?.source?.id);
 };
 
-export default function BroadcastHealthcarePage({ searchTerm, searchContext }: Props) {
+export default function BroadcastHealthcarePage({
+  searchTerm,
+  searchContext,
+}: Props) {
   const { palette } = useKISTheme();
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<HealthcareBroadcastCard[]>([]);
   const [timeFilter, setTimeFilter] = useState<HealthTimeFilter>('upcoming');
-  const [institutionMeta, setInstitutionMeta] = useState<Record<string, InstitutionBroadcastMeta>>({});
-  const [institutionDetails, setInstitutionDetails] = useState<Record<string, InstitutionCardDetails>>({});
+  const [institutionMeta, setInstitutionMeta] = useState<
+    Record<string, InstitutionBroadcastMeta>
+  >({});
+  const [institutionDetails, setInstitutionDetails] = useState<
+    Record<string, InstitutionCardDetails>
+  >({});
   const [joiningInstitutionId, setJoiningInstitutionId] = useState('');
+
+  useEffect(() => {
+    const nextFilter = String(searchContext || '')
+      .trim()
+      .toLowerCase();
+    if (['today', 'upcoming', 'past'].includes(nextFilter)) {
+      setTimeFilter(nextFilter as HealthTimeFilter);
+    }
+  }, [searchContext]);
 
   const loadHealthcareBroadcasts = useCallback(async () => {
     setLoading(true);
     try {
       const [res, profileStateResult] = await Promise.allSettled([
-        getRequest(ROUTES.broadcasts.list, { errorMessage: 'Unable to load healthcare broadcasts.' }),
+        getRequest(ROUTES.broadcasts.list, {
+          errorMessage: 'Unable to load healthcare broadcasts.',
+        }),
         fetchHealthProfileState({ forceNetwork: true }),
       ]);
       if (res.status !== 'fulfilled' || !res.value?.success) {
@@ -246,16 +282,23 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
       const rows = Array.isArray(res.value?.data?.results)
         ? res.value.data.results
         : Array.isArray(res.value?.data)
-          ? res.value.data
-          : [];
+        ? res.value.data
+        : [];
       const healthcareRows = rows.filter((row: any) => {
-        const type = String(row?.source_type || row?.source?.type || '').toLowerCase();
+        const type = String(
+          row?.source_type || row?.source?.type || '',
+        ).toLowerCase();
         return type === 'healthcare';
       });
       setItems(healthcareRows);
 
-      const profileState = profileStateResult.status === 'fulfilled' ? profileStateResult.value : null;
-      const institutions = Array.isArray(profileState?.profile?.institutions) ? profileState.profile.institutions : [];
+      const profileState =
+        profileStateResult.status === 'fulfilled'
+          ? profileStateResult.value
+          : null;
+      const institutions = Array.isArray(profileState?.profile?.institutions)
+        ? profileState.profile.institutions
+        : [];
       const nextMeta: Record<string, InstitutionBroadcastMeta> = {};
       institutions.forEach((institution: any) => {
         const id = String(institution?.id || '').trim();
@@ -280,11 +323,14 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
           institution?.profileEditor?.landingLogoUrl ??
           draft?.landingLogoUrl ??
           '';
-        const resolvedLogo = resolveBackendAssetUrl(rawLogo) || String(rawLogo || '');
+        const resolvedLogo =
+          resolveBackendAssetUrl(rawLogo) || String(rawLogo || '');
         nextMeta[id] = {
           id,
           name: String(institution?.name || ''),
-          type: String(institution?.type || '').trim().toLowerCase(),
+          type: String(institution?.type || '')
+            .trim()
+            .toLowerCase(),
           landingDraft: draft,
           landingIsPublished: resolveLandingPublished(
             draft?.isPublished,
@@ -308,16 +354,29 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
             .filter((value: string) => value.length > 0),
         ),
       );
-      const landingInstitutionIds = Array.from(new Set([...institutionIds, ...Object.keys(nextMeta)]));
+      const landingInstitutionIds = Array.from(
+        new Set([...institutionIds, ...Object.keys(nextMeta)]),
+      );
       const landingResponses = await Promise.allSettled(
-        landingInstitutionIds.map((institutionId) => fetchInstitutionLandingPage(institutionId)),
+        landingInstitutionIds.map(institutionId =>
+          fetchInstitutionLandingPage(institutionId),
+        ),
       );
       const profileEditorResponses = await Promise.allSettled(
-        landingInstitutionIds.map((institutionId) => fetchInstitutionProfileEditor(institutionId)),
+        landingInstitutionIds.map(institutionId =>
+          fetchInstitutionProfileEditor(institutionId),
+        ),
       );
-      const mergedMeta: Record<string, InstitutionBroadcastMeta> = { ...nextMeta };
+      const mergedMeta: Record<string, InstitutionBroadcastMeta> = {
+        ...nextMeta,
+      };
       landingResponses.forEach((result, index) => {
-        if (result.status !== 'fulfilled' || !result.value?.success || !result.value?.data) return;
+        if (
+          result.status !== 'fulfilled' ||
+          !result.value?.success ||
+          !result.value?.data
+        )
+          return;
         const institutionId = landingInstitutionIds[index];
         const current = mergedMeta[institutionId] || {
           id: institutionId,
@@ -337,7 +396,8 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
           ...current,
           landingDraft,
           landingIsPublished: !!result.value.data.isPublished,
-          logoUrl: resolveBackendAssetUrl(rawLogo) || rawLogo || current.logoUrl,
+          logoUrl:
+            resolveBackendAssetUrl(rawLogo) || rawLogo || current.logoUrl,
         };
       });
       profileEditorResponses.forEach((result, index) => {
@@ -346,7 +406,8 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
         const current = mergedMeta[institutionId];
         if (!current) return;
         const payload = result.value?.data ?? {};
-        const profileDraft = payload?.profile_editor ?? payload?.draft ?? payload;
+        const profileDraft =
+          payload?.profile_editor ?? payload?.draft ?? payload;
         if (
           !profileDraft ||
           typeof profileDraft !== 'object' ||
@@ -355,18 +416,23 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
         ) {
           return;
         }
-        const rawLogo = String((profileDraft as any)?.landingLogoUrl || current.logoUrl || '').trim();
+        const rawLogo = String(
+          (profileDraft as any)?.landingLogoUrl || current.logoUrl || '',
+        ).trim();
         mergedMeta[institutionId] = {
           ...current,
           landingDraft: profileDraft,
-          logoUrl: resolveBackendAssetUrl(rawLogo) || rawLogo || current.logoUrl,
+          logoUrl:
+            resolveBackendAssetUrl(rawLogo) || rawLogo || current.logoUrl,
         };
       });
       setInstitutionMeta(mergedMeta);
 
       const detailResponses = await Promise.allSettled(
-        institutionIds.map((institutionId) =>
-          getRequest(ROUTES.broadcasts.healthCards(institutionId), { errorMessage: 'Unable to load health card details.' }),
+        institutionIds.map(institutionId =>
+          getRequest(ROUTES.broadcasts.healthCards(institutionId), {
+            errorMessage: 'Unable to load health card details.',
+          }),
         ),
       );
       const nextDetails: Record<string, InstitutionCardDetails> = {};
@@ -381,11 +447,14 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
         const discountPercent = clampDiscount(
           membership?.discountPercent ?? membership?.discount_percent ?? 10,
         );
-        const cardsById = cards.reduce((acc: Record<string, any>, card: any) => {
-          const cardId = String(card?.id || '').trim();
-          if (cardId) acc[cardId] = card;
-          return acc;
-        }, {});
+        const cardsById = cards.reduce(
+          (acc: Record<string, any>, card: any) => {
+            const cardId = String(card?.id || '').trim();
+            if (cardId) acc[cardId] = card;
+            return acc;
+          },
+          {},
+        );
         nextDetails[institutionId] = {
           cardsById,
           ratingsByService: buildRatingsByService(ratings),
@@ -397,7 +466,10 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
       });
       setInstitutionDetails(nextDetails);
     } catch (error: any) {
-      Alert.alert('Healthcare broadcasts', error?.message || 'Unable to load healthcare broadcasts.');
+      Alert.alert(
+        'Healthcare broadcasts',
+        error?.message || 'Unable to load healthcare broadcasts.',
+      );
     } finally {
       setLoading(false);
     }
@@ -412,16 +484,24 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
       if (!institutionId) return;
       setJoiningInstitutionId(institutionId);
       try {
-        const response = await postRequest(ROUTES.broadcasts.healthCards(institutionId), {
-          action: 'join',
-        });
+        const response = await postRequest(
+          ROUTES.broadcasts.healthCards(institutionId),
+          {
+            action: 'join',
+          },
+        );
         if (!response?.success) {
-          throw new Error(response?.message || 'Unable to join this institution.');
+          throw new Error(
+            response?.message || 'Unable to join this institution.',
+          );
         }
         await loadHealthcareBroadcasts();
         Alert.alert('Membership', 'You are now a member of this institution.');
       } catch (error: any) {
-        Alert.alert('Membership', error?.message || 'Unable to join this institution.');
+        Alert.alert(
+          'Membership',
+          error?.message || 'Unable to join this institution.',
+        );
       } finally {
         setJoiningInstitutionId('');
       }
@@ -429,7 +509,7 @@ export default function BroadcastHealthcarePage({ searchTerm, searchContext }: P
     [loadHealthcareBroadcasts],
   );
 
-const handleBookNow = useCallback(
+  const handleBookNow = useCallback(
     async (args: {
       institutionId: string;
       institutionName: string;
@@ -465,7 +545,9 @@ const handleBookNow = useCallback(
         serviceId: args.serviceId,
         serviceName: args.serviceName,
         serviceDescription: args.serviceDescription,
-        configuredEngineFlowKeys: Array.isArray(args.configuredEngineFlowKeys) ? args.configuredEngineFlowKeys : undefined,
+        configuredEngineFlowKeys: Array.isArray(args.configuredEngineFlowKeys)
+          ? args.configuredEngineFlowKeys
+          : undefined,
         dateKey: args.date,
         timeValue: args.time,
         statusLabel: args.status,
@@ -477,25 +559,38 @@ const handleBookNow = useCallback(
   );
 
   const filtered = useMemo(() => {
-    const q = String(searchTerm || '').trim().toLowerCase();
+    const q = String(searchTerm || '')
+      .trim()
+      .toLowerCase();
     let base = [...items];
 
     if (q) {
-      base = base.filter((item) => {
-        const hay = `${item.title || ''} ${item.text || ''} ${item.health_card?.institution_name || ''}`.toLowerCase();
+      base = base.filter(item => {
+        const hay = `${item.title || ''} ${item.text || ''} ${
+          item.health_card?.institution_name || ''
+        }`.toLowerCase();
         return hay.includes(q);
       });
     }
 
-    const context = String(searchContext || '').trim().toLowerCase();
+    const context = String(searchContext || '')
+      .trim()
+      .toLowerCase();
     if (context === 'providers') {
-      return base.sort((a, b) => String(a.health_card?.institution_name || '').localeCompare(String(b.health_card?.institution_name || '')));
+      return base.sort((a, b) =>
+        String(a.health_card?.institution_name || '').localeCompare(
+          String(b.health_card?.institution_name || ''),
+        ),
+      );
     }
     if (context === 'services') {
       return base;
     }
     if (context === 'wellness') {
-      return base.filter((item) => String(item.health_card?.status || '').toLowerCase() !== 'blocked');
+      return base.filter(
+        item =>
+          String(item.health_card?.status || '').toLowerCase() !== 'blocked',
+      );
     }
 
     return base;
@@ -503,49 +598,53 @@ const handleBookNow = useCallback(
 
   const withTimeFilter = useMemo(() => {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const tomorrowStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+    );
 
-    return filtered.filter((item) => {
+    return filtered.filter(item => {
       const [y, m, d] = String(item.health_card?.date || '')
         .split('-')
-        .map((part) => Number(part));
+        .map(part => Number(part));
       if (!y || !m || !d) return timeFilter !== 'today';
       const target = new Date(y, m - 1, d);
-      if (timeFilter === 'today') return target >= todayStart && target < tomorrowStart;
+      if (timeFilter === 'today')
+        return target >= todayStart && target < tomorrowStart;
       if (timeFilter === 'upcoming') return target >= tomorrowStart;
       return target < todayStart;
     });
   }, [filtered, timeFilter]);
-  console.log("checking the health card Items: ", withTimeFilter)
 
   if (loading) {
     return (
-      <View style={{ marginTop: 10, paddingHorizontal: 12, alignItems: 'center' }}>
+      <View
+        style={{ marginTop: 10, paddingHorizontal: 12, alignItems: 'center' }}
+      >
         <ActivityIndicator color={palette.primary} />
-        <Text style={{ color: palette.subtext, marginTop: 8 }}>Loading healthcare broadcasts...</Text>
+        <Text style={{ color: palette.subtext, marginTop: 8 }}>
+          Loading healthcare broadcasts...
+        </Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={{ marginTop: 10, paddingHorizontal: 12, paddingBottom: 120, gap: 12 }}>
-      <View style={{ borderWidth: 2, borderColor: palette.divider, borderRadius: 18, padding: 10, backgroundColor: palette.surface }}>
-        <Text style={{ color: palette.text, fontWeight: '800' }}>Health cards</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          {(['today', 'upcoming', 'past'] as HealthTimeFilter[]).map((key) => (
-            <KISButton
-              key={key}
-              size="xs"
-              title={key[0].toUpperCase() + key.slice(1)}
-              variant={timeFilter === key ? 'primary' : 'outline'}
-              onPress={() => setTimeFilter(key)}
-            />
-          ))}
-        </View>
-      </View>
-
-      {withTimeFilter.map((item) => {
+    <ScrollView
+      contentContainerStyle={{
+        marginTop: 10,
+        paddingHorizontal: 12,
+        paddingBottom: 120,
+        gap: 12,
+      }}
+    >
+      {withTimeFilter.map(item => {
         const card = item.health_card || {};
         const statusKey = String(card.status || 'available').toLowerCase();
         const statusColor = STATUS_COLOR[statusKey] || '#10B981';
@@ -557,7 +656,8 @@ const handleBookNow = useCallback(
         const service = matchedCard?.service || {};
         const serviceId = String(service?.id || card?.service_id || '');
         const explicitEngineTokens = extractServiceEngineTokens(service, card);
-        const bookingEngines = resolveBookingEnginesFromKeys(explicitEngineTokens);
+        const bookingEngines =
+          resolveBookingEnginesFromKeys(explicitEngineTokens);
         const rating = institutionCardData?.ratingsByService?.[serviceId];
         const memberDiscount =
           institutionCardData?.membershipDiscountPercent ??
@@ -569,8 +669,16 @@ const handleBookNow = useCallback(
           card?.membership_open ??
           institution?.membershipOpen ??
           false;
-        const viewerIsMember = !!(institutionCardData?.viewerIsMember ?? card?.viewer_is_member ?? false);
-        const viewerCanManage = !!(institutionCardData?.viewerCanManage ?? card?.viewer_can_manage ?? false);
+        const viewerIsMember = !!(
+          institutionCardData?.viewerIsMember ??
+          card?.viewer_is_member ??
+          false
+        );
+        const viewerCanManage = !!(
+          institutionCardData?.viewerCanManage ??
+          card?.viewer_can_manage ??
+          false
+        );
         const landingPublished = resolveLandingPublished(
           institution?.landingIsPublished,
           card?.landing_is_published,
@@ -578,35 +686,60 @@ const handleBookNow = useCallback(
           card?.institution_landing_is_published,
           card?.institutionLandingIsPublished,
         );
-        const logoUrl = resolveBackendAssetUrl(
+        const logoUrl =
+          resolveBackendAssetUrl(
+            String(
+              institution?.logoUrl ||
+                card.institution_logo_url ||
+                item.attachments?.[0]?.url ||
+                '',
+            ).trim(),
+          ) ||
           String(
-            institution?.logoUrl || card.institution_logo_url || item.attachments?.[0]?.url || '',
-          ).trim(),
-        ) || String(institution?.logoUrl || card.institution_logo_url || item.attachments?.[0]?.url || '').trim();
+            institution?.logoUrl ||
+              card.institution_logo_url ||
+              item.attachments?.[0]?.url ||
+              '',
+          ).trim();
         const openLandingPreview = () => {
           if (!landingPublished) return;
           navigation.navigate('InstitutionLandingPreview', {
             institutionId,
             institutionType: institution?.type || undefined,
-            institutionName: institution?.name || card.institution_name || item.source?.name || 'Healthcare Institution',
+            institutionName:
+              institution?.name ||
+              card.institution_name ||
+              item.source?.name ||
+              'Healthcare Institution',
             draft: institution?.landingDraft || {},
           });
         };
 
         return (
-        <View
-          key={item.id}
-          style={{
-            borderWidth: 1,
-            borderColor: palette.primaryStrong,
-            borderRadius: 18,
-            backgroundColor: palette.card,
-            overflow: 'hidden',
-          }}
-        >
-            <View style={{ height: 170, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            key={item.id}
+            style={{
+              borderWidth: 1,
+              borderColor: palette.primaryStrong,
+              borderRadius: 18,
+              backgroundColor: palette.card,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                height: 170,
+                backgroundColor: palette.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               {logoUrl ? (
-                <Image source={{ uri: logoUrl }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
+                <Image
+                  source={{ uri: logoUrl }}
+                  resizeMode="cover"
+                  style={{ width: '100%', height: '100%' }}
+                />
               ) : (
                 <KISIcon name="heart" size={28} color={palette.primary} />
               )}
@@ -615,16 +748,28 @@ const handleBookNow = useCallback(
                   onPress={openLandingPreview}
                   accessibilityRole="button"
                   accessibilityLabel="Open institution landing page"
-                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                  }}
                 />
               ) : null}
               {membershipOpen && !viewerIsMember && !viewerCanManage ? (
                 <View style={{ position: 'absolute', left: 8, top: 8 }}>
                   <KISButton
-                    title={joiningInstitutionId === institutionId ? 'Joining...' : 'Join Institution'}
+                    title={
+                      joiningInstitutionId === institutionId
+                        ? 'Joining...'
+                        : 'Join Institution'
+                    }
                     size="xs"
                     onPress={() => {
-                      handleJoinInstitution(institutionId).catch(() => undefined);
+                      handleJoinInstitution(institutionId).catch(
+                        () => undefined,
+                      );
                     }}
                     disabled={joiningInstitutionId === institutionId}
                   />
@@ -632,10 +777,19 @@ const handleBookNow = useCallback(
               ) : null}
             </View>
             <View style={{ padding: 14 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <View style={{ flex: 1, paddingRight: 8 }}>
                   {landingPublished ? (
-                    <TouchableOpacity onPress={openLandingPreview} accessibilityRole="button">
+                    <TouchableOpacity
+                      onPress={openLandingPreview}
+                      accessibilityRole="button"
+                    >
                       <Text
                         style={{
                           color: palette.primary,
@@ -646,38 +800,86 @@ const handleBookNow = useCallback(
                       >
                         {card.service_name || item.title || 'Health Service'}
                       </Text>
-                      <Text style={{ color: palette.primary, marginTop: 2, fontSize: 11, fontWeight: '700' }}>
+                      <Text
+                        style={{
+                          color: palette.primary,
+                          marginTop: 2,
+                          fontSize: 11,
+                          fontWeight: '700',
+                        }}
+                      >
                         Tap title to open institution page
                       </Text>
                     </TouchableOpacity>
                   ) : (
-                    <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>
+                    <Text
+                      style={{
+                        color: palette.text,
+                        fontWeight: '900',
+                        fontSize: 17,
+                      }}
+                    >
                       {card.service_name || item.title || 'Health Service'}
                     </Text>
                   )}
                 </View>
-                <View style={{ borderRadius: 999, backgroundColor: `${statusColor}22`, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ color: statusColor, fontWeight: '800', fontSize: 12 }}>
+                <View
+                  style={{
+                    borderRadius: 999,
+                    backgroundColor: `${statusColor}22`,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: statusColor,
+                      fontWeight: '800',
+                      fontSize: 12,
+                    }}
+                  >
                     {statusKey.replace('_', ' ')}
                   </Text>
                 </View>
-                <View style={{ borderRadius: 999, backgroundColor: `${palette.primary}22`, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 6 }}>
-                  <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 12 }}>
+                <View
+                  style={{
+                    borderRadius: 999,
+                    backgroundColor: `${palette.primary}22`,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    marginLeft: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: palette.primary,
+                      fontWeight: '800',
+                      fontSize: 12,
+                    }}
+                  >
                     {memberDiscount}% off members
                   </Text>
                 </View>
               </View>
 
               <Text style={{ color: palette.subtext, marginTop: 4 }}>
-                {card.service_description || item.text || 'No description provided.'}
+                {card.service_description ||
+                  item.text ||
+                  'No description provided.'}
               </Text>
 
-              <Text style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}>
-                {toDateLabel(card.date)}{card.time ? ` · ${card.time}` : ''}
+              <Text
+                style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}
+              >
+                {toDateLabel(card.date)}
+                {card.time ? ` · ${card.time}` : ''}
               </Text>
 
               {landingPublished ? (
-                <TouchableOpacity onPress={openLandingPreview} accessibilityRole="button">
+                <TouchableOpacity
+                  onPress={openLandingPreview}
+                  accessibilityRole="button"
+                >
                   <Text
                     style={{
                       color: palette.primary,
@@ -686,20 +888,36 @@ const handleBookNow = useCallback(
                       textDecorationLine: 'underline',
                     }}
                   >
-                    {institution?.name || card.institution_name || item.source?.name || 'Healthcare Institution'}
+                    {institution?.name ||
+                      card.institution_name ||
+                      item.source?.name ||
+                      'Healthcare Institution'}
                   </Text>
                 </TouchableOpacity>
               ) : (
-                <Text style={{ color: palette.text, marginTop: 6, fontWeight: '700' }}>
-                  {institution?.name || card.institution_name || item.source?.name || 'Healthcare Institution'}
+                <Text
+                  style={{
+                    color: palette.text,
+                    marginTop: 6,
+                    fontWeight: '700',
+                  }}
+                >
+                  {institution?.name ||
+                    card.institution_name ||
+                    item.source?.name ||
+                    'Healthcare Institution'}
                 </Text>
               )}
 
-              <Text style={{ color: palette.text, marginTop: 6, fontWeight: '700' }}>
-                Service price: {toMoney(service?.basePriceCents ?? service?.base_price_cents)}
+              <Text
+                style={{ color: palette.text, marginTop: 6, fontWeight: '700' }}
+              >
+                Service price:{' '}
+                {toMoney(service?.basePriceCents ?? service?.base_price_cents)}
               </Text>
               <Text style={{ color: palette.subtext, marginTop: 2 }}>
-                Average rating: {rating ? rating.average.toFixed(1) : '0.0'} ({rating?.count ?? 0})
+                Average rating: {rating ? rating.average.toFixed(1) : '0.0'} (
+                {rating?.count ?? 0})
               </Text>
 
               <View
@@ -712,12 +930,29 @@ const handleBookNow = useCallback(
                   padding: 10,
                 }}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: palette.text, fontWeight: '800' }}>Booking Engines</Text>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>{bookingEngines.length} ready</Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: palette.text, fontWeight: '800' }}>
+                    Booking Engines
+                  </Text>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    {bookingEngines.length} ready
+                  </Text>
                 </View>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                  {bookingEngines.map((engine) => (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  {bookingEngines.map(engine => (
                     <View
                       key={`${item.id}-${engine.key}`}
                       style={{
@@ -743,10 +978,20 @@ const handleBookNow = useCallback(
                           justifyContent: 'center',
                         }}
                       >
-                        <KISIcon name={engine.icon} size={12} color={engine.color} />
+                        <KISIcon
+                          name={engine.icon}
+                          size={12}
+                          color={engine.color}
+                        />
                       </View>
                       <View style={{ marginLeft: 8, flex: 1 }}>
-                        <Text style={{ color: palette.text, fontSize: 12, fontWeight: '800' }}>
+                        <Text
+                          style={{
+                            color: palette.text,
+                            fontSize: 12,
+                            fontWeight: '800',
+                          }}
+                        >
                           {engine.label}
                         </Text>
                         <Text style={{ color: palette.subtext, fontSize: 10 }}>
@@ -756,7 +1001,9 @@ const handleBookNow = useCallback(
                     </View>
                   ))}
                 </View>
-                <Text style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}>
+                <Text
+                  style={{ color: palette.subtext, marginTop: 6, fontSize: 12 }}
+                >
                   These engines activate contextually after Book Now.
                 </Text>
               </View>
@@ -768,26 +1015,43 @@ const handleBookNow = useCallback(
                     handleBookNow({
                       institutionId,
                       institutionName:
-                        card.institution_name || item.source?.name || 'Healthcare Institution',
+                        card.institution_name ||
+                        item.source?.name ||
+                        'Healthcare Institution',
                       cardId,
                       serviceId,
-                      serviceName: card.service_name || item.title || 'Health Service',
-                      serviceDescription: card.service_description || item.text || '',
+                      serviceName:
+                        card.service_name || item.title || 'Health Service',
+                      serviceDescription:
+                        card.service_description || item.text || '',
                       date: card.date,
                       time: card.time,
                       status: statusKey.replace('_', ' '),
-                      basePriceCents: Number(service?.basePriceCents ?? service?.base_price_cents),
-                      memberPriceCents: Number.isFinite(Number(service?.basePriceCents ?? service?.base_price_cents))
+                      basePriceCents: Number(
+                        service?.basePriceCents ?? service?.base_price_cents,
+                      ),
+                      memberPriceCents: Number.isFinite(
+                        Number(
+                          service?.basePriceCents ?? service?.base_price_cents,
+                        ),
+                      )
                         ? Math.round(
-                            Number(service?.basePriceCents ?? service?.base_price_cents) *
-                              (100 - memberDiscount) /
+                            (Number(
+                              service?.basePriceCents ??
+                                service?.base_price_cents,
+                            ) *
+                              (100 - memberDiscount)) /
                               100,
                           )
                         : undefined,
                       institutionType: institution?.type,
-                      configuredEngineFlowKeys: resolveConfiguredEngineFlowKeys(bookingEngines),
+                      configuredEngineFlowKeys:
+                        resolveConfiguredEngineFlowKeys(bookingEngines),
                     }).catch((error: any) => {
-                      Alert.alert('Book now', error?.message || 'Unable to start this session.');
+                      Alert.alert(
+                        'Book now',
+                        error?.message || 'Unable to start this session.',
+                      );
                     });
                   }}
                 />
@@ -798,16 +1062,36 @@ const handleBookNow = useCallback(
       })}
 
       {withTimeFilter.length === 0 ? (
-        <View style={{ borderWidth: 2, borderColor: palette.divider, borderRadius: 18, padding: 14, backgroundColor: palette.surface }}>
-          <Text style={{ color: palette.text, fontWeight: '800' }}>No healthcare broadcasts yet</Text>
+        <View
+          style={{
+            borderWidth: 2,
+            borderColor: palette.divider,
+            borderRadius: 18,
+            padding: 14,
+            backgroundColor: palette.surface,
+          }}
+        >
+          <Text style={{ color: palette.text, fontWeight: '800' }}>
+            No healthcare broadcasts yet
+          </Text>
           <Text style={{ color: palette.subtext, marginTop: 4 }}>
             Broadcasted health cards will appear here under the Healthcare tab.
           </Text>
         </View>
       ) : null}
 
-      <TouchableOpacity onPress={() => loadHealthcareBroadcasts().catch(() => undefined)}>
-        <Text style={{ color: palette.primary, fontWeight: '800', textAlign: 'center' }}>Refresh healthcare broadcasts</Text>
+      <TouchableOpacity
+        onPress={() => loadHealthcareBroadcasts().catch(() => undefined)}
+      >
+        <Text
+          style={{
+            color: palette.primary,
+            fontWeight: '800',
+            textAlign: 'center',
+          }}
+        >
+          Refresh healthcare broadcasts
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );

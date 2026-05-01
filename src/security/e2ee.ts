@@ -297,20 +297,17 @@ const logE2EE = (...args: any[]) => {
   console.log('[E2EE]', ...args);
 };
 
-const ensureSession = async (recipientUserId: string) => {
-  const deviceId = await ensureDeviceId();
-  logE2EE('ensureSession:start', { recipientUserId, deviceId });
-  const bundleRes = await getRequest(
-    `${ROUTES.auth.e2eeFetchBundle(recipientUserId)}`,
-    { headers: { 'X-Device-Id': deviceId } },
-  );
-  if (!bundleRes?.success) {
-    logE2EE('ensureSession:bundle_missing', { recipientUserId, deviceId, response: bundleRes });
-    throw new Error('Missing E2EE bundle');
-  }
-  const bundle = bundleRes.data;
-  const address = getAddress(bundle.user_id, bundle.device_id);
+type DeviceBundle = {
+  user_id: string;
+  device_id: string;
+  identity_key: string;
+  signed_prekey: { id: number; key: string; signature: string };
+  one_time_prekey?: { id: number; key: string } | null;
+  registration_id?: number | null;
+};
 
+const buildSessionForBundle = async (bundle: DeviceBundle) => {
+  const address = getAddress(bundle.user_id, bundle.device_id);
   const preKeyBundle = {
     identityKey: fromB64(bundle.identity_key),
     registrationId: bundle.registration_id ?? 0,
@@ -329,14 +326,50 @@ const ensureSession = async (recipientUserId: string) => {
 
   const builder = new libsignal.SessionBuilder(signalStore, address);
   await builder.processPreKey(preKeyBundle);
-  logE2EE('ensureSession:ready', { recipientUserId, address: getSessionId(address), deviceId: bundle.device_id, hasPreKey: !!bundle.one_time_prekey });
+  logE2EE('ensureSession:ready', {
+    recipientUserId: bundle.user_id,
+    address: getSessionId(address),
+    deviceId: bundle.device_id,
+    hasPreKey: !!bundle.one_time_prekey,
+  });
   return { address, device_id: bundle.device_id };
+};
+
+const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle[]> => {
+  const deviceId = await ensureDeviceId();
+  logE2EE('ensureSession:start', { recipientUserId, deviceId });
+  const bundlesRes = await getRequest(
+    `${ROUTES.auth.e2eeFetchDeviceBundles(recipientUserId)}`,
+    { headers: { 'X-Device-Id': deviceId } },
+  );
+  if (bundlesRes?.success && Array.isArray(bundlesRes.data?.devices) && bundlesRes.data.devices.length) {
+    return bundlesRes.data.devices as DeviceBundle[];
+  }
+
+  const bundleRes = await getRequest(
+    `${ROUTES.auth.e2eeFetchBundle(recipientUserId)}`,
+    { headers: { 'X-Device-Id': deviceId } },
+  );
+  if (!bundleRes?.success || !bundleRes.data?.device_id) {
+    logE2EE('ensureSession:bundle_missing', { recipientUserId, deviceId, response: bundleRes });
+    throw new Error('Missing E2EE bundle');
+  }
+  return [bundleRes.data as DeviceBundle];
+};
+
+const ensureSessionsForUser = async (recipientUserId: string) => {
+  const bundles = await fetchDeviceBundles(recipientUserId);
+  const sessions = [];
+  for (const bundle of bundles) {
+    sessions.push(await buildSessionForBundle(bundle));
+  }
+  return sessions;
 };
 
 export const encryptForUser = async (recipientUserId: string, plaintext: string) => {
   const senderDeviceId = await ensureDeviceId();
   logE2EE('encryptForUser:start', { recipientUserId, senderDeviceId });
-  let session = await ensureSession(recipientUserId);
+  let session = (await ensureSessionsForUser(recipientUserId))[0];
   let cipher = new libsignal.SessionCipher(signalStore, session.address);
   const plaintextBytes = toArrayBuffer(plaintext);
   let encrypted;
@@ -348,7 +381,7 @@ export const encryptForUser = async (recipientUserId: string, plaintext: string)
       const sessionId = getSessionId(session.address);
       logE2EE('encryptForUser:no_session', { recipientUserId, sessionId, senderDeviceId });
       await signalStore.removeSession(sessionId);
-      session = await ensureSession(recipientUserId);
+      session = (await ensureSessionsForUser(recipientUserId))[0];
       cipher = new libsignal.SessionCipher(signalStore, session.address);
       encrypted = await cipher.encrypt(plaintextBytes);
     } else {
@@ -387,13 +420,19 @@ export const encryptPayloadForRecipients = async (
   const recipients: Array<{ userId: string; deviceId: string; type: number; ciphertext: string }> = [];
 
   for (const uid of uniqueIds) {
-    const result = await encryptForUser(uid, plaintext);
-    recipients.push({
-      userId: uid,
-      deviceId: result.encryptionMeta.recipientDeviceId,
-      type: result.encryptionMeta.type,
-      ciphertext: result.ciphertext,
-    });
+    const sessions = await ensureSessionsForUser(uid);
+    for (const session of sessions) {
+      const cipher = new libsignal.SessionCipher(signalStore, session.address);
+      const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
+      const body = encrypted.body;
+      const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
+      recipients.push({
+        userId: uid,
+        deviceId: session.device_id,
+        type: encrypted.type,
+        ciphertext: fromByteArray(bodyBytes),
+      });
+    }
   }
 
   return {

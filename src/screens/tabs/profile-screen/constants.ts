@@ -269,6 +269,8 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
     profileKey: 'broadcast_feed',
     label: 'Broadcast feed',
     helper: '10-day ephemeral queue for drops or events',
+    ownershipLabel: 'Broadcast-owned',
+    managementLabel: 'Broadcast workspace',
     icon: 'sparkles',
     tab: 'feeds',
     creationType: 'broadcast_feed',
@@ -283,8 +285,10 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
   },
   {
     profileKey: 'health',
-    label: 'Health profile',
-    helper: 'Clinics, hospitals & labs with care teams',
+    label: 'Health workspace',
+    helper: 'Domain workspace with a lightweight broadcast shell',
+    ownershipLabel: 'Health domain-owned',
+    managementLabel: 'Health workspace shell',
     icon: 'hospital',
     tab: 'health',
     creationType: 'health_profile',
@@ -293,12 +297,14 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
       const employees = Number(data?.employees_total ?? 0);
       return `${institutions} institutions · ${employees} staff`;
     },
-    emptySummary: 'Launch two institutions (max 5 free employees) before credits.',
+    emptySummary: 'Launch health institutions here. Broadcast shell data only supports discovery and lightweight profile extras.',
   },
   {
     profileKey: 'market',
-    label: 'Market profile',
-    helper: 'Shops & product drops for your brand',
+    label: 'Market workspace',
+    helper: 'Domain workspace with a lightweight broadcast shell',
+    ownershipLabel: 'Market domain-owned',
+    managementLabel: 'Market workspace shell',
     icon: 'cart',
     tab: 'market',
     creationType: 'market_profile',
@@ -307,12 +313,14 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
       const products = countProducts(data?.shops);
       return `${shops} shops · ${products} products`;
     },
-    emptySummary: 'Publish up to 5 shops (20 products each) before credits.',
+    emptySummary: 'Create shops in the market workspace. Broadcast shell data only supports discovery and lightweight profile extras.',
   },
   {
     profileKey: 'education',
-    label: 'Education profile',
-    helper: 'Courses, trainings & learning broadcasts',
+    label: 'Education workspace',
+    helper: 'Domain workspace with a lightweight broadcast shell',
+    ownershipLabel: 'Education domain-owned',
+    managementLabel: 'Education workspace shell',
     icon: 'school',
     tab: 'education',
     creationType: 'education_profile',
@@ -320,6 +328,6 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
       const courses = Array.isArray(data?.courses) ? data.courses.length : 0;
       return `${courses} courses`;
     },
-    emptySummary: 'Create up to 10 courses before extra credits are needed.',
+    emptySummary: 'Manage institutions and learning content in the education workspace. Broadcast shell data only supports discovery and lightweight profile extras.',
   },
 ];

@@ -108,6 +108,11 @@ type BackendMessage = {
 
   ciphertext?: string;
   encryptionMeta?: Record<string, any>;
+  iv?: string;
+  tag?: string;
+  aad?: string;
+  encryptionVersion?: string;
+  encryptionKeyVersion?: string;
   text?: string;
 
   attachments?: any[];
@@ -178,6 +183,11 @@ function mapBackendToChatMessage(
     text,
     ciphertext,
     encryptionMeta: raw.encryptionMeta ?? (raw as any).encryption_meta ?? undefined,
+    iv: raw.iv ?? undefined,
+    tag: raw.tag ?? undefined,
+    aad: raw.aad ?? undefined,
+    encryptionVersion: raw.encryptionVersion ?? undefined,
+    encryptionKeyVersion: raw.encryptionKeyVersion ?? undefined,
 
     voice: raw.voice,
     styledText: raw.styledText,

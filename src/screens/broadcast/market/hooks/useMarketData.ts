@@ -48,36 +48,35 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
     return `${MARKET_FEED_ENDPOINT}${qs}`;
   }, [q]);
 
-  const loadHome = useCallback(async (forceNetwork = false) => {
-    setLoadingHome(true);
-    const res = await getRequest(feedQuery, { errorMessage: 'Unable to load market.' });
-    const payload = normalizeHome(res?.data ?? res);
-    if (!mountedRef.current) return;
-    setHome(payload);
-    setLoadingHome(false);
-  }, [feedQuery]);
-
-  const fetchShops = useCallback(
-    async (params?: Record<string, string>) => {
-      const response = await getRequest(MARKET_SHOPS_ENDPOINT, {
-        params,
-        errorMessage: 'Unable to load shops.',
+  const loadHome = useCallback(
+    async (_forceNetwork = false) => {
+      setLoadingHome(true);
+      const res = await getRequest(feedQuery, {
+        errorMessage: 'Unable to load market.',
       });
-      return normalizeList<MarketShop>(response);
+      const payload = normalizeHome(res?.data ?? res);
+      if (!mountedRef.current) return;
+      setHome(payload);
+      setLoadingHome(false);
     },
-    [],
+    [feedQuery],
   );
 
-  const fetchProducts = useCallback(
-    async (params?: Record<string, string>) => {
-      const response = await getRequest(MARKET_PRODUCTS_ENDPOINT, {
-        params,
-        errorMessage: 'Unable to load products.',
-      });
-      return normalizeList<MarketProduct>(response);
-    },
-    [],
-  );
+  const fetchShops = useCallback(async (params?: Record<string, string>) => {
+    const response = await getRequest(MARKET_SHOPS_ENDPOINT, {
+      params,
+      errorMessage: 'Unable to load shops.',
+    });
+    return normalizeList<MarketShop>(response);
+  }, []);
+
+  const fetchProducts = useCallback(async (params?: Record<string, string>) => {
+    const response = await getRequest(MARKET_PRODUCTS_ENDPOINT, {
+      params,
+      errorMessage: 'Unable to load products.',
+    });
+    return normalizeList<MarketProduct>(response);
+  }, []);
 
   const loadMine = useCallback(async () => {
     setLoadingMine(true);
@@ -95,7 +94,10 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
       setMyShops(shops);
       setMyProducts(products);
     } catch (error: any) {
-      console.warn('Unable to load market owner data:', error?.message ?? error);
+      console.warn(
+        'Unable to load market owner data:',
+        error?.message ?? error,
+      );
       if (!mountedRef.current) return;
       setMyShops([]);
       setMyProducts([]);
@@ -109,84 +111,148 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
     await Promise.all([loadHome(), loadMine()]);
   }, [loadHome, loadMine]);
 
-  const joinShop = useCallback(async (shopId: string) => {
-    const res = await postRequest(MARKET_JOIN_SHOP_ENDPOINT(shopId), {}, { errorMessage: 'Unable to join shop.' });
-    if (res?.success === false) return { ok: false };
-    DeviceEventEmitter.emit('broadcast.refresh');
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const joinShop = useCallback(
+    async (shopId: string) => {
+      const res = await postRequest(
+        MARKET_JOIN_SHOP_ENDPOINT(shopId),
+        {},
+        { errorMessage: 'Unable to join shop.' },
+      );
+      if (res?.success === false) return { ok: false };
+      DeviceEventEmitter.emit('broadcast.refresh');
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const subscribeProduct = useCallback(async (productId: string) => {
-    const res = await postRequest(MARKET_SUBSCRIBE_PRODUCT_ENDPOINT(productId), {}, { errorMessage: 'Unable to subscribe.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const subscribeProduct = useCallback(
+    async (productId: string) => {
+      const res = await postRequest(
+        MARKET_SUBSCRIBE_PRODUCT_ENDPOINT(productId),
+        {},
+        { errorMessage: 'Unable to subscribe.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const broadcastProduct = useCallback(async (productId: string) => {
-    const res = await postRequest(MARKET_BROADCAST_PRODUCT_ENDPOINT(productId), {}, { errorMessage: 'Unable to broadcast product.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    DeviceEventEmitter.emit('broadcast.refresh');
-    return { ok: true };
-  }, [reloadAll]);
+  const broadcastProduct = useCallback(
+    async (productId: string) => {
+      const res = await postRequest(
+        MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
+        {},
+        { errorMessage: 'Unable to broadcast product.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      DeviceEventEmitter.emit('broadcast.refresh');
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const unpublishProduct = useCallback(async (productId: string) => {
-    const res = await deleteRequest(MARKET_BROADCAST_PRODUCT_ENDPOINT(productId), { errorMessage: 'Unable to remove broadcast.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    DeviceEventEmitter.emit('broadcast.refresh');
-    return { ok: true };
-  }, [reloadAll]);
+  const unpublishProduct = useCallback(
+    async (productId: string) => {
+      const res = await deleteRequest(
+        MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
+        { errorMessage: 'Unable to remove broadcast.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      DeviceEventEmitter.emit('broadcast.refresh');
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const deleteShop = useCallback(async (shopId: string) => {
-    const res = await deleteRequest(`${MARKET_SHOPS_ENDPOINT}${shopId}/`, { errorMessage: 'Unable to delete shop.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const deleteShop = useCallback(
+    async (shopId: string) => {
+      const res = await deleteRequest(`${MARKET_SHOPS_ENDPOINT}${shopId}/`, {
+        errorMessage: 'Unable to delete shop.',
+      });
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const deleteProduct = useCallback(async (productId: string) => {
-    const res = await deleteRequest(`${MARKET_PRODUCTS_ENDPOINT}${productId}/`, { errorMessage: 'Unable to delete product.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const deleteProduct = useCallback(
+    async (productId: string) => {
+      const res = await deleteRequest(
+        `${MARKET_PRODUCTS_ENDPOINT}${productId}/`,
+        { errorMessage: 'Unable to delete product.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const updateShop = useCallback(async (shopId: string, form: FormData) => {
-    const res = await patchRequest(`${MARKET_SHOPS_ENDPOINT}${shopId}/`, form, { errorMessage: 'Unable to update shop.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const updateShop = useCallback(
+    async (shopId: string, form: FormData) => {
+      const res = await patchRequest(
+        `${MARKET_SHOPS_ENDPOINT}${shopId}/`,
+        form,
+        { errorMessage: 'Unable to update shop.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const createShop = useCallback(async (form: FormData) => {
-    const res = await postRequest(MARKET_SHOPS_ENDPOINT, form, { errorMessage: 'Unable to create shop.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const createShop = useCallback(
+    async (form: FormData) => {
+      const res = await postRequest(MARKET_SHOPS_ENDPOINT, form, {
+        errorMessage: 'Unable to create shop.',
+      });
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const updateProduct = useCallback(async (productId: string, form: FormData) => {
-    const res = await patchRequest(`${MARKET_PRODUCTS_ENDPOINT}${productId}/`, form, { errorMessage: 'Unable to update product.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const updateProduct = useCallback(
+    async (productId: string, form: FormData) => {
+      const res = await patchRequest(
+        `${MARKET_PRODUCTS_ENDPOINT}${productId}/`,
+        form,
+        { errorMessage: 'Unable to update product.' },
+      );
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
-  const createProduct = useCallback(async (form: FormData) => {
-    const res = await postRequest(MARKET_PRODUCTS_ENDPOINT, form, { errorMessage: 'Unable to add product.' });
-    if (res?.success === false) return { ok: false };
-    await reloadAll();
-    return { ok: true };
-  }, [reloadAll]);
+  const createProduct = useCallback(
+    async (form: FormData) => {
+      const res = await postRequest(MARKET_PRODUCTS_ENDPOINT, form, {
+        errorMessage: 'Unable to add product.',
+      });
+      if (res?.success === false) return { ok: false };
+      await reloadAll();
+      return { ok: true };
+    },
+    [reloadAll],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
     loadHome();
     loadMine();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [loadHome, loadMine]);
 
   useEffect(() => {

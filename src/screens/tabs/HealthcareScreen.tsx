@@ -17,10 +17,21 @@ import {
   fetchTelemedicineSessions,
   fetchPatientMasterRecords,
   fetchPatientSummary,
+  fetchPatientHealthSummary,
+  fetchPatientEmergencyCard,
+  fetchPatientSharingSummary,
+  fetchPatientAccessHistory,
   fetchPatientEncounters,
   fetchPatientMedications,
   fetchPatientVitals,
+  createWellnessMetric,
   fetchPatientAllergies,
+  createProblemRecord,
+  createImmunizationRecord,
+  createProcedureRecord,
+  createHealthDocument,
+  createPatientAccessGrant,
+  revokePatientAccessGrant,
   createMedicationOrder,
   createVitalSign,
   endTelemedicineSession,
@@ -132,6 +143,60 @@ const INITIAL_TRIAGE_FORM = {
   symptoms: '',
 };
 
+const INITIAL_PROBLEM_FORM = {
+  title: '',
+  code: '',
+  severity: 'medium',
+  notes: '',
+};
+
+const INITIAL_WELLNESS_FORM = {
+  metric_type: 'steps',
+  source: 'manual',
+  value: '',
+  units: '',
+  secondary_value: '',
+  secondary_units: '',
+  measurement_window: 'daily',
+  source_label: '',
+};
+
+const INITIAL_ACCESS_GRANT_FORM = {
+  granted_to: '',
+  role: 'caregiver',
+  scope: 'summary',
+  expires_at: '',
+  note: '',
+  allow_emergency_override: true,
+};
+
+const INITIAL_IMMUNIZATION_FORM = {
+  vaccine_name: '',
+  manufacturer: '',
+  lot_number: '',
+  administered_at: '',
+  dose_number: '',
+  notes: '',
+};
+
+const INITIAL_PROCEDURE_FORM = {
+  procedure_name: '',
+  procedure_code: '',
+  performed_at: '',
+  location: '',
+  notes: '',
+};
+
+const INITIAL_DOCUMENT_FORM = {
+  title: '',
+  category: 'general',
+  source_label: '',
+  file_url: '',
+  mime_type: '',
+  issued_at: '',
+  notes: '',
+};
+
 export default function HealthcareScreen() {
   const { palette, tokens } = useKISTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
@@ -147,6 +212,10 @@ export default function HealthcareScreen() {
   const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [patientDetail, setPatientDetail] = useState<any | null>(null);
+  const [patientHealthSummary, setPatientHealthSummary] = useState<any | null>(null);
+  const [patientEmergencyCard, setPatientEmergencyCard] = useState<any | null>(null);
+  const [patientSharingSummary, setPatientSharingSummary] = useState<any | null>(null);
+  const [patientAccessHistory, setPatientAccessHistory] = useState<any[]>([]);
   const [patientDetailLoading, setPatientDetailLoading] = useState(false);
   const [timelineEntries, setTimelineEntries] = useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
@@ -158,8 +227,20 @@ export default function HealthcareScreen() {
     notes: '',
   });
   const [vitalForm, setVitalForm] = useState({ vital_type: '', value: '', units: '', notes: '' });
+  const [wellnessForm, setWellnessForm] = useState({ ...INITIAL_WELLNESS_FORM });
   const [medSubmitting, setMedSubmitting] = useState(false);
   const [vitalSubmitting, setVitalSubmitting] = useState(false);
+  const [wellnessSubmitting, setWellnessSubmitting] = useState(false);
+  const [accessGrantForm, setAccessGrantForm] = useState({ ...INITIAL_ACCESS_GRANT_FORM });
+  const [accessGrantSubmitting, setAccessGrantSubmitting] = useState(false);
+  const [problemForm, setProblemForm] = useState({ ...INITIAL_PROBLEM_FORM });
+  const [immunizationForm, setImmunizationForm] = useState({ ...INITIAL_IMMUNIZATION_FORM });
+  const [procedureForm, setProcedureForm] = useState({ ...INITIAL_PROCEDURE_FORM });
+  const [documentForm, setDocumentForm] = useState({ ...INITIAL_DOCUMENT_FORM });
+  const [problemSubmitting, setProblemSubmitting] = useState(false);
+  const [immunizationSubmitting, setImmunizationSubmitting] = useState(false);
+  const [procedureSubmitting, setProcedureSubmitting] = useState(false);
+  const [documentSubmitting, setDocumentSubmitting] = useState(false);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffUpdateId, setStaffUpdateId] = useState<string | null>(null);
   const [staffShiftId, setStaffShiftId] = useState<string | null>(null);
@@ -308,6 +389,8 @@ export default function HealthcareScreen() {
         setPatients(rows);
         setPatientCount(rows.length);
         setPatientDetail(null);
+        setPatientHealthSummary(null);
+        setPatientEmergencyCard(null);
       } else {
         Alert.alert('Patients', res.message || 'Unable to load patients.');
       }
@@ -739,13 +822,55 @@ export default function HealthcareScreen() {
 
   const loadPatientDetail = useCallback(
     async (patientId: string) => {
-      const res = await fetchPatientSummary(patientId);
-      if (res.success) {
-        setPatientDetail(res.data);
+      setPatientDetailLoading(true);
+      try {
+        const [detailRes, summaryRes, emergencyRes, sharingRes, historyRes] = await Promise.all([
+          fetchPatientSummary(patientId),
+          fetchPatientHealthSummary(patientId),
+          fetchPatientEmergencyCard(patientId),
+          fetchPatientSharingSummary(patientId),
+          fetchPatientAccessHistory(patientId),
+        ]);
+
+        if (detailRes.success) {
+          setPatientDetail(detailRes.data);
+        } else {
+          Alert.alert('Patient', detailRes.message || 'Unable to load patient profile.');
+        }
+
+        if (summaryRes.success) {
+          setPatientHealthSummary(summaryRes.data);
+        } else {
+          setPatientHealthSummary(null);
+        }
+
+        if (emergencyRes.success) {
+          setPatientEmergencyCard(emergencyRes.data);
+        } else {
+          setPatientEmergencyCard(null);
+        }
+
+        if (sharingRes.success) {
+          setPatientSharingSummary(sharingRes.data);
+        } else {
+          setPatientSharingSummary(null);
+        }
+
+        if (historyRes.success) {
+          const rows = Array.isArray(historyRes.data)
+            ? historyRes.data
+            : Array.isArray(historyRes.data?.results)
+            ? historyRes.data.results
+            : [];
+          setPatientAccessHistory(rows);
+        } else {
+          setPatientAccessHistory([]);
+        }
+
         await loadPatientTimeline(patientId);
-        return;
+      } finally {
+        setPatientDetailLoading(false);
       }
-      Alert.alert('Patient', res.message || 'Unable to load patient profile.');
     },
     [loadPatientTimeline],
   );
@@ -1223,6 +1348,244 @@ export default function HealthcareScreen() {
       setVitalSubmitting(false);
     }
   }, [vitalForm, patientDetail, loadPatientTimeline]);
+
+  const handleCreateWellnessMetric = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Wellness', 'Select a patient first.');
+      return;
+    }
+    if (!wellnessForm.metric_type.trim() || !wellnessForm.value) {
+      Alert.alert('Wellness', 'Metric type and value are required.');
+      return;
+    }
+    setWellnessSubmitting(true);
+    try {
+      const payload: Record<string, any> = {
+        patient: patientDetail.id,
+        metric_type: wellnessForm.metric_type,
+        source: wellnessForm.source,
+        source_label: wellnessForm.source_label.trim(),
+        measurement_window: wellnessForm.measurement_window,
+        value: wellnessForm.value,
+        units: wellnessForm.units.trim(),
+      };
+      if (wellnessForm.secondary_value) {
+        payload.secondary_value = wellnessForm.secondary_value;
+      }
+      if (wellnessForm.secondary_units.trim()) {
+        payload.secondary_units = wellnessForm.secondary_units.trim();
+      }
+      const res = await createWellnessMetric(payload);
+      if (res.success) {
+        setWellnessForm({ ...INITIAL_WELLNESS_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Wellness', 'Wellness metric saved.');
+        return;
+      }
+      Alert.alert('Wellness', res.message || 'Unable to save wellness metric.');
+    } catch (error: any) {
+      Alert.alert('Wellness', error?.message || 'Unable to save wellness metric.');
+    } finally {
+      setWellnessSubmitting(false);
+    }
+  }, [wellnessForm, patientDetail, loadPatientDetail]);
+
+  const handleCreateAccessGrant = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Sharing', 'Select a patient first.');
+      return;
+    }
+    if (!accessGrantForm.granted_to.trim()) {
+      Alert.alert('Sharing', 'A user id is required for delegation.');
+      return;
+    }
+    setAccessGrantSubmitting(true);
+    try {
+      const payload: Record<string, any> = {
+        patient: patientDetail.id,
+        granted_to: accessGrantForm.granted_to.trim(),
+        role: accessGrantForm.role,
+        scope: accessGrantForm.scope,
+        allow_emergency_override: accessGrantForm.allow_emergency_override,
+        note: accessGrantForm.note.trim(),
+      };
+      if (accessGrantForm.expires_at.trim()) {
+        payload.expires_at = accessGrantForm.expires_at.trim();
+      }
+      const res = await createPatientAccessGrant(payload);
+      if (res.success) {
+        setAccessGrantForm({ ...INITIAL_ACCESS_GRANT_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Sharing', 'Health access grant created.');
+        return;
+      }
+      Alert.alert('Sharing', res.message || 'Unable to create health access grant.');
+    } catch (error: any) {
+      Alert.alert('Sharing', error?.message || 'Unable to create health access grant.');
+    } finally {
+      setAccessGrantSubmitting(false);
+    }
+  }, [accessGrantForm, patientDetail, loadPatientDetail]);
+
+  const handleRevokeAccessGrant = useCallback(
+    async (grantId: string) => {
+      if (!patientDetail) return;
+      try {
+        const res = await revokePatientAccessGrant(grantId);
+        if (res.success) {
+          await loadPatientDetail(patientDetail.id);
+          return;
+        }
+        Alert.alert('Sharing', res.message || 'Unable to revoke access grant.');
+      } catch (error: any) {
+        Alert.alert('Sharing', error?.message || 'Unable to revoke access grant.');
+      }
+    },
+    [patientDetail, loadPatientDetail],
+  );
+
+  const handleCreateProblemRecord = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Problem list', 'Select a patient first.');
+      return;
+    }
+    if (!problemForm.title.trim()) {
+      Alert.alert('Problem list', 'Problem title is required.');
+      return;
+    }
+    setProblemSubmitting(true);
+    try {
+      const payload = {
+        patient: patientDetail.id,
+        title: problemForm.title.trim(),
+        code: problemForm.code.trim(),
+        severity: problemForm.severity,
+        clinical_status: 'active',
+        verification_status: 'provisional',
+        notes: problemForm.notes.trim(),
+      };
+      const res = await createProblemRecord(payload);
+      if (res.success) {
+        setProblemForm({ ...INITIAL_PROBLEM_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Problem list', 'Problem record saved.');
+        return;
+      }
+      Alert.alert('Problem list', res.message || 'Unable to save problem record.');
+    } catch (error: any) {
+      Alert.alert('Problem list', error?.message || 'Unable to save problem record.');
+    } finally {
+      setProblemSubmitting(false);
+    }
+  }, [patientDetail, problemForm, loadPatientDetail]);
+
+  const handleCreateImmunizationRecord = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Immunizations', 'Select a patient first.');
+      return;
+    }
+    if (!immunizationForm.vaccine_name.trim()) {
+      Alert.alert('Immunizations', 'Vaccine name is required.');
+      return;
+    }
+    setImmunizationSubmitting(true);
+    try {
+      const payload = {
+        patient: patientDetail.id,
+        vaccine_name: immunizationForm.vaccine_name.trim(),
+        manufacturer: immunizationForm.manufacturer.trim(),
+        lot_number: immunizationForm.lot_number.trim(),
+        administered_at: immunizationForm.administered_at || undefined,
+        dose_number: parseInt(immunizationForm.dose_number, 10) || undefined,
+        status: 'completed',
+        notes: immunizationForm.notes.trim(),
+      };
+      const res = await createImmunizationRecord(payload);
+      if (res.success) {
+        setImmunizationForm({ ...INITIAL_IMMUNIZATION_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Immunizations', 'Immunization saved.');
+        return;
+      }
+      Alert.alert('Immunizations', res.message || 'Unable to save immunization.');
+    } catch (error: any) {
+      Alert.alert('Immunizations', error?.message || 'Unable to save immunization.');
+    } finally {
+      setImmunizationSubmitting(false);
+    }
+  }, [patientDetail, immunizationForm, loadPatientDetail]);
+
+  const handleCreateProcedureRecord = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Procedures', 'Select a patient first.');
+      return;
+    }
+    if (!procedureForm.procedure_name.trim()) {
+      Alert.alert('Procedures', 'Procedure name is required.');
+      return;
+    }
+    setProcedureSubmitting(true);
+    try {
+      const payload = {
+        patient: patientDetail.id,
+        procedure_name: procedureForm.procedure_name.trim(),
+        procedure_code: procedureForm.procedure_code.trim(),
+        performed_at: procedureForm.performed_at || undefined,
+        location: procedureForm.location.trim(),
+        status: 'completed',
+        notes: procedureForm.notes.trim(),
+      };
+      const res = await createProcedureRecord(payload);
+      if (res.success) {
+        setProcedureForm({ ...INITIAL_PROCEDURE_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Procedures', 'Procedure record saved.');
+        return;
+      }
+      Alert.alert('Procedures', res.message || 'Unable to save procedure record.');
+    } catch (error: any) {
+      Alert.alert('Procedures', error?.message || 'Unable to save procedure record.');
+    } finally {
+      setProcedureSubmitting(false);
+    }
+  }, [patientDetail, procedureForm, loadPatientDetail]);
+
+  const handleCreateHealthDocument = useCallback(async () => {
+    if (!patientDetail) {
+      Alert.alert('Documents', 'Select a patient first.');
+      return;
+    }
+    if (!documentForm.title.trim()) {
+      Alert.alert('Documents', 'Document title is required.');
+      return;
+    }
+    setDocumentSubmitting(true);
+    try {
+      const payload = {
+        patient: patientDetail.id,
+        title: documentForm.title.trim(),
+        category: documentForm.category,
+        source_type: 'user',
+        source_label: documentForm.source_label.trim(),
+        file_url: documentForm.file_url.trim(),
+        mime_type: documentForm.mime_type.trim(),
+        issued_at: documentForm.issued_at || undefined,
+        notes: documentForm.notes.trim(),
+      };
+      const res = await createHealthDocument(payload);
+      if (res.success) {
+        setDocumentForm({ ...INITIAL_DOCUMENT_FORM });
+        await loadPatientDetail(patientDetail.id);
+        Alert.alert('Documents', 'Health document saved.');
+        return;
+      }
+      Alert.alert('Documents', res.message || 'Unable to save health document.');
+    } catch (error: any) {
+      Alert.alert('Documents', error?.message || 'Unable to save health document.');
+    } finally {
+      setDocumentSubmitting(false);
+    }
+  }, [patientDetail, documentForm, loadPatientDetail]);
 
 
   const handleUpdateStaffRole = useCallback(
@@ -2238,6 +2601,285 @@ export default function HealthcareScreen() {
           )}
         </ScrollView>
         {patientDetailLoading && <ActivityIndicator color={palette.primaryStrong} />}
+        {patientHealthSummary && (
+          <View style={[styles.patientDetail, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>Patient summary</Text>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>
+                  {patientHealthSummary?.identity?.full_name || 'Unknown patient'}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  MRN {patientHealthSummary?.identity?.mrn || 'Unavailable'}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  DOB {patientHealthSummary?.identity?.dob || 'Not recorded'}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Gender {patientHealthSummary?.identity?.gender || 'Unknown'}
+                </Text>
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Care snapshot</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Active meds {patientHealthSummary?.care_summary?.active_medications_count ?? 0}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Active allergies {patientHealthSummary?.care_summary?.active_allergies_count ?? 0}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Encounters {patientHealthSummary?.care_summary?.encounters_count ?? 0}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Appointments {patientHealthSummary?.care_summary?.appointments_count ?? 0}
+                </Text>
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Affiliations</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Total institutions {patientHealthSummary?.affiliations?.total_institutions ?? 0}
+                </Text>
+                {!!patientHealthSummary?.affiliations?.owned_institutions?.[0]?.name && (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Owner at {patientHealthSummary.affiliations.owned_institutions[0].name}
+                  </Text>
+                )}
+                {!!patientHealthSummary?.affiliations?.member_institutions?.[0]?.name && (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Member at {patientHealthSummary.affiliations.member_institutions[0].name}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Top allergies</Text>
+                {(patientHealthSummary?.top_allergies || []).length ? (
+                  (patientHealthSummary.top_allergies || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.agent} · {item.severity}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No allergies recorded.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Active medications</Text>
+                {(patientHealthSummary?.active_medications || []).length ? (
+                  (patientHealthSummary.active_medications || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.drug_name} {item.dosage ? `· ${item.dosage}` : ''}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No active medications.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Recent vitals</Text>
+                {(patientHealthSummary?.recent_vitals || []).length ? (
+                  (patientHealthSummary.recent_vitals || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.vital_type} {item.value}
+                      {item.units || ''}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No recent vitals.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Wellness trends</Text>
+                {Object.entries(patientHealthSummary?.wellness?.trends || {}).length ? (
+                  Object.entries(patientHealthSummary?.wellness?.trends || {}).map(([metricType, trend]: [string, any]) => (
+                    <Text key={metricType} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {metricType.replace(/_/g, ' ')} · {trend?.latest?.value}
+                      {trend?.latest?.units ? ` ${trend.latest.units}` : ''} · {trend?.summary?.direction || 'flat'}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No wellness trends yet.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
+        {patientEmergencyCard && (
+          <View style={[styles.patientDetail, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>Emergency card</Text>
+            <View style={[styles.emergencyCard, { borderColor: palette.danger, backgroundColor: palette.card }]}>
+              <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>
+                {patientEmergencyCard?.identity?.full_name || 'Unknown patient'}
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Blood type {patientEmergencyCard?.emergency?.blood_type || 'Not recorded'}
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Emergency contact {patientEmergencyCard?.emergency?.emergency_contact?.name || 'Not recorded'}
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Phone {patientEmergencyCard?.emergency?.emergency_contact?.phone || 'Not recorded'}
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Notes {patientEmergencyCard?.emergency?.medical_notes || 'No emergency notes'}
+              </Text>
+              {!!(patientEmergencyCard?.severe_allergies || []).length && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: 12 }}>Severe allergies</Text>
+                  {(patientEmergencyCard.severe_allergies || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.agent} · {item.severity}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+        {patientDetail && (
+          <View style={[styles.patientDetail, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>Health sharing & delegation</Text>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Sharing state</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Viewer mode {patientSharingSummary?.viewer_mode || 'unknown'}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  Active grants {patientSharingSummary?.active_grants_count ?? 0}
+                </Text>
+                {(patientSharingSummary?.grants || []).slice(0, 4).map((grant: any) => (
+                  <View key={grant.id} style={{ marginTop: 6 }}>
+                    <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                      {grant.role} · {grant.scope} · {grant.status}
+                    </Text>
+                    <Text style={{ color: palette.subtext, fontSize: 11 }}>
+                      User {grant.granted_to}
+                    </Text>
+                    {grant.status === 'active' && (
+                      <Pressable onPress={() => handleRevokeAccessGrant(grant.id)} style={{ marginTop: 2 }}>
+                        <Text style={{ color: palette.primaryStrong, fontSize: 11, fontWeight: '800' }}>Revoke</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Grant access</Text>
+                <TextInput
+                  value={accessGrantForm.granted_to}
+                  onChangeText={(value) => setAccessGrantForm((prev) => ({ ...prev, granted_to: value }))}
+                  placeholder="User id"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.input, { backgroundColor: palette.surface }]}
+                />
+                <TextInput
+                  value={accessGrantForm.role}
+                  onChangeText={(value) => setAccessGrantForm((prev) => ({ ...prev, role: value }))}
+                  placeholder="Role (caregiver, family, guardian)"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.input, { backgroundColor: palette.surface }]}
+                />
+                <TextInput
+                  value={accessGrantForm.scope}
+                  onChangeText={(value) => setAccessGrantForm((prev) => ({ ...prev, scope: value }))}
+                  placeholder="Scope (summary, emergency, records, full)"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.input, { backgroundColor: palette.surface }]}
+                />
+                <TextInput
+                  value={accessGrantForm.expires_at}
+                  onChangeText={(value) => setAccessGrantForm((prev) => ({ ...prev, expires_at: value }))}
+                  placeholder="Expires at (YYYY-MM-DDTHH:MM:SSZ)"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.input, { backgroundColor: palette.surface }]}
+                />
+                <TextInput
+                  value={accessGrantForm.note}
+                  onChangeText={(value) => setAccessGrantForm((prev) => ({ ...prev, note: value }))}
+                  placeholder="Reason or note"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.input, styles.textArea, { backgroundColor: palette.surface }]}
+                  multiline
+                />
+                <KISButton
+                  title={accessGrantSubmitting ? 'Sharing…' : 'Create access grant'}
+                  onPress={handleCreateAccessGrant}
+                  size="sm"
+                  disabled={accessGrantSubmitting}
+                />
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Access history</Text>
+                {patientAccessHistory.length ? (
+                  patientAccessHistory.slice(0, 5).map((entry: any) => (
+                    <Text key={entry.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {entry.action} · {new Date(entry.created_at).toLocaleString()}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No access history yet.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
+        {patientHealthSummary && (
+          <View style={[styles.patientDetail, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>Problem list & records vault</Text>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Problems</Text>
+                {(patientHealthSummary?.problems || []).length ? (
+                  (patientHealthSummary.problems || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.title} · {item.clinical_status}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No problem list entries yet.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Immunizations</Text>
+                {(patientHealthSummary?.immunizations || []).length ? (
+                  (patientHealthSummary.immunizations || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.vaccine_name} · {item.status}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No immunizations recorded.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Procedures</Text>
+                {(patientHealthSummary?.procedures || []).length ? (
+                  (patientHealthSummary.procedures || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.procedure_name} · {item.status}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No procedures logged.</Text>
+                )}
+              </View>
+              <View style={[styles.summaryCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <Text style={{ color: palette.text, fontWeight: '900' }}>Documents</Text>
+                {(patientHealthSummary?.documents || []).length ? (
+                  (patientHealthSummary.documents || []).map((item: any) => (
+                    <Text key={item.id} style={{ color: palette.subtext, fontSize: 12 }}>
+                      {item.title} · {item.category}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No health documents stored.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
         {patientDetail && (
           <View style={[styles.patientDetail, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
             <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>Family profiles</Text>
@@ -2282,6 +2924,155 @@ export default function HealthcareScreen() {
         )}
         {patientDetail && (
           <View style={[styles.formGrid, { marginTop: 16 }]}>
+            <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <Text style={[styles.sectionTitle, { fontSize: 14, color: palette.text }]}>Add problem</Text>
+              <TextInput
+                value={problemForm.title}
+                onChangeText={(value) => setProblemForm((prev) => ({ ...prev, title: value }))}
+                placeholder="Problem title"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={problemForm.code}
+                onChangeText={(value) => setProblemForm((prev) => ({ ...prev, code: value }))}
+                placeholder="Clinical code"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={problemForm.severity}
+                onChangeText={(value) => setProblemForm((prev) => ({ ...prev, severity: value }))}
+                placeholder="Severity"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={problemForm.notes}
+                onChangeText={(value) => setProblemForm((prev) => ({ ...prev, notes: value }))}
+                placeholder="Notes"
+                placeholderTextColor={palette.subtext}
+                multiline
+                style={[styles.input, styles.textArea, { backgroundColor: palette.card }]}
+              />
+              <KISButton
+                title={problemSubmitting ? 'Saving…' : 'Save problem'}
+                onPress={handleCreateProblemRecord}
+                size="sm"
+                disabled={problemSubmitting}
+              />
+            </View>
+            <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <Text style={[styles.sectionTitle, { fontSize: 14, color: palette.text }]}>Add immunization</Text>
+              <TextInput
+                value={immunizationForm.vaccine_name}
+                onChangeText={(value) => setImmunizationForm((prev) => ({ ...prev, vaccine_name: value }))}
+                placeholder="Vaccine name"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={immunizationForm.manufacturer}
+                onChangeText={(value) => setImmunizationForm((prev) => ({ ...prev, manufacturer: value }))}
+                placeholder="Manufacturer"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={immunizationForm.lot_number}
+                onChangeText={(value) => setImmunizationForm((prev) => ({ ...prev, lot_number: value }))}
+                placeholder="Lot number"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={immunizationForm.administered_at}
+                onChangeText={(value) => setImmunizationForm((prev) => ({ ...prev, administered_at: value }))}
+                placeholder="Administered at (ISO)"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <KISButton
+                title={immunizationSubmitting ? 'Saving…' : 'Save immunization'}
+                onPress={handleCreateImmunizationRecord}
+                size="sm"
+                disabled={immunizationSubmitting}
+              />
+            </View>
+            <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <Text style={[styles.sectionTitle, { fontSize: 14, color: palette.text }]}>Add procedure</Text>
+              <TextInput
+                value={procedureForm.procedure_name}
+                onChangeText={(value) => setProcedureForm((prev) => ({ ...prev, procedure_name: value }))}
+                placeholder="Procedure name"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={procedureForm.procedure_code}
+                onChangeText={(value) => setProcedureForm((prev) => ({ ...prev, procedure_code: value }))}
+                placeholder="Procedure code"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={procedureForm.performed_at}
+                onChangeText={(value) => setProcedureForm((prev) => ({ ...prev, performed_at: value }))}
+                placeholder="Performed at (ISO)"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={procedureForm.location}
+                onChangeText={(value) => setProcedureForm((prev) => ({ ...prev, location: value }))}
+                placeholder="Location"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <KISButton
+                title={procedureSubmitting ? 'Saving…' : 'Save procedure'}
+                onPress={handleCreateProcedureRecord}
+                size="sm"
+                disabled={procedureSubmitting}
+              />
+            </View>
+            <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <Text style={[styles.sectionTitle, { fontSize: 14, color: palette.text }]}>Add document</Text>
+              <TextInput
+                value={documentForm.title}
+                onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, title: value }))}
+                placeholder="Document title"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={documentForm.category}
+                onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, category: value }))}
+                placeholder="Category"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={documentForm.file_url}
+                onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, file_url: value }))}
+                placeholder="File URL"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <TextInput
+                value={documentForm.source_label}
+                onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, source_label: value }))}
+                placeholder="Source label"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, { backgroundColor: palette.card }]}
+              />
+              <KISButton
+                title={documentSubmitting ? 'Saving…' : 'Save document'}
+                onPress={handleCreateHealthDocument}
+                size="sm"
+                disabled={documentSubmitting}
+              />
+            </View>
             <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
               <Text style={[styles.sectionTitle, { fontSize: 14, color: palette.text }]}>Add family profile</Text>
               <TextInput
@@ -2483,6 +3274,73 @@ export default function HealthcareScreen() {
               onPress={handleCreateVitalSign}
               size="sm"
               disabled={vitalSubmitting}
+            />
+          </View>
+          <View style={[styles.formColumn, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+            <Text style={{ color: palette.text, fontWeight: '900' }}>Wellness metric</Text>
+            <TextInput
+              value={wellnessForm.metric_type}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, metric_type: value }))}
+              placeholder="Metric type (steps, sleep, heart_rate)"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.value}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, value }))}
+              placeholder="Primary value"
+              placeholderTextColor={palette.subtext}
+              keyboardType="numeric"
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.units}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, units: value }))}
+              placeholder="Units (count, hour, bpm, kg, mg/dL)"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.secondary_value}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, secondary_value: value }))}
+              placeholder="Secondary value (optional, diastolic for BP)"
+              placeholderTextColor={palette.subtext}
+              keyboardType="numeric"
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.secondary_units}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, secondary_units: value }))}
+              placeholder="Secondary units"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.source}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, source: value }))}
+              placeholder="Source (manual, apple_health, wearable)"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.measurement_window}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, measurement_window: value }))}
+              placeholder="Window (daily, instant, sleep_session)"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <TextInput
+              value={wellnessForm.source_label}
+              onChangeText={(value) => setWellnessForm((prev) => ({ ...prev, source_label: value }))}
+              placeholder="Source label"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.card }]}
+            />
+            <KISButton
+              title={wellnessSubmitting ? 'Saving…' : 'Save wellness metric'}
+              onPress={handleCreateWellnessMetric}
+              size="sm"
+              disabled={wellnessSubmitting}
             />
           </View>
         </View>
@@ -3197,6 +4055,25 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       padding: tokens.spacing.sm,
       marginTop: tokens.spacing.sm,
       gap: tokens.spacing.sm,
+    },
+    summaryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: tokens.spacing.sm,
+    },
+    summaryCard: {
+      flex: 1,
+      minWidth: 180,
+      borderWidth: 2,
+      borderRadius: tokens.radius.md,
+      padding: tokens.spacing.sm,
+      gap: tokens.spacing.xs,
+    },
+    emergencyCard: {
+      borderWidth: 2,
+      borderRadius: tokens.radius.md,
+      padding: tokens.spacing.sm,
+      gap: tokens.spacing.xs,
     },
     familyCard: {
       borderWidth: 2,

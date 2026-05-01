@@ -1,20 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { useLanguage } from './index';
 
 export default function LanguageSwitcher() {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
   const { language, languages, setLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
-
-  const activeLabel = useMemo(
-    () => languages.find((entry) => entry.code === language)?.label ?? 'English',
-    [language, languages],
-  );
 
   return (
     <>
@@ -42,12 +35,14 @@ export default function LanguageSwitcher() {
       >
         <View style={styles.backdrop}>
           <View style={[styles.card, { backgroundColor: palette.card }]}>
-            <Text style={[styles.title, { color: palette.text }]}>Choose language</Text>
+            <Text style={[styles.title, { color: palette.text }]}>
+              Choose language
+            </Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               Switch the app language for supported text.
             </Text>
 
-            {languages.map((entry) => {
+            {languages.map(entry => {
               const selected = entry.code === language;
               return (
                 <Pressable
@@ -60,11 +55,15 @@ export default function LanguageSwitcher() {
                     styles.option,
                     {
                       borderColor: selected ? palette.primary : palette.border,
-                      backgroundColor: selected ? palette.surfaceElevated : palette.surface,
+                      backgroundColor: selected
+                        ? palette.surfaceElevated
+                        : palette.surface,
                     },
                   ]}
                 >
-                  <Text style={[styles.optionLabel, { color: palette.text }]}>{entry.label}</Text>
+                  <Text style={[styles.optionLabel, { color: palette.text }]}>
+                    {entry.label}
+                  </Text>
                   <Text style={[styles.optionCode, { color: palette.subtext }]}>
                     {entry.code.toUpperCase()}
                   </Text>
@@ -72,8 +71,15 @@ export default function LanguageSwitcher() {
               );
             })}
 
-            <Pressable onPress={() => setOpen(false)} style={styles.closeButton}>
-              <Text style={[styles.closeLabel, { color: palette.primaryStrong }]}>Close</Text>
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={styles.closeButton}
+            >
+              <Text
+                style={[styles.closeLabel, { color: palette.primaryStrong }]}
+              >
+                Close
+              </Text>
             </Pressable>
           </View>
         </View>

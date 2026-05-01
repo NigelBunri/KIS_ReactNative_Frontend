@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import {
+  Animated,
   Modal,
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 
 export type PollDraft = {
   question: string;
@@ -31,9 +33,13 @@ export const PollModal: React.FC<PollModalProps> = ({
 }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   const updateOption = (idx: number, value: string) => {
-    setOptions((prev) => {
+    setOptions(prev => {
       const copy = [...prev];
       copy[idx] = value;
       return copy;
@@ -41,15 +47,15 @@ export const PollModal: React.FC<PollModalProps> = ({
   };
 
   const addOption = () => {
-    setOptions((prev) => [...prev, '']);
+    setOptions(prev => [...prev, '']);
   };
 
   const removeOption = (idx: number) => {
-    setOptions((prev) => prev.filter((_, i) => i !== idx));
+    setOptions(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleCreate = () => {
-    const cleaned = options.map((o) => o.trim()).filter(Boolean);
+    const cleaned = options.map(o => o.trim()).filter(Boolean);
     if (!question.trim() || cleaned.length < 2) {
       // minimal guard; real validation later
       return;
@@ -75,15 +81,32 @@ export const PollModal: React.FC<PollModalProps> = ({
           justifyContent: 'flex-end',
         }}
       >
-        <View
+        <Animated.View
           style={{
             backgroundColor: palette.surfaceElevated,
             borderTopLeftRadius: kisRadius.xl,
             borderTopRightRadius: kisRadius.xl,
             padding: KIS_TOKENS.spacing.lg,
             maxHeight: '80%',
+            transform: [{ translateY: dragY }],
           }}
         >
+          <View
+            {...panHandlers}
+            style={{
+              alignItems: 'center',
+              marginBottom: KIS_TOKENS.spacing.sm,
+            }}
+          >
+            <View
+              style={{
+                width: 42,
+                height: 4,
+                borderRadius: 999,
+                backgroundColor: palette.divider,
+              }}
+            />
+          </View>
           <Text
             style={{
               fontSize: KIS_TOKENS.typography.title,
@@ -141,7 +164,7 @@ export const PollModal: React.FC<PollModalProps> = ({
               >
                 <TextInput
                   value={opt}
-                  onChangeText={(val) => updateOption(idx, val)}
+                  onChangeText={val => updateOption(idx, val)}
                   placeholder={`Option ${idx + 1}`}
                   placeholderTextColor={palette.subtext}
                   style={{
@@ -197,7 +220,7 @@ export const PollModal: React.FC<PollModalProps> = ({
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

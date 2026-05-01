@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,8 +48,12 @@ import {
   sanitizeServiceList,
 } from '@/features/health-dashboard/serviceCatalogPolicy';
 
-const isSupportedType = (value: string): value is HealthDashboardInstitutionType =>
-  HEALTH_DASHBOARD_INSTITUTION_TYPES.includes(value as HealthDashboardInstitutionType);
+const isSupportedType = (
+  value: string,
+): value is HealthDashboardInstitutionType =>
+  HEALTH_DASHBOARD_INSTITUTION_TYPES.includes(
+    value as HealthDashboardInstitutionType,
+  );
 
 type CalendarViewMode = 'year' | 'month' | 'week';
 type ScheduleApplyScope = 'day' | 'week' | 'month' | 'year';
@@ -73,21 +83,82 @@ type AvailabilityStatusKey =
   | 'holiday'
   | 'blocked';
 
-const STATUS_OPTIONS: Array<{ key: AvailabilityStatusKey; label: string; description: string; color: string }> = [
-  { key: 'available', label: 'Available', description: 'Open for booking', color: '#10B981' },
-  { key: 'limited', label: 'Limited', description: 'Few slots available', color: '#F59E0B' },
-  { key: 'fully_booked', label: 'Booked', description: 'No free slots', color: '#EF4444' },
-  { key: 'on_call', label: 'On call', description: 'Available on request', color: '#3B82F6' },
-  { key: 'holiday', label: 'Holiday', description: 'Closed for holiday', color: '#8B5CF6' },
-  { key: 'blocked', label: 'Blocked', description: 'Unavailable / blocked', color: '#6B7280' },
+const STATUS_OPTIONS: Array<{
+  key: AvailabilityStatusKey;
+  label: string;
+  description: string;
+  color: string;
+}> = [
+  {
+    key: 'available',
+    label: 'Available',
+    description: 'Open for booking',
+    color: '#10B981',
+  },
+  {
+    key: 'limited',
+    label: 'Limited',
+    description: 'Few slots available',
+    color: '#F59E0B',
+  },
+  {
+    key: 'fully_booked',
+    label: 'Booked',
+    description: 'No free slots',
+    color: '#EF4444',
+  },
+  {
+    key: 'on_call',
+    label: 'On call',
+    description: 'Available on request',
+    color: '#3B82F6',
+  },
+  {
+    key: 'holiday',
+    label: 'Holiday',
+    description: 'Closed for holiday',
+    color: '#8B5CF6',
+  },
+  {
+    key: 'blocked',
+    label: 'Blocked',
+    description: 'Unavailable / blocked',
+    color: '#6B7280',
+  },
 ];
 
 const CLEAR_STATUS_KEY = 'clear';
-const WEEKDAY_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAY_ORDER = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 const TIME_STEP_MINUTES = 30;
-const SCHEDULE_APPLY_SCOPES: ScheduleApplyScope[] = ['day', 'week', 'month', 'year'];
+const SCHEDULE_APPLY_SCOPES: ScheduleApplyScope[] = [
+  'day',
+  'week',
+  'month',
+  'year',
+];
 
 const toDateOnlyIso = (date: Date) => {
   const y = date.getFullYear();
@@ -97,12 +168,15 @@ const toDateOnlyIso = (date: Date) => {
 };
 
 const fromIso = (value: string) => {
-  const [y, m, d] = String(value || '').split('-').map((part) => Number(part));
+  const [y, m, d] = String(value || '')
+    .split('-')
+    .map(part => Number(part));
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d);
 };
 
-const isTimeValue = (value: unknown): value is string => /^\d{2}:\d{2}$/.test(String(value || ''));
+const isTimeValue = (value: unknown): value is string =>
+  /^\d{2}:\d{2}$/.test(String(value || ''));
 const toModeToken = (value: unknown) =>
   String(value || '')
     .trim()
@@ -110,7 +184,11 @@ const toModeToken = (value: unknown) =>
     .replace(/[\s-]+/g, '_');
 const isAllDayValue = (value: unknown) => {
   const normalized = toModeToken(value);
-  return normalized === 'all_day' || normalized === 'allday' || normalized === 'full_day';
+  return (
+    normalized === 'all_day' ||
+    normalized === 'allday' ||
+    normalized === 'full_day'
+  );
 };
 
 const normalizeTimeList = (value: unknown): string[] => {
@@ -119,8 +197,8 @@ const normalizeTimeList = (value: unknown): string[] => {
     return Array.from(
       new Set(
         value
-          .map((entry) => String(entry || '').trim())
-          .filter((entry) => isTimeText(entry)),
+          .map(entry => String(entry || '').trim())
+          .filter(entry => isTimeText(entry)),
       ),
     ).sort();
   }
@@ -138,14 +216,22 @@ const normalizeTimeList = (value: unknown): string[] => {
   ).sort();
 };
 
-const resolveDateTimeList = (draft: AvailabilityDraft | null | undefined, dateKey: string): string[] => {
+const resolveDateTimeList = (
+  draft: AvailabilityDraft | null | undefined,
+  dateKey: string,
+): string[] => {
   if (!draft || !dateKey) return [];
-  const explicit = Array.isArray(draft.dayTimeLists?.[dateKey]) ? draft.dayTimeLists[dateKey] : [];
+  const explicit = Array.isArray(draft.dayTimeLists?.[dateKey])
+    ? draft.dayTimeLists[dateKey]
+    : [];
   if (explicit.length > 0) return normalizeTimeList(explicit);
   return normalizeTimeList(draft.dayTimes?.[dateKey]);
 };
 
-const resolveDateTimeMode = (draft: AvailabilityDraft | null | undefined, dateKey: string): DayTimeMode => {
+const resolveDateTimeMode = (
+  draft: AvailabilityDraft | null | undefined,
+  dateKey: string,
+): DayTimeMode => {
   if (!draft || !dateKey) return 'slots';
   return draft.dayTimeModes?.[dateKey] === 'all_day' ? 'all_day' : 'slots';
 };
@@ -153,13 +239,25 @@ const resolveDateTimeMode = (draft: AvailabilityDraft | null | undefined, dateKe
 const parseDateTime = (dateKey: string, time: string) => {
   const date = fromIso(dateKey);
   if (!date || !isTimeValue(time)) return null;
-  const [hh, mm] = time.split(':').map((part) => Number(part));
-  const parsed = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hh, mm, 0, 0);
+  const [hh, mm] = time.split(':').map(part => Number(part));
+  const parsed = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    hh,
+    mm,
+    0,
+    0,
+  );
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 };
 
-const buildCountdownLabel = (dateKey: string, time: string, nowMs: number): string | null => {
+const buildCountdownLabel = (
+  dateKey: string,
+  time: string,
+  nowMs: number,
+): string | null => {
   const target = parseDateTime(dateKey, time);
   if (!target) return null;
   const diff = target.getTime() - nowMs;
@@ -178,7 +276,10 @@ const buildCountdownLabel = (dateKey: string, time: string, nowMs: number): stri
   return `${minutes}m ${seconds}s`;
 };
 
-const buildDateTimesFromPayload = (raw: any, year: number): Record<string, string> => {
+const buildDateTimesFromPayload = (
+  raw: any,
+  year: number,
+): Record<string, string> => {
   const source =
     raw?.calendar_times ??
     raw?.calendarTimes ??
@@ -198,7 +299,10 @@ const buildDateTimesFromPayload = (raw: any, year: number): Record<string, strin
   return map;
 };
 
-const buildDateTimeListsFromPayload = (raw: any, year: number): Record<string, string[]> => {
+const buildDateTimeListsFromPayload = (
+  raw: any,
+  year: number,
+): Record<string, string[]> => {
   const source =
     raw?.calendar_time_lists ??
     raw?.calendarTimeLists ??
@@ -268,14 +372,18 @@ const buildDateTimeModesFromPayload = (
   }
 
   if (Array.isArray(allDayDatesRaw)) {
-    allDayDatesRaw.forEach((dateKey) => {
+    allDayDatesRaw.forEach(dateKey => {
       const date = fromIso(String(dateKey || ''));
       if (!date || date.getFullYear() !== year) return;
       map[toDateOnlyIso(date)] = 'all_day';
     });
   }
 
-  if (legacyTimes && typeof legacyTimes === 'object' && !Array.isArray(legacyTimes)) {
+  if (
+    legacyTimes &&
+    typeof legacyTimes === 'object' &&
+    !Array.isArray(legacyTimes)
+  ) {
     Object.entries(legacyTimes).forEach(([dateKey, value]) => {
       const date = fromIso(dateKey);
       if (!date || date.getFullYear() !== year) return;
@@ -287,7 +395,7 @@ const buildDateTimeModesFromPayload = (
     });
   }
 
-  Object.keys(timeLists).forEach((dateKey) => {
+  Object.keys(timeLists).forEach(dateKey => {
     if (map[dateKey]) return;
     map[dateKey] = 'slots';
   });
@@ -318,17 +426,23 @@ const getScopeDateKeys = (
     const first = startOfMonth(date);
     const lastDay = endOfMonth(date).getDate();
     for (let day = 1; day <= lastDay; day += 1) {
-      pushIfValidYear(targets, new Date(first.getFullYear(), first.getMonth(), day));
+      pushIfValidYear(
+        targets,
+        new Date(first.getFullYear(), first.getMonth(), day),
+      );
     }
   } else {
     const first = new Date(year, 0, 1);
-    const totalDays = Math.ceil((new Date(year + 1, 0, 1).getTime() - first.getTime()) / (24 * 60 * 60 * 1000));
+    const totalDays = Math.ceil(
+      (new Date(year + 1, 0, 1).getTime() - first.getTime()) /
+        (24 * 60 * 60 * 1000),
+    );
     for (let offset = 0; offset < totalDays; offset += 1) {
       pushIfValidYear(targets, addDays(first, offset));
     }
   }
 
-  return targets.map((item) => toDateOnlyIso(item));
+  return targets.map(item => toDateOnlyIso(item));
 };
 
 const extractServiceRows = (payload: any, preferredKeys: string[]): any[] => {
@@ -352,7 +466,7 @@ const extractServiceRows = (payload: any, preferredKeys: string[]): any[] => {
     }
 
     const nestedKeys = ['data', 'payload', 'result', 'response'];
-    nestedKeys.forEach((key) => {
+    nestedKeys.forEach(key => {
       const nested = current?.[key];
       if (nested && typeof nested === 'object') {
         queue.push(nested);
@@ -363,9 +477,14 @@ const extractServiceRows = (payload: any, preferredKeys: string[]): any[] => {
   return [];
 };
 
-const normalizeServiceRow = (raw: any, index: number): ServiceDefinition | null => {
+const normalizeServiceRow = (
+  raw: any,
+  index: number,
+): ServiceDefinition | null => {
   if (!raw || typeof raw !== 'object') return null;
-  const id = String(raw.id ?? raw.service_id ?? raw.key ?? `service_${index + 1}`).trim();
+  const id = String(
+    raw.id ?? raw.service_id ?? raw.key ?? `service_${index + 1}`,
+  ).trim();
   const name = String(raw.name ?? raw.title ?? raw.label ?? '').trim();
   if (!name) return null;
   const description = String(raw.description ?? raw.summary ?? '').trim();
@@ -380,15 +499,22 @@ const normalizeServiceRow = (raw: any, index: number): ServiceDefinition | null 
       ? Number(raw.base_price_cents)
       : undefined,
     mediumIds: Array.isArray(raw.mediumIds ?? raw.medium_ids)
-      ? (raw.mediumIds ?? raw.medium_ids).map((item: any) => String(item || '').trim()).filter(Boolean)
+      ? (raw.mediumIds ?? raw.medium_ids)
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
       : [],
     mediumNames: Array.isArray(raw.mediumNames ?? raw.medium_names)
-      ? (raw.mediumNames ?? raw.medium_names).map((item: any) => String(item || '').trim()).filter(Boolean)
+      ? (raw.mediumNames ?? raw.medium_names)
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
       : [],
   });
 };
 
-const normalizeHealthOpsServiceRow = (raw: any, index: number): ServiceDefinition | null => {
+const normalizeHealthOpsServiceRow = (
+  raw: any,
+  index: number,
+): ServiceDefinition | null => {
   if (!raw || typeof raw !== 'object') return null;
   const source =
     raw?.service && typeof raw.service === 'object'
@@ -420,13 +546,33 @@ const normalizeHealthOpsServiceRow = (raw: any, index: number): ServiceDefinitio
     description,
     active: source.is_active !== false && source.active !== false,
     basePriceCents,
-    mediumIds: Array.isArray(source.mediumIds ?? source.medium_ids ?? source.engineIds ?? source.engine_ids)
-      ? (source.mediumIds ?? source.medium_ids ?? source.engineIds ?? source.engine_ids)
+    mediumIds: Array.isArray(
+      source.mediumIds ??
+        source.medium_ids ??
+        source.engineIds ??
+        source.engine_ids,
+    )
+      ? (
+          source.mediumIds ??
+          source.medium_ids ??
+          source.engineIds ??
+          source.engine_ids
+        )
           .map((item: any) => String(item || '').trim())
           .filter(Boolean)
       : [],
-    mediumNames: Array.isArray(source.mediumNames ?? source.medium_names ?? source.engineNames ?? source.engine_names)
-      ? (source.mediumNames ?? source.medium_names ?? source.engineNames ?? source.engine_names)
+    mediumNames: Array.isArray(
+      source.mediumNames ??
+        source.medium_names ??
+        source.engineNames ??
+        source.engine_names,
+    )
+      ? (
+          source.mediumNames ??
+          source.medium_names ??
+          source.engineNames ??
+          source.engine_names
+        )
           .map((item: any) => String(item || '').trim())
           .filter(Boolean)
       : [],
@@ -439,11 +585,14 @@ const prettifyServiceId = (value: string) =>
     .replace(/[_-]+/g, ' ')
     .split(' ')
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
     .trim();
 
-const buildDateServiceIdsFromPayload = (raw: any, year: number): Record<string, string[]> => {
+const buildDateServiceIdsFromPayload = (
+  raw: any,
+  year: number,
+): Record<string, string[]> => {
   const source =
     raw?.calendar_service_ids ??
     raw?.calendarServiceIds ??
@@ -456,17 +605,21 @@ const buildDateServiceIdsFromPayload = (raw: any, year: number): Record<string, 
     const date = fromIso(dateKey);
     if (!date || date.getFullYear() !== year) return;
     if (!Array.isArray(value)) return;
-    const ids = value.map((item) => String(item || '').trim()).filter(Boolean);
+    const ids = value.map(item => String(item || '').trim()).filter(Boolean);
     if (!ids.length) return;
     map[toDateOnlyIso(date)] = Array.from(new Set(ids));
   });
   return map;
 };
 
-const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
-const endOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0);
-const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-const addMonths = (date: Date, months: number) => new Date(date.getFullYear(), date.getMonth() + months, 1);
+const startOfMonth = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), 1);
+const endOfMonth = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth() + 1, 0);
+const addDays = (date: Date, days: number) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+const addMonths = (date: Date, months: number) =>
+  new Date(date.getFullYear(), date.getMonth() + months, 1);
 
 const getMonthGrid = (date: Date) => {
   const first = startOfMonth(date);
@@ -488,15 +641,24 @@ const getWeekGrid = (date: Date) => {
   return [Array.from({ length: 7 }, (_, idx) => addDays(start, idx))];
 };
 
-const buildDateStatusesFromLegacy = (raw: any, year: number): Record<string, AvailabilityStatusKey> => {
+const buildDateStatusesFromLegacy = (
+  raw: any,
+  year: number,
+): Record<string, AvailabilityStatusKey> => {
   const statuses: Record<string, AvailabilityStatusKey> = {};
 
-  const explicit = raw?.calendar_statuses || raw?.calendarStatuses || raw?.date_statuses || raw?.dateStatuses;
+  const explicit =
+    raw?.calendar_statuses ||
+    raw?.calendarStatuses ||
+    raw?.date_statuses ||
+    raw?.dateStatuses;
   if (explicit && typeof explicit === 'object') {
     Object.entries(explicit).forEach(([date, status]) => {
       const d = fromIso(date);
       if (!d || d.getFullYear() !== year) return;
-      const found = STATUS_OPTIONS.find((option) => option.key === String(status));
+      const found = STATUS_OPTIONS.find(
+        option => option.key === String(status),
+      );
       if (found) statuses[toDateOnlyIso(d)] = found.key;
     });
     if (Object.keys(statuses).length > 0) return statuses;
@@ -531,7 +693,9 @@ const buildDateStatusesFromLegacy = (raw: any, year: number): Record<string, Ava
         return false;
       });
 
-      const hasSlot = slots.some((slot: any) => String(slot?.day || '').toLowerCase() === weekday);
+      const hasSlot = slots.some(
+        (slot: any) => String(slot?.day || '').toLowerCase() === weekday,
+      );
       if (hasRecurring || hasSlot) {
         statuses[dateIso] = 'available';
       }
@@ -547,9 +711,11 @@ const buildDateStatusesFromLegacy = (raw: any, year: number): Record<string, Ava
   return statuses;
 };
 
-const defaultServiceAvailability = (institutionType: HealthDashboardInstitutionType) =>
+const defaultServiceAvailability = (
+  institutionType: HealthDashboardInstitutionType,
+) =>
   Object.fromEntries(
-    HEALTH_DASHBOARD_DEFAULT_SERVICES[institutionType].map((service) => [
+    HEALTH_DASHBOARD_DEFAULT_SERVICES[institutionType].map(service => [
       service.id,
       {
         enabled: true,
@@ -559,7 +725,9 @@ const defaultServiceAvailability = (institutionType: HealthDashboardInstitutionT
     ]),
   );
 
-const createDefaultDraft = (institutionType: HealthDashboardInstitutionType): AvailabilityDraft => ({
+const createDefaultDraft = (
+  institutionType: HealthDashboardInstitutionType,
+): AvailabilityDraft => ({
   timezone: 'UTC',
   serviceAvailability: defaultServiceAvailability(institutionType),
   dayStatuses: {},
@@ -569,7 +737,10 @@ const createDefaultDraft = (institutionType: HealthDashboardInstitutionType): Av
   dayServiceIds: {},
 });
 
-export default function AvailabilityManagementScreen({ navigation, route }: any) {
+export default function AvailabilityManagementScreen({
+  navigation,
+  route,
+}: any) {
   const institutionId = route?.params?.institutionId as string | undefined;
   const institutionType = route?.params?.institutionType as string | undefined;
 
@@ -603,12 +774,20 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   const [draft, setDraft] = useState<AvailabilityDraft | null>(null);
   const [calendarMode, setCalendarMode] = useState<CalendarViewMode>('month');
   const [applyScope, setApplyScope] = useState<ScheduleApplyScope>('day');
-  const [anchorDate, setAnchorDate] = useState(new Date(calendarYear, new Date().getMonth(), new Date().getDate()));
-  const [selectedStatus, setSelectedStatus] = useState<AvailabilityStatusKey | typeof CLEAR_STATUS_KEY>('available');
+  const [anchorDate, setAnchorDate] = useState(
+    new Date(calendarYear, new Date().getMonth(), new Date().getDate()),
+  );
+  const [selectedStatus, setSelectedStatus] = useState<
+    AvailabilityStatusKey | typeof CLEAR_STATUS_KEY
+  >('available');
   const [activeDateKey, setActiveDateKey] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [servicesCatalog, setServicesCatalog] = useState<ServiceDefinition[]>([]);
-  const dayCellLayoutsRef = useRef<Record<string, { x: number; y: number; width: number; height: number }>>({});
+  const [servicesCatalog, setServicesCatalog] = useState<ServiceDefinition[]>(
+    [],
+  );
+  const dayCellLayoutsRef = useRef<
+    Record<string, { x: number; y: number; width: number; height: number }>
+  >({});
   const dayRowLayoutsRef = useRef<Record<string, { x: number; y: number }>>({});
   const paintedDateKeysRef = useRef<Set<string>>(new Set());
 
@@ -621,12 +800,21 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
     setLoading(true);
     try {
       const fallback = createDefaultDraft(dashboardType);
-      const bootstrap = await ensureInstitutionDashboardExists(institutionId, dashboardType);
+      const bootstrap = await ensureInstitutionDashboardExists(
+        institutionId,
+        dashboardType,
+      );
       if (!bootstrap?.success && Number(bootstrap?.status) !== 404) {
         // Continue in best-effort mode so service scheduling remains usable.
       }
 
-      const [res, dashboardServicesRes, dashboardServicesRawRes, healthOpsServicesRes, cardsResponse] = await Promise.all([
+      const [
+        res,
+        dashboardServicesRes,
+        dashboardServicesRawRes,
+        healthOpsServicesRes,
+        cardsResponse,
+      ] = await Promise.all([
         fetchInstitutionAvailability(institutionId),
         fetchInstitutionServices(institutionId),
         getRequest(ROUTES.healthDashboard.services(institutionId), {
@@ -642,34 +830,71 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
       const payload = (res?.success ? res?.data : undefined) ?? res ?? {};
       const data = payload?.availability ?? payload?.draft ?? payload;
-      const backendCards = cardsResponse?.success && Array.isArray(cardsResponse?.data?.cards)
-        ? cardsResponse.data.cards
-        : [];
+      const backendCards =
+        cardsResponse?.success && Array.isArray(cardsResponse?.data?.cards)
+          ? cardsResponse.data.cards
+          : [];
       const backendServices = backendCards
-        .map((card: any, index: number) => normalizeServiceRow(card?.service, index))
+        .map((card: any, index: number) =>
+          normalizeServiceRow(card?.service, index),
+        )
         .filter(Boolean) as ServiceDefinition[];
       const dashboardServiceRows = [
-        ...extractServiceRows(dashboardServicesRes, ['services', 'results', 'items']),
-        ...extractServiceRows(dashboardServicesRawRes, ['services', 'results', 'items']),
+        ...extractServiceRows(dashboardServicesRes, [
+          'services',
+          'results',
+          'items',
+        ]),
+        ...extractServiceRows(dashboardServicesRawRes, [
+          'services',
+          'results',
+          'items',
+        ]),
       ];
       const dashboardServices = dashboardServiceRows
         .map((row: any, index: number) => normalizeServiceRow(row, index))
         .filter(Boolean) as ServiceDefinition[];
-      const healthOpsServiceRows = extractServiceRows(healthOpsServicesRes, ['results', 'services', 'items']);
+      const healthOpsServiceRows = extractServiceRows(healthOpsServicesRes, [
+        'results',
+        'services',
+        'items',
+      ]);
       const healthOpsServices = healthOpsServiceRows
-        .map((row: any, index: number) => normalizeHealthOpsServiceRow(row, index))
+        .map((row: any, index: number) =>
+          normalizeHealthOpsServiceRow(row, index),
+        )
         .filter(Boolean) as ServiceDefinition[];
       const fallbackServices = HEALTH_DASHBOARD_DEFAULT_SERVICES[dashboardType];
-      const parsedDayTimes = buildDateTimesFromPayload(data || {}, calendarYear);
-      const parsedDayTimeLists = buildDateTimeListsFromPayload(data || {}, calendarYear);
-      const parsedDayTimeModes = buildDateTimeModesFromPayload(data || {}, calendarYear, parsedDayTimeLists);
-      const scheduledServiceIdsByDate = buildDateServiceIdsFromPayload(data || {}, calendarYear);
-      const scheduleLinkedServiceIds = new Set(
-        Object.values(scheduledServiceIdsByDate).flatMap((ids) => ids.map((item) => String(item || '').trim()).filter(Boolean)),
+      const parsedDayTimes = buildDateTimesFromPayload(
+        data || {},
+        calendarYear,
       );
-      const serviceAvailability = data?.serviceAvailability || data?.service_availability || {};
-      if (serviceAvailability && typeof serviceAvailability === 'object' && !Array.isArray(serviceAvailability)) {
-        Object.keys(serviceAvailability).forEach((serviceId) => {
+      const parsedDayTimeLists = buildDateTimeListsFromPayload(
+        data || {},
+        calendarYear,
+      );
+      const parsedDayTimeModes = buildDateTimeModesFromPayload(
+        data || {},
+        calendarYear,
+        parsedDayTimeLists,
+      );
+      const scheduledServiceIdsByDate = buildDateServiceIdsFromPayload(
+        data || {},
+        calendarYear,
+      );
+      const scheduleLinkedServiceIds = new Set(
+        Object.values(scheduledServiceIdsByDate).flatMap(ids =>
+          ids.map(item => String(item || '').trim()).filter(Boolean),
+        ),
+      );
+      const serviceAvailability =
+        data?.serviceAvailability || data?.service_availability || {};
+      if (
+        serviceAvailability &&
+        typeof serviceAvailability === 'object' &&
+        !Array.isArray(serviceAvailability)
+      ) {
+        Object.keys(serviceAvailability).forEach(serviceId => {
           const normalized = String(serviceId || '').trim();
           if (normalized) scheduleLinkedServiceIds.add(normalized);
         });
@@ -682,7 +907,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
         ...healthOpsServices,
       ];
       const catalogMap = new Map<string, ServiceDefinition>();
-      catalogSeed.forEach((service) => {
+      catalogSeed.forEach(service => {
         const serviceId = String(service?.id || '').trim();
         if (!serviceId) return;
         const existing = catalogMap.get(serviceId);
@@ -690,11 +915,16 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
           ...existing,
           ...service,
           id: serviceId,
-          name: String(service?.name || existing?.name || '').trim() || existing?.name || 'Health Service',
-          description: String(service?.description || existing?.description || '').trim(),
+          name:
+            String(service?.name || existing?.name || '').trim() ||
+            existing?.name ||
+            'Health Service',
+          description: String(
+            service?.description || existing?.description || '',
+          ).trim(),
         });
       });
-      scheduleLinkedServiceIds.forEach((serviceId) => {
+      scheduleLinkedServiceIds.forEach(serviceId => {
         if (catalogMap.has(serviceId)) return;
         catalogMap.set(serviceId, {
           id: serviceId,
@@ -707,8 +937,8 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       const catalog = sanitizeServiceList(Array.from(catalogMap.values()));
       const activeServiceIdSet = new Set(
         catalog
-          .filter((service) => service.active !== false)
-          .map((service) => String(service.id)),
+          .filter(service => service.active !== false)
+          .map(service => String(service.id)),
       );
 
       const merged: AvailabilityDraft = {
@@ -718,18 +948,26 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
           ...fallback.serviceAvailability,
           ...(data?.serviceAvailability || data?.service_availability || {}),
           ...Object.fromEntries(
-            catalog.map((service) => {
-              const serviceId = String(service.id || '').trim();
-              if (!serviceId) return ['', { enabled: true, durationMin: 30, slotGapMin: 10 }];
-              return [
-                serviceId,
-                (data?.serviceAvailability || data?.service_availability || {})?.[serviceId] || {
-                  enabled: service.active !== false,
-                  durationMin: 30,
-                  slotGapMin: 10,
-                },
-              ];
-            }).filter(([serviceId]) => Boolean(serviceId)),
+            catalog
+              .map(service => {
+                const serviceId = String(service.id || '').trim();
+                if (!serviceId)
+                  return [
+                    '',
+                    { enabled: true, durationMin: 30, slotGapMin: 10 },
+                  ];
+                return [
+                  serviceId,
+                  (data?.serviceAvailability ||
+                    data?.service_availability ||
+                    {})?.[serviceId] || {
+                    enabled: service.active !== false,
+                    durationMin: 30,
+                    slotGapMin: 10,
+                  },
+                ];
+              })
+              .filter(([serviceId]) => Boolean(serviceId)),
           ),
         },
         dayStatuses: buildDateStatusesFromLegacy(data || {}, calendarYear),
@@ -738,7 +976,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
         dayTimeModes: parsedDayTimeModes,
         dayServiceIds: Object.fromEntries(
           Object.entries(scheduledServiceIdsByDate).map(([dateKey, ids]) => {
-            const filtered = ids.filter((id) => activeServiceIdSet.has(id));
+            const filtered = ids.filter(id => activeServiceIdSet.has(id));
             return [dateKey, filtered.length > 0 ? filtered : ids];
           }),
         ),
@@ -747,7 +985,10 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       setServicesCatalog(catalog);
       setDraft(merged);
     } catch (error: any) {
-      Alert.alert('Availability', error?.message || 'Unable to load availability data.');
+      Alert.alert(
+        'Availability',
+        error?.message || 'Unable to load availability data.',
+      );
       setServicesCatalog(HEALTH_DASHBOARD_DEFAULT_SERVICES[dashboardType]);
       setDraft(createDefaultDraft(dashboardType));
     } finally {
@@ -764,12 +1005,15 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
     return () => clearInterval(timer);
   }, []);
 
-  const updateDraft = useCallback((updater: (prev: AvailabilityDraft) => AvailabilityDraft) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      return updater(prev);
-    });
-  }, []);
+  const updateDraft = useCallback(
+    (updater: (prev: AvailabilityDraft) => AvailabilityDraft) => {
+      setDraft(prev => {
+        if (!prev) return prev;
+        return updater(prev);
+      });
+    },
+    [],
+  );
 
   const applyStatusToDateKey = useCallback(
     (dateKey: string, toggleIfSame = false) => {
@@ -778,14 +1022,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       if (!date || date.getFullYear() !== calendarYear) return;
       const scopedDateKeys = getScopeDateKeys(date, applyScope, calendarYear);
       if (!scopedDateKeys.length) return;
-      updateDraft((prev) => {
+      updateDraft(prev => {
         const nextMap = { ...(prev.dayStatuses || {}) };
         const nextTimes = { ...(prev.dayTimes || {}) };
         const nextTimeLists = { ...(prev.dayTimeLists || {}) };
         const nextTimeModes = { ...(prev.dayTimeModes || {}) };
         const nextServiceIds = { ...(prev.dayServiceIds || {}) };
 
-        scopedDateKeys.forEach((targetDateKey) => {
+        scopedDateKeys.forEach(targetDateKey => {
           const targetDate = fromIso(targetDateKey);
           if (!targetDate || targetDate < todayStart) return;
           const currentStatus = nextMap[targetDateKey];
@@ -797,7 +1041,11 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
             delete nextServiceIds[targetDateKey];
             return;
           }
-          if (toggleIfSame && applyScope === 'day' && currentStatus === selectedStatus) {
+          if (
+            toggleIfSame &&
+            applyScope === 'day' &&
+            currentStatus === selectedStatus
+          ) {
             delete nextMap[targetDateKey];
             delete nextTimes[targetDateKey];
             delete nextTimeLists[targetDateKey];
@@ -840,14 +1088,25 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       }
       applyStatusToDateKey(dateKey);
     },
-    [applyStatusToDateKey, calendarYear, draft?.dayStatuses, selectedStatus, todayStart],
+    [
+      applyStatusToDateKey,
+      calendarYear,
+      draft?.dayStatuses,
+      selectedStatus,
+      todayStart,
+    ],
   );
 
   const hitTestDateKey = useCallback((x: number, y: number) => {
     const entries = Object.entries(dayCellLayoutsRef.current);
     for (let i = 0; i < entries.length; i += 1) {
       const [dateKey, layout] = entries[i];
-      if (x >= layout.x && x <= layout.x + layout.width && y >= layout.y && y <= layout.y + layout.height) {
+      if (
+        x >= layout.x &&
+        x <= layout.x + layout.width &&
+        y >= layout.y &&
+        y <= layout.y + layout.height
+      ) {
         return dateKey;
       }
     }
@@ -870,12 +1129,18 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (event) => {
+        onPanResponderGrant: event => {
           paintedDateKeysRef.current.clear();
-          paintAtPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
+          paintAtPoint(
+            event.nativeEvent.locationX,
+            event.nativeEvent.locationY,
+          );
         },
-        onPanResponderMove: (event) => {
-          paintAtPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
+        onPanResponderMove: event => {
+          paintAtPoint(
+            event.nativeEvent.locationX,
+            event.nativeEvent.locationY,
+          );
         },
         onPanResponderRelease: () => {
           paintedDateKeysRef.current.clear();
@@ -895,7 +1160,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
   const goPrevious = useCallback(() => {
     if (calendarMode === 'month') {
-      setAnchorDate((prev) => {
+      setAnchorDate(prev => {
         const next = addMonths(prev, -1);
         if (next < currentMonthStart) return currentMonthStart;
         return next;
@@ -903,7 +1168,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       return;
     }
     if (calendarMode === 'week') {
-      setAnchorDate((prev) => {
+      setAnchorDate(prev => {
         const next = addDays(prev, -7);
         if (next < currentMonthStart) return currentMonthStart;
         return next;
@@ -913,7 +1178,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
   const goNext = useCallback(() => {
     if (calendarMode === 'month') {
-      setAnchorDate((prev) => {
+      setAnchorDate(prev => {
         const next = addMonths(prev, 1);
         if (next > currentYearEnd) return currentYearEnd;
         return next;
@@ -921,7 +1186,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       return;
     }
     if (calendarMode === 'week') {
-      setAnchorDate((prev) => {
+      setAnchorDate(prev => {
         const next = addDays(prev, 7);
         if (next > currentYearEnd) return currentYearEnd;
         return next;
@@ -930,7 +1195,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   }, [calendarMode, currentYearEnd]);
 
   useEffect(() => {
-    setAnchorDate((prev) => {
+    setAnchorDate(prev => {
       if (prev < currentMonthStart) return currentMonthStart;
       if (prev > currentYearEnd) return currentYearEnd;
       return prev;
@@ -942,41 +1207,50 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
     setSaving(true);
     try {
-      const serviceRequiredStatuses = new Set<AvailabilityStatusKey>(['available', 'limited', 'on_call']);
+      const serviceRequiredStatuses = new Set<AvailabilityStatusKey>([
+        'available',
+        'limited',
+        'on_call',
+      ]);
       const scheduledDates = Object.keys(draft.dayStatuses || {});
-      const scheduledFutureDates = scheduledDates.filter((dateKey) => {
+      const scheduledFutureDates = scheduledDates.filter(dateKey => {
         const parsed = fromIso(dateKey);
         if (!parsed) return true;
         return parsed >= todayStart;
       });
       const timeModeByDate: Record<string, DayTimeMode> = {};
       const timeListByDate: Record<string, string[]> = {};
-      scheduledDates.forEach((dateKey) => {
+      scheduledDates.forEach(dateKey => {
         timeModeByDate[dateKey] = resolveDateTimeMode(draft, dateKey);
         timeListByDate[dateKey] = resolveDateTimeList(draft, dateKey);
       });
       const selectedServiceIds = new Set<string>();
-      scheduledFutureDates.forEach((dateKey) => {
-        const ids = Array.isArray(draft.dayServiceIds?.[dateKey]) ? draft.dayServiceIds[dateKey] : [];
+      scheduledFutureDates.forEach(dateKey => {
+        const ids = Array.isArray(draft.dayServiceIds?.[dateKey])
+          ? draft.dayServiceIds[dateKey]
+          : [];
         ids
-          .map((item) => String(item || '').trim())
+          .map(item => String(item || '').trim())
           .filter(Boolean)
-          .forEach((serviceId) => selectedServiceIds.add(serviceId));
+          .forEach(serviceId => selectedServiceIds.add(serviceId));
       });
       if (scheduledFutureDates.length > 0 && selectedServiceIds.size === 0) {
         throw new Error('Add at least one service before saving schedule.');
       }
-      const datesWithoutServices = scheduledFutureDates.filter((dateKey) => {
+      const datesWithoutServices = scheduledFutureDates.filter(dateKey => {
         const status = draft.dayStatuses?.[dateKey];
         if (!status || !serviceRequiredStatuses.has(status)) return false;
-        return !Array.isArray(draft.dayServiceIds?.[dateKey]) || draft.dayServiceIds[dateKey].length === 0;
+        return (
+          !Array.isArray(draft.dayServiceIds?.[dateKey]) ||
+          draft.dayServiceIds[dateKey].length === 0
+        );
       });
       if (datesWithoutServices.length > 0) {
         const sample = datesWithoutServices.slice(0, 3).join(', ');
         const suffix = datesWithoutServices.length > 3 ? '...' : '';
         throw new Error(`Add at least one service for: ${sample}${suffix}`);
       }
-      const datesWithoutTimes = scheduledFutureDates.filter((dateKey) => {
+      const datesWithoutTimes = scheduledFutureDates.filter(dateKey => {
         const status = draft.dayStatuses?.[dateKey];
         if (!status || !serviceRequiredStatuses.has(status)) return false;
         const mode = timeModeByDate[dateKey];
@@ -986,10 +1260,16 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       if (datesWithoutTimes.length > 0) {
         const sample = datesWithoutTimes.slice(0, 3).join(', ');
         const suffix = datesWithoutTimes.length > 3 ? '...' : '';
-        throw new Error(`Add at least one time slot or switch to all-day for: ${sample}${suffix}`);
+        throw new Error(
+          `Add at least one time slot or switch to all-day for: ${sample}${suffix}`,
+        );
       }
 
-      const blockedStatuses = new Set<AvailabilityStatusKey>(['blocked', 'holiday', 'fully_booked']);
+      const blockedStatuses = new Set<AvailabilityStatusKey>([
+        'blocked',
+        'holiday',
+        'fully_booked',
+      ]);
 
       const blockedTimes = Object.entries(draft.dayStatuses)
         .filter(([, status]) => blockedStatuses.has(status))
@@ -998,7 +1278,9 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
           date,
           start: '00:00',
           end: '23:59',
-          reason: STATUS_OPTIONS.find((option) => option.key === status)?.label || 'Blocked',
+          reason:
+            STATUS_OPTIONS.find(option => option.key === status)?.label ||
+            'Blocked',
         }));
 
       const calendarTimeLists = Object.fromEntries(
@@ -1007,8 +1289,10 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
           .filter(([, value]) => Array.isArray(value) && value.length > 0),
       );
       const calendarTimeModes = Object.fromEntries(
-        Object.entries(timeModeByDate)
-          .map(([dateKey, value]) => [dateKey, value === 'all_day' ? 'all_day' : 'slots']),
+        Object.entries(timeModeByDate).map(([dateKey, value]) => [
+          dateKey,
+          value === 'all_day' ? 'all_day' : 'slots',
+        ]),
       );
       const legacyCalendarTimes = Object.fromEntries(
         Object.entries(timeListByDate)
@@ -1034,21 +1318,26 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       };
 
       const res = await updateInstitutionAvailability(institutionId, payload);
-      if (!res?.success) throw new Error(res?.message || 'Unable to save availability settings.');
-      const reminderCalendarTimes = Object.entries(legacyCalendarTimes).reduce<Record<string, string>>(
-        (acc, [dateKey, timeValue]) => {
-          const parsed = fromIso(dateKey);
-          if (parsed && parsed < todayStart) return acc;
-          acc[dateKey] = String(timeValue);
-          return acc;
-        },
-        {},
-      );
+      if (!res?.success)
+        throw new Error(
+          res?.message || 'Unable to save availability settings.',
+        );
+      const reminderCalendarTimes = Object.entries(legacyCalendarTimes).reduce<
+        Record<string, string>
+      >((acc, [dateKey, timeValue]) => {
+        const parsed = fromIso(dateKey);
+        if (parsed && parsed < todayStart) return acc;
+        acc[dateKey] = String(timeValue);
+        return acc;
+      }, {});
       await upsertAvailabilityReminders(institutionId, reminderCalendarTimes);
       await runInAppNotificationTick();
       Alert.alert('Availability', 'Calendar availability saved.');
     } catch (error: any) {
-      Alert.alert('Availability', error?.message || 'Unable to save availability settings.');
+      Alert.alert(
+        'Availability',
+        error?.message || 'Unable to save availability settings.',
+      );
     } finally {
       setSaving(false);
     }
@@ -1058,14 +1347,18 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
     (date: Date, compact = false, rowLayoutKey?: string) => {
       const dateKey = toDateOnlyIso(date);
       const statusKey = draft?.dayStatuses?.[dateKey];
-      const statusMeta = STATUS_OPTIONS.find((option) => option.key === statusKey);
+      const statusMeta = STATUS_OPTIONS.find(
+        option => option.key === statusKey,
+      );
       const timeMode = resolveDateTimeMode(draft, dateKey);
       const selectedTimes = resolveDateTimeList(draft, dateKey);
-      const selectedServicesCount = draft?.dayServiceIds?.[dateKey]?.length ?? 0;
-      const nextSlot = selectedTimes.find((time) => {
-        const parsed = parseDateTime(dateKey, time);
-        return !!parsed && parsed.getTime() > nowMs;
-      }) || selectedTimes[0];
+      const selectedServicesCount =
+        draft?.dayServiceIds?.[dateKey]?.length ?? 0;
+      const nextSlot =
+        selectedTimes.find(time => {
+          const parsed = parseDateTime(dateKey, time);
+          return !!parsed && parsed.getTime() > nowMs;
+        }) || selectedTimes[0];
       const countdownLabel =
         timeMode === 'all_day'
           ? 'All day'
@@ -1080,7 +1373,11 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
       const baseBg = statusMeta ? `${statusMeta.color}33` : palette.surface;
       const border = statusMeta ? statusMeta.color : palette.divider;
-      const textColor = !isSelectable ? palette.subtext : inMonth ? palette.text : palette.subtext;
+      const textColor = !isSelectable
+        ? palette.subtext
+        : inMonth
+        ? palette.text
+        : palette.subtext;
 
       return (
         <TouchableOpacity
@@ -1090,8 +1387,10 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
           onLayout={
             compact
               ? undefined
-              : (event) => {
-                  const rowLayout = rowLayoutKey ? dayRowLayoutsRef.current[rowLayoutKey] : undefined;
+              : event => {
+                  const rowLayout = rowLayoutKey
+                    ? dayRowLayoutsRef.current[rowLayoutKey]
+                    : undefined;
                   const layout = event.nativeEvent.layout;
                   dayCellLayoutsRef.current[dateKey] = {
                     x: (rowLayout?.x || 0) + layout.x,
@@ -1113,8 +1412,16 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
             opacity: isSelectable ? 1 : 0.3,
           }}
         >
-          <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-            <Text style={{ ...typography.caption, color: textColor }}>{date.getDate()}</Text>
+          <View
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+            }}
+          >
+            <Text style={{ ...typography.caption, color: textColor }}>
+              {date.getDate()}
+            </Text>
             {countdownLabel && !compact ? (
               <View
                 style={{
@@ -1148,13 +1455,30 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
               </View>
             ) : null}
             {selectedServicesCount > 0 && !compact ? (
-              <Text style={{ fontSize: 8, color: palette.text }}>{selectedServicesCount} svc</Text>
+              <Text style={{ fontSize: 8, color: palette.text }}>
+                {selectedServicesCount} svc
+              </Text>
             ) : null}
           </View>
         </TouchableOpacity>
       );
     },
-    [activeDateKey, anchorDate, calendarYear, draft?.dayServiceIds, draft?.dayStatuses, draft?.dayTimeLists, draft?.dayTimeModes, draft?.dayTimes, handleDayPress, nowMs, palette.accentPrimary, palette.background, palette.divider, palette.subtext, palette.surface, palette.text, todayStart, typography.caption],
+    [
+      activeDateKey,
+      anchorDate,
+      calendarYear,
+      draft,
+      handleDayPress,
+      nowMs,
+      palette.accentPrimary,
+      palette.background,
+      palette.divider,
+      palette.subtext,
+      palette.surface,
+      palette.text,
+      todayStart,
+      typography.caption,
+    ],
   );
 
   const weekGrid = useMemo(() => getWeekGrid(anchorDate), [anchorDate]);
@@ -1165,9 +1489,23 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
       return (
         <View style={{ gap: compact ? 4 : spacing.xs }}>
           {!compact ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingHorizontal: 2,
+              }}
+            >
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => (
-                <Text key={`${date.getMonth()}-${idx}-${d}`} style={{ ...typography.caption, color: palette.subtext, width: 42, textAlign: 'center' }}>
+                <Text
+                  key={`${date.getMonth()}-${idx}-${d}`}
+                  style={{
+                    ...typography.caption,
+                    color: palette.subtext,
+                    width: 42,
+                    textAlign: 'center',
+                  }}
+                >
                   {d}
                 </Text>
               ))}
@@ -1182,12 +1520,13 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                 onLayout={
                   compact
                     ? undefined
-                    : (event) => {
-                        dayRowLayoutsRef.current[rowLayoutKey] = event.nativeEvent.layout;
+                    : event => {
+                        dayRowLayoutsRef.current[rowLayoutKey] =
+                          event.nativeEvent.layout;
                       }
                 }
               >
-                {week.map((day) => renderDayCell(day, compact, rowLayoutKey))}
+                {week.map(day => renderDayCell(day, compact, rowLayoutKey))}
               </View>
             );
           })}
@@ -1198,12 +1537,20 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   );
 
   const activeDate = activeDateKey ? fromIso(activeDateKey) : null;
-  const activeDateStatus = activeDateKey ? draft?.dayStatuses?.[activeDateKey] : undefined;
-  const activeDateTimeMode: DayTimeMode = activeDateKey ? resolveDateTimeMode(draft, activeDateKey) : 'slots';
-  const activeDateTimes = activeDateKey ? resolveDateTimeList(draft, activeDateKey) : [];
-  const activeDateServiceIds = activeDateKey ? draft?.dayServiceIds?.[activeDateKey] || [] : [];
+  const activeDateStatus = activeDateKey
+    ? draft?.dayStatuses?.[activeDateKey]
+    : undefined;
+  const activeDateTimeMode: DayTimeMode = activeDateKey
+    ? resolveDateTimeMode(draft, activeDateKey)
+    : 'slots';
+  const activeDateTimes = activeDateKey
+    ? resolveDateTimeList(draft, activeDateKey)
+    : [];
+  const activeDateServiceIds = activeDateKey
+    ? draft?.dayServiceIds?.[activeDateKey] || []
+    : [];
   const activeServices = useMemo(
-    () => servicesCatalog.filter((service) => service.active !== false),
+    () => servicesCatalog.filter(service => service.active !== false),
     [servicesCatalog],
   );
 
@@ -1229,7 +1576,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
     (time: string | null) => {
       if (!activeDateKey) return;
 
-      updateDraft((prev) => {
+      updateDraft(prev => {
         const nextTimes: Record<string, string> = {
           ...(prev.dayTimes || {}),
         };
@@ -1285,7 +1632,7 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   const setActiveDateTimeMode = useCallback(
     (mode: DayTimeMode) => {
       if (!activeDateKey) return;
-      updateDraft((prev) => ({
+      updateDraft(prev => ({
         ...prev,
         dayTimeModes: {
           ...(prev.dayTimeModes || {}),
@@ -1298,12 +1645,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   const toggleActiveDayServiceId = useCallback(
     (serviceId: string) => {
       if (!activeDateKey) return;
-      updateDraft((prev) => {
+      updateDraft(prev => {
         const current = Array.isArray(prev.dayServiceIds?.[activeDateKey])
           ? prev.dayServiceIds[activeDateKey]
           : [];
         const exists = current.includes(serviceId);
-        const next = exists ? current.filter((id) => id !== serviceId) : [...current, serviceId];
+        const next = exists
+          ? current.filter(id => id !== serviceId)
+          : [...current, serviceId];
         return {
           ...prev,
           dayServiceIds: {
@@ -1319,23 +1668,44 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   if (!dashboardType) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, padding: spacing.lg }}>
+        <LinearGradient
+          colors={[palette.gradientStart, palette.gradientEnd]}
+          style={{ flex: 1, padding: spacing.lg }}
+        >
           <View style={{ alignItems: 'flex-end' }}>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 12, padding: spacing.xs, backgroundColor: palette.card }}
+              style={{
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: 12,
+                padding: spacing.xs,
+                backgroundColor: palette.card,
+              }}
               accessibilityLabel="Close availability"
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Text style={{ ...typography.h2, color: palette.text }}>Unsupported Institution Type</Text>
-            <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>
-              Availability management supports only clinic, hospital, lab, diagnostics, pharmacy, and wellness center.
+            <Text style={{ ...typography.h2, color: palette.text }}>
+              Unsupported Institution Type
+            </Text>
+            <Text
+              style={{
+                ...typography.body,
+                color: palette.subtext,
+                marginTop: spacing.sm,
+              }}
+            >
+              Availability management supports only clinic, hospital, lab,
+              diagnostics, pharmacy, and wellness center.
             </Text>
             <View style={{ marginTop: spacing.lg }}>
-              <KISButton title="Back to dashboard" onPress={() => navigation.goBack()} />
+              <KISButton
+                title="Back to dashboard"
+                onPress={() => navigation.goBack()}
+              />
             </View>
           </View>
         </LinearGradient>
@@ -1346,9 +1716,20 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
   if (loading || !draft) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <LinearGradient
+          colors={[palette.gradientStart, palette.gradientEnd]}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
           <ActivityIndicator size="large" color={palette.accentPrimary} />
-          <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading availability...</Text>
+          <Text
+            style={{
+              ...typography.body,
+              color: palette.subtext,
+              marginTop: spacing.sm,
+            }}
+          >
+            Loading availability...
+          </Text>
         </LinearGradient>
       </SafeAreaView>
     );
@@ -1356,90 +1737,210 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-      <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-        <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+      <LinearGradient
+        colors={[palette.gradientStart, palette.gradientEnd]}
+        style={{ flex: 1 }}
+      >
+        <View
+          style={{
+            alignItems: 'flex-end',
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+          }}
+        >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 12, padding: spacing.xs, backgroundColor: palette.card }}
+            style={{
+              borderWidth: 1,
+              borderColor: palette.divider,
+              borderRadius: 12,
+              padding: spacing.xs,
+              backgroundColor: palette.card,
+            }}
             accessibilityLabel="Close availability"
           >
             <KISIcon name="close" size={18} color={palette.text} />
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
-          <View style={{ borderRadius: spacing.lg, padding: spacing.md, backgroundColor: palette.card, ...borders.card }}>
-            <Text style={{ ...typography.h2, color: palette.text }}>Scheduling & Availability</Text>
-            <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
-              Tap a status color, choose scope (day/week/month/year), then tap a date anchor to apply.
+        <ScrollView
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing.xl,
+          }}
+        >
+          <View
+            style={{
+              borderRadius: spacing.lg,
+              padding: spacing.md,
+              backgroundColor: palette.card,
+              ...borders.card,
+            }}
+          >
+            <Text style={{ ...typography.h2, color: palette.text }}>
+              Scheduling & Availability
+            </Text>
+            <Text
+              style={{
+                ...typography.body,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
+              Tap a status color, choose scope (day/week/month/year), then tap a
+              date anchor to apply.
             </Text>
 
-            <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.xs }}>
-              {(['year', 'month', 'week'] as CalendarViewMode[]).map((mode) => (
+            <View
+              style={{
+                marginTop: spacing.md,
+                flexDirection: 'row',
+                gap: spacing.xs,
+              }}
+            >
+              {(['year', 'month', 'week'] as CalendarViewMode[]).map(mode => (
                 <TouchableOpacity
                   key={mode}
                   onPress={() => setCalendarMode(mode)}
                   style={{
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: calendarMode === mode ? palette.accentPrimary : palette.divider,
-                    backgroundColor: calendarMode === mode ? `${palette.accentPrimary}22` : palette.surface,
+                    borderColor:
+                      calendarMode === mode
+                        ? palette.accentPrimary
+                        : palette.divider,
+                    backgroundColor:
+                      calendarMode === mode
+                        ? `${palette.accentPrimary}22`
+                        : palette.surface,
                     paddingHorizontal: spacing.md,
                     paddingVertical: spacing.xs,
                   }}
                 >
-                  <Text style={{ ...typography.label, color: palette.text }}>{mode.toUpperCase()}</Text>
+                  <Text style={{ ...typography.label, color: palette.text }}>
+                    {mode.toUpperCase()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.sm }}>
+            <Text
+              style={{
+                ...typography.caption,
+                color: palette.subtext,
+                marginTop: spacing.sm,
+              }}
+            >
               Apply scope
             </Text>
-            <View style={{ marginTop: spacing.xs, flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
-              {SCHEDULE_APPLY_SCOPES.map((scope) => (
+            <View
+              style={{
+                marginTop: spacing.xs,
+                flexDirection: 'row',
+                gap: spacing.xs,
+                flexWrap: 'wrap',
+              }}
+            >
+              {SCHEDULE_APPLY_SCOPES.map(scope => (
                 <TouchableOpacity
                   key={`scope-${scope}`}
                   onPress={() => setApplyScope(scope)}
                   style={{
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: applyScope === scope ? palette.accentPrimary : palette.divider,
-                    backgroundColor: applyScope === scope ? `${palette.accentPrimary}22` : palette.surface,
+                    borderColor:
+                      applyScope === scope
+                        ? palette.accentPrimary
+                        : palette.divider,
+                    backgroundColor:
+                      applyScope === scope
+                        ? `${palette.accentPrimary}22`
+                        : palette.surface,
                     paddingHorizontal: spacing.md,
                     paddingVertical: spacing.xs,
                   }}
                 >
-                  <Text style={{ ...typography.label, color: palette.text }}>{scope.toUpperCase()}</Text>
+                  <Text style={{ ...typography.label, color: palette.text }}>
+                    {scope.toUpperCase()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+            <Text
+              style={{
+                ...typography.caption,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
               Year scope applies only within {calendarYear}.
             </Text>
-            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
-              Week/Month/Year scope marks selected dates as all-day access by default.
+            <Text
+              style={{
+                ...typography.caption,
+                color: palette.subtext,
+                marginTop: 2,
+              }}
+            >
+              Week/Month/Year scope marks selected dates as all-day access by
+              default.
             </Text>
 
             {calendarMode !== 'year' ? (
-              <View style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <TouchableOpacity onPress={goPrevious} style={{ padding: spacing.xs }}>
+              <View
+                style={{
+                  marginTop: spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <TouchableOpacity
+                  onPress={goPrevious}
+                  style={{ padding: spacing.xs }}
+                >
                   <KISIcon name="chevron-left" size={18} color={palette.text} />
                 </TouchableOpacity>
                 <Text style={{ ...typography.label, color: palette.text }}>
-                  {MONTH_LABELS[anchorDate.getMonth()]} {anchorDate.getFullYear()}
+                  {MONTH_LABELS[anchorDate.getMonth()]}{' '}
+                  {anchorDate.getFullYear()}
                 </Text>
-                <TouchableOpacity onPress={goNext} style={{ padding: spacing.xs }}>
-                  <KISIcon name="chevron-right" size={18} color={palette.text} />
+                <TouchableOpacity
+                  onPress={goNext}
+                  style={{ padding: spacing.xs }}
+                >
+                  <KISIcon
+                    name="chevron-right"
+                    size={18}
+                    color={palette.text}
+                  />
                 </TouchableOpacity>
               </View>
             ) : null}
 
-            <View style={{ marginTop: spacing.sm, borderWidth: 1, borderColor: palette.divider, borderRadius: spacing.md, padding: spacing.sm, backgroundColor: palette.surface }}>
+            <View
+              style={{
+                marginTop: spacing.sm,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: spacing.md,
+                padding: spacing.sm,
+                backgroundColor: palette.surface,
+              }}
+            >
               {calendarMode === 'year' ? (
                 <View style={{ gap: spacing.sm }}>
-                  <Text style={{ ...typography.label, color: palette.text }}>{calendarYear}</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm }}>
+                  <Text style={{ ...typography.label, color: palette.text }}>
+                    {calendarYear}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
+                      gap: spacing.sm,
+                    }}
+                  >
                     {Array.from({ length: 12 }, (_, month) => {
                       const monthDate = new Date(calendarYear, month, 1);
                       const disabledMonth = monthDate < currentMonthStart;
@@ -1462,7 +1963,15 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                             opacity: disabledMonth ? 0.45 : 1,
                           }}
                         >
-                          <Text style={{ ...typography.caption, color: palette.text, marginBottom: 4 }}>{MONTH_LABELS[month]}</Text>
+                          <Text
+                            style={{
+                              ...typography.caption,
+                              color: palette.text,
+                              marginBottom: 4,
+                            }}
+                          >
+                            {MONTH_LABELS[month]}
+                          </Text>
                           {renderMonthCalendar(monthDate, true)}
                         </TouchableOpacity>
                       );
@@ -1470,12 +1979,31 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                   </View>
                 </View>
               ) : calendarMode === 'month' ? (
-                <View {...calendarPanResponder.panHandlers}>{renderMonthCalendar(anchorDate)}</View>
+                <View {...calendarPanResponder.panHandlers}>
+                  {renderMonthCalendar(anchorDate)}
+                </View>
               ) : (
-                <View style={{ gap: spacing.xs }} {...calendarPanResponder.panHandlers}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }}>
+                <View
+                  style={{ gap: spacing.xs }}
+                  {...calendarPanResponder.panHandlers}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 2,
+                    }}
+                  >
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => (
-                      <Text key={`week-${idx}-${d}`} style={{ ...typography.caption, color: palette.subtext, width: 42, textAlign: 'center' }}>
+                      <Text
+                        key={`week-${idx}-${d}`}
+                        style={{
+                          ...typography.caption,
+                          color: palette.subtext,
+                          width: 42,
+                          textAlign: 'center',
+                        }}
+                      >
                         {d}
                       </Text>
                     ))}
@@ -1484,11 +2012,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                     <View
                       key={`week-row-${rowIndex}`}
                       style={{ flexDirection: 'row', gap: spacing.xs }}
-                      onLayout={(event) => {
-                        dayRowLayoutsRef.current[`week-${rowIndex}`] = event.nativeEvent.layout;
+                      onLayout={event => {
+                        dayRowLayoutsRef.current[`week-${rowIndex}`] =
+                          event.nativeEvent.layout;
                       }}
                     >
-                      {week.map((day) => renderDayCell(day, false, `week-${rowIndex}`))}
+                      {week.map(day =>
+                        renderDayCell(day, false, `week-${rowIndex}`),
+                      )}
                     </View>
                   ))}
                 </View>
@@ -1510,35 +2041,81 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                   <Text style={{ ...typography.label, color: palette.text }}>
                     Schedule Details ({activeDateKey})
                   </Text>
-                  <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: palette.subtext,
+                      marginTop: 2,
+                    }}
+                  >
                     Tap again to edit status, services, and time for this date.
                   </Text>
                 </View>
                 {activeDateStatus ? (
-                  <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.sm }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
-                      <Text style={{ ...typography.caption, color: palette.subtext }}>Status:</Text>
-                      <Text style={{ ...typography.caption, color: palette.text, marginLeft: 6 }}>
-                        {STATUS_OPTIONS.find((option) => option.key === activeDateStatus)?.label || activeDateStatus}
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingBottom: spacing.sm,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          ...typography.caption,
+                          color: palette.subtext,
+                        }}
+                      >
+                        Status:
+                      </Text>
+                      <Text
+                        style={{
+                          ...typography.caption,
+                          color: palette.text,
+                          marginLeft: 6,
+                        }}
+                      >
+                        {STATUS_OPTIONS.find(
+                          option => option.key === activeDateStatus,
+                        )?.label || activeDateStatus}
                       </Text>
                     </View>
 
-                    <Text style={{ ...typography.caption, color: palette.subtext, marginBottom: 6 }}>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: palette.subtext,
+                        marginBottom: 6,
+                      }}
+                    >
                       Services (select one or more)
                     </Text>
                     {activeServices.length ? (
                       <View style={{ gap: spacing.xs }}>
-                        {activeServices.map((service) => {
-                          const selected = activeDateServiceIds.includes(service.id);
+                        {activeServices.map(service => {
+                          const selected = activeDateServiceIds.includes(
+                            service.id,
+                          );
                           return (
                             <TouchableOpacity
                               key={`${activeDateKey}-svc-${service.id}`}
-                              onPress={() => toggleActiveDayServiceId(service.id)}
+                              onPress={() =>
+                                toggleActiveDayServiceId(service.id)
+                              }
                               style={{
                                 borderRadius: spacing.sm,
                                 borderWidth: 1,
-                                borderColor: selected ? palette.accentPrimary : palette.divider,
-                                backgroundColor: selected ? `${palette.accentPrimary}22` : palette.card,
+                                borderColor: selected
+                                  ? palette.accentPrimary
+                                  : palette.divider,
+                                backgroundColor: selected
+                                  ? `${palette.accentPrimary}22`
+                                  : palette.card,
                                 paddingHorizontal: spacing.sm,
                                 paddingVertical: spacing.xs,
                                 flexDirection: 'row',
@@ -1551,27 +2128,56 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                                   height: 18,
                                   borderRadius: 4,
                                   borderWidth: 1,
-                                  borderColor: selected ? palette.accentPrimary : palette.divider,
-                                  backgroundColor: selected ? palette.accentPrimary : 'transparent',
+                                  borderColor: selected
+                                    ? palette.accentPrimary
+                                    : palette.divider,
+                                  backgroundColor: selected
+                                    ? palette.accentPrimary
+                                    : 'transparent',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   marginRight: spacing.xs,
                                 }}
                               >
-                                {selected ? <Text style={{ color: '#fff', fontSize: 11 }}>✓</Text> : null}
+                                {selected ? (
+                                  <Text style={{ color: '#fff', fontSize: 11 }}>
+                                    ✓
+                                  </Text>
+                                ) : null}
                               </View>
-                              <Text style={{ ...typography.caption, color: palette.text, flex: 1 }}>{service.name}</Text>
+                              <Text
+                                style={{
+                                  ...typography.caption,
+                                  color: palette.text,
+                                  flex: 1,
+                                }}
+                              >
+                                {service.name}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}
                       </View>
                     ) : (
-                      <Text style={{ ...typography.caption, color: palette.subtext }}>
-                        No active services. Activate at least one service in Service Catalog.
+                      <Text
+                        style={{
+                          ...typography.caption,
+                          color: palette.subtext,
+                        }}
+                      >
+                        No active services. Activate at least one service in
+                        Service Catalog.
                       </Text>
                     )}
 
-                    <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.sm, marginBottom: 6 }}>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: palette.subtext,
+                        marginTop: spacing.sm,
+                        marginBottom: 6,
+                      }}
+                    >
                       Access window
                     </Text>
 
@@ -1579,24 +2185,44 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                       <KISButton
                         title="Specific Times"
                         size="sm"
-                        variant={activeDateTimeMode === 'slots' ? 'primary' : 'outline'}
+                        variant={
+                          activeDateTimeMode === 'slots' ? 'primary' : 'outline'
+                        }
                         onPress={() => setActiveDateTimeMode('slots')}
                       />
                       <KISButton
                         title="All Day"
                         size="sm"
-                        variant={activeDateTimeMode === 'all_day' ? 'primary' : 'outline'}
+                        variant={
+                          activeDateTimeMode === 'all_day'
+                            ? 'primary'
+                            : 'outline'
+                        }
                         onPress={() => setActiveDateTimeMode('all_day')}
                       />
                     </View>
 
                     {activeDateTimeMode === 'all_day' ? (
-                      <Text style={{ ...typography.caption, color: palette.accentPrimary, marginTop: spacing.sm }}>
-                        Full-day access enabled. Users can book this service at any time on this date.
+                      <Text
+                        style={{
+                          ...typography.caption,
+                          color: palette.accentPrimary,
+                          marginTop: spacing.sm,
+                        }}
+                      >
+                        Full-day access enabled. Users can book this service at
+                        any time on this date.
                       </Text>
                     ) : timeOptions.length ? (
-                      <View style={{ marginTop: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                        {timeOptions.map((option) => {
+                      <View
+                        style={{
+                          marginTop: spacing.sm,
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: spacing.xs,
+                        }}
+                      >
+                        {timeOptions.map(option => {
                           const selected = activeDateTimes.includes(option);
                           return (
                             <TouchableOpacity
@@ -1605,24 +2231,42 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                               style={{
                                 borderRadius: 999,
                                 borderWidth: 1,
-                                borderColor: selected ? palette.accentPrimary : palette.divider,
-                                backgroundColor: selected ? `${palette.accentPrimary}22` : palette.card,
+                                borderColor: selected
+                                  ? palette.accentPrimary
+                                  : palette.divider,
+                                backgroundColor: selected
+                                  ? `${palette.accentPrimary}22`
+                                  : palette.card,
                                 paddingHorizontal: spacing.sm,
                                 paddingVertical: 6,
                               }}
                             >
-                              <Text style={{ ...typography.caption, color: palette.text }}>{option}</Text>
+                              <Text
+                                style={{
+                                  ...typography.caption,
+                                  color: palette.text,
+                                }}
+                              >
+                                {option}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}
                       </View>
                     ) : (
-                      <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.sm }}>
+                      <Text
+                        style={{
+                          ...typography.caption,
+                          color: palette.subtext,
+                          marginTop: spacing.sm,
+                        }}
+                      >
                         No remaining time slots for this date.
                       </Text>
                     )}
 
-                    {activeDateTimeMode === 'slots' && activeDateTimes.length > 0 ? (
+                    {activeDateTimeMode === 'slots' &&
+                    activeDateTimes.length > 0 ? (
                       <View style={{ marginTop: spacing.xs }}>
                         <KISButton
                           title="Clear selected times"
@@ -1633,7 +2277,13 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                       </View>
                     ) : null}
 
-                    <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.sm }}>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: palette.subtext,
+                        marginTop: spacing.sm,
+                      }}
+                    >
                       Selected: {activeDateServiceIds.length} service(s)
                       {activeDateTimeMode === 'all_day'
                         ? ' • All day'
@@ -1643,8 +2293,15 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                     </Text>
                   </View>
                 ) : (
-                  <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.sm }}>
-                    <Text style={{ ...typography.caption, color: palette.subtext }}>
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingBottom: spacing.sm,
+                    }}
+                  >
+                    <Text
+                      style={{ ...typography.caption, color: palette.subtext }}
+                    >
                       Select a day status first, then choose a time.
                     </Text>
                   </View>
@@ -1652,17 +2309,31 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
               </View>
             ) : null}
 
-            <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.md }}>Day Status Color Legend</Text>
+            <Text
+              style={{
+                ...typography.h3,
+                color: palette.text,
+                marginTop: spacing.md,
+              }}
+            >
+              Day Status Color Legend
+            </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
-              {STATUS_OPTIONS.map((option) => (
+              {STATUS_OPTIONS.map(option => (
                 <TouchableOpacity
                   key={option.key}
                   onPress={() => setSelectedStatus(option.key)}
                   style={{
                     borderRadius: spacing.sm,
                     borderWidth: 1,
-                    borderColor: selectedStatus === option.key ? option.color : palette.divider,
-                    backgroundColor: selectedStatus === option.key ? `${option.color}22` : palette.surface,
+                    borderColor:
+                      selectedStatus === option.key
+                        ? option.color
+                        : palette.divider,
+                    backgroundColor:
+                      selectedStatus === option.key
+                        ? `${option.color}22`
+                        : palette.surface,
                     padding: spacing.sm,
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -1678,8 +2349,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                     }}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ ...typography.label, color: palette.text }}>{option.label}</Text>
-                    <Text style={{ ...typography.caption, color: palette.subtext }}>{option.description}</Text>
+                    <Text style={{ ...typography.label, color: palette.text }}>
+                      {option.label}
+                    </Text>
+                    <Text
+                      style={{ ...typography.caption, color: palette.subtext }}
+                    >
+                      {option.description}
+                    </Text>
                   </View>
                   <View
                     style={{
@@ -1687,8 +2364,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                       height: 18,
                       borderRadius: 999,
                       borderWidth: 2,
-                      borderColor: selectedStatus === option.key ? option.color : palette.divider,
-                      backgroundColor: selectedStatus === option.key ? option.color : 'transparent',
+                      borderColor:
+                        selectedStatus === option.key
+                          ? option.color
+                          : palette.divider,
+                      backgroundColor:
+                        selectedStatus === option.key
+                          ? option.color
+                          : 'transparent',
                     }}
                   />
                 </TouchableOpacity>
@@ -1699,8 +2382,14 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                 style={{
                   borderRadius: spacing.sm,
                   borderWidth: 1,
-                  borderColor: selectedStatus === CLEAR_STATUS_KEY ? palette.accentPrimary : palette.divider,
-                  backgroundColor: selectedStatus === CLEAR_STATUS_KEY ? `${palette.accentPrimary}22` : palette.surface,
+                  borderColor:
+                    selectedStatus === CLEAR_STATUS_KEY
+                      ? palette.accentPrimary
+                      : palette.divider,
+                  backgroundColor:
+                    selectedStatus === CLEAR_STATUS_KEY
+                      ? `${palette.accentPrimary}22`
+                      : palette.surface,
                   padding: spacing.sm,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1717,14 +2406,24 @@ export default function AvailabilityManagementScreen({ navigation, route }: any)
                   }}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ ...typography.label, color: palette.text }}>Clear</Text>
-                  <Text style={{ ...typography.caption, color: palette.subtext }}>Remove status from selected date</Text>
+                  <Text style={{ ...typography.label, color: palette.text }}>
+                    Clear
+                  </Text>
+                  <Text
+                    style={{ ...typography.caption, color: palette.subtext }}
+                  >
+                    Remove status from selected date
+                  </Text>
                 </View>
               </TouchableOpacity>
             </View>
 
             <View style={{ marginTop: spacing.md }}>
-              <KISButton title={saving ? 'Saving...' : 'Save Availability'} onPress={saveAvailability} disabled={saving} />
+              <KISButton
+                title={saving ? 'Saving...' : 'Save Availability'}
+                onPress={saveAvailability}
+                disabled={saving}
+              />
             </View>
           </View>
         </ScrollView>

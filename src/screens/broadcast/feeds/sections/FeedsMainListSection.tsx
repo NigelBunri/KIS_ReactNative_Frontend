@@ -4,9 +4,7 @@ import { useKISTheme } from '@/theme/useTheme';
 
 import BroadcastFeedCard from '@/components/broadcast/BroadcastFeedCard';
 import BroadcastAuthorProfileSheet from '@/components/broadcast/BroadcastAuthorProfileSheet';
-import {
-  isUserBroadcastSource,
-} from '@/components/broadcast/authorProfileUtils';
+import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils';
 import useAuthorProfilePreview from '@/components/broadcast/useAuthorProfilePreview';
 import SectionHeader from '@/screens/broadcast/feeds/components/SectionHeader';
 
@@ -17,6 +15,15 @@ export type BroadcastSourceMeta = {
   verified?: boolean;
   allow_subscribe?: boolean;
   is_subscribed?: boolean;
+  can_open?: boolean;
+  conversation_id?: string;
+  join_policy?: string;
+  allow_apply?: boolean;
+  auto_approve?: boolean;
+  methods?: string[];
+  is_member?: boolean;
+  tier?: 'free' | 'pro' | 'business' | 'education' | string;
+  followers_count?: number;
 };
 
 export type BroadcastFeedItem = {
@@ -28,10 +35,18 @@ export type BroadcastFeedItem = {
   text_doc?: any;
   text_plain?: string;
   attachments?: any[];
-  author?: { display_name?: string; avatar_url?: string; id?: string; bio?: string; headline?: string };
+  author?: {
+    display_name?: string;
+    avatar_url?: string;
+    id?: string;
+    bio?: string;
+    headline?: string;
+  };
   created_at?: string;
   broadcasted_at?: string;
   reaction_count?: number;
+  viewer_reaction?: string | null;
+  viewer_saved?: boolean;
   comment_count?: number;
   share_count?: number;
   is_live?: boolean;
@@ -50,7 +65,10 @@ type Props = {
   onSave: (item: BroadcastFeedItem) => void;
   onComment: (item: BroadcastFeedItem) => void;
   onMenu: (item: BroadcastFeedItem) => void;
-  onSubscribe: (source: BroadcastSourceMeta, isSubscribed: boolean) => Promise<void> | void;
+  onSubscribe: (
+    source: BroadcastSourceMeta,
+    isSubscribed: boolean,
+  ) => Promise<void> | void;
 };
 
 export default function FeedsMainListSection({
@@ -81,13 +99,17 @@ export default function FeedsMainListSection({
     return 'Tech innovators';
   }, []);
 
-
   const list = items ?? [];
 
   return (
     <View style={{ gap: 12 }}>
       <View>
-        <SectionHeader title="Feeds" subtitle={headerSubtitle} rightLabel="•••" onRightPress={() => {}} />
+        <SectionHeader
+          title="Feeds"
+          subtitle={headerSubtitle}
+          rightLabel="•••"
+          onRightPress={() => {}}
+        />
       </View>
 
       {/* Pull-to-refresh feel using a small rail wrapper */}
@@ -119,13 +141,17 @@ export default function FeedsMainListSection({
 
           {list.length === 0 && !loading ? (
             <View style={{ paddingVertical: 10 }}>
-              <Text style={{ color: palette.subtext, fontWeight: '800' }}>No posts yet.</Text>
+              <Text style={{ color: palette.subtext, fontWeight: '800' }}>
+                No posts yet.
+              </Text>
             </View>
           ) : null}
 
-          {list.map((item) => {
+          {list.map(item => {
             const sourceId = item.source?.id ? String(item.source.id) : null;
-            const canSubscribe = Boolean(item.source?.allow_subscribe && sourceId);
+            const canSubscribe = Boolean(
+              item.source?.allow_subscribe && sourceId,
+            );
             const subscribed = Boolean(item.source?.is_subscribed);
             const enrichedSource: BroadcastSourceMeta = {
               ...(item.source ?? {}),
@@ -182,7 +208,9 @@ export default function FeedsMainListSection({
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: palette.subtext, fontWeight: '900' }}>Loading more…</Text>
+              <Text style={{ color: palette.subtext, fontWeight: '900' }}>
+                Loading more…
+              </Text>
             </View>
           ) : null}
         </View>

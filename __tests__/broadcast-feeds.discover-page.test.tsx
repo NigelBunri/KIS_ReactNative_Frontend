@@ -58,7 +58,6 @@ jest.mock('@/network/post', () => ({ postRequest: jest.fn() }));
 jest.mock('@/screens/broadcast/feeds/hooks/useFeedsData', () => jest.fn());
 
 let mainSectionProps: any = null;
-let trendingSectionProps: any = null;
 
 jest.mock('@/screens/broadcast/feeds/sections/FeedsMainListSection', () => {
   const React = require('react');
@@ -69,7 +68,11 @@ jest.mock('@/screens/broadcast/feeds/sections/FeedsMainListSection', () => {
       View,
       { testID: 'feeds-main-list' },
       React.createElement(Text, null, `items:${(props.items || []).length}`),
-      React.createElement(Text, null, `loading:${String(Boolean(props.loading))}`),
+      React.createElement(
+        Text,
+        null,
+        `loading:${String(Boolean(props.loading))}`,
+      ),
     );
   };
 });
@@ -78,7 +81,6 @@ jest.mock('@/screens/broadcast/feeds/sections/TrendingClipsSection', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return function MockTrendingClipsSection(props: any) {
-    trendingSectionProps = props;
     return React.createElement(
       View,
       { testID: 'trending-section' },
@@ -87,8 +89,12 @@ jest.mock('@/screens/broadcast/feeds/sections/TrendingClipsSection', () => {
   };
 });
 
-const mockedUseFeedsData = useFeedsData as jest.MockedFunction<typeof useFeedsData>;
-const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
+const mockedUseFeedsData = useFeedsData as jest.MockedFunction<
+  typeof useFeedsData
+>;
+const mockedPostRequest = postRequest as jest.MockedFunction<
+  typeof postRequest
+>;
 
 const item = {
   id: 'broadcast-1',
@@ -109,7 +115,9 @@ const item = {
   },
 };
 
-const createHookValue = (overrides: Partial<ReturnType<typeof useFeedsData>> = {}) => ({
+const createHookValue = (
+  overrides: Partial<ReturnType<typeof useFeedsData>> = {},
+) => ({
   items: [item],
   trending: [{ id: 'trend-1', title: 'Trend' }],
   trendingFeeds: [item],
@@ -130,7 +138,6 @@ describe('broadcast feeds discover page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mainSectionProps = null;
-    trendingSectionProps = null;
   });
 
   test('renders active feed list, passes loading state, and filters saved/search results', async () => {
@@ -138,7 +145,13 @@ describe('broadcast feeds discover page', () => {
       createHookValue({
         items: [
           item,
-          { ...item, id: 'broadcast-2', title: 'Beta release', text_plain: 'Hello Beta', viewer_saved: true },
+          {
+            ...item,
+            id: 'broadcast-2',
+            title: 'Beta release',
+            text_plain: 'Hello Beta',
+            viewer_saved: true,
+          },
         ],
         loading: true,
       }) as any,
@@ -152,15 +165,22 @@ describe('broadcast feeds discover page', () => {
     });
 
     const textNodes = renderer!.root.findAllByType('Text');
-    expect(textNodes.some((node) => node.props.children === 'items:1')).toBe(true);
-    expect(textNodes.some((node) => node.props.children === 'loading:true')).toBe(true);
+    expect(textNodes.some(node => node.props.children === 'items:1')).toBe(
+      true,
+    );
+    expect(textNodes.some(node => node.props.children === 'loading:true')).toBe(
+      true,
+    );
     expect(mainSectionProps.items[0].id).toBe('broadcast-2');
   });
 
   test('opens detail, starts comments flow, and shares from active feed actions', async () => {
     const hookValue = createHookValue();
     mockedUseFeedsData.mockReturnValue(hookValue as any);
-    mockedPostRequest.mockResolvedValue({ success: true, data: { conversation_id: 'conversation-1' } } as any);
+    mockedPostRequest.mockResolvedValue({
+      success: true,
+      data: { conversation_id: 'conversation-1' },
+    } as any);
 
     await ReactTestRenderer.act(async () => {
       ReactTestRenderer.create(<FeedsDiscoverPage />);
@@ -169,7 +189,10 @@ describe('broadcast feeds discover page', () => {
     await ReactTestRenderer.act(async () => {
       mainSectionProps.onOpenItem(item);
     });
-    expect(mockNavigate).toHaveBeenCalledWith('BroadcastDetail', { id: 'broadcast-1', item });
+    expect(mockNavigate).toHaveBeenCalledWith('BroadcastDetail', {
+      id: 'broadcast-1',
+      item,
+    });
 
     await ReactTestRenderer.act(async () => {
       await mainSectionProps.onComment(item);
@@ -215,7 +238,9 @@ describe('broadcast feeds discover page', () => {
       mainSectionProps.onMenu(item);
     });
     const menuButtons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] ?? [];
-    const saveButton = menuButtons.find((entry: any) => entry.text === 'Save post');
+    const saveButton = menuButtons.find(
+      (entry: any) => entry.text === 'Save post',
+    );
     const hideButton = menuButtons.find((entry: any) => entry.text === 'Hide');
 
     await ReactTestRenderer.act(async () => {
@@ -230,16 +255,26 @@ describe('broadcast feeds discover page', () => {
     });
     expect(hookValue.toggleSubscribe).toHaveBeenCalledWith(item.source, false);
 
-    const subscribedSource = { ...item.source, is_subscribed: true, name: 'Partner One' };
+    const subscribedSource = {
+      ...item.source,
+      is_subscribed: true,
+      name: 'Partner One',
+    };
     await ReactTestRenderer.act(async () => {
       await mainSectionProps.onSubscribe(subscribedSource, true);
     });
-    const unsubscribeButtons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] ?? [];
-    const unsubscribeButton = unsubscribeButtons.find((entry: any) => entry.text === 'Unsubscribe');
+    const unsubscribeButtons =
+      (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] ?? [];
+    const unsubscribeButton = unsubscribeButtons.find(
+      (entry: any) => entry.text === 'Unsubscribe',
+    );
     await ReactTestRenderer.act(async () => {
       await unsubscribeButton.onPress();
     });
-    expect(hookValue.toggleSubscribe).toHaveBeenCalledWith(subscribedSource, true);
+    expect(hookValue.toggleSubscribe).toHaveBeenCalledWith(
+      subscribedSource,
+      true,
+    );
 
     const scrollView = renderer!.root.findByType('ScrollView');
     await ReactTestRenderer.act(async () => {
@@ -261,7 +296,10 @@ describe('broadcast feeds discover page', () => {
       toggleSubscribe: jest.fn(async () => ({ ok: false })),
     });
     mockedUseFeedsData.mockReturnValue(hookValue as any);
-    mockedPostRequest.mockResolvedValue({ success: true, data: { conversation_id: 'conversation-1' } } as any);
+    mockedPostRequest.mockResolvedValue({
+      success: true,
+      data: { conversation_id: 'conversation-1' },
+    } as any);
 
     await ReactTestRenderer.act(async () => {
       ReactTestRenderer.create(<FeedsDiscoverPage />);
@@ -275,7 +313,9 @@ describe('broadcast feeds discover page', () => {
       await mainSectionProps.onSubscribe(item.source, false);
     });
 
-    const alertTitles = (Alert.alert as jest.Mock).mock.calls.map((call: any[]) => call[0]);
+    const alertTitles = (Alert.alert as jest.Mock).mock.calls.map(
+      (call: any[]) => call[0],
+    );
     expect(alertTitles).toContain('Reaction');
     expect(alertTitles).toContain('Share');
     expect(alertTitles).toContain('Subscribe');

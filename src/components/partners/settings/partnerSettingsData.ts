@@ -95,7 +95,7 @@ export const PARTNER_SETTINGS_SECTIONS: PartnerSettingsSection[] = [
       {
         key: 'org_apps_bible',
         title: 'Bible app',
-        description: 'Bible experience maintained by KCNI for partner accounts.',
+        description: 'Bible experience maintained by KCAN for partner accounts.',
         access: admins,
       },
     ],
@@ -302,12 +302,12 @@ export const PARTNER_SETTINGS_SECTIONS: PartnerSettingsSection[] = [
   {
     key: 'kcni_complaints',
     title: 'Complaints & disputes',
-    description: 'KCNI reviews service booking complaints and escrow releases.',
+    description: 'KCAN reviews service booking complaints and escrow releases.',
     features: [
       {
         key: 'complaints',
         title: 'Complaints',
-        description: 'Review KCNI-managed booking disputes and resolve funds.',
+        description: 'Review KCAN-managed booking disputes and resolve funds.',
         access: admins,
       },
     ],

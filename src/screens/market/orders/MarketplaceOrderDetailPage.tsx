@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import DocumentPicker from 'react-native-document-picker';
+import DocumentPicker, {
+  type DocumentPickerResponse,
+} from 'react-native-document-picker';
 import RNFS from 'react-native-fs';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
@@ -23,20 +25,22 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '@/navigation/types';
-import { backendCentsToFrontendKisc, backendOrderTotalToFrontendKisc } from '@/utils/currency';
+import {
+  backendCentsToFrontendKisc,
+  backendOrderTotalToFrontendKisc,
+} from '@/utils/currency';
 
-type MarketplaceOrderDetailRoute = RouteProp<RootStackParamList, 'MarketplaceOrderDetail'>;
+type MarketplaceOrderDetailRoute = RouteProp<
+  RootStackParamList,
+  'MarketplaceOrderDetail'
+>;
 type MarketplaceOrderDetailNavigation = NativeStackNavigationProp<
   RootStackParamList,
   'MarketplaceOrderDetail'
 >;
 
-const receiptFilePath = (orderId: string) => `${RNFS.DocumentDirectoryPath}/marketplace-order-${orderId}.pdf`;
-
-const modeLabels = {
-  buyer: 'Buyer actions',
-  provider: 'Provider actions',
-} as const;
+const receiptFilePath = (orderId: string) =>
+  `${RNFS.DocumentDirectoryPath}/marketplace-order-${orderId}.pdf`;
 
 export default function MarketplaceOrderDetailPage() {
   const { palette } = useKISTheme();
@@ -49,7 +53,8 @@ export default function MarketplaceOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [complaintText, setComplaintText] = useState('');
-  const [complaintAttachment, setComplaintAttachment] = useState<DocumentPicker.DocumentPickerResponse | null>(null);
+  const [complaintAttachment, setComplaintAttachment] =
+    useState<DocumentPickerResponse | null>(null);
   const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
 
@@ -57,9 +62,12 @@ export default function MarketplaceOrderDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getRequest(ROUTES.commerce.marketplaceOrder(orderId), {
-        errorMessage: 'Unable to load order.',
-      });
+      const response = await getRequest(
+        ROUTES.commerce.marketplaceOrder(orderId),
+        {
+          errorMessage: 'Unable to load order.',
+        },
+      );
       if (!response.success) {
         throw new Error(response.message || 'Unable to load order.');
       }
@@ -80,7 +88,9 @@ export default function MarketplaceOrderDetailPage() {
       if (!order?.id) return;
       setActionLoading(label);
       try {
-        const response = await postRequest(endpoint, undefined, { errorMessage: label });
+        const response = await postRequest(endpoint, undefined, {
+          errorMessage: label,
+        });
         if (!response.success) {
           throw new Error(response.message || label);
         }
@@ -126,7 +136,11 @@ export default function MarketplaceOrderDetailPage() {
   const handlePickAttachment = useCallback(async () => {
     try {
       const result = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.images, DocumentPicker.types.pdf, DocumentPicker.types.plainText],
+        type: [
+          DocumentPicker.types.images,
+          DocumentPicker.types.pdf,
+          DocumentPicker.types.plainText,
+        ],
       });
       setComplaintAttachment(result);
     } catch (err) {
@@ -138,7 +152,10 @@ export default function MarketplaceOrderDetailPage() {
   const submitComplaint = useCallback(async () => {
     if (!order?.id) return;
     if (!complaintText.trim()) {
-      Alert.alert('Complaint', 'Provide a short statement describing the issue.');
+      Alert.alert(
+        'Complaint',
+        'Provide a short statement describing the issue.',
+      );
       return;
     }
     setComplaintSubmitting(true);
@@ -151,11 +168,15 @@ export default function MarketplaceOrderDetailPage() {
           uri: complaintAttachment.fileCopyUri || complaintAttachment.uri,
           type: complaintAttachment.type || 'application/octet-stream',
           name: complaintAttachment.name || `attachment-${Date.now()}`,
-        });
+        } as any);
       }
-      const response = await postRequest(ROUTES.commerce.marketplaceComplaints, formData, {
-        errorMessage: 'Unable to submit complaint.',
-      });
+      const response = await postRequest(
+        ROUTES.commerce.marketplaceComplaints,
+        formData,
+        {
+          errorMessage: 'Unable to submit complaint.',
+        },
+      );
       if (!response.success) {
         throw new Error(response.message || 'Unable to submit complaint.');
       }
@@ -163,12 +184,14 @@ export default function MarketplaceOrderDetailPage() {
       setComplaintText('');
       setComplaintAttachment(null);
     } catch (err: any) {
-      Alert.alert('Complaint failed', err?.message || 'Unable to submit complaint.');
+      Alert.alert(
+        'Complaint failed',
+        err?.message || 'Unable to submit complaint.',
+      );
     } finally {
       setComplaintSubmitting(false);
     }
   }, [order, complaintText, complaintAttachment]);
-
 
   const items = useMemo(() => (order?.items ?? []) as Array<any>, [order]);
   const orderTotalKisc = useMemo(
@@ -182,7 +205,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg }]}> 
+      <View style={[styles.root, { backgroundColor: palette.bg }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
@@ -190,7 +213,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (error) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg, padding: 16 }]}> 
+      <View style={[styles.root, { backgroundColor: palette.bg, padding: 16 }]}>
         <Text style={{ color: palette.text }}>{error}</Text>
       </View>
     );
@@ -207,84 +230,152 @@ export default function MarketplaceOrderDetailPage() {
   const canComplete = mode === 'provider' && order.status === 'temporal';
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}> 
-      <View style={[styles.header, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View
+        style={[
+          styles.header,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>Order details</Text>
-      </View>
-      <View style={[styles.detailCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Shop</Text>
-        <Text style={[styles.sectionValue, { color: palette.text }]}> 
-          {order.shop_info?.name ?? (typeof order.shop === 'string' ? order.shop : order.shop?.name) ?? 'Shop'}
+        <Text style={[styles.title, { color: palette.text }]}>
+          Order details
         </Text>
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Status</Text>
-        <Text style={[styles.statusText, { color: palette.primaryStrong }]}>{statusLabel}</Text>
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Total</Text>
+      </View>
+      <View
+        style={[
+          styles.detailCard,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          Shop
+        </Text>
+        <Text style={[styles.sectionValue, { color: palette.text }]}>
+          {order.shop_info?.name ??
+            (typeof order.shop === 'string' ? order.shop : order.shop?.name) ??
+            'Shop'}
+        </Text>
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          Status
+        </Text>
+        <Text style={[styles.statusText, { color: palette.primaryStrong }]}>
+          {statusLabel}
+        </Text>
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          Total
+        </Text>
         <Text style={[styles.sectionValue, { color: palette.primaryStrong }]}>
           {orderTotalKisc.toFixed(2)} {order.currency ?? 'KISC'}
         </Text>
       </View>
       {isAwaitingSatisfaction ? (
-        <View style={[styles.awaitingBanner, { borderColor: palette.primaryLight }]}>
-          <Text style={[styles.awaitingBannerText, { color: palette.primaryStrong }]}>
-            Provider marked this order complete. Confirm satisfaction within 3 days or open a complaint.
+        <View
+          style={[styles.awaitingBanner, { borderColor: palette.primaryLight }]}
+        >
+          <Text
+            style={[
+              styles.awaitingBannerText,
+              { color: palette.primaryStrong },
+            ]}
+          >
+            Provider marked this order complete. Confirm satisfaction within 3
+            days or open a complaint.
           </Text>
         </View>
       ) : null}
-      <View style={styles.itemsSection}> 
-        {items.map((item) => {
+      <View style={styles.itemsSection}>
+        {items.map(item => {
           const attrs = item.selected_attributes || {};
           return (
             <View
               key={item.id}
-              style={[styles.itemCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}
+              style={[
+                styles.itemCard,
+                {
+                  borderColor: palette.divider,
+                  backgroundColor: palette.surface,
+                },
+              ]}
             >
               <View style={styles.itemRow}>
-                <Text style={[styles.itemName, { color: palette.text }]} numberOfLines={2}>
+                <Text
+                  style={[styles.itemName, { color: palette.text }]}
+                  numberOfLines={2}
+                >
                   {item.product_name || item.product_id}
                 </Text>
-                <Text style={[styles.itemPrice, { color: palette.primaryStrong }]}> 
-                  {backendCentsToFrontendKisc(item.unit_price_cents).toFixed(2)} {order.currency}
+                <Text
+                  style={[styles.itemPrice, { color: palette.primaryStrong }]}
+                >
+                  {backendCentsToFrontendKisc(item.unit_price_cents).toFixed(2)}{' '}
+                  {order.currency}
                 </Text>
               </View>
               <Text style={[styles.itemMeta, { color: palette.subtext }]}>
-                Qty: {item.quantity} · Line total: {(
-                  backendCentsToFrontendKisc(item.unit_price_cents) * Number(item.quantity ?? 0)
-                ).toFixed(2)} {order.currency ?? 'KISC'}
+                Qty: {item.quantity} · Line total:{' '}
+                {(
+                  backendCentsToFrontendKisc(item.unit_price_cents) *
+                  Number(item.quantity ?? 0)
+                ).toFixed(2)}{' '}
+                {order.currency ?? 'KISC'}
               </Text>
               {item.custom_description ? (
-                <Text style={[styles.itemMeta, { color: palette.text }]}> 
+                <Text style={[styles.itemMeta, { color: palette.text }]}>
                   {item.custom_description}
                 </Text>
               ) : null}
-              {Object.entries(attrs).map(([key, values]) => (
+              {Object.entries(attrs).map(([key, values]) =>
                 Array.isArray(values) ? (
                   <View key={key} style={styles.attributeRow}>
-                    <Text style={[styles.attributeLabel, { color: palette.subtext }]}>
+                    <Text
+                      style={[
+                        styles.attributeLabel,
+                        { color: palette.subtext },
+                      ]}
+                    >
                       {key}:
                     </Text>
                     <View style={styles.attributeChips}>
-                      {(values as string[]).map((value) => (
-                        <View key={value} style={[styles.attributeChip, { borderColor: palette.divider }]}> 
+                      {(values as string[]).map(value => (
+                        <View
+                          key={value}
+                          style={[
+                            styles.attributeChip,
+                            { borderColor: palette.divider },
+                          ]}
+                        >
                           <Text style={{ color: palette.text }}>{value}</Text>
                         </View>
                       ))}
                     </View>
                   </View>
-                ) : null
-              ))}
+                ) : null,
+              )}
             </View>
           );
         })}
       </View>
-      <View style={[styles.actionsSection, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Actions</Text>
+      <View
+        style={[
+          styles.actionsSection,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          Actions
+        </Text>
         <View style={styles.actionRow}>
           {canCancel ? (
             <KISButton
-              title={actionLoading === 'cancel' ? 'Cancelling…' : 'Cancel order'}
+              title={
+                actionLoading === 'cancel' ? 'Cancelling…' : 'Cancel order'
+              }
               size="sm"
               variant="outline"
               onPress={() =>
@@ -298,7 +389,9 @@ export default function MarketplaceOrderDetailPage() {
           ) : null}
           {canSatisfy ? (
             <KISButton
-              title={actionLoading === 'satisfy' ? 'Confirming…' : 'Mark satisfied'}
+              title={
+                actionLoading === 'satisfy' ? 'Confirming…' : 'Mark satisfied'
+              }
               size="sm"
               variant="secondary"
               onPress={() =>
@@ -312,7 +405,9 @@ export default function MarketplaceOrderDetailPage() {
           ) : null}
           {canComplete ? (
             <KISButton
-              title={actionLoading === 'complete' ? 'Completing…' : 'Mark completed'}
+              title={
+                actionLoading === 'complete' ? 'Completing…' : 'Mark completed'
+              }
               size="sm"
               variant="secondary"
               onPress={() =>
@@ -333,10 +428,20 @@ export default function MarketplaceOrderDetailPage() {
           loading={receiptLoading}
         />
       </View>
-      <View style={[styles.complaintSection, { borderColor: palette.divider, backgroundColor: palette.surface }]}> 
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>File a complaint</Text>
+      <View
+        style={[
+          styles.complaintSection,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          File a complaint
+        </Text>
         <TextInput
-          style={[styles.complaintInput, { borderColor: palette.divider, color: palette.text }]}
+          style={[
+            styles.complaintInput,
+            { borderColor: palette.divider, color: palette.text },
+          ]}
           placeholder="What went wrong?"
           placeholderTextColor={palette.subtext}
           value={complaintText}
@@ -344,10 +449,15 @@ export default function MarketplaceOrderDetailPage() {
           multiline
           numberOfLines={3}
         />
-        <Pressable onPress={handlePickAttachment} style={styles.attachmentButton}>
+        <Pressable
+          onPress={handlePickAttachment}
+          style={styles.attachmentButton}
+        >
           <KISIcon name="paperclip" size={16} color={palette.text} />
           <Text style={{ color: palette.text, marginLeft: 8 }}>
-            {complaintAttachment ? complaintAttachment.name : 'Add attachment (optional)'}
+            {complaintAttachment
+              ? complaintAttachment.name
+              : 'Add attachment (optional)'}
           </Text>
         </Pressable>
         <KISButton

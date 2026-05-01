@@ -50,6 +50,7 @@ export default function PartnerSettingsPanel({
   onOpenGovernance,
   onOpenFeature,
   onOpenOrgProfile,
+  onOpenComplaints,
 }: Props) {
   const { palette } = useKISTheme();
 

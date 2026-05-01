@@ -551,7 +551,7 @@ export default function PartnerCoursesPanel({
             ) : (
               <View style={{ justifyContent: 'center' }}>
                 <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    Bible courses are KCNI only.
+                    Bible courses are KCAN only.
                 </Text>
               </View>
             )}

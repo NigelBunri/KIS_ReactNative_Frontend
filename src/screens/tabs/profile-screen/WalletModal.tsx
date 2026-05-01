@@ -51,6 +51,9 @@ export function WalletModal(props: WalletModalProps) {
       <Text style={[styles.subtext, { color: palette.subtext }]}>
         Manage your KIS Coin wallet. 1 KISC = $100 USD.
       </Text>
+      <Text style={[styles.subtext, { color: palette.subtext }]}>
+        Use top up to add spendable balance. Use transfer only after you verify the receiver.
+      </Text>
 
       <View style={styles.walletModeRow}>
         {walletModes.map((mode) => (
@@ -131,6 +134,9 @@ export function WalletModal(props: WalletModalProps) {
               </Text>
               <Text style={{ color: palette.text, fontSize: 12 }}>
                 Number: {walletRecipientVerification.recipientPhoneDisplay}
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Double-check the receiver before you submit. Transfers move wallet value immediately.
               </Text>
             </View>
           ) : walletRecipientVerification?.error ? (

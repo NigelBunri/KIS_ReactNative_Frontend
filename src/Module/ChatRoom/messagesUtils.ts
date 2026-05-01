@@ -36,6 +36,7 @@ export type Chat = {
   unreadCount?: number;
   hasMention?: boolean;
   hasMedia?: boolean;
+  readStateAuthoritative?: boolean;
   // participants can be a simple string list OR the richer wire payload from server
   participants?: string[] | ParticipantWire[];
 
@@ -305,6 +306,7 @@ export function normalizeChatFromServer(raw: any): Chat {
   chat.unreadCount = typeof raw?.unreadCount === 'number' ? raw.unreadCount : raw?.unread_count ?? 0;
   chat.hasMention = raw?.hasMention ?? raw?.has_mention ?? false;
   chat.hasMedia = raw?.hasMedia ?? raw?.has_media ?? false;
+  chat.readStateAuthoritative = raw?.readStateAuthoritative ?? raw?.read_state_authoritative ?? false;
 
   // participants: if the server uses "participants" as rich objects, keep them.
   if (Array.isArray(raw?.participants)) {

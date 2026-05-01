@@ -20,7 +20,20 @@ type BroadcastItemLike = {
   profile?: Record<string, any> | null;
 };
 
-const buildFallbackProfile = (item: BroadcastItemLike) => ({
+type FallbackProfile = {
+  user: {
+    id: string | null;
+    display_name: string;
+    avatar_url: string | null;
+  };
+  profile: {
+    bio: string | null;
+    avatar_url: string | null;
+    cover_url: string | null;
+  };
+};
+
+const buildFallbackProfile = (item: BroadcastItemLike): FallbackProfile => ({
   user: {
     id: item?.author?.id ?? null,
     display_name: item?.author?.display_name ?? 'KIS user',
@@ -28,6 +41,8 @@ const buildFallbackProfile = (item: BroadcastItemLike) => ({
   },
   profile: {
     bio: extractBroadcastAuthorBio(item) || null,
+    avatar_url: item?.author?.avatar_url ?? null,
+    cover_url: null,
   },
 });
 

@@ -23,8 +23,14 @@ import type { RootStackParamList } from '@/navigation/types';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { formatKiscAmount } from '@/utils/currency';
-import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
-import { resolveShopDescription, resolveShopImageUri } from '@/utils/shopAssets';
+import {
+  KIS_COIN_CODE,
+  KIS_TO_USD_RATE,
+} from '@/screens/market/market.constants';
+import {
+  resolveShopDescription,
+  resolveShopImageUri,
+} from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
 import { useAuth } from '../../../../App';
 import {
@@ -37,6 +43,7 @@ import {
 
 type Props = {
   searchTerm?: string;
+  searchContext?: string;
 };
 
 type MarketBroadcastItem = {
@@ -61,6 +68,10 @@ type MarketBroadcastItem = {
       is_public?: boolean;
       public?: boolean;
     };
+    viewer_roles?: unknown[];
+    viewer_is_owner?: boolean;
+    viewer_is_admin?: boolean;
+    viewer_is_manager?: boolean;
   };
   product?: {
     id?: string;
@@ -83,7 +94,9 @@ type MarketBroadcastItem = {
     catalog_categories?: Array<{ id?: string; name?: string; slug?: string }>;
     condition?: string;
     sale_price?: number | string;
+    salePrice?: number | string;
     compare_at_price?: number | string;
+    compareAtPrice?: number | string;
     membership_discount_pct?: number;
   };
   service?: {
@@ -104,7 +117,12 @@ type MarketBroadcastItem = {
     rating_count?: number;
     images?: string[];
     membership_discount_pct?: number;
+    compare_at_price?: number | string;
+    compareAtPrice?: number | string;
+    compare_price?: number | string;
+    comparePrice?: number | string;
   };
+  booking?: any;
   is_deleted?: boolean;
 };
 
@@ -123,7 +141,10 @@ const DELIVERY_MODE_ICON_MAP: Record<string, string> = {
   shipping: 'truck',
 };
 
-const formatAvailabilityLabel = (rule?: { targets?: string[]; times?: string[] }) => {
+const formatAvailabilityLabel = (rule?: {
+  targets?: string[];
+  times?: string[];
+}) => {
   if (!rule) return 'Availability TBD';
   const date = rule.targets?.[0];
   const time = rule.times?.[0];
@@ -148,9 +169,8 @@ const FILTERS = [
   { key: 'broadcasted', label: 'Broadcasted' },
 ];
 
-const isBroadcastActive = (item?: MarketBroadcastItem) => item && item.is_deleted === false;
-
-
+const isBroadcastActive = (item?: MarketBroadcastItem) =>
+  item && item.is_deleted === false;
 
 const resolveShopLandingVisibility = (shop?: any) => {
   if (!shop) return false;
@@ -173,8 +193,10 @@ const resolveLandingPublished = (...values: unknown[]) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value !== 0;
     if (typeof value === 'string') {
       const normalized = value.trim().toLowerCase();
-      if (['true', '1', 'yes', 'published', 'active'].includes(normalized)) return true;
-      if (['false', '0', 'no', 'unpublished', 'inactive'].includes(normalized)) return false;
+      if (['true', '1', 'yes', 'published', 'active'].includes(normalized))
+        return true;
+      if (['false', '0', 'no', 'unpublished', 'inactive'].includes(normalized))
+        return false;
     }
   }
   return false;
@@ -200,8 +222,8 @@ const BroadcastProductCard = ({
   isProductInCart?: boolean;
 }) => {
   const { palette } = useKISTheme();
-  const product = item.product ?? {};
-  const source = item.source ?? {};
+  const product = useMemo(() => item.product ?? {}, [item.product]);
+  const source = useMemo(() => item.source ?? {}, [item.source]);
   const gallery = useMemo(() => collectProductImageUris(product), [product]);
   const primaryImage = gallery[0] ?? '';
   const [activeImage, setActiveImage] = useState(primaryImage);
@@ -211,9 +233,16 @@ const BroadcastProductCard = ({
   }, [primaryImage]);
 
   const regularPriceValue = Number(product?.price ?? 0);
-  const salePriceValue = Number(product?.sale_price ?? product?.salePrice ?? NaN);
-  const displayPrice = Number.isFinite(salePriceValue) && salePriceValue < regularPriceValue ? salePriceValue : regularPriceValue;
-  const usdValue = Number.isFinite(displayPrice) ? (displayPrice * KIS_TO_USD_RATE).toFixed(2) : '0.00';
+  const salePriceValue = Number(
+    product?.sale_price ?? product?.salePrice ?? NaN,
+  );
+  const displayPrice =
+    Number.isFinite(salePriceValue) && salePriceValue < regularPriceValue
+      ? salePriceValue
+      : regularPriceValue;
+  const usdValue = Number.isFinite(displayPrice)
+    ? (displayPrice * KIS_TO_USD_RATE).toFixed(2)
+    : '0.00';
   const comparePriceValue = Number(
     product.compare_at_price ??
       product.compareAtPrice ??
@@ -221,29 +250,45 @@ const BroadcastProductCard = ({
       product.salePrice ??
       0,
   );
-  const hasComparePrice = Number.isFinite(comparePriceValue) && comparePriceValue > displayPrice;
-  const showSalePrice = Number.isFinite(salePriceValue) && salePriceValue < regularPriceValue;
-  const rating = Number.isFinite(Number(product?.rating_avg ?? 0)) ? Number(product?.rating_avg ?? 0) : 0;
-  const ratingCount = Number.isFinite(Number(product?.rating_count ?? 0)) ? Number(product?.rating_count ?? 0) : 0;
+  const hasComparePrice =
+    Number.isFinite(comparePriceValue) && comparePriceValue > displayPrice;
+  const showSalePrice =
+    Number.isFinite(salePriceValue) && salePriceValue < regularPriceValue;
+  const rating = Number.isFinite(Number(product?.rating_avg ?? 0))
+    ? Number(product?.rating_avg ?? 0)
+    : 0;
+  const ratingCount = Number.isFinite(Number(product?.rating_count ?? 0))
+    ? Number(product?.rating_count ?? 0)
+    : 0;
   const viewerIsMember = Boolean(source.viewer_is_member);
-  const memberDiscount = Number(source.membership_discount_pct ?? product.membership_discount_pct ?? 5);
+  const memberDiscount = Number(
+    source.membership_discount_pct ?? product.membership_discount_pct ?? 5,
+  );
   const viewerCanSubmitRating = useMemo(() => {
     const roles = Array.isArray(source.viewer_roles)
-      ? source.viewer_roles.map((role) => String(role ?? '').toLowerCase())
+      ? source.viewer_roles.map((role: unknown) =>
+          String(role ?? '').toLowerCase(),
+        )
       : [];
     const elevated = new Set(['owner', 'admin', 'manager']);
-    const hasElevatedRole = roles.some((role) => elevated.has(role));
+    const hasElevatedRole = roles.some(role => elevated.has(role));
     return (
       viewerIsMember ||
       hasElevatedRole ||
-      Boolean(source.viewer_is_owner || source.viewer_is_admin || source.viewer_is_manager)
+      Boolean(
+        source.viewer_is_owner ||
+          source.viewer_is_admin ||
+          source.viewer_is_manager,
+      )
     );
   }, [source, viewerIsMember]);
   const handleRateProduct = useCallback(() => {
     Alert.alert('Rate product', 'Rating capability will open soon.');
   }, []);
 
-  const stockQty = Number.isFinite(Number(product?.stock_qty ?? product?.stock ?? 0))
+  const stockQty = Number.isFinite(
+    Number(product?.stock_qty ?? product?.stock ?? 0),
+  )
     ? Number(product?.stock_qty ?? product?.stock ?? 0)
     : 0;
   const availabilityLabel =
@@ -252,10 +297,15 @@ const BroadcastProductCard = ({
       : stockQty > 0
       ? 'In stock'
       : 'Out of stock';
-  const shippingLabel = product.requires_shipping === false ? 'Pickup only' : 'Ships';
-  const conditionLabel = product.condition ? product.condition : 'Condition TBD';
+  const shippingLabel =
+    product.requires_shipping === false ? 'Pickup only' : 'Ships';
+  const conditionLabel = product.condition
+    ? product.condition
+    : 'Condition TBD';
   const productTypeLabel =
-    product.catalog_categories?.[0]?.name ?? product.inventory_type ?? 'Product';
+    product.catalog_categories?.[0]?.name ??
+    product.inventory_type ??
+    'Product';
 
   const deliveryModes = Array.isArray(product.delivery_modes)
     ? product.delivery_modes
@@ -281,7 +331,10 @@ const BroadcastProductCard = ({
   };
   const handleViewShopProducts = () => {
     if (!resolvedShopId) {
-      Alert.alert('Shop unavailable', 'Unable to identify the shop for this product.');
+      Alert.alert(
+        'Shop unavailable',
+        'Unable to identify the shop for this product.',
+      );
       return;
     }
     navigation.navigate('ShopProducts', {
@@ -296,26 +349,46 @@ const BroadcastProductCard = ({
   };
 
   return (
-    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}> 
+    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}>
       {landingPublic && (shopName || shopDescription) && onOpenLanding ? (
         <Pressable
-          style={[styles.shopHeader, { borderColor: palette.divider, backgroundColor: `${palette.primaryStrong}08` }]}
+          style={[
+            styles.shopHeader,
+            {
+              borderColor: palette.divider,
+              backgroundColor: `${palette.primaryStrong}08`,
+            },
+          ]}
           onPress={onOpenLanding}
         >
           <View style={styles.shopHeaderInner}>
             {shopImageUri ? (
-              <Image source={{ uri: shopImageUri }} style={styles.shopHeaderImage} />
+              <Image
+                source={{ uri: shopImageUri }}
+                style={styles.shopHeaderImage}
+              />
             ) : (
-              <View style={[styles.shopIconFallback, { backgroundColor: `${palette.primaryStrong}22` }]}>
+              <View
+                style={[
+                  styles.shopIconFallback,
+                  { backgroundColor: `${palette.primaryStrong}22` },
+                ]}
+              >
                 <KISIcon name="cart" size={16} color={palette.primaryStrong} />
               </View>
             )}
             <View style={styles.shopHeaderText}>
-              <Text style={[styles.shopName, { color: palette.primaryStrong }]} numberOfLines={1}>
+              <Text
+                style={[styles.shopName, { color: palette.primaryStrong }]}
+                numberOfLines={1}
+              >
                 {shopName ?? 'Shop'}
               </Text>
               {shopDescription ? (
-                <Text style={[styles.shopDescription, { color: palette.subtext }]} numberOfLines={2}>
+                <Text
+                  style={[styles.shopDescription, { color: palette.subtext }]}
+                  numberOfLines={2}
+                >
                   {shopDescription}
                 </Text>
               ) : null}
@@ -324,17 +397,37 @@ const BroadcastProductCard = ({
         </Pressable>
       ) : null}
       <View style={styles.productHero}>
-        <Pressable onPress={() => openFullScreen(activeImage)} style={styles.productImageWrapper}>
+        <Pressable
+          onPress={() => openFullScreen(activeImage)}
+          style={styles.productImageWrapper}
+        >
           {activeImage ? (
-            <Image source={{ uri: activeImage }} style={[styles.productMainImage, { backgroundColor: palette.inputBg }]} resizeMode="cover" />
+            <Image
+              source={{ uri: activeImage }}
+              style={[
+                styles.productMainImage,
+                { backgroundColor: palette.inputBg },
+              ]}
+              resizeMode="cover"
+            />
           ) : (
-            <View style={[styles.productMainImage, styles.emptyImage, { backgroundColor: palette.inputBg }]}>
+            <View
+              style={[
+                styles.productMainImage,
+                styles.emptyImage,
+                { backgroundColor: palette.inputBg },
+              ]}
+            >
               <Text style={{ color: palette.subtext }}>No image yet</Text>
             </View>
           )}
         </Pressable>
         {gallery.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailRow}
+          >
             {gallery.map((uri, index) => (
               <Pressable
                 key={`${uri}-${index}`}
@@ -346,7 +439,11 @@ const BroadcastProductCard = ({
                     : { borderColor: palette.divider },
                 ]}
               >
-                <Image source={{ uri }} style={styles.thumbnailImage} resizeMode="cover" />
+                <Image
+                  source={{ uri }}
+                  style={styles.thumbnailImage}
+                  resizeMode="cover"
+                />
               </Pressable>
             ))}
           </ScrollView>
@@ -355,78 +452,147 @@ const BroadcastProductCard = ({
       <View style={styles.productInfo}>
         <View style={styles.productMetaRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.productTitle, { color: palette.text }]} numberOfLines={2}>
+            <Text
+              style={[styles.productTitle, { color: palette.text }]}
+              numberOfLines={2}
+            >
               {product?.name ?? 'Untitled product'}
             </Text>
-            <Text style={[styles.secondaryText, { color: palette.subtext }]} numberOfLines={2}>
+            <Text
+              style={[styles.secondaryText, { color: palette.subtext }]}
+              numberOfLines={2}
+            >
               {productTypeLabel}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { borderColor: palette.primaryStrong, backgroundColor: `${palette.primaryStrong}15` }]}>
-            <Text style={[styles.statusLabel, { color: palette.primaryStrong }]}>Product</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                borderColor: palette.primaryStrong,
+                backgroundColor: `${palette.primaryStrong}15`,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.statusLabel, { color: palette.primaryStrong }]}
+            >
+              Product
+            </Text>
           </View>
         </View>
-        <Text style={[styles.productDescription, { color: palette.subtext }]} numberOfLines={3}>
+        <Text
+          style={[styles.productDescription, { color: palette.subtext }]}
+          numberOfLines={3}
+        >
           {product?.description ?? 'No description yet.'}
         </Text>
         <View style={[styles.productMetaRow, { marginTop: 10 }]}>
           <View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-                <View>
-                  <Text style={[styles.priceTag, { color: palette.primaryStrong }]}>
-                    {formatKiscAmount(displayPrice, { suffix: product.currency ?? KIS_COIN_CODE })}
-                  </Text>
-                  {showSalePrice ? (
-                    <Text style={[styles.originalPrice, { color: palette.subtext }]}>
-                      {formatKiscAmount(regularPriceValue, { suffix: product.currency ?? KIS_COIN_CODE })}
-                    </Text>
-                  ) : null}
-                </View>
-                {hasComparePrice ? (
-                  <Text style={[styles.comparePrice, { color: palette.subtext }]}>
-                    Compare at {formatKiscAmount(comparePriceValue, { suffix: product.currency ?? KIS_COIN_CODE })}
+            <View
+              style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}
+            >
+              <View>
+                <Text
+                  style={[styles.priceTag, { color: palette.primaryStrong }]}
+                >
+                  {formatKiscAmount(displayPrice, {
+                    suffix: product.currency ?? KIS_COIN_CODE,
+                  })}
+                </Text>
+                {showSalePrice ? (
+                  <Text
+                    style={[styles.originalPrice, { color: palette.subtext }]}
+                  >
+                    {formatKiscAmount(regularPriceValue, {
+                      suffix: product.currency ?? KIS_COIN_CODE,
+                    })}
                   </Text>
                 ) : null}
               </View>
-            <Text style={[styles.secondaryText, { color: palette.text }]}>≈ ${usdValue} USD</Text>
+              {hasComparePrice ? (
+                <Text style={[styles.comparePrice, { color: palette.subtext }]}>
+                  Compare at{' '}
+                  {formatKiscAmount(comparePriceValue, {
+                    suffix: product.currency ?? KIS_COIN_CODE,
+                  })}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={[styles.secondaryText, { color: palette.text }]}>
+              ≈ ${usdValue} USD
+            </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
-            {deliveryModes.slice(0, 3).map((mode) => (
+            {deliveryModes.slice(0, 3).map(mode => (
               <View key={mode} style={styles.deliveryIcon}>
-                <KISIcon name={DELIVERY_MODE_ICON_MAP[mode.toLowerCase()] ?? 'map-pin'} size={16} color={palette.text} />
+                <KISIcon
+                  name={DELIVERY_MODE_ICON_MAP[mode.toLowerCase()] ?? 'map-pin'}
+                  size={16}
+                  color={palette.text}
+                />
               </View>
             ))}
           </View>
         </View>
         <View style={styles.memberBadge}>
-          <Text style={[styles.memberBadgeText, { color: palette.primaryStrong }]}>
+          <Text
+            style={[styles.memberBadgeText, { color: palette.primaryStrong }]}
+          >
             {viewerIsMember
               ? `You save ${memberDiscount}% as a member`
               : `Members save ${memberDiscount}% — members only`}
           </Text>
         </View>
         <View style={styles.serviceMetaRow}>
-          {productMetaItems.map((entry) => (
-            <Text key={entry.label} style={[styles.secondaryText, { color: palette.subtext }]}>
+          {productMetaItems.map(entry => (
+            <Text
+              key={entry.label}
+              style={[styles.secondaryText, { color: palette.subtext }]}
+            >
               {`${entry.label} · ${entry.value}`}
             </Text>
           ))}
         </View>
-        <View style={[styles.ratingRow, viewerCanSubmitRating && { alignItems: 'center', gap: 8 }]}> 
+        <View
+          style={[
+            styles.ratingRow,
+            viewerCanSubmitRating && { alignItems: 'center', gap: 8 },
+          ]}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.secondaryText, { color: palette.text }]}>⭐ {rating.toFixed(1)} / 5</Text>
-            <Text style={[styles.secondaryText, { color: palette.subtext }]}>({ratingCount} review{ratingCount === 1 ? '' : 's'})</Text>
+            <Text style={[styles.secondaryText, { color: palette.text }]}>
+              ⭐ {rating.toFixed(1)} / 5
+            </Text>
+            <Text style={[styles.secondaryText, { color: palette.subtext }]}>
+              ({ratingCount} review{ratingCount === 1 ? '' : 's'})
+            </Text>
           </View>
           {viewerCanSubmitRating ? (
             <Pressable
-              style={[styles.rateAction, { borderColor: palette.primaryStrong }]}
+              style={[
+                styles.rateAction,
+                { borderColor: palette.primaryStrong },
+              ]}
               onPress={handleRateProduct}
             >
-              <Text style={[styles.rateActionText, { color: palette.primaryStrong }]}>+</Text>
+              <Text
+                style={[
+                  styles.rateActionText,
+                  { color: palette.primaryStrong },
+                ]}
+              >
+                +
+              </Text>
             </Pressable>
           ) : null}
         </View>
-        <View style={[styles.actionRow, { justifyContent: 'flex-start', marginTop: 12 }]}> 
+        <View
+          style={[
+            styles.actionRow,
+            { justifyContent: 'flex-start', marginTop: 12 },
+          ]}
+        >
           {landingPublic && onOpenLanding ? (
             <KISButton
               title="View shop landing"
@@ -460,10 +626,21 @@ const BroadcastProductCard = ({
           />
         </View>
       </View>
-      <Modal visible={Boolean(fullscreenImage)} transparent onRequestClose={() => setFullscreenImage(null)}>
-        <Pressable style={styles.fullscreenOverlay} onPress={() => setFullscreenImage(null)}>
+      <Modal
+        visible={Boolean(fullscreenImage)}
+        transparent
+        onRequestClose={() => setFullscreenImage(null)}
+      >
+        <Pressable
+          style={styles.fullscreenOverlay}
+          onPress={() => setFullscreenImage(null)}
+        >
           {fullscreenImage ? (
-            <Image source={{ uri: fullscreenImage }} style={styles.fullscreenImage} resizeMode="contain" />
+            <Image
+              source={{ uri: fullscreenImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
           ) : null}
         </Pressable>
       </Modal>
@@ -473,7 +650,7 @@ const BroadcastProductCard = ({
 
 const BroadcastServiceCard = ({
   item,
-  onRefresh,
+  onRefresh: _onRefresh,
   landingPublic,
   shopName,
   shopImageUri,
@@ -501,17 +678,24 @@ const BroadcastServiceCard = ({
   onOpenBookingDetails?: (bookingId: string) => void;
 }) => {
   const { palette } = useKISTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const service = item.service ?? {};
-  const source = item.source ?? {};
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const service = useMemo(() => item.service ?? {}, [item.service]);
+  const source = useMemo(() => item.source ?? {}, [item.source]);
   const resolvedShopId = source.id ? String(source.id) : undefined;
   const resolvedShopTitle = shopName ?? source.name ?? 'Shop';
   const handleViewShopServices = () => {
     if (!resolvedShopId) {
-      Alert.alert('Shop unavailable', 'Unable to identify the shop for this service.');
+      Alert.alert(
+        'Shop unavailable',
+        'Unable to identify the shop for this service.',
+      );
       return;
     }
-    navigation.navigate('ShopServices', { shopId: resolvedShopId, shopName: resolvedShopTitle });
+    navigation.navigate('ShopServices', {
+      shopId: resolvedShopId,
+      shopName: resolvedShopTitle,
+    });
   };
   const gallery = useMemo(() => collectProductImageUris(service), [service]);
   const primaryImage = gallery[0] ?? '';
@@ -522,7 +706,9 @@ const BroadcastServiceCard = ({
   }, [service.id, primaryImage]);
 
   const priceValue = Number(service.price ?? 0);
-  const usdValue = Number.isFinite(priceValue) ? (priceValue * KIS_TO_USD_RATE).toFixed(2) : '0.00';
+  const usdValue = Number.isFinite(priceValue)
+    ? (priceValue * KIS_TO_USD_RATE).toFixed(2)
+    : '0.00';
   const comparePriceValue = Number(
     service.compare_at_price ??
       service.compareAtPrice ??
@@ -530,18 +716,34 @@ const BroadcastServiceCard = ({
       service.comparePrice ??
       0,
   );
-  const hasComparePrice = Number.isFinite(comparePriceValue) && comparePriceValue > priceValue;
-  const rating = Number.isFinite(Number(service.rating_avg ?? 0)) ? Number(service.rating_avg ?? 0) : 0;
-  const ratingCount = Number.isFinite(Number(service.rating_count ?? 0)) ? Number(service.rating_count ?? 0) : 0;
+  const hasComparePrice =
+    Number.isFinite(comparePriceValue) && comparePriceValue > priceValue;
+  const rating = Number.isFinite(Number(service.rating_avg ?? 0))
+    ? Number(service.rating_avg ?? 0)
+    : 0;
+  const ratingCount = Number.isFinite(Number(service.rating_count ?? 0))
+    ? Number(service.rating_count ?? 0)
+    : 0;
 
-  const availabilitySummary = formatAvailabilityLabel(service.availability_rules?.[0]);
+  const availabilitySummary = formatAvailabilityLabel(
+    service.availability_rules?.[0],
+  );
   const coverageLabel = formatCoverageLabel(service.coverage);
-  const durationText = service.duration_minutes ? `${service.duration_minutes} min` : 'Duration TBD';
-  const deliveryModes = Array.isArray(service.delivery_modes) ? service.delivery_modes : [];
-  const serviceTypeLabel = String(service.service_type ?? 'Service').replace(/(^|\s)(\w)/g, (match) => match.toUpperCase());
+  const durationText = service.duration_minutes
+    ? `${service.duration_minutes} min`
+    : 'Duration TBD';
+  const deliveryModes = Array.isArray(service.delivery_modes)
+    ? service.delivery_modes
+    : [];
+  const serviceTypeLabel = String(service.service_type ?? 'Service').replace(
+    /(^|\s)(\w)/g,
+    match => match.toUpperCase(),
+  );
 
   const viewerIsMember = Boolean(source.viewer_is_member);
-  const memberDiscount = Number(source.membership_discount_pct ?? service.membership_discount_pct ?? 5);
+  const memberDiscount = Number(
+    source.membership_discount_pct ?? service.membership_discount_pct ?? 5,
+  );
 
   const openFullScreen = (uri: string) => {
     if (!uri) return;
@@ -549,26 +751,46 @@ const BroadcastServiceCard = ({
   };
 
   return (
-    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}> 
+    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}>
       {landingPublic && (shopName || shopDescription) && onOpenLanding ? (
         <Pressable
-          style={[styles.shopHeader, { borderColor: palette.divider, backgroundColor: `${palette.primaryStrong}08` }]}
+          style={[
+            styles.shopHeader,
+            {
+              borderColor: palette.divider,
+              backgroundColor: `${palette.primaryStrong}08`,
+            },
+          ]}
           onPress={onOpenLanding}
         >
           <View style={styles.shopHeaderInner}>
             {shopImageUri ? (
-              <Image source={{ uri: shopImageUri }} style={styles.shopHeaderImage} />
+              <Image
+                source={{ uri: shopImageUri }}
+                style={styles.shopHeaderImage}
+              />
             ) : (
-              <View style={[styles.shopIconFallback, { backgroundColor: `${palette.primaryStrong}22` }]}>
+              <View
+                style={[
+                  styles.shopIconFallback,
+                  { backgroundColor: `${palette.primaryStrong}22` },
+                ]}
+              >
                 <KISIcon name="cart" size={16} color={palette.primaryStrong} />
               </View>
             )}
             <View style={styles.shopHeaderText}>
-              <Text style={[styles.shopName, { color: palette.primaryStrong }]} numberOfLines={1}>
+              <Text
+                style={[styles.shopName, { color: palette.primaryStrong }]}
+                numberOfLines={1}
+              >
                 {shopName ?? 'Shop'}
               </Text>
               {shopDescription ? (
-                <Text style={[styles.shopDescription, { color: palette.subtext }]} numberOfLines={2}>
+                <Text
+                  style={[styles.shopDescription, { color: palette.subtext }]}
+                  numberOfLines={2}
+                >
                   {shopDescription}
                 </Text>
               ) : null}
@@ -577,17 +799,37 @@ const BroadcastServiceCard = ({
         </Pressable>
       ) : null}
       <View style={styles.productHero}>
-        <Pressable onPress={() => openFullScreen(activeImage)} style={styles.productImageWrapper}>
+        <Pressable
+          onPress={() => openFullScreen(activeImage)}
+          style={styles.productImageWrapper}
+        >
           {activeImage ? (
-            <Image source={{ uri: activeImage }} style={[styles.productMainImage, { backgroundColor: palette.inputBg }]} resizeMode="cover" />
+            <Image
+              source={{ uri: activeImage }}
+              style={[
+                styles.productMainImage,
+                { backgroundColor: palette.inputBg },
+              ]}
+              resizeMode="cover"
+            />
           ) : (
-            <View style={[styles.productMainImage, styles.emptyImage, { backgroundColor: palette.inputBg }]}>
+            <View
+              style={[
+                styles.productMainImage,
+                styles.emptyImage,
+                { backgroundColor: palette.inputBg },
+              ]}
+            >
               <Text style={{ color: palette.subtext }}>No image yet</Text>
             </View>
           )}
         </Pressable>
         {gallery.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailRow}
+          >
             {gallery.map((uri, index) => (
               <Pressable
                 key={`${uri}-${index}`}
@@ -599,7 +841,11 @@ const BroadcastServiceCard = ({
                     : { borderColor: palette.divider },
                 ]}
               >
-                <Image source={{ uri }} style={styles.thumbnailImage} resizeMode="cover" />
+                <Image
+                  source={{ uri }}
+                  style={styles.thumbnailImage}
+                  resizeMode="cover"
+                />
               </Pressable>
             ))}
           </ScrollView>
@@ -608,75 +854,144 @@ const BroadcastServiceCard = ({
       <View style={styles.productInfo}>
         <View style={styles.productMetaRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.productTitle, { color: palette.text }]} numberOfLines={2}>
+            <Text
+              style={[styles.productTitle, { color: palette.text }]}
+              numberOfLines={2}
+            >
               {service.name ?? 'Untitled service'}
             </Text>
             <Text style={[styles.secondaryText, { color: palette.subtext }]}>
               {serviceTypeLabel}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { borderColor: palette.primaryStrong, backgroundColor: `${palette.primaryStrong}15` }]}> 
-            <Text style={[styles.statusLabel, { color: palette.primaryStrong }]}>Service</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                borderColor: palette.primaryStrong,
+                backgroundColor: `${palette.primaryStrong}15`,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.statusLabel, { color: palette.primaryStrong }]}
+            >
+              Service
+            </Text>
           </View>
         </View>
-        <Text style={[styles.productDescription, { color: palette.subtext }]} numberOfLines={2}>
+        <Text
+          style={[styles.productDescription, { color: palette.subtext }]}
+          numberOfLines={2}
+        >
           {service.short_summary ?? 'Short summary missing.'}
         </Text>
         {service.description ? (
-          <Text style={[styles.secondaryText, { color: palette.subtext, marginTop: 4 }]} numberOfLines={2}>
+          <Text
+            style={[
+              styles.secondaryText,
+              { color: palette.subtext, marginTop: 4 },
+            ]}
+            numberOfLines={2}
+          >
             {service.description}
           </Text>
         ) : null}
         <View style={styles.productMetaRow}>
           <View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-              <Text style={[styles.priceTag, { color: palette.primaryStrong }]}>{`${priceValue.toFixed(2)} ${service.currency ?? KIS_COIN_CODE}`}</Text>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}
+            >
+              <Text
+                style={[styles.priceTag, { color: palette.primaryStrong }]}
+              >{`${priceValue.toFixed(2)} ${
+                service.currency ?? KIS_COIN_CODE
+              }`}</Text>
               {hasComparePrice ? (
                 <Text style={[styles.comparePrice, { color: palette.subtext }]}>
-                  {`${comparePriceValue.toFixed(2)} ${service.currency ?? KIS_COIN_CODE}`}
+                  {`${comparePriceValue.toFixed(2)} ${
+                    service.currency ?? KIS_COIN_CODE
+                  }`}
                 </Text>
               ) : null}
             </View>
-            <Text style={[styles.secondaryText, { color: palette.text }]}>≈ ${usdValue} USD</Text>
+            <Text style={[styles.secondaryText, { color: palette.text }]}>
+              ≈ ${usdValue} USD
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}> 
-            {deliveryModes.slice(0, 3).map((mode) => (
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {deliveryModes.slice(0, 3).map(mode => (
               <View key={mode} style={styles.deliveryIcon}>
-                <KISIcon name={DELIVERY_MODE_ICON_MAP[mode.toLowerCase()] ?? 'map-pin'} size={16} color={palette.text} />
+                <KISIcon
+                  name={DELIVERY_MODE_ICON_MAP[mode.toLowerCase()] ?? 'map-pin'}
+                  size={16}
+                  color={palette.text}
+                />
               </View>
             ))}
           </View>
         </View>
         <View style={styles.memberBadge}>
-          <Text style={[styles.memberBadgeText, { color: palette.primaryStrong }]}> 
+          <Text
+            style={[styles.memberBadgeText, { color: palette.primaryStrong }]}
+          >
             {viewerIsMember
               ? `You save ${memberDiscount}% as a member`
               : `Members save ${memberDiscount}% — members only`}
           </Text>
         </View>
-        <View style={styles.serviceMetaRow}> 
-          <Text style={[styles.secondaryText, { color: palette.subtext }]}>Next availability · {availabilitySummary}</Text>
-          <Text style={[styles.secondaryText, { color: palette.subtext }]}>Duration · {durationText}</Text>
-          <Text style={[styles.secondaryText, { color: palette.subtext }]}>Coverage · {coverageLabel}</Text>
+        <View style={styles.serviceMetaRow}>
+          <Text style={[styles.secondaryText, { color: palette.subtext }]}>
+            Next availability · {availabilitySummary}
+          </Text>
+          <Text style={[styles.secondaryText, { color: palette.subtext }]}>
+            Duration · {durationText}
+          </Text>
+          <Text style={[styles.secondaryText, { color: palette.subtext }]}>
+            Coverage · {coverageLabel}
+          </Text>
         </View>
         <View style={styles.ratingRow}>
-          <Text style={[styles.secondaryText, { color: palette.text }]}>⭐ {rating.toFixed(1)} / 5</Text>
-          <Text style={[styles.secondaryText, { color: palette.subtext, marginLeft: 6 }]}>
+          <Text style={[styles.secondaryText, { color: palette.text }]}>
+            ⭐ {rating.toFixed(1)} / 5
+          </Text>
+          <Text
+            style={[
+              styles.secondaryText,
+              { color: palette.subtext, marginLeft: 6 },
+            ]}
+          >
             ({ratingCount} review{ratingCount === 1 ? '' : 's'})
           </Text>
         </View>
-        <View style={[styles.actionRow, { justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 12 }]}> 
+        <View
+          style={[
+            styles.actionRow,
+            {
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              marginTop: 12,
+            },
+          ]}
+        >
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-        {existingBooking && existingBooking.id ? (
-          <KISButton
-            title="Details"
-            size="xs"
-            variant="outline"
-            onPress={() => onOpenBookingDetails?.(String(existingBooking.id))}
-          />
-        ) : onBook ? (
-          <KISButton title="Book service" size="xs" variant="secondary" onPress={onBook} />
-        ) : null}
+            {existingBooking && existingBooking.id ? (
+              <KISButton
+                title="Details"
+                size="xs"
+                variant="outline"
+                onPress={() =>
+                  onOpenBookingDetails?.(String(existingBooking.id))
+                }
+              />
+            ) : onBook ? (
+              <KISButton
+                title="Book service"
+                size="xs"
+                variant="secondary"
+                onPress={onBook}
+              />
+            ) : null}
             {onBroadcast ? (
               <KISButton
                 title={isBroadcasted ? 'Remove broadcast' : 'Broadcast'}
@@ -697,10 +1012,21 @@ const BroadcastServiceCard = ({
           />
         </View>
       </View>
-      <Modal visible={Boolean(fullscreenImage)} transparent onRequestClose={() => setFullscreenImage(null)}>
-        <Pressable style={styles.fullscreenOverlay} onPress={() => setFullscreenImage(null)}>
+      <Modal
+        visible={Boolean(fullscreenImage)}
+        transparent
+        onRequestClose={() => setFullscreenImage(null)}
+      >
+        <Pressable
+          style={styles.fullscreenOverlay}
+          onPress={() => setFullscreenImage(null)}
+        >
           {fullscreenImage ? (
-            <Image source={{ uri: fullscreenImage }} style={styles.fullscreenImage} resizeMode="contain" />
+            <Image
+              source={{ uri: fullscreenImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
           ) : null}
         </Pressable>
       </Modal>
@@ -708,37 +1034,70 @@ const BroadcastServiceCard = ({
   );
 };
 
-export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
+export default function BroadcastMarketPage({
+  searchTerm = '',
+  searchContext = 'all',
+}: Props) {
   const { palette } = useKISTheme();
   const [marketItems, setMarketItems] = useState<MarketBroadcastItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0].key);
-  const [broadcastingServiceId, setBroadcastingServiceId] = useState<string | null>(null);
+  const [broadcastingServiceId, setBroadcastingServiceId] = useState<
+    string | null
+  >(null);
   const navigation = useNavigation<MarketPageNavigationProp>();
-  const [shopLandingVisibility, setShopLandingVisibility] = useState<Record<string, boolean>>({});
-  const [shopDetailCache, setShopDetailCache] = useState<Record<string, any>>({});
+  const [shopLandingVisibility, setShopLandingVisibility] = useState<
+    Record<string, boolean>
+  >({});
+  const [shopDetailCache, setShopDetailCache] = useState<Record<string, any>>(
+    {},
+  );
   const { user } = useAuth();
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
   const [cartState, setCartState] = useState(getShopCartState());
-  const cartProductIndex = useMemo(() => buildCartProductIndex(cartState), [cartState]);
+  const cartProductIndex = useMemo(
+    () => buildCartProductIndex(cartState),
+    [cartState],
+  );
 
-  const fetchShopDetail = useCallback(async (shopId: string) => {
-    try {
-      const response = await getRequest(`${ROUTES.commerce.shops}${shopId}/`, {
-        forceNetwork: true,
-        errorMessage: 'Unable to load shop details.',
-      });
-      const data = response?.data ?? response ?? null;
-      if (data) {
-        setShopLandingVisibility((prev) => ({ ...prev, [shopId]: resolveShopLandingVisibility(data) }));
-        setShopDetailCache((prev) => ({ ...prev, [shopId]: data }));
-        return data;
-      }
-    } catch (error) {
-      console.warn('Unable to refresh shop detail before opening landing preview:', error);
+  useEffect(() => {
+    const nextFilter = String(searchContext || '')
+      .trim()
+      .toLowerCase();
+    if (FILTERS.some(filter => filter.key === nextFilter)) {
+      setActiveFilter(nextFilter);
     }
-    return shopDetailCache[shopId];
-  }, []);
+  }, [searchContext]);
+
+  const fetchShopDetail = useCallback(
+    async (shopId: string) => {
+      try {
+        const response = await getRequest(
+          `${ROUTES.commerce.shops}${shopId}/`,
+          {
+            forceNetwork: true,
+            errorMessage: 'Unable to load shop details.',
+          },
+        );
+        const data = response?.data ?? response ?? null;
+        if (data) {
+          setShopLandingVisibility(prev => ({
+            ...prev,
+            [shopId]: resolveShopLandingVisibility(data),
+          }));
+          setShopDetailCache(prev => ({ ...prev, [shopId]: data }));
+          return data;
+        }
+      } catch (error) {
+        console.warn(
+          'Unable to refresh shop detail before opening landing preview:',
+          error,
+        );
+      }
+      return shopDetailCache[shopId];
+    },
+    [shopDetailCache],
+  );
 
   const loadServiceBookings = useCallback(async () => {
     if (!user?.id) {
@@ -777,9 +1136,12 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
   }, [loadServiceBookings]);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('service-booking.refresh', () => {
-      void loadServiceBookings();
-    });
+    const subscription = DeviceEventEmitter.addListener(
+      'service-booking.refresh',
+      () => {
+        void loadServiceBookings();
+      },
+    );
     return () => subscription.remove();
   }, [loadServiceBookings]);
 
@@ -796,11 +1158,13 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
 
   const bookingByService = useMemo(() => {
     const map: Record<string, any> = {};
-    serviceBookings.forEach((booking) => {
+    serviceBookings.forEach(booking => {
       const serviceId =
         booking?.service_details?.id ||
         (booking?.service_id ? String(booking.service_id) : null) ||
-        (booking?.service && typeof booking.service.id === 'string' ? booking.service.id : null) ||
+        (booking?.service && typeof booking.service.id === 'string'
+          ? booking.service.id
+          : null) ||
         (booking?.service ? String(booking.service) : null) ||
         null;
       if (!serviceId) return;
@@ -822,10 +1186,11 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
   const openLandingForShop = useCallback(
     async (shopId?: string, shopName?: string) => {
       if (!shopId) return;
-      const shopDetail = (await fetchShopDetail(shopId)) ?? shopDetailCache[shopId];
-      const landingPage = shopDetail?.landing_page ?? shopDetail?.landingPage ?? {};
+      const shopDetail =
+        (await fetchShopDetail(shopId)) ?? shopDetailCache[shopId];
       const shopData = shopDetail ?? shopDetailCache[shopId];
-      const { landingDraft, heroImage, previewGalleryImageUris } = buildShopLandingPreview(shopData ?? {});
+      const { landingDraft, heroImage, previewGalleryImageUris } =
+        buildShopLandingPreview(shopData ?? {});
       navigation.navigate('InstitutionLandingPreview', {
         institutionId: shopId,
         institutionName: shopName ?? shopData?.name ?? 'Shop',
@@ -848,34 +1213,37 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
   const loadMarketBroadcasts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(`${ROUTES.broadcasts.list}?source_type=market_all`, {
-        errorMessage: 'Unable to load market broadcast.',
-      });
+      const res = await getRequest(
+        `${ROUTES.broadcasts.list}?source_type=market_all`,
+        {
+          errorMessage: 'Unable to load market broadcast.',
+        },
+      );
       const records = res?.data?.results ?? res?.data ?? res ?? [];
       const itemsArray = Array.isArray(records) ? records : [];
       setMarketItems(itemsArray);
       const affectedIds = Array.from(
         new Set(
           itemsArray
-            .map((item) => item.source?.id)
+            .map(item => item.source?.id)
             .filter((id): id is string => Boolean(id)),
         ),
       );
       if (affectedIds.length) {
-        setShopLandingVisibility((prev) => {
+        setShopLandingVisibility(prev => {
           if (!Object.keys(prev).length) return prev;
           const next = { ...prev };
-          affectedIds.forEach((id) => {
+          affectedIds.forEach(id => {
             if (next[id] !== undefined) {
               delete next[id];
             }
           });
           return next;
         });
-        setShopDetailCache((prev) => {
+        setShopDetailCache(prev => {
           if (!Object.keys(prev).length) return prev;
           const next = { ...prev };
-          affectedIds.forEach((id) => {
+          affectedIds.forEach(id => {
             if (next[id] !== undefined) {
               delete next[id];
             }
@@ -883,7 +1251,7 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
           return next;
         });
       }
-    } catch (error: any) {
+    } catch {
       setMarketItems([]);
     } finally {
       setLoading(false);
@@ -897,16 +1265,32 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
       try {
         const endpoint = ROUTES.commerce.shopServiceBroadcast(serviceId);
         const response = currentlyBroadcasted
-          ? await deleteRequest(endpoint, { errorMessage: 'Unable to remove service broadcast.' })
-          : await postRequest(endpoint, {}, { errorMessage: 'Unable to broadcast service.' });
+          ? await deleteRequest(endpoint, {
+              errorMessage: 'Unable to remove service broadcast.',
+            })
+          : await postRequest(
+              endpoint,
+              {},
+              { errorMessage: 'Unable to broadcast service.' },
+            );
         if (!response?.success) {
-          throw new Error(response?.message || 'Unable to update service broadcast.');
+          throw new Error(
+            response?.message || 'Unable to update service broadcast.',
+          );
         }
         await loadMarketBroadcasts();
         DeviceEventEmitter.emit('broadcast.refresh');
-        Alert.alert('Services', currentlyBroadcasted ? 'Service broadcast removed.' : 'Service broadcasted.');
+        Alert.alert(
+          'Services',
+          currentlyBroadcasted
+            ? 'Service broadcast removed.'
+            : 'Service broadcasted.',
+        );
       } catch (error: any) {
-        Alert.alert('Services', error?.message || 'Unable to update broadcast status.');
+        Alert.alert(
+          'Services',
+          error?.message || 'Unable to update broadcast status.',
+        );
       } finally {
         setBroadcastingServiceId(null);
       }
@@ -914,41 +1298,47 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
     [loadMarketBroadcasts],
   );
 
-  const refreshShopLandingVisibility = useCallback(async (shopIds: string[]) => {
-    if (!shopIds.length) return;
-    try {
-      const responses = await Promise.allSettled(
-        shopIds.map((id) =>
-          getRequest(`${ROUTES.commerce.shops}${id}/`, {
-            forceNetwork: true,
-            errorMessage: 'Unable to load shop landing visibility.',
-          }),
-        ),
-      );
-      const visibilityUpdates: Record<string, boolean> = {};
-      const detailUpdates: Record<string, any> = {};
-      responses.forEach((result, index) => {
-        if (result.status !== 'fulfilled') return;
-        const data = result.value?.data ?? result.value;
-        if (!data) return;
-        const shopId = shopIds[index];
-        visibilityUpdates[shopId] = resolveShopLandingVisibility(data);
-        detailUpdates[shopId] = data;
-      });
-      if (Object.keys(visibilityUpdates).length) {
-        setShopLandingVisibility((prev) => ({ ...prev, ...visibilityUpdates }));
+  const refreshShopLandingVisibility = useCallback(
+    async (shopIds: string[]) => {
+      if (!shopIds.length) return;
+      try {
+        const responses = await Promise.allSettled(
+          shopIds.map(id =>
+            getRequest(`${ROUTES.commerce.shops}${id}/`, {
+              forceNetwork: true,
+              errorMessage: 'Unable to load shop landing visibility.',
+            }),
+          ),
+        );
+        const visibilityUpdates: Record<string, boolean> = {};
+        const detailUpdates: Record<string, any> = {};
+        responses.forEach((result, index) => {
+          if (result.status !== 'fulfilled') return;
+          const data = result.value?.data ?? result.value;
+          if (!data) return;
+          const shopId = shopIds[index];
+          visibilityUpdates[shopId] = resolveShopLandingVisibility(data);
+          detailUpdates[shopId] = data;
+        });
+        if (Object.keys(visibilityUpdates).length) {
+          setShopLandingVisibility(prev => ({ ...prev, ...visibilityUpdates }));
+        }
+        if (Object.keys(detailUpdates).length) {
+          setShopDetailCache(prev => ({ ...prev, ...detailUpdates }));
+        }
+      } catch (error) {
+        console.warn('Unable to refresh landing visibility for shops:', error);
       }
-      if (Object.keys(detailUpdates).length) {
-        setShopDetailCache((prev) => ({ ...prev, ...detailUpdates }));
-      }
-    } catch (error) {
-      console.warn('Unable to refresh landing visibility for shops:', error);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     loadMarketBroadcasts();
-    const subscription = DeviceEventEmitter.addListener('broadcast.refresh', loadMarketBroadcasts);
+    const subscription = DeviceEventEmitter.addListener(
+      'broadcast.refresh',
+      loadMarketBroadcasts,
+    );
     return () => subscription.remove();
   }, [loadMarketBroadcasts]);
 
@@ -956,11 +1346,13 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
     const ids = Array.from(
       new Set(
         marketItems
-          .map((item) => item.source?.id)
+          .map(item => item.source?.id)
           .filter((id): id is string => Boolean(id)),
       ),
     );
-    const uncachedIds = ids.filter((id) => shopLandingVisibility[id] === undefined);
+    const uncachedIds = ids.filter(
+      id => shopLandingVisibility[id] === undefined,
+    );
     if (uncachedIds.length) {
       void refreshShopLandingVisibility(uncachedIds);
     }
@@ -969,14 +1361,22 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
   const filteredProducts = useMemo(() => {
     let list = [...marketItems];
     if (activeFilter === 'trending') {
-      list = list.filter((item) => Number(item.product?.rating_avg ?? 0) > 0);
+      list = list.filter(item => Number(item.product?.rating_avg ?? 0) > 0);
     } else if (activeFilter === 'drops') {
-      list = list.filter((item) => String(item.source?.name ?? '').toLowerCase().includes('drop'));
+      list = list.filter(item =>
+        String(item.source?.name ?? '')
+          .toLowerCase()
+          .includes('drop'),
+      );
+    } else if (activeFilter === 'broadcasted') {
+      list = list.filter(item => isBroadcastActive(item));
     }
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase();
-      list = list.filter((item) => {
-        const hay = `${item.product?.name ?? ''} ${item.product?.description ?? ''}`.toLowerCase();
+      list = list.filter(item => {
+        const hay = `${item.product?.name ?? ''} ${
+          item.product?.description ?? ''
+        }`.toLowerCase();
         return hay.includes(term);
       });
     }
@@ -984,55 +1384,39 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
   }, [marketItems, activeFilter, searchTerm]);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}> 
-      <View style={[styles.filterSection, { backgroundColor: palette.surface, borderColor: palette.divider }]}> 
-        <Text style={[styles.filterHeading, { color: palette.text }]}>Filters</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterChips}
-        >
-          {FILTERS.map((filter) => {
-            const isActive = filter.key === activeFilter;
-            return (
-              <Pressable
-                key={filter.key}
-                style={[
-                  styles.filterChip,
-                  {
-                    borderColor: isActive ? palette.primary : palette.divider,
-                    backgroundColor: isActive ? palette.primarySoft : 'transparent',
-                  },
-                ]}
-                onPress={() => setActiveFilter(filter.key)}
-              >
-                <Text style={{ color: isActive ? palette.primaryStrong : palette.text }}>
-                  {filter.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        <Text style={[styles.filterPreview, { color: palette.subtext }]}>
-          {searchTerm ? `Showing results for “${searchTerm}”` : 'Browse broadcast products'}
-        </Text>
-      </View>
-      <View style={styles.listWrapper}> 
+    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+      <View style={styles.listWrapper}>
         {loading && !filteredProducts.length ? (
           <View style={styles.loader}>
             <ActivityIndicator color={palette.primaryStrong} />
           </View>
         ) : filteredProducts.length ? (
-          <ScrollView contentContainerStyle={styles.productsList} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.productsList}
+            showsVerticalScrollIndicator={false}
+          >
             {filteredProducts.map((item, index) => {
               const source = item.source ?? {};
-              const cachedLanding = source.id ? shopLandingVisibility[source.id] : undefined;
-              const shopDetail = source.id ? shopDetailCache[source.id] : undefined;
-              const landingPublic = cachedLanding ?? resolveShopLandingVisibility(shopDetail ?? source);
-              const resolvedShopName = shopDetail?.name ?? source.name ?? 'Shop';
+              const cachedLanding = source.id
+                ? shopLandingVisibility[source.id]
+                : undefined;
+              const shopDetail = source.id
+                ? shopDetailCache[source.id]
+                : undefined;
+              const landingPublic =
+                cachedLanding ??
+                resolveShopLandingVisibility(shopDetail ?? source);
+              const resolvedShopName =
+                shopDetail?.name ?? source.name ?? 'Shop';
               const shopImageUri = resolveShopImageUri(shopDetail, source);
-              const shopDescription = resolveShopDescription(shopDetail, source);
-              const onOpenLanding = source.id && landingPublic ? () => openLandingForShop(source.id, resolvedShopName) : undefined;
+              const shopDescription = resolveShopDescription(
+                shopDetail,
+                source,
+              );
+              const onOpenLanding =
+                source.id && landingPublic
+                  ? () => openLandingForShop(source.id, resolvedShopName)
+                  : undefined;
               const shopName = landingPublic ? resolvedShopName : undefined;
               const service = item.service ?? {};
               const serviceIsBroadcasted = isBroadcastActive(item);
@@ -1046,7 +1430,11 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
                 return (
                   <View
                     key={`${item.id}-${index}`}
-                    style={index === filteredProducts.length - 1 ? undefined : styles.cardSpacing}
+                    style={
+                      index === filteredProducts.length - 1
+                        ? undefined
+                        : styles.cardSpacing
+                    }
                   >
                     <BroadcastServiceCard
                       item={item}
@@ -1056,9 +1444,12 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
                       shopImageUri={shopImageUri}
                       shopDescription={shopDescription}
                       onOpenLanding={landingPublic ? onOpenLanding : undefined}
-                      onBook={() => openServiceBooking(service.id, service.name)}
+                      onBook={() =>
+                        openServiceBooking(service.id, service.name)
+                      }
                       isBroadcasted={serviceIsBroadcasted}
                       broadcastLoading={broadcastingServiceId === service.id}
+                      onBroadcast={handleServiceBroadcast}
                       existingBooking={existingBooking}
                       onOpenBookingDetails={openBookingDetails}
                     />
@@ -1068,7 +1459,11 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
               return (
                 <View
                   key={`${item.id}-${index}`}
-                  style={index === filteredProducts.length - 1 ? undefined : styles.cardSpacing}
+                  style={
+                    index === filteredProducts.length - 1
+                      ? undefined
+                      : styles.cardSpacing
+                  }
                 >
                   <BroadcastProductCard
                     item={item}
@@ -1078,7 +1473,9 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
                     shopImageUri={shopImageUri}
                     shopDescription={shopDescription}
                     onOpenLanding={landingPublic ? onOpenLanding : undefined}
-                    isProductInCart={Boolean(productId && cartHasProduct(cartProductIndex, productId))}
+                    isProductInCart={Boolean(
+                      productId && cartHasProduct(cartProductIndex, productId),
+                    )}
                   />
                 </View>
               );
@@ -1086,7 +1483,7 @@ export default function BroadcastMarketPage({ searchTerm = '' }: Props) {
           </ScrollView>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: palette.subtext }]}> 
+            <Text style={[styles.emptyText, { color: palette.subtext }]}>
               No broadcast products match the current filters.
             </Text>
           </View>
@@ -1103,15 +1500,37 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   filterSection: {
-    borderWidth: 1.5,
-    borderRadius: 20,
+    borderWidth: 1,
+    borderRadius: 24,
     padding: 14,
     marginBottom: 12,
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  filterHeadingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  filterEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  filterMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterHeading: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '900',
   },
   filterChips: {
     flexDirection: 'row',
@@ -1119,9 +1538,9 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     marginRight: 10,
   },
   filterPreview: {
@@ -1240,6 +1659,17 @@ const styles = StyleSheet.create({
   memberBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  deliveryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceMetaRow: {
+    gap: 4,
+    marginTop: 8,
   },
   broadcastShopBadgeLarge: {
     borderRadius: 16,

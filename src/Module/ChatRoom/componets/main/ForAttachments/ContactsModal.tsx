@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Animated,
   Modal,
   View,
   Text,
@@ -10,6 +11,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 
 export type SimpleContact = {
   id: string;
@@ -35,6 +37,10 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
   const [contacts, setContacts] = useState<SimpleContact[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   useEffect(() => {
     const loadContactsFromCache = async () => {
@@ -48,7 +54,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
           return;
         }
         const parsed = JSON.parse(raw) as any[];
-        const mapped: SimpleContact[] = (parsed || []).map((c) => ({
+        const mapped: SimpleContact[] = (parsed || []).map(c => ({
           id: c.id ?? c.phone ?? String(Math.random()),
           name: c.name ?? c.phone ?? 'Unknown',
           phone: c.phone ?? '',
@@ -56,10 +62,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
         setContacts(mapped);
         setSelectedIds([]);
       } catch (e) {
-        console.warn(
-          '[ContactsModal] Failed to read contacts cache:',
-          e,
-        );
+        console.warn('[ContactsModal] Failed to read contacts cache:', e);
         setContacts([]);
         setSelectedIds([]);
       } finally {
@@ -71,13 +74,13 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
   }, [visible]);
 
   const toggleContact = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
     );
   };
 
   const handleShare = () => {
-    const selected = contacts.filter((c) => selectedIds.includes(c.id));
+    const selected = contacts.filter(c => selectedIds.includes(c.id));
     if (onSendContacts && selected.length) {
       onSendContacts(selected);
     }
@@ -93,15 +96,32 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
           justifyContent: 'flex-end',
         }}
       >
-        <View
+        <Animated.View
           style={{
             backgroundColor: palette.surfaceElevated,
             borderTopLeftRadius: kisRadius.xl,
             borderTopRightRadius: kisRadius.xl,
             padding: KIS_TOKENS.spacing.lg,
             maxHeight: '80%',
+            transform: [{ translateY: dragY }],
           }}
         >
+          <View
+            {...panHandlers}
+            style={{
+              alignItems: 'center',
+              marginBottom: KIS_TOKENS.spacing.sm,
+            }}
+          >
+            <View
+              style={{
+                width: 42,
+                height: 4,
+                borderRadius: 999,
+                backgroundColor: palette.divider,
+              }}
+            />
+          </View>
           <Text
             style={{
               fontSize: KIS_TOKENS.typography.title,
@@ -141,7 +161,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
           ) : (
             <FlatList
               data={contacts}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               style={{ maxHeight: 320 }}
               renderItem={({ item }) => {
                 const selected = selectedIds.includes(item.id);
@@ -212,14 +232,12 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
                 opacity: selectedIds.length ? 1 : 0.5,
               }}
             >
-              <Text
-                style={{ color: palette.primary, fontWeight: '700' }}
-              >
+              <Text style={{ color: palette.primary, fontWeight: '700' }}>
                 Share
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

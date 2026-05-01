@@ -48,7 +48,6 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import EngineModal from './HealthEnginesDashboads/EngineModal';
 
-
 type EngineData = {
   id: string;
   name: string;
@@ -56,7 +55,10 @@ type EngineData = {
   system_flag: boolean;
 };
 
-type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionServicesCatalog'>;
+type Props = NativeStackScreenProps<
+  RootStackParamList,
+  'HealthInstitutionServicesCatalog'
+>;
 type MediumRow = {
   id: string;
   name: string;
@@ -82,7 +84,14 @@ type BookNowAction = {
   label: string;
   run: () => void | Promise<void>;
 };
-type ViewerRole = 'owner' | 'admin' | 'manager' | 'staff' | 'analyst' | 'member' | 'unassigned';
+type ViewerRole =
+  | 'owner'
+  | 'admin'
+  | 'manager'
+  | 'staff'
+  | 'analyst'
+  | 'member'
+  | 'unassigned';
 type EngineKey =
   | 'appointment'
   | 'video'
@@ -123,7 +132,9 @@ const SUPPORTED_TYPES: HealthDashboardInstitutionType[] = [
   'wellness_center',
 ];
 
-const normalizeInstitutionType = (value: string | undefined): HealthDashboardInstitutionType => {
+const normalizeInstitutionType = (
+  value: string | undefined,
+): HealthDashboardInstitutionType => {
   const raw = String(value ?? '').trim();
   if (raw === 'laboratory') return 'lab';
   if (raw === 'diagnostics_center') return 'diagnostics';
@@ -153,7 +164,7 @@ const extractServiceRows = (payload: any, preferredKeys: string[]): any[] => {
     }
 
     const nestedKeys = ['data', 'payload', 'result', 'response'];
-    nestedKeys.forEach((key) => {
+    nestedKeys.forEach(key => {
       const nested = current?.[key];
       if (nested && typeof nested === 'object') {
         queue.push(nested);
@@ -164,9 +175,14 @@ const extractServiceRows = (payload: any, preferredKeys: string[]): any[] => {
   return [];
 };
 
-const normalizeServiceRow = (raw: any, index: number): ServiceDefinition | null => {
+const normalizeServiceRow = (
+  raw: any,
+  index: number,
+): ServiceDefinition | null => {
   if (!raw || typeof raw !== 'object') return null;
-  const id = String(raw.id ?? raw.service_id ?? raw.key ?? `service_${index + 1}`).trim();
+  const id = String(
+    raw.id ?? raw.service_id ?? raw.key ?? `service_${index + 1}`,
+  ).trim();
   const name = String(raw.name ?? raw.title ?? raw.label ?? '').trim();
   if (!name) return null;
   const description = String(raw.description ?? raw.summary ?? '').trim();
@@ -182,12 +198,23 @@ const normalizeServiceRow = (raw: any, index: number): ServiceDefinition | null 
       : Number.isFinite(Number(raw.base_price_cents))
       ? Number(raw.base_price_cents)
       : undefined,
-    mediumIds: Array.isArray(mediumIdsSource) ? mediumIdsSource.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
-    mediumNames: Array.isArray(mediumNamesSource) ? mediumNamesSource.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
+    mediumIds: Array.isArray(mediumIdsSource)
+      ? mediumIdsSource
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
+      : [],
+    mediumNames: Array.isArray(mediumNamesSource)
+      ? mediumNamesSource
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
+      : [],
   });
 };
 
-const normalizeHealthOpsServiceRow = (raw: any, index: number): ServiceDefinition | null => {
+const normalizeHealthOpsServiceRow = (
+  raw: any,
+  index: number,
+): ServiceDefinition | null => {
   if (!raw || typeof raw !== 'object') return null;
   const source =
     raw?.service && typeof raw.service === 'object'
@@ -225,9 +252,19 @@ const normalizeHealthOpsServiceRow = (raw: any, index: number): ServiceDefinitio
     name,
     description,
     active: source.is_active !== false && source.active !== false,
-    basePriceCents: Number.isFinite(baseCostMicro) ? Math.max(0, Math.round(baseCostMicro / 10)) : undefined,
-    mediumIds: Array.isArray(mediumIdsSource) ? mediumIdsSource.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
-    mediumNames: Array.isArray(mediumNamesSource) ? mediumNamesSource.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
+    basePriceCents: Number.isFinite(baseCostMicro)
+      ? Math.max(0, Math.round(baseCostMicro / 10))
+      : undefined,
+    mediumIds: Array.isArray(mediumIdsSource)
+      ? mediumIdsSource
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
+      : [],
+    mediumNames: Array.isArray(mediumNamesSource)
+      ? mediumNamesSource
+          .map((item: any) => String(item || '').trim())
+          .filter(Boolean)
+      : [],
   });
 };
 
@@ -253,13 +290,10 @@ const money = (amountCents?: number) =>
     ? `${(Number(amountCents) / 10000).toFixed(3).replace(/\.?0+$/, '')} KISC`
     : null;
 
-const toKisc = (micro?: number) => {
-  if (!Number.isFinite(Number(micro))) return '0.000';
-  return (Number(micro) / 100000).toFixed(3);
-};
-
 const normalizeViewerRole = (value: unknown): ViewerRole => {
-  const role = String(value || '').trim().toLowerCase();
+  const role = String(value || '')
+    .trim()
+    .toLowerCase();
   if (
     role === 'owner' ||
     role === 'admin' ||
@@ -276,7 +310,10 @@ const normalizeViewerRole = (value: unknown): ViewerRole => {
 
 const normalizeEngineName = (value: string) => value.trim().toLowerCase();
 
-const ENGINE_ICON_BY_NAME: Record<string, 'calendar' | 'video' | 'chat' | 'file' | 'cart' | 'bell' | 'heart' | 'list'> = {
+const ENGINE_ICON_BY_NAME: Record<
+  string,
+  'calendar' | 'video' | 'chat' | 'file' | 'cart' | 'bell' | 'heart' | 'list'
+> = {
   'appointment engine': 'calendar',
   'video consultation engine': 'video',
   'secure messaging / chat engine': 'chat',
@@ -312,17 +349,26 @@ const ENGINE_NAME_TO_FLOW_KEY: Record<string, string> = {
   'notification & reminder engine': 'reminder',
 };
 
-const resolveEngineFlowKeysFromMediumNames = (mediumNames: string[]): string[] =>
+const resolveEngineFlowKeysFromMediumNames = (
+  mediumNames: string[],
+): string[] =>
   Array.from(
     new Set(
       mediumNames
-        .map((name) => ENGINE_NAME_TO_FLOW_KEY[normalizeEngineName(name)])
+        .map(name => ENGINE_NAME_TO_FLOW_KEY[normalizeEngineName(name)])
         .filter((value): value is string => !!value),
     ),
   );
 
-export default function InstitutionServicesCatalogScreen({ navigation, route }: Props) {
-  const { institutionId, institutionName: routeName, institutionType: routeType } = route.params;
+export default function InstitutionServicesCatalogScreen({
+  navigation,
+  route,
+}: Props) {
+  const {
+    institutionId,
+    institutionName: routeName,
+    institutionType: routeType,
+  } = route.params;
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
@@ -330,10 +376,13 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
-  const [institutionName, setInstitutionName] = useState(routeName || 'Institution');
-  const [institutionType, setInstitutionType] = useState<HealthDashboardInstitutionType>(
-    normalizeInstitutionType(routeType),
+  const [institutionName, setInstitutionName] = useState(
+    routeName || 'Institution',
   );
+  const [institutionType, setInstitutionType] =
+    useState<HealthDashboardInstitutionType>(
+      normalizeInstitutionType(routeType),
+    );
   const [services, setServices] = useState<ServiceDefinition[]>([]);
   const [saving, setSaving] = useState(false);
   const [newServiceName, setNewServiceName] = useState('');
@@ -345,7 +394,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
   const [newServiceMediumIds, setNewServiceMediumIds] = useState<string[]>([]);
   const [bookNowActions, setBookNowActions] = useState<BookNowAction[]>([]);
   const [bookNowServiceName, setBookNowServiceName] = useState('');
-  const [engineExecutions, setEngineExecutions] = useState<EngineExecutionRow[]>([]);
+  const [engineExecutions, setEngineExecutions] = useState<
+    EngineExecutionRow[]
+  >([]);
   const [viewerRole, setViewerRole] = useState<ViewerRole>('unassigned');
   const [previewCards, setPreviewCards] = useState<PreviewCardRow[]>([]);
   const [selectedEngine, setSelectedEngine] = useState<EngineData | null>(null);
@@ -357,12 +408,20 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       const institutionList = Array.isArray(profileState.profile?.institutions)
         ? profileState.profile.institutions
         : [];
-      const institution = institutionList.find((item: any) => String(item?.id) === String(institutionId));
-      const resolvedType = normalizeInstitutionType(institution?.type ?? routeType);
+      const institution = institutionList.find(
+        (item: any) => String(item?.id) === String(institutionId),
+      );
+      const resolvedType = normalizeInstitutionType(
+        institution?.type ?? routeType,
+      );
       const customServices = resolveInstitutionServices(institution);
       const fallbackServices = HEALTH_DASHBOARD_DEFAULT_SERVICES[resolvedType];
       await ensureInstitutionDashboardExists(institutionId, resolvedType);
-      const [dashboardServicesRes, dashboardServicesRawRes, healthOpsServicesRes] = await Promise.all([
+      const [
+        dashboardServicesRes,
+        dashboardServicesRawRes,
+        healthOpsServicesRes,
+      ] = await Promise.all([
         fetchInstitutionServices(institutionId),
         getRequest(ROUTES.healthDashboard.services(institutionId), {
           errorMessage: 'Unable to load institution services.',
@@ -372,19 +431,38 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
         }),
       ]);
       const dashboardServiceRows = [
-        ...extractServiceRows(dashboardServicesRes, ['services', 'results', 'items']),
-        ...extractServiceRows(dashboardServicesRawRes, ['services', 'results', 'items']),
+        ...extractServiceRows(dashboardServicesRes, [
+          'services',
+          'results',
+          'items',
+        ]),
+        ...extractServiceRows(dashboardServicesRawRes, [
+          'services',
+          'results',
+          'items',
+        ]),
       ];
       const dashboardServices = dashboardServiceRows
         .map((row: any, index: number) => normalizeServiceRow(row, index))
         .filter(Boolean) as ServiceDefinition[];
-      const healthOpsServiceRows = extractServiceRows(healthOpsServicesRes, ['results', 'services', 'items']);
+      const healthOpsServiceRows = extractServiceRows(healthOpsServicesRes, [
+        'results',
+        'services',
+        'items',
+      ]);
       const healthOpsServices = healthOpsServiceRows
-        .map((row: any, index: number) => normalizeHealthOpsServiceRow(row, index))
+        .map((row: any, index: number) =>
+          normalizeHealthOpsServiceRow(row, index),
+        )
         .filter(Boolean) as ServiceDefinition[];
 
       const mergedMap = new Map<string, ServiceDefinition>();
-      [...fallbackServices, ...customServices, ...dashboardServices, ...healthOpsServices].forEach((service) => {
+      [
+        ...fallbackServices,
+        ...customServices,
+        ...dashboardServices,
+        ...healthOpsServices,
+      ].forEach(service => {
         const serviceId = String(service?.id || '').trim();
         if (!serviceId) return;
         const existing = mergedMap.get(serviceId);
@@ -392,18 +470,31 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           ...existing,
           ...service,
           id: serviceId,
-          name: String(service?.name || existing?.name || '').trim() || existing?.name || 'Health Service',
-          description: String(service?.description || existing?.description || '').trim(),
+          name:
+            String(service?.name || existing?.name || '').trim() ||
+            existing?.name ||
+            'Health Service',
+          description: String(
+            service?.description || existing?.description || '',
+          ).trim(),
           mediumIds: Array.from(
             new Set([
-              ...((existing?.mediumIds || []).map((item) => String(item || '').trim()).filter(Boolean)),
-              ...((service?.mediumIds || []).map((item) => String(item || '').trim()).filter(Boolean)),
+              ...(existing?.mediumIds || [])
+                .map(item => String(item || '').trim())
+                .filter(Boolean),
+              ...(service?.mediumIds || [])
+                .map(item => String(item || '').trim())
+                .filter(Boolean),
             ]),
           ),
           mediumNames: Array.from(
             new Set([
-              ...((existing?.mediumNames || []).map((item) => String(item || '').trim()).filter(Boolean)),
-              ...((service?.mediumNames || []).map((item) => String(item || '').trim()).filter(Boolean)),
+              ...(existing?.mediumNames || [])
+                .map(item => String(item || '').trim())
+                .filter(Boolean),
+              ...(service?.mediumNames || [])
+                .map(item => String(item || '').trim())
+                .filter(Boolean),
             ]),
           ),
         });
@@ -413,7 +504,10 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       setInstitutionType(resolvedType);
       setServices(sanitizeServiceList(Array.from(mergedMap.values())));
     } catch (error: any) {
-      Alert.alert('Services page', error?.message || 'Unable to load institution services.');
+      Alert.alert(
+        'Services page',
+        error?.message || 'Unable to load institution services.',
+      );
       const fallbackType = normalizeInstitutionType(routeType);
       setInstitutionType(fallbackType);
       setServices(HEALTH_DASHBOARD_DEFAULT_SERVICES[fallbackType]);
@@ -435,7 +529,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       ]);
 
       if (mediumRes?.success) {
-        const rows = Array.isArray(mediumRes?.data?.results) ? mediumRes.data.results : [];
+        const rows = Array.isArray(mediumRes?.data?.results)
+          ? mediumRes.data.results
+          : [];
         setMediums(
           rows
             .map((row: any) => ({
@@ -444,20 +540,27 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               description: String(row?.description || ''),
               system_flag: !!row?.system_flag,
             }))
-            .filter((medium: MediumRow) => !isRemovedHealthEngineName(medium.name)),
+            .filter(
+              (medium: MediumRow) => !isRemovedHealthEngineName(medium.name),
+            ),
         );
       }
       const viewer = cardsRes?.data?.viewer ?? {};
       setViewerRole(normalizeViewerRole(viewer?.role));
-      const rawCards = Array.isArray(cardsRes?.data?.cards) ? cardsRes.data.cards : [];
+      const rawCards = Array.isArray(cardsRes?.data?.cards)
+        ? cardsRes.data.cards
+        : [];
       const normalizedCards: PreviewCardRow[] = rawCards
         .map((row: any, index: number) => {
-          const service = row?.service && typeof row.service === 'object' ? row.service : {};
+          const service =
+            row?.service && typeof row.service === 'object' ? row.service : {};
           const serviceId = String(service?.id || '').trim();
           const serviceName = String(service?.name || '').trim();
           if (!serviceId || !serviceName) return null;
           const centsRaw = service?.basePriceCents ?? service?.base_price_cents;
-          const basePriceCents = Number.isFinite(Number(centsRaw)) ? Number(centsRaw) : undefined;
+          const basePriceCents = Number.isFinite(Number(centsRaw))
+            ? Number(centsRaw)
+            : undefined;
           return {
             id: String(row?.id || `preview-${index + 1}`),
             date: String(row?.date || row?.dateKey || ''),
@@ -471,7 +574,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           } as PreviewCardRow;
         })
         .filter(Boolean) as PreviewCardRow[];
-      normalizedCards.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      normalizedCards.sort((a, b) =>
+        `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`),
+      );
       setPreviewCards(normalizedCards);
 
       const executionRows = Array.isArray(cardsRes?.data?.engine_executions)
@@ -488,7 +593,10 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
         })),
       );
     } catch (error: any) {
-      Alert.alert('Engines', error?.message || 'Unable to load engine settings.');
+      Alert.alert(
+        'Engines',
+        error?.message || 'Unable to load engine settings.',
+      );
     } finally {
       setMediumLoading(false);
     }
@@ -503,19 +611,28 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       if (!response?.success) {
         throw new Error(response?.message || 'Unable to load service catalog.');
       }
-      const rows = Array.isArray(response?.data?.results) ? response.data.results : [];
+      const rows = Array.isArray(response?.data?.results)
+        ? response.data.results
+        : [];
       setApiServices(
         rows.map((row: any) => ({
           id: String(row?.id || ''),
           name: String(row?.name || ''),
           description: String(row?.description || ''),
           is_default: !!row?.is_default,
-          medium_ids: Array.isArray(row?.medium_ids) ? row.medium_ids.map((id: any) => String(id)) : [],
-          medium_links: Array.isArray(row?.medium_links) ? row.medium_links : [],
+          medium_ids: Array.isArray(row?.medium_ids)
+            ? row.medium_ids.map((id: any) => String(id))
+            : [],
+          medium_links: Array.isArray(row?.medium_links)
+            ? row.medium_links
+            : [],
         })),
       );
     } catch (error: any) {
-      Alert.alert('Services', error?.message || 'Unable to load service catalog.');
+      Alert.alert(
+        'Services',
+        error?.message || 'Unable to load service catalog.',
+      );
     } finally {
       setServiceLoading(false);
     }
@@ -534,31 +651,38 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
   }, [loadServiceCatalog]);
 
   const activeCount = useMemo(
-    () => services.filter((service) => service.active !== false).length,
+    () => services.filter(service => service.active !== false).length,
     [services],
   );
 
   const defaultServiceIdSet = useMemo(
-    () => new Set(HEALTH_DASHBOARD_DEFAULT_SERVICES[institutionType].map((service) => service.id)),
+    () =>
+      new Set(
+        HEALTH_DASHBOARD_DEFAULT_SERVICES[institutionType].map(
+          service => service.id,
+        ),
+      ),
     [institutionType],
   );
 
   const assignableMediums = useMemo(
-    () => mediums.filter((medium) => !blocksHealthServiceMapping(medium.name)),
+    () => mediums.filter(medium => !blocksHealthServiceMapping(medium.name)),
     [mediums],
   );
 
   const hasComingSoonEngines = useMemo(
-    () => mediums.some((medium) => isComingSoonHealthEngineName(medium.name)),
+    () => mediums.some(medium => isComingSoonHealthEngineName(medium.name)),
     [mediums],
   );
 
   const serviceMediumNamesByName = useMemo(() => {
     const out = new Map<string, string[]>();
-    apiServices.forEach((service) => {
-      const mediumNames = filterHealthEngineNames((service.medium_links || [])
-        .map((link) => String(link?.medium?.name || '').trim())
-        .filter(Boolean));
+    apiServices.forEach(service => {
+      const mediumNames = filterHealthEngineNames(
+        (service.medium_links || [])
+          .map(link => String(link?.medium?.name || '').trim())
+          .filter(Boolean),
+      );
       if (mediumNames.length > 0) {
         out.set(service.name.trim().toLowerCase(), mediumNames);
       }
@@ -570,20 +694,25 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
     async (nextServices: ServiceDefinition[]) => {
       const cleanedServices = sanitizeServiceList(nextServices);
       const payload = {
-        services: cleanedServices.map((service) => ({
+        services: cleanedServices.map(service => ({
           id: String(service.id || '').trim(),
           name: String(service.name || '').trim(),
           description: String(service.description || '').trim(),
           active: service.active !== false,
           basePriceCents:
-            Number.isFinite(Number(service.basePriceCents)) && Number(service.basePriceCents) >= 0
+            Number.isFinite(Number(service.basePriceCents)) &&
+            Number(service.basePriceCents) >= 0
               ? Number(service.basePriceCents)
               : undefined,
           mediumIds: Array.isArray(service.mediumIds)
-            ? service.mediumIds.map((id) => String(id || '').trim()).filter(Boolean)
+            ? service.mediumIds
+                .map(id => String(id || '').trim())
+                .filter(Boolean)
             : [],
           mediumNames: Array.isArray(service.mediumNames)
-            ? service.mediumNames.map((name) => String(name || '').trim()).filter(Boolean)
+            ? service.mediumNames
+                .map(name => String(name || '').trim())
+                .filter(Boolean)
             : [],
         })),
       };
@@ -592,9 +721,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
         throw new Error(res?.message || 'Unable to update services.');
       }
       const normalized = Array.isArray(res?.data?.services)
-        ? res.data.services
+        ? (res.data.services
             .map((row: any, index: number) => normalizeServiceRow(row, index))
-            .filter(Boolean) as ServiceDefinition[]
+            .filter(Boolean) as ServiceDefinition[])
         : [];
       setServices(normalized.length > 0 ? normalized : cleanedServices);
     },
@@ -606,8 +735,10 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       if (saving) return;
       setSaving(true);
       try {
-        const next = services.map((service) =>
-          service.id === serviceId ? { ...service, active: service.active === false } : service,
+        const next = services.map(service =>
+          service.id === serviceId
+            ? { ...service, active: service.active === false }
+            : service,
         );
         await persistServices(next);
       } catch (error: any) {
@@ -629,15 +760,19 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       setSaving(true);
       try {
         if (!serviceId.startsWith('custom_')) {
-          const url = `${ROUTES.broadcasts.healthService(serviceId)}?institution_id=${encodeURIComponent(institutionId)}`;
+          const url = `${ROUTES.broadcasts.healthService(
+            serviceId,
+          )}?institution_id=${encodeURIComponent(institutionId)}`;
           const response = await deleteRequest(url, {
             errorMessage: 'Unable to delete service mapping.',
           });
           if (!response?.success && Number(response?.status) !== 404) {
-            throw new Error(response?.message || 'Unable to delete service mapping.');
+            throw new Error(
+              response?.message || 'Unable to delete service mapping.',
+            );
           }
         }
-        const next = services.filter((service) => service.id !== serviceId);
+        const next = services.filter(service => service.id !== serviceId);
         await persistServices(next);
         await loadServiceCatalog();
       } catch (error: any) {
@@ -646,7 +781,14 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
         setSaving(false);
       }
     },
-    [defaultServiceIdSet, institutionId, loadServiceCatalog, persistServices, saving, services],
+    [
+      defaultServiceIdSet,
+      institutionId,
+      loadServiceCatalog,
+      persistServices,
+      saving,
+      services,
+    ],
   );
 
   const addCustomService = useCallback(async () => {
@@ -679,8 +821,8 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       const created = createResponse?.data?.service ?? {};
       const createdServiceId = String(created?.id || `custom_${nanoid(10)}`);
       const selectedMediumNames = assignableMediums
-        .filter((medium) => newServiceMediumIds.includes(medium.id))
-        .map((medium) => medium.name);
+        .filter(medium => newServiceMediumIds.includes(medium.id))
+        .map(medium => medium.name);
       const next: ServiceDefinition[] = [
         ...services,
         {
@@ -702,14 +844,29 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
     } finally {
       setSaving(false);
     }
-  }, [assignableMediums, institutionId, loadServiceCatalog, newServiceDescription, newServiceMediumIds, newServiceName, persistServices, saving, services]);
+  }, [
+    assignableMediums,
+    institutionId,
+    loadServiceCatalog,
+    newServiceDescription,
+    newServiceMediumIds,
+    newServiceName,
+    persistServices,
+    saving,
+    services,
+  ]);
 
   const resolveServiceMediumNames = useCallback(
     (service: ServiceDefinition) => {
-      if (Array.isArray(service.mediumNames) && service.mediumNames.length > 0) {
+      if (
+        Array.isArray(service.mediumNames) &&
+        service.mediumNames.length > 0
+      ) {
         return filterHealthEngineNames(service.mediumNames);
       }
-      return filterHealthEngineNames(serviceMediumNamesByName.get(service.name.trim().toLowerCase()) || []);
+      return filterHealthEngineNames(
+        serviceMediumNamesByName.get(service.name.trim().toLowerCase()) || [],
+      );
     },
     [serviceMediumNamesByName],
   );
@@ -816,7 +973,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
             Alert.alert(
               'Payment & Billing',
               money(service.basePriceCents)
-                ? `Consultation charge starts at ${money(service.basePriceCents)}.`
+                ? `Consultation charge starts at ${money(
+                    service.basePriceCents,
+                  )}.`
                 : 'Payment workflow is ready for this service.',
             );
           },
@@ -855,7 +1014,10 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           label: 'Dispatch Emergency',
           run: async () => {
             await executeEngine('emergency');
-            Alert.alert('Emergency Dispatch', 'Emergency workflow has been triggered for this service.');
+            Alert.alert(
+              'Emergency Dispatch',
+              'Emergency workflow has been triggered for this service.',
+            );
           },
         });
       }
@@ -879,7 +1041,10 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           label: 'Start Logistics',
           run: async () => {
             await executeEngine('logistics');
-            Alert.alert('Home Logistics', 'Home logistics workflow has been started.');
+            Alert.alert(
+              'Home Logistics',
+              'Home logistics workflow has been started.',
+            );
           },
         });
       }
@@ -900,7 +1065,13 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       setBookNowServiceName(service.name);
       setBookNowActions(actions);
     },
-    [institutionId, institutionName, institutionType, navigation, resolveServiceMediumNames],
+    [
+      institutionId,
+      institutionName,
+      institutionType,
+      navigation,
+      resolveServiceMediumNames,
+    ],
   );
 
   const isOwnerViewer = viewerRole === 'owner';
@@ -908,13 +1079,16 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
   const handleOwnerPreview = useCallback(
     async (service: ServiceDefinition) => {
       if (!isOwnerViewer) {
-        Alert.alert('Owner preview', 'Only the institution owner can run free preview flows.');
+        Alert.alert(
+          'Owner preview',
+          'Only the institution owner can run free preview flows.',
+        );
         return;
       }
 
       const candidate =
         previewCards.find(
-          (row) =>
+          row =>
             String(row.serviceId) === String(service.id) &&
             String(row.statusKey || '').toLowerCase() !== 'blocked' &&
             String(row.statusKey || '').toLowerCase() !== 'holiday',
@@ -929,7 +1103,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
       }
 
       try {
-        const configuredEngineFlowKeys = resolveEngineFlowKeysFromMediumNames(resolveServiceMediumNames(service));
+        const configuredEngineFlowKeys = resolveEngineFlowKeysFromMediumNames(
+          resolveServiceMediumNames(service),
+        );
         navigation.navigate('HealthServiceSession', {
           institutionId,
           institutionType,
@@ -938,7 +1114,8 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           sessionSource: 'broadcasts',
           serviceId: service.id,
           serviceName: service.name,
-          serviceDescription: service.description || candidate.serviceDescription,
+          serviceDescription:
+            service.description || candidate.serviceDescription,
           configuredEngineFlowKeys,
           dateKey: candidate.date,
           timeValue: candidate.time,
@@ -947,17 +1124,33 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
           ownerPreview: true,
         });
       } catch (error: any) {
-        Alert.alert('Owner preview', error?.message || 'Unable to start owner preview.');
+        Alert.alert(
+          'Owner preview',
+          error?.message || 'Unable to start owner preview.',
+        );
       }
     },
-    [institutionId, institutionName, institutionType, isOwnerViewer, navigation, previewCards, resolveServiceMediumNames],
+    [
+      institutionId,
+      institutionName,
+      institutionType,
+      isOwnerViewer,
+      navigation,
+      previewCards,
+      resolveServiceMediumNames,
+    ],
   );
 
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ position: 'absolute', right: spacing.lg, top: spacing.lg }}>
+        <LinearGradient
+          colors={[palette.gradientStart, palette.gradientEnd]}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <View
+            style={{ position: 'absolute', right: spacing.lg, top: spacing.lg }}
+          >
             <TouchableOpacity
               onPress={() => navigation.goBack()}
               style={{
@@ -973,7 +1166,13 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
             </TouchableOpacity>
           </View>
           <ActivityIndicator size="large" color={palette.accentPrimary} />
-          <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>
+          <Text
+            style={{
+              ...typography.body,
+              color: palette.subtext,
+              marginTop: spacing.sm,
+            }}
+          >
             Loading services...
           </Text>
         </LinearGradient>
@@ -983,8 +1182,17 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-      <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-        <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+      <LinearGradient
+        colors={[palette.gradientStart, palette.gradientEnd]}
+        style={{ flex: 1 }}
+      >
+        <View
+          style={{
+            alignItems: 'flex-end',
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+          }}
+        >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={{
@@ -999,7 +1207,12 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
             <KISIcon name="close" size={18} color={palette.text} />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+        <ScrollView
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing.xl,
+          }}
+        >
           <View
             style={{
               borderRadius: spacing.lg,
@@ -1008,17 +1221,37 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               ...borders.card,
             }}
           >
-            <Text style={{ ...typography.h2, color: palette.text }}>{institutionName} Services</Text>
-            <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
-              {institutionType.replace('_', ' ')} • {activeCount} active services
+            <Text style={{ ...typography.h2, color: palette.text }}>
+              {institutionName} Services
+            </Text>
+            <Text
+              style={{
+                ...typography.body,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
+              {institutionType.replace('_', ' ')} • {activeCount} active
+              services
             </Text>
             {isOwnerViewer ? (
-              <Text style={{ ...typography.caption, color: palette.accentPrimary, marginTop: spacing.xs }}>
-                Owner preview is enabled. You can run engine flows without KIS charges from this catalog.
+              <Text
+                style={{
+                  ...typography.caption,
+                  color: palette.accentPrimary,
+                  marginTop: spacing.xs,
+                }}
+              >
+                Owner preview is enabled. You can run engine flows without KIS
+                charges from this catalog.
               </Text>
             ) : null}
             <View style={{ marginTop: spacing.sm }}>
-              <KISButton title="Reload Services" variant="outline" onPress={loadServices} />
+              <KISButton
+                title="Reload Services"
+                variant="outline"
+                onPress={loadServices}
+              />
             </View>
           </View>
 
@@ -1031,12 +1264,20 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               ...borders.card,
             }}
           >
-            <Text style={{ ...typography.h3, color: palette.text }}>Engine Activity</Text>
-            <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
+            <Text style={{ ...typography.h3, color: palette.text }}>
+              Engine Activity
+            </Text>
+            <Text
+              style={{
+                ...typography.body,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
               Latest engine executions for this institution.
             </Text>
             <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
-              {engineExecutions.map((row) => (
+              {engineExecutions.map(row => (
                 <View
                   key={`engine-${row.id}`}
                   style={{
@@ -1048,10 +1289,18 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                   }}
                 >
                   <Text style={{ ...typography.label, color: palette.text }}>
-                    {String(row.engine || '').toUpperCase()} • {row.service_name || row.service_id || 'Service'}
+                    {String(row.engine || '').toUpperCase()} •{' '}
+                    {row.service_name || row.service_id || 'Service'}
                   </Text>
-                  <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
-                    {row.status || 'executed'} {row.created_at ? `• ${row.created_at}` : ''}
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: palette.subtext,
+                      marginTop: 2,
+                    }}
+                  >
+                    {row.status || 'executed'}{' '}
+                    {row.created_at ? `• ${row.created_at}` : ''}
                   </Text>
                 </View>
               ))}
@@ -1072,7 +1321,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               ...borders.card,
             }}
           >
-            <Text style={{ ...typography.h3, color: palette.text }}>Add Custom Service</Text>
+            <Text style={{ ...typography.h3, color: palette.text }}>
+              Add Custom Service
+            </Text>
             <KISTextInput
               label="Service name"
               value={newServiceName}
@@ -1085,14 +1336,34 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               onChangeText={setNewServiceDescription}
               style={{ marginTop: spacing.sm }}
             />
-            <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.sm }}>
+            <Text
+              style={{
+                ...typography.label,
+                color: palette.text,
+                marginTop: spacing.sm,
+              }}
+            >
               Select Engines (required)
             </Text>
-            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
-              Coming-up engines stay in the catalog, but they cannot be attached to services yet.
+            <Text
+              style={{
+                ...typography.caption,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
+              Coming-up engines stay in the catalog, but they cannot be attached
+              to services yet.
             </Text>
-            <View style={{ marginTop: spacing.xs, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-              {assignableMediums.map((medium) => {
+            <View
+              style={{
+                marginTop: spacing.xs,
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: spacing.xs,
+              }}
+            >
+              {assignableMediums.map(medium => {
                 const selected = newServiceMediumIds.includes(medium.id);
                 return (
                   <KISButton
@@ -1101,9 +1372,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                     size="xs"
                     variant={selected ? 'primary' : 'outline'}
                     onPress={() =>
-                      setNewServiceMediumIds((prev) =>
+                      setNewServiceMediumIds(prev =>
                         prev.includes(medium.id)
-                          ? prev.filter((id) => id !== medium.id)
+                          ? prev.filter(id => id !== medium.id)
                           : [...prev, medium.id],
                       )
                     }
@@ -1113,7 +1384,11 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               })}
             </View>
             <View style={{ marginTop: spacing.sm }}>
-              <KISButton title={saving ? 'Saving...' : 'Add Service'} onPress={addCustomService} disabled={saving} />
+              <KISButton
+                title={saving ? 'Saving...' : 'Add Service'}
+                onPress={addCustomService}
+                disabled={saving}
+              />
             </View>
           </View>
 
@@ -1126,9 +1401,18 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               ...borders.card,
             }}
           >
-            <Text style={{ ...typography.h3, color: palette.text }}>Available Engines</Text>
-            <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
-              Engines are fixed system capabilities. Creating, editing, and deleting engines is disabled.
+            <Text style={{ ...typography.h3, color: palette.text }}>
+              Available Engines
+            </Text>
+            <Text
+              style={{
+                ...typography.body,
+                color: palette.subtext,
+                marginTop: spacing.xs,
+              }}
+            >
+              Engines are fixed system capabilities. Creating, editing, and
+              deleting engines is disabled.
             </Text>
             {hasComingSoonEngines ? (
               <View
@@ -1144,7 +1428,9 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                 <Text style={{ ...typography.label, color: '#9A3412' }}>
                   Some health engines are still coming up.
                 </Text>
-                <Text style={{ ...typography.body, color: '#7C2D12', marginTop: 4 }}>
+                <Text
+                  style={{ ...typography.body, color: '#7C2D12', marginTop: 4 }}
+                >
                   {HEALTH_ENGINE_CONTACT_NOTICE}
                 </Text>
               </View>
@@ -1158,7 +1444,7 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               />
             </View>
             <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
-              {mediums.map((medium) => (
+              {mediums.map(medium => (
                 <View
                   key={medium.id}
                   style={{
@@ -1177,18 +1463,27 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                       alignItems: 'center',
                     }}
                   >
-                    <Text style={{ ...typography.h3, color: palette.text, flex: 1 }}>
+                    <Text
+                      style={{ ...typography.h3, color: palette.text, flex: 1 }}
+                    >
                       {medium.name}
                     </Text>
                     <KISButton
                       onPress={() => {
                         if (isComingSoonHealthEngineName(medium.name)) {
-                          Alert.alert('Coming up', HEALTH_ENGINE_CONTACT_NOTICE);
+                          Alert.alert(
+                            'Coming up',
+                            HEALTH_ENGINE_CONTACT_NOTICE,
+                          );
                           return;
                         }
                         setSelectedEngine(medium);
                       }}
-                      title={isComingSoonHealthEngineName(medium.name) ? 'Coming Up' : 'Manage'}
+                      title={
+                        isComingSoonHealthEngineName(medium.name)
+                          ? 'Coming Up'
+                          : 'Manage'
+                      }
                       variant="outline"
                     />
                   </View>
@@ -1248,7 +1543,7 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               gap: spacing.sm,
             }}
           >
-            {services.map((service) => (
+            {services.map(service => (
               <View
                 key={service.id}
                 style={{
@@ -1262,10 +1557,19 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                 {(() => {
                   const mediumNames = resolveServiceMediumNames(service);
                   return mediumNames.length > 0 ? (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs }}>
-                      {mediumNames.map((mediumName) => {
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: spacing.xs,
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      {mediumNames.map(mediumName => {
                         const iconName =
-                          ENGINE_ICON_BY_NAME[normalizeEngineName(mediumName)] || 'list';
+                          ENGINE_ICON_BY_NAME[
+                            normalizeEngineName(mediumName)
+                          ] || 'list';
                         return (
                           <View
                             key={`${service.id}-${mediumName}`}
@@ -1280,8 +1584,18 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                               backgroundColor: palette.card,
                             }}
                           >
-                            <KISIcon name={iconName} size={13} color={palette.accentPrimary} />
-                            <Text style={{ ...typography.caption, color: palette.text, marginLeft: 4 }}>
+                            <KISIcon
+                              name={iconName}
+                              size={13}
+                              color={palette.accentPrimary}
+                            />
+                            <Text
+                              style={{
+                                ...typography.caption,
+                                color: palette.text,
+                                marginLeft: 4,
+                              }}
+                            >
                               {mediumName}
                             </Text>
                           </View>
@@ -1290,28 +1604,69 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
                     </View>
                   ) : null;
                 })()}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ ...typography.h3, color: palette.text, flex: 1 }}>{service.name}</Text>
-                  <Text style={{ ...typography.label, color: service.active ? palette.accentPrimary : palette.subtext }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{ ...typography.h3, color: palette.text, flex: 1 }}
+                  >
+                    {service.name}
+                  </Text>
+                  <Text
+                    style={{
+                      ...typography.label,
+                      color: service.active
+                        ? palette.accentPrimary
+                        : palette.subtext,
+                    }}
+                  >
                     {service.active ? 'ACTIVE' : 'INACTIVE'}
                   </Text>
                 </View>
                 {service.description && (
-                  <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
+                  <Text
+                    style={{
+                      ...typography.body,
+                      color: palette.subtext,
+                      marginTop: spacing.xs,
+                    }}
+                  >
                     {service.description}
                   </Text>
                 )}
                 {resolveServiceMediumNames(service).length > 0 ? (
-                  <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
+                  <Text
+                    style={{
+                      ...typography.body,
+                      color: palette.subtext,
+                      marginTop: spacing.xs,
+                    }}
+                  >
                     Engines: {resolveServiceMediumNames(service).join(', ')}
                   </Text>
                 ) : null}
                 {money(service.basePriceCents) ? (
-                  <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.xs }}>
+                  <Text
+                    style={{
+                      ...typography.label,
+                      color: palette.text,
+                      marginTop: spacing.xs,
+                    }}
+                  >
                     Starting at {money(service.basePriceCents)}
                   </Text>
                 ) : null}
-                <View style={{ marginTop: spacing.sm, flexDirection: 'column', gap: spacing.xs }}>
+                <View
+                  style={{
+                    marginTop: spacing.sm,
+                    flexDirection: 'column',
+                    gap: spacing.xs,
+                  }}
+                >
                   {isOwnerViewer ? (
                     <KISButton
                       title="Owner Preview"
@@ -1363,11 +1718,17 @@ export default function InstitutionServicesCatalogScreen({ navigation, route }: 
               <Text style={{ ...typography.h3, color: palette.text }}>
                 Book Now Options - {bookNowServiceName}
               </Text>
-              <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
+              <Text
+                style={{
+                  ...typography.body,
+                  color: palette.subtext,
+                  marginTop: spacing.xs,
+                }}
+              >
                 Multiple engines are attached. Choose the workflow to continue.
               </Text>
               <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
-                {bookNowActions.map((action) => (
+                {bookNowActions.map(action => (
                   <KISButton
                     key={action.id}
                     title={action.label}

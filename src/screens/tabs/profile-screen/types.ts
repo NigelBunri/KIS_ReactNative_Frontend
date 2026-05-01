@@ -71,6 +71,8 @@ export type BroadcastProfileDefinition = {
   profileKey: BroadcastProfileKey;
   label: string;
   helper: string;
+  ownershipLabel?: string;
+  managementLabel?: string;
   icon: string;
   tab: BroadcastTabId;
   creationType: BroadcastCreationType;

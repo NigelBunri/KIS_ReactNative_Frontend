@@ -23,14 +23,24 @@ const REACTION_EVENT = 'broadcast.reaction';
 
 export default function FeedsListScreen() {
   const { palette } = useKISTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<FeedsStackParamList, 'FeedsList'>>();
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<FeedsStackParamList, 'FeedsList'>
+    >();
 
-  const { items, loading, loadingMore, hasMore, refresh, loadMore, updateItem } =
-    useBroadcastFeed();
+  const {
+    items,
+    loading,
+    loadingMore,
+    hasMore,
+    refresh,
+    loadMore,
+    updateItem,
+  } = useBroadcastFeed();
 
   const handleReact = useCallback(
     async (broadcastId: string) => {
-      updateItem(broadcastId, (item) => ({
+      updateItem(broadcastId, item => ({
         ...item,
         engagement: {
           ...item.engagement,
@@ -48,7 +58,7 @@ export default function FeedsListScreen() {
         }
         DeviceEventEmitter.emit(REACTION_EVENT, { id: broadcastId, delta: 1 });
       } catch {
-        updateItem(broadcastId, (item) => ({
+        updateItem(broadcastId, item => ({
           ...item,
           engagement: {
             ...item.engagement,
@@ -61,14 +71,21 @@ export default function FeedsListScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: any }) => (
+    ({ item, index }: { item: any; index: number }) => (
       <FeedItemCard
         item={item}
-        onPress={() => navigation.navigate('BroadcastDetail', { id: item.id, item })}
+        onPress={() =>
+          navigation.navigate('BroadcastDetail', {
+            id: item.id,
+            item,
+            items,
+            index,
+          })
+        }
         onReact={() => handleReact(item.id)}
       />
     ),
-    [handleReact, navigation],
+    [handleReact, items, navigation],
   );
 
   const listEmpty = (
@@ -76,7 +93,9 @@ export default function FeedsListScreen() {
       {loading ? (
         <ActivityIndicator color={palette.primary} />
       ) : (
-        <Text style={[styles.emptyText, { color: palette.subtext }]}>No feeds yet.</Text>
+        <Text style={[styles.emptyText, { color: palette.subtext }]}>
+          No feeds yet.
+        </Text>
       )}
     </View>
   );
@@ -85,7 +104,9 @@ export default function FeedsListScreen() {
     <View style={styles.footer}>
       {loadingMore ? <ActivityIndicator color={palette.primary} /> : null}
       {!hasMore && items.length > 0 ? (
-        <Text style={[styles.footerText, { color: palette.subtext }]}>You’re all caught up</Text>
+        <Text style={[styles.footerText, { color: palette.subtext }]}>
+          You’re all caught up
+        </Text>
       ) : null}
     </View>
   );
@@ -93,7 +114,7 @@ export default function FeedsListScreen() {
   return (
     <FlatList
       data={items}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       renderItem={renderItem}
       contentContainerStyle={styles.list}
       ListEmptyComponent={listEmpty}
@@ -104,7 +125,13 @@ export default function FeedsListScreen() {
           loadMore();
         }
       }}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={refresh}
+          tintColor={palette.primary}
+        />
+      }
     />
   );
 }

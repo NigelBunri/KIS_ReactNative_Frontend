@@ -1,5 +1,11 @@
 // src/components/feeds/composer/FeedComposerSheet.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -13,8 +19,13 @@ import {
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 
-import type { ComposerType, FeedComposerPayload, RichComposerState } from './types';
+import type {
+  ComposerType,
+  FeedComposerPayload,
+  RichComposerState,
+} from './types';
 import { stateToDoc } from './richTextUtils';
 import { MediaComposerPage } from './pages/MediaComposerPage';
 import { PollComposerPage } from './pages/PollComposerPage';
@@ -28,7 +39,11 @@ type Props = {
   onSubmit: (payload: FeedComposerPayload) => Promise<void> | void;
 };
 
-export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props) {
+export default function FeedComposerSheet({
+  visible,
+  onClose,
+  onSubmit,
+}: Props) {
   const { palette } = useKISTheme();
 
   const [step, setStep] = useState<'picker' | 'form'>('picker');
@@ -60,11 +75,21 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
     if (!visible) return;
     setStep('picker');
     setType('text');
-    Animated.timing(sheetY, { toValue: 0, duration: 240, useNativeDriver: true }).start();
+    Animated.timing(sheetY, {
+      toValue: 0,
+      duration: 240,
+      useNativeDriver: true,
+    }).start();
   }, [visible, sheetY]);
 
   const resetAll = useCallback(() => {
-    setRich({ text: '', spans: [], blocks: {}, defaultAlign: 'left', styledBg: undefined });
+    setRich({
+      text: '',
+      spans: [],
+      blocks: {},
+      defaultAlign: 'left',
+      styledBg: undefined,
+    });
     setLink('');
     setAttachments([]);
     setVideoThumbUri(null);
@@ -76,11 +101,19 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
   }, []);
 
   const closeSheet = useCallback(() => {
-    Animated.timing(sheetY, { toValue: 600, duration: 220, useNativeDriver: true }).start(() => {
+    Animated.timing(sheetY, {
+      toValue: 600,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
       resetAll();
       onClose();
     });
   }, [sheetY, onClose, resetAll]);
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose: closeSheet,
+  });
 
   const options = useMemo(
     () => [
@@ -132,7 +165,7 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
           link={link}
           setLink={setLink}
           caption={rich.text}
-          setCaption={(t) => setRich((p) => ({ ...p, text: t }))}
+          setCaption={t => setRich(p => ({ ...p, text: t }))}
         />
       );
     }
@@ -173,8 +206,17 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
     if (['image', 'video', 'short_video', 'document', 'audio'].includes(type)) {
       if (!attachments.length && !trimmed) return;
 
-      if ((type === 'video' || type === 'short_video') && attachments.length && videoThumbUri) {
-        payload.attachments = [{ ...normalizeAttachmentKind(attachments[0]), thumbUrl: videoThumbUri }];
+      if (
+        (type === 'video' || type === 'short_video') &&
+        attachments.length &&
+        videoThumbUri
+      ) {
+        payload.attachments = [
+          {
+            ...normalizeAttachmentKind(attachments[0]),
+            thumbUrl: videoThumbUri,
+          },
+        ];
       } else {
         payload.attachments = attachments.map(normalizeAttachmentKind);
       }
@@ -185,7 +227,7 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
     }
 
     if (type === 'poll') {
-      const opts = pollOptions.map((o) => o.trim()).filter(Boolean);
+      const opts = pollOptions.map(o => o.trim()).filter(Boolean);
       if (!pollQuestion.trim() || opts.length < 2) return;
       payload.poll = {
         question: pollQuestion.trim(),
@@ -242,31 +284,64 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={closeSheet}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={closeSheet}
+    >
       <Pressable style={styles.backdrop} onPress={closeSheet} />
-      <Animated.View style={[styles.sheet, { backgroundColor: palette.card, transform: [{ translateY: sheetY }] }]}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: palette.card,
+            transform: [{ translateY: Animated.add(sheetY, dragY) }],
+          },
+        ]}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.sheetScroll}
+          showsVerticalScrollIndicator={false}
+        >
           {step === 'picker' ? (
             <>
-              <View style={styles.sheetHeader}>
-                <Text style={[styles.sheetTitle, { color: palette.text }]}>Create post</Text>
+              <View style={styles.sheetHeader} {...panHandlers}>
+                <Text style={[styles.sheetTitle, { color: palette.text }]}>
+                  Create post
+                </Text>
                 <Pressable onPress={closeSheet}>
                   <KISIcon name="close" size={20} color={palette.text} />
                 </Pressable>
               </View>
 
               <View style={styles.optionGrid}>
-                {options.map((opt) => (
+                {options.map(opt => (
                   <Pressable
                     key={opt.key}
                     onPress={() => {
                       setType(opt.key as ComposerType);
                       setStep('form');
                     }}
-                    style={[styles.optionCard, { borderColor: palette.divider }]}
+                    style={[
+                      styles.optionCard,
+                      { borderColor: palette.divider },
+                    ]}
                   >
-                    <KISIcon name={opt.icon as any} size={20} color={palette.primary} />
-                    <Text style={{ color: palette.text, marginTop: 6, fontSize: 12, fontWeight: '900' }}>
+                    <KISIcon
+                      name={opt.icon as any}
+                      size={20}
+                      color={palette.primary}
+                    />
+                    <Text
+                      style={{
+                        color: palette.text,
+                        marginTop: 6,
+                        fontSize: 12,
+                        fontWeight: '900',
+                      }}
+                    >
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -275,13 +350,16 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
             </>
           ) : (
             <>
-              <View style={styles.sheetHeader}>
-                <Pressable onPress={() => setStep('picker')} style={{ padding: 6 }}>
+              <View style={styles.sheetHeader} {...panHandlers}>
+                <Pressable
+                  onPress={() => setStep('picker')}
+                  style={{ padding: 6 }}
+                >
                   <KISIcon name="arrow-left" size={18} color={palette.text} />
                 </Pressable>
 
                 <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                  {options.find((o) => o.key === type)?.label ?? 'Create post'}
+                  {options.find(o => o.key === type)?.label ?? 'Create post'}
                 </Text>
 
                 <Pressable onPress={closeSheet}>
@@ -293,10 +371,21 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
 
               <Pressable
                 onPress={submit}
-                style={[styles.submitButton, { backgroundColor: palette.primary, opacity: submitting ? 0.7 : 1 }]}
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor: palette.primary,
+                    opacity: submitting ? 0.7 : 1,
+                  },
+                ]}
                 disabled={submitting}
               >
-                <Text style={{ color: palette.onPrimary ?? '#fff', fontWeight: '900' }}>
+                <Text
+                  style={{
+                    color: palette.onPrimary ?? '#fff',
+                    fontWeight: '900',
+                  }}
+                >
                   {submitting ? 'Posting…' : 'Post'}
                 </Text>
               </Pressable>
@@ -307,7 +396,9 @@ export default function FeedComposerSheet({ visible, onClose, onSubmit }: Props)
         {uploadingVideo && (
           <View style={styles.uploadOverlay}>
             <ActivityIndicator size="large" color={palette.primary} />
-            <Text style={[styles.uploadText, { color: palette.text }]}>Uploading video…</Text>
+            <Text style={[styles.uploadText, { color: palette.text }]}>
+              Uploading video…
+            </Text>
           </View>
         )}
       </Animated.View>

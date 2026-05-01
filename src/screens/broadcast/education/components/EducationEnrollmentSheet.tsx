@@ -1,9 +1,13 @@
 // src/screens/broadcast/education/components/EducationEnrollmentSheet.tsx
 import React from 'react';
-import { Linking, Modal, ScrollView, Text, View } from 'react-native';
+import { Animated, Linking, Modal, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
-import type { EducationContentItem, EducationPricing } from '@/screens/broadcast/education/api/education.models';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
+import type {
+  EducationContentItem,
+  EducationPricing,
+} from '@/screens/broadcast/education/api/education.models';
 
 type Props = {
   visible: boolean;
@@ -31,6 +35,10 @@ export default function EducationEnrollmentSheet({
   receiptUrl,
 }: Props) {
   const { palette } = useKISTheme();
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   if (!content) return null;
 
@@ -40,7 +48,7 @@ export default function EducationEnrollmentSheet({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={{ flex: 1, backgroundColor: palette.backdrop }}>
-        <View
+        <Animated.View
           style={{
             marginTop: '30%',
             backgroundColor: palette.surface,
@@ -48,32 +56,86 @@ export default function EducationEnrollmentSheet({
             borderTopRightRadius: 28,
             padding: 24,
             flex: 1,
+            transform: [{ translateY: dragY }],
           }}
         >
+          <View
+            {...panHandlers}
+            style={{ alignItems: 'center', paddingBottom: 14 }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 5,
+                borderRadius: 999,
+                backgroundColor: palette.divider,
+              }}
+            />
+          </View>
           <ScrollView>
-            <Text style={{ color: palette.subtext, marginBottom: 4 }}>Enroll now</Text>
-            <Text style={{ color: palette.text, fontWeight: '800', fontSize: 20 }}>{content.title}</Text>
-            <Text style={{ color: palette.primaryStrong, marginTop: 6, fontWeight: '700' }}>{priceLabel}</Text>
-            <Text style={{ color: palette.subtext, marginTop: 12 }}>
-              {content.partnerName ?? 'Creator'} · {content.level ?? 'All levels'}
+            <Text style={{ color: palette.subtext, marginBottom: 4 }}>
+              Enroll now
             </Text>
-            <Text style={{ marginTop: 12, color: palette.subtext }}>{content.summary}</Text>
-            <View style={{ marginTop: 14, borderRadius: 16, padding: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.divider }}>
-              <Text style={{ color: palette.text, fontWeight: '700' }}>Payment flow</Text>
-              <Text style={{ color: palette.subtext, marginTop: 6, lineHeight: 19 }}>
-                Education payments use KISC. Funds are held first and only released to the provider after satisfaction or the normal auto-release window.
+            <Text
+              style={{ color: palette.text, fontWeight: '800', fontSize: 20 }}
+            >
+              {content.title}
+            </Text>
+            <Text
+              style={{
+                color: palette.primaryStrong,
+                marginTop: 6,
+                fontWeight: '700',
+              }}
+            >
+              {priceLabel}
+            </Text>
+            <Text style={{ color: palette.subtext, marginTop: 12 }}>
+              {content.partnerName ?? 'Creator'} ·{' '}
+              {content.level ?? 'All levels'}
+            </Text>
+            <Text style={{ marginTop: 12, color: palette.subtext }}>
+              {content.summary}
+            </Text>
+            <View
+              style={{
+                marginTop: 14,
+                borderRadius: 16,
+                padding: 12,
+                backgroundColor: palette.card,
+                borderWidth: 1,
+                borderColor: palette.divider,
+              }}
+            >
+              <Text style={{ color: palette.text, fontWeight: '700' }}>
+                Payment flow
+              </Text>
+              <Text
+                style={{ color: palette.subtext, marginTop: 6, lineHeight: 19 }}
+              >
+                Education payments use KISC. Funds are held first and only
+                released to the provider after satisfaction or the normal
+                auto-release window.
               </Text>
             </View>
             <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>
               {pricing?.isFree ? (
-                <KISButton title="Free enroll" onPress={() => onFreeEnroll(content)} />
+                <KISButton
+                  title="Free enroll"
+                  onPress={() => onFreeEnroll(content)}
+                />
               ) : (
-                <KISButton title="Checkout" onPress={() => onCheckout(content)} />
+                <KISButton
+                  title="Checkout"
+                  onPress={() => onCheckout(content)}
+                />
               )}
               <KISButton title="Close" variant="secondary" onPress={onClose} />
             </View>
             {paymentState === 'processing' ? (
-              <Text style={{ color: palette.primary, marginTop: 14 }}>Processing payment…</Text>
+              <Text style={{ color: palette.primary, marginTop: 14 }}>
+                Processing payment…
+              </Text>
             ) : null}
             {paymentState === 'success' && receiptUrl ? (
               <Text
@@ -86,7 +148,7 @@ export default function EducationEnrollmentSheet({
               </Text>
             ) : null}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

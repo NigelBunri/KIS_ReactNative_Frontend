@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -22,7 +28,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
-import ROUTES, { buildMediaSource, resolveBackendAssetUrl, useMediaHeaders } from '@/network';
+import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
 import {
   getBroadcastFeedVideoPosterUrl,
   getBroadcastFeedVideoRiskNote,
@@ -34,16 +40,20 @@ import { logFeedEvent } from '@/network/personalization';
 import BroadcastFeedCard, { type BroadcastFeedItem } from './BroadcastFeedCard';
 export type { BroadcastFeedItem } from './BroadcastFeedCard';
 import BroadcastAuthorProfileSheet from '@/components/broadcast/BroadcastAuthorProfileSheet';
-import {
-  isUserBroadcastSource,
-} from '@/components/broadcast/authorProfileUtils';
+import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils';
 import useAuthorProfilePreview from '@/components/broadcast/useAuthorProfilePreview';
-import FeedPostActionsSheet, { type FeedPostAction } from '@/components/feeds/FeedPostActionsSheet';
+import FeedPostActionsSheet, {
+  type FeedPostAction,
+} from '@/components/feeds/FeedPostActionsSheet';
 import Skeleton from '@/components/common/Skeleton';
-import ShareRenderer, { type SharePayload } from '@/components/feeds/ShareRenderer';
+import ShareRenderer, {
+  type SharePayload,
+} from '@/components/feeds/ShareRenderer';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import MarketStudioSection from './MarketStudioSection';
 import { getAccessToken } from '@/security/authStorage';
+import { wasNativeShareCompleted } from '@/utils/shareCompletion';
+import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroadcastPosterId';
 
 /* ───────────────────────────────────────────── */
 /* Section Layout (Feeds / Market / Lessons)     */
@@ -81,19 +91,6 @@ type Props = {
 };
 
 const SHORT_VIDEO_THRESHOLD_SECONDS = 3 * 60;
-
-const normalizeAttachmentUrl = (attachment: any) => {
-  if (!attachment) return null;
-  if (typeof attachment === 'string') return resolveBackendAssetUrl(attachment);
-  const raw =
-    attachment.url ??
-    attachment.uri ??
-    attachment.file_url ??
-    attachment.fileUrl ??
-    attachment.path ??
-    null;
-  return resolveBackendAssetUrl(raw);
-};
 
 const resolveVideoAttachment = (item: BroadcastFeedItem) => {
   const attachments = Array.isArray(item.attachments) ? item.attachments : [];
@@ -146,11 +143,15 @@ const isMarketBroadcast = (item: BroadcastFeedItem) => {
 
 const extractDurationSeconds = (attachment: any) => {
   if (!attachment) return undefined;
-  if (typeof attachment.duration_seconds === 'number') return attachment.duration_seconds;
+  if (typeof attachment.duration_seconds === 'number')
+    return attachment.duration_seconds;
   if (typeof attachment.duration === 'number') return attachment.duration;
-  if (typeof attachment.durationSeconds === 'number') return attachment.durationSeconds;
-  if (typeof attachment.duration_ms === 'number') return Math.round(attachment.duration_ms / 1000);
-  if (typeof attachment.durationMs === 'number') return Math.round(attachment.durationMs / 1000);
+  if (typeof attachment.durationSeconds === 'number')
+    return attachment.durationSeconds;
+  if (typeof attachment.duration_ms === 'number')
+    return Math.round(attachment.duration_ms / 1000);
+  if (typeof attachment.durationMs === 'number')
+    return Math.round(attachment.durationMs / 1000);
   if (typeof attachment.durationMilliseconds === 'number')
     return Math.round(attachment.durationMilliseconds / 1000);
   return undefined;
@@ -158,13 +159,20 @@ const extractDurationSeconds = (attachment: any) => {
 
 const deriveVideoCategory = (attachment: any, durationSeconds?: number) => {
   if (!attachment) return undefined;
-  const normalized = (attachment.kind ?? attachment.mimeType ?? attachment.type ?? '')
+  const normalized = (
+    attachment.kind ??
+    attachment.mimeType ??
+    attachment.type ??
+    ''
+  )
     .toString()
     .toLowerCase();
 
   if (normalized.includes('short')) return 'shorts';
   if (durationSeconds !== undefined) {
-    return durationSeconds < SHORT_VIDEO_THRESHOLD_SECONDS ? 'shorts' : 'videos';
+    return durationSeconds < SHORT_VIDEO_THRESHOLD_SECONDS
+      ? 'shorts'
+      : 'videos';
   }
   if (normalized.includes('video')) return 'videos';
   return undefined;
@@ -247,8 +255,10 @@ export default function BroadcastFeedSection({
       if (parsed?.forYouTab) updateForYouTab(parsed.forYouTab);
       if (parsed?.sourceChip) setSourceChip(parsed.sourceChip);
       if (parsed?.sortMode) setSortMode(parsed.sortMode);
-      if (typeof parsed?.autoplayEnabled === 'boolean') setAutoplayEnabled(parsed.autoplayEnabled);
-      if (typeof parsed?.compactMode === 'boolean') setCompactMode(parsed.compactMode);
+      if (typeof parsed?.autoplayEnabled === 'boolean')
+        setAutoplayEnabled(parsed.autoplayEnabled);
+      if (typeof parsed?.compactMode === 'boolean')
+        setCompactMode(parsed.compactMode);
       if (typeof parsed?.safeMode === 'boolean') setSafeMode(parsed.safeMode);
     } catch {
       // ignore
@@ -272,7 +282,15 @@ export default function BroadcastFeedSection({
     } catch {
       // ignore
     }
-  }, [activeForYouTab, mainSection, sourceChip, sortMode, autoplayEnabled, compactMode, safeMode]);
+  }, [
+    activeForYouTab,
+    mainSection,
+    sourceChip,
+    sortMode,
+    autoplayEnabled,
+    compactMode,
+    safeMode,
+  ]);
 
   useEffect(() => {
     loadPrefs();
@@ -295,25 +313,37 @@ export default function BroadcastFeedSection({
 
   const [broadcasts, setBroadcasts] = useState<BroadcastFeedItem[]>([]);
   const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [broadcastConversationIds, setBroadcastConversationIds] = useState<Record<string, string | null>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
+    {},
+  );
+  const [broadcastConversationIds, setBroadcastConversationIds] = useState<
+    Record<string, string | null>
+  >({});
   const broadcastConversationIdsRef = useRef<Record<string, string | null>>({});
-  const [activeBroadcastCommentId, setActiveBroadcastCommentId] = useState<string | null>(null);
+  const [activeBroadcastCommentId, setActiveBroadcastCommentId] = useState<
+    string | null
+  >(null);
 
-  const handleCommentCountChange = useCallback((itemId: string, count: number) => {
-    setCommentCounts((prev) => ({ ...prev, [itemId]: count }));
-  }, []);
+  const handleCommentCountChange = useCallback(
+    (itemId: string, count: number) => {
+      setCommentCounts(prev => ({ ...prev, [itemId]: count }));
+    },
+    [],
+  );
 
   useEffect(() => {
     broadcastConversationIdsRef.current = broadcastConversationIds;
   }, [broadcastConversationIds]);
 
   useEffect(() => {
-    setBroadcastConversationIds((prev) => {
+    setBroadcastConversationIds(prev => {
       let changed = false;
       const next = { ...prev };
-      broadcasts.forEach((broadcast) => {
-        if (next[broadcast.id] === undefined && broadcast.comment_conversation_id != null) {
+      broadcasts.forEach(broadcast => {
+        if (
+          next[broadcast.id] === undefined &&
+          broadcast.comment_conversation_id != null
+        ) {
           next[broadcast.id] = broadcast.comment_conversation_id;
           changed = true;
         }
@@ -322,31 +352,50 @@ export default function BroadcastFeedSection({
     });
   }, [broadcasts]);
 
-  const setBroadcastConversationId = useCallback((itemId: string, value: string | null) => {
-    setBroadcastConversationIds((prev) => {
-      if (prev[itemId] === value) return prev;
-      return { ...prev, [itemId]: value };
-    });
-  }, []);
+  const setBroadcastConversationId = useCallback(
+    (itemId: string, value: string | null) => {
+      setBroadcastConversationIds(prev => {
+        if (prev[itemId] === value) return prev;
+        return { ...prev, [itemId]: value };
+      });
+    },
+    [],
+  );
 
   const fetchBroadcastConversationId = useCallback(
     async (itemId: string) => {
       const cached = broadcastConversationIdsRef.current[itemId];
       if (cached?.startsWith?.('broadcast:')) {
-        console.log('[BroadcastFeedSection] reusing broadcast conversation', { itemId, cached });
+        console.log('[BroadcastFeedSection] reusing broadcast conversation', {
+          itemId,
+          cached,
+        });
         return cached;
       }
       try {
         const url = ROUTES.broadcasts.commentRoom(itemId);
-        console.log('[BroadcastFeedSection] requesting broadcast conversation', {
-          itemId,
-          cached,
+        console.log(
+          '[BroadcastFeedSection] requesting broadcast conversation',
+          {
+            itemId,
+            cached,
+            url,
+          },
+        );
+        const res = await postRequest(
           url,
-        });
-        const res = await postRequest(url, {}, { errorMessage: 'Unable to load comments.' });
+          {},
+          { errorMessage: 'Unable to load comments.' },
+        );
         const resolved =
-          res?.data?.conversation_id ?? res?.data?.conversationId ?? res?.data?.id ?? null;
-        console.log('[BroadcastFeedSection] received conversation id', { itemId, resolved });
+          res?.data?.conversation_id ??
+          res?.data?.conversationId ??
+          res?.data?.id ??
+          null;
+        console.log('[BroadcastFeedSection] received conversation id', {
+          itemId,
+          resolved,
+        });
         setBroadcastConversationId(itemId, resolved);
         return resolved;
       } catch (err) {
@@ -359,7 +408,7 @@ export default function BroadcastFeedSection({
   );
 
   const toggleBroadcastComments = useCallback((itemId: string) => {
-    setActiveBroadcastCommentId((prev) => (prev === itemId ? null : itemId));
+    setActiveBroadcastCommentId(prev => (prev === itemId ? null : itemId));
   }, []);
 
   // Share
@@ -391,7 +440,7 @@ export default function BroadcastFeedSection({
 
   const toggleSaved = useCallback(
     async (item: BroadcastFeedItem) => {
-      setSavedIds((prev) => {
+      setSavedIds(prev => {
         const next = { ...prev, [item.id]: !prev[item.id] };
         persistSaved(next);
         return next;
@@ -409,13 +458,17 @@ export default function BroadcastFeedSection({
    * Stream URL resolution
    * ───────────────────────── */
 
-  const [pendingVideoItem, setPendingVideoItem] = useState<BroadcastFeedItem | null>(null);
-  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
+  const [pendingVideoItem, setPendingVideoItem] =
+    useState<BroadcastFeedItem | null>(null);
+  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<
+    Record<string, string>
+  >({});
 
   const resolveDirectMediaUrl = useCallback(
     async (attachmentBundle: { id: string; url: string }) => {
       if (!attachmentBundle?.url) return null;
-      if (!attachmentBundle.url.includes('/stream/')) return attachmentBundle.url;
+      if (!attachmentBundle.url.includes('/stream/'))
+        return attachmentBundle.url;
 
       const cacheHit = resolvedMediaUrls[attachmentBundle.id];
       if (cacheHit) return cacheHit;
@@ -427,7 +480,10 @@ export default function BroadcastFeedSection({
         });
         const direct = response.headers.get('X-Video-URL');
         if (direct) {
-          setResolvedMediaUrls((prev) => ({ ...prev, [attachmentBundle.id]: direct }));
+          setResolvedMediaUrls(prev => ({
+            ...prev,
+            [attachmentBundle.id]: direct,
+          }));
           return direct;
         }
       } catch (error) {
@@ -492,65 +548,112 @@ export default function BroadcastFeedSection({
 
     // External legacy filter (kept compatible)
     if (filterSource && filterSource !== 'all') {
-      items = items.filter((it) => it.source?.type?.toLowerCase() === filterSource);
+      items = items.filter(
+        it => it.source?.type?.toLowerCase() === filterSource,
+      );
     }
 
     // Main section gating
     if (mainSection === 'lessons') {
-      items = items.filter((it) => Boolean(it.is_lesson) || it.source?.type === 'lesson' || it.video_category === 'lessons');
+      items = items.filter(
+        it =>
+          Boolean(it.is_lesson) ||
+          it.source?.type === 'lesson' ||
+          it.video_category === 'lessons',
+      );
     } else if (mainSection === 'market') {
-      items = items.filter((it) => Boolean(it.product) || it.source?.type === 'market' || it.source_type === 'market');
+      items = items.filter(
+        it =>
+          Boolean(it.product) ||
+          it.source?.type === 'market' ||
+          it.source_type === 'market',
+      );
     } else {
       // feed: filter out market posts
-      items = items.filter((it) => !isMarketBroadcast(it));
+      items = items.filter(it => !isMarketBroadcast(it));
     }
 
     // For You / Following (stub until server provides following)
     if (activeForYouTab === 'following') {
       // Heuristic: show only items from sources the user is subscribed to
-      items = items.filter((it) => Boolean(it.source?.is_subscribed) || Boolean(it.source?.is_member));
+      items = items.filter(
+        it =>
+          Boolean(it.source?.is_subscribed) || Boolean(it.source?.is_member),
+      );
     }
 
     // Source chips (design-level filter)
     if (sourceChip !== 'all') {
-      if (sourceChip === 'live') items = items.filter((it) => Boolean(it.is_live) || it.source?.type === 'live');
-      if (sourceChip === 'lessons') items = items.filter((it) => Boolean(it.is_lesson) || it.source?.type === 'lesson');
-      if (sourceChip === 'market') items = items.filter((it) => Boolean(it.product) || it.source?.type === 'market');
-      if (sourceChip === 'channel') items = items.filter((it) => it.source?.type === 'channel');
-      if (sourceChip === 'community') items = items.filter((it) => it.source?.type === 'community');
-      if (sourceChip === 'partner') items = items.filter((it) => it.source?.type === 'partner');
+      if (sourceChip === 'live')
+        items = items.filter(
+          it => Boolean(it.is_live) || it.source?.type === 'live',
+        );
+      if (sourceChip === 'lessons')
+        items = items.filter(
+          it => Boolean(it.is_lesson) || it.source?.type === 'lesson',
+        );
+      if (sourceChip === 'market')
+        items = items.filter(
+          it => Boolean(it.product) || it.source?.type === 'market',
+        );
+      if (sourceChip === 'channel')
+        items = items.filter(it => it.source?.type === 'channel');
+      if (sourceChip === 'community')
+        items = items.filter(it => it.source?.type === 'community');
+      if (sourceChip === 'partner')
+        items = items.filter(it => it.source?.type === 'partner');
     }
 
     // Media filter
     if (mediaFilter) {
-      if (mediaFilter === 'videos') items = items.filter((it) => it.video_category === 'videos');
-      if (mediaFilter === 'shorts') items = items.filter((it) => it.video_category === 'shorts');
+      if (mediaFilter === 'videos')
+        items = items.filter(it => it.video_category === 'videos');
+      if (mediaFilter === 'shorts')
+        items = items.filter(it => it.video_category === 'shorts');
     }
 
     // Search
     if (normalizedSearch) {
-      items = items.filter((it) => {
-        const hay = `${it.title || ''} ${it.text || ''} ${it.text_plain || ''} ${it.source?.name || ''}`.toLowerCase();
+      items = items.filter(it => {
+        const hay = `${it.title || ''} ${it.text || ''} ${
+          it.text_plain || ''
+        } ${it.source?.name || ''}`.toLowerCase();
         return hay.includes(normalizedSearch);
       });
     }
 
     // Safe mode (stub)
     if (safeMode) {
-      items = items.filter((it) => !it.is_premium);
+      items = items.filter(it => !it.is_premium);
     }
 
     // Sorting
     if (sortMode === 'trending') {
       items.sort((a, b) => {
-        const aScore = (a.reaction_count ?? 0) + (a.comment_count ?? 0) + (a.share_count ?? 0);
-        const bScore = (b.reaction_count ?? 0) + (b.comment_count ?? 0) + (b.share_count ?? 0);
+        const aScore =
+          (a.reaction_count ?? 0) +
+          (a.comment_count ?? 0) +
+          (a.share_count ?? 0);
+        const bScore =
+          (b.reaction_count ?? 0) +
+          (b.comment_count ?? 0) +
+          (b.share_count ?? 0);
         return bScore - aScore;
       });
     }
 
     return items;
-  }, [activeForYouTab, broadcasts, filterSource, normalizedSearch, mediaFilter, mainSection, sourceChip, sortMode, safeMode]);
+  }, [
+    activeForYouTab,
+    broadcasts,
+    filterSource,
+    normalizedSearch,
+    mediaFilter,
+    mainSection,
+    sourceChip,
+    sortMode,
+    safeMode,
+  ]);
 
   const videoItems = useMemo(
     () => computedFiltered.filter(hasVideoAttachment),
@@ -571,7 +674,7 @@ export default function BroadcastFeedSection({
 
   const actuallyOpenVideoModal = useCallback(
     (item: BroadcastFeedItem) => {
-      const index = videoItems.findIndex((entry) => entry.id === item.id);
+      const index = videoItems.findIndex(entry => entry.id === item.id);
       if (index === -1) return;
       setVideoQueue(videoItems);
       setCurrentVideoIndex(index);
@@ -593,7 +696,11 @@ export default function BroadcastFeedSection({
     const v = resolveVideoAttachment(item);
     if (!v) return;
 
-    void logFeedEvent({ feedType: 'broadcast', event: 'video_open', targetId: item.id });
+    void logFeedEvent({
+      feedType: 'broadcast',
+      event: 'video_open',
+      targetId: item.id,
+    });
 
     const prepareAndOpen = async () => {
       if (v.url?.includes('/stream/')) {
@@ -624,7 +731,12 @@ export default function BroadcastFeedSection({
     };
 
     prepareAndOpen();
-  }, [pendingVideoItem, mediaHeaders.Authorization, actuallyOpenVideoModal, tryResolveStreamUrl]);
+  }, [
+    pendingVideoItem,
+    mediaHeaders.Authorization,
+    actuallyOpenVideoModal,
+    tryResolveStreamUrl,
+  ]);
 
   const closeVideoModal = useCallback(() => {
     setIsVideoPlaying(false);
@@ -638,7 +750,7 @@ export default function BroadcastFeedSection({
 
   const goToNextVideo = useCallback(() => {
     if (currentVideoIndex < videoQueue.length - 1) {
-      setCurrentVideoIndex((prev) => prev + 1);
+      setCurrentVideoIndex(prev => prev + 1);
       setCurrentVideoSourceIndex(0);
       setIsVideoPlaying(true);
       return true;
@@ -649,7 +761,7 @@ export default function BroadcastFeedSection({
 
   const goToPreviousVideo = useCallback(() => {
     if (currentVideoIndex > 0) {
-      setCurrentVideoIndex((prev) => prev - 1);
+      setCurrentVideoIndex(prev => prev - 1);
       setCurrentVideoSourceIndex(0);
       setIsVideoPlaying(true);
       return true;
@@ -670,7 +782,8 @@ export default function BroadcastFeedSection({
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_evt, gesture) =>
-          Math.abs(gesture.dy) > 20 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+          Math.abs(gesture.dy) > 20 &&
+          Math.abs(gesture.dy) > Math.abs(gesture.dx),
         onPanResponderMove: (_evt, gesture) => translateY.setValue(gesture.dy),
         onPanResponderRelease: (_evt, gesture) => {
           if (gesture.dy < -90) {
@@ -707,8 +820,11 @@ export default function BroadcastFeedSection({
   );
 
   const currentVideoItem = videoQueue[currentVideoIndex];
-  const currentVideoBundle = currentVideoItem ? resolveVideoAttachment(currentVideoItem) : null;
-  const currentVideoSource = currentVideoBundle?.sources?.[currentVideoSourceIndex] ?? null;
+  const currentVideoBundle = currentVideoItem
+    ? resolveVideoAttachment(currentVideoItem)
+    : null;
+  const currentVideoSource =
+    currentVideoBundle?.sources?.[currentVideoSourceIndex] ?? null;
 
   const resolvedCurrentVideoUrl =
     currentVideoBundle?.id &&
@@ -718,32 +834,38 @@ export default function BroadcastFeedSection({
       ? resolvedMediaUrls[currentVideoBundle.id]
       : currentVideoSource?.url ?? currentVideoBundle?.url;
 
-  const currentVideoPlaybackSource =
-    resolvedCurrentVideoUrl
-      ? buildMediaSource(
-          resolvedCurrentVideoUrl,
-          resolvedCurrentVideoUrl?.includes('/media/') ? undefined : mediaHeaders,
-        )
-      : undefined;
+  const currentVideoPlaybackSource = resolvedCurrentVideoUrl
+    ? buildMediaSource(
+        resolvedCurrentVideoUrl,
+        resolvedCurrentVideoUrl?.includes('/media/') ? undefined : mediaHeaders,
+      )
+    : undefined;
 
   const handleLegacyVideoError = useCallback(
     (error: any) => {
       console.warn('Video playback error', error);
-      if (currentVideoBundle?.sources && currentVideoSourceIndex < currentVideoBundle.sources.length - 1) {
+      if (
+        currentVideoBundle?.sources &&
+        currentVideoSourceIndex < currentVideoBundle.sources.length - 1
+      ) {
         const fallbackIndex = currentVideoSourceIndex + 1;
         const fallbackSource = currentVideoBundle.sources[fallbackIndex];
         if (__DEV__) {
           console.warn('[BroadcastFeedSection] falling back video source', {
-            from: currentVideoSource ? {
-              kind: currentVideoSource.kind,
-              host: currentVideoSource.host,
-              risk: getBroadcastFeedVideoRiskNote(currentVideoSource),
-            } : null,
-            to: fallbackSource ? {
-              kind: fallbackSource.kind,
-              host: fallbackSource.host,
-              risk: getBroadcastFeedVideoRiskNote(fallbackSource),
-            } : null,
+            from: currentVideoSource
+              ? {
+                  kind: currentVideoSource.kind,
+                  host: currentVideoSource.host,
+                  risk: getBroadcastFeedVideoRiskNote(currentVideoSource),
+                }
+              : null,
+            to: fallbackSource
+              ? {
+                  kind: fallbackSource.kind,
+                  host: fallbackSource.host,
+                  risk: getBroadcastFeedVideoRiskNote(fallbackSource),
+                }
+              : null,
             videoId: currentVideoBundle.id,
           });
         }
@@ -753,7 +875,9 @@ export default function BroadcastFeedSection({
       }
       Alert.alert(
         'Playback error',
-        `Unable to play this broadcast video (${getBroadcastFeedVideoSourceLabel(currentVideoSource)}).`,
+        `Unable to play this broadcast video (${getBroadcastFeedVideoSourceLabel(
+          currentVideoSource,
+        )}).`,
       );
     },
     [currentVideoBundle, currentVideoSource, currentVideoSourceIndex],
@@ -765,8 +889,8 @@ export default function BroadcastFeedSection({
 
   const captureShareImage = async (payload: SharePayload) => {
     setSharePayload(payload);
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(true)));
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise(resolve => requestAnimationFrame(() => resolve(true)));
+    await new Promise(resolve => setTimeout(resolve, 60));
     const uri = await shareShotRef.current?.capture?.();
     setSharePayload(null);
     return uri as string | undefined;
@@ -785,8 +909,15 @@ export default function BroadcastFeedSection({
   };
 
   const handleShare = async (item: BroadcastFeedItem) => {
-    const text = item.text_plain ?? item.text ?? item.styled_text?.text ?? item.product?.name ?? '';
-    const attachment = Array.isArray(item.attachments) ? item.attachments[0] : null;
+    const text =
+      item.text_plain ??
+      item.text ??
+      item.styled_text?.text ??
+      item.product?.name ??
+      '';
+    const attachment = Array.isArray(item.attachments)
+      ? item.attachments[0]
+      : null;
     const attachmentUrl = attachment?.url ?? attachment?.uri ?? null;
     const kind = attachment?.kind ?? attachment?.mimeType ?? '';
     const isImage = String(kind).includes('image');
@@ -805,12 +936,13 @@ export default function BroadcastFeedSection({
       if (imageUri) {
         const url = await uploadShareAsset(imageUri);
         if (url) {
+          const shareResult = await Share.share({ message: url, url });
+          if (!wasNativeShareCompleted(shareResult)) return;
           await postRequest(
             ROUTES.broadcasts.share(item.id),
             { platform: 'app' },
             { errorMessage: 'Unable to log share.' },
           );
-          await Share.share({ message: url, url });
           return;
         }
       }
@@ -826,19 +958,24 @@ export default function BroadcastFeedSection({
     if (imageUri) {
       const url = await uploadShareAsset(imageUri);
       if (url) {
+        const shareResult = await Share.share({ message: url, url });
+        if (!wasNativeShareCompleted(shareResult)) return;
         await postRequest(
           ROUTES.broadcasts.share(item.id),
           { platform: 'app' },
           { errorMessage: 'Unable to log share.' },
         );
-        await Share.share({ message: url, url });
       }
     }
   };
 
   const copyBroadcastLink = (item: BroadcastFeedItem) => {
     const fallback = `https://kis.app/broadcasts/${item.id}`;
-    const permalink = (item as any).permalink ?? (item as any).link ?? (item as any).url ?? fallback;
+    const permalink =
+      (item as any).permalink ??
+      (item as any).link ??
+      (item as any).url ??
+      fallback;
     Clipboard.setString(permalink);
     Alert.alert('Link copied', 'Broadcast link saved to clipboard.');
   };
@@ -868,38 +1005,63 @@ export default function BroadcastFeedSection({
   };
 
   const handleMute = async (item: BroadcastFeedItem) => {
-    const targetId = item.author?.id;
+    const targetId = resolveBroadcastPosterUserId(item);
     if (!targetId) {
-      Alert.alert('Mute', 'Unable to find broadcaster.');
+      Alert.alert('Mute poster', 'Unable to find this poster.');
       return false;
     }
-    const res = await postRequest(
-      ROUTES.moderation.userBlocks,
-      { blocked: targetId },
-      { errorMessage: 'Unable to mute broadcaster.' },
+    Alert.alert(
+      'Mute poster',
+      'You will never see posts from this poster again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, mute',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await postRequest(
+              ROUTES.moderation.userBlocks,
+              { blocked: targetId, reason: 'broadcast_mute' },
+              { errorMessage: 'Unable to mute poster.' },
+            );
+            if (res?.success) {
+              Alert.alert(
+                'Muted',
+                'You will no longer see posts from this poster.',
+              );
+              loadBroadcasts();
+              return;
+            }
+            Alert.alert('Mute poster', res?.message || 'Try again later.');
+          },
+        },
+      ],
     );
-    if (res?.success) {
-      Alert.alert('Muted', 'You will no longer see broadcasts from this broadcaster.');
-      loadBroadcasts();
-      return true;
-    }
-    Alert.alert('Mute failed', res?.message || 'Try again later.');
-    return false;
+    return true;
   };
 
   const handleHideBroadcast = async (item: BroadcastFeedItem) => {
-    const res = await postRequest(
-      ROUTES.broadcasts.hide(item.id),
-      {},
-      { errorMessage: 'Unable to hide broadcast.' },
-    );
-    if (res?.success) {
-      Alert.alert('Hidden', 'This broadcast will be hidden from your feed.');
-      loadBroadcasts();
-      return true;
-    }
-    Alert.alert('Hide failed', res?.message || 'Try again later.');
-    return false;
+    Alert.alert('Hide post', 'You will never see this post again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Yes, hide',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await postRequest(
+            ROUTES.broadcasts.hide(item.id),
+            {},
+            { errorMessage: 'Unable to hide post.' },
+          );
+          if (res?.success) {
+            Alert.alert('Hidden', 'You will not see this post again.');
+            loadBroadcasts();
+            return;
+          }
+          Alert.alert('Hide post', res?.message || 'Try again later.');
+        },
+      },
+    ]);
+    return true;
   };
 
   const handleLike = async (item: BroadcastFeedItem) => {
@@ -910,13 +1072,18 @@ export default function BroadcastFeedSection({
     );
     if (!res?.success) return;
 
-    const nextCount = res.data?.count ?? (res as any)?.count ?? item.reaction_count ?? 0;
+    const nextCount =
+      res.data?.count ?? (res as any)?.count ?? item.reaction_count ?? 0;
     const reacted = res.data?.reacted ?? (res as any)?.reacted;
 
-    setBroadcasts((prev) =>
-      prev.map((b) =>
+    setBroadcasts(prev =>
+      prev.map(b =>
         b.id === item.id
-          ? { ...b, reaction_count: nextCount, viewer_reaction: reacted ? '❤️' : null }
+          ? {
+              ...b,
+              reaction_count: nextCount,
+              viewer_reaction: reacted ? '❤️' : null,
+            }
           : b,
       ),
     );
@@ -938,7 +1105,11 @@ export default function BroadcastFeedSection({
       joinPolicy === 'open'
         ? ROUTES.community.join(String(communityId))
         : ROUTES.community.requestJoin(String(communityId));
-    const res = await postRequest(url, {}, { errorMessage: 'Unable to join community.' });
+    const res = await postRequest(
+      url,
+      {},
+      { errorMessage: 'Unable to join community.' },
+    );
     if (res?.success) {
       loadBroadcasts();
       return true;
@@ -955,7 +1126,11 @@ export default function BroadcastFeedSection({
       allowSubscribe && !allowApply
         ? ROUTES.partners.subscribe(String(partnerId))
         : ROUTES.partners.apply(String(partnerId));
-    const res = await postRequest(url, {}, { errorMessage: 'Unable to join partner.' });
+    const res = await postRequest(
+      url,
+      {},
+      { errorMessage: 'Unable to join partner.' },
+    );
     if (res?.success) {
       loadBroadcasts();
       return true;
@@ -1055,9 +1230,11 @@ export default function BroadcastFeedSection({
       ) : broadcasts.length === 0 ? (
         <Text style={{ color: palette.subtext }}>No broadcasts yet.</Text>
       ) : computedFiltered.length === 0 ? (
-        <Text style={{ color: palette.subtext }}>No broadcasts match this filter.</Text>
+        <Text style={{ color: palette.subtext }}>
+          No broadcasts match this filter.
+        </Text>
       ) : (
-        computedFiltered.map((item) => (
+        computedFiltered.map(item => (
           <BroadcastFeedCard
             key={item.id}
             item={{
@@ -1068,14 +1245,22 @@ export default function BroadcastFeedSection({
             onShare={() => handleShare(item)}
             onOpenSource={() => handleOpenSource(item)}
             onMenuPress={() => openActionMenu(item)}
-            onVideoPress={() => hasVideoAttachment(item) && openVideoModal(item)}
-            onOpenMarket={() => Alert.alert('Market', 'Opening storefront… (wired next)')}
+            onVideoPress={() =>
+              hasVideoAttachment(item) && openVideoModal(item)
+            }
+            onOpenMarket={() =>
+              Alert.alert('Market', 'Opening storefront… (wired next)')
+            }
             onSave={() => toggleSaved(item)}
             onJoinLesson={() => handleJoinLesson(item)}
             commentConversationId={broadcastConversationIds[item.id] ?? null}
             fetchConversationId={() => fetchBroadcastConversationId(item.id)}
-            onConversationResolved={(id) => setBroadcastConversationId(item.id, id)}
-            onMessageCountChange={(count) => handleCommentCountChange(item.id, count)}
+            onConversationResolved={id =>
+              setBroadcastConversationId(item.id, id)
+            }
+            onMessageCountChange={count =>
+              handleCommentCountChange(item.id, count)
+            }
             contextLabel={item.source?.name ?? item.title ?? 'Broadcast'}
             showComments={activeBroadcastCommentId === item.id}
             onToggleComments={() => toggleBroadcastComments(item.id)}
@@ -1105,25 +1290,55 @@ export default function BroadcastFeedSection({
 
   const renderLessonsBody = () => (
     <View style={{ paddingHorizontal: 12, paddingBottom: 90, gap: 12 }}>
-      <View style={[styles.lessonHero, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+      <View
+        style={[
+          styles.lessonHero,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>
           Lessons
         </Text>
         <Text style={{ color: palette.subtext, marginTop: 4 }}>
           Live classrooms, replays, and guided learning — all inside broadcasts.
         </Text>
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+            marginTop: 10,
+            flexWrap: 'wrap',
+          }}
+        >
           <Pressable
             onPress={() => setSourceChip('lessons')}
-            style={[styles.heroBtn, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}
+            style={[
+              styles.heroBtn,
+              {
+                backgroundColor: palette.primarySoft,
+                borderColor: palette.primary,
+              },
+            ]}
           >
-            <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Explore lessons</Text>
+            <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
+              Explore lessons
+            </Text>
           </Pressable>
           <Pressable
-            onPress={() => Alert.alert('Create lesson', 'Lesson studio coming next.')}
-            style={[styles.heroBtn, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+            onPress={() =>
+              Alert.alert('Create lesson', 'Lesson studio coming next.')
+            }
+            style={[
+              styles.heroBtn,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.divider,
+              },
+            ]}
           >
-            <Text style={{ color: palette.text, fontWeight: '900' }}>Create lesson</Text>
+            <Text style={{ color: palette.text, fontWeight: '900' }}>
+              Create lesson
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -1197,22 +1412,26 @@ export default function BroadcastFeedSection({
           {
             key: 'follow',
             label: 'Follow broadcaster',
-            onPress: () => Alert.alert('Follow', 'Follow system is ready (hook next).'),
+            onPress: () =>
+              Alert.alert('Follow', 'Follow system is ready (hook next).'),
           },
           {
             key: 'pin',
             label: 'Pin broadcast',
-            onPress: () => Alert.alert('Pinned', 'Pinned locally (feature hook ready).'),
+            onPress: () =>
+              Alert.alert('Pinned', 'Pinned locally (feature hook ready).'),
           },
           {
             key: 'schedule',
             label: 'Schedule reminder',
-            onPress: () => Alert.alert('Scheduled', 'Reminder scheduling hook ready.'),
+            onPress: () =>
+              Alert.alert('Scheduled', 'Reminder scheduling hook ready.'),
           },
           {
             key: 'analytics',
             label: 'View insights',
-            onPress: () => Alert.alert('Insights', 'Analytics screen hook ready.'),
+            onPress: () =>
+              Alert.alert('Insights', 'Analytics screen hook ready.'),
           },
         );
 
@@ -1262,19 +1481,30 @@ export default function BroadcastFeedSection({
                 <Video
                   ref={videoPlayerRef}
                   key={videoQueue[currentVideoIndex]?.id}
-                  source={currentVideoPlaybackSource ?? { uri: resolvedCurrentVideoUrl ?? '' }}
+                  source={
+                    currentVideoPlaybackSource ?? {
+                      uri: resolvedCurrentVideoUrl ?? '',
+                    }
+                  }
                   style={styles.videoPlayer}
                   paused={!isVideoPlaying}
                   controls={false}
                   resizeMode="contain"
-                  poster={currentVideoBundle?.thumbUrl ?? currentVideoBundle?.url ?? undefined}
+                  poster={
+                    currentVideoBundle?.thumbUrl ??
+                    currentVideoBundle?.url ??
+                    undefined
+                  }
                   posterResizeMode="cover"
                   onEnd={handleVideoEnd}
                   onError={handleLegacyVideoError}
                 />
 
                 {!isVideoPlaying && (
-                  <Pressable style={styles.modalPlayOverlay} onPress={() => setIsVideoPlaying(true)}>
+                  <Pressable
+                    style={styles.modalPlayOverlay}
+                    onPress={() => setIsVideoPlaying(true)}
+                  >
                     <KISIcon name="play" size={34} color="#fff" />
                     <Text style={styles.modalPlayLabel}>Play</Text>
                   </Pressable>
@@ -1288,7 +1518,9 @@ export default function BroadcastFeedSection({
                     style={styles.videoFloatingActionButton}
                   >
                     <KISIcon name="share" size={20} color="#fff" />
-                    <Text style={styles.actionCountText}>{currentVideoItem.share_count ?? 0}</Text>
+                    <Text style={styles.actionCountText}>
+                      {currentVideoItem.share_count ?? 0}
+                    </Text>
                   </Pressable>
 
                   <Pressable
@@ -1298,9 +1530,18 @@ export default function BroadcastFeedSection({
                     <KISIcon
                       name="heart"
                       size={20}
-                      color={currentVideoItem.viewer_reaction ? '#F97316' : '#fff'}
+                      color={
+                        currentVideoItem.viewer_reaction ? '#F97316' : '#fff'
+                      }
                     />
-                    <Text style={[styles.actionCountText, currentVideoItem.viewer_reaction ? { color: '#F97316' } : null]}>
+                    <Text
+                      style={[
+                        styles.actionCountText,
+                        currentVideoItem.viewer_reaction
+                          ? { color: '#F97316' }
+                          : null,
+                      ]}
+                    >
                       {currentVideoItem.reaction_count ?? 0}
                     </Text>
                   </Pressable>
@@ -1308,12 +1549,18 @@ export default function BroadcastFeedSection({
               )}
 
               <View style={styles.videoControls}>
-                <Pressable onPress={() => setAutoplayEnabled((p) => !p)} style={styles.videoControlButton}>
+                <Pressable
+                  onPress={() => setAutoplayEnabled(p => !p)}
+                  style={styles.videoControlButton}
+                >
                   <Text style={{ color: '#fff', fontWeight: '800' }}>
                     Autoplay {autoplayEnabled ? 'On' : 'Off'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => setIsVideoPlaying((p) => !p)} style={styles.videoControlButton}>
+                <Pressable
+                  onPress={() => setIsVideoPlaying(p => !p)}
+                  style={styles.videoControlButton}
+                >
                   <Text style={{ color: '#fff', fontWeight: '800' }}>
                     {isVideoPlaying ? 'Pause' : 'Play'}
                   </Text>

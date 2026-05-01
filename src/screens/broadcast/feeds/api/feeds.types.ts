@@ -61,6 +61,10 @@ export type TrendingClipItem = {
   id: string;
   title?: string;
   body?: string;
+  text?: any;
+  styled_text?: any;
+  text_doc?: any;
+  text_plain?: string;
   broadcastedAt?: string;
   attachments?: any[];
   engagement?: { reactions?: number; comments?: number };
@@ -75,8 +79,18 @@ export type PaginatedResult<T> = {
 
 export const normalizePaginated = <T>(data: any): PaginatedResult<T> => {
   if (!data) return { results: [], next: null, previous: null, count: 0 };
-  if (Array.isArray(data)) return { results: data as T[], next: null, previous: null, count: data.length };
-  const results = Array.isArray(data.results) ? data.results : Array.isArray(data.data) ? data.data : [];
+  if (Array.isArray(data))
+    return {
+      results: data as T[],
+      next: null,
+      previous: null,
+      count: data.length,
+    };
+  const results = Array.isArray(data.results)
+    ? data.results
+    : Array.isArray(data.data)
+    ? data.data
+    : [];
   return {
     results,
     next: data.next ?? null,

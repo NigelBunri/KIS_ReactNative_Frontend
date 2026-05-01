@@ -1,11 +1,16 @@
 // src/screens/tabs/profile/ProfileScreen.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   DeviceEventEmitter,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -13,7 +18,12 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  RouteProp,
+} from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import KISButton from '@/constants/KISButton';
@@ -38,14 +48,9 @@ import {
 } from '@/services/inAppNotificationService';
 import { filterInstitutionsForVisibleRoles } from '@/screens/health/accessControl';
 
-import HeroHeader from './profile/components/HeroHeader';
-import AccountCreditsCard from './profile/components/AccountCreditsCard';
-
 import BottomSheet from './profile/sheets/BottomSheet';
 import SheetHeader from './profile/sheets/SheetHeader';
 import {
-  BroadcastProfilesSection,
-  ImpactSnapshotSection,
   PartnerProfilesSection,
   LogoutSection,
 } from '@/screens/tabs/profile-screen-sections';
@@ -55,15 +60,26 @@ import type {
   RootStackParamList,
 } from '@/navigation/types';
 
-const ESCROW_PENDING_STATUSES = new Set(['pending', 'awaiting_satisfaction', 'dispute']);
-const CANCELLED_BOOKING_STATUSES = new Set(['cancelled', 'canceled', 'rejected', 'void']);
+const ESCROW_PENDING_STATUSES = new Set([
+  'pending',
+  'awaiting_satisfaction',
+  'dispute',
+]);
+const CANCELLED_BOOKING_STATUSES = new Set([
+  'cancelled',
+  'canceled',
+  'rejected',
+  'void',
+]);
 
 const getBookingServiceId = (booking: any) => {
   if (!booking) return null;
   return (
     booking?.service_details?.id ||
     (booking?.service_id ? String(booking.service_id) : null) ||
-    (booking?.service && typeof booking.service.id === 'string' ? booking.service.id : null) ||
+    (booking?.service && typeof booking.service.id === 'string'
+      ? booking.service.id
+      : null) ||
     (booking?.service ? String(booking.service) : null) ||
     null
   );
@@ -71,10 +87,12 @@ const getBookingServiceId = (booking: any) => {
 
 const dedupeBookingsByService = (bookings: any[]) => {
   const seen = new Map<string, any>();
-  bookings.forEach((booking) => {
+  bookings.forEach(booking => {
     if (!booking) return;
-    const fallbackId = booking?.id ?? booking?.booking_id ?? booking?.reference ?? '';
-    const serviceId = getBookingServiceId(booking) || (fallbackId ? String(fallbackId) : '');
+    const fallbackId =
+      booking?.id ?? booking?.booking_id ?? booking?.reference ?? '';
+    const serviceId =
+      getBookingServiceId(booking) || (fallbackId ? String(fallbackId) : '');
     if (!serviceId) return;
     if (!seen.has(serviceId)) {
       seen.set(serviceId, booking);
@@ -109,6 +127,24 @@ import ShopEditorDrawer from '@/screens/market/ShopEditorDrawer';
 import { resolveShopImageUri } from '@/utils/shopAssets';
 import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
 import { useLanguage } from '@/languages';
+import {
+  AppointmentSummaryCard,
+  ImpactSnapshotCard,
+  LanguageSelectorCard,
+  MarketplaceOrdersSummary,
+  NotificationSummaryCard,
+  PartnerOrganizationSummary,
+  ProfileHeroCard,
+  QuickActionGrid,
+  RecentActivityTimeline,
+  WalletSummaryCard,
+  WorkspaceLauncherSection,
+} from './profile/components/dashboard';
+import { createProfileDashboardTheme } from './profile/profileDashboardTheme';
+import {
+  buildImpactSnapshotStats,
+  buildRecentActivityItems,
+} from './profile/profileDashboardData';
 
 const DEFAULT_MARKET_FORM: MarketFormState = {
   name: '',
@@ -123,44 +159,74 @@ const DEFAULT_MARKET_FORM: MarketFormState = {
 const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 
 export default function ProfileScreen() {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  const dashboardTheme = useMemo(
+    () => createProfileDashboardTheme(palette, tone),
+    [palette, tone],
+  );
   const { language, languages, setLanguage } = useLanguage();
   const { setAuth, setPhone, callingCode } = useAuth();
-  const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
-  const tabsNavigation = useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Profile'>>();
+  const c = useProfileController({
+    setAuth,
+    setPhone,
+    locationCallingCode: callingCode,
+  });
+  const tabsNavigation =
+    useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Profile'>>();
   const route = useRoute<RouteProp<MainTabsParamList, 'Profile'>>();
   const broadcastProfiles = c.broadcastProfiles;
   const upgradeTiers = useMemo(
-    () => (c.tierCatalog && c.tierCatalog.length ? c.tierCatalog : c.profile?.tiers || []),
+    () =>
+      c.tierCatalog && c.tierCatalog.length
+        ? c.tierCatalog
+        : c.profile?.tiers || [],
     [c.tierCatalog, c.profile?.tiers],
   );
-  const requestedBroadcastProfileKey = route.params?.broadcastProfileKey ?? null;
-  const [managementPanelKey, setManagementPanelKey] = useState<BroadcastProfileKey | null>(null);
+  const requestedBroadcastProfileKey =
+    route.params?.broadcastProfileKey ?? null;
+  const [managementPanelKey, setManagementPanelKey] =
+    useState<BroadcastProfileKey | null>(null);
   const [panelFeedItemTitle, setPanelFeedItemTitle] = useState('');
   const [panelFeedItemSummary, setPanelFeedItemSummary] = useState('');
-  const [panelFeedMediaType, setPanelFeedMediaType] = useState<FeedMediaType>('video');
-  const [panelFeedMediaOptions, setPanelFeedMediaOptions] = useState<FeedMediaOptions>(
-    () => buildDefaultFeedMediaOptions(),
-  );
+  const [panelFeedMediaType, setPanelFeedMediaType] =
+    useState<FeedMediaType>('video');
+  const [panelFeedMediaOptions, setPanelFeedMediaOptions] =
+    useState<FeedMediaOptions>(() => buildDefaultFeedMediaOptions());
   const [panelFeedAssets, setPanelFeedAssets] = useState<Asset[]>([]);
-  const [panelFeedExistingAttachments, setPanelFeedExistingAttachments] = useState<any[]>([]);
+  const [panelFeedExistingAttachments, setPanelFeedExistingAttachments] =
+    useState<any[]>([]);
   const [panelFeedAdding, setPanelFeedAdding] = useState(false);
-  const [panelAttachmentUploading, setPanelAttachmentUploading] = useState(false);
-  const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
-  const [panelFeedDeletingId, setPanelFeedDeletingId] = useState<string | null>(null);
-  const [panelFeedBroadcastingId, setPanelFeedBroadcastingId] = useState<string | null>(null);
-  const managementPanelOffset = useRef(new Animated.Value(profileLayout.SCREEN_WIDTH)).current;
-  const [marketForm, setMarketForm] = useState<MarketFormState>(DEFAULT_MARKET_FORM);
+  const [panelAttachmentUploading, setPanelAttachmentUploading] =
+    useState(false);
+  const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(
+    null,
+  );
+  const [panelFeedDeletingId, setPanelFeedDeletingId] = useState<string | null>(
+    null,
+  );
+  const [panelFeedBroadcastingId, setPanelFeedBroadcastingId] = useState<
+    string | null
+  >(null);
+  const managementPanelOffset = useRef(
+    new Animated.Value(profileLayout.SCREEN_WIDTH),
+  ).current;
+  const [marketForm, setMarketForm] =
+    useState<MarketFormState>(DEFAULT_MARKET_FORM);
   const [marketFormMode, setMarketFormMode] = useState<'add' | 'edit'>('add');
   const [marketFormLoading, setMarketFormLoading] = useState(false);
   const [shopEditorVisible, setShopEditorVisible] = useState(false);
-  const [shopEditorMode, setShopEditorMode] = useState<'create' | 'edit'>('create');
+  const [shopEditorMode, setShopEditorMode] = useState<'create' | 'edit'>(
+    'create',
+  );
   const [activeShop, setActiveShop] = useState<any | null>(null);
   const [commerceShops, setCommerceShops] = useState<any[]>([]);
   const [commerceShopsLoading, setCommerceShopsLoading] = useState(false);
   const [marketplaceOrders, setMarketplaceOrders] = useState<any[]>([]);
-  const [marketplaceOrdersLoading, setMarketplaceOrdersLoading] = useState(false);
-  const [marketplaceOrdersError, setMarketplaceOrdersError] = useState<string | null>(null);
+  const [marketplaceOrdersLoading, setMarketplaceOrdersLoading] =
+    useState(false);
+  const [marketplaceOrdersError, setMarketplaceOrdersError] = useState<
+    string | null
+  >(null);
   const currentUserId = useMemo(() => {
     const userId = c.profile?.user?.id;
     return userId ? String(userId) : null;
@@ -170,11 +236,13 @@ export default function ProfileScreen() {
     return ownerId ? String(ownerId) : null;
   }, [activeShop?.owner]);
   const canDeleteActiveShop = useMemo(() => {
-    return Boolean(activeShopOwnerId && currentUserId && activeShopOwnerId === currentUserId);
+    return Boolean(
+      activeShopOwnerId && currentUserId && activeShopOwnerId === currentUserId,
+    );
   }, [activeShopOwnerId, currentUserId]);
   const updateMarketFormField = useCallback(
     (changes: Partial<MarketFormState>) => {
-      setMarketForm((prev) => ({ ...prev, ...changes }));
+      setMarketForm(prev => ({ ...prev, ...changes }));
     },
     [],
   );
@@ -182,24 +250,37 @@ export default function ProfileScreen() {
     title: '',
     summary: '',
   });
-  const [educationFormMode, setEducationFormMode] = useState<'add' | 'edit'>('add');
+  const [educationFormMode, setEducationFormMode] = useState<'add' | 'edit'>(
+    'add',
+  );
   const [educationFormLoading, setEducationFormLoading] = useState(false);
   const [educationModuleForm, setEducationModuleForm] = useState({
     title: '',
     summary: '',
     resource_url: '',
   });
-  const [educationModuleSubmitting, setEducationModuleSubmitting] = useState(false);
+  const [educationModuleSubmitting, setEducationModuleSubmitting] =
+    useState(false);
   const [educationLessonsData, setEducationLessonsData] = useState<any[]>([]);
-  const [educationAnalyticsLoading, setEducationAnalyticsLoading] = useState(false);
-  const [educationAnalyticsError, setEducationAnalyticsError] = useState<string | null>(null);
-  const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
+  const [educationAnalyticsLoading, setEducationAnalyticsLoading] =
+    useState(false);
+  const [educationAnalyticsError, setEducationAnalyticsError] = useState<
+    string | null
+  >(null);
+  const [inAppNotifications, setInAppNotifications] = useState<
+    InAppNotification[]
+  >([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [deletingNotificationId, setDeletingNotificationId] = useState<string | null>(null);
-  const [deletingGalleryItemId, setDeletingGalleryItemId] = useState<string | null>(null);
+  const [, setDeletingNotificationId] = useState<string | null>(null);
+  const [deletingGalleryItemId, setDeletingGalleryItemId] = useState<
+    string | null
+  >(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [providerAppointments, setProviderAppointments] = useState<any[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(
+    null,
+  );
 
   const loadInAppNotifications = useCallback(async () => {
     setLoadingNotifications(true);
@@ -215,63 +296,89 @@ export default function ProfileScreen() {
   const loadAppointments = useCallback(async () => {
     if (!userId) return;
     setAppointmentsLoading(true);
+    setAppointmentsError(null);
     try {
       const response = await getRequest(ROUTES.commerce.serviceBookings, {
         errorMessage: 'Unable to load appointments.',
         forceNetwork: true,
       });
-        if (response?.success) {
-          const payload = response.data ?? response ?? {};
-          const records = Array.isArray(payload)
-            ? payload
-            : Array.isArray((payload as any).results)
-            ? (payload as any).results
-            : [];
-          const normalizedUserId = String(userId);
-          const activeRecords = records.filter((booking) => {
-            const status = ((booking?.status ?? '') as string).toLowerCase();
-            return !CANCELLED_BOOKING_STATUSES.has(status);
-          });
-          const payerBookings = dedupeBookingsByService(
-            activeRecords.filter((booking) => String(booking?.user) === normalizedUserId),
-          );
-          const providerBookings = dedupeBookingsByService(
-            activeRecords.filter((booking) => String(booking?.provider_details?.id) === normalizedUserId),
-          );
-          setAppointments(payerBookings);
-          setProviderAppointments(providerBookings);
-        }
-    } catch (error) {
-      console.error('Failed to load appointments', error);
+      if (response?.success) {
+        const payload = response.data ?? response ?? {};
+        const records = Array.isArray(payload)
+          ? payload
+          : Array.isArray((payload as any).results)
+          ? (payload as any).results
+          : [];
+        const normalizedUserId = String(userId);
+        const activeRecords = records.filter((booking: any) => {
+          const status = ((booking?.status ?? '') as string).toLowerCase();
+          return !CANCELLED_BOOKING_STATUSES.has(status);
+        });
+        const payerBookings = dedupeBookingsByService(
+          activeRecords.filter(
+            (booking: any) => String(booking?.user) === normalizedUserId,
+          ),
+        );
+        const providerBookings = dedupeBookingsByService(
+          activeRecords.filter(
+            (booking: any) =>
+              String(booking?.provider_details?.id) === normalizedUserId,
+          ),
+        );
+        setAppointments(payerBookings);
+        setProviderAppointments(providerBookings);
+      } else {
+        setAppointmentsError(
+          response?.message || 'Unable to load appointments.',
+        );
+      }
+    } catch (error: any) {
+      setAppointmentsError(error?.message || 'Unable to load appointments.');
     } finally {
       setAppointmentsLoading(false);
     }
   }, [userId]);
 
-  const openRemoteLink = useCallback((url: string) => {
-    if (!url) return;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Meeting link', 'Unable to open the meeting link.');
-    });
-  }, []);
-
   const pendingServicePayments = useMemo(
-    () => appointments.filter((booking) => ESCROW_PENDING_STATUSES.has(booking?.escrow_status)),
+    () =>
+      appointments.filter(booking =>
+        ESCROW_PENDING_STATUSES.has(booking?.escrow_status),
+      ),
     [appointments],
   );
   const pendingReceivePayments = useMemo(
-    () => providerAppointments.filter((booking) => ESCROW_PENDING_STATUSES.has(booking?.escrow_status)),
+    () =>
+      providerAppointments.filter(booking =>
+        ESCROW_PENDING_STATUSES.has(booking?.escrow_status),
+      ),
     [providerAppointments],
   );
+  const confirmedAppointments = useMemo(
+    () =>
+      appointments.filter(
+        booking =>
+          String(booking?.status || '')
+            .trim()
+            .toLowerCase() === 'confirmed',
+      ),
+    [appointments],
+  );
+  const unreadNotifications = useMemo(
+    () => inAppNotifications.filter(item => !item.readAt),
+    [inAppNotifications],
+  );
 
-  const detectMediaTypeFromAsset = useCallback((asset?: Asset | null): FeedMediaType => {
-    if (!asset?.type) return 'file';
-    const mime = asset.type.toLowerCase();
-    if (mime.startsWith('video/')) return 'video';
-    if (mime.startsWith('audio/')) return 'audio';
-    if (mime.startsWith('image/')) return 'image';
-    return 'file';
-  }, []);
+  const detectMediaTypeFromAsset = useCallback(
+    (asset?: Asset | null): FeedMediaType => {
+      if (!asset?.type) return 'file';
+      const mime = asset.type.toLowerCase();
+      if (mime.startsWith('video/')) return 'video';
+      if (mime.startsWith('audio/')) return 'audio';
+      if (mime.startsWith('image/')) return 'image';
+      return 'file';
+    },
+    [],
+  );
 
   const handlePickFeedMedia = useCallback(async () => {
     const result = await launchImageLibrary({
@@ -280,14 +387,14 @@ export default function ProfileScreen() {
       quality: 0.9,
     });
     if (result.didCancel || !result.assets?.length) return;
-    const assets = result.assets.filter((asset) => asset?.uri) as Asset[];
+    const assets = result.assets.filter(asset => asset?.uri) as Asset[];
     if (!assets.length) return;
-    setPanelFeedAssets((prev) => [...prev, ...assets]);
+    setPanelFeedAssets(prev => [...prev, ...assets]);
     setPanelFeedMediaType(detectMediaTypeFromAsset(assets[0]));
   }, [detectMediaTypeFromAsset]);
 
   const removeTemporaryFeedAsset = useCallback((index: number) => {
-    setPanelFeedAssets((prev) => prev.filter((_, idx) => idx !== index));
+    setPanelFeedAssets(prev => prev.filter((_, idx) => idx !== index));
   }, []);
 
   const handleAttachProfileFile = useCallback(async () => {
@@ -302,7 +409,10 @@ export default function ProfileScreen() {
       if (result.didCancel || !result.assets?.length) return;
       const asset = result.assets[0];
       if (!asset?.uri) return;
-      const attachment = await c.uploadProfileAttachment(asset, managementPanelKey);
+      const attachment = await c.uploadProfileAttachment(
+        asset,
+        managementPanelKey,
+      );
       if (!attachment) {
         throw new Error('Unable to upload attachment.');
       }
@@ -311,20 +421,21 @@ export default function ProfileScreen() {
       await c.manageProfileSection(profileType, { attachments: [attachment] });
       Alert.alert('Attachment uploaded', 'It has been added to the profile.');
     } catch (error: any) {
-      Alert.alert('Attachment', error?.message || 'Unable to upload attachment.');
+      Alert.alert(
+        'Attachment',
+        error?.message || 'Unable to upload attachment.',
+      );
     } finally {
       setPanelAttachmentUploading(false);
     }
   }, [managementPanelKey, c]);
 
-  console.log("Kis wallet check from c: ", c)
-
   const accountTier = c.profile?.account?.tier;
   const points = c.profile?.account?.points ?? 0;
-  const kisWalletMicro = Number(c.kisWallet?.balance_micro ?? 0);
   const kisWalletLabel = String(c.kisWallet?.balance_label ?? '0.00 KISC');
   const kisWalletUsdLabel = String(c.kisWallet?.usd_label ?? '$0.00');
-  const currentTier = accountTier || c.profile?.tier || c.profile?.subscription?.tier;
+  const currentTier =
+    accountTier || c.profile?.tier || c.profile?.subscription?.tier;
   const tierLabel =
     currentTier?.name ??
     currentTier?.label ??
@@ -332,12 +443,11 @@ export default function ProfileScreen() {
     currentTier?.tierName ??
     null;
   const partnerProfiles = c.profile?.partner_profiles || [];
-  const partnerProfilesCount = c.profile?.partner_profiles_count ?? 0;
   const partnerProfilesLimitLabel = c.profile?.partner_profiles_limit_label;
-  const partnerProfilesLimitValue = c.profile?.partner_profiles_limit_value ?? 0;
+  const partnerProfilesLimitValue =
+    c.profile?.partner_profiles_limit_value ?? 0;
   const partnerProfilesIsUnlimited = !!c.profile?.partner_profiles_is_unlimited;
   const canCreatePartner = !!c.profile?.partner_profiles_can_create;
-  const showCreatePartnerButton = canCreatePartner;
   const editGalleryItems = useMemo(() => {
     const gallery: Array<{
       id: string;
@@ -379,21 +489,38 @@ export default function ProfileScreen() {
       });
     };
 
-    pushItem('cover_preview', c.profile?.profile?.cover_url, 'Cover image', 'Cover');
-    pushItem('avatar_preview', c.profile?.profile?.avatar_url, 'Profile image', 'Avatar');
+    pushItem(
+      'cover_preview',
+      c.profile?.profile?.cover_url,
+      'Cover image',
+      'Cover',
+    );
+    pushItem(
+      'avatar_preview',
+      c.profile?.profile?.avatar_url,
+      'Profile image',
+      'Avatar',
+    );
 
     const showcases = c.profile?.sections?.showcases || {};
-    const orderedTypes = ['portfolio', 'case_study', 'testimonial', 'certification', 'intro_video', 'highlight'];
-    orderedTypes.forEach((typeKey) => {
-      const rows = Array.isArray((showcases as any)?.[typeKey]) ? (showcases as any)[typeKey] : [];
+    const orderedTypes = [
+      'portfolio',
+      'case_study',
+      'testimonial',
+      'certification',
+      'intro_video',
+      'highlight',
+    ];
+    orderedTypes.forEach(typeKey => {
+      const rows = Array.isArray((showcases as any)?.[typeKey])
+        ? (showcases as any)[typeKey]
+        : [];
       rows.forEach((row: any, index: number) => {
         const rowId = String(row?.id || `${typeKey}_${index}`);
-        const uri = row?.file_url || row?.file || row?.cover_url || row?.payload?.url;
+        const uri =
+          row?.file_url || row?.file || row?.cover_url || row?.payload?.url;
         const title = String(
-          row?.title ||
-            row?.name ||
-            row?.summary ||
-            typeKey.replace(/_/g, ' '),
+          row?.title || row?.name || row?.summary || typeKey.replace(/_/g, ' '),
         );
         const forceKind = typeKey === 'intro_video' ? 'video' : undefined;
         pushItem(
@@ -409,77 +536,72 @@ export default function ProfileScreen() {
       });
     });
     return gallery;
-  }, [c.profile?.profile?.avatar_url, c.profile?.profile?.cover_url, c.profile?.sections?.showcases]);
+  }, [
+    c.profile?.profile?.avatar_url,
+    c.profile?.profile?.cover_url,
+    c.profile?.sections?.showcases,
+  ]);
 
-  const handleDeleteGalleryItem = useCallback(async (item: any) => {
-    const itemType = item?.itemType;
-    const itemId = String(item?.itemId || '').trim();
-    if (!itemType || !itemId) return;
-    setDeletingGalleryItemId(itemId);
-    try {
-      await c.deleteItem(itemType, itemId);
-    } finally {
-      setDeletingGalleryItemId(null);
-    }
-  }, [c]);
+  const handleDeleteGalleryItem = useCallback(
+    async (item: any) => {
+      const itemType = item?.itemType;
+      const itemId = String(item?.itemId || '').trim();
+      if (!itemType || !itemId) return;
+      setDeletingGalleryItemId(itemId);
+      try {
+        await c.deleteItem(itemType, itemId);
+      } finally {
+        setDeletingGalleryItemId(null);
+      }
+    },
+    [c],
+  );
 
-  const handleDeleteWalletEntry = useCallback((entryId: string) => {
-    const id = String(entryId || '').trim();
-    if (!id) return;
-    Alert.alert(
-      'Delete transaction history',
-      'This removes the transaction from your history list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            c.deleteWalletLedgerEntry(id).catch((error: any) => {
-              Alert.alert('Wallet', error?.message || 'Unable to delete transaction history.');
-            });
-          },
-        },
-      ],
-    );
-  }, [c]);
-
-  const sheetTitle = useMemo(() => getSheetTitle(c.activeSheet), [c.activeSheet]);
+  const sheetTitle = useMemo(
+    () => getSheetTitle(c.activeSheet),
+    [c.activeSheet],
+  );
 
   const openWalletSheet = c.openSheet;
   const setWalletForm = c.setWalletForm;
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('wallet.open', (payload: any) => {
-      const normalizedMode = String(payload?.mode || '').trim().toLowerCase();
-      const mappedMode =
-        normalizedMode === 'transfer'
-          ? 'transfer'
-          : 'add_kisc';
-      openWalletSheet('wallet');
-      setWalletForm((prev: any) => ({
-        ...prev,
-        mode: mappedMode,
-        amount: payload?.amount ? String(payload.amount) : prev.amount,
-        reference: payload?.reference ? String(payload.reference) : prev.reference,
-      }));
-    });
+    const sub = DeviceEventEmitter.addListener(
+      'wallet.open',
+      (payload: any) => {
+        const normalizedMode = String(payload?.mode || '')
+          .trim()
+          .toLowerCase();
+        const mappedMode =
+          normalizedMode === 'transfer' ? 'transfer' : 'add_kisc';
+        openWalletSheet('wallet');
+        setWalletForm((prev: any) => ({
+          ...prev,
+          mode: mappedMode,
+          amount: payload?.amount ? String(payload.amount) : prev.amount,
+          reference: payload?.reference
+            ? String(payload.reference)
+            : prev.reference,
+        }));
+      },
+    );
     return () => sub.remove();
   }, [openWalletSheet, setWalletForm]);
 
   useEffect(() => {
     loadInAppNotifications().catch(() => undefined);
-    const sub = DeviceEventEmitter.addListener(IN_APP_NOTIFICATIONS_UPDATED_EVENT, () => {
-      loadInAppNotifications().catch(() => undefined);
-    });
+    const sub = DeviceEventEmitter.addListener(
+      IN_APP_NOTIFICATIONS_UPDATED_EVENT,
+      () => {
+        loadInAppNotifications().catch(() => undefined);
+      },
+    );
     return () => sub.remove();
   }, [loadInAppNotifications]);
 
-  const handleDeleteNotification = useCallback((item: InAppNotification) => {
-    Alert.alert(
-      'Delete notification',
-      'This will remove the notification.',
-      [
+  const handleDeleteNotification = useCallback(
+    (item: InAppNotification) => {
+      Alert.alert('Delete notification', 'This will remove the notification.', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -489,23 +611,30 @@ export default function ProfileScreen() {
             deleteInAppNotification(item.id)
               .then(() => loadInAppNotifications())
               .catch((error: any) => {
-                Alert.alert('Notifications', error?.message || 'Unable to delete notification.');
+                Alert.alert(
+                  'Notifications',
+                  error?.message || 'Unable to delete notification.',
+                );
               })
               .finally(() => setDeletingNotificationId(null));
           },
         },
-      ],
-    );
-  }, [loadInAppNotifications]);
+      ]);
+    },
+    [loadInAppNotifications],
+  );
 
-  const openManagementPanel = useCallback((key: BroadcastProfileKey) => {
-    setManagementPanelKey(key);
-    Animated.timing(managementPanelOffset, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [managementPanelOffset]);
+  const openManagementPanel = useCallback(
+    (key: BroadcastProfileKey) => {
+      setManagementPanelKey(key);
+      Animated.timing(managementPanelOffset, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    },
+    [managementPanelOffset],
+  );
 
   const closeManagementPanel = useCallback(() => {
     Animated.timing(managementPanelOffset, {
@@ -528,8 +657,11 @@ export default function ProfileScreen() {
   }, []);
 
   const updatePanelFeedMediaOptions = useCallback(
-    (type: FeedMediaType, updates: Partial<FeedMediaOptions[FeedMediaType]>) => {
-      setPanelFeedMediaOptions((prev) => ({
+    (
+      type: FeedMediaType,
+      updates: Partial<FeedMediaOptions[FeedMediaType]>,
+    ) => {
+      setPanelFeedMediaOptions(prev => ({
         ...prev,
         [type]: {
           ...prev[type],
@@ -550,8 +682,8 @@ export default function ProfileScreen() {
 
     setPanelFeedAdding(true);
     const attachmentsPayload = panelFeedAssets
-      .filter((asset) => asset?.uri)
-      .map((asset) => ({
+      .filter(asset => asset?.uri)
+      .map(asset => ({
         uri: asset.uri!,
         name: asset.fileName || `feed-${Date.now()}`,
         type: asset.type || 'application/octet-stream',
@@ -580,7 +712,10 @@ export default function ProfileScreen() {
       }
       resetFeedForm();
     } catch (error: any) {
-      Alert.alert('Broadcast item', error?.message || 'Unable to save this item.');
+      Alert.alert(
+        'Broadcast item',
+        error?.message || 'Unable to save this item.',
+      );
     } finally {
       setPanelFeedAdding(false);
     }
@@ -597,35 +732,33 @@ export default function ProfileScreen() {
     resetFeedForm,
   ]);
 
-  const handleEditFeedItem = useCallback(
-    (item: any) => {
-      setEditingFeedItemId(item.id);
-      setPanelFeedItemTitle(item.title || '');
-      setPanelFeedItemSummary(item.summary || '');
-      const entryType = (item.media_type as FeedMediaType) || 'text';
-      setPanelFeedMediaType(entryType);
-      const attachments =
-        (Array.isArray(item.attachments) ? item.attachments : []).filter(Boolean);
-      const baseAttachments =
-        attachments.length > 0
-          ? attachments
-          : item.attachment
-          ? [item.attachment]
-          : [];
-      setPanelFeedExistingAttachments(baseAttachments);
-      setPanelFeedAssets([]);
-      const nextOptions = buildDefaultFeedMediaOptions();
-      const existingOptions = item.media_options;
-      if (existingOptions && typeof existingOptions === 'object') {
-        nextOptions[entryType] = {
-          ...nextOptions[entryType],
-          ...existingOptions,
-        };
-      }
-      setPanelFeedMediaOptions(nextOptions);
-    },
-    [],
-  );
+  const handleEditFeedItem = useCallback((item: any) => {
+    setEditingFeedItemId(item.id);
+    setPanelFeedItemTitle(item.title || '');
+    setPanelFeedItemSummary(item.summary || '');
+    const entryType = (item.media_type as FeedMediaType) || 'text';
+    setPanelFeedMediaType(entryType);
+    const attachments = (
+      Array.isArray(item.attachments) ? item.attachments : []
+    ).filter(Boolean);
+    const baseAttachments =
+      attachments.length > 0
+        ? attachments
+        : item.attachment
+        ? [item.attachment]
+        : [];
+    setPanelFeedExistingAttachments(baseAttachments);
+    setPanelFeedAssets([]);
+    const nextOptions = buildDefaultFeedMediaOptions();
+    const existingOptions = item.media_options;
+    if (existingOptions && typeof existingOptions === 'object') {
+      nextOptions[entryType] = {
+        ...nextOptions[entryType],
+        ...existingOptions,
+      };
+    }
+    setPanelFeedMediaOptions(nextOptions);
+  }, []);
 
   const handleCancelFeedEdit = useCallback(() => {
     resetFeedForm();
@@ -640,7 +773,10 @@ export default function ProfileScreen() {
           resetFeedForm();
         }
       } catch (error: any) {
-        Alert.alert('Delete item', error?.message || 'Unable to delete the item.');
+        Alert.alert(
+          'Delete item',
+          error?.message || 'Unable to delete the item.',
+        );
       } finally {
         setPanelFeedDeletingId(null);
       }
@@ -655,17 +791,23 @@ export default function ProfileScreen() {
         await c.broadcastFeedEntry(feed.id);
         Alert.alert('Broadcast', 'This item was broadcasted to your feed.');
       } catch (error: any) {
-        Alert.alert('Broadcast', error?.message || 'Unable to broadcast the item.');
+        Alert.alert(
+          'Broadcast',
+          error?.message || 'Unable to broadcast the item.',
+        );
       } finally {
-        setPanelFeedBroadcastingId((prev) => (prev === feed.id ? null : prev));
+        setPanelFeedBroadcastingId(prev => (prev === feed.id ? null : prev));
       }
     },
     [c],
   );
 
-  const handleBroadcastCTA = (def: (typeof BROADCAST_PROFILE_DEFINITIONS)[number]) => {
-    openManagementPanel(def.profileKey);
-  };
+  const handleBroadcastCTA = useCallback(
+    (def: (typeof BROADCAST_PROFILE_DEFINITIONS)[number]) => {
+      openManagementPanel(def.profileKey);
+    },
+    [openManagementPanel],
+  );
 
   const rootNavigation =
     tabsNavigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
@@ -685,7 +827,12 @@ export default function ProfileScreen() {
       openManagementPanel(requestedKey);
     }
     tabsNavigation.setParams({ broadcastProfileKey: undefined });
-  }, [tabsNavigation, managementPanelKey, openManagementPanel, requestedBroadcastProfileKey]);
+  }, [
+    tabsNavigation,
+    managementPanelKey,
+    openManagementPanel,
+    requestedBroadcastProfileKey,
+  ]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(
@@ -702,7 +849,9 @@ export default function ProfileScreen() {
     (shop?: any) => {
       rootNavigation?.navigate('ProfileLandingEditor', {
         kind: 'market',
-        profileLabel: shop?.name ? `${shop.name} landing page` : 'Market Profile',
+        profileLabel: shop?.name
+          ? `${shop.name} landing page`
+          : 'Market Profile',
         shopId: shop?.id,
         shopName: shop?.name,
       });
@@ -718,22 +867,28 @@ export default function ProfileScreen() {
     [rootNavigation],
   );
 
-  const openEducationLandingBuilder = useCallback((institution?: any) => {
-    rootNavigation?.navigate('ProfileLandingEditor', {
-      kind: 'education',
-      profileLabel: institution?.name || 'Education Profile',
-      returnBroadcastProfileKey: 'education',
-    });
-  }, [rootNavigation]);
+  const openEducationLandingBuilder = useCallback(
+    (institution?: any) => {
+      rootNavigation?.navigate('ProfileLandingEditor', {
+        kind: 'education',
+        profileLabel: institution?.name || 'Education Profile',
+        returnBroadcastProfileKey: 'education',
+      });
+    },
+    [rootNavigation],
+  );
 
-  const openPartnerLandingBuilder = useCallback((partnerId: string, partnerName?: string | null) => {
-    if (!partnerId) return;
-    rootNavigation?.navigate('ProfileLandingEditor', {
-      kind: 'partner',
-      partnerId,
-      profileLabel: partnerName || 'Partner Profile',
-    });
-  }, [rootNavigation]);
+  const openPartnerLandingBuilder = useCallback(
+    (partnerId: string, partnerName?: string | null) => {
+      if (!partnerId) return;
+      rootNavigation?.navigate('ProfileLandingEditor', {
+        kind: 'partner',
+        partnerId,
+        profileLabel: partnerName || 'Partner Profile',
+      });
+    },
+    [rootNavigation],
+  );
 
   const handleViewInstitution = useCallback(
     (inst: any) => {
@@ -769,10 +924,14 @@ export default function ProfileScreen() {
     });
   }, [rootNavigation]);
 
-  const managementPanelData = managementPanelKey ? broadcastProfiles?.[managementPanelKey] : null;
+  const managementPanelData = managementPanelKey
+    ? broadcastProfiles?.[managementPanelKey]
+    : null;
   const managementPanelDefinition =
     managementPanelKey &&
-    BROADCAST_PROFILE_DEFINITIONS.find((def) => def.profileKey === managementPanelKey);
+    BROADCAST_PROFILE_DEFINITIONS.find(
+      def => def.profileKey === managementPanelKey,
+    );
 
   const resetMarketForm = useCallback(() => {
     setMarketForm(DEFAULT_MARKET_FORM);
@@ -804,7 +963,10 @@ export default function ProfileScreen() {
     return [];
   }, []);
 
-  const manageableRoles = useMemo(() => new Set(['owner', 'manager', 'admin']), []);
+  const manageableRoles = useMemo(
+    () => new Set(['owner', 'manager', 'admin']),
+    [],
+  );
 
   const manageableShops = useMemo(() => {
     if (!currentUserId) {
@@ -865,7 +1027,10 @@ export default function ProfileScreen() {
           shops = unwrapList(fallbackResponse.data);
         } else {
           if (fallbackResponse?.message) {
-            console.warn('Unable to load commerce shops:', fallbackResponse.message);
+            console.warn(
+              'Unable to load commerce shops:',
+              fallbackResponse.message,
+            );
           }
         }
       } else if (!response?.success && response?.message) {
@@ -874,29 +1039,42 @@ export default function ProfileScreen() {
       if (shops.length) {
         let revenueByShopId = new Map<string, number>();
         try {
-          const providerOrdersRes = await getRequest(ROUTES.commerce.marketplaceProviderOrders, {
-            errorMessage: 'Unable to load shop revenue.',
-          });
-          const providerOrders = providerOrdersRes?.success ? unwrapList(providerOrdersRes.data) : [];
-          revenueByShopId = providerOrders.reduce((map: Map<string, number>, order: any) => {
-            const shopId =
-              order?.shop_info?.id ??
-              order?.shop?.id ??
-              order?.shop_id ??
-              null;
-            const status = String(order?.status ?? '').toLowerCase();
-            if (!shopId || status === 'cancelled' || status === 'canceled') {
+          const providerOrdersRes = await getRequest(
+            ROUTES.commerce.marketplaceProviderOrders,
+            {
+              errorMessage: 'Unable to load shop revenue.',
+            },
+          );
+          const providerOrders = providerOrdersRes?.success
+            ? unwrapList(providerOrdersRes.data)
+            : [];
+          revenueByShopId = providerOrders.reduce(
+            (map: Map<string, number>, order: any) => {
+              const shopId =
+                order?.shop_info?.id ??
+                order?.shop?.id ??
+                order?.shop_id ??
+                null;
+              const status = String(order?.status ?? '').toLowerCase();
+              if (!shopId || status === 'cancelled' || status === 'canceled') {
+                return map;
+              }
+              const orderTotal = backendOrderTotalToFrontendKisc(
+                order?.total_amount ?? order?.amount ?? 0,
+              );
+              map.set(
+                String(shopId),
+                (map.get(String(shopId)) ?? 0) + orderTotal,
+              );
               return map;
-            }
-            const orderTotal = backendOrderTotalToFrontendKisc(order?.total_amount ?? order?.amount ?? 0);
-            map.set(String(shopId), (map.get(String(shopId)) ?? 0) + orderTotal);
-            return map;
-          }, new Map<string, number>());
+            },
+            new Map<string, number>(),
+          );
         } catch {
           revenueByShopId = new Map<string, number>();
         }
         shops = await Promise.all(
-          shops.map(async (shop) => {
+          shops.map(async (shop: any) => {
             const shopId = shop?.id;
             if (!shopId) return shop;
             try {
@@ -910,23 +1088,30 @@ export default function ProfileScreen() {
                   errorMessage: 'Unable to load shop services.',
                 }),
               ]);
-              const products = productsRes?.success ? unwrapList(productsRes.data) : [];
-              const services = servicesRes?.success ? unwrapList(servicesRes.data) : [];
+              const products = productsRes?.success
+                ? unwrapList(productsRes.data)
+                : [];
+              const services = servicesRes?.success
+                ? unwrapList(servicesRes.data)
+                : [];
               return {
                 ...shop,
                 products_count: products.length,
                 services_count: services.length,
-                revenue_total: revenueByShopId.get(String(shopId)) ?? Number(shop?.revenue_total ?? shop?.revenue ?? 0),
+                revenue_total:
+                  revenueByShopId.get(String(shopId)) ??
+                  Number(shop?.revenue_total ?? shop?.revenue ?? 0),
               };
             } catch {
               return {
                 ...shop,
-                revenue_total: revenueByShopId.get(String(shopId)) ?? Number(shop?.revenue_total ?? shop?.revenue ?? 0),
+                revenue_total:
+                  revenueByShopId.get(String(shopId)) ??
+                  Number(shop?.revenue_total ?? shop?.revenue ?? 0),
               };
             }
           }),
         );
-        console.log('[ProfileScreen] loaded shop example', shops[0]?.featuredImage ?? shops[0]?.image_url ?? 'no image');
       }
       setCommerceShops(shops);
     } catch (error: any) {
@@ -949,37 +1134,30 @@ export default function ProfileScreen() {
     }, [loadAppointments]),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadMarketplaceOrders();
-    }, [loadMarketplaceOrders]),
-  );
-
   useEffect(() => {
     if (!currentUserId) {
       setCommerceShops([]);
     }
   }, [currentUserId]);
 
-
   const handleEducationFormTitleChange = useCallback((value: string) => {
-    setEducationForm((prev) => ({ ...prev, title: value }));
+    setEducationForm(prev => ({ ...prev, title: value }));
   }, []);
 
   const handleEducationFormSummaryChange = useCallback((value: string) => {
-    setEducationForm((prev) => ({ ...prev, summary: value }));
+    setEducationForm(prev => ({ ...prev, summary: value }));
   }, []);
 
   const handleEducationModuleTitleChange = useCallback((value: string) => {
-    setEducationModuleForm((prev) => ({ ...prev, title: value }));
+    setEducationModuleForm(prev => ({ ...prev, title: value }));
   }, []);
 
   const handleEducationModuleSummaryChange = useCallback((value: string) => {
-    setEducationModuleForm((prev) => ({ ...prev, summary: value }));
+    setEducationModuleForm(prev => ({ ...prev, summary: value }));
   }, []);
 
   const handleEducationModuleResourceChange = useCallback((value: string) => {
-    setEducationModuleForm((prev) => ({ ...prev, resource_url: value }));
+    setEducationModuleForm(prev => ({ ...prev, resource_url: value }));
   }, []);
 
   const resolveAttachmentUrl = useCallback((attachment: any) => {
@@ -993,16 +1171,19 @@ export default function ProfileScreen() {
     );
   }, []);
 
-  const attachmentKey = useCallback((attachment: any) => {
-    return (
-      attachment?.key ??
-      attachment?.file_key ??
-      attachment?.id ??
-      attachment?.name ??
-      resolveAttachmentUrl(attachment) ??
-      null
-    );
-  }, [resolveAttachmentUrl]);
+  const attachmentKey = useCallback(
+    (attachment: any) => {
+      return (
+        attachment?.key ??
+        attachment?.file_key ??
+        attachment?.id ??
+        attachment?.name ??
+        resolveAttachmentUrl(attachment) ??
+        null
+      );
+    },
+    [resolveAttachmentUrl],
+  );
 
   const handleRemoveFeedAttachment = useCallback(
     async (feed: any, attachment: any) => {
@@ -1022,27 +1203,34 @@ export default function ProfileScreen() {
       } catch (error: any) {
         const message = error?.message ?? 'Unable to remove attachment.';
         if (message.toLowerCase().includes('not found')) {
-          const retainAttachments = attachments.filter((att) => attachmentKey(att) !== targetKey);
-            try {
-              await c.updateBroadcastFeedEntry(
-                feed.id,
-                feed.title ?? '',
-                feed.summary ?? '',
-                (feed.media_type as FeedMediaType) ?? 'text',
-                [],
-                retainAttachments,
-                feed.media_options ?? {},
-              );
+          const retainAttachments = attachments.filter(
+            att => attachmentKey(att) !== targetKey,
+          );
+          try {
+            await c.updateBroadcastFeedEntry(
+              feed.id,
+              feed.title ?? '',
+              feed.summary ?? '',
+              (feed.media_type as FeedMediaType) ?? 'text',
+              [],
+              retainAttachments,
+              feed.media_options ?? {},
+            );
             Alert.alert('Attachment', 'Attachment removed.');
           } catch (innerError: any) {
-            Alert.alert('Attachment', innerError?.message || 'Unable to remove attachment.');
+            Alert.alert(
+              'Attachment',
+              innerError?.message || 'Unable to remove attachment.',
+            );
           }
         } else {
           Alert.alert('Attachment', message);
         }
       } finally {
         if (editingFeedItemId === feed.id) {
-          setPanelFeedExistingAttachments((prev) => prev.filter((att) => attachmentKey(att) !== targetKey));
+          setPanelFeedExistingAttachments(prev =>
+            prev.filter(att => attachmentKey(att) !== targetKey),
+          );
         }
       }
     },
@@ -1120,7 +1308,9 @@ export default function ProfileScreen() {
         setEducationAnalyticsError(lessonRes.message ?? null);
       }
     } catch (error: any) {
-      setEducationAnalyticsError(error?.message || 'Unable to load lesson insights.');
+      setEducationAnalyticsError(
+        error?.message || 'Unable to load lesson insights.',
+      );
     } finally {
       setEducationAnalyticsLoading(false);
     }
@@ -1142,14 +1332,24 @@ export default function ProfileScreen() {
           : [];
         setMarketplaceOrders(orders);
       } else {
-        setMarketplaceOrdersError(response.message ?? 'Unable to load your marketplace orders.');
+        setMarketplaceOrdersError(
+          response.message ?? 'Unable to load your marketplace orders.',
+        );
       }
     } catch (loadError: any) {
-      setMarketplaceOrdersError(loadError?.message ?? 'Unable to load your marketplace orders.');
+      setMarketplaceOrdersError(
+        loadError?.message ?? 'Unable to load your marketplace orders.',
+      );
     } finally {
       setMarketplaceOrdersLoading(false);
     }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMarketplaceOrders();
+    }, [loadMarketplaceOrders]),
+  );
 
   useEffect(() => {
     if (managementPanelKey === 'education') {
@@ -1160,12 +1360,15 @@ export default function ProfileScreen() {
   const upcomingLessons = useMemo(() => {
     const now = Date.now();
     return educationLessonsData
-      .filter((lesson) => {
+      .filter(lesson => {
         if (!lesson?.starts_at) return false;
         const startsAt = new Date(lesson.starts_at).getTime();
         return !Number.isNaN(startsAt) && startsAt >= now;
       })
-      .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
+      );
   }, [educationLessonsData]);
 
   const totalEnrollments = useMemo(
@@ -1188,6 +1391,289 @@ export default function ProfileScreen() {
     });
     return sorted.slice(0, 3);
   }, [marketplaceOrders]);
+  const marketplaceOrderSummary = useMemo(() => {
+    const summary = {
+      pending: 0,
+      completed: 0,
+      disputed: 0,
+    };
+    marketplaceOrders.forEach(order => {
+      const status = String(order?.status || order?.order_status || '')
+        .trim()
+        .toLowerCase();
+      if (
+        [
+          'pending',
+          'processing',
+          'awaiting_payment',
+          'awaiting_confirmation',
+        ].includes(status)
+      ) {
+        summary.pending += 1;
+      } else if (['completed', 'delivered', 'fulfilled'].includes(status)) {
+        summary.completed += 1;
+      } else if (
+        ['dispute', 'disputed', 'refunded', 'cancelled', 'canceled'].includes(
+          status,
+        )
+      ) {
+        summary.disputed += 1;
+      }
+    });
+    return summary;
+  }, [marketplaceOrders]);
+
+  const profileDisplayName = c.profile?.user?.display_name || 'Your name';
+  const profileHandle = `@${profileDisplayName
+    .toLowerCase()
+    .replace(/\s+/g, '')}`;
+  const profileCompletion = c.profile?.profile?.completion_score ?? 0;
+  const currentLanguageLabel =
+    languages.find(entry => entry.code === language)?.label ?? 'English';
+
+  const walletDashboardActions = useMemo(
+    () => [
+      {
+        key: 'wallet-add',
+        title: 'Add Funds',
+        icon: 'plus' as const,
+        tone: 'primary' as const,
+        onPress: () => {
+          openWalletSheet('wallet');
+          setWalletForm((prev: any) => ({ ...prev, mode: 'add_kisc' }));
+        },
+      },
+      {
+        key: 'wallet-transfer',
+        title: 'Transfer',
+        icon: 'arrow-left' as const,
+        tone: 'info' as const,
+        onPress: () => {
+          openWalletSheet('wallet');
+          setWalletForm((prev: any) => ({ ...prev, mode: 'transfer' }));
+        },
+      },
+      {
+        key: 'upgrade-account',
+        title: 'Upgrade Account',
+        icon: 'star' as const,
+        tone: 'primary' as const,
+        onPress: () => c.openSheet('upgrade'),
+      },
+      {
+        key: 'wallet-history',
+        title: 'History',
+        icon: 'calendar' as const,
+        tone: 'warning' as const,
+        onPress: () => c.openSheet('wallet'),
+      },
+    ],
+    [c, openWalletSheet, setWalletForm],
+  );
+
+  const quickActionItems = useMemo(
+    () => [
+      {
+        key: 'create-partner',
+        title: 'Create Partner',
+        subtitle: canCreatePartner
+          ? 'Launch an organization profile'
+          : 'Partner limit reached',
+        icon: 'people' as const,
+        tone: 'primary' as const,
+        onPress: canCreatePartner ? c.openCreatePartner : undefined,
+      },
+      {
+        key: 'create-broadcast',
+        title: 'Create Broadcast',
+        subtitle: 'Open your broadcast feed studio',
+        icon: 'megaphone' as const,
+        tone: 'warning' as const,
+        onPress: () => openManagementPanel('broadcast_feed'),
+      },
+      {
+        key: 'create-course',
+        title: 'Create Course',
+        subtitle: 'Open the education workspace',
+        icon: 'school' as const,
+        tone: 'success' as const,
+        onPress: () => openManagementPanel('education'),
+      },
+      {
+        key: 'create-shop',
+        title: 'Create Shop',
+        subtitle: 'Open commerce setup',
+        icon: 'cart' as const,
+        tone: 'info' as const,
+        onPress: openShopEditorForCreate,
+      },
+    ],
+    [
+      c.openCreatePartner,
+      canCreatePartner,
+      openManagementPanel,
+      openShopEditorForCreate,
+    ],
+  );
+
+  const recentActivityItems = useMemo(
+    () =>
+      buildRecentActivityItems(c.profile, appointments, openBookingDetails, 4),
+    [c.profile, appointments, openBookingDetails],
+  );
+
+  const impactSnapshotStats = useMemo(
+    () => buildImpactSnapshotStats(c.profile, 'month'),
+    [c.profile],
+  );
+
+  const appointmentSummaryStats = useMemo(
+    () => [
+      { key: 'active', label: 'Active', value: appointments.length },
+      {
+        key: 'confirmed',
+        label: 'Confirmed',
+        value: confirmedAppointments.length,
+      },
+      {
+        key: 'pending',
+        label: 'Payment pending',
+        value: pendingServicePayments.length,
+      },
+      {
+        key: 'payout',
+        label: 'Awaiting payout',
+        value: pendingReceivePayments.length,
+      },
+    ],
+    [
+      appointments.length,
+      confirmedAppointments.length,
+      pendingServicePayments.length,
+      pendingReceivePayments.length,
+    ],
+  );
+
+  const appointmentDashboardItems = useMemo(
+    () =>
+      appointments.slice(0, 3).map((booking: any, index: number) => {
+        const scheduledAt = booking?.scheduled_at
+          ? new Date(booking.scheduled_at)
+          : null;
+        const dateLabel =
+          scheduledAt && !Number.isNaN(scheduledAt.getTime())
+            ? scheduledAt.toLocaleString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })
+            : undefined;
+        return {
+          id: String(booking?.id || `appointment-${index}`),
+          title: booking?.service_name || 'Service appointment',
+          provider: booking?.shop_name || 'Provider',
+          dateLabel,
+          status: booking?.status || 'pending',
+          paymentStatus:
+            booking?.deposit_cents && booking?.status === 'confirmed'
+              ? 'Paid'
+              : 'Pending',
+          meetingLink: booking?.remote_meeting_link,
+          onPress: booking?.id
+            ? () => openBookingDetails(String(booking.id))
+            : undefined,
+        };
+      }),
+    [appointments, openBookingDetails],
+  );
+
+  const notificationDashboardItems = useMemo(
+    () =>
+      inAppNotifications.slice(0, 5).map(item => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        createdAt: item.createdAt
+          ? new Date(item.createdAt).toLocaleString()
+          : undefined,
+        read: !!item.readAt,
+        onPress: () => {
+          markInAppNotificationAsRead(item.id).catch(() => undefined);
+          rootNavigation?.navigate('ProfileNotificationDetail', {
+            notificationId: item.id,
+            notification: item,
+          });
+        },
+      })),
+    [inAppNotifications, rootNavigation],
+  );
+
+  const marketplaceSummaryStats = useMemo(
+    () => [
+      {
+        key: 'pending',
+        label: 'Pending',
+        value: marketplaceOrderSummary.pending,
+      },
+      {
+        key: 'completed',
+        label: 'Completed',
+        value: marketplaceOrderSummary.completed,
+      },
+      {
+        key: 'disputed',
+        label: 'Disputed / closed',
+        value: marketplaceOrderSummary.disputed,
+      },
+    ],
+    [
+      marketplaceOrderSummary.completed,
+      marketplaceOrderSummary.disputed,
+      marketplaceOrderSummary.pending,
+    ],
+  );
+
+  const marketplaceDashboardOrders = useMemo(
+    () =>
+      recentMarketplaceOrders.map(order => ({
+        id: String(order?.id || order?.reference || order?.title || 'order'),
+        label:
+          order?.product_name ||
+          order?.service_name ||
+          order?.title ||
+          order?.reference ||
+          'Marketplace order',
+        status: String(
+          order?.status || order?.order_status || 'pending',
+        ).replace(/_/g, ' '),
+        date:
+          order?.created_at || order?.createdAt
+            ? new Date(order.created_at || order.createdAt).toLocaleDateString()
+            : undefined,
+      })),
+    [recentMarketplaceOrders],
+  );
+
+  const workspaceLaunchers = useMemo(
+    () =>
+      BROADCAST_PROFILE_DEFINITIONS.map(def => {
+        const profileData = broadcastProfiles?.[def.profileKey];
+        const summaryText = profileData
+          ? def.summary(profileData)
+          : def.emptySummary;
+        return {
+          key: def.profileKey,
+          title: def.label,
+          helper: def.helper,
+          icon: def.icon as any,
+          meta: summaryText,
+          onPress: () => handleBroadcastCTA(def),
+        };
+      }),
+    [broadcastProfiles, handleBroadcastCTA],
+  );
 
   const handleEducationModuleSave = useCallback(async () => {
     const title = educationModuleForm.title.trim();
@@ -1215,14 +1701,16 @@ export default function ProfileScreen() {
     }
   }, [educationModuleForm, c, resetEducationModuleForm]);
 
-
   const handleMarketFormSave = useCallback(async () => {
     const name = marketForm.name.trim();
     if (!name) {
       Alert.alert('Market profile', 'Provide a shop name.');
       return;
     }
-    const employeeSlotCount = Math.max(1, Number.parseInt(marketForm.employeeSlots, 10) || 1);
+    const employeeSlotCount = Math.max(
+      1,
+      Number.parseInt(marketForm.employeeSlots, 10) || 1,
+    );
     if (!marketForm.id && !marketForm.featuredImageFile) {
       Alert.alert('Market profile', 'Upload a shop image before publishing.');
       return;
@@ -1237,15 +1725,24 @@ export default function ProfileScreen() {
     }
     setMarketFormLoading(true);
     try {
-      const endpoint = marketForm.id ? `${ROUTES.commerce.shops}${marketForm.id}/` : ROUTES.commerce.shops;
+      const endpoint = marketForm.id
+        ? `${ROUTES.commerce.shops}${marketForm.id}/`
+        : ROUTES.commerce.shops;
       const response = marketForm.id
-        ? await patchRequest(endpoint, formData, { errorMessage: 'Unable to update shop.' })
-        : await postRequest(endpoint, formData, { errorMessage: 'Unable to create shop.' });
+        ? await patchRequest(endpoint, formData, {
+            errorMessage: 'Unable to update shop.',
+          })
+        : await postRequest(endpoint, formData, {
+            errorMessage: 'Unable to create shop.',
+          });
       if (!response?.success) {
         throw new Error(response?.message || 'Unable to save shop.');
       }
       await loadCommerceShops();
-      Alert.alert('Market profile', marketForm.id ? 'Shop updated.' : 'Shop created.');
+      Alert.alert(
+        'Market profile',
+        marketForm.id ? 'Shop updated.' : 'Shop created.',
+      );
       resetMarketForm();
       closeShopEditor();
     } catch (error: any) {
@@ -1258,14 +1755,20 @@ export default function ProfileScreen() {
   const handleMarketFormDelete = useCallback(async () => {
     if (!marketForm.id) return;
     if (!canDeleteActiveShop) {
-      Alert.alert('Market profile', 'Only the shop owner can delete this shop.');
+      Alert.alert(
+        'Market profile',
+        'Only the shop owner can delete this shop.',
+      );
       return;
     }
     setMarketFormLoading(true);
     try {
-      const res = await deleteRequest(`${ROUTES.commerce.shops}${marketForm.id}/`, {
-        errorMessage: 'Unable to delete shop.',
-      });
+      const res = await deleteRequest(
+        `${ROUTES.commerce.shops}${marketForm.id}/`,
+        {
+          errorMessage: 'Unable to delete shop.',
+        },
+      );
       if (!res?.success) {
         throw new Error(res?.message || 'Unable to delete shop.');
       }
@@ -1278,7 +1781,13 @@ export default function ProfileScreen() {
     } finally {
       setMarketFormLoading(false);
     }
-  }, [marketForm.id, resetMarketForm, closeShopEditor, loadCommerceShops, canDeleteActiveShop]);
+  }, [
+    marketForm.id,
+    resetMarketForm,
+    closeShopEditor,
+    loadCommerceShops,
+    canDeleteActiveShop,
+  ]);
 
   const handleEducationFormSave = useCallback(async () => {
     const title = educationForm.title.trim();
@@ -1290,16 +1799,23 @@ export default function ProfileScreen() {
     const nextCourses =
       educationFormMode === 'edit' && educationForm.id
         ? courses.map((course: any) =>
-            course.id === educationForm.id ? { ...course, title, summary: educationForm.summary.trim() } : course,
+            course.id === educationForm.id
+              ? { ...course, title, summary: educationForm.summary.trim() }
+              : course,
           )
         : [...courses, { title, summary: educationForm.summary.trim() }];
 
     setEducationFormLoading(true);
     try {
-      await c.manageProfileSection('education_profile', { courses: nextCourses });
+      await c.manageProfileSection('education_profile', {
+        courses: nextCourses,
+      });
       resetEducationForm();
     } catch (error: any) {
-      Alert.alert('Education profile', error?.message || 'Unable to update courses.');
+      Alert.alert(
+        'Education profile',
+        error?.message || 'Unable to update courses.',
+      );
     } finally {
       setEducationFormLoading(false);
     }
@@ -1314,13 +1830,20 @@ export default function ProfileScreen() {
   const handleEducationFormDelete = useCallback(async () => {
     if (!educationForm.id) return;
     const courses = managementPanelData?.courses ?? [];
-    const nextCourses = courses.filter((course: any) => course.id !== educationForm.id);
+    const nextCourses = courses.filter(
+      (course: any) => course.id !== educationForm.id,
+    );
     setEducationFormLoading(true);
     try {
-      await c.manageProfileSection('education_profile', { courses: nextCourses });
+      await c.manageProfileSection('education_profile', {
+        courses: nextCourses,
+      });
       resetEducationForm();
     } catch (error: any) {
-      Alert.alert('Education profile', error?.message || 'Unable to delete course.');
+      Alert.alert(
+        'Education profile',
+        error?.message || 'Unable to delete course.',
+      );
     } finally {
       setEducationFormLoading(false);
     }
@@ -1340,7 +1863,9 @@ export default function ProfileScreen() {
       : [];
 
     if (managementPanelKey === 'broadcast_feed') {
-      const feeds: any[] = Array.isArray(managementPanelData?.feeds) ? managementPanelData.feeds : [];
+      const feeds: any[] = Array.isArray(managementPanelData?.feeds)
+        ? managementPanelData.feeds
+        : [];
       const expiresAt = managementPanelData?.expires_at
         ? new Date(managementPanelData.expires_at).toString()
         : 'N/A';
@@ -1379,7 +1904,9 @@ export default function ProfileScreen() {
     }
 
     if (managementPanelKey === 'health') {
-      const institutionsRaw: any[] = Array.isArray(managementPanelData?.institutions)
+      const institutionsRaw: any[] = Array.isArray(
+        managementPanelData?.institutions,
+      )
         ? managementPanelData.institutions
         : [];
       const institutions = filterInstitutionsForVisibleRoles(institutionsRaw, {
@@ -1388,20 +1915,20 @@ export default function ProfileScreen() {
         email: String(c.profile?.user?.email || '').trim() || undefined,
       });
       return (
-      <HealthManagementModal
-        palette={palette}
-        title={panelTitle}
-        subtitle={panelHint ?? ''}
-        institutions={institutions}
-        currentUser={{
-          id: c.profile?.user?.id ? String(c.profile.user.id) : undefined,
-          phone: String(c.profile?.user?.phone || '').trim() || undefined,
-          email: String(c.profile?.user?.email || '').trim() || undefined,
-        }}
-        onManageInstitution={handleEditInstitution}
-        onViewInstitution={handleViewInstitution}
-        onAddInstitution={handleAddInstitution}
-      />
+        <HealthManagementModal
+          palette={palette}
+          title={panelTitle}
+          subtitle={panelHint ?? ''}
+          institutions={institutions}
+          currentUser={{
+            id: c.profile?.user?.id ? String(c.profile.user.id) : undefined,
+            phone: String(c.profile?.user?.phone || '').trim() || undefined,
+            email: String(c.profile?.user?.email || '').trim() || undefined,
+          }}
+          onManageInstitution={handleEditInstitution}
+          onViewInstitution={handleViewInstitution}
+          onAddInstitution={handleAddInstitution}
+        />
       );
     }
 
@@ -1423,8 +1950,12 @@ export default function ProfileScreen() {
     }
 
     if (managementPanelKey === 'education') {
-      const courses: any[] = Array.isArray(managementPanelData?.courses) ? managementPanelData.courses : [];
-      const modules: any[] = Array.isArray(managementPanelData?.modules) ? managementPanelData.modules : [];
+      const courses: any[] = Array.isArray(managementPanelData?.courses)
+        ? managementPanelData.courses
+        : [];
+      const modules: any[] = Array.isArray(managementPanelData?.modules)
+        ? managementPanelData.modules
+        : [];
       return (
         <EducationManagementModal
           palette={palette}
@@ -1467,16 +1998,32 @@ export default function ProfileScreen() {
 
     return (
       <View style={styles.managementPanelBody}>
-        <Text style={[styles.managementPanelTitle, { color: palette.text }]}>{panelTitle}</Text>
-        <Text style={[styles.managementPanelSubtitle, { color: palette.subtext }]}>{panelHint}</Text>
-        <Text style={{ color: palette.subtext, marginTop: 8 }}>Profile not created yet.</Text>
+        <Text style={[styles.managementPanelTitle, { color: palette.text }]}>
+          {panelTitle}
+        </Text>
+        <Text
+          style={[styles.managementPanelSubtitle, { color: palette.subtext }]}
+        >
+          {panelHint}
+        </Text>
+        <Text style={{ color: palette.subtext, marginTop: 8 }}>
+          Profile not created yet.
+        </Text>
       </View>
     );
   };
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            gap: 18,
+            paddingBottom: 44,
+          },
+        ]}
+      >
         {c.loading && !c.profile ? (
           <View style={{ gap: 16 }}>
             <View style={[styles.card, { backgroundColor: palette.card }]}>
@@ -1498,8 +2045,12 @@ export default function ProfileScreen() {
           </View>
         ) : !c.profile ? (
           <View style={[styles.card, { backgroundColor: palette.card }]}>
-            <Text style={[styles.title, { color: palette.text }]}>Profile not available</Text>
-            <Text style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}>
+            <Text style={[styles.title, { color: palette.text }]}>
+              Profile not available
+            </Text>
+            <Text
+              style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}
+            >
               Pull to refresh or try again.
             </Text>
             <View style={{ marginTop: 12 }}>
@@ -1508,326 +2059,214 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <>
-            {/* HERO (matches mock) */}
-            <HeroHeader
+            <ProfileHeroCard
               coverUrl={c.profile.profile?.cover_url}
               avatarUrl={c.profile.profile?.avatar_url}
-              displayName={c.profile.user?.display_name || 'Your name'}
-              handle={`@${(c.profile.user?.display_name || 'user')
-                .toLowerCase()
-                .replace(/\s+/g, '')}`}
-              headline={c.profile.profile?.headline || 'Add a headline that sells you'}
-              tierName={accountTier?.name || 'Free'}
-              completion={c.profile.profile?.completion_score ?? 0}
+              displayName={profileDisplayName}
+              handle={profileHandle}
+              headline={
+                c.profile.profile?.headline || 'Add a headline that sells you'
+              }
+              tierLabel={tierLabel || accountTier?.name || 'Free'}
+              completionLabel={`${profileCompletion}% complete`}
               onEdit={c.openEditProfile}
+              onNotificationsPress={() =>
+                rootNavigation?.navigate('ProfileNotifications')
+              }
+              onSettingsPress={() => c.openSheet('privacy')}
+              notificationCount={unreadNotifications.length}
             />
-
-            {/* OVERVIEW */}
-            <View style={[styles.card, { backgroundColor: palette.card }]}>
-              <View style={styles.headerRow}>
-                <Text style={[styles.title, { color: palette.text }]}>Profile Overview</Text>
-                <Text style={[styles.subtext, { color: palette.subtext }]}>
-                  {c.profile.profile?.industry || 'Industry not set'}
+            <View style={{ top: -82, paddingHorizontal: 18, gap: 12 }}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: dashboardTheme.isDark
+                      ? 'rgba(13, 20, 36, 0.94)'
+                      : 'rgba(255,255,255,0.98)',
+                    borderColor: dashboardTheme.isDark
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(230,222,247,0.95)',
+                    borderWidth: 1,
+                    borderRadius: 24,
+                    shadowColor: palette.shadow,
+                    shadowOpacity: dashboardTheme.isDark ? 0.22 : 0.08,
+                    shadowRadius: dashboardTheme.isDark ? 22 : 14,
+                    shadowOffset: {
+                      width: 0,
+                      height: dashboardTheme.isDark ? 14 : 8,
+                    },
+                    elevation: dashboardTheme.isDark ? 8 : 4,
+                  },
+                ]}
+              >
+                <View style={styles.headerRow}>
+                  <Text style={[styles.title, { color: palette.text }]}>
+                    Profile overview
+                  </Text>
+                  <Text style={[styles.subtext, { color: palette.subtext }]}>
+                    {c.profile.profile?.industry || 'Industry not set'}
+                  </Text>
+                </View>
+                <Text
+                  style={{ fontSize: 14, lineHeight: 21, color: palette.text }}
+                >
+                  {c.profile.profile?.bio ||
+                    'Add a short bio that explains your work.'}
                 </Text>
-              </View>
-
-              <Text style={{ fontSize: 14, lineHeight: 20, color: palette.text }}>
-                {c.profile.profile?.bio || 'Add a short bio that explains your work.'}
-              </Text>
-
-              <View style={styles.actionRow}>
-                <KISButton title="Edit Profile" onPress={c.openEditProfile} />
-                <KISButton
-                  title="Privacy"
-                  variant="outline"
-                  onPress={() => c.openSheet('privacy')}
-                />
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.divider,
-                  borderWidth: 1,
-                },
-              ]}
-            >
-              <View style={styles.headerRow}>
-                <Text style={[styles.title, { color: palette.text }]}>Language</Text>
-                <Text style={[styles.subtext, { color: palette.subtext }]}>
-                  {languages.find((entry) => entry.code === language)?.label ?? 'English'}
-                </Text>
-              </View>
-
-              <Text style={{ fontSize: 14, lineHeight: 20, color: palette.subtext }}>
-                Choose the language used for supported app text.
-              </Text>
-
-              <View style={styles.actionRow}>
-                {languages.map((entry) => (
+                <View style={[styles.actionRow, { gap: 10, flexWrap: 'wrap' }]}>
                   <KISButton
-                    key={entry.code}
-                    title={entry.label}
-                    variant={entry.code === language ? 'primary' : 'outline'}
-                    onPress={() => {
-                      setLanguage(entry.code).catch(() => undefined);
-                    }}
+                    title="Complete Profile"
+                    onPress={c.openEditProfile}
                   />
-                ))}
+                  <KISButton
+                    title="Privacy"
+                    variant="outline"
+                    onPress={() => c.openSheet('privacy')}
+                  />
+                </View>
               </View>
-            </View>
 
-            {/* ACCOUNT / WALLET / UPGRADE */}
-          <AccountCreditsCard
-            tierName={accountTier?.name || 'Free'}
-            tierPriceCents={accountTier?.price_cents || 0}
-            walletBalanceMicro={kisWalletMicro}
-            walletBalanceLabel={kisWalletLabel}
-            walletUsdLabel={kisWalletUsdLabel}
-            points={points}
-            onWallet={() => c.openSheet('wallet')}
-            onUpgrade={() => c.openSheet('upgrade')}
-            showCreatePartnerButton={showCreatePartnerButton}
-            onCreatePartner={c.openCreatePartner}
-            walletLedger={c.walletLedger}
-            onDeleteWalletEntry={handleDeleteWalletEntry}
-            deletingWalletEntryId={c.deletingWalletEntryId}
-            partnerProfilesCount={partnerProfilesCount}
-            partnerProfilesLimitLabel={partnerProfilesLimitLabel}
-            partnerProfilesLimitValue={partnerProfilesLimitValue}
-            partnerProfilesIsUnlimited={partnerProfilesIsUnlimited}
-            pendingServicePayments={pendingServicePayments}
-            pendingReceivePayments={pendingReceivePayments}
-            onOpenBookingDetails={openBookingDetails}
-          />
-
-            <View
-              style={[
-                styles.card,
-                {
-                  borderColor: palette.divider,
-                  backgroundColor: palette.surface,
-                  borderWidth: 1,
-                  marginTop: 12,
-                  gap: 10,
-                },
-              ]}
-            >
-              <Text style={[styles.title, { color: palette.text }]}>Appointments</Text>
-              <Text style={[styles.subtext, { color: palette.subtext }]}>
-                Your booked services appear here with confirmed meeting details once payment settles.
-              </Text>
-              <View style={{ gap: 10 }}>
-                {appointmentsLoading ? (
-                  <Text style={{ color: palette.subtext }}>Loading appointments...</Text>
-                ) : appointments.length ? (
-                  appointments.map((booking) => {
-                    const scheduledAt = new Date(booking.scheduled_at);
-                    const formattedDate = scheduledAt.toLocaleString(undefined, {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                    const paymentStatus = booking.deposit_cents && booking.status === 'confirmed' ? 'Paid' : 'Pending';
-                    const remoteAvailable = Boolean(
-                      booking.remote_meeting_link && booking.status === 'confirmed',
-                    );
-                    return (
-                      <View
-                        key={booking.id}
-                        style={{
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: palette.divider,
-                          padding: 12,
-                          backgroundColor: palette.card,
-                        }}
-                      >
-                        <Text style={{ color: palette.text, fontWeight: '600' }}>
-                          {booking.service_name || 'Service appointment'}
-                        </Text>
-                        <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                          {booking.shop_name || 'Provider'} • {formattedDate}
-                        </Text>
-                        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
-                          Status: {booking.status || 'pending'} • Payment: {paymentStatus} •{' '}
-                          {remoteAvailable ? 'Remote' : 'In-person'}
-                        </Text>
-                        {remoteAvailable && (
-                          <Pressable
-                            onPress={() => openRemoteLink(booking.remote_meeting_link)}
-                            style={{ marginTop: 8 }}
-                          >
-                            <Text style={{ color: palette.primaryStrong, fontSize: 12, marginBottom: 4 }}>
-                              Meeting link (paid)
-                            </Text>
-                            <Text style={{ color: palette.text, fontSize: 11, opacity: 0.8 }}>
-                              {booking.remote_meeting_link}
-                            </Text>
-                          </Pressable>
-                        )}
-                        <View style={{ marginTop: 10, flexDirection: 'row' }}>
-                          <KISButton
-                            title="Details"
-                            size="xs"
-                            variant="outline"
-                            onPress={() => openBookingDetails(String(booking.id))}
-                          />
-                        </View>
-                      </View>
-                    );
-                  })
-                ) : (
-                  <Text style={{ color: palette.subtext }}>No appointments booked yet.</Text>
-                )}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+                <View style={{ flex: 1, minWidth: 280 }}>
+                  <WalletSummaryCard
+                    balanceLabel={kisWalletLabel}
+                    usdLabel={kisWalletUsdLabel}
+                    tierLabel={`${
+                      tierLabel || accountTier?.name || 'Free'
+                    } • ${points} pts`}
+                    actions={walletDashboardActions}
+                    onViewAll={() => c.openSheet('wallet')}
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 280 }}>
+                  <QuickActionGrid
+                    title="Quick actions"
+                    items={quickActionItems}
+                  />
+                </View>
               </View>
-            </View>
 
-            <View
-              style={[
-                styles.card,
-                {
-                  borderColor: palette.divider,
-                  backgroundColor: palette.surface,
-                  borderWidth: 1,
-                  marginTop: 12,
-                },
-              ]}
-            >
-              <Text style={[styles.title, { color: palette.text }]}>In-app notifications</Text>
-              <Text style={[styles.subtext, { color: palette.subtext, marginTop: 4 }]}>
-                Appointment and schedule reminders appear here.
-              </Text>
-              <View style={{ marginTop: 10, gap: 8 }}>
-                {loadingNotifications ? (
-                  <Text style={{ color: palette.subtext }}>Loading notifications...</Text>
-                ) : inAppNotifications.length ? (
-                  inAppNotifications.slice(0, 10).map((item) => {
-                    const isRead = !!item.readAt;
-                    return (
-                      <View
-                        key={item.id}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: isRead ? palette.divider : palette.primary,
-                          borderRadius: 12,
-                          padding: 10,
-                          backgroundColor: isRead ? palette.card : `${palette.primary}14`,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                          <Pressable
-                            style={{ flex: 1 }}
-                            onPress={() => {
-                              markInAppNotificationAsRead(item.id).catch(() => undefined);
-                            }}
-                          >
-                            <Text style={{ color: palette.text, fontWeight: isRead ? '600' : '800' }}>
-                              {item.title}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => handleDeleteNotification(item)}
-                            disabled={deletingNotificationId === item.id}
-                            hitSlop={8}
-                          >
-                            <KISIcon
-                              name="trash"
-                              size={16}
-                              color={deletingNotificationId === item.id ? palette.subtext : palette.text}
-                            />
-                          </Pressable>
-                        </View>
-                        <Text style={{ color: palette.subtext, marginTop: 2 }}>{item.body}</Text>
-                        <Text style={{ color: palette.subtext, marginTop: 4, fontSize: 11 }}>
-                          {new Date(item.createdAt).toLocaleString()}
-                        </Text>
-                      </View>
-                    );
-                  })
-                ) : (
-                  <Text style={{ color: palette.subtext }}>No in-app notifications yet.</Text>
-                )}
+              <RecentActivityTimeline
+                items={recentActivityItems}
+                onViewAll={() =>
+                  rootNavigation?.navigate('ProfileRecentActivity')
+                }
+              />
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+                <View style={{ flex: 1, minWidth: 280 }}>
+                  <ImpactSnapshotCard
+                    periodLabel="This month"
+                    stats={impactSnapshotStats}
+                    onViewAll={() =>
+                      rootNavigation?.navigate('ProfileImpactSnapshot')
+                    }
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 280 }}>
+                  {partnerProfiles.length === 0 ? (
+                    <PartnerOrganizationSummary
+                      summary="No organizations yet. Create your first partner organization and open its landing page."
+                      ctaTitle={
+                        canCreatePartner
+                          ? 'Create Organization'
+                          : 'Partner Limit Reached'
+                      }
+                      onPress={
+                        canCreatePartner ? c.openCreatePartner : undefined
+                      }
+                    />
+                  ) : (
+                    <PartnerProfilesSection
+                      palette={palette}
+                      partners={partnerProfiles}
+                      limitLabel={partnerProfilesLimitLabel}
+                      limitValue={partnerProfilesLimitValue}
+                      isUnlimited={partnerProfilesIsUnlimited}
+                      canCreate={canCreatePartner}
+                      actionLoadingId={c.partnerActionId}
+                      onDeactivate={c.deactivatePartnerProfile}
+                      onReactivate={c.reactivatePartnerProfile}
+                      onDelete={c.deletePartnerProfile}
+                      onOpenLandingBuilder={openPartnerLandingBuilder}
+                    />
+                  )}
+                </View>
               </View>
-            </View>
 
-            <BroadcastProfilesSection
-              palette={palette}
-              broadcastProfiles={broadcastProfiles}
-              definitions={BROADCAST_PROFILE_DEFINITIONS}
-              onProfileAction={handleBroadcastCTA}
-            />
+              <AppointmentSummaryCard
+                summary={appointmentSummaryStats}
+                items={
+                  appointmentsLoading || appointmentsError
+                    ? []
+                    : appointmentDashboardItems
+                }
+              />
+              {appointmentsLoading ? (
+                <Text style={{ color: palette.subtext, marginTop: -4 }}>
+                  Loading appointments...
+                </Text>
+              ) : appointmentsError ? (
+                <Text
+                  style={{ color: palette.error || '#E53935', marginTop: -4 }}
+                >
+                  {appointmentsError}
+                </Text>
+              ) : null}
 
-            <PartnerProfilesSection
-              palette={palette}
-              partners={partnerProfiles}
-              limitLabel={partnerProfilesLimitLabel}
-              limitValue={partnerProfilesLimitValue}
-              isUnlimited={partnerProfilesIsUnlimited}
-              canCreate={canCreatePartner}
-              actionLoadingId={c.partnerActionId}
-              onDeactivate={c.deactivatePartnerProfile}
-              onReactivate={c.reactivatePartnerProfile}
-              onDelete={c.deletePartnerProfile}
-              onOpenLandingBuilder={openPartnerLandingBuilder}
-            />
-
-            <ImpactSnapshotSection
-              palette={palette}
-              stats={[
-                { label: 'Articles', value: c.profile.sections?.articles?.length || 0 },
-                { label: 'Projects', value: c.profile.sections?.projects?.length || 0 },
-                {
-                  label: 'Testimonials',
-                  value: c.profile.sections?.showcases?.testimonial?.length || 0,
-                },
-                { label: 'Activity', value: c.profile.sections?.activity?.length || 0 },
-              ]}
-            />
-
-            <View
-              style={[
-                styles.marketOrdersSection,
-                { backgroundColor: palette.surface, borderColor: palette.divider },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>Marketplace orders</Text>
+              <MarketplaceOrdersSummary
+                summary={marketplaceSummaryStats}
+                recentOrders={marketplaceDashboardOrders}
+                onViewOrders={() =>
+                  rootNavigation?.navigate('MarketplaceOrders')
+                }
+                onViewReceivedOrders={() =>
+                  rootNavigation?.navigate('MarketplaceProviderOrders')
+                }
+              />
               {marketplaceOrdersLoading ? (
-                <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 8 }} />
+                <ActivityIndicator
+                  color={palette.primaryStrong}
+                  style={{ marginTop: -4 }}
+                />
               ) : marketplaceOrdersError ? (
-                <Text style={{ color: palette.error || '#E53935', marginTop: 8 }}>
+                <Text
+                  style={{ color: palette.error || '#E53935', marginTop: -4 }}
+                >
                   {marketplaceOrdersError}
                 </Text>
-              ) : (
-                <Text style={{ color: palette.subtext, marginTop: 6 }}>
-                  {marketplaceOrders.length
-                    ? `You have ${marketplaceOrders.length} marketplace order${
-                        marketplaceOrders.length === 1 ? '' : 's'
-                      }.`
-                    : 'No marketplace orders yet. Place one from your cart.'}
+              ) : null}
+
+              <NotificationSummaryCard
+                unreadCount={unreadNotifications.length}
+                items={notificationDashboardItems}
+                onViewAll={() =>
+                  rootNavigation?.navigate('ProfileNotifications')
+                }
+                onDeleteItem={id => {
+                  const target = inAppNotifications.find(
+                    item => item.id === id,
+                  );
+                  if (target) handleDeleteNotification(target);
+                }}
+              />
+              {loadingNotifications ? (
+                <Text style={{ color: palette.subtext, marginTop: -4 }}>
+                  Loading notifications...
                 </Text>
-              )}
-              <View style={styles.marketOrderActions}>
-                <KISButton
-                  title="View orders"
-                  size="sm"
-                  variant="primary"
-                  onPress={() => rootNavigation?.navigate('MarketplaceOrders')}
-                  disabled={marketplaceOrdersLoading}
-                />
-                <KISButton
-                  title="Received orders"
-                  size="sm"
-                  variant="outline"
-                  onPress={() => rootNavigation?.navigate('MarketplaceProviderOrders')}
-                  disabled={marketplaceOrdersLoading}
-                />
-              </View>
+              ) : null}
+
+              <WorkspaceLauncherSection items={workspaceLaunchers} />
+
+              <LanguageSelectorCard
+                currentLabel={currentLanguageLabel}
+                languages={languages}
+                currentCode={language}
+                onSelect={code => {
+                  setLanguage(code as any).catch(() => undefined);
+                }}
+              />
             </View>
 
             <LogoutSection palette={palette} onLogout={c.logout} />
@@ -1840,7 +2279,10 @@ export default function ProfileScreen() {
         <Animated.View
           style={[
             styles.slideContainer,
-            { backgroundColor: palette.bg, transform: [{ translateX: c.slideX }] },
+            {
+              backgroundColor: palette.bg,
+              transform: [{ translateX: c.slideX }],
+            },
           ]}
         >
           <PartnerCreateSlide onClose={c.closeCreatePartner} />
@@ -1857,19 +2299,31 @@ export default function ProfileScreen() {
             },
           ]}
         >
-        <View style={styles.managementPanelHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.managementPanelTitle, { color: palette.text }]}> 
-              {managementPanelDefinition?.label ?? 'Profile console'}
-            </Text>
-            <Text style={[styles.managementPanelSubtitle, { color: palette.subtext }]}> 
-              {managementPanelDefinition?.helper}
-            </Text>
+          <View style={styles.managementPanelHeader}>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.managementPanelTitle, { color: palette.text }]}
+              >
+                {managementPanelDefinition?.managementLabel ??
+                  managementPanelDefinition?.label ??
+                  'Profile console'}
+              </Text>
+              <Text
+                style={[
+                  styles.managementPanelSubtitle,
+                  { color: palette.subtext },
+                ]}
+              >
+                {managementPanelDefinition?.helper}
+              </Text>
+            </View>
+            <Pressable
+              onPress={closeManagementPanel}
+              style={styles.managementClose}
+            >
+              <KISIcon name="close" size={28} color={palette.subtext} />
+            </Pressable>
           </View>
-          <Pressable onPress={closeManagementPanel} style={styles.managementClose}>
-            <KISIcon name="close" size={28} color={palette.subtext} />
-          </Pressable>
-        </View>
           {renderManagementPanelContent()}
         </Animated.View>
       )}
@@ -1882,7 +2336,11 @@ export default function ProfileScreen() {
         onChangeField={updateMarketFormField}
         onClose={closeShopEditor}
         onSave={handleMarketFormSave}
-        onDelete={marketFormMode === 'edit' && canDeleteActiveShop ? handleMarketFormDelete : undefined}
+        onDelete={
+          marketFormMode === 'edit' && canDeleteActiveShop
+            ? handleMarketFormDelete
+            : undefined
+        }
         activeShop={activeShop}
         canDeleteShop={canDeleteActiveShop}
       />
@@ -1902,7 +2360,7 @@ export default function ProfileScreen() {
                 saving={c.saving}
                 saveProfile={c.saveProfile}
                 sections={c.sectionList}
-                onAddSectionItem={(type) => {
+                onAddSectionItem={type => {
                   if (type === 'portfolio' || type === 'intro_video') {
                     c.addGalleryMedia();
                     return;
@@ -1926,6 +2384,7 @@ export default function ProfileScreen() {
                 setDraftPrivacy={c.setDraftPrivacy}
                 saving={c.saving}
                 savePrivacy={c.savePrivacy}
+                profile={c.profile}
               />
             )}
 
@@ -1960,15 +2419,15 @@ export default function ProfileScreen() {
                 accountTier={accountTier}
                 saving={c.saving}
                 onUpgrade={c.upgradeTier}
-                subscription={c.billingHistory?.subscription ?? c.profile?.subscription}
+                subscription={
+                  c.billingHistory?.subscription ?? c.profile?.subscription
+                }
                 billingHistory={c.billingHistory}
                 usage={c.billingHistory?.usage || c.profile?.stats}
                 onCancel={c.cancelSubscription}
                 onResume={c.resumeSubscription}
                 onDowngrade={c.downgradeTier}
                 onRetry={c.retryTransaction}
-                onDeleteTransaction={c.deleteBillingTransaction}
-                deletingTransactionId={c.deletingBillingTransactionId}
               />
             )}
           </ScrollView>

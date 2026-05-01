@@ -161,9 +161,17 @@ export default function PartnerOrganizationAppsPanel({
         <Text style={{ color: palette.subtext, fontSize: 12 }}>
           {TYPE_LABELS[app.type ?? ''] ?? 'Organization App'}
         </Text>
+        <Text style={{ color: palette.subtext, fontSize: 11 }}>
+          Status: {app.status || 'draft'} · Scope: {app.is_promoted_global ? 'global promoted' : 'partner launcher'}
+        </Text>
         {app.description ? (
           <Text style={{ color: palette.subtext, fontSize: 12 }}>
             {app.description}
+          </Text>
+        ) : null}
+        {app.tabs?.length ? (
+          <Text style={{ color: palette.subtext, fontSize: 11 }}>
+            Tabs: {app.tabs.map((tab) => tab.title).join(', ')}
           </Text>
         ) : null}
         <Text style={{ color: palette.subtext, fontSize: 11 }}>

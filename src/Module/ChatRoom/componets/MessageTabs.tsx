@@ -216,6 +216,7 @@ export function ChatsTab({
         const itemAt = item.lastAt ?? '';
         const metaTs = Date.parse(metaAt || '');
         const itemTs = Date.parse(itemAt || '');
+        const backendOwnsUnread = item.readStateAuthoritative === true;
         const useMeta =
           metaAt &&
           (!Number.isNaN(metaTs) &&
@@ -224,7 +225,12 @@ export function ChatsTab({
           ? meta?.lastMessage ?? ''
           : item.lastMessage ?? '';
         const displayLastAt = useMeta ? metaAt : itemAt;
-        const displayUnread = useMeta
+        const useMetaUnread =
+          useMeta &&
+          (!backendOwnsUnread ||
+            (Number.isNaN(itemTs) && !Number.isNaN(metaTs)) ||
+            (!Number.isNaN(metaTs) && !Number.isNaN(itemTs) && metaTs > itemTs));
+        const displayUnread = useMetaUnread
           ? meta?.unreadCount ?? 0
           : item.unreadCount ?? 0;
 

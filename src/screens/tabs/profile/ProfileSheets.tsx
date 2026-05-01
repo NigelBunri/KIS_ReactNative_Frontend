@@ -1,6 +1,15 @@
 import React from 'react';
-import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 import { styles } from './profile.styles';
 import type { ItemType } from './profile.types';
 import {
@@ -89,19 +98,31 @@ export default function ProfileSheets(props: Props) {
     retryTransaction,
   } = props;
 
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: Boolean(activeSheet),
+    onClose: closeSheet,
+  });
+
   if (!activeSheet) return null;
 
   const accountTier = profile?.account?.tier;
   const sheetTitle = getSheetTitle(activeSheet);
 
   return (
-    <Animated.View style={[styles.sheetWrap, { transform: [{ translateY: sheetY }] }]}> 
+    <Animated.View
+      style={[
+        styles.sheetWrap,
+        { transform: [{ translateY: Animated.add(sheetY, dragY) }] },
+      ]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.sheet, { backgroundColor: palette.bg }]}
       >
-        <View style={styles.sheetHeader}>
-          <Text style={[styles.sheetTitle, { color: palette.text }]}>{sheetTitle}</Text>
+        <View style={styles.sheetHeader} {...panHandlers}>
+          <Text style={[styles.sheetTitle, { color: palette.text }]}>
+            {sheetTitle}
+          </Text>
           <Pressable onPress={closeSheet}>
             <KISIcon name="close" size={22} color={palette.subtext} />
           </Pressable>
@@ -126,6 +147,7 @@ export default function ProfileSheets(props: Props) {
               setDraftPrivacy={setDraftPrivacy}
               saving={saving}
               savePrivacy={savePrivacy}
+              profile={profile}
             />
           )}
 

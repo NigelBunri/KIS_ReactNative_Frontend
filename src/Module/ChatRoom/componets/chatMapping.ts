@@ -113,6 +113,11 @@ export const mapBackendToChatMessage = (
     text,
     ciphertext,
     encryptionMeta: payload.encryptionMeta ?? payload.encryption_meta ?? undefined,
+    iv: payload.iv ?? undefined,
+    tag: payload.tag ?? undefined,
+    aad: payload.aad ?? undefined,
+    encryptionVersion: payload.encryptionVersion ?? undefined,
+    encryptionKeyVersion: payload.encryptionKeyVersion ?? undefined,
     replyToId: payload.replyToId,
     attachments: payload.attachments
       ? mapAttachments(payload.attachments)

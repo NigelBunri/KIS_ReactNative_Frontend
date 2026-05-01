@@ -1,16 +1,11 @@
 // src/screens/chat/componets/PinnedMessagesSheet.tsx
 
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-  FlatList,
-} from 'react-native';
+import { Animated, Modal, View, Text, Pressable, FlatList } from 'react-native';
 
 import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
+import usePullDownToClose from '@/hooks/usePullDownToClose';
 import { ChatMessage } from '../../chatTypes';
 
 type PinnedMessagesSheetProps = {
@@ -35,6 +30,10 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
   onJumpToMessage,
 }) => {
   const count = pinnedMessages.length;
+  const { dragY, panHandlers } = usePullDownToClose({
+    enabled: visible,
+    onClose,
+  });
 
   const handlePressPinned = (item: ChatMessage) => {
     if (onJumpToMessage) {
@@ -75,11 +74,7 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
             marginBottom: 2,
           }}
         >
-          <KISIcon
-            name="pin"
-            size={14}
-            color={palette.primary}
-          />
+          <KISIcon name="pin" size={14} color={palette.primary} />
           <Text
             style={{
               marginLeft: 6,
@@ -127,17 +122,19 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
       <View style={styles.sheetOverlay}>
         <Pressable style={styles.sheetBackdrop} onPress={onClose} />
 
-        <View
+        <Animated.View
           style={[
             styles.sheetContainer,
             {
               backgroundColor: palette.card,
               borderTopColor: palette.divider,
+              transform: [{ translateY: dragY }],
             },
           ]}
         >
           {/* Header */}
           <View
+            {...panHandlers}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -159,11 +156,7 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
             </Text>
 
             <Pressable onPress={onClose}>
-              <KISIcon
-                name="close"
-                size={20}
-                color={palette.subtext}
-              />
+              <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>
 
@@ -187,12 +180,12 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
           ) : (
             <FlatList
               data={pinnedMessages}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 24 }}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

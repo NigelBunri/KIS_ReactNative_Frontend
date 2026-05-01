@@ -7,6 +7,7 @@ import { deleteRequest } from '@/network/delete';
 
 const IN_APP_NOTIFICATIONS_KEY = 'kis_in_app_notifications_v1';
 const AVAILABILITY_REMINDERS_KEY = 'kis_availability_reminders_v1';
+const BIBLE_READING_REMINDERS_KEY = 'kis_bible_reading_reminders_v1';
 
 export const IN_APP_NOTIFICATIONS_UPDATED_EVENT = 'inAppNotifications.updated';
 
@@ -16,10 +17,13 @@ export type InAppNotification = {
   body: string;
   createdAt: string;
   readAt?: string | null;
-  kind: 'availability_reminder' | 'backend';
+  kind: 'availability_reminder' | 'bible_reading_reminder' | 'backend';
   institutionId?: string;
   dateKey?: string;
   time?: string;
+  bibleEventId?: string;
+  passageRef?: string;
+  offsetMinutes?: number;
 };
 
 type AvailabilityReminder = {
@@ -28,6 +32,17 @@ type AvailabilityReminder = {
   dateKey: string;
   time: string;
   fireAtIso: string;
+  firedAt?: string;
+};
+
+type BibleReadingReminder = {
+  id: string;
+  eventId: string;
+  passageRef: string;
+  startAtIso: string;
+  fireAtIso: string;
+  offsetMinutes: number;
+  channels: string[];
   firedAt?: string;
 };
 
@@ -78,7 +93,10 @@ const pushNotification = async (item: InAppNotification) => {
   emitUpdated();
 };
 
-const isLocalNotification = (id: string) => String(id || '').startsWith('availability:');
+const isLocalNotification = (id: string) => {
+  const value = String(id || '');
+  return value.startsWith('availability:') || value.startsWith('bible-reading:');
+};
 
 const toBackendNotification = (raw: any): InAppNotification | null => {
   const id = String(raw?.id || '').trim();
@@ -183,10 +201,63 @@ export const upsertAvailabilityReminders = async (
   await writeJson(AVAILABILITY_REMINDERS_KEY, [...keepOther, ...nextForInstitution]);
 };
 
+export const scheduleBibleReadingEventReminders = async (event: {
+  id: string | number;
+  passage_ref?: string;
+  start_at?: string;
+  reminder_offsets?: number[];
+  reminder_channels?: string[];
+}) => {
+  const eventId = String(event.id || '').trim();
+  const startAtIso = String(event.start_at || '').trim();
+  if (!eventId || !startAtIso) return;
+
+  const startTime = new Date(startAtIso).getTime();
+  if (!Number.isFinite(startTime)) return;
+
+  const existing = await readJson<BibleReadingReminder[]>(BIBLE_READING_REMINDERS_KEY, []);
+  const keepOther = existing.filter((item) => item.eventId !== eventId);
+  const channels = Array.isArray(event.reminder_channels) && event.reminder_channels.length
+    ? event.reminder_channels
+    : ['in_app'];
+  const offsets = Array.isArray(event.reminder_offsets) && event.reminder_offsets.length
+    ? event.reminder_offsets
+    : [0];
+
+  const nextForEvent = offsets
+    .map((offset) => {
+      const offsetMinutes = Number(offset);
+      if (!Number.isFinite(offsetMinutes)) return null;
+      const fireAtIso = new Date(startTime - offsetMinutes * 60 * 1000).toISOString();
+      return {
+        id: `${eventId}:${offsetMinutes}`,
+        eventId,
+        passageRef: String(event.passage_ref || 'Bible reading'),
+        startAtIso,
+        fireAtIso,
+        offsetMinutes,
+        channels,
+      };
+    })
+    .filter(Boolean) as BibleReadingReminder[];
+
+  await writeJson(BIBLE_READING_REMINDERS_KEY, [...keepOther, ...nextForEvent]);
+};
+
+export const deleteBibleReadingEventReminders = async (eventId: string | number) => {
+  const existing = await readJson<BibleReadingReminder[]>(BIBLE_READING_REMINDERS_KEY, []);
+  await writeJson(
+    BIBLE_READING_REMINDERS_KEY,
+    existing.filter((item) => item.eventId !== String(eventId)),
+  );
+};
+
 export const runInAppNotificationTick = async () => {
   const now = Date.now();
-  const reminders = await readJson<AvailabilityReminder[]>(AVAILABILITY_REMINDERS_KEY, []);
-  if (!reminders.length) return;
+  const [reminders, bibleReminders] = await Promise.all([
+    readJson<AvailabilityReminder[]>(AVAILABILITY_REMINDERS_KEY, []),
+    readJson<BibleReadingReminder[]>(BIBLE_READING_REMINDERS_KEY, []),
+  ]);
 
   let changed = false;
   const nextReminders = [...reminders];
@@ -212,6 +283,33 @@ export const runInAppNotificationTick = async () => {
     });
   }
 
+  let bibleChanged = false;
+  const nextBibleReminders = [...bibleReminders];
+  for (let i = 0; i < nextBibleReminders.length; i += 1) {
+    const reminder = nextBibleReminders[i];
+    if (reminder.firedAt) continue;
+    const fireAtMs = new Date(reminder.fireAtIso).getTime();
+    if (!Number.isFinite(fireAtMs) || fireAtMs > now) continue;
+
+    bibleChanged = true;
+    nextBibleReminders[i] = { ...reminder, firedAt: new Date().toISOString() };
+    const leadText =
+      reminder.offsetMinutes === 0
+        ? `Time to read ${reminder.passageRef}.`
+        : `${reminder.passageRef} starts in ${reminder.offsetMinutes} minute${reminder.offsetMinutes === 1 ? '' : 's'}.`;
+    await pushNotification({
+      id: `bible-reading:${reminder.id}:${now}`,
+      title: 'Bible reading reminder',
+      body: leadText,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      kind: 'bible_reading_reminder',
+      bibleEventId: reminder.eventId,
+      passageRef: reminder.passageRef,
+      offsetMinutes: reminder.offsetMinutes,
+    });
+  }
+
   const today = toDateOnlyIso(new Date());
   const pruned = nextReminders.filter((item) => {
     if (!item.firedAt) return true;
@@ -220,6 +318,17 @@ export const runInAppNotificationTick = async () => {
 
   if (changed || pruned.length !== reminders.length) {
     await writeJson(AVAILABILITY_REMINDERS_KEY, pruned);
+  }
+
+  const pruneBefore = now - 7 * 24 * 60 * 60 * 1000;
+  const prunedBible = nextBibleReminders.filter((item) => {
+    if (!item.firedAt) return true;
+    const startMs = new Date(item.startAtIso).getTime();
+    return Number.isFinite(startMs) && startMs >= pruneBefore;
+  });
+
+  if (bibleChanged || prunedBible.length !== bibleReminders.length) {
+    await writeJson(BIBLE_READING_REMINDERS_KEY, prunedBible);
   }
 };
 

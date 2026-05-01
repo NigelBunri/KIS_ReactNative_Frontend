@@ -33,7 +33,7 @@ import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import { useSocket } from '../../../SocketProvider';
 import { loadMessages, upsertMessage } from '@/Module/ChatRoom/Storage/chatStorage';
-import { normalizePhoneKey } from '@/Module/ChatRoom/messagesUtils';
+import { normalizePhoneKey, participantsToIds } from '@/Module/ChatRoom/messagesUtils';
 import { decryptFromUser, ensureDeviceId } from '@/security/e2ee';
 import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
@@ -201,7 +201,33 @@ const queueMetaRefresh = useCallback(
 
 const deviceIdRef = useRef<string>('');
 const joinedRoomsRef = useRef<Set<string>>(new Set());
-const { socket, isConnected, typingByConversation, currentUserId, presenceByUser } = useSocket();
+const { socket, isConnected, typingByConversation, currentUserId, presenceByUser, startCall } = useSocket();
+
+const handleStartQuickCall = useCallback(
+  async (chat: Chat | undefined | null, media: 'voice' | 'video') => {
+    if (!chat || !startCall) {
+      Alert.alert('Call unavailable', 'Calling is not ready yet.');
+      return;
+    }
+    const conversationId = String((chat as any).conversationId ?? chat.id ?? '');
+    if (!conversationId) {
+      Alert.alert('Call unavailable', 'Conversation is not ready yet.');
+      return;
+    }
+
+    const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
+      (id) => String(id) !== String(currentUserId ?? ''),
+    );
+
+    await startCall({
+      conversationId,
+      title: chat.name ?? 'Call',
+      media,
+      inviteeUserIds,
+    });
+  },
+  [startCall, currentUserId],
+);
 
 const refreshConversations = useCallback(async (force?: boolean) => {
   const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined, !!force);
@@ -1535,13 +1561,17 @@ const handleMuteSelected = () => {
                   <KISIcon name="chat" size={20} color={palette.primary} />
                 </Pressable>
                 <Pressable
-                  onPress={() => Alert.alert('Coming up', 'Voice calls are coming soon.')}
+                  onPress={() => {
+                    void handleStartQuickCall(avatarPreview.chat, 'voice');
+                  }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
                 >
                   <KISIcon name="phone" size={20} color={palette.text} />
                 </Pressable>
                 <Pressable
-                  onPress={() => Alert.alert('Coming up', 'Video calls are coming soon.')}
+                  onPress={() => {
+                    void handleStartQuickCall(avatarPreview.chat, 'video');
+                  }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
                 >
                   <KISIcon name="video" size={20} color={palette.text} />

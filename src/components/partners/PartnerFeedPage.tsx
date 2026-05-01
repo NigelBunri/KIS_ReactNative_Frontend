@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -21,14 +27,26 @@ import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import { Partner, PartnerPost } from './partnersTypes';
-import FeedComposerSheet, { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
+import FeedComposerSheet, {
+  FeedComposerPayload,
+} from '@/components/feeds/FeedComposerSheet';
 import { prepareBroadcastVideoPayload } from '@/components/feeds/videoAttachmentHelpers';
 import FeedPostActionsSheet from '@/components/feeds/FeedPostActionsSheet';
-import { InlineCommentSheet, formatCommentContextLabel } from '@/components/feeds/FeedScreen';
-import ShareRenderer, { type SharePayload } from '@/components/feeds/ShareRenderer';
+import {
+  InlineCommentSheet,
+  formatCommentContextLabel,
+} from '@/components/feeds/FeedScreen';
+import ShareRenderer, {
+  type SharePayload,
+} from '@/components/feeds/ShareRenderer';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import Video from 'react-native-video';
 import { getAccessToken } from '@/security/authStorage';
+import RichTextRenderer from '@/components/feeds/RichTextRenderer';
+import {
+  getFeedPlainText,
+  getFeedRichTextValue,
+} from '@/components/feeds/richTextValue';
 
 type FeedItem =
   | { type: 'post'; data: PartnerPost }
@@ -47,10 +65,14 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
   const [actionsVisible, setActionsVisible] = useState(false);
   const [activePost, setActivePost] = useState<PartnerPost | null>(null);
   const [commentSheetVisible, setCommentSheetVisible] = useState(false);
-  const [commentThread, setCommentThread] = useState<
-    { post: PartnerPost; conversationId: string; context?: Record<string, any> } | null
-  >(null);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [commentThread, setCommentThread] = useState<{
+    post: PartnerPost;
+    conversationId: string;
+    context?: Record<string, any>;
+  } | null>(null);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
+    {},
+  );
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<Record<string, boolean>>({});
   const likedPostIdsRef = useRef<Record<string, boolean>>({});
@@ -58,7 +80,7 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
     (count: number) => {
       const postId = commentThread?.post.id;
       if (!postId) return;
-      setCommentCounts((prev) => ({ ...prev, [postId]: count }));
+      setCommentCounts(prev => ({ ...prev, [postId]: count }));
     },
     [commentThread?.post?.id],
   );
@@ -70,15 +92,23 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
   const loadFeed = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(`${ROUTES.partners.posts}?partner=${partner.id}`, {
-        errorMessage: 'Failed to load partner feed',
-      });
-      const list = (res?.data?.results ?? res?.data ?? res ?? []) as PartnerPost[];
+      const res = await getRequest(
+        `${ROUTES.partners.posts}?partner=${partner.id}`,
+        {
+          errorMessage: 'Failed to load partner feed',
+        },
+      );
+      const list = (res?.data?.results ??
+        res?.data ??
+        res ??
+        []) as PartnerPost[];
       setPosts(Array.isArray(list) ? list : []);
       console.log('[PartnerFeedPage] loadFeed payload', list);
       console.log(
         '[PartnerFeedPage] attachments preview',
-        (Array.isArray(list) ? list : []).map((post) => post?.attachments?.slice?.(0, 1)),
+        (Array.isArray(list) ? list : []).map(post =>
+          post?.attachments?.slice?.(0, 1),
+        ),
       );
     } finally {
       setLoading(false);
@@ -94,28 +124,31 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
   }, [likedPostIds]);
 
   useEffect(() => {
-    setCommentCounts((prev) => {
+    setCommentCounts(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (next[post.id] == null && typeof post.comments_count === 'number') {
           next[post.id] = post.comments_count;
         }
       });
       return next;
     });
-    setLikeCounts((prev) => {
+    setLikeCounts(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (next[post.id] == null && Array.isArray(post.reactions)) {
-          const count = post.reactions.reduce((sum, r) => sum + (r?.count ?? 0), 0);
+          const count = post.reactions.reduce(
+            (sum, r) => sum + (r?.count ?? 0),
+            0,
+          );
           next[post.id] = count;
         }
       });
       return next;
     });
-    setLikedPostIds((prev) => {
+    setLikedPostIds(prev => {
       const next = { ...prev };
-      posts.forEach((post) => {
+      posts.forEach(post => {
         if (typeof post.has_reacted === 'boolean') {
           next[post.id] = post.has_reacted;
         }
@@ -142,8 +175,8 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
   const handleReact = async (postId: string) => {
     const alreadyLiked = likedPostIdsRef.current[postId];
     const nextLiked = !alreadyLiked;
-    setLikedPostIds((prev) => ({ ...prev, [postId]: nextLiked }));
-    setLikeCounts((prev) => ({
+    setLikedPostIds(prev => ({ ...prev, [postId]: nextLiked }));
+    setLikeCounts(prev => ({
       ...prev,
       [postId]: Math.max(0, (prev[postId] ?? 0) + (nextLiked ? 1 : -1)),
     }));
@@ -154,14 +187,14 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
     );
     if (res?.data?.has_reacted !== undefined) {
       const serverLiked = Boolean(res.data.has_reacted);
-      setLikedPostIds((prev) => ({ ...prev, [postId]: serverLiked }));
+      setLikedPostIds(prev => ({ ...prev, [postId]: serverLiked }));
     }
   };
 
   const captureShareImage = async (payload: SharePayload) => {
     setSharePayload(payload);
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(true)));
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise(resolve => requestAnimationFrame(() => resolve(true)));
+    await new Promise(resolve => setTimeout(resolve, 60));
     const uri = await shareShotRef.current?.capture?.();
     setSharePayload(null);
     return uri as string | undefined;
@@ -183,8 +216,12 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
 
   const handleShare = async (post: PartnerPost) => {
     const text = post.text ?? post.styled_text?.text ?? '';
-    const attachment = Array.isArray(post.attachments) ? post.attachments[0] : null;
-    const attachmentUrl = resolveBackendAssetUrl(attachment?.url ?? attachment?.uri ?? null);
+    const attachment = Array.isArray(post.attachments)
+      ? post.attachments[0]
+      : null;
+    const attachmentUrl = resolveBackendAssetUrl(
+      attachment?.url ?? attachment?.uri ?? null,
+    );
     const kind = attachment?.kind ?? attachment?.mimeType ?? '';
     const isImage = String(kind).includes('image');
     const watermarkColor = '#F97316';
@@ -224,7 +261,10 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
     }
 
     if (attachmentUrl) {
-      await Share.share({ message: `KIS: ${attachmentUrl}`, url: attachmentUrl });
+      await Share.share({
+        message: `KIS: ${attachmentUrl}`,
+        url: attachmentUrl,
+      });
       return;
     }
 
@@ -267,7 +307,7 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
       { errorMessage: 'Unable to delete post.' },
     );
     if (res?.success) {
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setPosts(prev => prev.filter(p => p.id !== postId));
     }
   };
 
@@ -290,7 +330,7 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
       { errorMessage: 'Unable to block user.' },
     );
     if (res?.success) {
-      setPosts((prev) => prev.filter((p) => p.author?.id !== userId));
+      setPosts(prev => prev.filter(p => p.author?.id !== userId));
     }
   };
 
@@ -325,7 +365,7 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
   const scrollToActivePost = useCallback(() => {
     if (!activePost) return;
     const index = feedItems.findIndex(
-      (item) => item.type === 'post' && item.data.id === activePost.id,
+      item => item.type === 'post' && item.data.id === activePost.id,
     );
     if (index < 0) return;
     setTimeout(() => {
@@ -351,7 +391,10 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
         <Pressable onPress={onBack} style={styles.headerButton}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+        <Text
+          style={[styles.headerTitle, { color: palette.text }]}
+          numberOfLines={1}
+        >
           {partner.name} Feed
         </Text>
       </View>
@@ -369,18 +412,36 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
               key={`partner-feed-skel-${idx}`}
               style={[
                 styles.postCard,
-                { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                {
+                  borderColor: palette.inputBorder,
+                  backgroundColor: palette.card,
+                },
               ]}
             >
               <View style={styles.postHeader}>
                 <Skeleton width={36} height={36} radius={18} />
                 <View style={{ flex: 1 }}>
                   <Skeleton width="50%" height={12} radius={6} />
-                  <Skeleton width="30%" height={10} radius={6} style={{ marginTop: 6 }} />
+                  <Skeleton
+                    width="30%"
+                    height={10}
+                    radius={6}
+                    style={{ marginTop: 6 }}
+                  />
                 </View>
               </View>
-              <Skeleton width="100%" height={12} radius={6} style={{ marginTop: 10 }} />
-              <Skeleton width="80%" height={12} radius={6} style={{ marginTop: 6 }} />
+              <Skeleton
+                width="100%"
+                height={12}
+                radius={6}
+                style={{ marginTop: 10 }}
+              />
+              <Skeleton
+                width="80%"
+                height={12}
+                radius={6}
+                style={{ marginTop: 6 }}
+              />
             </View>
           ))}
         </View>
@@ -388,9 +449,11 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
         <FlatList
           ref={listRef}
           data={feedItems}
-          keyExtractor={(item, idx) => (item.type === 'post' ? item.data.id : item.id ?? String(idx))}
+          keyExtractor={(item, idx) =>
+            item.type === 'post' ? item.data.id : item.id ?? String(idx)
+          }
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-          onScrollToIndexFailed={(info) => {
+          onScrollToIndexFailed={info => {
             listRef.current?.scrollToOffset({
               offset: info.averageItemLength * info.index,
               animated: true,
@@ -402,11 +465,23 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
                 <View
                   style={[
                     styles.adCard,
-                    { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                    {
+                      borderColor: palette.inputBorder,
+                      backgroundColor: palette.card,
+                    },
                   ]}
                 >
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>Sponsored</Text>
-                  <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600', marginTop: 6 }}>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Sponsored
+                  </Text>
+                  <Text
+                    style={{
+                      color: palette.text,
+                      fontSize: 15,
+                      fontWeight: '600',
+                      marginTop: 6,
+                    }}
+                  >
                     Reach partner members with targeted updates
                   </Text>
                   <Text style={{ color: palette.subtext, marginTop: 6 }}>
@@ -416,7 +491,9 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
               );
             }
             const post = item.data;
-            const attachment = Array.isArray(post.attachments) ? post.attachments[0] : null;
+            const attachment = Array.isArray(post.attachments)
+              ? post.attachments[0]
+              : null;
             const rawAttachmentUrl =
               (typeof attachment === 'string' ? attachment : null) ??
               attachment?.url ??
@@ -435,26 +512,39 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
                   attachment?.preview_url ??
                   attachment?.previewUrl ??
                   null,
-              ) ??
-              attachmentUrl;
-            const kind = attachment?.kind ?? attachment?.mimeType ?? attachment?.type ?? '';
-            const isVideo = String(kind).includes('video') || String(kind).includes('mp4');
+              ) ?? attachmentUrl;
+            const kind =
+              attachment?.kind ??
+              attachment?.mimeType ??
+              attachment?.type ??
+              '';
+            const isVideo =
+              String(kind).includes('video') || String(kind).includes('mp4');
             const videoSource = buildMediaSource(attachmentUrl, mediaHeaders);
             return (
               <View
                 style={[
                   styles.postCard,
-                  { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                  {
+                    borderColor: palette.inputBorder,
+                    backgroundColor: palette.card,
+                  },
                 ]}
               >
                 <View style={styles.postHeader}>
-                  <ImagePlaceholder size={36} radius={18} style={styles.avatar} />
+                  <ImagePlaceholder
+                    size={36}
+                    radius={18}
+                    style={styles.avatar}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: palette.text, fontWeight: '700' }}>
                       {post.author?.display_name ?? 'Member'}
                     </Text>
                     <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                      {post.created_at ? new Date(post.created_at).toLocaleString() : 'Just now'}
+                      {post.created_at
+                        ? new Date(post.created_at).toLocaleString()
+                        : 'Just now'}
                     </Text>
                   </View>
                   <Pressable
@@ -464,7 +554,11 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
                     }}
                     style={styles.moreButton}
                   >
-                    <KISIcon name="more-vert" size={18} color={palette.subtext} />
+                    <KISIcon
+                      name="more-vert"
+                      size={18}
+                      color={palette.subtext}
+                    />
                   </Pressable>
                 </View>
                 {attachmentUrl ? (
@@ -479,22 +573,39 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
                         resizeMode="cover"
                       />
                     ) : (
-                      <Image source={{ uri: attachmentUrl }} style={styles.media} />
+                      <Image
+                        source={{ uri: attachmentUrl }}
+                        style={styles.media}
+                      />
                     )}
                   </View>
                 ) : null}
-                <Text style={{ color: palette.text, marginTop: 10 }}>
-                  {post.text ?? ''}
-                </Text>
+                <View style={{ marginTop: 10 }}>
+                  <RichTextRenderer
+                    value={getFeedRichTextValue(post)}
+                    fallback={getFeedPlainText(post)}
+                    style={{ maxHeight: 112, overflow: 'hidden' }}
+                  />
+                </View>
                 <View style={styles.postActions}>
-                  <Pressable style={styles.actionPill} onPress={() => handleReact(post.id)}>
+                  <Pressable
+                    style={styles.actionPill}
+                    onPress={() => handleReact(post.id)}
+                  >
                     <KISIcon
                       name="heart"
                       size={14}
-                      color={likedPostIds[post.id] ? palette.primary : palette.subtext}
+                      color={
+                        likedPostIds[post.id]
+                          ? palette.primary
+                          : palette.subtext
+                      }
                     />
                     <Text style={{ color: palette.subtext, marginLeft: 6 }}>
-                      Like{(likeCounts[post.id] ?? 0) ? ` (${likeCounts[post.id]})` : ''}
+                      Like
+                      {likeCounts[post.id] ?? 0
+                        ? ` (${likeCounts[post.id]})`
+                        : ''}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -506,14 +617,19 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
                     <KISIcon name="comment" size={14} color={palette.subtext} />
                     <Text style={{ color: palette.subtext, marginLeft: 6 }}>
                       Comment
-                      {(commentCounts[post.id] ?? post.comments_count)
+                      {commentCounts[post.id] ?? post.comments_count
                         ? ` (${commentCounts[post.id] ?? post.comments_count})`
                         : ''}
                     </Text>
                   </Pressable>
-                  <Pressable style={styles.actionPill} onPress={() => handleShare(post)}>
+                  <Pressable
+                    style={styles.actionPill}
+                    onPress={() => handleShare(post)}
+                  >
                     <KISIcon name="share" size={14} color={palette.subtext} />
-                    <Text style={{ color: palette.subtext, marginLeft: 6 }}>Share</Text>
+                    <Text style={{ color: palette.subtext, marginLeft: 6 }}>
+                      Share
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -596,14 +712,16 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
               if (activePost) handleDelete(activePost.id);
             },
           },
-        ].filter((action) => action.key !== 'delete' || activePost?.id)}
+        ].filter(action => action.key !== 'delete' || activePost?.id)}
       />
 
       <InlineCommentSheet
         visible={commentSheetVisible}
         conversationId={commentThread?.conversationId}
         headerLabel={`Feed: ${
-          commentThread?.post?.text ?? commentThread?.post?.styled_text?.text ?? partner.name
+          commentThread?.post?.text ??
+          commentThread?.post?.styled_text?.text ??
+          partner.name
         }`}
         contextLabel={formatCommentContextLabel(commentThread?.context)}
         onClose={() => {
@@ -633,13 +751,28 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
   postCard: { borderWidth: 2, borderRadius: 14, padding: 14, marginBottom: 14 },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   moreButton: { padding: 6 },
-  postActions: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  actionPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999 },
+  postActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    flexWrap: 'wrap',
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
   adCard: { borderWidth: 2, borderRadius: 14, padding: 14, marginBottom: 14 },
   mediaWrap: { marginTop: 10 },
   media: { width: '100%', height: 180, borderRadius: 12 },

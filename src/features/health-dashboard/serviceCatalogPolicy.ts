@@ -11,7 +11,7 @@ const normalizeEngineLabel = (value: unknown) =>
     .replace(/\s+/g, ' ');
 
 export const HEALTH_ENGINE_CONTACT_NOTICE =
-  'If you want this service, contact KIS from the KCNI partner account, then open the KIS Features group.';
+  'If you want this service, contact KIS from the KCAN partner account, then open the KIS Features group.';
 
 export const REMOVED_HEALTH_ENGINE_NAMES = ['My test medium'] as const;
 

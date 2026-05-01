@@ -257,7 +257,6 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
       ...panelFeedExistingAttachments,
       ...panelFeedAssets,
     ];
-    console.log('feeds items:', feeds);
     return attachments
       .map((attachment, index) => {
         const preview = getAttachmentPreviewInfo(attachment);

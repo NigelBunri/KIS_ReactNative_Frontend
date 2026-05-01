@@ -158,7 +158,7 @@ export default function PartnerComplaintsPanel({
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.settingsPanelTitle, { color: palette.text }]}>Complaints</Text>
-            <Text style={[styles.settingsPanelDescription, { color: palette.subtext }]}>Review KCNI booking disputes and resolve escrow funds.</Text>
+            <Text style={[styles.settingsPanelDescription, { color: palette.subtext }]}>Review KCAN booking disputes and resolve escrow funds.</Text>
           </View>
         </View>
 
@@ -270,7 +270,9 @@ export default function PartnerComplaintsPanel({
                     <KISButton
                       title="Refund Payment"
                       size="xs"
-                      variant="danger"
+                      variant="outline"
+                      style={{ borderColor: palette.error || '#E53935' }}
+                      textStyle={{ color: palette.error || '#E53935' }}
                       disabled={!isPending || resolving.id === complaint.id}
                       loading={resolving.id === complaint.id && resolving.action === 'refund'}
                       onPress={() => resolveComplaint(complaint.id, 'refund')}

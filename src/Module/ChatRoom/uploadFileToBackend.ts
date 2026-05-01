@@ -10,10 +10,14 @@ export type AttachmentKind =
 export type AttachmentMeta = {
   id: string;
   url: string;
+  publicUrl?: string;
+  downloadUrl?: string;
   originalName: string;
   mimeType: string;
   size: number;
   kind: AttachmentKind;
+  private?: boolean;
+  scanStatus?: 'pending' | 'passed' | 'failed' | 'not_configured' | string;
   width?: number;
   height?: number;
   durationMs?: number;
@@ -134,10 +138,14 @@ export async function uploadFileToBackend(opts: {
   return {
     id: attachment.id ?? attachment.key,
     url: attachment.url,
+    publicUrl: attachment.publicUrl,
+    downloadUrl: attachment.downloadUrl,
     originalName: attachment.originalName ?? attachment.name ?? file.name,
     mimeType: attachment.mimeType ?? attachment.mime ?? file.type ?? 'application/octet-stream',
     size: attachment.size ?? file.size ?? 0,
     kind,
+    private: attachment.private,
+    scanStatus: attachment.scanStatus,
     width: attachment.width,
     height: attachment.height,
     durationMs: attachment.durationMs,

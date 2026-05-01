@@ -2,6 +2,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchMyHealthProfile } from '@/services/healthcareService';
 
 const HEALTH_PROFILE_CACHE_KEY = 'kis_health_profile_cache_v1';
 let healthProfileReadBlockedUntil = 0;
@@ -47,8 +48,38 @@ const resolveHealthProfile = (responseData: any) => {
 
 const normalizeHealthProfileForCache = (profile: any) => {
   if (!profile || typeof profile !== 'object') return null;
-  const institutions = resolveInstitutions(profile);
-  return { ...profile, institutions };
+  const canonicalProfile = profile?.identity
+    ? {
+        profile_type: 'health_profile',
+        canonical: true,
+        patient_id: profile?.patient_id,
+        linked_user_id: profile?.linked_user_id,
+        identity: profile?.identity ?? {},
+        emergency: profile?.emergency ?? {},
+        care_summary: profile?.care_summary ?? {},
+        allergies: Array.isArray(profile?.allergies) ? profile.allergies : [],
+        medications: Array.isArray(profile?.medications) ? profile.medications : [],
+        vitals: Array.isArray(profile?.vitals) ? profile.vitals : [],
+        appointments: Array.isArray(profile?.appointments) ? profile.appointments : [],
+        encounters: Array.isArray(profile?.encounters) ? profile.encounters : [],
+        consents: Array.isArray(profile?.consents) ? profile.consents : [],
+        affiliations: profile?.affiliations ?? {},
+        provenance: profile?.provenance ?? {},
+        completeness: profile?.completeness ?? {},
+        payload: {
+          institutions: [
+            ...(Array.isArray(profile?.affiliations?.owned_institutions)
+              ? profile.affiliations.owned_institutions
+              : []),
+            ...(Array.isArray(profile?.affiliations?.member_institutions)
+              ? profile.affiliations.member_institutions
+              : []),
+          ],
+        },
+      }
+    : profile;
+  const institutions = resolveInstitutions(canonicalProfile);
+  return { ...canonicalProfile, institutions };
 };
 
 const resolveInstitutions = (profile: any): any[] => {
@@ -127,6 +158,21 @@ export const fetchHealthProfileState = async (options?: { forceNetwork?: boolean
       profile: cached,
       exists: resolveHasOwnerProfile(cached),
     };
+  }
+  const canonicalRes = await fetchMyHealthProfile();
+  if (canonicalRes?.success && canonicalRes?.data) {
+    const canonicalNormalized = normalizeHealthProfileForCache(canonicalRes.data);
+    if (canonicalNormalized) {
+      await writeCachedHealthProfile(canonicalNormalized);
+      logHealthProfile('fetchHealthProfileState:canonical-success', {
+        patientId: canonicalNormalized?.patient_id,
+        institutions: canonicalNormalized?.institutions?.length ?? 0,
+      });
+      return {
+        profile: canonicalNormalized,
+        exists: true,
+      };
+    }
   }
   const res = await getRequest(ROUTES.broadcasts.createProfile, {
     forceNetwork: !!options?.forceNetwork,

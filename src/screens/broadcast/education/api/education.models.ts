@@ -52,6 +52,29 @@ export interface EducationTrustSignals {
   previewItemCount?: number;
 }
 
+export interface EducationDetailSummaryItem {
+  label: string;
+  value: string | number;
+  tone?: string;
+}
+
+export interface EducationDetailSummarySection {
+  title: string;
+  items?: EducationDetailSummaryItem[];
+}
+
+export interface EducationDetailSummary {
+  variant?: string;
+  eyebrow?: string;
+  module?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  status?: string;
+  highlights?: EducationDetailSummaryItem[];
+  sections?: EducationDetailSummarySection[];
+}
+
 export interface EducationBase {
   id: string;
   title: string;
@@ -81,6 +104,8 @@ export interface EducationBase {
   bookingEnabled?: boolean;
   membershipPolicy?: string;
   targetLabel?: string;
+  detailSummary?: EducationDetailSummary | null;
+  detail_summary?: EducationDetailSummary | null;
   type: EducationContentType;
 }
 
