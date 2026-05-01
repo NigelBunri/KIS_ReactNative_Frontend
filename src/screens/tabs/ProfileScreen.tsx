@@ -47,6 +47,10 @@ import {
   type InAppNotification,
 } from '@/services/inAppNotificationService';
 import { filterInstitutionsForVisibleRoles } from '@/screens/health/accessControl';
+import FeedComposerSheet, {
+  type FeedComposerPayload,
+} from '@/components/feeds/FeedComposerSheet';
+import { prepareBroadcastVideoPayload } from '@/components/feeds/videoAttachmentHelpers';
 
 import BottomSheet from './profile/sheets/BottomSheet';
 import SheetHeader from './profile/sheets/SheetHeader';
@@ -207,6 +211,8 @@ export default function ProfileScreen() {
   const [panelFeedBroadcastingId, setPanelFeedBroadcastingId] = useState<
     string | null
   >(null);
+  const [advancedFeedComposerVisible, setAdvancedFeedComposerVisible] =
+    useState(false);
   const managementPanelOffset = useRef(
     new Animated.Value(profileLayout.SCREEN_WIDTH),
   ).current;
@@ -732,6 +738,85 @@ export default function ProfileScreen() {
     resetFeedForm,
   ]);
 
+  const handleAdvancedFeedSubmit = useCallback(
+    async (payload: FeedComposerPayload) => {
+      const prepared = await prepareBroadcastVideoPayload(payload);
+      if (!prepared) return;
+
+      const composerType = prepared.composerType ?? 'text';
+      const mediaType: FeedMediaType =
+        composerType === 'image'
+          ? 'image'
+          : composerType === 'video' || composerType === 'short_video'
+          ? 'video'
+          : composerType === 'audio'
+          ? 'audio'
+          : composerType === 'document'
+          ? 'file'
+          : 'text';
+      const attachments = Array.isArray(prepared.attachments)
+        ? prepared.attachments
+        : [];
+      const localAttachments = attachments
+        .map(attachment => {
+          const uri = attachment?.uri ?? attachment?.url;
+          if (!uri || /^https?:\/\//i.test(String(uri))) return null;
+          return {
+            uri: String(uri),
+            name:
+              attachment?.originalName ??
+              attachment?.name ??
+              `feed-${Date.now()}`,
+            type:
+              attachment?.mimeType ??
+              attachment?.type ??
+              'application/octet-stream',
+          };
+        })
+        .filter(
+          (
+            attachment,
+          ): attachment is { uri: string; name: string; type: string } =>
+            Boolean(attachment),
+        );
+      const remoteAttachments = attachments.filter(attachment => {
+        const uri = attachment?.uri ?? attachment?.url;
+        return !uri || /^https?:\/\//i.test(String(uri));
+      });
+      const summary =
+        prepared.textPlain?.trim() ||
+        prepared.textPreview?.trim() ||
+        prepared.event?.title?.trim?.() ||
+        prepared.poll?.question?.trim?.() ||
+        prepared.link?.trim() ||
+        '';
+      const title =
+        summary.split(/\n+/)[0]?.slice(0, 80).trim() ||
+        (composerType === 'poll'
+          ? 'Poll'
+          : composerType === 'event'
+          ? 'Event'
+          : composerType === 'link'
+          ? 'Link'
+          : 'Broadcast update');
+
+      await c.addBroadcastFeedEntry(
+        title,
+        summary,
+        mediaType,
+        localAttachments,
+        buildDefaultFeedMediaOptions()[mediaType],
+        {
+          ...prepared,
+          attachmentPayloads: remoteAttachments,
+        },
+      );
+      setAdvancedFeedComposerVisible(false);
+      Alert.alert('Broadcast item', 'Advanced feed item saved to your queue.');
+    },
+    [c],
+  );
+
   const handleEditFeedItem = useCallback((item: any) => {
     setEditingFeedItemId(item.id);
     setPanelFeedItemTitle(item.title || '');
@@ -794,6 +879,24 @@ export default function ProfileScreen() {
         Alert.alert(
           'Broadcast',
           error?.message || 'Unable to broadcast the item.',
+        );
+      } finally {
+        setPanelFeedBroadcastingId(prev => (prev === feed.id ? null : prev));
+      }
+    },
+    [c],
+  );
+
+  const handleRemoveBroadcastFeedItem = useCallback(
+    async (feed: any) => {
+      setPanelFeedBroadcastingId(feed?.id ?? null);
+      try {
+        await c.unbroadcastFeedEntry(feed.id);
+        Alert.alert('Broadcast', 'This item was removed from your feed.');
+      } catch (error: any) {
+        Alert.alert(
+          'Broadcast',
+          error?.message || 'Unable to remove the item from broadcast.',
         );
       } finally {
         setPanelFeedBroadcastingId(prev => (prev === feed.id ? null : prev));
@@ -1891,6 +1994,8 @@ export default function ProfileScreen() {
           handleEditFeedItem={handleEditFeedItem}
           handleDeleteFeedItem={handleDeleteFeedItem}
           handleBroadcastFeedItem={handleBroadcastFeedItem}
+          handleRemoveBroadcastFeedItem={handleRemoveBroadcastFeedItem}
+          onOpenAdvancedComposer={() => setAdvancedFeedComposerVisible(true)}
           panelFeedBroadcastingId={panelFeedBroadcastingId}
           setPanelFeedExistingAttachments={setPanelFeedExistingAttachments}
           setPanelFeedMediaType={setPanelFeedMediaType}
@@ -2433,6 +2538,11 @@ export default function ProfileScreen() {
           </ScrollView>
         </BottomSheet>
       )}
+      <FeedComposerSheet
+        visible={advancedFeedComposerVisible}
+        onClose={() => setAdvancedFeedComposerVisible(false)}
+        onSubmit={handleAdvancedFeedSubmit}
+      />
     </View>
   );
 }

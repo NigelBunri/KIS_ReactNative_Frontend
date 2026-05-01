@@ -26,6 +26,7 @@ import { profileLayout } from './profile.styles';
 import { popularLanguages } from './profile.constants';
 import { tierMetaFor } from './profile/tierMeta';
 import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
+import type { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
 
 const CENTS_PER_KISC = 100;
 const MICROS_PER_CENT = 10;
@@ -649,6 +650,9 @@ export const useProfileController = (opts: {
   );
 
   type BroadcastAttachmentPayload = { uri: string; name: string; type: string };
+  type BroadcastFeedEntryExtras = Partial<FeedComposerPayload> & {
+    attachmentPayloads?: any[];
+  };
 
   const appendBroadcastAttachments = useCallback(
     (form: FormData, files?: BroadcastAttachmentPayload[]) => {
@@ -661,6 +665,31 @@ export const useProfileController = (opts: {
           } as any);
         }
       });
+    },
+    [],
+  );
+
+  const appendBroadcastFeedExtras = useCallback(
+    (form: FormData, extras?: BroadcastFeedEntryExtras) => {
+      if (!extras) return;
+      if (extras.text !== undefined)
+        form.append('text', JSON.stringify(extras.text));
+      if (extras.textPlain) form.append('text_plain', extras.textPlain);
+      if (extras.textPreview) form.append('text_preview', extras.textPreview);
+      if (extras.poll) form.append('poll', JSON.stringify(extras.poll));
+      if (extras.event) form.append('event', JSON.stringify(extras.event));
+      if (extras.link) form.append('link', extras.link);
+      if (extras.composerType)
+        form.append('composer_type', extras.composerType);
+      const attachmentPayloads =
+        extras.attachmentPayloads ??
+        (extras.attachments ?? []).filter((attachment: any) => {
+          const uri = attachment?.uri ?? attachment?.url;
+          return !uri || /^https?:\/\//i.test(String(uri));
+        });
+      if (attachmentPayloads.length) {
+        form.append('attachment_payloads', JSON.stringify(attachmentPayloads));
+      }
     },
     [],
   );
@@ -689,6 +718,7 @@ export const useProfileController = (opts: {
       mediaType: FeedMediaType,
       attachments?: BroadcastAttachmentPayload[],
       mediaOptions?: FeedMediaOptions[FeedMediaType],
+      extras?: BroadcastFeedEntryExtras,
     ) => {
       const form = new FormData();
       form.append('title', title);
@@ -696,6 +726,7 @@ export const useProfileController = (opts: {
       form.append('media_type', mediaType);
       appendBroadcastAttachments(form, attachments);
       form.append('media_options', JSON.stringify(mediaOptions ?? {}));
+      appendBroadcastFeedExtras(form, extras);
       const res = await postRequest(ROUTES.broadcasts.feedProfile, form);
       if (res?.success) {
         void loadBroadcastProfiles();
@@ -703,7 +734,11 @@ export const useProfileController = (opts: {
       }
       throw new Error(res?.message || 'Unable to add broadcast item.');
     },
-    [appendBroadcastAttachments, loadBroadcastProfiles],
+    [
+      appendBroadcastAttachments,
+      appendBroadcastFeedExtras,
+      loadBroadcastProfiles,
+    ],
   );
 
   const updateBroadcastFeedEntry = useCallback(
@@ -715,6 +750,7 @@ export const useProfileController = (opts: {
       attachments?: BroadcastAttachmentPayload[],
       retainAttachments?: any[],
       mediaOptions?: FeedMediaOptions[FeedMediaType],
+      extras?: BroadcastFeedEntryExtras,
     ) => {
       const form = new FormData();
       form.append('title', title);
@@ -725,6 +761,7 @@ export const useProfileController = (opts: {
         form.append('retain_attachments', JSON.stringify(retainAttachments));
       }
       form.append('media_options', JSON.stringify(mediaOptions ?? {}));
+      appendBroadcastFeedExtras(form, extras);
       const res = await patchRequest(ROUTES.broadcasts.feedEntry(id), form);
       if (res?.success) {
         void loadBroadcastProfiles();
@@ -732,7 +769,11 @@ export const useProfileController = (opts: {
       }
       throw new Error(res?.message || 'Unable to update broadcast item.');
     },
-    [appendBroadcastAttachments, loadBroadcastProfiles],
+    [
+      appendBroadcastAttachments,
+      appendBroadcastFeedExtras,
+      loadBroadcastProfiles,
+    ],
   );
 
   const deleteBroadcastFeedEntry = useCallback(
@@ -775,6 +816,22 @@ export const useProfileController = (opts: {
         return res.data?.feed ?? null;
       }
       throw new Error(res?.message || 'Unable to broadcast feed item.');
+    },
+    [loadBroadcastProfiles],
+  );
+
+  const unbroadcastFeedEntry = useCallback(
+    async (id: string) => {
+      const res = await deleteRequest(
+        ROUTES.broadcasts.feedEntryUnbroadcast(id),
+      );
+      if (res?.success) {
+        await loadBroadcastProfiles();
+        return res.data?.feed ?? null;
+      }
+      throw new Error(
+        res?.message || 'Unable to remove feed item from broadcast.',
+      );
     },
     [loadBroadcastProfiles],
   );
@@ -1911,6 +1968,7 @@ export const useProfileController = (opts: {
     deleteBroadcastFeedEntry,
     removeBroadcastFeedAttachment,
     broadcastFeedEntry,
+    unbroadcastFeedEntry,
 
     // derived
     sectionList,
