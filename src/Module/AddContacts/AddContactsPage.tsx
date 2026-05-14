@@ -46,11 +46,9 @@ import { NewChannelForm } from './components/NewChannelForm';
 import { addContactsStyles as styles } from './addContactsStyles';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import {
+  fetchConversationsForCurrentUser,
   normalizeConversation,
-  CONVERSATION_CACHE_KEY,
-  CONVERSATION_CACHE_TYPE,
 } from '../ChatRoom/normalizeConversation';
-import { getCache } from '@/network/cache';
 
 export type AddContactsPageProps = {
   onClose: () => void;
@@ -188,14 +186,11 @@ const findExistingDirectConversationForContact = async (
   contact: KISContact,
 ): Promise<any | null> => {
   try {
-    const existingRaw = await getCache(
-      CONVERSATION_CACHE_TYPE,
-      CONVERSATION_CACHE_KEY,
-    );
+    const existingRaw = await fetchConversationsForCurrentUser([], undefined, true);
 
     if (!Array.isArray(existingRaw)) {
       console.log(
-        '[findExistingDirectConversationForContact] Conversation cache is not an array:',
+        '[findExistingDirectConversationForContact] Conversation list is not an array:',
         existingRaw,
       );
       return null;

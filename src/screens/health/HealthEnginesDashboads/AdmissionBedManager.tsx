@@ -383,7 +383,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
         />
 
         <TextInput
-          placeholder="Price per Night (KISC)"
+          placeholder="Price per Night (USD)"
           placeholderTextColor={palette.subtext}
           keyboardType="numeric"
           value={price}
@@ -478,7 +478,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
                   }}
                 />
               </View>
-              <Text style={{ color: palette.text }}>{toKiscLabel(room.priceKisc)} KISC / Night</Text>
+              <Text style={{ color: palette.text }}>{toKiscLabel(room.priceKisc)} USD / Night</Text>
               <Text
                 style={{
                   fontWeight: '600',

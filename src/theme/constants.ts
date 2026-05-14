@@ -8,44 +8,64 @@ export type KISTone = 'light' | 'dark';
 
 export const KIS_COLORS = {
   brand: {
-    orange: '#FF8A33',
-    primary: '#FF8A33',
-    purple: '#6C4AF2',
-    gradientStart: '#FF8A33',
-    gradientEnd: '#6C4AF2',
+    // Royal gold is a metallic range, not a single flat color.
+    goldHighlight: '#FFF4B8',
+    goldLight: '#F4D77A',
+    gold: '#C9A24A',
+    goldRose: '#D6B15E',
+    goldDeep: '#9A6A14',
+    goldShadow: '#5E3B0A',
+    goldSoft: '#FFF2C7',
+    goldMuted: '#E6D7B2',
+    goldGradientStart: '#FFF4B8',
+    goldGradientMid: '#C9A24A',
+    goldGradientEnd: '#8A5A12',
+    purple: '#4B1D78',
+    purpleDeep: '#2A0F45',
+    purpleSoft: '#EEE4FA',
+    imperialPurple: '#6E35B7',
+    ivory: '#FFFBF2',
+    parchment: '#F8F1E3',
+    royalInk: '#17111F',
+    primary: '#9A6A14',
+    secondary: '#4B1D78',
+    // Deprecated compatibility alias. New code should use gold/primary.
+    orange: '#9A6A14',
+    gradientStart: '#FFF4B8',
+    gradientEnd: '#4B1D78',
   },
 
   // Base swatches per tone (kept compatible with existing keys)
   dark: {
-    orange: '#FF8A33',
-    bg: '#0F0D14',
-    card: '#1A1720',
-    text: '#EDEDED',
-    subtext: '#B5B2BD',
-    inputBg: '#1A1720',
-    inputBorder: '#746f81ff',
-    divider: '#362b47ff',
+    orange: '#9A6A14',
+    bg: '#09070D',
+    card: '#15101F',
+    text: '#F7F1E3',
+    subtext: '#C8BFD6',
+    inputBg: '#1B1428',
+    inputBorder: '#8A5A12',
+    divider: '#5E3B0A',
 
-    // 🆕 New
-    chrome: '#0B0A10',          // outer app chrome/background
-    bar: '#14121A',             // bars/strips like tab bar
-    shadow: 'rgba(0,0,0,0.9)',  // iOS shadowColor fallback
+    // New
+    chrome: '#07050B',          // outer app chrome/background
+    bar: '#120C1C',             // bars/strips like tab bar
+    shadow: 'rgba(0,0,0,0.92)', // iOS shadowColor fallback
   },
 
   light: {
-    orange: '#FF8A33',
+    orange: '#7A4B3E',
     bg: '#FFFFFF',
-    card: '#F7F6FB',
-    text: '#1B1B1F',
-    subtext: '#5C5A66',
-    inputBg: '#FFFFFF',
-    inputBorder: '#E6E2EE',
-    divider: '#EAE7F2',
+    card: '#FFFDF8',
+    text: '#4B2F2A',
+    subtext: '#8A6557',
+    inputBg: '#FFFDF8',
+    inputBorder: '#D9A875',
+    divider: '#E7C7A1',
 
-    // 🆕 New
-    chrome: '#F5F5FA',
-    bar: '#E7E4F0',
-    shadow: 'rgba(0,0,0,0.35)',
+    // Reference-inspired light mode: cream pages, coffee-brown controls, tan-gold accents.
+    chrome: '#F2D8B8',
+    bar: '#FFFFFF',
+    shadow: 'rgba(90,55,45,0.24)',
   },
 
   states: {
@@ -87,6 +107,24 @@ export type KISPalette = {
   secondary: string;
   gradientStart: string;
   gradientEnd: string;
+  goldHighlight: string;
+  goldLight: string;
+  gold: string;
+  goldRose: string;
+  goldDeep: string;
+  goldShadow: string;
+  goldSoft: string;
+  goldMuted: string;
+  goldGradientStart: string;
+  goldGradientMid: string;
+  goldGradientEnd: string;
+  purple: string;
+  purpleDeep: string;
+  purpleSoft: string;
+  imperialPurple: string;
+  ivory: string;
+  parchment: string;
+  royalInk: string;
 
   // Brand tints/intensities used in UI
   primarySoft: string;
@@ -149,16 +187,23 @@ export const createPalette = (tone: KISTone): KISPalette => {
   const base = tone === 'dark' ? c.dark : c.light;
 
   // sensible elevated default when not provided by swatches
-  const elevated = tone === 'dark' ? '#3c3847ff' : '#e6e6e9ff';
+  const elevated = tone === 'dark' ? '#3c3847ff' : '#F4DDBD';
 
-  // soft tint derived from brand primary (alpha works well across themes)
+  const lightCoffeePrimary = '#7A4B3E';
+  const lightCoffeeStrong = '#5A372D';
+  const lightCoffeeSoft = '#F2D8B8';
+  const lightTanGold = '#D9A875';
+  const darkReadableGold = '#E7C76D';
+  const darkReadableGoldStrong = '#FFF0A8';
+
+  // Soft tint derived from the active primary color.
   const primarySoft =
     tone === 'dark'
-      ? 'rgba(255,138,51,0.16)'
-      : 'rgba(255,138,51,0.15)';
+      ? 'rgba(201,162,74,0.20)'
+      : lightCoffeeSoft;
 
   // stronger color used for text/icons on top of primarySoft
-  const primaryStrong = c.brand.primary;
+  const primaryStrong = tone === 'dark' ? darkReadableGoldStrong : lightCoffeeStrong;
 
   // dimming veil for modals
   const backdrop =
@@ -166,26 +211,21 @@ export const createPalette = (tone: KISTone): KISPalette => {
       ? 'rgba(0,0,0,0.55)'
       : 'rgba(0,0,0,0.25)';
 
-  // 🆕 KIS-style chat colors using both gradientStart & gradientEnd
-  // - Light: soft tints of orange (sender) & purple (receiver)
-  // - Dark: richer, deeper variants of orange & purple
-  // 🆕 KIS-style chat colors using deeper, desaturated variants in dark mode
+  // Royal chat colors using gold for outgoing and purple for incoming.
   const chatBg =
     tone === 'dark'
-      ? '#0C0B0F'          // nearly-black violet/charcoal base
-      : '#FFF5EE';         // light warm background
+      ? '#09070D'
+      : '#FFFFFF';
 
-  // Outgoing (sender) bubble → dark muted burnt-orange
   const outgoingBubble =
     tone === 'dark'
-      ? '#3F2A1F'          // extremely dark warm orange tone
-      : '#FFE3CF';         // light orange-tinted bubble
+      ? '#33260F'
+      : '#F2D8B8';
 
-  // Incoming (receiver) bubble → deep muted purple/indigo
   const incomingBubble =
     tone === 'dark'
-      ? '#1E1A2B'          // deep desaturated purple, almost charcoal
-      : '#ECE6FF';         // light lavender bubble
+      ? '#20112F'
+      : '#FFFDF8';
 
   const chatHeaderBg = base.card;
   const chatComposerBg = base.card;
@@ -211,14 +251,14 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
   const readStatus =
     tone === 'dark'
-      ? '#8B7CFB'
-      : c.brand.purple;
+      ? lightTanGold
+      : lightCoffeePrimary;
 
-  const onPrimary = '#FFFFFF';
+  const onPrimary = tone === 'dark' ? '#FFFFFF' : '#FFFBF2';
   const onPrimaryMuted =
     tone === 'dark'
-      ? '#B3E5FC'
-      : '#E0E0E0';
+      ? c.brand.goldSoft
+      : '#F6E8BD';
 
   const disabled =
     tone === 'dark'
@@ -253,20 +293,38 @@ export const createPalette = (tone: KISTone): KISPalette => {
     text: base.text,
     subtext: base.subtext,
     mutedText: base.subtext,     // 🆕 keeps request banners aligned with subtext
-    inverseText: tone === 'dark' ? '#0F0D14' : '#FFFFFF',
+    inverseText: tone === 'dark' ? c.brand.royalInk : '#FFFFFF',
 
     // Inputs & borders
     inputBg: base.inputBg,
     inputBorder: base.inputBorder,
     border: base.inputBorder,
-    borderMuted: tone === 'dark' ? '#272530' : '#EFEAF6',
+    borderMuted: tone === 'dark' ? c.brand.goldShadow : '#E7C7A1',
     divider: base.divider,
 
     // Brand
-    primary: c.brand.primary,
-    secondary: c.brand.purple,
-    gradientStart: c.brand.gradientStart,
-    gradientEnd: c.brand.gradientEnd,
+    primary: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
+    secondary: tone === 'dark' ? c.brand.secondary : lightCoffeeStrong,
+    gradientStart: tone === 'dark' ? c.brand.gradientStart : '#F2D8B8',
+    gradientEnd: tone === 'dark' ? c.brand.gradientEnd : lightCoffeePrimary,
+    goldHighlight: c.brand.goldHighlight,
+    goldLight: c.brand.goldLight,
+    gold: tone === 'dark' ? darkReadableGold : lightTanGold,
+    goldRose: c.brand.goldRose,
+    goldDeep: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
+    goldShadow: tone === 'dark' ? '#B9852E' : c.brand.goldShadow,
+    goldSoft: c.brand.goldSoft,
+    goldMuted: c.brand.goldMuted,
+    goldGradientStart: c.brand.goldGradientStart,
+    goldGradientMid: c.brand.goldGradientMid,
+    goldGradientEnd: c.brand.goldGradientEnd,
+    purple: c.brand.purple,
+    purpleDeep: c.brand.purpleDeep,
+    purpleSoft: c.brand.purpleSoft,
+    imperialPurple: c.brand.imperialPurple,
+    ivory: c.brand.ivory,
+    parchment: c.brand.parchment,
+    royalInk: c.brand.royalInk,
 
     // Brand tints/intensities
     primarySoft,
@@ -279,7 +337,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
     info: c.states.info,
 
     // State-aware borders
-    borderDanger: tone === 'dark' ? '#7A1F29' : '#F3B2B7',
+    borderDanger: tone === 'dark' ? '#7A1F29' : '#C46A74',
 
     // Backdrop + shadow
     backdrop,
@@ -313,8 +371,8 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
     // Compatibility aliases
     muted: base.subtext,
-    accent: c.brand.primary,
-    accentPrimary: c.brand.primary,
+    accent: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
+    accentPrimary: tone === 'dark' ? darkReadableGoldStrong : lightCoffeePrimary,
     surfaceSoft: elevated,
     successSoft,
     dangerSoft,

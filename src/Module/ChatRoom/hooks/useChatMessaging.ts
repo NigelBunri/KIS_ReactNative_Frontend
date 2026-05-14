@@ -50,6 +50,23 @@ type UseChatMessagingParams = {
   conversationId: string | null;
 };
 
+const CHAT_SIGNAL_ENCRYPTION_TIMEOUT_MS = 900;
+const CHAT_CONVERSATION_ENCRYPTION_TIMEOUT_MS = 700;
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 /* ========================================================================
  * HOOK
  * ===================================================================== */
@@ -294,8 +311,13 @@ export function useChatMessaging({
           };
         });
 
-      const senderId =
-        serverMsg.senderId != null ? String(serverMsg.senderId) : '';
+      const rawSenderId =
+        serverMsg.senderId ??
+        serverMsg.sender_id ??
+        serverMsg.sender?.id ??
+        serverMsg.userId ??
+        serverMsg.user_id;
+      const senderId = rawSenderId != null ? String(rawSenderId) : '';
 
       const normalizedConversationId =
         serverMsg.conversationId ??
@@ -367,7 +389,11 @@ export function useChatMessaging({
 
       const rawCiphertext = serverMsg.ciphertext ?? undefined;
       const hasEncryptedMeta = !!(serverMsg.encryptionMeta ?? serverMsg.encryption_meta);
-      const text = serverMsg.text ?? (rawCiphertext || hasEncryptedMeta ? 'Encrypted message' : '');
+      const text =
+        serverMsg.text ??
+        serverMsg.previewText ??
+        serverMsg.preview_text ??
+        (rawCiphertext || hasEncryptedMeta ? 'Encrypted message' : '');
 
       return {
         id: serverMsg.id ?? serverMsg._id,
@@ -631,15 +657,17 @@ export function useChatMessaging({
   const sendOverNetworkImpl =
   useCallback<SendOverNetworkFn>(
     async (message) => {
-      console.log(
-        '[sendOverNetworkImpl]',
-        'socket:',
-        !!socket,
-        'connected:',
-        isConnected,
-        'message:',
-        message,
-      );
+      console.log('[chat.send.debug] start', {
+        socketReady: !!socket,
+        connected: !!(socket && (isConnected || socket.connected)),
+        messageId: message.id,
+        clientId: message.clientId,
+        conversationId: message.conversationId ?? conversationId ?? storageRoomId,
+        status: message.status,
+        kind: message.kind,
+        hasText: typeof message.text === 'string' && message.text.length > 0,
+        participantCount: Array.isArray(chat?.participants) ? chat.participants.length : 0,
+      });
 
       // Socket not ready → keep message queued locally
       if (!socket || !(isConnected || socket.connected) || !chat) {
@@ -713,6 +741,10 @@ export function useChatMessaging({
         kind: (message.kind as MessageKind) ?? 'text',
         clientId,
         text: message.text ?? message.styledText?.text ?? undefined,
+        previewText:
+          typeof (message.text ?? message.styledText?.text) === 'string'
+            ? String(message.text ?? message.styledText?.text).slice(0, 200)
+            : undefined,
         replyToId: message.replyToId ?? null,
         attachments: message.attachments ? normalizeAttachments(message.attachments) : undefined,
         contacts: normalizeContacts(message.contacts),
@@ -731,27 +763,58 @@ export function useChatMessaging({
       let payloadToSend: any = basePayload;
       try {
         const recipientUserIds = getRecipientUserIds();
+        console.log('[chat.send.debug] signal recipients', {
+          conversationId: String(convId),
+          recipientUserIds,
+          currentUserId: String(currentUserId),
+        });
         if (!recipientUserIds.length) {
           throw new Error('Missing recipient device inventory for signal fanout');
         }
-        const signalEncrypted = await encryptPayloadForRecipients(
-          String(currentUserId),
-          recipientUserIds,
-          basePayload,
+        const signalRecipientUserIds = Array.from(
+          new Set([String(currentUserId), ...recipientUserIds.map((id) => String(id))]),
         );
+        const signalStartedAt = Date.now();
+        const signalEncrypted = await withTimeout(
+          encryptPayloadForRecipients(
+            String(currentUserId),
+            signalRecipientUserIds,
+            basePayload,
+          ),
+          CHAT_SIGNAL_ENCRYPTION_TIMEOUT_MS,
+          'Signal encryption',
+        );
+        console.log('[chat.send.debug] signal encryption ready', {
+          conversationId: String(convId),
+          elapsedMs: Date.now() - signalStartedAt,
+          recipientCipherCount: Array.isArray(signalEncrypted.encryptionMeta?.recipients)
+            ? signalEncrypted.encryptionMeta.recipients.length
+            : 0,
+        });
         payloadToSend = {
           conversationId: basePayload.conversationId,
           clientId,
           kind: basePayload.kind,
+          previewText: basePayload.previewText,
           encryptionMeta: signalEncrypted.encryptionMeta,
         };
       } catch (err) {
         try {
-          const encrypted = await encryptConversationPayload(String(convId), basePayload);
+          const conversationEncryptStartedAt = Date.now();
+          const encrypted = await withTimeout(
+            encryptConversationPayload(String(convId), basePayload),
+            CHAT_CONVERSATION_ENCRYPTION_TIMEOUT_MS,
+            'Conversation encryption',
+          );
+          console.log('[chat.send.debug] conversation encryption ready', {
+            conversationId: String(convId),
+            elapsedMs: Date.now() - conversationEncryptStartedAt,
+          });
           payloadToSend = {
             conversationId: basePayload.conversationId,
             clientId,
             kind: basePayload.kind,
+            previewText: basePayload.previewText,
             encrypted: true,
             ciphertext: encrypted.ciphertext,
             iv: encrypted.iv,
@@ -761,8 +824,12 @@ export function useChatMessaging({
             aad: encrypted.aad,
           };
         } catch (legacyErr) {
-          console.warn('[useChatMessaging] encryption failed', err, legacyErr);
-          return { ok: false };
+          console.warn('[useChatMessaging] encryption unavailable/slow; sending plaintext fallback', err, legacyErr);
+          payloadToSend = {
+            ...basePayload,
+            encrypted: false,
+            encryptionMeta: undefined,
+          };
         }
       }
 
@@ -778,13 +845,22 @@ export function useChatMessaging({
                 ack?: any,
               ) => {
                 if (err) {
-                  console.warn('[chat.send] error', err);
+                  console.warn('[chat.send.debug] socket ack timeout/error', {
+                    conversationId: payloadToSend?.conversationId,
+                    clientId,
+                    err,
+                  });
                   return resolve({ ok: false });
                 }
 
                 const success = ack?.ok === true;
 
                 if (!success) {
+                  console.warn('[chat.send.debug] ACK failed', {
+                    conversationId: payloadToSend?.conversationId,
+                    clientId,
+                    ack,
+                  });
                   return resolve({ ok: false });
                 }
 
@@ -800,6 +876,13 @@ export function useChatMessaging({
                   );
                   return resolve({ ok: false });
                 }
+
+                console.log('[chat.send.debug] ACK success', {
+                  conversationId: payloadToSend?.conversationId,
+                  clientId,
+                  serverId,
+                  seq: ackPayload?.seq,
+                });
 
                 resolve({
                   ok: true,
@@ -840,7 +923,7 @@ export function useChatMessaging({
       '[useChatMessaging] socket connected → flush queue',
     );
 
-    attemptFlushQueue();
+    attemptFlushQueue({ silent: true });
     syncHistory();
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
 
@@ -853,12 +936,7 @@ export function useChatMessaging({
         (m) => m.status === 'pending' || m.status === 'failed',
       );
       if (!hasQueued) return;
-      flushInFlightRef.current = true;
-      attemptFlushQueue()
-        .catch(() => {})
-        .finally(() => {
-          flushInFlightRef.current = false;
-        });
+      attemptFlushQueue({ silent: true }).catch(() => {});
     }, 8000);
 
     return () => clearInterval(interval);
@@ -868,8 +946,7 @@ export function useChatMessaging({
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       if (!socket || !(isConnected || socket.connected)) return;
-      attemptFlushQueue();
-      syncHistory();
+      attemptFlushQueue({ silent: true });
     });
     return () => sub.remove();
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
@@ -898,7 +975,7 @@ export function useChatMessaging({
       const matchIndex = messagesRef.current.findIndex((m) => {
         if (serverMsg.clientId && m.clientId && m.clientId === serverMsg.clientId) return true;
         if ((serverMsg.id ?? serverMsg._id) && m.serverId && m.serverId === (serverMsg.id ?? serverMsg._id)) return true;
-        if (!serverMsg.clientId && String(serverMsg.senderId ?? '') === String(currentUserId) && m.fromMe && m.status === 'pending') return true;
+        if (!serverMsg.clientId && String(serverMsg.senderId ?? serverMsg.sender_id ?? '') === String(currentUserId) && m.fromMe && m.status === 'pending') return true;
         return false;
       });
 
@@ -1265,7 +1342,6 @@ export function useChatMessaging({
     sendTyping,
     retryMessage: async (messageId: string) => {
       await retryMessage(messageId);
-      await attemptFlushQueue();
     },
     sendReaction: (messageId: string, emoji: string, convId?: string | null) => {
       const resolvedConvId =

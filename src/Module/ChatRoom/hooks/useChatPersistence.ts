@@ -107,7 +107,7 @@ export type UseChatPersistenceResult = {
     extra?: Partial<ChatMessage>,
   ) => Promise<void>;
 
-  attemptFlushQueue: () => Promise<void>;
+  attemptFlushQueue: (options?: { silent?: boolean }) => Promise<void>;
 
   replaceMessages: (
     next: ChatMessage[],
@@ -190,8 +190,10 @@ function normalizeSender(
 ): ChatMessage {
   if (msg.senderId == null) return msg;
   const senderId = String(msg.senderId);
-  const fromMe =
-    senderId !== '' && senderId === String(currentUserId);
+  if (!currentUserId) {
+    return { ...msg, senderId };
+  }
+  const fromMe = senderId !== '' && senderId === String(currentUserId);
   return { ...msg, senderId, fromMe };
 }
 
@@ -313,7 +315,9 @@ export function useChatPersistence(
         );
         const sorted = sortMessages(normalized);
         setMessages(sorted);
-        await saveMessages(roomId, sorted);
+        if (currentUserId) {
+          await saveMessages(roomId, sorted);
+        }
       } catch (err) {
         console.warn('[useChatPersistence] load error', err);
         setMessages([]);
@@ -524,8 +528,9 @@ export function useChatPersistence(
    * --------------------------------------------------------------------- */
 
   const attemptFlushQueue = useCallback(
-    async () => {
+    async (options?: { silent?: boolean }) => {
       if (!sendOverNetwork) return;
+      const silent = !!options?.silent;
       if (flushInFlightRef.current) return;
       flushInFlightRef.current = true;
 
@@ -540,12 +545,16 @@ export function useChatPersistence(
             continue;
           }
 
-          const sending = next.map((m) =>
-            m.clientId === msg.clientId
-              ? { ...m, status: 'sending' as MessageStatus }
-              : m,
-          );
-          await persist(sending);
+          const sending = silent
+            ? next
+            : next.map((m) =>
+                m.clientId === msg.clientId
+                  ? { ...m, status: 'sending' as MessageStatus }
+                  : m,
+              );
+          if (!silent) {
+            await persist(sending);
+          }
 
           const result = await sendOverNetwork(msg).catch(
             () => ({ ok: false } as SendOverNetworkNack),
@@ -557,7 +566,9 @@ export function useChatPersistence(
                   ...m,
                 status: result.ok
                   ? STATUS_SENT
-                  : STATUS_FAILED,
+                  : silent
+                    ? m.status
+                    : STATUS_FAILED,
                 serverId:
                   result.ok
                     ? result.serverId
@@ -570,7 +581,7 @@ export function useChatPersistence(
                   result.ok && result.createdAt
                     ? result.createdAt
                     : m.createdAt,
-                isLocalOnly: !result.ok,
+                isLocalOnly: result.ok ? false : m.isLocalOnly,
               }
             : m,
         );
@@ -626,6 +637,7 @@ export function useChatPersistence(
           : m,
       );
       await persist(next);
+      await attemptFlushQueue();
     },
   };
 }

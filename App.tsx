@@ -39,6 +39,9 @@ import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
 import { MainTabs } from '@/navigation/AppNavigator';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
+import ChannelHomePage from '@/screens/broadcast/channels/ChannelHomePage';
+import ChannelContentDetailPage from '@/screens/broadcast/channels/ChannelContentDetailPage';
+import LiveWatchPage from '@/screens/broadcast/channels/LiveWatchPage';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -437,6 +440,18 @@ function AppContent() {
                     <RootStack.Screen
                       name="BroadcastDetail"
                       component={BroadcastDetailScreen}
+                    />
+                    <RootStack.Screen
+                      name="ChannelHome"
+                      component={ChannelHomePage}
+                    />
+                    <RootStack.Screen
+                      name="ChannelContentDetail"
+                      component={ChannelContentDetailPage}
+                    />
+                    <RootStack.Screen
+                      name="LiveWatch"
+                      component={LiveWatchPage}
                     />
                     <RootStack.Screen
                       name="PartnerInsights"

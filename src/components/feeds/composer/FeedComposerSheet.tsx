@@ -33,18 +33,36 @@ import { EventComposerPage } from './pages/EventComposerPage';
 import { LinkComposerPage } from './pages/LinkComposerPage';
 import { TextComposerPage } from './pages/TextComposerPage';
 
+type ChannelComposerContext = {
+  channelId?: string;
+  channelHandle?: string;
+  channelName?: string;
+  contentType?: FeedComposerPayload['contentType'];
+  visibility?: string;
+  scheduledAt?: string | null;
+  playlistIds?: string[];
+  thumbnail?: string | null;
+  captions?: any;
+  embedAllowed?: boolean;
+};
+
 type Props = {
   visible: boolean;
   onClose: () => void;
   onSubmit: (payload: FeedComposerPayload) => Promise<void> | void;
+  channelContext?: ChannelComposerContext;
 };
 
 export default function FeedComposerSheet({
   visible,
   onClose,
   onSubmit,
+  channelContext,
 }: Props) {
   const { palette } = useKISTheme();
+  const channelLabel = channelContext?.channelHandle
+    ? `@${String(channelContext.channelHandle).replace(/^@/, '')}`
+    : channelContext?.channelName || '';
 
   const [step, setStep] = useState<'picker' | 'form'>('picker');
   const [type, setType] = useState<ComposerType>('text');
@@ -255,6 +273,22 @@ export default function FeedComposerSheet({
     }
 
     payload.composerType = type;
+    if (channelContext?.channelId) {
+      payload.channelId = channelContext.channelId;
+      payload.channel_id = channelContext.channelId;
+    }
+    payload.contentType = channelContext?.contentType || type;
+    payload.content_type = channelContext?.contentType || type;
+    payload.visibility = channelContext?.visibility || 'private';
+    payload.scheduledAt = channelContext?.scheduledAt || null;
+    payload.scheduled_at = channelContext?.scheduledAt || null;
+    payload.playlistIds = channelContext?.playlistIds || [];
+    payload.playlist_ids = channelContext?.playlistIds || [];
+    payload.thumbnail = channelContext?.thumbnail || videoThumbUri || null;
+    payload.thumbnail_url = channelContext?.thumbnail || videoThumbUri || null;
+    payload.captions = channelContext?.captions || undefined;
+    payload.embedAllowed = Boolean(channelContext?.embedAllowed);
+    payload.embed_allowed = Boolean(channelContext?.embedAllowed);
 
     setUploadingVideo(type === 'video' || type === 'short_video');
     setSubmitting(true);
@@ -277,6 +311,7 @@ export default function FeedComposerSheet({
     eventStartsAt,
     eventLocation,
     link,
+    channelContext,
     onSubmit,
     closeSheet,
   ]);
@@ -308,9 +343,16 @@ export default function FeedComposerSheet({
           {step === 'picker' ? (
             <>
               <View style={styles.sheetHeader} {...panHandlers}>
-                <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                  Create post
-                </Text>
+                <View style={styles.sheetTitleBlock}>
+                  <Text style={[styles.sheetTitle, { color: palette.text }]}>
+                    {channelLabel ? `Create in ${channelLabel}` : 'Create post'}
+                  </Text>
+                  {channelLabel ? (
+                    <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+                      This feed will be saved inside the selected channel.
+                    </Text>
+                  ) : null}
+                </View>
                 <Pressable onPress={closeSheet}>
                   <KISIcon name="close" size={20} color={palette.text} />
                 </Pressable>
@@ -358,9 +400,16 @@ export default function FeedComposerSheet({
                   <KISIcon name="arrow-left" size={18} color={palette.text} />
                 </Pressable>
 
-                <Text style={[styles.sheetTitle, { color: palette.text }]}>
-                  {options.find(o => o.key === type)?.label ?? 'Create post'}
-                </Text>
+                <View style={styles.sheetTitleBlock}>
+                  <Text style={[styles.sheetTitle, { color: palette.text }]}>
+                    {options.find(o => o.key === type)?.label ?? 'Create post'}
+                  </Text>
+                  {channelLabel ? (
+                    <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+                      Create in {channelLabel}
+                    </Text>
+                  ) : null}
+                </View>
 
                 <Pressable onPress={closeSheet}>
                   <KISIcon name="close" size={20} color={palette.text} />
@@ -386,7 +435,7 @@ export default function FeedComposerSheet({
                     fontWeight: '900',
                   }}
                 >
-                  {submitting ? 'Posting…' : 'Post'}
+                  {submitting ? 'Posting...' : channelLabel ? `Post to ${channelLabel}` : 'Post'}
                 </Text>
               </Pressable>
             </>
@@ -424,7 +473,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  sheetTitleBlock: { flex: 1, paddingHorizontal: 10 },
   sheetTitle: { fontSize: 16, fontWeight: '900' },
+  sheetSubtitle: { marginTop: 3, fontSize: 11, lineHeight: 15, fontWeight: '700' },
 
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   optionCard: {

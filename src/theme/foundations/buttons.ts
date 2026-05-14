@@ -25,7 +25,7 @@ export const createButtonStyles = (
   tokens: typeof KIS_TOKENS,
 ): ButtonRecipes => {
   const secondarySoft =
-    tone === 'dark' ? 'rgba(108,74,242,0.22)' : 'rgba(108,74,242,0.16)';
+    tone === 'dark' ? 'rgba(201,162,74,0.18)' : 'rgba(217,168,117,0.22)';
 
   const baseContainer: ViewStyle = {
     height: tokens.controlHeights.md,
@@ -45,7 +45,7 @@ export const createButtonStyles = (
 
   return {
     primary: {
-      container: { ...baseContainer, backgroundColor: palette.primary },
+      container: { ...baseContainer, backgroundColor: palette.primary, overflow: 'hidden' },
       text: { ...textBase, color: palette.onPrimary },
     },
     secondary: {
@@ -53,9 +53,9 @@ export const createButtonStyles = (
         ...baseContainer,
         backgroundColor: secondarySoft,
         borderWidth: 2,
-        borderColor: palette.secondary,
+        borderColor: palette.goldDeep,
       },
-      text: { ...textBase, color: palette.secondary },
+      text: { ...textBase, color: palette.goldDeep },
     },
     outline: {
       container: {

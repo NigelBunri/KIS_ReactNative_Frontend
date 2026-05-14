@@ -54,7 +54,7 @@ const formatPrice = (item: EducationContentItem) => {
   if (!pricing) return 'Pricing TBD';
   if (pricing.isFree) return 'Free';
   const amount = Number(pricing.amountCents || 0) / 100;
-  return `${pricing.currency || 'KISC'} ${amount.toLocaleString()}`;
+  return `${pricing.currency || 'USD'} ${amount.toLocaleString()}`;
 };
 
 const formatSchedule = (item: EducationContentItem) => {

@@ -19,7 +19,8 @@ import type { RootStackParamList } from '@/navigation/types';
 import type { RouteProp } from '@react-navigation/native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
-import { backendCentsToFrontendKisc, formatKiscAmount } from '@/utils/currency';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
+import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
 import {
   createDefaultAvailability,
   formatDateKey,
@@ -36,7 +37,7 @@ const FLOW_STEP = {
   SUCCESS: 2,
 } as const;
 
-const formatMoneyLabel = (value: number) => formatKiscAmount(value);
+const formatMoneyLabel = (value: number) => formatUsdAmount(value);
 
 const TIME_SLOT_START_HOUR = 8;
 const TIME_SLOT_END_HOUR = 20;
@@ -321,6 +322,15 @@ const ServiceBookingScreen = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingResult, setBookingResult] = useState<any>(null);
+
+  useEffect(() => {
+    if (!serviceId) return;
+    markMainTabNotificationSourceRead({
+      source: 'market',
+      targetType: 'shop_service',
+      targetId: serviceId,
+    }).catch(() => undefined);
+  }, [serviceId]);
 
   const dateOptions = useMemo(
     () => buildDateOptions(service, availability),
@@ -911,7 +921,7 @@ const ServiceBookingScreen = () => {
                                 {extractOptionPrice(pkg)
                                   ? `· ${extractOptionPrice(pkg).toFixed(
                                       2,
-                                    )} KISC`
+                                    )} USD`
                                   : ''}
                               </Text>
                             </Pressable>
@@ -964,7 +974,7 @@ const ServiceBookingScreen = () => {
                                 {extractOptionPrice(addon)
                                   ? `· ${extractOptionPrice(addon).toFixed(
                                       2,
-                                    )} KISC`
+                                    )} USD`
                                   : ''}
                               </Text>
                             </Pressable>
@@ -1401,9 +1411,9 @@ const ServiceBookingScreen = () => {
           style={{ color: palette.subtext, textAlign: 'center', maxWidth: 260 }}
         >
           {Number(bookingResult?.deposit_cents ?? 0) > 0
-            ? `Your wallet was charged ${formatKiscAmount(
-                backendCentsToFrontendKisc(bookingResult?.deposit_cents ?? 0),
-              )} and the shop owner has been notified.`
+            ? `Your USD payment request for ${formatUsdAmount(
+                backendCentsToUsd(bookingResult?.deposit_cents ?? 0),
+              )} is pending direct provider checkout, and the shop owner has been notified.`
             : 'Your booking request has been sent and the shop owner has been notified.'}
         </Text>
         <KISButton title="Done" onPress={() => navigation.goBack()} />
@@ -1703,7 +1713,7 @@ const ServiceBookingScreen = () => {
                 <Text key={name} style={{ color: palette.text, fontSize: 13 }}>
                   {name}{' '}
                   {extractOptionPrice(pkg)
-                    ? `· ${extractOptionPrice(pkg).toFixed(2)} KISC`
+                    ? `· ${extractOptionPrice(pkg).toFixed(2)} USD`
                     : ''}
                 </Text>
               );
@@ -1718,7 +1728,7 @@ const ServiceBookingScreen = () => {
                 <Text key={name} style={{ color: palette.text, fontSize: 13 }}>
                   {name}{' '}
                   {extractOptionPrice(addon)
-                    ? `· ${extractOptionPrice(addon).toFixed(2)} KISC`
+                    ? `· ${extractOptionPrice(addon).toFixed(2)} USD`
                     : ''}
                 </Text>
               );

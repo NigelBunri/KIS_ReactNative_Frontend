@@ -12,7 +12,9 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { KISPalette } from '@/theme/constants';
 import { marketStyles } from '@/screens/market/market.styles';
 import { resolveShopImageUri } from '@/utils/shopAssets';
-import { formatKiscAmount } from '@/utils/currency';
+import { formatUsdAmount } from '@/utils/currency';
+import { VerificationBadgeRow, VerificationStatusCard } from '@/components/verification';
+import { getVerificationSummary } from '@/services/verificationService';
 
 type MarketManagementModalProps = {
   palette: KISPalette;
@@ -24,6 +26,7 @@ type MarketManagementModalProps = {
   onEditShop: (shop: any) => void;
   onViewDashboard: (shop: any) => void;
   onOpenLandingBuilder?: (shop?: any) => void;
+  onOpenVerificationCenter?: (shop: any) => void;
   onRefresh?: () => void;
 };
 
@@ -54,6 +57,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
     onEditShop,
     onViewDashboard,
     onOpenLandingBuilder,
+    onOpenVerificationCenter,
     onRefresh,
   } = props;
 
@@ -139,7 +143,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
       { label: 'Members', value: totalMembers },
       {
         label: 'Revenue',
-        value: formatKiscAmount(totalRevenue, { decimals: 2 }),
+        value: formatUsdAmount(totalRevenue, { decimals: 2 }),
       },
     ],
     [shops.length, totalProducts, totalServices, totalMembers, totalRevenue],
@@ -182,6 +186,16 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
           <KISButton title="Create shop" onPress={onCreateShop} />
         </View>
       </View>
+      {shops.length ? (
+        <VerificationStatusCard
+          palette={palette}
+          summary={getVerificationSummary(shops[0])}
+          title="Shop verification center"
+          subtitle="Open a shop card below to submit private business evidence metadata."
+          onOpen={() => onOpenVerificationCenter?.(shops[0])}
+        />
+      ) : null}
+
       {loading && (
         <View
           style={[
@@ -330,6 +344,11 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                     <Text style={{ color: palette.subtext, fontSize: 12 }}>
                       {tagline}
                     </Text>
+                    <VerificationBadgeRow
+                      palette={palette}
+                      summary={getVerificationSummary(shop)}
+                      compact
+                    />
                   </View>
 
                   <View style={marketStyles.cardFooter}>
@@ -346,6 +365,12 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                         onPress={() => onEditShop(shop)}
                       />
                     ) : null}
+                    <KISButton
+                      title="Verification"
+                      size="xs"
+                      variant="outline"
+                      onPress={() => onOpenVerificationCenter?.(shop)}
+                    />
                   </View>
                   {onOpenLandingBuilder ? (
                     <Text

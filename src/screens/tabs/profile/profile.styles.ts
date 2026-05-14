@@ -251,7 +251,7 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 14,
     padding: 10,
-    borderColor: '#FF8A33',
+    borderColor: '#D9A875',
   },
   managementStatValue: {
     ...TYPOGRAPHY_PRESETS.title,

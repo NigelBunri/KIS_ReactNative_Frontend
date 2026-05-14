@@ -236,7 +236,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         />
 
         <TextInput
-          placeholder="Platform Margin Per Order (KISC)"
+          placeholder="Platform Margin Per Order (USD)"
           value={labMargin}
           keyboardType="numeric"
           onChangeText={setLabMargin}
@@ -258,7 +258,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
           <View key={test.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{test.name}</Text>
             <Text style={{ color: palette.subtext }}>
-              {toKiscLabel(test.price)} KISC • {test.turnaroundHours}h
+              {toKiscLabel(test.price)} USD • {test.turnaroundHours}h
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Test" variant="outline" onPress={() => editLabTest(test)} />
@@ -273,7 +273,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
 
         <TextInput placeholder="Test Name" value={newTestName} onChangeText={setNewTestName} style={input(palette, spacing)} />
         <TextInput
-          placeholder="Price (KISC)"
+          placeholder="Price (USD)"
           value={newTestPrice}
           keyboardType="numeric"
           onChangeText={setNewTestPrice}
@@ -360,7 +360,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
 
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Orders: {completedOrders}</Text>
-        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} KISC</Text>
+        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} USD</Text>
         <Text style={{ color: palette.text }}>
           Completion Rate: {totalOrders === 0 ? 0 : Math.round((completedOrders / totalOrders) * 100)}%
         </Text>

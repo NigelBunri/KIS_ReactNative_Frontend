@@ -22,11 +22,8 @@ import { collectProductImageUris } from '@/utils/productImages';
 import type { RootStackParamList } from '@/navigation/types';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { formatKiscAmount } from '@/utils/currency';
-import {
-  KIS_COIN_CODE,
-  KIS_TO_USD_RATE,
-} from '@/screens/market/market.constants';
 import {
   resolveShopDescription,
   resolveShopImageUri,
@@ -240,9 +237,6 @@ const BroadcastProductCard = ({
     Number.isFinite(salePriceValue) && salePriceValue < regularPriceValue
       ? salePriceValue
       : regularPriceValue;
-  const usdValue = Number.isFinite(displayPrice)
-    ? (displayPrice * KIS_TO_USD_RATE).toFixed(2)
-    : '0.00';
   const comparePriceValue = Number(
     product.compare_at_price ??
       product.compareAtPrice ??
@@ -496,31 +490,25 @@ const BroadcastProductCard = ({
                 <Text
                   style={[styles.priceTag, { color: palette.primaryStrong }]}
                 >
-                  {formatKiscAmount(displayPrice, {
-                    suffix: product.currency ?? KIS_COIN_CODE,
-                  })}
+                  {formatKiscAmount(displayPrice, { suffix: 'USD' })}
                 </Text>
                 {showSalePrice ? (
                   <Text
                     style={[styles.originalPrice, { color: palette.subtext }]}
                   >
-                    {formatKiscAmount(regularPriceValue, {
-                      suffix: product.currency ?? KIS_COIN_CODE,
-                    })}
+                    {formatKiscAmount(regularPriceValue, { suffix: 'USD' })}
                   </Text>
                 ) : null}
               </View>
               {hasComparePrice ? (
                 <Text style={[styles.comparePrice, { color: palette.subtext }]}>
                   Compare at{' '}
-                  {formatKiscAmount(comparePriceValue, {
-                    suffix: product.currency ?? KIS_COIN_CODE,
-                  })}
+                  {formatKiscAmount(comparePriceValue, { suffix: 'USD' })}
                 </Text>
               ) : null}
             </View>
             <Text style={[styles.secondaryText, { color: palette.text }]}>
-              ≈ ${usdValue} USD
+              USD direct checkout
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -706,9 +694,6 @@ const BroadcastServiceCard = ({
   }, [service.id, primaryImage]);
 
   const priceValue = Number(service.price ?? 0);
-  const usdValue = Number.isFinite(priceValue)
-    ? (priceValue * KIS_TO_USD_RATE).toFixed(2)
-    : '0.00';
   const comparePriceValue = Number(
     service.compare_at_price ??
       service.compareAtPrice ??
@@ -904,19 +889,15 @@ const BroadcastServiceCard = ({
             >
               <Text
                 style={[styles.priceTag, { color: palette.primaryStrong }]}
-              >{`${priceValue.toFixed(2)} ${
-                service.currency ?? KIS_COIN_CODE
-              }`}</Text>
+              >{`USD ${priceValue.toFixed(2)}`}</Text>
               {hasComparePrice ? (
                 <Text style={[styles.comparePrice, { color: palette.subtext }]}>
-                  {`${comparePriceValue.toFixed(2)} ${
-                    service.currency ?? KIS_COIN_CODE
-                  }`}
+                  {`USD ${comparePriceValue.toFixed(2)}`}
                 </Text>
               ) : null}
             </View>
             <Text style={[styles.secondaryText, { color: palette.text }]}>
-              ≈ ${usdValue} USD
+              USD direct checkout
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -1186,6 +1167,11 @@ export default function BroadcastMarketPage({
   const openLandingForShop = useCallback(
     async (shopId?: string, shopName?: string) => {
       if (!shopId) return;
+      markMainTabNotificationSourceRead({
+        source: 'market',
+        targetType: 'shop',
+        targetId: shopId,
+      }).catch(() => undefined);
       const shopDetail =
         (await fetchShopDetail(shopId)) ?? shopDetailCache[shopId];
       const shopData = shopDetail ?? shopDetailCache[shopId];

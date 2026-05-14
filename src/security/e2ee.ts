@@ -306,6 +306,10 @@ type DeviceBundle = {
   registration_id?: number | null;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value?: string | null) => UUID_RE.test(String(value ?? ''));
+
 const buildSessionForBundle = async (bundle: DeviceBundle) => {
   const address = getAddress(bundle.user_id, bundle.device_id);
   const preKeyBundle = {
@@ -336,6 +340,9 @@ const buildSessionForBundle = async (bundle: DeviceBundle) => {
 };
 
 const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle[]> => {
+  if (!isUuid(recipientUserId)) {
+    throw new Error('Invalid E2EE recipient user id');
+  }
   const deviceId = await ensureDeviceId();
   logE2EE('ensureSession:start', { recipientUserId, deviceId });
   const bundlesRes = await getRequest(
@@ -416,7 +423,11 @@ export const encryptPayloadForRecipients = async (
 ) => {
   const plaintext = JSON.stringify(payload);
   const senderDeviceId = await ensureDeviceId();
-  const uniqueIds = Array.from(new Set([senderUserId, ...recipientUserIds])).filter(Boolean);
+  const uniqueIds = Array.from(new Set([senderUserId, ...recipientUserIds]))
+    .filter((uid) => isUuid(uid));
+  if (!uniqueIds.length) {
+    throw new Error('Missing valid E2EE recipient user ids');
+  }
   const recipients: Array<{ userId: string; deviceId: string; type: number; ciphertext: string }> = [];
 
   for (const uid of uniqueIds) {

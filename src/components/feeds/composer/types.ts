@@ -87,6 +87,20 @@ export type FeedComposerPayload = {
   event?: any;
   link?: string;
   composerType?: ComposerType;
+  channelId?: string;
+  channel_id?: string;
+  contentType?: ComposerType | 'rich_text' | 'live_stream' | 'gallery';
+  content_type?: ComposerType | 'rich_text' | 'live_stream' | 'gallery';
+  visibility?: 'public' | 'unlisted' | 'private' | string;
+  scheduledAt?: string | null;
+  scheduled_at?: string | null;
+  playlistIds?: string[];
+  playlist_ids?: string[];
+  thumbnail?: string | null;
+  thumbnail_url?: string | null;
+  captions?: any;
+  embedAllowed?: boolean;
+  embed_allowed?: boolean;
 };
 
 export type AttachmentLike = {

@@ -16,6 +16,20 @@ export type RootStackParamList = {
     items?: any[];
     index?: number;
   };
+  ChannelHome: {
+    channelId?: string;
+    handle?: string;
+    channel?: any;
+  };
+  ChannelContentDetail: {
+    contentId: string;
+    item?: any;
+    channel?: any;
+  };
+  LiveWatch: {
+    streamId: string;
+    stream?: any;
+  };
   PartnerInsights: undefined;
   AdminTools: undefined;
   AdminDashboard: { target: string; title: string };

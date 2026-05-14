@@ -131,7 +131,7 @@ export default function HomeLogisticsManager() {
           onPress={() => setEngineEnabled(!engineEnabled)}
           variant="outline"
         />
-        <TextInput placeholder="Default Fee (KISC)" value={defaultFee} keyboardType="numeric" onChangeText={setDefaultFee} style={input(palette, spacing)} />
+        <TextInput placeholder="Default Fee (USD)" value={defaultFee} keyboardType="numeric" onChangeText={setDefaultFee} style={input(palette, spacing)} />
         <TextInput placeholder="Max Active Requests" value={maxActive} keyboardType="numeric" onChangeText={setMaxActive} style={input(palette, spacing)} />
         <KISButton title={autoAssign ? "Disable Auto-Assign Staff" : "Enable Auto-Assign Staff"} onPress={() => setAutoAssign(!autoAssign)} variant="outline" />
       </View>
@@ -177,7 +177,7 @@ export default function HomeLogisticsManager() {
         {requests.map(r => (
           <View key={r.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{r.patientName} ({r.type})</Text>
-            <Text style={{ color: palette.subtext }}>Priority: {r.priority} • Status: {r.status} • Assigned: {r.assignedStaff || "Unassigned"} • Fee: {r.price} KISC</Text>
+            <Text style={{ color: palette.subtext }}>Priority: {r.priority} • Status: {r.status} • Assigned: {r.assignedStaff || "Unassigned"} • Fee: {r.price} USD</Text>
             {["Requested", "Assigned", "En Route", "Completed", "Cancelled"].map(s => (
               <KISButton key={s} title={s} onPress={() => updateRequestStatus(r.id, s as ServiceStatus)} variant="outline" />
             ))}
@@ -191,7 +191,7 @@ export default function HomeLogisticsManager() {
         <Text style={{ color: palette.text }}>Total Requests: {totalServices}</Text>
         <Text style={{ color: palette.text }}>Active Requests: {activeServices}</Text>
         <Text style={{ color: palette.text }}>Completed Requests: {completedServices}</Text>
-        <Text style={{ color: palette.text }}>Revenue Generated: {revenue} KISC</Text>
+        <Text style={{ color: palette.text }}>Revenue Generated: {revenue} USD</Text>
       </View>
 
     </ScrollView>

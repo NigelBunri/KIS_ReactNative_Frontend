@@ -22,7 +22,13 @@ import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import DocumentPicker from 'react-native-document-picker';
 import { getUserData } from '@/network/cache';
-import { backendCentsToFrontendKisc, formatKiscAmount } from '@/utils/currency';
+import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
+import {
+  getDirectPaymentInfo,
+  isProviderPaymentFailed,
+  isProviderPaymentPending,
+  openDirectPaymentUrl,
+} from '@/utils/directPaymentHandoff';
 import {
   createDefaultAvailability,
   formatDateKey,
@@ -31,8 +37,8 @@ import {
   ServiceAvailability,
 } from './availabilityUtils';
 
-const formatKisc = (value: number | null | undefined) => {
-  return formatKiscAmount(backendCentsToFrontendKisc(value));
+const formatUsd = (value: number | null | undefined) => {
+  return formatUsdAmount(backendCentsToUsd(value));
 };
 
 const formatDurationLabel = (ms: number) => {
@@ -380,6 +386,7 @@ const ServiceBookingDetailsPage = () => {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [paymentOpening, setPaymentOpening] = useState(false);
   const [receiptLinks, setReceiptLinks] = useState<{
     pdf?: string;
     page?: string;
@@ -1137,12 +1144,12 @@ const ServiceBookingDetailsPage = () => {
   const balanceAmountCents = Number.isFinite(Number(booking?.balance_cents))
     ? booking?.balance_cents ?? 0
     : Math.max((booking?.price_cents ?? 0) - depositAmountCents, 0);
-  const remainingAmountLabel = formatKisc(balanceAmountCents);
-  const amount = formatKisc(
+  const remainingAmountLabel = formatUsd(balanceAmountCents);
+  const amount = formatUsd(
     booking?.price_cents ?? payment?.amount_cents ?? depositAmountCents,
   );
-  const depositAmountLabel = formatKisc(depositAmountCents);
-  const currency = payment?.currency ?? 'KISC';
+  const depositAmountLabel = formatUsd(depositAmountCents);
+  const currency = payment?.currency ?? 'USD';
   const durationText = booking?.service_details?.duration_minutes
     ? `${booking.service_details.duration_minutes} min`
     : 'Duration TBD';
@@ -1169,6 +1176,33 @@ const ServiceBookingDetailsPage = () => {
       : paymentStatusValue === 'failed' || paymentStatusValue === 'refunded'
       ? palette.error ?? palette.warning
       : palette.success;
+  const directPayment = getDirectPaymentInfo(payment, booking);
+  const directPaymentPending = isProviderPaymentPending(directPayment.status || paymentStatusValue);
+  const directPaymentFailed = isProviderPaymentFailed(directPayment.status || paymentStatusValue);
+
+  const openBookingCheckout = useCallback(async () => {
+    if (!directPayment.paymentUrl) {
+      Alert.alert(
+        'Payment pending',
+        directPayment.reference
+          ? `Payment reference ${directPayment.reference} is waiting for a provider checkout link. Refresh after the provider link is ready.`
+          : 'This booking is waiting for a provider checkout link. Refresh after the provider link is ready.',
+      );
+      return;
+    }
+    setPaymentOpening(true);
+    try {
+      const opened = await openDirectPaymentUrl(directPayment.paymentUrl);
+      if (!opened) {
+        throw new Error('Unable to open the secure checkout link on this device.');
+      }
+      Alert.alert('Checkout opened', 'Return to KIS after payment, then refresh this booking.');
+    } catch (e: any) {
+      Alert.alert('Checkout', e?.message || 'Unable to open checkout.');
+    } finally {
+      setPaymentOpening(false);
+    }
+  }, [directPayment.paymentUrl, directPayment.reference]);
 
   const handlePayRemaining = useCallback(() => {
     if (!bookingId || balanceAmountCents <= 0) return;
@@ -1192,7 +1226,7 @@ const ServiceBookingDetailsPage = () => {
                   res?.message || 'Unable to complete the remaining payment.',
                 );
               }
-              Alert.alert('Booking', 'Remaining payment completed.');
+              Alert.alert('Booking', 'Payment request updated. Open secure checkout when the provider link is available.');
               loadBooking();
             } catch (e: any) {
               Alert.alert(
@@ -1572,7 +1606,7 @@ const ServiceBookingDetailsPage = () => {
             >
               <Text style={{ color: palette.text }}>Requested price</Text>
               <Text style={{ color: palette.text, fontWeight: '600' }}>
-                {formatKiscAmount(Number(bookingMetadata.requested_price))}
+                {formatUsdAmount(Number(bookingMetadata.requested_price))}
               </Text>
             </View>
           ) : null}
@@ -1875,8 +1909,13 @@ const ServiceBookingDetailsPage = () => {
           <View style={{ marginTop: 6 }}>
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
               Reference ·{' '}
-              {payment?.transaction_reference || booking?.payment_tx_ref || '—'}
+              {directPayment.reference || payment?.transaction_reference || booking?.payment_tx_ref || '—'}
             </Text>
+            {directPayment.intentId ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Intent · {directPayment.intentId}
+              </Text>
+            ) : null}
             {payment?.notes ? (
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
                 Notes · {payment.notes}
@@ -1891,6 +1930,20 @@ const ServiceBookingDetailsPage = () => {
               flexWrap: 'wrap',
             }}
           >
+            {(directPaymentPending || directPaymentFailed) && (
+              <KISButton
+                title={paymentOpening ? 'Opening checkout…' : 'Open secure checkout'}
+                size="sm"
+                onPress={openBookingCheckout}
+                loading={paymentOpening}
+                disabled={paymentOpening || !directPayment.paymentUrl}
+              />
+            )}
+            {directPaymentPending && !directPayment.paymentUrl ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                Checkout link is not available yet. Refresh after the provider link is ready.
+              </Text>
+            ) : null}
             {showCompletePaymentButton && (
               <KISButton
                 title="Complete payment"

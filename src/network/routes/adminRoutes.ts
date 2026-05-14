@@ -61,6 +61,8 @@ const adminRoutes = {
     deviceTokenRegister: `${API_BASE_URL}/api/v1/notification-device-tokens/register/`,
     deviceTokenUnregister: `${API_BASE_URL}/api/v1/notification-device-tokens/unregister/`,
     unreadCount: `${API_BASE_URL}/api/v1/notifications/unread-count/`,
+    mainTabBadgeCounts: `${API_BASE_URL}/api/v1/notifications/main-tab-badge-counts/`,
+    markSourceRead: `${API_BASE_URL}/api/v1/notifications/mark-source-read/`,
     markAllRead: `${API_BASE_URL}/api/v1/notifications/mark-all-read/`,
   },
 };

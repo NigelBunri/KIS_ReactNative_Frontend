@@ -24,7 +24,7 @@ import { getAccessToken } from '@/security/authStorage';
 import type { RootStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteShopCart } from '@/screens/market/cart/shopCartManager';
-import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
+import { backendOrderTotalToUsd } from '@/utils/currency';
 
 type MyOrdersNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -160,8 +160,8 @@ export default function MyOrdersPage() {
   }, []);
 
   const renderOrder = ({ item }: { item: MarketplaceOrder }) => {
-    const total = backendOrderTotalToFrontendKisc(item.total_amount);
-    const currency = item.currency ?? 'KISC';
+    const total = backendOrderTotalToUsd(item.total_amount);
+    const currency = 'USD';
     const status = statusLabel(item);
     const canCancel = item.status === 'temporal';
     const canSatisfy =

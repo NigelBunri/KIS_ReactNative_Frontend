@@ -363,6 +363,15 @@ export default function UpdatesTab({
     };
   }, []);
 
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('status.create', () => {
+      openStatusComposer();
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [openStatusComposer]);
+
   const statuses = useMemo(() => {
     if (!searchTerm.trim())
       return statusUsers.length ? statusUsers : SAMPLE_STATUSES;

@@ -46,7 +46,7 @@ const MARKET_DIFFERENTIATORS = [
   'Auto-pricing alerts when competitors discount similar goods',
   'Custom storefront theming per shop',
   'Flash sale scheduling with countdown timers',
-  'Multi-currency display + automatic conversion hints',
+  'USD-only pricing with secure Flutterwave checkout',
   'Bundled products (kits and collections)',
   'Customer reviews + verified order badges',
   'Dynamic shipping estimate builder',
@@ -116,7 +116,7 @@ const MARKET_PLATFORM_FEATURES = [
   'Lesson + product bundles (course kits)',
   'Shop membership tiers',
   'Auto-approve join policy UI',
-  'Multi-currency display hint chip',
+  'USD checkout readiness hint chip',
   'Insights shortcut + KPI cards',
 ] as const;
 
@@ -348,7 +348,7 @@ export default function MarketStudioSection({
       setProductForm({
         name: editingProduct.name,
         price: String(editingProduct.price),
-        currency: editingProduct.currency || 'USD',
+        currency: 'USD',
         description: editingProduct.description || '',
         stock: String(editingProduct.stock_qty ?? 0),
       });
@@ -423,7 +423,7 @@ export default function MarketStudioSection({
     form.append('name', productForm.name.trim());
     form.append('description', productForm.description.trim());
     form.append('price', productForm.price.trim());
-    form.append('currency', (productForm.currency || 'USD').trim() || 'USD');
+    form.append('currency', 'USD');
     const stockQty = Math.max(0, Number(productForm.stock || 0));
     form.append('stock_qty', String(Number.isFinite(stockQty) ? Math.floor(stockQty) : 0));
 
@@ -504,7 +504,7 @@ export default function MarketStudioSection({
     setProductForm({
       name: product.name,
       price: String(product.price),
-      currency: product.currency || 'USD',
+      currency: 'USD',
       description: product.description || '',
       stock: String(product.stock_qty ?? 0),
     });
@@ -741,7 +741,7 @@ export default function MarketStudioSection({
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: palette.text, fontWeight: '900' }}>{product.name}</Text>
                   <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    {product.price} {product.currency}
+                    USD {product.price}
                   </Text>
                   <Text style={{ color: palette.subtext, fontSize: 11 }}>
                     Shop: {product.shop_name ?? 'Independent'} · Stock: {product.stock_qty ?? 0}
@@ -975,11 +975,7 @@ export default function MarketStudioSection({
           onChangeText={(t) => setProductForm((prev) => ({ ...prev, price: t }))}
           keyboardType="numeric"
         />
-        <KISTextInput
-          label="Currency"
-          value={productForm.currency}
-          onChangeText={(t) => setProductForm((prev) => ({ ...prev, currency: t }))}
-        />
+        <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700' }}>Currency is fixed to USD. Payments are processed through Flutterwave.</Text>
 
         <KISTextInput
           label="Stock"
@@ -1034,7 +1030,7 @@ export default function MarketStudioSection({
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: palette.text, fontWeight: '900' }}>{product.name}</Text>
                   <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    {product.price} {product.currency} · Stock: {product.stock_qty ?? 0}
+                    USD {product.price} · Stock: {product.stock_qty ?? 0}
                   </Text>
                 </View>
 

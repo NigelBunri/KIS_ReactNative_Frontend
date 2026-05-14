@@ -113,8 +113,7 @@ export const visibilityDescriptions: Record<string, string> = {
 };
 
 export const walletModes = [
-  { value: 'add_kisc', label: 'Add KIS Coins' },
-  { value: 'transfer', label: 'Send KIS Coins' },
+  { value: 'history', label: 'Credit history' },
 ];
 
 export const paymentProviders = [

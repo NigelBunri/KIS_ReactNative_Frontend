@@ -50,13 +50,6 @@ export default function TrendingClipsSection({
 
   return (
     <View
-      style={{
-        borderWidth: 2,
-        borderColor: palette.divider,
-        borderRadius: 22,
-        backgroundColor: palette.card,
-        paddingVertical: 10,
-      }}
     >
       <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
         <SectionHeader

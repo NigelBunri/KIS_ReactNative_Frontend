@@ -255,7 +255,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           variant="outline"
         />
         <TextInput
-          placeholder="Default Markup (KISC)"
+          placeholder="Default Markup (USD)"
           value={defaultMarkup}
           keyboardType="numeric"
           onChangeText={setDefaultMarkup}
@@ -284,7 +284,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
               {med.name} ({med.category})
             </Text>
             <Text style={{ color: palette.subtext }}>
-              Stock: {med.stock} • Price: {toKiscLabel(med.price)} KISC • Exp: {med.expiryDate}
+              Stock: {med.stock} • Price: {toKiscLabel(med.price)} USD • Exp: {med.expiryDate}
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Medication" variant="outline" onPress={() => editMedication(med)} />
@@ -317,7 +317,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           style={input(palette, spacing)}
         />
         <TextInput
-          placeholder="Price (KISC)"
+          placeholder="Price (USD)"
           value={newMed.price}
           keyboardType="numeric"
           onChangeText={(text) => setNewMed((prev) => ({ ...prev, price: text }))}
@@ -386,7 +386,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           <View key={order.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{order.patientName}</Text>
             <Text style={{ color: palette.subtext }}>
-              Priority: {order.priority} • Status: {order.status} • Price: {toKiscLabel(order.totalPrice)} KISC
+              Priority: {order.priority} • Status: {order.status} • Price: {toKiscLabel(order.totalPrice)} USD
             </Text>
             {['Pending', 'Processing', 'Ready', 'Delivered', 'Cancelled'].map((statusValue) => (
               <KISButton
@@ -406,7 +406,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         <Text style={{ color: palette.text }}>Out of Stock: {outOfStock}</Text>
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Orders: {completedOrders}</Text>
-        <Text style={{ color: palette.text }}>Revenue: {toKiscLabel(revenue)} KISC</Text>
+        <Text style={{ color: palette.text }}>Revenue: {toKiscLabel(revenue)} USD</Text>
       </View>
     </ScrollView>
   );

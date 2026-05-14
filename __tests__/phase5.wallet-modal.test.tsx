@@ -45,77 +45,57 @@ const palette: any = {
   danger: '#F04438',
 };
 
-describe('WalletModal transfer verification gating', () => {
-  test('keeps submit disabled until receiver is verified', () => {
+describe('WalletModal promotional-credit safety copy', () => {
+  test('renders read-only promotional-credit wording', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
         <WalletModal
           palette={palette}
           walletForm={{
-            mode: 'transfer',
-            amount: '1',
-            recipient: '699123456',
+            mode: 'history',
+            amount: '',
+            recipient: '',
             reference: '',
           }}
           setWalletForm={jest.fn()}
           saving={false}
-          walletRecipientVerification={{
-            checking: false,
-            verified: false,
-            recipientName: '',
-            recipientPhoneDisplay: '',
-            error: '',
-          }}
         />,
       );
     });
-
-    const submit = tree!.root.findByProps({ testID: 'kis-button-Submit' });
-    expect(submit.props.disabled).toBe(true);
-  });
-
-  test('enables submit and shows receiver info after verification', () => {
-    let tree: ReactTestRenderer.ReactTestRenderer;
-    ReactTestRenderer.act(() => {
-      tree = ReactTestRenderer.create(
-        <WalletModal
-          palette={palette}
-          walletForm={{
-            mode: 'transfer',
-            amount: '1',
-            recipient: '699123456',
-            reference: '',
-          }}
-          setWalletForm={jest.fn()}
-          saving={false}
-          walletRecipientVerification={{
-            checking: false,
-            verified: true,
-            recipientName: 'Receiver Name',
-            recipientPhoneDisplay: '+237699123456',
-            error: '',
-          }}
-        />,
-      );
-    });
-
-    const submit = tree!.root.findByProps({ testID: 'kis-button-Submit' });
-    expect(submit.props.disabled).toBe(false);
 
     const texts = tree!.root.findAllByType(Text).map(node => {
       const value = node.props.children;
       return Array.isArray(value) ? value.join('') : String(value);
     });
     expect(
-      texts.some(
-        value => value.includes('Receiver:') && value.includes('Receiver Name'),
-      ),
+      texts.some(value => value.includes('cannot be bought, transferred, withdrawn, sold, or converted to cash')),
     ).toBe(true);
-    expect(
-      texts.some(
-        value => value.includes('Number:') && value.includes('+237699123456'),
-      ),
-    ).toBe(true);
+    expect(texts.some(value => value.includes('Read-only credit center'))).toBe(true);
+  });
+
+  test('explains legacy wallet actions are unavailable', () => {
+    let tree: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      tree = ReactTestRenderer.create(
+        <WalletModal
+          palette={palette}
+          walletForm={{
+            mode: 'transfer',
+            amount: '1',
+            recipient: '699123456',
+            reference: '',
+          }}
+          setWalletForm={jest.fn()}
+          saving={false}
+        />,
+      );
+    });
+
+    const texts = tree!.root.findAllByType(Text).map(node => {
+      const value = node.props.children;
+      return Array.isArray(value) ? value.join('') : String(value);
+    });
+    expect(texts.some(value => value.includes('This wallet action is unavailable'))).toBe(true);
   });
 });

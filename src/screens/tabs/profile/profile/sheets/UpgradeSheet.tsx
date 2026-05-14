@@ -1,28 +1,23 @@
 // src/screens/tabs/profile/profile/sheets/UpgradeSheet.tsx
 import React from 'react';
-import { Image, Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISText from '@/components/common/KISText';
 import { KISIcon } from '@/constants/kisIcons';
 import { styles } from '../../profile.styles';
 import { tierMetaFor } from '../tierMeta';
-import kisCoin from '../../../../../assets/KIS-Coin.png';
-
 const PARTNER_PRO_HIGHLIGHTS = [
   'Unlimited partner organizations, automation, and integrations',
   'Advanced partner analytics + compliance dashboards, exports, and access reviews',
   'Priority partner webhooks, automation rules, and fraud insights',
   'Partner-grade studio routing for broadcasts, lessons, and market drops',
 ];
-const CENTS_PER_KISC = 100;
-
-const toKiscAmount = (amountCents: unknown, withSign = false) => {
+const formatUsd = (amountCents: unknown, withSign = false) => {
   const cents = Number(amountCents);
-  if (!Number.isFinite(cents)) return '0.000 KISC';
+  if (!Number.isFinite(cents)) return '$0.00';
   const sign = withSign && cents < 0 ? '-' : '';
-  const kisc = (Math.abs(cents) / CENTS_PER_KISC).toFixed(2);
-  return `${sign}${kisc} KISC`;
+  return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
 };
 
 export default function UpgradeSheet(props: {
@@ -168,7 +163,7 @@ export default function UpgradeSheet(props: {
           Compare plans
         </Text>
         <Text style={{ color: palette.subtext, fontSize: 12 }}>
-          Pick a tier that fits your growth. Upgrades apply instantly after KIS Coin confirmation.
+          Pick a tier that fits your growth. Paid upgrades use secure USD checkout through Flutterwave. Promotional credits may subsidize eligible upgrades when available.
         </Text>
       </View>
 
@@ -347,9 +342,8 @@ export default function UpgradeSheet(props: {
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={kisCoin} style={{ width: 16, height: 16 }} />
                     <Text style={[styles.tierPrice, { color: palette.text }]}>
-                      {toKiscAmount(tier.price_cents)}
+                      {formatUsd(tier.price_cents)}
                     </Text>
                     <Text style={[styles.tierTagline, { color: palette.subtext, marginTop: 0 }]}>/mo</Text>
                   </View>
@@ -434,11 +428,7 @@ export default function UpgradeSheet(props: {
                 </KISText>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
                   <KISText preset="helper" color={palette.subtext}>
-                    {tx.status || 'pending'} ·
-                  </KISText>
-                  <Image source={kisCoin} style={{ width: 12, height: 12 }} />
-                  <KISText preset="helper" color={palette.subtext}>
-                    {toKiscAmount(tx.amount_cents, true)}
+                    {tx.status || 'pending'} · {formatUsd(tx.amount_cents, true)}
                   </KISText>
                 </View>
                 {toTransactionCounterparty(tx) ? (

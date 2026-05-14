@@ -17,6 +17,12 @@ import PartnerCoursesSection from './center/PartnerCoursesSection';
 import PartnerGroupsSection from './center/PartnerGroupsSection';
 import PartnerHeaderSection from './center/PartnerHeaderSection';
 import { KISIcon } from '@/constants/kisIcons';
+import {
+  VerificationBadgeRow,
+  VerificationCenterSheet,
+  VerificationStatusCard,
+} from '@/components/verification';
+import { getVerificationSummary } from '@/services/verificationService';
 
 type Props = {
   selectedPartner: Partner;
@@ -62,6 +68,11 @@ export default function PartnersCenterPane({
     groups: false,
     communities: false,
   });
+  const [verificationVisible, setVerificationVisible] = useState(false);
+  const partnerVerificationSummary = useMemo(
+    () => getVerificationSummary(selectedPartner),
+    [selectedPartner],
+  );
 
   const sectionHeaders = useMemo(
     () => ({
@@ -126,6 +137,18 @@ export default function PartnersCenterPane({
           partner={selectedPartner}
           onPress={onPartnerHeaderPress}
         />
+        <VerificationStatusCard
+          palette={palette}
+          summary={partnerVerificationSummary}
+          title="Partner verification"
+          subtitle="Submit company registration, representative authorization, and beneficial-owner references."
+          onOpen={() => setVerificationVisible(true)}
+        />
+        <VerificationBadgeRow
+          palette={palette}
+          summary={partnerVerificationSummary}
+          compact
+        />
         <PartnerAdminsStrip admins={selectedPartner?.admins ?? []} />
 
         {/* General feed */}
@@ -162,7 +185,7 @@ export default function PartnersCenterPane({
               styles.groupRow,
               {
                 backgroundColor: palette.surface,
-                borderColor: 'rgba(255,138,51,0.24)',
+                borderColor: palette.goldLight,
                 shadowColor: palette.shadow ?? '#000',
                 opacity: pressed ? 0.8 : 1,
                 transform: [{ scale: pressed ? 0.985 : 1 }],
@@ -351,6 +374,15 @@ export default function PartnersCenterPane({
           </>
         )}
       </ScrollView>
+      <VerificationCenterSheet
+        visible={verificationVisible}
+        palette={palette}
+        subject={{ type: 'partner', id: selectedPartner?.id }}
+        title="Partner verification"
+        subtitle="Submit private company evidence references for staff/provider review."
+        initialSummary={partnerVerificationSummary}
+        onClose={() => setVerificationVisible(false)}
+      />
     </Animated.View>
   );
 }

@@ -16,10 +16,6 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
-import {
-  KIS_COIN_CODE,
-  KIS_TO_USD_RATE,
-} from '@/screens/market/market.constants';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
@@ -41,6 +37,7 @@ import {
   collectProductImageUris,
   resolveProductImageUri,
 } from '@/utils/productImages';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 
 const normalizeListInput = (value?: string[] | string | null) => {
   if (!value) return [];
@@ -406,9 +403,7 @@ export default function ProductDetailsPage() {
       entries.push({ label: 'Inventory type', value: product.inventory_type });
     }
 
-    if (product?.currency) {
-      entries.push({ label: 'Currency', value: product.currency });
-    }
+    entries.push({ label: 'Currency', value: 'USD' });
 
     if (product?.price !== undefined && product?.price !== null) {
       entries.push({ label: 'Base price', value: `${product.price}` });
@@ -678,6 +673,11 @@ export default function ProductDetailsPage() {
   useEffect(() => {
     if (!product?.id) return;
     void incrementProductViewCount(String(product.id));
+    markMainTabNotificationSourceRead({
+      source: 'market',
+      targetType: 'product',
+      targetId: String(product.id),
+    }).catch(() => undefined);
   }, [product?.id]);
   useEffect(() => {
     if (quantityLimit <= 0) {
@@ -1107,32 +1107,26 @@ export default function ProductDetailsPage() {
             <View style={styles.priceRow}>
               <View>
                 <Text style={[styles.price, { color: palette.primaryStrong }]}>
-                  {`${displayPrice.toFixed(2)} ${
-                    product.currency ?? KIS_COIN_CODE
-                  }`}
+                  {`USD ${displayPrice.toFixed(2)}`}
                 </Text>
                 {showSalePrice ? (
                   <Text
                     style={[styles.originalPrice, { color: palette.subtext }]}
                   >
-                    {`${variantBasePrice.toFixed(2)} ${
-                      product.currency ?? KIS_COIN_CODE
-                    }`}
+                    {`USD ${variantBasePrice.toFixed(2)}`}
                   </Text>
                 ) : null}
               </View>
 
               {comparePrice > displayPrice ? (
                 <Text style={[styles.comparePrice, { color: palette.subtext }]}>
-                  {`${comparePrice.toFixed(2)} ${
-                    product.currency ?? KIS_COIN_CODE
-                  }`}
+                  {`USD ${comparePrice.toFixed(2)}`}
                 </Text>
               ) : null}
             </View>
 
             <Text style={[styles.usdText, { color: palette.subtext }]}>
-              ≈ ${(displayPrice * KIS_TO_USD_RATE).toFixed(2)} USD
+              USD direct checkout
             </Text>
           </View>
 
@@ -1588,9 +1582,7 @@ export default function ProductDetailsPage() {
                             { color: palette.primaryStrong },
                           ]}
                         >
-                          {`${variantPrice.toFixed(2)} ${
-                            product.currency ?? KIS_COIN_CODE
-                          }`}
+                          {`USD ${variantPrice.toFixed(2)}`}
                         </Text>
                         <Text
                           style={[

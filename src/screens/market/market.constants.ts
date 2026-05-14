@@ -1,6 +1,7 @@
-export const KIS_COIN_CODE = 'KISC';
-export const KIS_COIN_LABEL = 'KIS Coin';
-export const KIS_TO_USD_RATE = 100;
+export const KIS_COIN_CODE = 'USD';
+export const KIS_COIN_LABEL = 'USD';
+export const KIS_TO_USD_RATE = 1; // compatibility only; new commerce prices are USD-first
+export const MARKET_PAYMENT_PROVIDER_LABEL = 'Flutterwave';
 
 export const CATEGORY_SELECTION_LIMIT = 5;
 

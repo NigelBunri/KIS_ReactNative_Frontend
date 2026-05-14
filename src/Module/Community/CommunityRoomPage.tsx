@@ -13,6 +13,7 @@ import { loadMessages } from '@/Module/ChatRoom/Storage/chatStorage';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import { styles as chatListStyles } from '@/Module/ChatRoom/messagesUtils';
 import { KISIcon } from '@/constants/kisIcons';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
@@ -91,6 +92,15 @@ export default function CommunityRoomPage({
     loadCommunityData();
   }, [loadCommunityData]);
 
+  useEffect(() => {
+    if (!community?.id) return;
+    markMainTabNotificationSourceRead({
+      source: 'partners',
+      targetType: 'partner_community',
+      targetId: community.id,
+    }).catch(() => undefined);
+  }, [community?.id]);
+
   const loadMetaFor = useCallback(async (groupIds: string[]) => {
     const next: Record<string, { lastAt?: string; lastMessage?: string }> = {};
     await Promise.all(
@@ -135,6 +145,11 @@ export default function CommunityRoomPage({
 
   const openGroupChat = (group: Group) => {
     if (!group.conversation_id) return;
+    markMainTabNotificationSourceRead({
+      source: 'partners',
+      targetType: 'partner_group',
+      targetId: group.id,
+    }).catch(() => undefined);
     onOpenChat({
       id: String(group.conversation_id),
       conversationId: String(group.conversation_id),

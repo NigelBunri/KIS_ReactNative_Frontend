@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   Pressable,
-  Platform,
   Animated,
   Alert,
   Easing,
@@ -20,6 +19,7 @@ import {
   Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   createMaterialTopTabNavigator,
@@ -30,7 +30,8 @@ import { KIS_TOKENS } from '../../theme/constants';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
 import { KISIcon } from '@/constants/kisIcons';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
-import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
+import ChatRoomPage, { type AttachmentFilePayload } from '@/Module/ChatRoom/ChatRoomPage';
+import { CameraCaptureModal } from '@/Module/ChatRoom/componets/main/CameraCaptureModal';
 import { useSocket } from '../../../SocketProvider';
 import { loadMessages, upsertMessage } from '@/Module/ChatRoom/Storage/chatStorage';
 import { normalizePhoneKey, participantsToIds } from '@/Module/ChatRoom/messagesUtils';
@@ -40,6 +41,7 @@ import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
 import CallsTab from '@/screens/tabs/MesssagingSubTabs/CallsTab';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import { 
   styles,
   type CustomFilter,
@@ -87,6 +89,19 @@ type ConversationMetaEntry = {
   lastMessageFromMe?: boolean;
 };
 
+type SearchSectionKey = 'contacts' | 'groups' | 'channels' | 'other' | 'messages';
+
+type GlobalSearchResult = {
+  id: string;
+  section: SearchSectionKey;
+  title: string;
+  subtitle?: string;
+  icon: string;
+  chat?: Chat;
+  messageId?: string;
+  timestamp?: string;
+};
+
 /**
  * Changes in this file focus on animation smoothness & robustness:
  * - Replace timing-based hide/show with a spring and a small state machine to avoid re-trigger thrash
@@ -96,12 +111,16 @@ type ConversationMetaEntry = {
  * - Avoid repeated setState on layout if height hasn't changed
  */
 export default function MessagesScreen({ onOpenChat, onOpenInfo }: MessagesScreenProps) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   // Search & menus
   const [query, setQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
+  const [cameraShareVisible, setCameraShareVisible] = useState(false);
+  const [pendingCameraShare, setPendingCameraShare] = useState<AttachmentFilePayload | null>(null);
 
   // Quick chips incl. Archived/Blocked
   const [activeQuick, setActiveQuick] = useState<Set<LocalQuick>>(new Set());
@@ -253,6 +272,160 @@ useEffect(() => {
     active = false;
   };
 }, [currentUserId, query]);
+
+const chatConversationKey = useCallback((chat: Chat | any) => {
+  return String(chat?.conversationId ?? chat?.id ?? '');
+}, []);
+
+const resultMatches = useCallback((value: unknown, term: string) => {
+  return String(value ?? '').toLowerCase().includes(term.toLowerCase());
+}, []);
+
+useEffect(() => {
+  let active = true;
+  const term = query.trim();
+
+  if (term.length < 2) {
+    setGlobalSearchResults([]);
+    setGlobalSearchLoading(false);
+    return () => {
+      active = false;
+    };
+  }
+
+  const timer = setTimeout(async () => {
+    setGlobalSearchLoading(true);
+    try {
+      const [serverConversations, participantRes] = await Promise.all([
+        searchConversationsFromServer(term, currentUserId ?? undefined),
+        getRequest(`${ROUTES.chat.searchParticipants}?q=${encodeURIComponent(term)}`, {
+          errorMessage: 'Unable to search participants.',
+        }).catch(() => null),
+      ]);
+
+      const byConversationId = new Map<string, Chat>();
+      [...conversations, ...serverConversations].forEach((chat: any) => {
+        const key = chatConversationKey(chat);
+        if (key) byConversationId.set(key, chat);
+      });
+
+      const next: GlobalSearchResult[] = [];
+      const seen = new Set<string>();
+      const pushResult = (result: GlobalSearchResult) => {
+        const key = `${result.section}:${result.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        next.push(result);
+      };
+
+      const participantItems = Array.isArray(participantRes?.data?.results)
+        ? participantRes.data.results
+        : Array.isArray(participantRes?.results)
+        ? participantRes.results
+        : [];
+
+      participantItems.slice(0, 12).forEach((item: any) => {
+        const convId = String(item?.conversation_id || '');
+        const chat = byConversationId.get(convId);
+        const user = item?.user ?? {};
+        if (!convId || !chat) return;
+        pushResult({
+          id: `participant-${convId}-${user?.id || item?.membership_display_name || user?.phone || 'user'}`,
+          section: 'contacts',
+          title: String(user?.display_name || item?.membership_display_name || user?.phone || chat.name || 'Contact'),
+          subtitle: String(user?.phone || chat.name || 'Open chat'),
+          icon: 'user',
+          chat,
+        });
+      });
+
+      [...byConversationId.values()].forEach((chat: any) => {
+        const name = String(chat?.name || '');
+        const lastMessage = String(chat?.lastMessage || conversationMeta?.[chatConversationKey(chat)]?.lastMessage || '');
+        const searchable = [name, lastMessage, chat?.title, chat?.description].filter(Boolean).join(' ');
+        if (!resultMatches(searchable, term)) return;
+        const isDirect = Boolean(chat?.isDirect || chat?.kind === 'direct');
+        const isChannel = chat?.kind === 'channel';
+        const isCommunity =
+          chat?.isCommunityChat ||
+          chat?.kind === 'community' ||
+          Boolean(chat?.communityId) ||
+          Boolean(communityByConversationId?.[chatConversationKey(chat)]);
+        const isGroup = Boolean(chat?.isGroup || chat?.isGroupChat || chat?.kind === 'group');
+        const section: SearchSectionKey = isDirect
+          ? 'contacts'
+          : isChannel
+          ? 'channels'
+          : isCommunity
+          ? 'other'
+          : isGroup
+          ? 'groups'
+          : 'other';
+        pushResult({
+          id: `chat-${chatConversationKey(chat)}`,
+          section,
+          title: name || 'Chat',
+          subtitle: lastMessage || (section === 'contacts' ? 'Contact' : section === 'groups' ? 'Group' : section === 'channels' ? 'Channel' : 'Community'),
+          icon: section === 'contacts' ? 'user' : section === 'groups' ? 'group' : section === 'channels' ? 'sub-channel' : 'users',
+          chat,
+        });
+      });
+
+      const messageCandidates = [...byConversationId.values()].slice(0, 80);
+      const messageMatches = await Promise.all(
+        messageCandidates.map(async (chat: any) => {
+          const convId = chatConversationKey(chat);
+          if (!convId) return [];
+          const messages = await loadMessages(convId).catch(() => []);
+          return messages
+            .filter((message: any) => {
+              const text = String(message?.text ?? message?.styledText?.text ?? '');
+              return text.toLowerCase().includes(term.toLowerCase());
+            })
+            .slice(-3)
+            .map((message: any) => ({
+              chat,
+              message,
+              convId,
+              text: String(message?.text ?? message?.styledText?.text ?? ''),
+            }));
+        }),
+      );
+
+      messageMatches.flat().slice(0, 18).forEach(({ chat, message, convId, text }) => {
+        const messageId = String(message?.serverId ?? message?.id ?? message?.clientId ?? '');
+        if (!messageId) return;
+        pushResult({
+          id: `message-${convId}-${messageId}`,
+          section: 'messages',
+          title: String(chat?.name || 'Chat'),
+          subtitle: text,
+          icon: 'chat',
+          chat,
+          messageId,
+          timestamp: message?.createdAt,
+        });
+      });
+
+      if (active) setGlobalSearchResults(next);
+    } finally {
+      if (active) setGlobalSearchLoading(false);
+    }
+  }, 160);
+
+  return () => {
+    active = false;
+    clearTimeout(timer);
+  };
+}, [
+  chatConversationKey,
+  communityByConversationId,
+  conversationMeta,
+  conversations,
+  currentUserId,
+  query,
+  resultMatches,
+]);
 
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('conversation.refresh', async () => {
@@ -482,11 +655,18 @@ useEffect(() => {
     const encMeta = payload?.encryptionMeta ?? payload?.encryption_meta;
     const hasEncrypted = !!(encMeta || payload?.ciphertext);
     const lastAt = payload?.createdAt ?? new Date().toISOString();
-    const senderId =
-      payload?.senderId != null ? String(payload.senderId) : '';
+    const rawSenderId =
+      payload?.senderId ??
+      payload?.sender_id ??
+      payload?.sender?.id ??
+      payload?.userId ??
+      payload?.user_id;
+    const senderId = rawSenderId != null ? String(rawSenderId) : '';
     const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
     const previewText =
       payload?.text ??
+      payload?.previewText ??
+      payload?.preview_text ??
       getMessagePreviewText(payload) ??
       (hasEncrypted ? 'Encrypted message' : '');
 
@@ -503,6 +683,76 @@ useEffect(() => {
           lastMessageFromMe: isFromMe,
         },
       };
+    });
+
+    setConversations((prev) => {
+      const exists = prev.some((item: any) => {
+        const existingId = item?.conversation_id ?? item?.conversationId ?? item?.id;
+        return String(existingId ?? '') === convId;
+      });
+      if (exists) {
+        return prev.map((item: any) => {
+          const existingId = item?.conversation_id ?? item?.conversationId ?? item?.id;
+          if (String(existingId ?? '') !== convId) return item;
+          return {
+            ...item,
+            last_message_preview: previewText,
+            lastMessage: previewText,
+            last_message_at: lastAt,
+            lastAt,
+            updated_at: lastAt,
+          };
+        });
+      }
+
+      const fallbackName =
+        payload?.senderName ??
+        payload?.sender_name ??
+        payload?.sender?.display_name ??
+        payload?.sender?.username ??
+        payload?.sender?.phone ??
+        'Direct chat';
+
+      console.log('[MessagesScreen] realtime conversation upsert', {
+        conversationId: convId,
+        senderId,
+        isFromMe,
+        fallbackName,
+      });
+
+      return [
+        {
+          id: convId,
+          conversationId: convId,
+          conversation_id: convId,
+          type: 'direct',
+          kind: 'direct',
+          title: fallbackName,
+          name: fallbackName,
+          last_message_preview: previewText,
+          lastMessage: previewText,
+          last_message_at: lastAt,
+          lastAt,
+          created_at: lastAt,
+          updated_at: lastAt,
+          unread_count: isFromMe ? 0 : 1,
+          unreadCount: isFromMe ? 0 : 1,
+          read_state_authoritative: false,
+          participants: senderId
+            ? [
+                {
+                  id: `member-${senderId}`,
+                  user: {
+                    id: senderId,
+                    display_name: fallbackName,
+                    username: fallbackName,
+                  },
+                },
+              ]
+            : [],
+        },
+        ...prev,
+      ];
     });
 
     try {
@@ -531,7 +781,7 @@ useEffect(() => {
       const type = recipientCipher?.type ?? encMeta?.type ?? 1;
       if (senderDeviceId && ciphertext) {
         decryptFromUser(
-          String(payload?.senderId ?? ''),
+          String(payload?.senderId ?? payload?.sender_id ?? payload?.sender?.id ?? ''),
           String(senderDeviceId),
           String(ciphertext),
           Number(type),
@@ -634,7 +884,7 @@ useEffect(() => {
   return () => {
     socket.off('chat.message', onMessage);
   };
-}, [socket, isConnected, currentUserId, queueMetaRefresh]);
+}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations]);
 
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('message.status', (payload: any) => {
@@ -701,32 +951,140 @@ useEffect(() => {
 }, [selectedChat]);
 
 // handlers for app bar actions
-const handleClearSelection = () => {
+const selectedConversationIds = useMemo(
+  () =>
+    selectedChat
+      .map(chat => String((chat as any).conversationId ?? chat.id ?? ''))
+      .filter(Boolean),
+  [selectedChat],
+);
+
+const conversationActionUrl = useCallback(
+  (conversationId: string, action: 'pin' | 'mute' | 'archive' | 'delete-for-me' | 'mark-read') =>
+    `${ROUTES.chat.listConversations}${conversationId}/${action}/`,
+  [],
+);
+
+const handleClearSelection = useCallback(() => {
   setSelectedChat([]);
   setSelectMode(false);
   setMenuVisible(false);
-};
+}, []);
 
-const handleDeleteSelected = () => {
-  // TODO: implement deletion logic
-  // e.g. call API, update chats list, etc.
-  console.log('Delete chats:', selectedChat);
-};
+const updateSelectedConversations = useCallback(
+  (updater: (chat: Chat) => Chat | null) => {
+    const selectedIds = new Set(selectedConversationIds);
+    setConversations(prev =>
+      prev
+        .map(chat => {
+          const id = String((chat as any).conversationId ?? chat.id ?? '');
+          return selectedIds.has(id) ? updater(chat) : chat;
+        })
+        .filter(Boolean) as Chat[],
+    );
+  },
+  [selectedConversationIds],
+);
 
-const handlePinSelected = () => {
-  console.log('Pin chats:', selectedChat);
-};
+const handleDeleteSelected = useCallback(() => {
+  if (!selectedConversationIds.length) return;
+  const count = selectedConversationIds.length;
+  Alert.alert(
+    count === 1 ? 'Delete chat?' : `Delete ${count} chats?`,
+    'This removes the selected chats from this device list. It does not delete messages for the other person.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          updateSelectedConversations(() => null);
+          setConversationMeta(prev => {
+            const next = { ...prev };
+            selectedConversationIds.forEach(id => {
+              delete next[id];
+            });
+            return next;
+          });
+          void Promise.allSettled(
+            selectedConversationIds.map(conversationId =>
+              postRequest(conversationActionUrl(conversationId, 'delete-for-me'), {}),
+            ),
+          );
+          handleClearSelection();
+        },
+      },
+    ],
+  );
+}, [conversationActionUrl, handleClearSelection, selectedConversationIds, updateSelectedConversations]);
 
-const handleMuteSelected = () => {
-  console.log('Mute chats:', selectedChat);
-};
+const handlePinSelected = useCallback(() => {
+  if (!selectedConversationIds.length) return;
+  const shouldPin = selectedChat.some(chat => !(chat as any).isPinned);
+  updateSelectedConversations(chat => ({ ...chat, isPinned: shouldPin } as Chat));
+  void Promise.allSettled(
+    selectedConversationIds.map(conversationId =>
+      postRequest(conversationActionUrl(conversationId, 'pin'), { pinned: shouldPin }),
+    ),
+  );
+  handleClearSelection();
+}, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
+
+const handleMuteSelected = useCallback(() => {
+  if (!selectedConversationIds.length) return;
+  const shouldMute = selectedChat.some(chat => !chat.isMuted);
+  updateSelectedConversations(chat => ({ ...chat, isMuted: shouldMute }));
+  void Promise.allSettled(
+    selectedConversationIds.map(conversationId =>
+      postRequest(conversationActionUrl(conversationId, 'mute'), { muted: shouldMute }),
+    ),
+  );
+  handleClearSelection();
+}, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
+
+const handleArchiveSelected = useCallback(() => {
+  if (!selectedConversationIds.length) return;
+  const shouldArchive = selectedChat.some(chat => !chat.isArchived);
+  updateSelectedConversations(chat => ({ ...chat, isArchived: shouldArchive }));
+  void Promise.allSettled(
+    selectedConversationIds.map(conversationId =>
+      postRequest(conversationActionUrl(conversationId, 'archive'), { archived: shouldArchive }),
+    ),
+  );
+  handleClearSelection();
+}, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
+
+const handleMarkReadSelected = useCallback(() => {
+  if (!selectedConversationIds.length) return;
+  updateSelectedConversations(chat => ({ ...chat, unreadCount: 0 }));
+  setConversationMeta(prev => {
+    const next = { ...prev };
+    selectedConversationIds.forEach(id => {
+      if (next[id]) next[id] = { ...next[id], unreadCount: 0 };
+    });
+    return next;
+  });
+  void Promise.allSettled(
+    selectedConversationIds.map(conversationId =>
+      postRequest(conversationActionUrl(conversationId, 'mark-read'), {}),
+    ),
+  );
+  handleClearSelection();
+}, [conversationActionUrl, handleClearSelection, selectedConversationIds, updateSelectedConversations]);
+
+const handleSelectAllChats = useCallback(() => {
+  setSelectedChat(conversations.filter(chat => chat.kind !== 'channel'));
+  setMenuVisible(false);
+}, [conversations]);
 
 
 
   const [addVisible, setAddVisible] = useState(false);
+  const [addInitialMode, setAddInitialMode] = useState<'list' | 'addGroup' | 'addChannel' | undefined>(undefined);
   const addSlide = useRef(new Animated.Value(0)).current; // 0 = off-screen, 1 = on-screen
 
-  const openAddContacts = () => {
+  const openAddContacts = useCallback((initialMode?: 'list' | 'addGroup' | 'addChannel') => {
+    setAddInitialMode(initialMode);
     setAddVisible(true);
     Animated.timing(addSlide, {
       toValue: 1,
@@ -734,7 +1092,7 @@ const handleMuteSelected = () => {
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }
+  }, [addSlide]);
 
   
   const closeChat = () => {
@@ -749,7 +1107,7 @@ const handleMuteSelected = () => {
     });
   };
 
-  const closeAddContacts = () => {
+  const closeAddContacts = useCallback(() => {
     Animated.timing(addSlide, {
       toValue: 0,
       duration: 260,
@@ -757,8 +1115,9 @@ const handleMuteSelected = () => {
       useNativeDriver: true,
     }).start(() => {
       setAddVisible(false);
+      setAddInitialMode(undefined);
     });
-  };
+  }, [addSlide]);
 
   const addTranslateY = addSlide.interpolate({
     inputRange: [0, 1],
@@ -975,18 +1334,19 @@ const handleMuteSelected = () => {
         style={{
           transform: [{ translateY: translateTabY }],
           marginBottom: tabNegMargin, // collapse layout space while hidden
-          backgroundColor: palette.bar,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: palette.inputBorder,
+          backgroundColor: messageTopPanelBg,
+          borderBottomWidth: 0,
+          borderBottomColor: 'transparent',
+          overflow: 'hidden',
         }}
       >
         <MaterialTopTabBar
           {...tabProps}
-          style={{ backgroundColor: palette.bar, elevation: 0 }}
-          indicatorStyle={{ backgroundColor: palette.primary, height: 3, borderRadius: 3 }}
+          style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
+          indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
           labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: 14 }}
-          activeTintColor={palette.text}
-          inactiveTintColor={palette.subtext}
+          activeTintColor={palette.ivory}
+          inactiveTintColor={palette.goldSoft}
         />
       </Animated.View>
     );
@@ -1013,6 +1373,104 @@ const handleMuteSelected = () => {
       { key: 'settings', label: 'Settings' },
     ];
   }, [activeTopTab]);
+
+  const handleNormalMenuAction = useCallback((key: string) => {
+    setMenuVisible(false);
+    switch (key) {
+      case 'new-chat':
+      case 'new-call':
+        openAddContacts('list');
+        return;
+      case 'new-group':
+        openAddContacts('addGroup');
+        return;
+      case 'new-channel':
+        openAddContacts('addChannel');
+        return;
+      case 'new-status':
+        tabRef.current?.navigate?.('Updates');
+        DeviceEventEmitter.emit('status.create');
+        return;
+      case 'call-history':
+        tabRef.current?.navigate?.('Calls');
+        return;
+      case 'updates-settings':
+      case 'calls-settings':
+      case 'settings':
+        setFilterMgrOpen(true);
+        return;
+      default:
+        return;
+    }
+  }, [openAddContacts]);
+
+  const handleHeaderCameraPress = useCallback(() => {
+    if (activeTopTab === 'Chats') {
+      setMenuVisible(false);
+      setCameraShareVisible(true);
+      return;
+    }
+    setTabSearchOpen(true);
+  }, [activeTopTab]);
+
+  const handleCameraShareCapture = useCallback((payload: AttachmentFilePayload) => {
+    setCameraShareVisible(false);
+    setPendingCameraShare(payload);
+    openAddContacts('list');
+  }, [openAddContacts]);
+
+const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
+    onOpenChat(chat);
+    if (pendingCameraShare) {
+      const targetId = String((chat as any).conversationId ?? chat.id ?? '');
+      const sharePayload = pendingCameraShare;
+      setPendingCameraShare(null);
+      closeAddContacts();
+      setTimeout(() => {
+        DeviceEventEmitter.emit('chat.sendPendingAttachment', {
+          targetId,
+          attachment: sharePayload,
+        });
+      }, 450);
+    }
+  }, [closeAddContacts, onOpenChat, pendingCameraShare]);
+
+  const groupedSearchResults = useMemo(() => {
+    const order: SearchSectionKey[] = ['contacts', 'groups', 'channels', 'other', 'messages'];
+    return order
+      .map((section) => ({
+        section,
+        title:
+          section === 'contacts'
+            ? 'Contacts'
+            : section === 'groups'
+            ? 'Groups'
+            : section === 'channels'
+            ? 'Channels'
+            : section === 'other'
+            ? 'Other'
+            : 'Messages',
+        items: globalSearchResults.filter((item) => item.section === section).slice(0, section === 'messages' ? 12 : 8),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [globalSearchResults]);
+
+  const handleSearchResultPress = useCallback(
+    (result: GlobalSearchResult) => {
+      if (!result.chat) return;
+      setMenuVisible(false);
+      setQuery('');
+      setGlobalSearchResults([]);
+      const chat = result.messageId
+        ? ({
+            ...result.chat,
+            initialTargetMessageId: result.messageId,
+          } as Chat)
+        : result.chat;
+      onOpenChat(chat);
+    },
+    [onOpenChat],
+  );
 
   useEffect(() => {
     if (activeTopTab === 'Chats') {
@@ -1057,247 +1515,327 @@ const handleMuteSelected = () => {
     ],
   } as const;
 
+  const messageTopPanelBg = tone === 'dark' ? '#5E3B0A' : '#6B4334';
+  const messageGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334'];
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.chrome, paddingTop: insets.top }]}>
+    <View style={[styles.wrap, { backgroundColor: tone === 'dark' ? palette.bg : '#FFFFFF' }]}>
+      <LinearGradient
+        colors={messageGoldGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.messageGoldPanel}
+      >
+      
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
-          // 🔵 SELECT MODE APP BAR
           <View
             style={[
               styles.appBar,
-              { borderBottomColor: palette.inputBorder },
+              styles.royalAppBar,
+              {
+                backgroundColor: 'transparent',
+                borderBottomColor: 'transparent',
+                paddingTop: insets.top + 14,
+              },
             ]}
           >
-            {/* LEFT: back arrow + count */}
-            <View style={styles.appBarLeft}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <Pressable
                 onPress={handleClearSelection}
                 hitSlop={10}
                 style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
+                  {
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.13)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,244,184,0.30)',
+                    opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                  },
                 ]}
               >
-                <KISIcon name="arrow-left" size={20} color={palette.text} />
+                <KISIcon name="arrow-left" size={20} color={palette.ivory} />
               </Pressable>
 
-              <Text
-                style={[
-                  styles.appName,
-                  { color: palette.text, marginLeft: 4 },
-                ]}
-              >
-                {selectCount ?? selectedChat.length}
-              </Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={{
+                    color: palette.ivory,
+                    fontSize: 18,
+                    fontWeight: '900',
+                    letterSpacing: 0.2,
+                  }}
+                  numberOfLines={1}
+                >
+                  {selectCount ?? selectedChat.length} selected
+                </Text>
+                <Text
+                  style={{
+                    color: palette.goldSoft,
+                    fontSize: 11,
+                    fontWeight: '800',
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Manage chats
+                </Text>
+              </View>
             </View>
 
-            {/* RIGHT: pin, mute, delete, menu */}
             <View style={styles.appBarRight}>
-              <Pressable
-                onPress={handlePinSelected}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
-                ]}
-              >
-                <KISIcon name="pin" size={18} color={palette.text} />
-              </Pressable>
-
-              <Pressable
-                onPress={handleMuteSelected}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
-                ]}
-              >
-                <KISIcon name="mute" size={18} color={palette.text} />
-              </Pressable>
-
-              <Pressable
-                onPress={handleDeleteSelected}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
-                ]}
-              >
-                <KISIcon name="trash" size={18} color={palette.text} />
-              </Pressable>
+              {[
+                { key: 'archive', icon: 'download', onPress: handleArchiveSelected },
+                { key: 'pin', icon: 'pin', onPress: handlePinSelected },
+                { key: 'mute', icon: 'mute', onPress: handleMuteSelected },
+                { key: 'delete', icon: 'trash', onPress: handleDeleteSelected },
+              ].map(action => (
+                <Pressable
+                  key={action.key}
+                  onPress={action.onPress}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    {
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.13)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,244,184,0.26)',
+                      opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                    },
+                  ]}
+                >
+                  <KISIcon name={action.icon as any} size={18} color={palette.ivory} />
+                </Pressable>
+              ))}
 
               <Pressable
                 onPress={() => setMenuVisible((v) => !v)}
-                hitSlop={10}
+                hitSlop={8}
                 style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
+                  {
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.13)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,244,184,0.26)',
+                    opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                  },
                 ]}
               >
-                <KISIcon name="menu" size={18} color={palette.text} />
+                <KISIcon name="menu" size={18} color={palette.ivory} />
               </Pressable>
             </View>
 
-            {/* Dropdown menu (selection actions) */}
-            <View pointerEvents={menuVisible ? 'auto' : 'none'} style={{ zIndex: 5 }}>
-              {/* overlay */}
-              <Pressable
-                onPress={() => setMenuVisible(false)}
-                style={[styles.menuOverlay, { opacity: menuVisible ? 1 : 0 }]}
-              />
-              {/* popover */}
-              <Animated.View
-                style={[
-                  styles.menuBox,
-                  {
-                    position: 'absolute',
-                    right: 12,
-                    top: Platform.select({ ios: 46, android: 50, default: 46 }),
-                    borderColor: palette.inputBorder,
-                    backgroundColor: palette.card,
-                    shadowColor: palette.shadow,
-                  },
-                  KIS_TOKENS.elevation.popover,
-                  menuStyle,
-                ]}
-              >
-                {[
-                  { key: 'select-all', label: 'Select all' },
-                  { key: 'mark-read', label: 'Mark as read' },
-                  { key: 'archive', label: 'Archive' },
-                ].map((m) => (
-                  <Pressable
-                    key={m.key}
-                    onPress={() => {
-                      // TODO: handle each menu item
-                      setMenuVisible(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.menuItem,
-                      { backgroundColor: pressed ? palette.surface : 'transparent' },
-                    ]}
-                  >
-                    <Text style={{ color: palette.text, fontSize: 14 }}>
-                      {m.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </Animated.View>
-            </View>
           </View>
         ) : (
-          // 🟢 NORMAL APP BAR (your original)
           <View
             style={[
               styles.appBar,
-              { borderBottomColor: palette.inputBorder },
+              styles.royalAppBar,
+              {
+                backgroundColor: 'transparent',
+                borderBottomColor: 'transparent',
+                paddingTop: insets.top + 14,
+              },
             ]}
           >
-            <View style={styles.appBarLeft}>
-              <Text style={[styles.appName, { color: palette.text }]}> KIS </Text>
-              <Text style={[styles.appSubtitle, { color: palette.subtext }]}>
-                Kingdom Impact Social
-              </Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,244,184,0.30)',
+                }}
+              >
+                <Text style={{ color: palette.ivory, fontSize: 18, fontWeight: '900' }}>K</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={{
+                    color: palette.ivory,
+                    fontSize: 22,
+                    fontWeight: '900',
+                    letterSpacing: 0.3,
+                  }}
+                  numberOfLines={1}
+                >
+                  KIS
+                </Text>
+                <Text
+                  style={{
+                    color: palette.goldSoft,
+                    marginTop: 2,
+                    fontSize: 12,
+                    fontWeight: '800',
+                    letterSpacing: 0.2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Kingdom Impact Social
+                </Text>
+              </View>
             </View>
 
             <View style={styles.appBarRight}>
-              <Pressable
-                onPress={() => {
-                  if (activeTopTab === 'Chats') return;
-                  setTabSearchOpen(true);
-                }}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
-                ]}
-              >
-                <KISIcon
-                  name={activeTopTab === 'Chats' ? 'camera' : 'search'}
-                  size={18}
-                  color={palette.text}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => setMenuVisible((v) => !v)}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1, padding: 8 },
-                ]}
-              >
-                <KISIcon name="menu" size={18} color={palette.text} />
-              </Pressable>
+              {[
+                {
+                  key: 'camera-search',
+                  icon: activeTopTab === 'Chats' ? 'camera' : 'search',
+                  onPress: handleHeaderCameraPress,
+                },
+                { key: 'menu', icon: 'menu', onPress: () => setMenuVisible((v) => !v) },
+              ].map(action => (
+                <Pressable
+                  key={action.key}
+                  onPress={action.onPress}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    {
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.13)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,244,184,0.26)',
+                      opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                    },
+                  ]}
+                >
+                  <KISIcon name={action.icon as any} size={18} color={palette.ivory} />
+                </Pressable>
+              ))}
             </View>
 
-            {/* Dropdown menu (normal mode) */}
-            <View pointerEvents={menuVisible ? 'auto' : 'none'} style={{ zIndex: 5 }}>
-              <Pressable
-                onPress={() => setMenuVisible(false)}
-                style={[styles.menuOverlay, { opacity: menuVisible ? 1 : 0 }]}
-              />
-              <Animated.View
-                style={[
-                  styles.menuBox,
-                  {
-                    position: 'absolute',
-                    right: 12,
-                    top: Platform.select({ ios: 46, android: 50, default: 46 }),
-                    borderColor: palette.inputBorder,
-                    backgroundColor: palette.card,
-                    shadowColor: palette.shadow,
-                  },
-                  KIS_TOKENS.elevation.popover,
-                  menuStyle,
-                ]}
-              >
-                {menuItems.map((m) => (
-                  <Pressable
-                    key={m.key}
-                    onPress={() => setMenuVisible(false)}
-                    style={({ pressed }) => [
-                      styles.menuItem,
-                      { backgroundColor: pressed ? palette.surface : 'transparent' },
-                    ]}
-                  >
-                    <Text style={{ color: palette.text, fontSize: 14 }}>
-                      {m.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </Animated.View>
-            </View>
           </View>
+
         )}
 
 
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+      <View
+        pointerEvents="auto"
+        style={StyleSheet.absoluteFillObject}
+      >
+        <Pressable
+          onPress={() => setMenuVisible(false)}
+          style={[styles.menuOverlay, { opacity: menuVisible ? 1 : 0 }]}
+        />
+        <Animated.View
+          style={[
+            styles.menuBox,
+            {
+              position: 'absolute',
+              right: 12,
+              top: insets.top + 62,
+              borderColor: palette.gold,
+              backgroundColor: palette.card,
+              shadowColor: palette.shadow,
+            },
+            KIS_TOKENS.elevation.popover,
+            menuStyle,
+          ]}
+        >
+          {(selectedChat.length > 0
+            ? [
+                { key: 'select-all', label: 'Select all', onPress: handleSelectAllChats },
+                { key: 'mark-read', label: 'Mark as read', onPress: handleMarkReadSelected },
+                { key: 'archive', label: 'Archive', onPress: handleArchiveSelected },
+              ]
+            : menuItems.map((m) => ({
+                ...m,
+                onPress: () => handleNormalMenuAction(m.key),
+              }))
+          ).map((m) => (
+            <Pressable
+              key={m.key}
+              onPress={() => {
+                setMenuVisible(false);
+                m.onPress();
+              }}
+              style={({ pressed }) => [
+                styles.menuItem,
+                { backgroundColor: pressed ? palette.goldSoft : 'transparent' },
+              ]}
+            >
+              <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>
+                {m.label}
+              </Text>
+            </Pressable>
+          ))}
+        </Animated.View>
+      </View>
+      </Modal>
+
+
       {/* ------------ Animated Elevated Search Bar + Filters ------------ */}
-      {activeTopTab === 'Chats' ? (
+      {(
         <Animated.View
           onLayout={onHeaderLayout}
           style={{
             transform: [{ translateY: translateHeaderY }],
             marginBottom: headerNegMargin, // collapse space so list moves up
             paddingHorizontal: 12,
-            paddingTop: 10,
+            paddingTop: 4,
             paddingBottom: 8,
+            marginTop: -1,
             zIndex: 1,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+            overflow: 'hidden',
           }}
         >
           <View
             style={[
               styles.searchContainer,
               {
-                borderColor: palette.inputBorder,
-                backgroundColor: palette.surfaceElevated,
-                shadowColor: palette.shadow,
+                borderColor: palette.goldMuted,
+                backgroundColor: palette.card,
+                shadowColor: 'transparent',
               },
-              KIS_TOKENS.elevation.card,
             ]}
           >
             <KISIcon name="search" size={18} color={palette.text} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search chats, people, and groups…"
+              placeholder={
+                activeTopTab === 'Updates'
+                  ? 'Search updates, channels, and messages…'
+                  : activeTopTab === 'Calls'
+                  ? 'Search calls, contacts, and messages…'
+                  : 'Search chats, people, groups, and messages…'
+              }
               placeholderTextColor={palette.subtext}
               style={[styles.searchInput, { color: palette.text }]}
             />
-            <Pressable onPress={() => {}} style={styles.searchIconBtn}>
-              <KISIcon name="mic" size={18} color={palette.text} />
+            <Pressable onPress={() => setQuery('')} style={styles.searchIconBtn}>
+              <KISIcon name={query.trim() ? 'close' : 'mic'} size={18} color={palette.text} />
             </Pressable>
             <View style={[styles.searchDivider, { backgroundColor: palette.inputBorder }]} />
             <Pressable onPress={() => setFilterMgrOpen(true)} style={styles.searchIconBtn} hitSlop={8}>
@@ -1305,8 +1843,64 @@ const handleMuteSelected = () => {
             </Pressable>
           </View>
 
+          {query.trim().length >= 2 ? (
+            <View
+              style={[
+                localSearchStyles.resultsCard,
+                {
+                  backgroundColor: palette.card,
+                  borderColor: palette.goldMuted,
+                  shadowColor: palette.shadow,
+                },
+                KIS_TOKENS.elevation.popover,
+              ]}
+            >
+              {globalSearchLoading ? (
+                <Text style={[localSearchStyles.resultEmpty, { color: palette.subtext }]}>
+                  Searching...
+                </Text>
+              ) : groupedSearchResults.length ? (
+                groupedSearchResults.map((group) => (
+                  <View key={group.section} style={localSearchStyles.resultGroup}>
+                    <Text style={[localSearchStyles.resultSectionTitle, { color: palette.subtext }]}>
+                      {group.title}
+                    </Text>
+                    {group.items.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => handleSearchResultPress(item)}
+                        style={({ pressed }) => [
+                          localSearchStyles.resultRow,
+                          { backgroundColor: pressed ? palette.surface : 'transparent' },
+                        ]}
+                      >
+                        <View style={[localSearchStyles.resultIcon, { backgroundColor: palette.primarySoft }]}>
+                          <KISIcon name={item.icon as any} size={17} color={palette.primaryStrong} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[localSearchStyles.resultTitle, { color: palette.text }]} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          {item.subtitle ? (
+                            <Text style={[localSearchStyles.resultSubtitle, { color: palette.subtext }]} numberOfLines={1}>
+                              {item.subtitle}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                ))
+              ) : (
+                <Text style={[localSearchStyles.resultEmpty, { color: palette.subtext }]}>
+                  No matching chats, contacts, channels, or messages.
+                </Text>
+              )}
+            </View>
+          ) : null}
+
           {/* Quick chips + Custom filter row */}
-          <View style={styles.chipsRow}>
+          {activeTopTab === 'Chats' ? <View style={styles.chipsRow}>
             {(['Unread', 'Groups', 'Community', 'Mentions', 'Archived', 'Blocked'] as LocalQuick[]).map(
               (chip) => (
                 <ToggleChip
@@ -1345,9 +1939,10 @@ const handleMuteSelected = () => {
               <KISIcon name="add" size={18} color={palette.text} />
               <Text style={{ color: palette.text, fontSize: 13 }}>Create</Text>
             </Pressable>
-          </View>
+          </View> : null}
         </Animated.View>
-      ) : null}
+      )}
+      </LinearGradient>
 
       {/* ------------ Updates/Calls Search Modal ------------ */}
       {tabSearchOpen && activeTopTab !== 'Chats' ? (
@@ -1385,11 +1980,19 @@ const handleMuteSelected = () => {
       ) : null}
 
       {/* ------------ Top Tabs (animated tab bar) ------------ */}
-      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <View style={{ flex: 1, backgroundColor: tone === 'dark' ? palette.bg : '#FFFFFF' }}>
         <Tab.Navigator
           {...({ ref: tabRef } as any)}
           tabBar={(props) => <AnimatedTopBar {...props} />}
-          screenOptions={{ swipeEnabled: true, tabBarScrollEnabled: false }}
+          screenOptions={{
+            swipeEnabled: true,
+            tabBarScrollEnabled: false,
+            tabBarIndicatorStyle: {
+              backgroundColor: palette.goldDeep,
+              height: 3,
+              borderRadius: 3,
+            },
+          }}
         >
           <Tab.Screen
             name="Chats"
@@ -1431,19 +2034,19 @@ const handleMuteSelected = () => {
           <Tab.Screen
             name="Updates"
             children={() => (
-              <UpdatesTab searchTerm={tabSearchQuery} onOpenChat={onOpenChat} />
+              <UpdatesTab searchTerm={query} onOpenChat={onOpenChat} />
             )}
           />
           <Tab.Screen
             name="Calls"
-            children={() => <CallsTab searchTerm={tabSearchQuery} />}
+            children={() => <CallsTab searchTerm={query} />}
           />
         </Tab.Navigator>
 
         {/* 🔵 Suspended "Add" button (FAB) */}
         {activeTopTab === 'Chats' ? (
           <Pressable
-            onPress={openAddContacts}
+            onPress={() => openAddContacts('list')}
             style={({ pressed }) => [
               {
                 position: 'absolute',
@@ -1454,17 +2057,36 @@ const handleMuteSelected = () => {
                 borderRadius: 28,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: palette.primary,
-                shadowColor: palette.shadow,
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 6,
+                backgroundColor: palette.goldDeep,
+                shadowColor: palette.goldDeep,
+                shadowOpacity: 0.34,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 5 },
+                elevation: 7,
+                overflow: 'hidden',
               },
               pressed && { opacity: KIS_TOKENS.opacity.pressed },
             ]}
           >
-            <KISIcon name="add" size={24} color={palette.inverseText ?? '#fff'} />
+            <LinearGradient
+              colors={messageGoldGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: -8,
+                bottom: -8,
+                left: 6,
+                width: 16,
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                transform: [{ rotate: '-18deg' }],
+              }}
+            />
+            <KISIcon name="add" size={24} color={palette.ivory ?? '#fff'} />
           </Pressable>
         ) : null}
       </View>
@@ -1600,6 +2222,13 @@ const handleMuteSelected = () => {
         ) : null}
       </Modal>
 
+      <CameraCaptureModal
+        visible={cameraShareVisible}
+        palette={palette}
+        onClose={() => setCameraShareVisible(false)}
+        onCapture={handleCameraShareCapture}
+      />
+
       {/* Custom Filter Manager */}
       <FilterManager
         visible={filterMgrOpen}
@@ -1629,6 +2258,8 @@ const handleMuteSelected = () => {
             chat={activeChat}
             onBack={closeChat}
             allChats={conversations}
+            onOpenChat={onOpenChat}
+            initialTargetMessageId={(activeChat as any)?.initialTargetMessageId ?? null}
           />
         </Animated.View>
       )}
@@ -1646,7 +2277,7 @@ const handleMuteSelected = () => {
             backgroundColor: palette.bg,
           }}
         >
-          <AddContactsPage onOpenChat={onOpenChat} onClose={closeAddContacts} />
+          <AddContactsPage onOpenChat={handleOpenChatFromAddContacts} onClose={closeAddContacts} initialMode={addInitialMode} />
         </Animated.View>
       )}
     </View>
@@ -1654,3 +2285,52 @@ const handleMuteSelected = () => {
   
   
 }
+
+const localSearchStyles = StyleSheet.create({
+  resultsCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    maxHeight: 390,
+  },
+  resultGroup: {
+    paddingVertical: 6,
+  },
+  resultSectionTitle: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 4,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  resultIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  resultSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  resultEmpty: {
+    padding: 14,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+});

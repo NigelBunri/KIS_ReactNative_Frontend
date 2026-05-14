@@ -8,7 +8,9 @@ import {
   ViewStyle,
   TextStyle,
   View,
+  StyleSheet,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { createButtonStyles } from '@/theme/foundations/buttons';
 import { useKISTheme } from '@/theme/useTheme';
 
@@ -64,6 +66,10 @@ export default function KISButton({
 
   const spinnerColor =
     (variantStyles.text as TextStyle | undefined)?.color || palette.text;
+  const metallicGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', palette.goldDeep, palette.gold, '#7A4B3E'];
+  const shouldUseGoldGradient = variant === 'primary' && !isDisabled;
 
   return (
     <Pressable
@@ -74,6 +80,15 @@ export default function KISButton({
         pressed && { opacity: tokens.opacity.pressed },
       ]}
     >
+      {shouldUseGoldGradient ? (
+        <LinearGradient
+          colors={metallicGoldGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      ) : null}
+      {shouldUseGoldGradient ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
       {left ? <View style={{ marginRight: 6 }}>{left}</View> : null}
 
       {title ? <Text style={titleStyles}>{title}</Text> : children}
@@ -90,3 +105,14 @@ export default function KISButton({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  goldSheen: {
+    position: 'absolute',
+    top: 1,
+    left: 10,
+    right: 10,
+    height: 1,
+    backgroundColor: 'rgba(255,244,184,0.55)',
+  },
+});

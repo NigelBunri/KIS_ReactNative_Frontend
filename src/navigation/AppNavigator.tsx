@@ -3,6 +3,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   DeviceEventEmitter,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
@@ -37,10 +39,15 @@ import { useSocket } from '../../SocketProvider';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import {
-  fetchUnreadInAppNotificationsCount,
-  IN_APP_NOTIFICATIONS_UPDATED_EVENT,
   startInAppNotificationRuntime,
 } from '@/services/inAppNotificationService';
+import {
+  bindMainTabBadgeSourceEvents,
+  emptyMainTabBadgeCounts,
+  fetchMainTabBadgeCounts,
+  MAIN_TAB_BADGES_REALTIME_EVENT,
+  MainTabBadgeCounts,
+} from '@/services/mainTabNotificationBadges';
 
 type RouteKey = 'Partners' | 'Bible' | 'Messages' | 'Broadcast' | 'Profile';
 
@@ -57,7 +64,7 @@ const routeIconMap: Record<RouteKey, KISIconName> = {
 // 👇 extend props to accept hidNav
 type AnimatedKISTabBarProps = BottomTabBarProps & {
   hidNav: boolean;
-  profileUnreadCount: number;
+  badgeCounts: MainTabBadgeCounts;
 };
 
 function AnimatedKISTabBar({
@@ -65,7 +72,7 @@ function AnimatedKISTabBar({
   descriptors,
   navigation,
   hidNav,
-  profileUnreadCount,
+  badgeCounts,
 }: AnimatedKISTabBarProps) {
   // 🌓 Follow device theme
   const systemScheme = useColorScheme(); // 'light' | 'dark' | null
@@ -87,10 +94,14 @@ function AnimatedKISTabBar({
   const count = state.routes.length;
   const tabWidth = width / count;
 
-  const { palette: p } = theme;
-  const focusedTextColor = p.text;
+  const { palette: p, tone } = theme;
+  const isRoyalLightBar = tone === 'light';
+  const focusedTextColor = isRoyalLightBar ? p.goldDeep : p.text;
   const unfocusedTextColor = p.subtext;
-  const barBg = p.bar ?? p.surface;
+  const barBg = isRoyalLightBar ? '#FFFFFF' : (p.bar ?? p.surface);
+  const selectedGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', p.goldDeep, p.gold, '#7A4B3E'];
 
   // 🔒 If hidNav is true, don’t render the bar at all
   if (hidNav) {
@@ -116,6 +127,7 @@ function AnimatedKISTabBar({
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const label = descriptors[route.key].options.title ?? route.name;
+          const badgeCount = badgeCounts[route.name as RouteKey] ?? 0;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -139,20 +151,29 @@ function AnimatedKISTabBar({
                   style={[
                     styles.iconCircle,
                     {
-                      backgroundColor: focused ? p.primary : p.surfaceElevated,
+                      backgroundColor: focused ? p.goldDeep : (isRoyalLightBar ? p.card : p.surfaceElevated),
                     },
                   ]}
                 >
+                  {focused ? (
+                    <LinearGradient
+                      colors={selectedGoldGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[StyleSheet.absoluteFillObject, styles.selectedTabGradient]}
+                    />
+                  ) : null}
+                  {focused ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
                   <KISIcon
                     name={routeIconMap[route.name as RouteKey]}
                     size={24}
                     color={focused ? p.onPrimary : unfocusedTextColor}
                     focused={focused}
                   />
-                  {route.name === 'Profile' && profileUnreadCount > 0 ? (
+                  {badgeCount > 0 ? (
                     <View style={styles.badge}>
                       <Text style={styles.badgeLabel}>
-                        {profileUnreadCount > 99 ? '99+' : String(profileUnreadCount)}
+                        {badgeCount > 99 ? '99+' : String(badgeCount)}
                       </Text>
                     </View>
                   ) : null}
@@ -177,7 +198,7 @@ function AnimatedKISTabBar({
 
 export function MainTabs() {
   const { palette } = useKISTheme();
-  const { currentUserId } = useSocket();
+  const { currentUserId, socket, isConnected } = useSocket();
   const [communityByConversationId, setCommunityByConversationId] = useState<
     Record<string, { id: string; name: string }>
   >({});
@@ -200,29 +221,60 @@ export function MainTabs() {
 
   // 👇 control for hiding the nav bar (managed ONLY here)
   const [hidNav, setHidNav] = useState(false);
-  const [profileUnreadCount, setProfileUnreadCount] = useState(0);
+  const [badgeCounts, setBadgeCounts] = useState<MainTabBadgeCounts>(() => emptyMainTabBadgeCounts());
 
   useEffect(() => {
     startInAppNotificationRuntime();
     let alive = true;
-    const refreshUnread = async () => {
-      const unread = await fetchUnreadInAppNotificationsCount();
-      if (alive) setProfileUnreadCount(unread);
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshBadges = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchMainTabBadgeCounts(currentUserId)
+          .then((next) => {
+            if (alive) setBadgeCounts(next);
+          })
+          .catch(() => undefined);
+      }, 120);
     };
-    refreshUnread().catch(() => undefined);
-    const sub = DeviceEventEmitter.addListener(IN_APP_NOTIFICATIONS_UPDATED_EVENT, (payload: any) => {
-      const next = Number(payload?.unreadCount);
-      if (Number.isFinite(next)) {
-        setProfileUnreadCount(Math.max(0, next));
-      } else {
-        refreshUnread().catch(() => undefined);
-      }
+
+    refreshBadges();
+    const unbindBadgeEvents = bindMainTabBadgeSourceEvents(refreshBadges);
+    const realtimeEvents = [
+      'chat.message',
+      'chat.message_receipt',
+      'chat.edit',
+      'chat.delete',
+      'conversation.created',
+      'conversation.updated',
+      'broadcast.created',
+      'broadcast.updated',
+      'channel.content.created',
+      'channel.content.updated',
+      'notification.created',
+      'partner.message',
+      MAIN_TAB_BADGES_REALTIME_EVENT,
+    ];
+
+    realtimeEvents.forEach((eventName) => {
+      socket?.on(eventName, refreshBadges);
     });
+
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshBadges();
+    });
+
     return () => {
       alive = false;
-      sub.remove();
+      if (refreshTimer) clearTimeout(refreshTimer);
+      unbindBadgeEvents();
+      realtimeEvents.forEach((eventName) => {
+        socket?.off(eventName, refreshBadges);
+      });
+      appStateSub.remove();
     };
-  }, []);
+  }, [currentUserId, socket, isConnected]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -438,7 +490,7 @@ export function MainTabs() {
           headerShown: false,
           tabBarShowLabel: false,
         }}
-        tabBar={(p) => <AnimatedKISTabBar {...p} hidNav={hidNav} profileUnreadCount={profileUnreadCount} />}
+        tabBar={(p) => <AnimatedKISTabBar {...p} hidNav={hidNav} badgeCounts={badgeCounts} />}
       >
         <Tabs.Screen name="Messages" options={{ title: 'Messages' }}>
           {() => <MessagesScreen onOpenChat={openChat} onOpenInfo={openInfo} />}
@@ -488,6 +540,8 @@ export function MainTabs() {
           chat={activeChat}
           onBack={closeChat}
           onOpenInfo={openInfo}
+          onOpenChat={openChat}
+          initialTargetMessageId={(activeChat as any)?.initialTargetMessageId ?? null}
         />
       </RNAnimated.View>
 
@@ -593,22 +647,39 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 42,
     height: 42,
-    borderRadius: 12,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'visible',
+  },
+  selectedTabGradient: {
+    borderRadius: 18,
+  },
+  goldSheen: {
+    position: 'absolute',
+    top: 3,
+    left: 9,
+    right: 9,
+    height: 1,
+    backgroundColor: 'rgba(255,244,184,0.55)',
+    zIndex: 1,
   },
   badge: {
     position: 'absolute',
-    right: -8,
-    top: -6,
-    minWidth: 18,
-    height: 18,
+    right: -10,
+    top: -8,
+    minWidth: 19,
+    height: 19,
     borderRadius: 999,
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     backgroundColor: '#EF4444',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
+    elevation: 20,
   },
   badgeLabel: {
     color: '#FFFFFF',

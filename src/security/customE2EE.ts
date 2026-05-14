@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { fromByteArray, toByteArray } from 'base64-js';
 import crypto from 'react-native-quick-crypto';
 
 import { getRequest } from '@/network/get';
@@ -62,6 +63,11 @@ async function loadConversationKey(
   return promise;
 }
 
+const toBase64 = (value: Uint8Array | Buffer) =>
+  fromByteArray(value instanceof Uint8Array ? value : new Uint8Array(value));
+
+const fromBase64 = (value: string) => Buffer.from(toByteArray(value));
+
 const buildAad = (conversationId: string, clientId?: string, kind?: string) => {
   const parts = [conversationId, clientId ?? '', kind ?? ''];
   return Buffer.from(parts.join('|'), 'utf8');
@@ -72,7 +78,7 @@ export async function encryptConversationPayload(
   payload: Record<string, any>,
 ) {
   const entry = await loadConversationKey(conversationId);
-  const key = Buffer.from(entry.key, 'base64');
+  const key = fromBase64(entry.key);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const aad = buildAad(conversationId, payload.clientId, payload.kind);
@@ -91,16 +97,16 @@ export async function encryptConversationPayload(
     'version',
     entry.version,
     'aad',
-    aad.toString('base64'),
+    toBase64(aad),
   );
 
   return {
-    ciphertext: encrypted.toString('base64'),
-    iv: iv.toString('base64'),
-    tag: tag.toString('base64'),
+    ciphertext: toBase64(encrypted),
+    iv: toBase64(iv),
+    tag: toBase64(tag),
     encryptionVersion: ENCRYPTION_VERSION,
     encryptionKeyVersion: entry.version,
-    aad: aad.toString('base64'),
+    aad: toBase64(aad),
   };
 }
 
@@ -113,17 +119,17 @@ export async function decryptConversationPayload(
   versionHint?: string,
 ) {
   const entry = await loadConversationKey(conversationId, versionHint);
-  const key = Buffer.from(entry.key, 'base64');
+  const key = fromBase64(entry.key);
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
     key,
-    Buffer.from(iv, 'base64'),
+    fromBase64(iv),
   );
-  decipher.setAuthTag(Buffer.from(tag, 'base64') as any);
+  decipher.setAuthTag(fromBase64(tag) as any);
 
   if (aadBase64) {
     try {
-      const aad = Buffer.from(aadBase64, 'base64');
+      const aad = fromBase64(aadBase64);
       if (aad.length) {
         decipher.setAAD(aad as any);
       }
@@ -133,7 +139,7 @@ export async function decryptConversationPayload(
   }
 
   const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(ciphertext, 'base64')),
+    decipher.update(fromBase64(ciphertext)),
     decipher.final(),
   ]);
 

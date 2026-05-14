@@ -335,7 +335,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         <TextInput placeholder="Strength (e.g 500mg)" value={strength} onChangeText={setStrength} style={input(palette, spacing)} />
         <TextInput placeholder="Form (Tablet/Syrup)" value={form} onChangeText={setForm} style={input(palette, spacing)} />
         <TextInput placeholder="Default Dosage" value={defaultDosage} onChangeText={setDefaultDosage} style={input(palette, spacing)} />
-        <TextInput placeholder="Drug Price (KISC)" keyboardType="numeric" value={drugPrice} onChangeText={setDrugPrice} style={input(palette, spacing)} />
+        <TextInput placeholder="Drug Price (USD)" keyboardType="numeric" value={drugPrice} onChangeText={setDrugPrice} style={input(palette, spacing)} />
 
         <KISButton
           title={controlled ? 'Controlled: YES' : 'Controlled: NO'}
@@ -359,7 +359,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         {drugs.map((drug) => (
           <View key={drug.id} style={{ marginTop: spacing.sm }}>
             <Text style={{ color: palette.text }}>
-              {drug.name} • {drug.strength || 'N/A'} • {drug.form || 'N/A'} • {toKiscLabel(drug.price)} KISC
+              {drug.name} • {drug.strength || 'N/A'} • {drug.form || 'N/A'} • {toKiscLabel(drug.price)} USD
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit" onPress={() => editDrug(drug)} variant="outline" />
@@ -425,7 +425,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         <Text style={{ color: palette.text }}>Active: {activeCount}</Text>
         <Text style={{ color: palette.text }}>Dispensed: {dispensedCount}</Text>
         <Text style={{ color: palette.text }}>Expired: {expiredCount}</Text>
-        <Text style={{ color: palette.text }}>Total Drug Value: {toKiscLabel(totalValue)} KISC</Text>
+        <Text style={{ color: palette.text }}>Total Drug Value: {toKiscLabel(totalValue)} USD</Text>
       </View>
     </ScrollView>
   );

@@ -101,7 +101,7 @@ export default function VideoConsultationManager() {
         />
 
         <TextInput
-          placeholder="Price Per Minute (KISC)"
+          placeholder="Price Per Minute (USD)"
           keyboardType="numeric"
           value={pricePerMinute}
           onChangeText={setPricePerMinute}
@@ -194,7 +194,7 @@ export default function VideoConsultationManager() {
           </Text>
 
           <Text style={{ color: palette.text }}>
-            Current Cost: {liveCost} KISC
+            Current Cost: {liveCost} USD
           </Text>
 
           <KISButton title="End Session" onPress={endSession} />
@@ -216,7 +216,7 @@ export default function VideoConsultationManager() {
         </Text>
 
         <Text style={{ color: palette.text }}>
-          Revenue Generated: {totalRevenue} KISC
+          Revenue Generated: {totalRevenue} USD
         </Text>
 
         <Text style={{ color: palette.text }}>

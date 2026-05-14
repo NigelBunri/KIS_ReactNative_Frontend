@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
 import {
@@ -28,7 +29,10 @@ export default function PartnerCommunitiesSection({
   onCommunityFeedPress,
   showHeader = true,
 }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  const metallicGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
 
   if (communities.length === 0) return null;
 
@@ -159,22 +163,32 @@ export default function PartnerCommunitiesSection({
                         styles.communityGroupRow,
                         {
                           backgroundColor: isSelected
-                            ? palette.primarySoft
+                            ? palette.goldDeep
                             : palette.surfaceElevated ?? palette.surface,
                           borderColor: isSelected
-                            ? palette.primaryStrong
+                            ? palette.goldLight
                             : palette.borderMuted,
+                          overflow: 'hidden',
                           opacity: pressed ? 0.8 : 1,
                           transform: [{ scale: pressed ? 0.985 : 1 }],
                         },
                       ]}
                     >
+                      {isSelected ? (
+                        <LinearGradient
+                          colors={metallicGoldGradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                      ) : null}
+                      {isSelected ? <View pointerEvents="none" style={localStyles.goldSheen} /> : null}
                       <View
                         style={[
                           styles.groupHash,
                           {
                             backgroundColor: isSelected
-                              ? palette.primaryStrong
+                              ? 'rgba(255,255,255,0.18)'
                               : palette.primarySoft,
                           },
                         ]}
@@ -182,7 +196,7 @@ export default function PartnerCommunitiesSection({
                         <Text
                           style={{
                             color: isSelected
-                              ? palette.onPrimary
+                              ? palette.ivory
                               : palette.primaryStrong,
                             fontSize: 15,
                             fontWeight: '900',
@@ -195,7 +209,7 @@ export default function PartnerCommunitiesSection({
                         style={{
                           flex: 1,
                           color: isSelected
-                            ? palette.primaryStrong
+                            ? palette.ivory
                             : palette.text,
                           fontSize: 14,
                           fontWeight: isSelected ? '700' : '400',
@@ -215,3 +229,11 @@ export default function PartnerCommunitiesSection({
     </>
   );
 }
+
+const localStyles = StyleSheet.create({
+  goldSheen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    transform: [{ translateX: -22 }, { rotate: '-18deg' }, { scaleX: 0.36 }],
+  },
+});

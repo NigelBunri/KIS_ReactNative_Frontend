@@ -15,6 +15,8 @@ export default function BroadcastHeaderBar({
   onCreate,
 }: Props) {
   const { palette, tokens } = useKISTheme();
+  const headerTextColor = palette.ivory ?? '#FFFFFF';
+  const headerMutedColor = palette.goldSoft ?? 'rgba(255,244,184,0.86)';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
@@ -23,23 +25,23 @@ export default function BroadcastHeaderBar({
         <View
           style={[
             styles.mark,
-            { backgroundColor: palette.surface, borderColor: palette.border },
+            { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: palette.goldLight },
           ]}
         >
           <KISIcon name="megaphone" size={18} color={palette.primaryStrong} />
         </View>
         <View>
-          <Text style={[styles.eyebrow, { color: palette.subtext }]}>
+          <Text style={[styles.eyebrow, { color: headerMutedColor }]}>
             Studio signal
           </Text>
-          <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+          <Text style={[styles.title, { color: headerTextColor }]}>{title}</Text>
         </View>
         <View
           style={[
             styles.badge,
             {
-              backgroundColor: palette.primarySoft,
-              borderColor: palette.primary,
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              borderColor: palette.goldLight,
             },
           ]}
         >

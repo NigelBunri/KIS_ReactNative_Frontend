@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 
 import type { BibleTranslation, BibleVerse } from '@/screens/tabs/bible/useBibleData';
 
@@ -6,6 +7,8 @@ const EVENTS_KEY = 'kis.bible.local.reading_events.v1';
 const HIGHLIGHTS_KEY = 'kis.bible.local.highlights.v1';
 const NOTES_KEY = 'kis.bible.local.notes.v1';
 const BOOKMARKS_KEY = 'kis.bible.local.bookmarks.v1';
+
+export const BIBLE_READING_EVENTS_UPDATED_EVENT = 'bible.readingEvents.updated';
 
 export type LocalBibleEvent = {
   id: string;
@@ -65,6 +68,10 @@ export const upsertLocalBibleEvent = async (event: LocalBibleEvent) => {
   const normalized = { ...event, id: String(event.id), updated_at: nowIso() };
   const next = [normalized, ...list.filter((item) => String(item.id) !== normalized.id)];
   await writeJson(EVENTS_KEY, next.slice(0, 500));
+  DeviceEventEmitter.emit(BIBLE_READING_EVENTS_UPDATED_EVENT, {
+    action: 'upsert',
+    eventId: normalized.id,
+  });
   return normalized;
 };
 
@@ -74,6 +81,10 @@ export const deleteLocalBibleEvent = async (eventId: string | number) => {
     EVENTS_KEY,
     list.filter((item) => String(item.id) !== String(eventId)),
   );
+  DeviceEventEmitter.emit(BIBLE_READING_EVENTS_UPDATED_EVENT, {
+    action: 'delete',
+    eventId: String(eventId),
+  });
 };
 
 export const mergeBibleEventsWithLocal = async <T extends LocalBibleEvent>(

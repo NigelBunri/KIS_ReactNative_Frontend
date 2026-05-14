@@ -208,7 +208,7 @@ export default function EmergencyDispatchManager() {
         />
 
         <TextInput
-          placeholder="Base Dispatch Fee (KISC)"
+          placeholder="Base Dispatch Fee (USD)"
           value={baseFee}
           keyboardType="numeric"
           onChangeText={setBaseFee}
@@ -216,7 +216,7 @@ export default function EmergencyDispatchManager() {
         />
 
         <TextInput
-          placeholder="Per KM Fee (KISC)"
+          placeholder="Per KM Fee (USD)"
           value={perKmFee}
           keyboardType="numeric"
           onChangeText={setPerKmFee}
@@ -356,7 +356,7 @@ export default function EmergencyDispatchManager() {
               {req.priority} • {req.status}
             </Text>
             <Text style={{ color: palette.subtext }}>
-              Price: {req.price} KISC
+              Price: {req.price} USD
             </Text>
 
             {[
@@ -402,7 +402,7 @@ export default function EmergencyDispatchManager() {
           Active Ambulances: {activeAmbulances}
         </Text>
         <Text style={{ color: palette.text }}>
-          Revenue Generated: {revenue} KISC
+          Revenue Generated: {revenue} USD
         </Text>
       </View>
 

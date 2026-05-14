@@ -1,6 +1,9 @@
 import { API_BASE_URL } from '../config';
 
 const miscRoutes = {
+  uploads: {
+    file: `${API_BASE_URL}/uploads/file`,
+  },
   moderation: {
     flags: `${API_BASE_URL}/api/v1/flags/`,
     flagsQueueSummary: `${API_BASE_URL}/api/v1/flags/queue-summary/`,

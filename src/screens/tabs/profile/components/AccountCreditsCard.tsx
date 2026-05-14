@@ -13,12 +13,17 @@ import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { styles } from '../profile.styles';
 import coin from '../../../../assets/KIS-Coin.png';
-const MICROS_PER_KISC = 1000;
-const CENTS_PER_KISC = 100;
+const MICROS_PER_PROMO_CREDIT = 1000;
 
-const toKiscFromCents = (cents?: number) => {
+const formatUsd = (cents?: number) => {
   const safe = Number.isFinite(Number(cents)) ? Math.max(0, Number(cents)) : 0;
-  return (safe / CENTS_PER_KISC).toFixed(2);
+  return `$${(safe / 100).toFixed(2)}`;
+};
+
+const normalizeCreditLabel = (label?: string) => {
+  const value = String(label || '').trim();
+  if (!value) return '0 promotional credits';
+  return value.replace(/KISC/g, 'promotional credits').replace(/KIS Coins?/gi, 'promotional credits');
 };
 
 const toEntryAmount = (entry: any) => {
@@ -28,17 +33,16 @@ const toEntryAmount = (entry: any) => {
       String(entry?.transaction_type || '').toLowerCase() === 'debit'
         ? '-'
         : '+';
-    return `${sign}${(Math.abs(amountMicro) / MICROS_PER_KISC).toFixed(
+    return `${sign}${(Math.abs(amountMicro) / MICROS_PER_PROMO_CREDIT).toFixed(
       2,
-    )} KISC`;
+    )} promotional credits`;
   }
   const amountCents = Number(entry?.amount_cents);
   if (Number.isFinite(amountCents) && amountCents !== 0) {
-    const kisc = Math.abs(amountCents) / CENTS_PER_KISC;
     const sign = amountCents < 0 ? '-' : '+';
-    return `${sign}${kisc.toFixed(2)} KISC`;
+    return `${sign}$${(Math.abs(amountCents) / 100).toFixed(2)} USD`;
   }
-  return '0.00 KISC';
+  return '0 promotional credits';
 };
 
 const toCounterpartyLabel = (entry: any) => {
@@ -130,7 +134,6 @@ export default function AccountCreditsCard({
   tierName,
   tierPriceCents,
   walletBalanceLabel,
-  walletUsdLabel,
   points,
   onWallet,
   onUpgrade,
@@ -148,7 +151,6 @@ export default function AccountCreditsCard({
   tierName: string;
   tierPriceCents: number;
   walletBalanceLabel?: string;
-  walletUsdLabel?: string;
   points: number;
   onWallet: () => void;
   onUpgrade: () => void;
@@ -192,11 +194,8 @@ export default function AccountCreditsCard({
     ? 'Unlimited partner orgs'
     : partnerProfilesLimitLabel ?? (partnerProfilesLimitValue ?? 0).toString();
 
-  const resolvedKiscLabel = useMemo(
-    () =>
-      walletBalanceLabel && walletBalanceLabel.trim()
-        ? walletBalanceLabel
-        : '0.00 KISC',
+  const resolvedCreditLabel = useMemo(
+    () => normalizeCreditLabel(walletBalanceLabel),
     [walletBalanceLabel],
   );
 
@@ -209,12 +208,12 @@ export default function AccountCreditsCard({
     >
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.text }]}>
-          Account & KIS-Coins
+          Account & promotional credits
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Image source={coin} style={{ width: 14, height: 14 }} />
           <Text style={[styles.subtext, { color: palette.subtext }]}>
-            {toKiscFromCents(tierPriceCents)} KISC
+            {formatUsd(tierPriceCents)}
           </Text>
           <Text style={[styles.subtext, { color: palette.subtext }]}>/mo</Text>
         </View>
@@ -284,25 +283,22 @@ export default function AccountCreditsCard({
                 { color: palette.subtext, marginTop: 6 },
               ]}
             >
-              {resolvedKiscLabel}
+              {resolvedCreditLabel}
             </Text>
           </View>
 
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={[styles.statLabel, { color: palette.subtext }]}>
-              KIS Coin Balance
+              Promotional credit balance
             </Text>
             <Text style={[styles.statValue, { color: palette.text }]}>
-              {resolvedKiscLabel}
+              {resolvedCreditLabel}
             </Text>
             <Text style={[styles.statMeta, { color: palette.subtext }]}>
-              {walletUsdLabel ?? '$0.00'}
+              Gift/reward credits can subsidize eligible account upgrades only.
             </Text>
             <Text style={[styles.statMeta, { color: palette.subtext }]}>
-              Used for upgrades, transfers, and billing.
-            </Text>
-            <Text style={[styles.statMeta, { color: palette.subtext }]}>
-              Top up anytime from the wallet section.
+              They cannot be bought, transferred, withdrawn, sold, or converted to cash.
             </Text>
           </View>
         </View>
@@ -339,7 +335,7 @@ export default function AccountCreditsCard({
 
       <View style={{ gap: 10 }}>
         <KISButton
-          title="Add KIS Coins"
+          title="View credits & history"
           variant="secondary"
           onPress={onWallet}
         />
@@ -392,7 +388,7 @@ export default function AccountCreditsCard({
         </TouchableOpacity>
         {!showHistory ? null : walletLedger.length === 0 ? (
           <Text style={[styles.subtext, { color: palette.subtext }]}>
-            No recent KIS wallet activity.
+            No recent promotional-credit or billing activity.
           </Text>
         ) : (
           walletLedger.slice(0, 6).map((entry: any) => (

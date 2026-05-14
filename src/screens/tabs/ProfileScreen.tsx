@@ -51,6 +51,16 @@ import FeedComposerSheet, {
   type FeedComposerPayload,
 } from '@/components/feeds/FeedComposerSheet';
 import { prepareBroadcastVideoPayload } from '@/components/feeds/videoAttachmentHelpers';
+import {
+  VerificationCenterSheet,
+  VerificationStaffConsole,
+  VerificationStatusCard,
+  normalizeVerificationSummary,
+} from '@/components/verification';
+import type {
+  VerificationSubjectRef,
+  VerificationSummary,
+} from '@/services/verificationService';
 
 import BottomSheet from './profile/sheets/BottomSheet';
 import SheetHeader from './profile/sheets/SheetHeader';
@@ -75,6 +85,18 @@ const CANCELLED_BOOKING_STATUSES = new Set([
   'rejected',
   'void',
 ]);
+type VerificationCenterTarget = {
+  subject: VerificationSubjectRef;
+  title: string;
+  subtitle?: string;
+  summary?: VerificationSummary | null;
+};
+
+type AdvancedFeedChannelContext = {
+  channelId?: string;
+  channelHandle?: string;
+  channelName?: string;
+} | null;
 
 const getBookingServiceId = (booking: any) => {
   if (!booking) return null;
@@ -213,6 +235,8 @@ export default function ProfileScreen() {
   >(null);
   const [advancedFeedComposerVisible, setAdvancedFeedComposerVisible] =
     useState(false);
+  const [advancedFeedChannelContext, setAdvancedFeedChannelContext] =
+    useState<AdvancedFeedChannelContext>(null);
   const managementPanelOffset = useRef(
     new Animated.Value(profileLayout.SCREEN_WIDTH),
   ).current;
@@ -438,8 +462,7 @@ export default function ProfileScreen() {
 
   const accountTier = c.profile?.account?.tier;
   const points = c.profile?.account?.points ?? 0;
-  const kisWalletLabel = String(c.kisWallet?.balance_label ?? '0.00 KISC');
-  const kisWalletUsdLabel = String(c.kisWallet?.usd_label ?? '$0.00');
+  const kisWalletLabel = String(c.kisWallet?.balance_label ?? '0 promotional credits');
   const currentTier =
     accountTier || c.profile?.tier || c.profile?.subscription?.tier;
   const tierLabel =
@@ -454,6 +477,24 @@ export default function ProfileScreen() {
     c.profile?.partner_profiles_limit_value ?? 0;
   const partnerProfilesIsUnlimited = !!c.profile?.partner_profiles_is_unlimited;
   const canCreatePartner = !!c.profile?.partner_profiles_can_create;
+  const [verificationCenterTarget, setVerificationCenterTarget] =
+    useState<VerificationCenterTarget | null>(null);
+  const [verificationStaffConsoleVisible, setVerificationStaffConsoleVisible] = useState(false);
+  const userVerificationSummary = useMemo(
+    () =>
+      normalizeVerificationSummary(c.profile?.user) ||
+      normalizeVerificationSummary(c.profile?.profile) ||
+      normalizeVerificationSummary(c.profile),
+    [c.profile],
+  );
+  const profileUserAny = c.profile?.user as any;
+  const profileAccountAny = c.profile?.account as any;
+  const canOpenVerificationStaffConsole = Boolean(
+    profileUserAny?.is_staff ||
+      profileUserAny?.is_superuser ||
+      profileUserAny?.is_admin ||
+      profileAccountAny?.is_staff,
+  );
   const editGalleryItems = useMemo(() => {
     const gallery: Array<{
       id: string;
@@ -738,6 +779,22 @@ export default function ProfileScreen() {
     resetFeedForm,
   ]);
 
+  const openAdvancedFeedComposer = useCallback(
+    (channel?: { id?: string; handle?: string; display_name?: string } | null) => {
+      setAdvancedFeedChannelContext(
+        channel?.id
+          ? {
+              channelId: String(channel.id),
+              channelHandle: channel.handle ? String(channel.handle) : undefined,
+              channelName: channel.display_name ? String(channel.display_name) : undefined,
+            }
+          : null,
+      );
+      setAdvancedFeedComposerVisible(true);
+    },
+    [],
+  );
+
   const handleAdvancedFeedSubmit = useCallback(
     async (payload: FeedComposerPayload) => {
       const prepared = await prepareBroadcastVideoPayload(payload);
@@ -812,6 +869,7 @@ export default function ProfileScreen() {
         },
       );
       setAdvancedFeedComposerVisible(false);
+      setAdvancedFeedChannelContext(null);
       Alert.alert('Broadcast item', 'Advanced feed item saved to your queue.');
     },
     [c],
@@ -1772,6 +1830,7 @@ export default function ProfileScreen() {
           helper: def.helper,
           icon: def.icon as any,
           meta: summaryText,
+          verificationSummary: normalizeVerificationSummary(profileData),
           onPress: () => handleBroadcastCTA(def),
         };
       }),
@@ -1995,7 +2054,7 @@ export default function ProfileScreen() {
           handleDeleteFeedItem={handleDeleteFeedItem}
           handleBroadcastFeedItem={handleBroadcastFeedItem}
           handleRemoveBroadcastFeedItem={handleRemoveBroadcastFeedItem}
-          onOpenAdvancedComposer={() => setAdvancedFeedComposerVisible(true)}
+          onOpenAdvancedComposer={openAdvancedFeedComposer}
           panelFeedBroadcastingId={panelFeedBroadcastingId}
           setPanelFeedExistingAttachments={setPanelFeedExistingAttachments}
           setPanelFeedMediaType={setPanelFeedMediaType}
@@ -2033,6 +2092,14 @@ export default function ProfileScreen() {
           onManageInstitution={handleEditInstitution}
           onViewInstitution={handleViewInstitution}
           onAddInstitution={handleAddInstitution}
+          onOpenVerificationCenter={(institution: any) =>
+            setVerificationCenterTarget({
+              subject: { type: 'health_institution', id: institution?.id },
+              title: 'Health institution verification',
+              subtitle: 'Submit licensing, accreditation, and authorization metadata using private media references.',
+              summary: normalizeVerificationSummary(institution),
+            })
+          }
         />
       );
     }
@@ -2050,6 +2117,14 @@ export default function ProfileScreen() {
           onViewDashboard={handleViewShopDashboard}
           onOpenLandingBuilder={openMarketLandingBuilder}
           onRefresh={loadCommerceShops}
+          onOpenVerificationCenter={(shop: any) =>
+            setVerificationCenterTarget({
+              subject: { type: 'shop', id: shop?.id },
+              title: 'Shop verification',
+              subtitle: 'Submit business identity and storefront proof through private media references.',
+              summary: normalizeVerificationSummary(shop),
+            })
+          }
         />
       );
     }
@@ -2097,6 +2172,14 @@ export default function ProfileScreen() {
           panelAttachmentUploading={panelAttachmentUploading}
           handleAttachProfileFile={handleAttachProfileFile}
           onOpenLandingBuilder={openEducationLandingBuilder}
+          onOpenVerificationCenter={(institution: any) =>
+            setVerificationCenterTarget({
+              subject: { type: 'education_institution', id: institution?.id },
+              title: 'Education verification',
+              subtitle: 'Submit accreditation and authorization metadata using private media references.',
+              summary: normalizeVerificationSummary(institution),
+            })
+          }
         />
       );
     }
@@ -2180,6 +2263,15 @@ export default function ProfileScreen() {
               }
               onSettingsPress={() => c.openSheet('privacy')}
               notificationCount={unreadNotifications.length}
+              verificationSummary={userVerificationSummary}
+              onVerificationPress={() =>
+                setVerificationCenterTarget({
+                  subject: { type: 'user' },
+                  title: 'User verification',
+                  subtitle: 'Verify your identity and show trusted badges on your profile.',
+                  summary: userVerificationSummary,
+                })
+              }
             />
             <View style={{ top: -82, paddingHorizontal: 18, gap: 12 }}>
               <View
@@ -2220,6 +2312,20 @@ export default function ProfileScreen() {
                     'Add a short bio that explains your work.'}
                 </Text>
                 <View style={[styles.actionRow, { gap: 10, flexWrap: 'wrap' }]}>
+                  <VerificationStatusCard
+                    palette={palette}
+                    summary={userVerificationSummary}
+                    title="Profile verification"
+                    subtitle="Submit private evidence references for staff/provider review."
+                    onOpen={() =>
+                      setVerificationCenterTarget({
+                        subject: { type: 'user' },
+                        title: 'User verification',
+                        subtitle: 'Verify your identity and unlock trusted profile badges.',
+                        summary: userVerificationSummary,
+                      })
+                    }
+                  />
                   <KISButton
                     title="Complete Profile"
                     onPress={c.openEditProfile}
@@ -2229,6 +2335,13 @@ export default function ProfileScreen() {
                     variant="outline"
                     onPress={() => c.openSheet('privacy')}
                   />
+                  {canOpenVerificationStaffConsole ? (
+                    <KISButton
+                      title="Verification review"
+                      variant="secondary"
+                      onPress={() => setVerificationStaffConsoleVisible(true)}
+                    />
+                  ) : null}
                 </View>
               </View>
 
@@ -2236,7 +2349,6 @@ export default function ProfileScreen() {
                 <View style={{ flex: 1, minWidth: 280 }}>
                   <WalletSummaryCard
                     balanceLabel={kisWalletLabel}
-                    usdLabel={kisWalletUsdLabel}
                     tierLabel={`${
                       tierLabel || accountTier?.name || 'Free'
                     } • ${points} pts`}
@@ -2380,6 +2492,24 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Partner slide */}
+      <VerificationStaffConsole
+        visible={verificationStaffConsoleVisible}
+        palette={palette}
+        onClose={() => setVerificationStaffConsoleVisible(false)}
+      />
+
+      {verificationCenterTarget ? (
+        <VerificationCenterSheet
+          visible={Boolean(verificationCenterTarget)}
+          palette={palette}
+          subject={verificationCenterTarget.subject}
+          title={verificationCenterTarget.title}
+          subtitle={verificationCenterTarget.subtitle}
+          initialSummary={verificationCenterTarget.summary}
+          onClose={() => setVerificationCenterTarget(null)}
+        />
+      ) : null}
+
       {c.showCreatePartner && (
         <Animated.View
           style={[
@@ -2540,8 +2670,12 @@ export default function ProfileScreen() {
       )}
       <FeedComposerSheet
         visible={advancedFeedComposerVisible}
-        onClose={() => setAdvancedFeedComposerVisible(false)}
+        onClose={() => {
+          setAdvancedFeedComposerVisible(false);
+          setAdvancedFeedChannelContext(null);
+        }}
         onSubmit={handleAdvancedFeedSubmit}
+        channelContext={advancedFeedChannelContext ?? undefined}
       />
     </View>
   );

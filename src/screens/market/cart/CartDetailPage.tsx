@@ -13,7 +13,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import KISButton from '@/constants/KISButton';
-import { formatKiscAmount } from '@/utils/currency';
+import { formatUsdAmount } from '@/utils/currency';
 import {
   deleteShopCart,
   getShopCartState,
@@ -300,7 +300,7 @@ const CartDetailPage = () => {
                       { color: palette.primaryStrong },
                     ]}
                   >
-                    {formatKiscAmount(item.price * item.quantity)}
+                    {formatUsdAmount(item.price * item.quantity)}
                   </Text>
                 </View>
                 <View style={cartDetailStyles.quantityRow}>
@@ -342,7 +342,7 @@ const CartDetailPage = () => {
                       { color: palette.subtext },
                     ]}
                   >
-                    {`${formatKiscAmount(item.price)} per item`}
+                    {`${formatUsdAmount(item.price)} per item`}
                   </Text>
                 </View>
                 {!cartIsCheckedOut &&
@@ -372,7 +372,7 @@ const CartDetailPage = () => {
       )}
       <View style={cartDetailStyles.footer}>
         <Text style={[cartDetailStyles.footerText, { color: palette.text }]}>
-          Total · {formatKiscAmount(totalAmount)}
+          Total · {formatUsdAmount(totalAmount)}
         </Text>
         <KISButton
           title="Delete cart"

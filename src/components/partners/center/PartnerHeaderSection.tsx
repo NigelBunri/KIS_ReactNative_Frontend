@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
@@ -12,25 +12,32 @@ type Props = {
 };
 
 export default function PartnerHeaderSection({ partner, onPress }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone, isDark } = useKISTheme();
+  const metallicGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
   const initials =
     partner?.initials || partner?.name?.slice(0, 2).toUpperCase();
-  const titleColor = palette.text;
-  const mutedColor = palette.subtext;
+  const titleColor = isDark ? palette.ivory : palette.text;
+  const mutedColor = isDark ? palette.goldSoft : palette.subtext;
+  const strongLabelColor = isDark ? palette.ivory : palette.goldDeep;
+  const roleTextColor = isDark ? palette.ivory : palette.goldDeep;
+  const rolePillBg = isDark ? 'rgba(255,251,242,0.10)' : palette.surface;
+  const activePillBg = isDark ? 'rgba(217,168,117,0.16)' : palette.primarySoft;
 
   return (
     <>
       <Text
-        style={[styles.partnerHeaderKicker, { color: palette.primaryStrong }]}
+        style={[styles.partnerHeaderKicker, { color: strongLabelColor }]}
       >
         Partner workspace
       </Text>
       <View style={styles.partnerHeaderRow}>
         <LinearGradient
-          colors={[palette.primarySoft, palette.surface, palette.primarySoft]}
+          colors={isDark ? ['#5A372D', '#8A5A12', '#D9A875'] : [palette.primarySoft, palette.surface, palette.primarySoft]}
           style={[
             styles.partnerHeroAvatar,
-            { borderColor: palette.borderMuted },
+            { borderColor: isDark ? palette.goldLight : palette.borderMuted },
           ]}
         >
           {partner?.avatar_url ? (
@@ -42,7 +49,7 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
           ) : (
             <Text
               style={{
-                color: palette.primaryStrong,
+                color: isDark ? palette.royalInk : palette.goldDeep,
                 fontSize: 18,
                 fontWeight: '900',
               }}
@@ -77,9 +84,10 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
               paddingVertical: 6,
               borderRadius: 14,
               borderWidth: 1,
-              borderColor: palette.primaryStrong,
-              backgroundColor: palette.primaryStrong,
-              shadowColor: palette.primaryStrong,
+              borderColor: palette.goldLight,
+              backgroundColor: palette.goldDeep,
+              shadowColor: palette.goldDeep,
+              overflow: 'hidden',
               shadowOpacity: 0.18,
               shadowRadius: 8,
               shadowOffset: { width: 0, height: 4 },
@@ -89,9 +97,16 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             },
           ]}
         >
+          <LinearGradient
+            colors={metallicGoldGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View pointerEvents="none" style={localStyles.goldSheen} />
           <Text
             style={{
-              color: palette.onPrimary ?? '#fff',
+              color: palette.ivory ?? '#fff',
               fontSize: 12,
               fontWeight: '800',
             }}
@@ -101,7 +116,7 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
           <KISIcon
             name="settings"
             size={14}
-            color={palette.onPrimary ?? '#fff'}
+            color={palette.ivory ?? '#fff'}
           />
         </Pressable>
       </View>
@@ -111,14 +126,14 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             styles.partnerHeaderPill,
             {
               borderColor: palette.borderMuted,
-              backgroundColor: palette.surface,
+              backgroundColor: rolePillBg,
             },
           ]}
         >
           <Text
             style={[
               styles.partnerHeaderPillText,
-              { color: palette.primaryStrong },
+              { color: roleTextColor },
             ]}
           >
             Role: {partner?.member_role || partner?.role || 'Member'}
@@ -129,11 +144,11 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             styles.partnerHeaderPill,
             {
               borderColor: palette.borderMuted,
-              backgroundColor: palette.primarySoft,
+              backgroundColor: activePillBg,
             },
           ]}
         >
-          <Text style={[styles.partnerHeaderPillText, { color: palette.text }]}>
+          <Text style={[styles.partnerHeaderPillText, { color: isDark ? palette.ivory : palette.text }]}>
             Active partner
           </Text>
         </View>
@@ -141,3 +156,11 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
     </>
   );
 }
+
+const localStyles = StyleSheet.create({
+  goldSheen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
+  },
+});

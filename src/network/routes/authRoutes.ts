@@ -64,6 +64,18 @@ const authRoutes = {
     detail: (id: string) => `${API_BASE_URL}/api/v1/subscriptions/${id}/`,
     create: `${API_BASE_URL}/api/v1/subscriptions/`,
   },
+  verification: {
+    userStatus: `${API_BASE_URL}/api/v1/verification/user/status/`,
+    userStart: `${API_BASE_URL}/api/v1/verification/user/start/`,
+    staffCases: `${API_BASE_URL}/api/v1/verification/staff/cases/`,
+    staffCase: (caseId: string) => `${API_BASE_URL}/api/v1/verification/staff/cases/${caseId}/`,
+    staffBadgeIssue: `${API_BASE_URL}/api/v1/verification/staff/badges/issue/`,
+    staffBadgeRevoke: (badgeId: string) => `${API_BASE_URL}/api/v1/verification/staff/badges/${badgeId}/revoke/`,
+    staffAuditEvents: `${API_BASE_URL}/api/v1/verification/staff/audit-events/`,
+    staffProviderCallbacks: `${API_BASE_URL}/api/v1/verification/staff/provider-callbacks/`,
+    staffSuspiciousSignals: `${API_BASE_URL}/api/v1/verification/staff/suspicious-signals/`,
+    staffExpiryReminders: `${API_BASE_URL}/api/v1/verification/staff/expiry-reminders/`,
+  },
   contacts: {
     check: `${API_BASE_URL}/api/v1/users/check-contacts/`,
   },

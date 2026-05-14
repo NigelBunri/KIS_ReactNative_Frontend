@@ -18,7 +18,7 @@ import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import type { RootStackParamList } from '@/navigation/types';
-import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
+import { backendOrderTotalToUsd } from '@/utils/currency';
 
 type ProviderOrdersNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -118,7 +118,7 @@ export default function ProviderOrdersPage() {
   );
 
   const renderOrder = ({ item }: { item: MarketplaceOrderSummary }) => {
-    const total = backendOrderTotalToFrontendKisc(item.total_amount);
+    const total = backendOrderTotalToUsd(item.total_amount);
     const buyerName =
       typeof item.buyer === 'string'
         ? item.buyer
@@ -161,7 +161,7 @@ export default function ProviderOrdersPage() {
             Buyer · {buyerName}
           </Text>
           <Text style={[styles.meta, { color: palette.subtext }]}>
-            {status} · {total.toFixed(2)} {item.currency ?? 'KISC'}
+            {status} · {total.toFixed(2)} USD
           </Text>
         </Pressable>
         <View style={styles.actions}>

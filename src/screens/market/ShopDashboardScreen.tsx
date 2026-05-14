@@ -1781,7 +1781,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         const priceValue = String(payload.price ?? '').trim();
         formData.append('price', priceValue || '0');
         const currencyValue =
-          String(payload.currency ?? KIS_COIN_CODE).trim() || KIS_COIN_CODE;
+          KIS_COIN_CODE;
         formData.append('currency', currencyValue);
         const stockValue = String(
           payload.stock_qty ?? payload.stock ?? payload.stockQty ?? '',

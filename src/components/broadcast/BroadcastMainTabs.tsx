@@ -6,6 +6,7 @@ import { KISIcon } from '@/constants/kisIcons';
 
 export type BroadcastMainTabId =
   | 'feeds'
+  | 'channels'
   | 'education'
   | 'market'
   | 'healthcare';
@@ -19,6 +20,7 @@ type Props = {
 
 const TABS: TabDef[] = [
   { id: 'feeds', label: 'Feeds', icon: 'spark' },
+  { id: 'channels', label: 'Channels', icon: 'sub-channel' },
   { id: 'education', label: 'Education', icon: 'book' },
   { id: 'market', label: 'Market', icon: 'store' },
   { id: 'healthcare', label: 'Healthcare', icon: 'heart' },
@@ -26,13 +28,15 @@ const TABS: TabDef[] = [
 
 export default function BroadcastMainTabs({ value, onChange }: Props) {
   const { palette, tokens } = useKISTheme();
+  const inactiveTextColor = palette.ivory ?? '#FFFFFF';
+  const inactiveIconColor = palette.goldSoft ?? 'rgba(255,244,184,0.86)';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
     <View
       style={[
         styles.wrap,
-        { backgroundColor: palette.surface, borderColor: palette.border },
+        { backgroundColor: 'transparent', borderColor: 'transparent' },
       ]}
     >
       <ScrollView
@@ -49,8 +53,8 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
               style={[
                 styles.pill,
                 {
-                  backgroundColor: active ? 'transparent' : 'transparent',
-                  borderColor: active ? palette.primary : 'transparent',
+                  backgroundColor: active ? 'transparent' : 'rgba(255,255,255,0.08)',
+                  borderColor: active ? palette.goldLight : 'rgba(255,244,184,0.26)',
                 },
               ]}
               accessibilityRole="button"
@@ -66,11 +70,11 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
               <KISIcon
                 name={t.icon as any}
                 size={15}
-                color={active ? palette.primaryStrong : palette.subtext}
+                color={active ? palette.primaryStrong : inactiveIconColor}
               />
               <Text
                 style={{
-                  color: active ? palette.primaryStrong : palette.text,
+                  color: active ? palette.primaryStrong : inactiveTextColor,
                   fontWeight: '900',
                   marginLeft: 6,
                   fontSize: 13,
@@ -89,16 +93,11 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
 const makeStyles = (_tokens: any) =>
   StyleSheet.create({
     wrap: {
-      borderWidth: 1,
-      borderRadius: 22,
+      borderWidth: 0,
+      borderRadius: 0,
       paddingVertical: 6,
-      paddingHorizontal: 4,
+      paddingHorizontal: 0,
       alignItems: 'center',
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 2,
     },
     scrollContent: {
       flexDirection: 'row',

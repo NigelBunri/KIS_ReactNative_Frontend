@@ -483,7 +483,7 @@ export default function ProductEditorDrawer({
         description: product.description ?? '',
         price: product.price != null ? String(product.price) : '',
         sale_price: product.sale_price != null ? String(product.sale_price) : '',
-        currency: product.currency ?? KIS_COIN_CODE,
+        currency: KIS_COIN_CODE,
         inventory_type: product.inventory_type ?? 'PHYSICAL',
         stock_qty: product.stock_qty != null ? String(product.stock_qty) : '',
         low_stock_threshold:
@@ -661,7 +661,7 @@ export default function ProductEditorDrawer({
       description: form.description.trim(),
       price: form.price.trim(),
       sale_price: form.sale_price.trim() ? form.sale_price.trim() : null,
-      currency: form.currency.trim() || KIS_COIN_CODE,
+      currency: KIS_COIN_CODE,
       inventory_type: form.inventory_type,
       stock_qty: form.stock_qty.trim() || '0',
       low_stock_threshold: form.low_stock_threshold.trim()
@@ -1050,18 +1050,16 @@ export default function ProductEditorDrawer({
                 keyboardType="numeric"
               />
 
-              <KISTextInput
-                label="Currency"
-                value={form.currency}
-                onChangeText={(value) => updateField({ currency: value.toUpperCase() })}
-              />
+              <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700' }}>
+                Currency is fixed to USD. Payments are processed through Flutterwave.
+              </Text>
 
               <View style={{ marginTop: 6 }}>
                 <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 25, marginBottom: 6 }}>
-                  Equivalent USD value: ${formatUsd(form.price)}
+                  USD price preview: ${formatUsd(form.price)}
                 </Text>
                 <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                  1 {KIS_COIN_CODE} = ${KIS_TO_USD_RATE} USD
+                  USD direct provider checkout
                 </Text>
               </View>
 

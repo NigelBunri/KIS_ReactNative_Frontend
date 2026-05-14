@@ -78,6 +78,8 @@ export type Chat = {
   isLocked?: boolean;
   isBlocked?: boolean;
   isMuted?: boolean;
+  isPinned?: boolean;
+  isHidden?: boolean;
 };
 
 export type CustomFilterRule = {
@@ -403,6 +405,21 @@ export function bySearch(chat: Chat, query: string) {
 export const styles = StyleSheet.create({
   wrap: { flex: 1 },
 
+  messageGoldPanel: {
+    overflow: 'hidden',
+    backgroundColor: '#6B4334',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  messageGoldSheen: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 2,
+    backgroundColor: 'rgba(255,244,184,0.45)',
+  },
+
   /* App Bar */
   appBar: {
     flexDirection: 'row',
@@ -411,6 +428,18 @@ export const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  royalAppBar: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: 'hidden',
   },
   appBarLeft: { flex: 1 },
   appName: { fontSize: 22, fontWeight: '900', letterSpacing: 0.3 },

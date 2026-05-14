@@ -14,10 +14,6 @@ import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
-import {
-  KIS_COIN_CODE,
-  KIS_TO_USD_RATE,
-} from '@/screens/market/market.constants';
 import { collectProductImageUris } from '@/utils/productImages';
 
 const fallbackCover = require('@/assets/logo-light.png');
@@ -171,7 +167,7 @@ const ShopServicesPage = () => {
   const renderServiceItem = useCallback(
     ({ item }: { item: ShopService }) => {
       const priceValue = Number(item.price ?? 0);
-      const currency = item.currency ?? KIS_COIN_CODE;
+      const currency = 'USD';
       const comparePrice = Number(item.compare_at_price ?? 0);
       const imageUri = collectProductImageUris(item)[0] ?? null;
       const durationText = item.duration_minutes
@@ -249,7 +245,7 @@ const ShopServicesPage = () => {
                     { color: palette.subtext },
                   ]}
                 >
-                  ≈ ${(priceValue * KIS_TO_USD_RATE).toFixed(2)} USD
+                  USD direct checkout
                 </Text>
               </View>
               <Text

@@ -217,6 +217,10 @@ const broadcastRoutes = {
     reactivate: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/reactivate/`,
     remove: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/remove/`,
+    verificationStatus: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/verification-status/`,
+    verificationStart: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/verification/start/`,
   },
   broadcasts: {
     list: `${API_BASE_URL}/api/v1/broadcasts/`,
@@ -230,6 +234,67 @@ const broadcastRoutes = {
     features: `${API_BASE_URL}/api/v1/broadcasts/features/`,
     channelFeatures: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/features/`,
+    channels: `${API_BASE_URL}/api/v1/broadcasts/channels/`,
+    channelDetail: (handleOrId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${handleOrId}/`,
+    channelSubscribe: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/subscribe/`,
+    channelSubscription: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/subscription/`,
+    channelReport: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/report/`,
+    channelModeration: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/moderation/`,
+    channelAnalytics: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/analytics/`,
+    channelBroadcast: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/broadcast/`,
+    channelContents: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/contents/`,
+    channelPlaylists: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/playlists/`,
+    channelLiveStreams: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/live-streams/`,
+    liveStreamDetail: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/`,
+    liveStreamStart: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/start/`,
+    liveStreamEnd: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/end/`,
+    embedContent: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/embed/contents/${contentId}/`,
+    embedContentOembed: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/embed/contents/${contentId}/oembed/`,
+    channelContentEmbedToken: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/embed-token/`,
+    channelContentReact: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/react/`,
+    channelContentSave: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/save/`,
+    channelContentShare: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/share/`,
+    channelContentView: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/view/`,
+    channelContentReport: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/report/`,
+    channelContentBroadcast: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/broadcast/`,
+    channelContentComments: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/comments/`,
+    channelCommentModerate: (commentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/moderate/`,
+    channelModerationAction: (recordId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-moderation/${recordId}/action/`,
+    playlistItems: (playlistId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/`,
+    playlistItemDetail: (playlistId: string, contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/${contentId}/`,
+    channelContentDetail: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/`,
+    channelContentPublish: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/publish/`,
+    channelContentAssets: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/assets/`,
     videos: (type?: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/videos/${
         type ? `?type=${encodeURIComponent(type)}` : ''
@@ -258,6 +323,10 @@ const broadcastRoutes = {
     educationInstitutions: `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`,
     educationInstitution: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/`,
+    educationInstitutionVerificationStatus: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/verification-status/`,
+    educationInstitutionVerificationStart: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/verification/start/`,
     educationInstitutionDashboard: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/dashboard/`,
     educationInstitutionMemberships: (id: string) =>
@@ -420,6 +489,10 @@ const broadcastRoutes = {
     cartCurrent: `${API_BASE_URL}/api/v1/commerce/carts/current/`,
     cart: (id: string) => `${API_BASE_URL}/api/v1/commerce/carts/${id}/`,
     shops: `${API_BASE_URL}/api/v1/commerce/shops/`,
+    shopVerificationStatus: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shops/${id}/`,
+    shopVerificationStart: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shops/${id}/request_verification/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
     productBroadcast: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/products/${id}/broadcast/`,

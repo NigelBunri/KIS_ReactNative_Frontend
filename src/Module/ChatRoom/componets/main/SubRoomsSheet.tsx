@@ -14,6 +14,7 @@ type SubRoomsSheetProps = {
   parentRoomId: string;
   subRooms: SubRoom[];
   palette: any;
+  onOpenSubRoom: (subRoom: SubRoom) => void;
 };
 
 export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
@@ -22,6 +23,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
   parentRoomId: _parentRoomId,
   subRooms,
   palette,
+  onOpenSubRoom,
 }) => {
   const count = subRooms.length;
   const { dragY, panHandlers } = usePullDownToClose({
@@ -44,11 +46,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
           borderBottomWidth: 1,
           borderBottomColor: palette.divider,
         }}
-        // Later this will navigate or request join
-        onPress={() => {
-          // placeholder – just close for now
-          onClose();
-        }}
+        onPress={() => onOpenSubRoom(item)}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <KISIcon name="layers" size={16} color={palette.primary} />
@@ -71,7 +69,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
                 marginTop: 2,
               }}
             >
-              Nested sub-room (UI only for now)
+              Tap to open the dedicated conversation
             </Text>
           </View>
         </View>

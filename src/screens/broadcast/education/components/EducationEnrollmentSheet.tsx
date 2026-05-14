@@ -22,7 +22,7 @@ type Props = {
 const formatPrice = (price?: EducationPricing) => {
   if (!price) return 'Pricing TBD';
   if (price.isFree) return 'Free';
-  return `${price.currency ?? 'KISC'} ${(price.amountCents ?? 0) / 100}`;
+  return `${price.currency ?? 'USD'} ${(price.amountCents ?? 0) / 100}`;
 };
 
 export default function EducationEnrollmentSheet({
@@ -113,9 +113,8 @@ export default function EducationEnrollmentSheet({
               <Text
                 style={{ color: palette.subtext, marginTop: 6, lineHeight: 19 }}
               >
-                Education payments use KISC. Funds are held first and only
-                released to the provider after satisfaction or the normal
-                auto-release window.
+                Education payments use USD direct provider checkout. Access is
+                confirmed after the provider payment status is verified.
               </Text>
             </View>
             <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>

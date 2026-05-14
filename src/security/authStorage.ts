@@ -12,23 +12,28 @@ const readSecure = async (key: string): Promise<string | null> => {
   }
 };
 
-const writeSecure = async (key: string, value: string | null): Promise<void> => {
+const writeSecure = async (key: string, value: string | null): Promise<boolean> => {
   try {
     if (!value) {
       await EncryptedStorage.removeItem(key);
-      return;
+      return true;
     }
     await EncryptedStorage.setItem(key, value);
+    return true;
   } catch {
-    // Best effort: callers remain functional even if secure store is unavailable.
+    // Some local/dev builds do not have a usable encrypted store.
+    // Return false so callers keep the AsyncStorage fallback instead of losing auth.
+    return false;
   }
 };
 
 const migrateLegacyToken = async (key: string): Promise<string | null> => {
   const legacy = await AsyncStorage.getItem(key);
   if (!legacy) return null;
-  await writeSecure(key, legacy);
-  await AsyncStorage.removeItem(key);
+  const secureWritten = await writeSecure(key, legacy);
+  if (secureWritten) {
+    await AsyncStorage.removeItem(key);
+  }
   return legacy;
 };
 
@@ -42,19 +47,29 @@ export const getAccessToken = async (): Promise<string | null> => getToken(ACCES
 
 export const getRefreshToken = async (): Promise<string | null> => getToken(REFRESH_TOKEN_KEY);
 
+const persistToken = async (key: string, value: string | null | undefined): Promise<void> => {
+  if (value === undefined) return;
+  if (!value) {
+    await writeSecure(key, null);
+    await AsyncStorage.removeItem(key);
+    return;
+  }
+
+  const secureWritten = await writeSecure(key, value);
+  if (secureWritten) {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await AsyncStorage.setItem(key, value);
+  }
+};
+
 export const setAuthTokens = async (tokens: {
   accessToken?: string | null;
   refreshToken?: string | null;
 }): Promise<void> => {
   const { accessToken, refreshToken } = tokens;
-  if (accessToken !== undefined) {
-    await writeSecure(ACCESS_TOKEN_KEY, accessToken ?? null);
-    await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
-  }
-  if (refreshToken !== undefined) {
-    await writeSecure(REFRESH_TOKEN_KEY, refreshToken ?? null);
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
+  await persistToken(ACCESS_TOKEN_KEY, accessToken);
+  await persistToken(REFRESH_TOKEN_KEY, refreshToken);
 };
 
 export const clearAuthTokens = async (): Promise<void> => {

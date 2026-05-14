@@ -262,7 +262,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
           style={input(palette, spacing)}
         />
         <TextInput
-          placeholder="Price (KISC)"
+          placeholder="Price (USD)"
           keyboardType="numeric"
           value={price}
           onChangeText={setPrice}
@@ -309,7 +309,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         <View key={type.id} style={card(palette, spacing)}>
           <Text style={{ ...typography.h3, color: palette.text }}>{type.name}</Text>
           <Text style={{ color: palette.text }}>
-            {type.duration} mins • {toKiscLabel(type.price)} KISC
+            {type.duration} mins • {toKiscLabel(type.price)} USD
           </Text>
 
           <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
@@ -358,7 +358,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Analytics</Text>
         <Text style={{ color: palette.text }}>Available Slots: {slots.filter((slot) => slot.available).length}</Text>
-        <Text style={{ color: palette.text }}>Potential Revenue: {toKiscLabel(totalPotentialRevenue)} KISC</Text>
+        <Text style={{ color: palette.text }}>Potential Revenue: {toKiscLabel(totalPotentialRevenue)} USD</Text>
       </View>
     </ScrollView>
   );

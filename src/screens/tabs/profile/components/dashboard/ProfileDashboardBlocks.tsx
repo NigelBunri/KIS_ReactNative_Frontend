@@ -9,13 +9,15 @@ import {
 } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
+import { VerificationBadgeRow } from '@/components/verification';
+import type { VerificationSummary } from '@/services/verificationService';
 import { useKISTheme } from '@/theme/useTheme';
 import {
   createProfileDashboardTheme,
   getProfileDashboardCardStyle,
 } from '../../profileDashboardTheme';
 
-import KISC from '../../../../../assets/KIS-Coin.png';
+import creditIcon from '../../../../../assets/KIS-Coin.png';
 
 type DashboardAction = {
   key: string;
@@ -77,6 +79,7 @@ type WorkspaceLauncher = {
   helper?: string;
   icon: KISIconName;
   meta?: string;
+  verificationSummary?: VerificationSummary | null;
   onPress?: () => void;
 };
 
@@ -192,6 +195,8 @@ export const ProfileHeroCard = ({
   onNotificationsPress,
   onSettingsPress,
   notificationCount,
+  verificationSummary,
+  onVerificationPress,
 }: {
   coverUrl?: string | null;
   avatarUrl?: string | null;
@@ -204,6 +209,8 @@ export const ProfileHeroCard = ({
   onNotificationsPress?: () => void;
   onSettingsPress?: () => void;
   notificationCount?: number;
+  verificationSummary?: VerificationSummary | null;
+  onVerificationPress?: () => void;
 }) => {
   const { palette, dashboardTheme, isDark } = useDashboardTheme();
 
@@ -304,6 +311,9 @@ export const ProfileHeroCard = ({
                   </Text>
                 </View>
               ) : null}
+              <Pressable onPress={onVerificationPress} disabled={!onVerificationPress}>
+                <VerificationBadgeRow palette={palette} summary={verificationSummary} compact />
+              </Pressable>
             </View>
           </View>
         </View>
@@ -315,7 +325,6 @@ export const ProfileHeroCard = ({
 export const WalletSummaryCard = ({
   title = 'Wallet',
   balanceLabel,
-  usdLabel,
   tierLabel,
   actions,
   onViewAll,
@@ -333,15 +342,15 @@ export const WalletSummaryCard = ({
       <SectionHeader title={title} actionLabel="View all" onAction={onViewAll} />
       <View style={dashboardStyles.walletTopRow}>
         <View style={{ flex: 1, gap: 8 }}>
-          <Text style={dashboardTheme.content.meta}>KIS Coin Balance</Text>
+          <Text style={dashboardTheme.content.meta}>Promotional credits</Text>
           <Text style={[dashboardTheme.content.heading, { fontSize: 24 }]} numberOfLines={1}>
-            {balanceLabel}
+            {String(balanceLabel || '').replace(/KISC/g, 'promotional credits')}
           </Text>
-          {usdLabel ? <Text style={dashboardTheme.content.meta}>{usdLabel}</Text> : null}
+          <Text style={dashboardTheme.content.meta}>Reward credits are not cash or transferable value.</Text>
           {tierLabel ? <Text style={dashboardTheme.content.meta}>Plan: {tierLabel}</Text> : null}
         </View>
         <View style={[dashboardStyles.walletCoinBadge, dashboardTheme.chips.primary]}>
-          <Image source={KISC} style={dashboardStyles.walletCoinIcon} />
+          <Image source={creditIcon} style={dashboardStyles.walletCoinIcon} />
         </View>
       </View>
       {actions?.length ? (
@@ -550,7 +559,7 @@ export const MarketplaceOrdersSummary = ({
   onViewOrders?: () => void;
   onViewReceivedOrders?: () => void;
 }) => {
-  const { dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme } = useDashboardTheme();
   return (
     <DashboardCard>
       <SectionHeader title="Marketplace orders" actionLabel="View all orders" onAction={onViewOrders} />
@@ -571,7 +580,7 @@ export const MarketplaceOrdersSummary = ({
           {recentOrders.map((order) => (
             <View
               key={order.id}
-              style={[dashboardStyles.orderCard, {borderWidth: 2, borderColor: '#FF8A33', borderRadius: 15,}]}
+              style={[dashboardStyles.orderCard, { borderWidth: 2, borderColor: palette.gold, borderRadius: 15 }]}
             >
               <Text style={dashboardTheme.content.body} numberOfLines={1}>
                 {order.label}
@@ -628,6 +637,7 @@ export const WorkspaceLauncherSection = ({
                     {item.meta}
                   </Text>
                 ) : null}
+                <VerificationBadgeRow palette={palette} summary={item.verificationSummary} compact />
               </View>
               <KISIcon name="chevron-right" size={18} color={palette.subtext} />
             </Pressable>
@@ -645,7 +655,7 @@ export const AppointmentSummaryCard = ({
   summary: StatItem[];
   items: AppointmentItem[];
 }) => {
-  const { dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme } = useDashboardTheme();
   return (
     <DashboardCard>
       <SectionHeader
@@ -669,7 +679,7 @@ export const AppointmentSummaryCard = ({
           <Pressable
             key={item.id}
             onPress={item.onPress}
-            style={[dashboardStyles.orderCard, {borderWidth: 2, borderColor: '#FF8A33', borderRadius: 15,}]}
+            style={[dashboardStyles.orderCard, { borderWidth: 2, borderColor: palette.gold, borderRadius: 15 }]}
           >
             <Text style={dashboardTheme.content.body} numberOfLines={1}>
               {item.title}

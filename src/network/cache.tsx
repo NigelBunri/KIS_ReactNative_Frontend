@@ -3,29 +3,53 @@ import RNFS from 'react-native-fs';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { CacheTypes, CacheKeys } from './cacheKeys';
 
-const getBaseDirectoryPath = () => `${RNFS.DocumentDirectoryPath}/com.kis`;
-const normalizeCacheType = (type: string) => {
-  const trimmed = String(type || '').trim();
-  if (!trimmed) return CacheTypes.DEFAULT;
-  return trimmed.replace(/[\\\/]+/g, '_').toLowerCase();
+const getBaseDirectoryPath = (type?: string) => {
+  const normalizedType = normalizeCacheType(type || CacheTypes.DEFAULT);
+  if (normalizedType === 'chat_cache') {
+    const cacheRoot = RNFS.CachesDirectoryPath || RNFS.DocumentDirectoryPath;
+    return `${cacheRoot}/kis_cache`;
+  }
+  return `${RNFS.DocumentDirectoryPath}/com.kis`;
 };
+
+const safePathSegment = (value: string, fallback: string) => {
+  const trimmed = String(value || '').trim();
+  const safe = trimmed
+    .replace(/[\\/:*?"<>|#%&{}$!'@+=`\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return safe || fallback;
+};
+
+const normalizeCacheType = (type: string) =>
+  safePathSegment(type || CacheTypes.DEFAULT, CacheTypes.DEFAULT).toLowerCase();
+
+const normalizeCacheKey = (key: string) => safePathSegment(key || 'cache', 'cache');
+
 const getSubDirectoryPath = (type: string) =>
-  `${getBaseDirectoryPath()}/${normalizeCacheType(type)}`;
+  `${getBaseDirectoryPath(type)}/${normalizeCacheType(type)}`;
+
+const getCacheFilePath = (type: string, key: string) =>
+  `${getSubDirectoryPath(type)}/${normalizeCacheKey(key)}.json`;
 
 const stripTrailingSlash = (path: string) => path.replace(/\/+$/, '');
 
 const ensureDirectoryExists = async (dirPath: string) => {
   const normalizedPath = stripTrailingSlash(dirPath);
   const exists = await RNFS.exists(normalizedPath);
-  if (!exists) {
+  if (exists) return;
+  try {
     await RNFS.mkdir(normalizedPath);
+  } catch (error) {
+    const existsAfterError = await RNFS.exists(normalizedPath).catch(() => false);
+    if (!existsAfterError) throw error;
   }
 };
 
 let cacheRootReady = false;
 const ensureCacheRootExists = async () => {
   if (cacheRootReady) return;
-  await ensureDirectoryExists(getBaseDirectoryPath());
+  await ensureDirectoryExists(getBaseDirectoryPath(CacheTypes.DEFAULT));
   cacheRootReady = true;
 };
 
@@ -82,7 +106,7 @@ const toPaginatedShape = (value: any): { meta?: any; results: any[] } => {
 
 export const getCache = async (type: string, key: string) => {
   try {
-    const file = `${getSubDirectoryPath(type)}/${key}.json`;
+    const file = getCacheFilePath(type, key);
     return await readJson(file);
   } catch (error) {
     console.warn(`[cache] getCache failed for ${type}/${key}:`, error);
@@ -94,8 +118,9 @@ export const setCache = async (type: string, key: string, data: any) => {
   try {
     await ensureCacheRootExists();
     const dir = getSubDirectoryPath(type);
-    const file = `${dir}/${key}.json`;
+    const file = getCacheFilePath(type, key);
 
+    await ensureDirectoryExists(getBaseDirectoryPath(type));
     await ensureDirectoryExists(dir);
 
     const oldValue = await getCache(type, key);
@@ -167,7 +192,7 @@ export const setCache = async (type: string, key: string, data: any) => {
 
 export const clearCacheByKey = async (type: string, key: string) => {
   try {
-    const file = `${getSubDirectoryPath(type)}/${key}.json`;
+    const file = getCacheFilePath(type, key);
     const exists = await RNFS.exists(file);
     if (exists) {
       await RNFS.unlink(file);

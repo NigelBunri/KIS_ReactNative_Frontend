@@ -250,7 +250,7 @@ describe('useProfileController phase-05 runtime flows', () => {
     expect(setAuth).not.toHaveBeenCalledWith(false);
   });
 
-  test('wallet transfer submit is blocked until recipient verification succeeds', async () => {
+  test('wallet transfer submit is blocked by promotional-credit safety policy', async () => {
     const setAuth = jest.fn();
     const setPhone = jest.fn();
     const ref = React.createRef<ControllerRef>();
@@ -278,33 +278,18 @@ describe('useProfileController phase-05 runtime flows', () => {
       await ref.current?.submitWalletAction();
     });
 
+    expect(mockedPostRequest).not.toHaveBeenCalledWith(
+      ROUTES.wallet.transfer,
+      expect.anything(),
+      expect.anything(),
+    );
     expect(
       (Alert.alert as jest.Mock).mock.calls.some(
         call =>
           call[0] === 'Wallet' &&
-          call[1] === 'Verify the recipient first before sending KIS Coins.',
+          String(call[1]).includes('Buying, sending, withdrawing, or converting KIS promotional credits is disabled'),
       ),
     ).toBe(true);
-
-    await ReactTestRenderer.act(async () => {
-      await ref.current?.verifyWalletRecipient();
-    });
-
-    await ReactTestRenderer.act(async () => {
-      await ref.current?.submitWalletAction();
-    });
-
-    expect(mockedPostRequest).toHaveBeenCalledWith(
-      ROUTES.wallet.transfer,
-      expect.objectContaining({
-        recipient_id: 'recipient-1',
-        recipient_phone: '699123456',
-        country: 'CM',
-        amount_cents: 100,
-      }),
-      expect.objectContaining({
-        errorMessage: 'Unable to transfer KIS wallet balance.',
-      }),
-    );
   });
+
 });

@@ -8,7 +8,7 @@ type ChatType = ChatRoomPageProps['chat'];
 
 export function useChatAuth(chat: ChatType | undefined) {
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>('local-user');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
   useEffect(() => {

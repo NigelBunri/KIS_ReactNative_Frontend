@@ -50,6 +50,12 @@ import {
   updateHealthOpsPharmacyTracking,
 } from '@/services/healthOpsPhase5Service';
 import {
+  getDirectPaymentInfo,
+  isProviderPaymentFailed,
+  isProviderPaymentPending,
+  openDirectPaymentUrl,
+} from '@/utils/directPaymentHandoff';
+import {
   endHealthOpsReminderSession,
   endHealthOpsWellnessSession,
   fetchHealthOpsReminderSession,
@@ -110,13 +116,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'HealthServiceSession'>;
 
 const toMoney = (cents?: number) => {
   if (!Number.isFinite(Number(cents))) return 'Not set';
-  const kisc = Number(cents) / 10000;
-  return `${kisc.toFixed(3).replace(/\.?0+$/, '')} KISC`;
+  const usd = Number(cents) / 100;
+  return `${usd.toFixed(2).replace(/\.?0+$/, '')} USD`;
 };
 
 const toKisc = (micro?: number) => {
-  if (!Number.isFinite(Number(micro))) return '0.000';
-  return (Number(micro) / 100000).toFixed(3);
+  if (!Number.isFinite(Number(micro))) return '0.00';
+  return (Number(micro) / 1000).toFixed(2);
 };
 
 const toDateLabel = (isoDate?: string) => {
@@ -323,13 +329,13 @@ const BILLING_STEP_META: Array<{
   },
   {
     key: 'select_payment_method',
-    label: 'Confirm KIS Wallet',
-    subtitle: 'Use your profile KIS Coin wallet as the payment source.',
+    label: 'Confirm USD Provider',
+    subtitle: 'Use your profile USD provider checkout as the payment source.',
   },
   {
     key: 'authorize_payment',
-    label: 'Authorize Wallet Payment',
-    subtitle: 'Authorize and confirm wallet debit.',
+    label: 'Authorize Provider Payment',
+    subtitle: 'Authorize and confirm provider payment authorization.',
   },
   {
     key: 'issue_receipt',
@@ -891,6 +897,9 @@ export default function HealthServiceSessionScreen({
   const billingStatus = String(billingSession?.status || '')
     .trim()
     .toLowerCase();
+  const billingPayment = getDirectPaymentInfo(billingSession);
+  const billingPaymentPending = isProviderPaymentPending(billingPayment.status || billingStatus);
+  const billingPaymentFailed = isProviderPaymentFailed(billingPayment.status || billingStatus);
   const billingStepState =
     billingSession?.step_state &&
     typeof billingSession.step_state === 'object' &&
@@ -2955,6 +2964,30 @@ export default function HealthServiceSessionScreen({
     bootstrapBillingSession({ quiet: true }).catch(() => undefined);
   }, [bootstrapBillingSession, cleanWorkflowSessionId, isHealthOpsSession]);
 
+  const openBillingCheckout = useCallback(async () => {
+    if (!billingPayment.paymentUrl) {
+      Alert.alert(
+        'Payment pending',
+        billingPayment.reference
+          ? `Payment reference ${billingPayment.reference} is waiting for a provider checkout link. Refresh after the provider link is ready.`
+          : 'This billing session is waiting for a provider checkout link. Refresh after the provider link is ready.',
+      );
+      return;
+    }
+    setBillingBusy(true);
+    try {
+      const opened = await openDirectPaymentUrl(billingPayment.paymentUrl);
+      if (!opened) {
+        throw new Error('Unable to open the secure checkout link on this device.');
+      }
+      Alert.alert('Checkout opened', 'Return to KIS after payment, then refresh billing.');
+    } catch (error: any) {
+      Alert.alert('Checkout', error?.message || 'Unable to open checkout.');
+    } finally {
+      setBillingBusy(false);
+    }
+  }, [billingPayment.paymentUrl, billingPayment.reference]);
+
   const completeBillingStep = useCallback(
     async (stepKey: string) => {
       if (!billingSessionId) {
@@ -2968,16 +3001,29 @@ export default function HealthServiceSessionScreen({
           completed_at: new Date().toISOString(),
         };
         if (stepKey === 'select_payment_method') {
-          nextPayload.payment_provider = 'kis_wallet';
-          nextPayload.payment_method = 'wallet_balance';
+          nextPayload.payment_provider = 'flutterwave';
+          nextPayload.payment_method = 'provider_checkout';
         }
         if (stepKey === 'authorize_payment') {
+          if (!billingPayment.paymentUrl) {
+            Alert.alert(
+              'Payment pending',
+              billingPayment.reference
+                ? `Payment reference ${billingPayment.reference} is waiting for a provider checkout link. Refresh after the provider link is ready.`
+                : 'This billing session is waiting for a provider checkout link. Refresh after the provider link is ready.',
+            );
+            return;
+          }
+          await openBillingCheckout();
+          return;
+        }
+        if (stepKey === 'authorize_payment_confirmed') {
           const payableMicro = Math.max(
             0,
             Math.floor(Number(billingSession?.payable_amount_micro || 0)),
           );
-          nextPayload.payment_provider = 'kis_wallet';
-          nextPayload.payment_method = 'wallet_balance';
+          nextPayload.payment_provider = 'flutterwave';
+          nextPayload.payment_method = 'provider_checkout';
           nextPayload.amount_paid_micro = payableMicro;
           nextPayload.amount_paid_kisc = toKisc(payableMicro);
         }
@@ -3009,7 +3055,7 @@ export default function HealthServiceSessionScreen({
         setBillingBusy(false);
       }
     },
-    [billingSession?.payable_amount_micro, billingSessionId],
+    [billingPayment.paymentUrl, billingPayment.reference, billingSession?.payable_amount_micro, billingSessionId, openBillingCheckout],
   );
 
   const finishBillingSession = useCallback(
@@ -4107,7 +4153,7 @@ export default function HealthServiceSessionScreen({
                   marginTop: 4,
                 }}
               >
-                Remaining KISC: {toKisc(viewerWalletMicro)} KISC
+                Remaining USD: {toKisc(viewerWalletMicro)} USD
               </Text>
             ) : null}
           </View>
@@ -6583,20 +6629,50 @@ export default function HealthServiceSessionScreen({
                   >
                     Payable:{' '}
                     {toKisc(Number(billingSession?.payable_amount_micro || 0))}{' '}
-                    KISC
+                    USD
                   </Text>
                   <Text
                     style={{ ...typography.caption, color: palette.subtext }}
                   >
-                    Payment source: KIS Coin wallet (profile account)
+                    Payment source: USD provider checkout
                   </Text>
-                  {String(billingSession?.payment_reference || '').trim() ? (
+                  {billingPayment.intentId ? (
+                    <Text
+                      style={{ ...typography.caption, color: palette.subtext }}
+                    >
+                      Payment intent: {billingPayment.intentId}
+                    </Text>
+                  ) : null}
+                  {String(billingSession?.payment_reference || billingPayment.reference || '').trim() ? (
                     <Text
                       style={{ ...typography.caption, color: palette.subtext }}
                     >
                       Payment ref:{' '}
-                      {String(billingSession?.payment_reference || '').trim()}
+                      {String(billingSession?.payment_reference || billingPayment.reference || '').trim()}
                     </Text>
+                  ) : null}
+                  {billingPaymentPending || billingPaymentFailed ? (
+                    <View style={{ marginTop: spacing.sm }}>
+                      <KISButton
+                        title={billingBusy ? 'Opening checkout...' : 'Open secure checkout'}
+                        size="xs"
+                        onPress={() => {
+                          openBillingCheckout().catch(() => undefined);
+                        }}
+                        disabled={billingBusy || !billingPayment.paymentUrl}
+                      />
+                      {!billingPayment.paymentUrl ? (
+                        <Text
+                          style={{
+                            ...typography.caption,
+                            color: palette.subtext,
+                            marginTop: spacing.xs,
+                          }}
+                        >
+                          Checkout link is not available yet. Refresh after the provider link is ready.
+                        </Text>
+                      ) : null}
+                    </View>
                   ) : null}
                 </View>
               ) : null}

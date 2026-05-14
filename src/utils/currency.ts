@@ -1,5 +1,6 @@
-export const KISC_CURRENCY = 'KISC';
-export const FRONTEND_KISC_MAJOR_TO_BACKEND_CENTS = 10000;
+export const KISC_CURRENCY = 'promotional credits';
+export const USD_CURRENCY = 'USD';
+export const FRONTEND_KISC_MAJOR_TO_BACKEND_CENTS = 10000; // compatibility only
 
 export const normalizeCurrencyValue = (value: number | string | null | undefined) => {
   if (typeof value === 'string') {
@@ -52,4 +53,35 @@ export const backendOrderTotalToFrontendKisc = (
     return 0;
   }
   return numeric / 100;
+};
+
+
+export const formatUsdAmount = (
+  value: number | string | null | undefined,
+  options?: { decimals?: number; suffix?: string },
+) => {
+  const numeric = normalizeCurrencyValue(value);
+  const decimals = options?.decimals ?? 2;
+  const suffix = options?.suffix ?? USD_CURRENCY;
+  return `${numeric.toFixed(decimals)} ${suffix}`;
+};
+
+export const backendCentsToUsd = (
+  value: number | string | null | undefined,
+) => {
+  const numeric = normalizeCurrencyValue(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return numeric / 100;
+};
+
+export const backendOrderTotalToUsd = (
+  value: number | string | null | undefined,
+) => {
+  const numeric = normalizeCurrencyValue(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return numeric;
 };

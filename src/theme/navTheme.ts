@@ -15,17 +15,18 @@ type KISNavTheme = NavTheme & {
 export function makeNavTheme(tone: KISTone): KISNavTheme {
   const base = tone === 'dark' ? DarkTheme : DefaultTheme;
   const c = tone === 'dark' ? KIS_COLORS.dark : KIS_COLORS.light;
+  const isLight = tone === 'light';
 
   return {
     ...base,
     colors: {
       ...base.colors,
-      primary: KIS_COLORS.brand.orange,
+      primary: KIS_COLORS.brand.primary,
       background: c.bg,
-      card: c.card,
-      text: c.text,
-      border: c.divider,
-      notification: KIS_COLORS.brand.purple,
+      card: isLight ? KIS_COLORS.brand.purpleDeep : c.card,
+      text: isLight ? KIS_COLORS.brand.ivory : c.text,
+      border: isLight ? KIS_COLORS.brand.goldDeep : c.divider,
+      notification: isLight ? KIS_COLORS.brand.gold : KIS_COLORS.brand.secondary,
     },
     fonts: {
       regular: { fontFamily: 'System', fontWeight: '400' },

@@ -269,7 +269,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         />
 
         <TextInput
-          placeholder="Margin Per Order (KISC)"
+          placeholder="Margin Per Order (USD)"
           value={defaultMargin}
           keyboardType="numeric"
           onChangeText={setDefaultMargin}
@@ -303,7 +303,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
           <View key={study.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{study.name}</Text>
             <Text style={{ color: palette.subtext }}>
-              {toKiscLabel(study.price)} KISC • {study.turnaroundHours}h
+              {toKiscLabel(study.price)} USD • {study.turnaroundHours}h
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Study" variant="outline" onPress={() => editStudy(study)} />
@@ -428,7 +428,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Reports: {completedReports}</Text>
         <Text style={{ color: palette.text }}>Urgent Cases: {urgentCases}</Text>
-        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} KISC</Text>
+        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} USD</Text>
       </View>
     </ScrollView>
   );

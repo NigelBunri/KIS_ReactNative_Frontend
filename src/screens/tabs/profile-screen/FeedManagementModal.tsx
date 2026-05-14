@@ -21,6 +21,24 @@ import type { FeedMediaType, FeedMediaOptions } from './types';
 import { KISIcon } from '@/constants/kisIcons';
 import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import { getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
+import ChannelStudioScreen from '@/screens/broadcast/channels/studio/ChannelStudioScreen';
+
+const alpha = (hex: string | undefined, opacity: string) => {
+  const value = String(hex || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+    return `${value}${opacity}`;
+  }
+  return value || '#000000';
+};
+
+const getFeedMediaIcon = (mediaType: any) => {
+  const type = String(mediaType || '').toLowerCase();
+  if (type.includes('video') || type === 'short_video') return 'video';
+  if (type.includes('image')) return 'image';
+  if (type.includes('audio')) return 'audio';
+  if (type.includes('file') || type.includes('document')) return 'file';
+  return 'sparkles';
+};
 
 const RemoveAttachment = ({
   palette,
@@ -42,9 +60,9 @@ const RemoveAttachment = ({
     >
       <KISButton
         onPress={() => onRemoveAttachment(feed, attachment)}
-        style={{ backgroundColor: '#ff8b33a4' }}
+        style={{ backgroundColor: alpha(palette.danger, '18') }}
       >
-        <KISIcon name="trash" size={20} color={palette.text} />
+        <KISIcon name="trash" size={20} color={palette.danger} />
       </KISButton>
     </View>
   );
@@ -268,7 +286,7 @@ export type FeedManagementModalProps = {
   handleDeleteFeedItem: (id: string) => void;
   handleBroadcastFeedItem: (feed: any) => void;
   handleRemoveBroadcastFeedItem: (feed: any) => void;
-  onOpenAdvancedComposer: () => void;
+  onOpenAdvancedComposer: (channel?: { id?: string; handle?: string; display_name?: string } | null) => void;
   setPanelFeedExistingAttachments: React.Dispatch<React.SetStateAction<any[]>>;
   setPanelFeedMediaType: React.Dispatch<React.SetStateAction<FeedMediaType>>;
   setPanelFeedItemTitle: React.Dispatch<React.SetStateAction<string>>;
@@ -345,6 +363,10 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
       })
       .filter((item): item is { key: string; label: string } => Boolean(item));
   }, [panelFeedAssets, panelFeedExistingAttachments]);
+  const studioTint = alpha(palette.primary, '12');
+  const studioGlow = alpha(palette.primaryStrong, '18');
+  const premiumBorder = alpha(palette.primaryStrong, '30');
+  const mutedWash = alpha(palette.subtext, '10');
 
   return (
     <ScrollView
@@ -357,27 +379,57 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         style={[
           modalStyles.heroCard,
           {
-            borderColor: palette.divider,
+            borderColor: premiumBorder,
             backgroundColor: palette.card,
           },
         ]}
       >
-        <Text style={[modalStyles.heroTitle, { color: palette.text }]}>
-          {title}
-        </Text>
-        <Text style={[modalStyles.heroSubtitle, { color: palette.subtext }]}>
-          {subtitle}
-        </Text>
+        <View
+          pointerEvents="none"
+          style={[
+            modalStyles.heroAura,
+            { backgroundColor: studioGlow },
+          ]}
+        />
+        <View style={modalStyles.heroTopRow}>
+          <View
+            style={[
+              modalStyles.heroIconFrame,
+              {
+                backgroundColor: studioTint,
+                borderColor: premiumBorder,
+              },
+            ]}
+          >
+            <KISIcon
+              name="sparkles"
+              size={22}
+              color={palette.primaryStrong}
+            />
+          </View>
+          <View style={modalStyles.heroCopy}>
+            <Text style={[modalStyles.heroEyebrow, { color: palette.primaryStrong }]}>
+              BROADCAST WORKSPACE
+            </Text>
+            <Text style={[modalStyles.heroTitle, { color: palette.text }]}>
+              {title}
+            </Text>
+            <Text style={[modalStyles.heroSubtitle, { color: palette.subtext }]}>
+              {subtitle}
+            </Text>
+          </View>
+        </View>
         <View style={modalStyles.heroStatsGrid}>
           <View
             style={[
               modalStyles.heroStatTile,
               {
-                borderColor: palette.divider,
+                borderColor: premiumBorder,
                 backgroundColor: palette.surface,
               },
             ]}
           >
+            <KISIcon name="layers" size={16} color={palette.primaryStrong} />
             <Text style={[modalStyles.heroStatValue, { color: palette.text }]}>
               {feeds.length}
             </Text>
@@ -391,11 +443,12 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
             style={[
               modalStyles.heroStatTile,
               {
-                borderColor: palette.divider,
+                borderColor: premiumBorder,
                 backgroundColor: palette.surface,
               },
             ]}
           >
+            <KISIcon name="send" size={16} color={palette.primaryStrong} />
             <Text style={[modalStyles.heroStatValue, { color: palette.text }]}>
               {numberOfBroadcastFeeds}
             </Text>
@@ -409,11 +462,12 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
             style={[
               modalStyles.heroStatTile,
               {
-                borderColor: palette.divider,
+                borderColor: premiumBorder,
                 backgroundColor: palette.surface,
               },
             ]}
           >
+            <KISIcon name="star" size={16} color={palette.primaryStrong} />
             <Text style={[modalStyles.heroStatValue, { color: palette.text }]}>
               {expiresAt}
             </Text>
@@ -430,20 +484,84 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         style={[
           modalStyles.sectionCard,
           {
-            borderColor: palette.divider,
+            borderColor: premiumBorder,
+            backgroundColor: palette.card,
+          },
+        ]}
+      >
+        <View style={modalStyles.sectionTitleRow}>
+          <View
+            style={[
+              modalStyles.sectionMark,
+              { backgroundColor: palette.primaryStrong },
+            ]}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
+              Channel Control Room
+            </Text>
+            <Text style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}>
+              Select a channel, create inside it, and control what is broadcast live.
+            </Text>
+          </View>
+        </View>
+        <ChannelStudioScreen
+          legacyFeeds={feeds}
+          liveCount={numberOfBroadcastFeeds}
+          expiresAt={expiresAt}
+          onCreate={onOpenAdvancedComposer}
+        />
+      </View>
+
+      <View
+        style={[
+          modalStyles.sectionCard,
+          {
+            borderColor: premiumBorder,
             backgroundColor: palette.card,
           },
         ]}
       >
         <View style={modalStyles.sectionHeader}>
-          <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
-            Feed Queue
-          </Text>
-          <Text
-            style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}
-          >
-            Edit, broadcast, or remove queued items.
-          </Text>
+          <View style={modalStyles.sectionTitleRow}>
+            <View
+              style={[
+                modalStyles.sectionMark,
+                { backgroundColor: palette.primaryStrong },
+              ]}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
+                Feed Queue
+              </Text>
+              <Text
+                style={[
+                  modalStyles.sectionSubtitle,
+                  { color: palette.subtext },
+                ]}
+              >
+                Edit, broadcast, or remove queued items.
+              </Text>
+            </View>
+            <View
+              style={[
+                modalStyles.sectionBadge,
+                {
+                  backgroundColor: studioTint,
+                  borderColor: premiumBorder,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  modalStyles.sectionBadgeText,
+                  { color: palette.primaryStrong },
+                ]}
+              >
+                {numberOfBroadcastFeeds}/{feeds.length} live
+              </Text>
+            </View>
+          </View>
         </View>
         {feeds.length === 0 ? (
           <View
@@ -479,10 +597,11 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
               const feedSummary =
                 (feed.summary && feed.summary.length > 120
                   ? `${feed.summary.slice(0, 120)}…`
-                  : feed.summary) || 'No summary';
+                : feed.summary) || 'No summary';
               const attachments = [
                 ...(Array.isArray(feed.attachments) ? feed.attachments : []),
               ].filter(Boolean);
+              const mediaIcon = getFeedMediaIcon(feed.media_type);
 
               return (
                 <View
@@ -490,17 +609,45 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                   style={[
                     modalStyles.feedCard,
                     {
-                      borderColor: palette.divider,
+                      borderColor: isLive ? premiumBorder : palette.divider,
                       backgroundColor: palette.surface,
                     },
                   ]}
                 >
+                  <View
+                    style={[
+                      modalStyles.feedAccentRail,
+                      {
+                        backgroundColor: isLive
+                          ? palette.primaryStrong
+                          : alpha(palette.subtext, '35'),
+                      },
+                    ]}
+                  />
                   <View style={modalStyles.feedCardHeader}>
-                    <Text
-                      style={[modalStyles.feedTitle, { color: palette.text }]}
-                    >
-                      {feed.title}
-                    </Text>
+                    <View style={modalStyles.feedTitleCluster}>
+                      <View
+                        style={[
+                          modalStyles.feedIconFrame,
+                          {
+                            backgroundColor: isLive ? studioTint : mutedWash,
+                            borderColor: isLive ? premiumBorder : palette.divider,
+                          },
+                        ]}
+                      >
+                        <KISIcon
+                          name={mediaIcon as any}
+                          size={17}
+                          color={isLive ? palette.primaryStrong : palette.subtext}
+                        />
+                      </View>
+                      <Text
+                        style={[modalStyles.feedTitle, { color: palette.text }]}
+                        numberOfLines={2}
+                      >
+                        {feed.title || 'Untitled broadcast item'}
+                      </Text>
+                    </View>
                     <View
                       style={[
                         modalStyles.feedStatusPill,
@@ -545,14 +692,21 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                   ) : null}
 
                   <View style={modalStyles.feedMetaRow}>
-                    <Text
+                    <View
                       style={[
-                        modalStyles.feedMetaText,
-                        { color: palette.subtext },
+                        modalStyles.feedMetaChip,
+                        { backgroundColor: mutedWash },
                       ]}
                     >
-                      {mediaLabel}
-                    </Text>
+                      <Text
+                        style={[
+                          modalStyles.feedMetaText,
+                          { color: palette.subtext },
+                        ]}
+                      >
+                        {mediaLabel}
+                      </Text>
+                    </View>
                     <Text
                       style={[
                         modalStyles.feedMetaDivider,
@@ -561,14 +715,21 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                     >
                       •
                     </Text>
-                    <Text
+                    <View
                       style={[
-                        modalStyles.feedMetaText,
-                        { color: palette.subtext },
+                        modalStyles.feedMetaChip,
+                        { backgroundColor: mutedWash },
                       ]}
                     >
-                      {createdLabel}
-                    </Text>
+                      <Text
+                        style={[
+                          modalStyles.feedMetaText,
+                          { color: palette.subtext },
+                        ]}
+                      >
+                        {createdLabel}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={modalStyles.feedActionsRow}>
@@ -624,22 +785,35 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         style={[
           modalStyles.sectionCard,
           {
-            borderColor: palette.divider,
+            borderColor: premiumBorder,
             backgroundColor: palette.card,
           },
         ]}
       >
         <View style={modalStyles.sectionHeader}>
-          <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
-            {editingFeedItemId
-              ? 'Update Broadcast Item'
-              : 'Compose Broadcast Item'}
-          </Text>
-          <Text
-            style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}
-          >
-            Attach media, style by content type, and save to queue.
-          </Text>
+          <View style={modalStyles.sectionTitleRow}>
+            <View
+              style={[
+                modalStyles.sectionMark,
+                { backgroundColor: palette.primaryStrong },
+              ]}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
+                {editingFeedItemId
+                  ? 'Update Broadcast Item'
+                  : 'Compose Broadcast Item'}
+              </Text>
+              <Text
+                style={[
+                  modalStyles.sectionSubtitle,
+                  { color: palette.subtext },
+                ]}
+              >
+                Attach media, style by content type, and save to queue.
+              </Text>
+            </View>
+          </View>
         </View>
         {!editingFeedItemId ? (
           <KISButton
@@ -1410,86 +1584,165 @@ const ColorDot: React.FC<{
 
 const modalStyles = StyleSheet.create({
   panelContent: {
-    gap: 14,
+    gap: 16,
+    paddingBottom: 36,
   },
   heroCard: {
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
+    gap: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
+  },
+  heroAura: {
+    position: 'absolute',
+    right: -42,
+    top: -46,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 12,
   },
+  heroIconFrame: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  heroEyebrow: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
   heroTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 27,
   },
   heroSubtitle: {
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   heroStatsGrid: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   heroStatTile: {
     flex: 1,
-    minHeight: 74,
+    minHeight: 88,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    justifyContent: 'center',
+    borderRadius: 18,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    justifyContent: 'space-between',
   },
   heroStatValue: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
   },
   heroStatLabel: {
     marginTop: 2,
     fontSize: 11,
-    letterSpacing: 0.2,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
+    fontWeight: '800',
   },
   sectionCard: {
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 14,
-    gap: 12,
+    borderRadius: 22,
+    padding: 15,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
   },
   sectionHeader: {
-    gap: 3,
+    gap: 8,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionMark: {
+    width: 5,
+    alignSelf: 'stretch',
+    minHeight: 40,
+    borderRadius: 99,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
   },
   sectionSubtitle: {
     fontSize: 12,
     lineHeight: 16,
   },
+  sectionBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sectionBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
   emptyStateCard: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 18,
     gap: 4,
   },
   emptyStateTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '900',
   },
   emptyStateText: {
     fontSize: 12,
     lineHeight: 16,
   },
   queueList: {
-    gap: 10,
+    gap: 12,
   },
   feedCard: {
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    gap: 8,
+    borderRadius: 20,
+    padding: 13,
+    paddingLeft: 16,
+    gap: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 1,
+  },
+  feedAccentRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   feedCardHeader: {
     flexDirection: 'row',
@@ -1497,19 +1750,34 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  feedTitleCluster: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  feedIconFrame: {
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   feedTitle: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '900',
+    lineHeight: 20,
   },
   feedStatusPill: {
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
   },
   feedStatusPillText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   feedSummary: {
@@ -1521,9 +1789,14 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  feedMetaChip: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
   feedMetaText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   feedMetaDivider: {
     fontSize: 11,
@@ -1536,17 +1809,17 @@ const modalStyles = StyleSheet.create({
   },
   attachmentHeader: {
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
   attachmentHeaderTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '900',
   },
   attachmentHeaderSubtitle: {
     marginTop: 2,
@@ -1561,9 +1834,9 @@ const modalStyles = StyleSheet.create({
   },
   attachmentRow: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    borderRadius: 16,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -1592,8 +1865,8 @@ const modalStyles = StyleSheet.create({
   mediaTypePill: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     marginRight: 8,
   },
   formActions: {
@@ -1601,13 +1874,15 @@ const modalStyles = StyleSheet.create({
     gap: 8,
   },
   carouselWrapper: {
-    marginVertical: 10,
+    marginVertical: 12,
   },
   carouselContent: {
     paddingRight: 10,
   },
   carouselCard: {
     marginRight: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   deleteAttachment: {
     marginTop: 8,
@@ -1624,7 +1899,7 @@ const modalStyles = StyleSheet.create({
     marginTop: 8,
   },
   carouselDot: {
-    width: 6,
+    width: 18,
     height: 6,
     borderRadius: 3,
     marginHorizontal: 2,
@@ -1632,11 +1907,12 @@ const modalStyles = StyleSheet.create({
   },
   typeSection: {
     marginTop: 16,
-    gap: 8,
+    gap: 10,
+    borderRadius: 18,
   },
   typeSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
   },
   typeSectionLabel: {
     fontSize: 11,
@@ -1652,9 +1928,9 @@ const modalStyles = StyleSheet.create({
   },
   styleChip: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
   },
   colorRow: {
     flexDirection: 'row',
@@ -1704,8 +1980,8 @@ const modalStyles = StyleSheet.create({
   textPreviewWrapper: {
     marginTop: 12,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 18,
+    padding: 12,
   },
   textPreview: {
     lineHeight: 22,

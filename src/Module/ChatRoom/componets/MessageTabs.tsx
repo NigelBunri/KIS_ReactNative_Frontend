@@ -156,6 +156,9 @@ export function ChatsTab({
     };
 
     return filtered.sort((a, b) => {
+      const aPinned = Boolean((a as any).isPinned);
+      const bPinned = Boolean((b as any).isPinned);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
       const aAt = getLastAt(a);
       const bAt = getLastAt(b);
       const aTs = Date.parse(aAt || '');
@@ -307,10 +310,10 @@ export function ChatsTab({
               styles.row,
             {
               backgroundColor: isSelected
-                  ? palette.primarySoft
+                  ? palette.goldSoft
                   : palette.card,
                 borderColor: isSelected
-                  ? palette.primaryStrong
+                  ? palette.goldDeep
                   : palette.inputBorder,
               },
               KIS_TOKENS.elevation.card,
@@ -423,6 +426,9 @@ export function ChatsTab({
                     </Text>
                   </View>
                 )}
+                {(item as any).isPinned ? (
+                  <KISIcon name="pin" size={14} color={palette.goldDeep ?? palette.primaryStrong} />
+                ) : null}
                 {item.isMuted && (
                   <KISIcon
                     name="volume-mute"

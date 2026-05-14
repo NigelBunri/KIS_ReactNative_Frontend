@@ -1,6 +1,7 @@
 // src/screens/tabs/BibleScreen.tsx
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useBibleData } from './bible/useBibleData';
 import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
@@ -11,9 +12,13 @@ import PrayerPanel from '../../components/Bible/PrayerPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
 import { KISIcon } from '../../constants/kisIcons';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 
 export default function BibleScreen() {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  const metallicGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
   const {
@@ -44,6 +49,25 @@ export default function BibleScreen() {
   const registerReadFilterOpener = useCallback((open: () => void) => {
     setOpenReadFilters(() => open);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'daily') {
+      markMainTabNotificationSourceRead({
+        source: 'bible',
+        targetType: 'bible_daily_passage',
+      }).catch(() => undefined);
+    } else if (activeTab === 'meditations') {
+      markMainTabNotificationSourceRead({
+        source: 'bible',
+        targetType: 'bible_meditation_post',
+      }).catch(() => undefined);
+    } else if (activeTab === 'reading-planner') {
+      markMainTabNotificationSourceRead({
+        source: 'bible',
+        targetType: 'bible_reading_event',
+      }).catch(() => undefined);
+    }
+  }, [activeTab]);
 
   const renderTab = () => {
     switch (activeTab) {
@@ -95,20 +119,29 @@ export default function BibleScreen() {
                 style={[
                   styles.tabChip,
                   {
-                    backgroundColor: isActive ? palette.primarySoft : palette.surface,
-                    borderColor: palette.divider,
+                    backgroundColor: isActive ? palette.goldDeep : palette.surface,
+                    borderColor: isActive ? palette.goldLight : palette.divider,
                   },
                 ]}
               >
+                {isActive ? (
+                  <LinearGradient
+                    colors={metallicGoldGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                ) : null}
+                {isActive ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
                 <View style={styles.tabLabel}>
                   <KISIcon
                     name={tab.icon as any}
                     size={14}
-                    color={isActive ? palette.primaryStrong : palette.subtext}
+                    color={isActive ? palette.ivory : palette.subtext}
                   />
                   <Text
                     numberOfLines={1}
-                    style={{ color: isActive ? palette.primaryStrong : palette.text, fontWeight: '700' }}
+                    style={{ color: isActive ? palette.ivory : palette.text, fontWeight: '800' }}
                   >
                     {tab.label}
                   </Text>
@@ -137,9 +170,16 @@ export default function BibleScreen() {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={openReadFilters}
-          style={[styles.floatingFilter, { backgroundColor: palette.primaryStrong }]}
+          style={[styles.floatingFilter, { backgroundColor: palette.goldDeep }]}
         >
-          <KISIcon name="filter" size={22} color="#fff" />
+          <LinearGradient
+            colors={metallicGoldGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View pointerEvents="none" style={styles.goldSheen} />
+          <KISIcon name="filter" size={22} color={palette.ivory} />
         </TouchableOpacity>
       ) : null}
     </View>
@@ -158,6 +198,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     minHeight: 32,
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   contentWrap: { flex: 1, minHeight: 0 },
@@ -179,5 +220,11 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 8,
     zIndex: 20,
+    overflow: 'hidden',
+  },
+  goldSheen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    transform: [{ translateX: -18 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
   },
 });

@@ -9,6 +9,11 @@ import { clearCacheByKey, getCache, setCache } from '@/network/cache';
 export const CONVERSATION_CACHE_TYPE = 'CHAT_CACHE';
 export const CONVERSATION_CACHE_KEY = 'CONVERSATION_LIST';
 
+const conversationListCacheKey = (currentUserId?: string) => {
+  const userPart = currentUserId ? String(currentUserId).trim() : 'anon';
+  return `${CONVERSATION_CACHE_KEY}:${userPart || 'anon'}`;
+};
+
 /* -------------------------------------------------------------------------- */
 /*  CONSTANTS                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -107,7 +112,9 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
       )
     : null;
   const isBlocked = Boolean(selfMember?.is_blocked ?? selfMember?.isBlocked);
-  const isMuted = Boolean(selfMember?.is_muted ?? selfMember?.isMuted);
+  const isMuted = Boolean(raw.is_muted ?? raw.isMuted ?? selfMember?.is_muted ?? selfMember?.isMuted);
+  const isPinned = Boolean(raw.is_pinned ?? raw.isPinned ?? selfMember?.is_pinned ?? selfMember?.isPinned);
+  const isHidden = Boolean(raw.is_hidden ?? raw.isHidden ?? selfMember?.is_hidden ?? selfMember?.isHidden);
 
   return {
     id,
@@ -151,6 +158,8 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
     isLocked: raw.is_locked ?? raw.isLocked ?? false,
     isBlocked,
     isMuted,
+    isPinned,
+    isHidden,
   };
 }
 
@@ -158,9 +167,9 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
  * Read cached conversation list from local storage.
  * Single source of truth: list is stored only under CONVERSATION_CACHE_KEY.
  */
-async function getRawConversationsFromCache(): Promise<any[]> {
+async function getRawConversationsFromCache(currentUserId?: string): Promise<any[]> {
   try {
-    const cached = await getCache(CONVERSATION_CACHE_TYPE, CONVERSATION_CACHE_KEY);
+    const cached = await getCache(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId));
 
     if (!cached) return [];
 
@@ -189,7 +198,7 @@ async function getRawConversationsFromCache(): Promise<any[]> {
  * - If backend returns empty list → clear cache
  * - Otherwise we overwrite the single list cache with a de-duplicated array.
  */
-async function refreshConversationsAndHandleEmpty() {
+async function refreshConversationsAndHandleEmpty(currentUserId?: string): Promise<any[]> {
   try {
     const res = await getRequest(ROUTES.chat.listConversations, {
       errorMessage: 'Unable to load conversations.',
@@ -209,8 +218,8 @@ async function refreshConversationsAndHandleEmpty() {
       console.log(
         '[fetchConversations] Backend returned ZERO conversations → clearing local cache',
       );
-      await clearCacheByKey(CONVERSATION_CACHE_TYPE, CONVERSATION_CACHE_KEY);
-      return;
+      await clearCacheByKey(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId));
+      return [];
     }
 
     // ── De-duplicate by computed chat id (last one wins) ──────────────────
@@ -223,13 +232,15 @@ async function refreshConversationsAndHandleEmpty() {
     const dedupedRawList = Array.from(map.values());
 
     // ── Store ONLY the deduped list under the main conversations key ──────
-    await setCache(CONVERSATION_CACHE_TYPE, CONVERSATION_CACHE_KEY, dedupedRawList);
+    await setCache(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId), dedupedRawList);
 
     console.log(
       '[refreshConversationsAndHandleEmpty] Cached deduped conversations list (no per-conversation payloads)',
     );
+    return dedupedRawList;
   } catch (error) {
     console.warn('[fetchConversations] Background refresh failed:', error);
+    return [];
   }
 }
 
@@ -291,12 +302,19 @@ export async function fetchConversationsForCurrentUser(
   const userKey = currentUserId ? String(currentUserId) : 'anon';
   if (forceRefresh) {
     lastRefreshByUser[userKey] = Date.now();
-    await refreshConversationsAndHandleEmpty();
+    const freshRaw = await refreshConversationsAndHandleEmpty(currentUserId);
+    if (freshRaw.length) {
+      const normalizedFresh = freshRaw.map((item: any) =>
+        normalizeConversation(item, currentUserId),
+      );
+      return dedupeChats(normalizedFresh);
+    }
   }
 
-  const cachedRaw = await getRawConversationsFromCache();
+  let cachedRaw = await getRawConversationsFromCache(currentUserId);
   if (!cachedRaw.length) {
-    await refreshConversationsAndHandleEmpty();
+    const freshRaw = await refreshConversationsAndHandleEmpty(currentUserId);
+    cachedRaw = freshRaw.length ? freshRaw : await getRawConversationsFromCache(currentUserId);
   }
   console.log('[fetchConversationsForCurrentUser] Cached raw list:', cachedRaw);
 

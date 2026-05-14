@@ -23,6 +23,7 @@ import usePullDownToClose from '@/hooks/usePullDownToClose';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import {
   EducationContentItem,
   EducationCourse,
@@ -435,6 +436,9 @@ export default function EducationDetailSheet({
   const contentViewerState = (content as any)?.viewerState ?? {};
   const contentEnrollment = contentViewerState?.enrollment ?? null;
   const contentBooking = contentViewerState?.booking ?? null;
+  const contentNotificationType = String(
+    (content as any)?.type || (content as any)?.content_type || 'education_content',
+  );
 
   useEffect(() => {
     const nextProgress = content?.progress || null;
@@ -458,6 +462,16 @@ export default function EducationDetailSheet({
     setViewerEnrollment(contentEnrollment);
     setViewerBooking(contentBooking);
   }, [content?.id, contentEnrollment, contentBooking]);
+
+  useEffect(() => {
+    if (!visible || !content?.id) return;
+    markMainTabNotificationSourceRead({
+      source: 'education',
+      targetType: contentNotificationType,
+      targetId: String(content.id),
+    }).catch(() => undefined);
+  }, [visible, content?.id, contentNotificationType]);
+
   const enrollmentStatus = String(
     viewerEnrollment?.status ||
       (content as any)?.viewerState?.enrollment_status ||
@@ -1879,7 +1893,7 @@ export default function EducationDetailSheet({
                     ) : null}
                     {viewerBooking?.amount_cents ? (
                       <Text style={{ color: palette.subtext, marginTop: 4 }}>
-                        Paid: {viewerBooking.currency || 'KISC'}{' '}
+                        Paid: {viewerBooking.currency || 'USD'}{' '}
                         {Number(viewerBooking.amount_cents || 0) / 100}
                       </Text>
                     ) : null}
@@ -1893,7 +1907,7 @@ export default function EducationDetailSheet({
                         }}
                       >
                         The provider marked this completed. Confirm satisfaction
-                        to release payment from KISC escrow.
+                        after provider payment confirmation.
                       </Text>
                     ) : null}
                     {viewerBooking?.status === 'awaiting_satisfaction' &&

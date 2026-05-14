@@ -151,7 +151,13 @@ function mapBackendToChatMessage(
   currentUserId: string,
   roomId: string,
 ): ChatMessage {
-  const senderId = raw.senderId != null ? String(raw.senderId) : '';
+  const rawSenderId =
+    raw.senderId ??
+    (raw as any).sender_id ??
+    (raw as any).sender?.id ??
+    (raw as any).userId ??
+    (raw as any).user_id;
+  const senderId = rawSenderId != null ? String(rawSenderId) : '';
   const fromMe = senderId !== '' && senderId === String(currentUserId);
 
   const createdAt =
@@ -159,7 +165,7 @@ function mapBackendToChatMessage(
       ? raw.createdAt
       : new Date(raw.createdAt).toISOString();
 
-  const rawText = raw.text ?? '';
+  const rawText = raw.text ?? (raw as any).previewText ?? (raw as any).preview_text ?? '';
   const ciphertext = raw.ciphertext ?? undefined;
   const hasEncryptedMeta = !!(raw.encryptionMeta ?? (raw as any).encryption_meta);
   const text = rawText || (ciphertext || hasEncryptedMeta ? 'Encrypted message' : undefined);

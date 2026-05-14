@@ -21,6 +21,7 @@ import EducationDetailSheet from '@/screens/broadcast/education/components/Educa
 import EducationEnrollmentSheet from '@/screens/broadcast/education/components/EducationEnrollmentSheet';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
 import useEducationOfflineStore from '@/screens/broadcast/education/hooks/useEducationOfflineStore';
+import { getDirectPaymentInfo, openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 import type {
   EducationContentItem,
   EducationContentType,
@@ -397,17 +398,41 @@ export default function EducationV2DiscoverPage({
       } as unknown as EducationContentItem);
       setDetailVisible(true);
       const booking = payload?.booking;
+      const directPayment = getDirectPaymentInfo(booking, payload);
+      if (String(booking?.status || '').toLowerCase() === 'payment_pending') {
+        if (directPayment.paymentUrl) {
+          try {
+            const opened = await openDirectPaymentUrl(directPayment.paymentUrl);
+            Alert.alert(
+              opened ? 'Checkout opened' : 'Payment pending',
+              opened
+                ? 'Return to KIS after payment, then refresh this education item.'
+                : 'The secure checkout link is not available on this device. Refresh after payment is confirmed.',
+            );
+          } catch (error: any) {
+            Alert.alert('Checkout', error?.message || 'Unable to open checkout.');
+          }
+        } else {
+          Alert.alert(
+            'Payment pending',
+            directPayment.reference
+              ? `Payment reference ${directPayment.reference} is waiting for a provider checkout link.`
+              : 'This booking is waiting for a provider checkout link.',
+          );
+        }
+        return;
+      }
       if (booking?.status === 'awaiting_satisfaction') {
         Alert.alert(
           'Booked',
-          'Payment is held in KISC escrow until you confirm satisfaction or auto-release after 3 days.',
+          'USD provider payment is pending confirmation; satisfaction can be confirmed after payment is verified.',
         );
         return;
       }
       if (booking?.status === 'confirmed') {
         Alert.alert(
           'Booked',
-          'Payment received in KISC and held until the provider marks this completed.',
+          'USD provider payment is being tracked until the provider marks this completed.',
         );
         return;
       }
@@ -495,7 +520,7 @@ export default function EducationV2DiscoverPage({
     const priceLabel = pricing?.isFree
       ? 'Free'
       : pricing
-      ? `${pricing.currency || 'KISC'} ${
+      ? `${pricing.currency || 'USD'} ${
           Number(pricing.amountCents || 0) / 100
         }`
       : 'Pricing TBD';
@@ -1204,7 +1229,7 @@ export default function EducationV2DiscoverPage({
         >
           {heroPricing?.isFree
             ? 'Free'
-            : `${heroPricing?.currency || 'KISC'} ${
+            : `${heroPricing?.currency || 'USD'} ${
                 Number(heroPricing?.amountCents || 0) / 100
               }`}
         </Text>

@@ -287,7 +287,7 @@ const resolveInstitutionServices = (institution: any): ServiceDefinition[] => {
 
 const money = (amountCents?: number) =>
   Number.isFinite(Number(amountCents))
-    ? `${(Number(amountCents) / 10000).toFixed(3).replace(/\.?0+$/, '')} KISC`
+    ? `${(Number(amountCents) / 10000).toFixed(3).replace(/\.?0+$/, '')} USD`
     : null;
 
 const normalizeViewerRole = (value: unknown): ViewerRole => {

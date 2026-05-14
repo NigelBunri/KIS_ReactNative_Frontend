@@ -321,17 +321,19 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
           </Pressable>
 
           {/* Actual modal */}
-          <CountryPicker
-            visible={countryPickerVisible}
-            countryCode={countryCode}
-            withFilter
-            withCallingCode
-            withFlag
-            withEmoji
-            withCountryNameButton={false}
-            onSelect={handleCountrySelect}
-            onClose={() => setCountryPickerVisible(false)}
-          />
+          {countryPickerVisible ? (
+            <CountryPicker
+              visible={countryPickerVisible}
+              countryCode={countryCode}
+              withFilter
+              withCallingCode
+              withFlag
+              withEmoji
+              withCountryNameButton={false}
+              onSelect={handleCountrySelect}
+              onClose={() => setCountryPickerVisible(false)}
+            />
+          ) : null}
 
           {/* Phone input */}
           <View

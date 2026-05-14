@@ -110,6 +110,24 @@ const listFromResponse = (data: any) => {
 
 const numericText = (value: string) => value.replace(/[^\d]/g, '');
 
+const normalizeReferenceToken = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const parseSavedVerseReference = (value?: string | null) => {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const match = text.match(/^(.+?)\s+(\d+)(?::(\d+)(?:[-–](\d+))?)?$/);
+  if (!match) return null;
+  const chapter = Number(match[2]);
+  const verse = match[3] ? Number(match[3]) : undefined;
+  if (!Number.isFinite(chapter) || chapter <= 0) return null;
+  return {
+    bookName: match[1].trim(),
+    chapter,
+    verse: Number.isFinite(verse) && verse && verse > 0 ? verse : undefined,
+  };
+};
+
 const localDateTimeForTomorrow = () => {
   const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
   date.setMinutes(0, 0, 0);
@@ -124,7 +142,7 @@ export default function BibleReaderPanel({
   onLoad,
   onRegisterFilterOpener,
 }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, isDark } = useKISTheme();
   const solidSheetBg = palette.bg || palette.surface || '#FFFFFF';
   const [selectedTranslation, setSelectedTranslation] = useState<
     string | undefined
@@ -175,9 +193,12 @@ export default function BibleReaderPanel({
   const [offlineJobs, setOfflineJobs] = useState<
     Record<string, BibleOfflineDownloadJob>
   >({});
+  const readerScrollRef = useRef<ScrollView | null>(null);
+  const verseOffsetsRef = useRef<Record<string, number>>({});
+  const pendingScrollVerseRef = useRef<number | null>(null);
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
 
-  const verses = reader?.verses ?? [];
+  const verses = useMemo(() => reader?.verses ?? [], [reader?.verses]);
   const currentTranslationCode =
     selectedTranslation ?? reader?.translation?.code ?? translations[0]?.code;
   const currentBookCode = selectedBook ?? reader?.book?.code ?? books[0]?.code;
@@ -185,6 +206,14 @@ export default function BibleReaderPanel({
     () => books.find(book => book.code === currentBookCode) || books[0],
     [books, currentBookCode],
   );
+  const bookLookup = useMemo(() => {
+    const map = new Map<string, BibleBook>();
+    books.forEach(book => {
+      map.set(normalizeReferenceToken(book.name), book);
+      map.set(normalizeReferenceToken(book.code), book);
+    });
+    return map;
+  }, [books]);
   const currentChapter = Number(chapterInput || reader?.chapter?.number || 1);
   const currentReference =
     reader?.reference ||
@@ -314,12 +343,37 @@ export default function BibleReaderPanel({
     if (reader?.translation?.language)
       setSelectedLanguage(reader.translation.language);
     setSelectedVerses(new Set());
+    verseOffsetsRef.current = {};
   }, [
     reader?.translation?.code,
     reader?.translation?.language,
     reader?.book?.code,
     reader?.chapter?.number,
   ]);
+
+  const scrollToVerseNumber = useCallback((verseNumber: number) => {
+    const runScroll = () => {
+      const y = verseOffsetsRef.current[String(verseNumber)];
+      if (typeof y !== 'number') return false;
+      readerScrollRef.current?.scrollTo({
+        y: Math.max(0, y + 190),
+        animated: true,
+      });
+      return true;
+    };
+    if (!runScroll()) {
+      setTimeout(runScroll, 180);
+    }
+  }, []);
+
+  useEffect(() => {
+    const target = pendingScrollVerseRef.current;
+    if (!target || !verses.length) return;
+    const exists = verses.some(verse => Number(verse.number) === target);
+    if (!exists) return;
+    pendingScrollVerseRef.current = null;
+    setTimeout(() => scrollToVerseNumber(target), 220);
+  }, [reader?.chapter?.number, scrollToVerseNumber, verses]);
 
   useEffect(() => {
     onRegisterFilterOpener?.(() => setFilterOpen(true));
@@ -495,6 +549,59 @@ export default function BibleReaderPanel({
     onLoad(currentTranslationCode, undefined, undefined, referenceInput.trim());
     setFilterOpen(false);
   };
+
+  const openSavedLibraryVerse = useCallback(
+    (item: LibraryItem) => {
+      const parsed = parseSavedVerseReference(item.verse_ref);
+      const fallbackVerse = verses.find(
+        verse => String(verse.id) === String(item.verse),
+      );
+      const targetVerse = parsed?.verse ?? fallbackVerse?.number;
+
+      if (!parsed) {
+        setFilterOpen(false);
+        if (targetVerse) {
+          pendingScrollVerseRef.current = Number(targetVerse);
+          scrollToVerseNumber(Number(targetVerse));
+        }
+        return;
+      }
+
+      const targetBook = bookLookup.get(
+        normalizeReferenceToken(parsed.bookName),
+      );
+      const translationCode = item.translation || currentTranslationCode;
+      if (targetVerse) {
+        pendingScrollVerseRef.current = Number(targetVerse);
+      }
+      setFilterOpen(false);
+      setLanguageDropdownOpen(false);
+      setTranslationDropdownOpen(false);
+      if (translationCode) setSelectedTranslation(String(translationCode));
+      if (targetBook?.code) {
+        setSelectedBook(targetBook.code);
+        setChapterInput(String(parsed.chapter));
+        if (translationCode) {
+          onLoad(String(translationCode), targetBook.code, parsed.chapter);
+        }
+        return;
+      }
+
+      const reference = targetVerse
+        ? `${parsed.bookName} ${parsed.chapter}:${targetVerse}`
+        : `${parsed.bookName} ${parsed.chapter}`;
+      if (translationCode) {
+        onLoad(String(translationCode), undefined, undefined, reference);
+      }
+    },
+    [
+      bookLookup,
+      currentTranslationCode,
+      onLoad,
+      scrollToVerseNumber,
+      verses,
+    ],
+  );
 
   const selectLanguageFromFilter = (language: string) => {
     setSelectedLanguage(language);
@@ -1484,8 +1591,10 @@ export default function BibleReaderPanel({
                 </View>
               ) : null}
               {displayedLibraryItems.slice(0, 40).map(item => (
-                <View
+                <TouchableOpacity
                   key={`${item.id}-${item.color || item.text || 'bookmark'}`}
+                  activeOpacity={0.78}
+                  onPress={() => openSavedLibraryVerse(item)}
                   style={[styles.libraryItem, { borderColor: palette.divider }]}
                 >
                   <View style={styles.headerRow}>
@@ -1535,7 +1644,16 @@ export default function BibleReaderPanel({
                       {item.verse_text}
                     </Text>
                   ) : null}
-                </View>
+                  <Text
+                    style={{
+                      color: palette.primaryStrong,
+                      fontWeight: '800',
+                      marginTop: 4,
+                    }}
+                  >
+                    Open in reader
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -1779,6 +1897,7 @@ export default function BibleReaderPanel({
       </View>
 
       <ScrollView
+        ref={readerScrollRef}
         style={styles.readerScroll}
         contentContainerStyle={styles.readerScrollContent}
         showsVerticalScrollIndicator={false}
@@ -1874,9 +1993,20 @@ export default function BibleReaderPanel({
                     Number(verse.number) === 1 && text.length > 0;
                   const firstLetter = isChapterStart ? text.slice(0, 1) : '';
                   const remainingText = isChapterStart ? text.slice(1) : text;
+                  const hasSavedHighlight = Boolean(highlightColor) && !selected;
+                  const markedTextColor = isDark && hasSavedHighlight ? '#111111' : palette.text;
+                  const markedNumberColor = isDark && hasSavedHighlight
+                    ? '#2A1B08'
+                    : selected
+                      ? palette.primaryStrong
+                      : palette.subtext;
                   return (
                     <TouchableOpacity
                       key={id}
+                      onLayout={event => {
+                        verseOffsetsRef.current[String(verse.number)] =
+                          event.nativeEvent.layout.y;
+                      }}
                       onPress={() => toggleVerse(id)}
                       onLongPress={() => {
                         setActionVerse(verse);
@@ -1900,7 +2030,7 @@ export default function BibleReaderPanel({
                       {isChapterStart ? (
                         <>
                           <Text
-                            style={[styles.dropCap, { color: palette.text }]}
+                            style={[styles.dropCap, { color: markedTextColor }]}
                           >
                             {firstLetter}
                           </Text>
@@ -1908,17 +2038,13 @@ export default function BibleReaderPanel({
                             <Text
                               style={[
                                 styles.bibleVerseText,
-                                { color: palette.text, fontSize },
+                                { color: markedTextColor, fontSize },
                               ]}
                             >
                               <Text
                                 style={[
                                   styles.supVerseNumber,
-                                  {
-                                    color: selected
-                                      ? palette.primaryStrong
-                                      : palette.subtext,
-                                  },
+                                  { color: markedNumberColor },
                                 ]}
                               >
                                 {verse.number}
@@ -1931,17 +2057,13 @@ export default function BibleReaderPanel({
                         <Text
                           style={[
                             styles.bibleVerseText,
-                            { color: palette.text, fontSize },
+                            { color: markedTextColor, fontSize },
                           ]}
                         >
                           <Text
                             style={[
                               styles.supVerseNumber,
-                              {
-                                color: selected
-                                  ? palette.primaryStrong
-                                  : palette.subtext,
-                              },
+                              { color: markedNumberColor },
                             ]}
                           >
                             {verse.number}
@@ -1975,14 +2097,14 @@ const styles = StyleSheet.create({
   readerScroll: { flex: 1 },
   readerScrollContent: { gap: 14, paddingVertical: 16, paddingBottom: 40 },
   stack: { gap: 14 },
-  title: { fontSize: 22, fontWeight: '900' },
+  title: { fontSize: 18, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   headerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   kcanBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 8 },
   readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
   translationLabel: { fontSize: 12, textTransform: 'uppercase' },
-  chapterTitle: { fontSize: 24, fontWeight: '900', marginTop: 4 },
+  chapterTitle: { fontSize: 20, fontWeight: '900', marginTop: 4 },
   referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: {
     flex: 1,

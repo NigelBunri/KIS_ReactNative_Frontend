@@ -302,6 +302,7 @@ export type ChatMessage = {
 export type SubRoom = {
   id: string;
   parentRoomId: string;
+  conversationId: string;
   rootMessageId?: string;
   title?: string;
 };

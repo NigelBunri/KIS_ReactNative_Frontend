@@ -157,6 +157,10 @@ const healthRoutes = {
     walletTransactions: `${API_BASE_URL}/api/v1/wallet/ledger/`,
     institutionServices: (institutionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/services/`,
+    institutionVerificationStatus: (institutionId: string) =>
+      `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/verification-status/`,
+    institutionVerificationStart: (institutionId: string) =>
+      `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/verification/start/`,
     serviceEngineMappings: (serviceId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/services/${encodeURIComponent(serviceId)}/engines/`,
     serviceEngineMappingsReorder: (serviceId: string) =>

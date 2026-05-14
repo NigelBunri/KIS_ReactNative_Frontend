@@ -30,7 +30,7 @@ export default function SectionHeader({ title, subtitle, rightLabel, onRightPres
           onPress={onRightPress}
           style={{
             borderWidth: 2,
-            borderColor: palette.divider,
+            borderColor: palette.goldDeep,
             backgroundColor: palette.surface,
             paddingHorizontal: 12,
             paddingVertical: 8,

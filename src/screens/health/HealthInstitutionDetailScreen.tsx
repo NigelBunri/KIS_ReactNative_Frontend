@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,7 @@ import {
 } from '@/theme/health';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
+import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { getInstitutionRoleForUser } from './accessControl';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionDetail'>;
@@ -66,6 +67,15 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
     services: true,
     members: true,
   });
+
+  useEffect(() => {
+    if (!institutionId) return;
+    markMainTabNotificationSourceRead({
+      source: 'health',
+      targetType: 'health_institution',
+      targetId: institutionId,
+    }).catch(() => undefined);
+  }, [institutionId]);
 
   const dashboardType = useMemo(() => {
     if (!isSupportedType(institutionType)) return null;

@@ -828,7 +828,7 @@ export default function ServiceEditorDrawer({
                   Approximate USD value: ${priceInUsd}
                 </Text>
                 <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                  1 {KIS_COIN_CODE} = ${KIS_TO_USD_RATE} USD
+                  USD direct provider checkout
                 </Text>
               </View>
 

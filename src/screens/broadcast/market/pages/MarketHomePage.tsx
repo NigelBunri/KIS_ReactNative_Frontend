@@ -53,8 +53,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '' }: Prop
             <View style={{ gap: 12 }}>
               {home.trending_products.slice(0, 2).map((p) => {
                 const price = p.price !== undefined && p.price !== null ? String(p.price) : '';
-                const currency = p.currency ?? '';
-                const priceLabel = price ? `Price ${currency ? `${currency} ` : ''}${price}` : '';
+                const priceLabel = price ? `Price USD ${price}` : '';
                 const badge = p.badge ? String(p.badge).toUpperCase() : p.is_trending ? 'TREND' : undefined;
 
                 return (

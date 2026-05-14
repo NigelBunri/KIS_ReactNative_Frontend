@@ -96,7 +96,7 @@ export default function FeedsMainListSection({
 
   const headerSubtitle = useMemo(() => {
     // optional: if your backend returns a top channel/source, you can show it here
-    return 'Tech innovators';
+    return 'Innovators';
   }, []);
 
   const list = items ?? [];
@@ -107,19 +107,12 @@ export default function FeedsMainListSection({
         <SectionHeader
           title="Feeds"
           subtitle={headerSubtitle}
-          rightLabel="•••"
-          onRightPress={() => {}}
         />
       </View>
 
       {/* Pull-to-refresh feel using a small rail wrapper */}
       <View
         style={{
-          borderWidth: 2,
-          borderColor: palette.divider,
-          borderRadius: 22,
-          backgroundColor: palette.card,
-          padding: 10,
         }}
       >
         <View
@@ -175,9 +168,9 @@ export default function FeedsMainListSection({
                 onShare={() => onShare(item)}
                 onOpenSource={() => onOpenItem(item)}
                 onVideoPress={() => onOpenItem(item)}
-                onMenuPress={() => onMenu(item)}
                 onSave={() => onSave(item)}
                 onToggleComments={() => onComment(item)}
+                onMenuPress={() => onMenu(item)}
                 onOpenAuthorProfile={
                   isUserBroadcastSource(item)
                     ? () => {

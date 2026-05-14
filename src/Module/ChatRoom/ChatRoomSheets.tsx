@@ -18,6 +18,7 @@ type Props = {
   subRoomsSheetVisible: boolean;
   onCloseSubRooms: () => void;
   subRooms: SubRoom[];
+  onOpenSubRoom: (subRoom: SubRoom) => void;
 };
 
 export default function ChatRoomSheets({
@@ -34,6 +35,7 @@ export default function ChatRoomSheets({
   subRoomsSheetVisible,
   onCloseSubRooms,
   subRooms,
+  onOpenSubRoom,
 }: Props) {
   return (
     <>
@@ -52,6 +54,7 @@ export default function ChatRoomSheets({
         parentRoomId={roomId}
         subRooms={subRooms}
         palette={palette}
+        onOpenSubRoom={onOpenSubRoom}
       />
 
       <ForwardChatSheet

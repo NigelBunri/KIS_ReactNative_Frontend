@@ -22,24 +22,27 @@ type Props = {
   onReset: () => void;
 };
 
-const Chip = ({ label, active, onPress }: any) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => ({
-      borderWidth: 1,
-      borderColor: active ? '#FF8A33' : '#AAA',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 14,
-      backgroundColor: active ? 'rgba(255,138,51,0.12)' : 'transparent',
-      opacity: pressed ? 0.8 : 1,
-      marginRight: 8,
-      marginBottom: 8,
-    })}
-  >
-    <Text style={{ color: active ? '#FF8A33' : '#555', fontSize: 12 }}>{label}</Text>
-  </Pressable>
-);
+const Chip = ({ label, active, onPress }: any) => {
+  const { palette } = useKISTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        borderWidth: 1,
+        borderColor: active ? palette.gold : palette.divider,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+        backgroundColor: active ? palette.goldSoft : 'transparent',
+        opacity: pressed ? 0.8 : 1,
+        marginRight: 8,
+        marginBottom: 8,
+      })}
+    >
+      <Text style={{ color: active ? palette.goldDeep : palette.text, fontSize: 12 }}>{label}</Text>
+    </Pressable>
+  );
+};
 
 export default function EducationFilterSheet({
   visible,

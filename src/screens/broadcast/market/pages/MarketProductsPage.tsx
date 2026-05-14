@@ -12,10 +12,6 @@ import {
   MarketShop,
 } from '@/screens/broadcast/market/api/market.types';
 import MarketProductCard from '@/screens/broadcast/market/components/MarketProductCard';
-import {
-  KIS_COIN_CODE,
-  KIS_TO_USD_RATE,
-} from '@/screens/market/market.constants';
 import { useCatalogCategories } from '@/screens/market/useCatalogCategories';
 import { collectProductImageUris } from '@/utils/productImages';
 
@@ -118,8 +114,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
         ? String(product.price)
         : '';
     if (!priceValue) return '';
-    const currency = (product.currency ?? KIS_COIN_CODE).trim();
-    return `Price ${currency} ${priceValue}`;
+    return `Price USD ${priceValue}`;
   };
 
   useEffect(() => {
@@ -145,12 +140,6 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     setForm({ ...DEFAULT_PRODUCT_FORM });
   }, []);
 
-  const priceInUsd = useMemo(() => {
-    const parsed = Number(form.price);
-    return Number.isFinite(parsed)
-      ? (parsed * KIS_TO_USD_RATE).toFixed(2)
-      : '0.00';
-  }, [form.price]);
 
   const pickImages = useCallback(async () => {
     const result = await launchImageLibrary({
@@ -214,7 +203,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     formData.append('slug', trimmedName.toLowerCase().replace(/\s+/g, '-'));
     formData.append('description', form.description.trim());
     formData.append('price', trimmedPrice);
-    formData.append('currency', KIS_COIN_CODE);
+    formData.append('currency', 'USD');
     const stockQty = Math.max(0, Number(form.stock_qty || 0));
     formData.append(
       'stock_qty',
@@ -510,10 +499,10 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
           />
           <View style={{ marginTop: 6 }}>
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              Approximate USD value: ${priceInUsd}
+              Currency: USD · Checkout by Flutterwave
             </Text>
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              1 {KIS_COIN_CODE} = ${KIS_TO_USD_RATE} USD (fixed)
+              USD direct provider checkout
             </Text>
           </View>
           <KISTextInput
@@ -610,7 +599,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                           {product.name}
                         </Text>
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                          {product.price ?? ''} {product.currency ?? ''} ·
+                          USD {product.price ?? ''} ·
                           Stock: {product.stock_qty ?? 0}
                         </Text>
                         {product.catalog_categories?.[0]?.name ? (

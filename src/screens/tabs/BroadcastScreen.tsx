@@ -24,6 +24,7 @@ import BroadcastMainTabs, {
 } from '@/components/broadcast/BroadcastMainTabs';
 import BroadcastSearchRow from '@/components/broadcast/BroadcastSearchRow';
 import BroadcastFeedsPage from '../broadcast/pages/BroadcastFeedsPage';
+import ChannelsDiscoverPage from '../broadcast/channels/ChannelsDiscoverPage';
 import BroadcastEducationPage from '../broadcast/pages/BroadcastEducationPage';
 import BroadcastMarketPage from '../broadcast/pages/BroadcastMarketPage';
 import BroadcastHealthcarePage from '../broadcast/pages/BroadcastHealthcarePage';
@@ -46,6 +47,15 @@ const FILTER_OPTIONS: Record<BroadcastMainTabId, BroadcastFilterOption[]> = {
     { key: 'latest', label: 'Latest', description: 'Fresh broadcasts' },
     { key: 'trending', label: 'Trending', description: 'Most active' },
     { key: 'saved', label: 'Saved', description: 'Your keeps' },
+  ],
+  channels: [
+    { key: 'all', label: 'All', description: 'Every channel' },
+    { key: 'video', label: 'Video', description: 'Long-form uploads' },
+    { key: 'shorts', label: 'Shorts', description: 'Vertical clips' },
+    { key: 'live', label: 'Live', description: 'Streams and replays' },
+    { key: 'education', label: 'Education', description: 'Learning channels' },
+    { key: 'market', label: 'Market', description: 'Shops and services' },
+    { key: 'health', label: 'Health', description: 'Care providers' },
   ],
   education: [
     { key: 'course', label: 'Courses', description: 'Structured learning' },
@@ -71,6 +81,7 @@ const FILTER_OPTIONS: Record<BroadcastMainTabId, BroadcastFilterOption[]> = {
 
 const SEARCH_PLACEHOLDERS: Record<BroadcastMainTabId, string> = {
   feeds: 'Search broadcast feeds',
+  channels: 'Search channels',
   education: 'Search courses & lessons',
   market: 'Search marketplace drops',
   healthcare: 'Search providers & services',
@@ -78,6 +89,7 @@ const SEARCH_PLACEHOLDERS: Record<BroadcastMainTabId, string> = {
 
 const PROFILE_KEY_BY_TAB: Record<BroadcastMainTabId, BroadcastProfileKey> = {
   feeds: 'broadcast_feed',
+  channels: 'broadcast_feed',
   education: 'education',
   market: 'market',
   healthcare: 'health',
@@ -85,6 +97,7 @@ const PROFILE_KEY_BY_TAB: Record<BroadcastMainTabId, BroadcastProfileKey> = {
 
 const MAIN_TAB_ORDER: BroadcastMainTabId[] = [
   'feeds',
+  'channels',
   'education',
   'market',
   'healthcare',
@@ -95,8 +108,11 @@ const TAB_SWIPE_MAX_VERTICAL_DRIFT = 30;
 const TAB_SWIPE_DIRECTION_RATIO = 2.5;
 
 export default function BroadcastScreen() {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   const styles = useMemo(() => makeStyles(palette), [palette]);
+  const broadcastGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334'];
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
@@ -104,6 +120,7 @@ export default function BroadcastScreen() {
     Record<BroadcastMainTabId, string>
   >({
     feeds: '',
+    channels: '',
     education: '',
     market: '',
     healthcare: '',
@@ -247,7 +264,6 @@ export default function BroadcastScreen() {
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 120 }}
-        stickyHeaderIndices={[0]}
         keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: palette.bg }}
         refreshControl={
@@ -260,82 +276,85 @@ export default function BroadcastScreen() {
         }
       >
         <LinearGradient
-          colors={[palette.bg, palette.surfaceElevated, palette.bg]}
+          colors={broadcastGoldGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headerContainer}
         >
           <View style={styles.headerHalo} />
-          <View style={styles.headerSection}>
-            <BroadcastHeaderBar
-              title="Broadcast"
-              tierLabel="Business Pro"
-              onCreate={handleCreate}
-            />
-          </View>
-          <View style={styles.headerSection}>
-            <BroadcastMainTabs
-              value={activeMainTab}
-              onChange={setActiveMainTab}
-            />
-          </View>
-          <View style={styles.headerSection}>
-            <BroadcastSearchRow
-              searchPlaceholder={SEARCH_PLACEHOLDERS[activeMainTab]}
-              searchValue={currentSearchTerm}
-              onSearchChange={next =>
-                setSearchTerms(prev => ({ ...prev, [activeMainTab]: next }))
-              }
-              onFilterPress={() => setFilterVisible(prev => !prev)}
-              filterLabel={currentFilterOption.label}
-              filterActive={filterVisible}
-            />
-          </View>
-          {showFilterPanel ? (
-            <View style={[styles.headerSection, styles.filterPanel]}>
-              {FILTER_OPTIONS[activeMainTab].map(option => (
-                <Pressable
-                  key={option.key}
-                  onPress={() => handleFilterSelect(option.key)}
-                  style={[
-                    styles.filterOption,
-                    {
-                      borderColor:
-                        option.key === currentFilter
-                          ? palette.primary
-                          : palette.divider,
-                      backgroundColor:
-                        option.key === currentFilter
-                          ? palette.primarySoft
-                          : palette.surface,
-                    },
-                  ]}
-                >
-                  <Text
+          
+          <View style={styles.headerInner}>
+            <View style={styles.headerSection}>
+              <BroadcastHeaderBar
+                title="Broadcast"
+                tierLabel="Business Pro"
+                onCreate={handleCreate}
+              />
+            </View>
+            <View style={styles.headerSection}>
+              <BroadcastMainTabs
+                value={activeMainTab}
+                onChange={setActiveMainTab}
+              />
+            </View>
+            <View style={styles.headerSection}>
+              <BroadcastSearchRow
+                searchPlaceholder={SEARCH_PLACEHOLDERS[activeMainTab]}
+                searchValue={currentSearchTerm}
+                onSearchChange={next =>
+                  setSearchTerms(prev => ({ ...prev, [activeMainTab]: next }))
+                }
+                onFilterPress={() => setFilterVisible(prev => !prev)}
+                filterLabel={currentFilterOption.label}
+                filterActive={filterVisible}
+              />
+            </View>
+            {showFilterPanel ? (
+              <View style={[styles.headerSection, styles.filterPanel]}>
+                {FILTER_OPTIONS[activeMainTab].map(option => (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => handleFilterSelect(option.key)}
                     style={[
-                      styles.filterOptionLabel,
+                      styles.filterOption,
                       {
-                        color:
+                        borderColor:
                           option.key === currentFilter
-                            ? palette.primaryStrong
-                            : palette.text,
+                            ? palette.primary
+                            : palette.divider,
+                        backgroundColor:
+                          option.key === currentFilter
+                            ? palette.primarySoft
+                            : palette.surface,
                       },
                     ]}
                   >
-                    {option.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.filterOptionDescription,
-                      { color: palette.subtext },
-                    ]}
-                  >
-                    {option.description}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+                    <Text
+                      style={[
+                        styles.filterOptionLabel,
+                        {
+                          color:
+                            option.key === currentFilter
+                              ? palette.primaryStrong
+                              : palette.text,
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.filterOptionDescription,
+                        { color: palette.subtext },
+                      ]}
+                    >
+                      {option.description}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
         </LinearGradient>
         <View
           style={{ paddingHorizontal: 12 }}
@@ -349,6 +368,12 @@ export default function BroadcastScreen() {
                 handleFilterSelect('trending');
                 setFilterVisible(false);
               }}
+            />
+          )}
+          {activeMainTab === 'channels' && (
+            <ChannelsDiscoverPage
+              searchTerm={currentSearchTerm}
+              searchContext={currentFilter}
             />
           )}
           {activeMainTab === 'education' && (
@@ -407,13 +432,15 @@ export default function BroadcastScreen() {
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
   StyleSheet.create({
     headerContainer: {
-      paddingHorizontal: 12,
-      paddingTop: 12,
-      paddingBottom: 22,
-      backgroundColor: palette.bg,
-      borderBottomWidth: 1,
-      borderBottomColor: palette.border,
-      overflow: 'visible',
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      backgroundColor: '#6B4334',
+      borderBottomWidth: 0,
+      borderBottomColor: 'transparent',
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      overflow: 'hidden',
       shadowColor: palette.shadow ?? '#000',
       shadowOpacity: 0.08,
       shadowRadius: 18,
@@ -427,16 +454,29 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       width: 150,
       height: 150,
       borderRadius: 75,
-      backgroundColor: palette.primarySoft,
-      opacity: 0.55,
+      backgroundColor: palette.gold,
+      opacity: 0.16,
+    },
+    headerSheen: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      backgroundColor: 'rgba(255,244,184,0.45)',
+    },
+    headerInner: {
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 22,
     },
     headerSection: {
       marginBottom: 12,
     },
     filterPanel: {
-      borderWidth: 1,
+      borderWidth: 0,
       borderRadius: 22,
-      borderColor: palette.border,
+      borderColor: 'transparent',
       padding: 8,
       backgroundColor: palette.surface,
       flexDirection: 'row',

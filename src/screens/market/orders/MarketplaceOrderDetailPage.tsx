@@ -26,9 +26,16 @@ import { KISIcon } from '@/constants/kisIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '@/navigation/types';
 import {
-  backendCentsToFrontendKisc,
-  backendOrderTotalToFrontendKisc,
+  backendCentsToUsd,
+  backendOrderTotalToUsd,
 } from '@/utils/currency';
+import {
+  getDirectPaymentInfo,
+  isProviderPaymentFailed,
+  isProviderPaymentPending,
+  openDirectPaymentUrl,
+  paymentStatusLabel,
+} from '@/utils/directPaymentHandoff';
 
 type MarketplaceOrderDetailRoute = RouteProp<
   RootStackParamList,
@@ -57,6 +64,7 @@ export default function MarketplaceOrderDetailPage() {
     useState<DocumentPickerResponse | null>(null);
   const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [paymentOpening, setPaymentOpening] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -194,14 +202,40 @@ export default function MarketplaceOrderDetailPage() {
   }, [order, complaintText, complaintAttachment]);
 
   const items = useMemo(() => (order?.items ?? []) as Array<any>, [order]);
-  const orderTotalKisc = useMemo(
-    () => backendOrderTotalToFrontendKisc(order?.total_amount),
+  const orderTotalUsd = useMemo(
+    () => backendOrderTotalToUsd(order?.total_amount),
     [order?.total_amount],
   );
   const statusLabel = useMemo(() => {
     if (!order?.status) return 'Unknown';
     return order.status.charAt(0).toUpperCase() + order.status.slice(1);
   }, [order]);
+
+  const directPayment = useMemo(() => getDirectPaymentInfo(order), [order]);
+
+  const openOrderCheckout = useCallback(async () => {
+    if (!directPayment.paymentUrl) {
+      Alert.alert(
+        'Payment pending',
+        directPayment.reference
+          ? `Payment reference ${directPayment.reference} is waiting for a provider checkout link. Refresh after the provider link is ready.`
+          : 'This order is waiting for a provider checkout link. Refresh after the provider link is ready.',
+      );
+      return;
+    }
+    setPaymentOpening(true);
+    try {
+      const opened = await openDirectPaymentUrl(directPayment.paymentUrl);
+      if (!opened) {
+        throw new Error('Unable to open the secure checkout link on this device.');
+      }
+      Alert.alert('Checkout opened', 'Return to KIS after payment, then refresh this order.');
+    } catch (err: any) {
+      Alert.alert('Checkout', err?.message || 'Unable to open checkout.');
+    } finally {
+      setPaymentOpening(false);
+    }
+  }, [directPayment.paymentUrl, directPayment.reference]);
 
   if (loading) {
     return (
@@ -224,10 +258,16 @@ export default function MarketplaceOrderDetailPage() {
   }
 
   const isAwaitingSatisfaction = order.status === 'awaiting_satisfaction';
+  const orderPaymentStatus = directPayment.status;
+  const orderPaymentPending = isProviderPaymentPending(orderPaymentStatus);
+  const orderPaymentFailed = isProviderPaymentFailed(orderPaymentStatus);
+  const orderPaymentReady = ['paid', 'success', 'successful', 'satisfied'].includes(orderPaymentStatus);
   const canCancel = mode === 'buyer' && order.status === 'temporal';
   const canSatisfy =
-    mode === 'buyer' && (order.status === 'temporal' || isAwaitingSatisfaction);
-  const canComplete = mode === 'provider' && order.status === 'temporal';
+    mode === 'buyer' &&
+    orderPaymentReady &&
+    (order.status === 'temporal' || isAwaitingSatisfaction);
+  const canComplete = mode === 'provider' && orderPaymentReady && order.status === 'temporal';
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -271,8 +311,56 @@ export default function MarketplaceOrderDetailPage() {
           Total
         </Text>
         <Text style={[styles.sectionValue, { color: palette.primaryStrong }]}>
-          {orderTotalKisc.toFixed(2)} {order.currency ?? 'KISC'}
+          {orderTotalUsd.toFixed(2)} {order.currency ?? 'USD'}
         </Text>
+      </View>
+      <View
+        style={[
+          styles.detailCard,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
+        ]}
+      >
+        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+          Payment
+        </Text>
+        <Text
+          style={[
+            styles.sectionValue,
+            {
+              color: orderPaymentFailed
+                ? palette.error ?? palette.primaryStrong
+                : orderPaymentPending
+                ? palette.warning ?? palette.primaryStrong
+                : palette.success ?? palette.primaryStrong,
+            },
+          ]}
+        >
+          {paymentStatusLabel(orderPaymentStatus)}
+        </Text>
+        {directPayment.reference ? (
+          <Text style={[styles.itemMeta, { color: palette.subtext }]}>
+            Reference · {directPayment.reference}
+          </Text>
+        ) : null}
+        {directPayment.intentId ? (
+          <Text style={[styles.itemMeta, { color: palette.subtext }]}>
+            Intent · {directPayment.intentId}
+          </Text>
+        ) : null}
+        {orderPaymentPending || orderPaymentFailed ? (
+          <KISButton
+            title={paymentOpening ? 'Opening checkout...' : 'Open secure checkout'}
+            size="sm"
+            onPress={openOrderCheckout}
+            loading={paymentOpening}
+            disabled={paymentOpening || !directPayment.paymentUrl}
+          />
+        ) : null}
+        {orderPaymentPending && !directPayment.paymentUrl ? (
+          <Text style={[styles.itemMeta, { color: palette.subtext }]}>
+            Checkout link is not available yet. Refresh after the provider link is ready.
+          </Text>
+        ) : null}
       </View>
       {isAwaitingSatisfaction ? (
         <View
@@ -313,17 +401,17 @@ export default function MarketplaceOrderDetailPage() {
                 <Text
                   style={[styles.itemPrice, { color: palette.primaryStrong }]}
                 >
-                  {backendCentsToFrontendKisc(item.unit_price_cents).toFixed(2)}{' '}
-                  {order.currency}
+                  {backendCentsToUsd(item.unit_price_cents).toFixed(2)}{' '}
+                  {order.currency ?? 'USD'}
                 </Text>
               </View>
               <Text style={[styles.itemMeta, { color: palette.subtext }]}>
                 Qty: {item.quantity} · Line total:{' '}
                 {(
-                  backendCentsToFrontendKisc(item.unit_price_cents) *
+                  backendCentsToUsd(item.unit_price_cents) *
                   Number(item.quantity ?? 0)
                 ).toFixed(2)}{' '}
-                {order.currency ?? 'KISC'}
+                {order.currency ?? 'USD'}
               </Text>
               {item.custom_description ? (
                 <Text style={[styles.itemMeta, { color: palette.text }]}>
@@ -420,6 +508,13 @@ export default function MarketplaceOrderDetailPage() {
             />
           ) : null}
         </View>
+        <KISButton
+          title={loading ? 'Refreshing…' : 'Refresh payment status'}
+          size="sm"
+          variant="outline"
+          onPress={fetchOrder}
+          disabled={loading}
+        />
         <KISButton
           title={receiptLoading ? 'Downloading…' : 'Download receipt'}
           size="sm"

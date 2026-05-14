@@ -941,7 +941,7 @@ const toDateLabel = (isoDate: string) => {
 const toMoney = (cents?: number) => {
   if (!Number.isFinite(Number(cents))) return 'Not set';
   const kisc = Number(cents) / 10000;
-  return `${kisc.toFixed(3).replace(/\.?0+$/, '')} KISC`;
+  return `${kisc.toFixed(3).replace(/\.?0+$/, '')} USD`;
 };
 
 const getCardPrimaryTime = (

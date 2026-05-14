@@ -1244,13 +1244,13 @@ export default function BroadcastFeedSection({
             onLike={() => handleLike(item)}
             onShare={() => handleShare(item)}
             onOpenSource={() => handleOpenSource(item)}
-            onMenuPress={() => openActionMenu(item)}
             onVideoPress={() =>
               hasVideoAttachment(item) && openVideoModal(item)
             }
             onOpenMarket={() =>
               Alert.alert('Market', 'Opening storefront… (wired next)')
             }
+            onMenuPress={() => openActionMenu(item)}
             onSave={() => toggleSaved(item)}
             onJoinLesson={() => handleJoinLesson(item)}
             commentConversationId={broadcastConversationIds[item.id] ?? null}

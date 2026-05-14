@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, NEST_API_BASE_URL } from '../config';
 
 const socialRoutes = {
   messaging: {
@@ -74,10 +74,11 @@ const socialRoutes = {
     searchConversations: `${API_BASE_URL}/api/v1/chats/conversations/search/`,
     searchParticipants: `${API_BASE_URL}/api/v1/chats/conversations/participant-search/`,
     directConversation: `${API_BASE_URL}/api/v1/chats/conversations/direct/`,
+    threads: `${API_BASE_URL}/api/v1/chats/threads/`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>
-      `${API_BASE_URL}/api/v1/auth/e2ee/conversations/${conversationId}/key/`,
+      `${NEST_API_BASE_URL}/api/v1/e2ee/conversations/${conversationId}/key`,
   },
 };
 

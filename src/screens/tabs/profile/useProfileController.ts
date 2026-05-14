@@ -28,7 +28,6 @@ import { tierMetaFor } from './profile/tierMeta';
 import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
 import type { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
 
-const CENTS_PER_KISC = 100;
 const MICROS_PER_CENT = 10;
 const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 const DEFAULT_PROFILE_LANGUAGE = 'English';
@@ -335,10 +334,10 @@ export const useProfileController = (opts: {
     usd_label: string;
   }>({
     balance_micro: 0,
-    balance_label: '0.00 KISC',
-    usd_label: '$0.00',
+    balance_label: '0 promotional credits',
+    usd_label: '',
   });
-  const [lastWalletPaymentUrl, setLastWalletPaymentUrl] = useState('');
+  const [lastWalletPaymentUrl] = useState('');
   const [tierCatalog, setTierCatalog] = useState<any[]>([]);
 
   const [draftProfile, setDraftProfile] = useState<DraftProfile>({
@@ -521,8 +520,12 @@ export const useProfileController = (opts: {
           : 0;
         setKisWallet({
           balance_micro: safeMicro,
-          balance_label: String(wallet?.balance_kisc_label ?? '0.00 KISC'),
-          usd_label: String(wallet?.balance_usd_label ?? '$0.00'),
+          balance_label: String(
+            wallet?.promotional_credit_label ??
+              wallet?.balance_kisc_label ??
+              '0 promotional credits',
+          ),
+          usd_label: '',
         });
         return {
           balance_micro: safeMicro,
@@ -539,12 +542,10 @@ export const useProfileController = (opts: {
         ? Math.max(0, Math.floor(cents))
         : 0;
       const fallbackMicro = safeCents * MICROS_PER_CENT;
-      const fallbackKisc = safeCents / (CENTS_PER_KISC ?? 100);
-      const fallbackUsd = fallbackKisc * 100;
       setKisWallet({
         balance_micro: fallbackMicro,
-        balance_label: `${fallbackKisc.toFixed(3)} KISC`,
-        usd_label: `$${fallbackUsd.toFixed(2)}`,
+        balance_label: '0 promotional credits',
+        usd_label: '',
       });
       return {
         balance_micro: fallbackMicro,
@@ -1484,14 +1485,6 @@ export const useProfileController = (opts: {
       tier?.name || tier?.code || tier?.slug || '',
     ).toLowerCase();
     const isPartnerTier = tierName.includes('partner');
-    const priceCents = Number(tier?.price_cents || 0);
-    let latestWallet = { balance_cents: 0, balance_micro: 0 };
-    try {
-      latestWallet = (await loadKisWallet()) ?? latestWallet;
-    } catch (error) {
-      console.warn('Unable to refresh wallet before upgrade:', error);
-    }
-    const walletBalanceCents = Math.max(0, latestWallet?.balance_cents ?? 0);
     const currentTier = profile?.tier || profile?.subscription?.tier;
     const currentRank = tierMetaFor(currentTier || {}).tierRank ?? 0;
     const targetRank = tierMetaFor(tier || {}).tierRank ?? 0;
@@ -1507,20 +1500,10 @@ export const useProfileController = (opts: {
       );
       return;
     }
-    if (priceCents > walletBalanceCents) {
-      const requiredKisc = (priceCents / CENTS_PER_KISC).toFixed(3);
-      const availableKisc = (walletBalanceCents / CENTS_PER_KISC).toFixed(3);
-      Alert.alert(
-        'Insufficient KIS Coins',
-        `This upgrade needs ${requiredKisc} KISC, but your wallet has ${availableKisc} KISC.`,
-      );
-      return;
-    }
-
     setSaving(true);
     const res = await postRequest(ROUTES.wallet.upgrade, {
       tier: tierId,
-      payment_method: 'kisc',
+      payment_method: 'flutterwave',
     });
     setSaving(false);
 
@@ -1528,12 +1511,22 @@ export const useProfileController = (opts: {
       const fallback = 'Could not upgrade';
       const threshed = String(res?.message || fallback).trim();
       const normalized = threshed.replace(/\s+/g, ' ');
-      const mentionWallet = /insufficient|balance|kisc/i.test(
-        normalized.toLowerCase(),
-      );
+      Alert.alert('Upgrade', normalized);
+      return;
+    }
+
+    const paymentUrl = res?.data?.payment_url;
+    if (paymentUrl) {
+      Linking.openURL(paymentUrl).catch(() => {
+        Alert.alert(
+          'Upgrade',
+          'The secure checkout was created, but the payment link could not be opened automatically.',
+        );
+      });
+      await loadBillingHistory();
       Alert.alert(
         'Upgrade',
-        mentionWallet ? 'Not enough KIS Coins in your wallet.' : normalized,
+        'Secure USD checkout is ready. Complete the Flutterwave payment to activate this plan.',
       );
       return;
     }
@@ -1757,106 +1750,10 @@ export const useProfileController = (opts: {
   }, [walletForm.recipient, profile?.user?.country, profile?.user?.id]);
 
   const submitWalletAction = async () => {
-    const amountKisc = Number(walletForm.amount || 0);
-    const amountCents = Number.isFinite(amountKisc)
-      ? Math.round(amountKisc * CENTS_PER_KISC)
-      : 0;
-    const mode = String(walletForm.mode || '')
-      .trim()
-      .toLowerCase();
-
-    setSaving(true);
-    setLastWalletPaymentUrl('');
-    let res: any = null;
-
-    if (!amountCents || amountCents < 1) {
-      setSaving(false);
-      Alert.alert('Wallet', 'Enter a valid KIS Coin amount.');
-      return;
-    }
-
-    if (
-      mode === 'add_kisc' ||
-      mode === 'deposit' ||
-      mode === 'cash_to_credits'
-    ) {
-      res = await postRequest(
-        ROUTES.wallet.deposit,
-        {
-          amount_cents: amountCents,
-          provider: String(walletForm.provider || 'flutterwave')
-            .trim()
-            .toLowerCase(),
-        },
-        {
-          errorMessage: 'Unable to top up KIS wallet.',
-        },
-      );
-    } else if (mode === 'transfer') {
-      const recipientPhone = String(walletForm.recipient || '').trim();
-      const recipientDigits = normalizePhoneForCompare(recipientPhone);
-      if (!recipientPhone) {
-        setSaving(false);
-        Alert.alert('Wallet', 'Recipient phone number is required.');
-        return;
-      }
-      if (
-        !walletRecipientVerification.verified ||
-        !walletRecipientVerification.recipientId ||
-        walletRecipientVerification.recipientPhoneDigits !== recipientDigits
-      ) {
-        setSaving(false);
-        Alert.alert(
-          'Wallet',
-          'Verify the recipient first before sending KIS Coins.',
-        );
-        return;
-      }
-
-      const countryHint = String(profile?.user?.country || 'CM')
-        .trim()
-        .toUpperCase();
-      res = await postRequest(
-        ROUTES.wallet.transfer,
-        {
-          recipient_id: walletRecipientVerification.recipientId,
-          recipient_phone: recipientPhone,
-          country: countryHint,
-          amount_cents: amountCents,
-        },
-        {
-          errorMessage: 'Unable to transfer KIS wallet balance.',
-        },
-      );
-    } else {
-      setSaving(false);
-      Alert.alert('Wallet', 'Unsupported wallet action.');
-      return;
-    }
-
-    setSaving(false);
-
-    if (!res?.success) {
-      const msg = res?.message || 'Action failed';
-      Alert.alert('Wallet', msg);
-      return;
-    }
-
-    const paymentUrl = res?.data?.payment_url;
-    if (paymentUrl) {
-      setLastWalletPaymentUrl(String(paymentUrl));
-      Linking.openURL(String(paymentUrl)).catch(() => undefined);
-      Alert.alert('Wallet', 'Your top-up payment link is ready.');
-      return;
-    }
-
-    closeSheet();
-    loadKisWallet();
-    loadWalletLedger();
-    loadProfile();
-    if (mode === 'transfer') {
-      Alert.alert('Wallet', 'Your transfer was completed successfully.');
-    }
+    Alert.alert(
+      'Wallet',
+      'Buying, sending, withdrawing, or converting KIS promotional credits is disabled. Use secure USD checkout for paid account upgrades.',
+    );
   };
 
   const sectionList = useMemo(() => {

@@ -1,5 +1,6 @@
 // src/screens/tabs/Filters.tsx
 import React, { useEffect, useState } from 'react';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Alert,
+  StyleSheet,
 } from 'react-native';
 import {
   styles,
@@ -31,18 +33,29 @@ export function ToggleChip({
   onPress: () => void;
   palette: any;
 }) {
+  const metallicGoldGradient = ['#5A372D', palette.goldDeep, palette.gold, '#7A4B3E'];
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: active ? palette.primarySoft : pressed ? palette.surface : palette.card,
-          borderColor: active ? palette.primary : palette.inputBorder,
+          backgroundColor: active ? palette.goldDeep : pressed ? palette.surface : palette.card,
+          borderColor: active ? palette.goldLight : palette.inputBorder,
+          overflow: 'hidden',
         },
       ]}
     >
-      <Text style={{ color: active ? palette.primaryStrong : palette.text, fontSize: 13 }}>
+      {active ? (
+        <LinearGradient
+          colors={metallicGoldGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      ) : null}
+      <Text style={{ color: active ? palette.ivory : palette.text, fontSize: 13, fontWeight: active ? '900' : '400' }}>
         {label}
       </Text>
     </Pressable>

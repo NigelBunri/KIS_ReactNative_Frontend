@@ -107,9 +107,34 @@ export type AttachmentFilePayload = {
   onStatus?: (uri: string, status: 'uploading' | 'done' | 'failed') => void;
 };
 
+const normalizeSubRoom = (row: any, parentRoomId: string): SubRoom | null => {
+  const conversationId =
+    row?.child_conversation_id ??
+    row?.childConversationId ??
+    row?.child_conversation?.id ??
+    row?.childConversation?.id ??
+    row?.conversationId ??
+    null;
+  if (!conversationId) return null;
+  return {
+    id: String(row?.id ?? conversationId),
+    parentRoomId,
+    conversationId: String(conversationId),
+    rootMessageId: row?.parent_message_key ?? row?.rootMessageId ?? undefined,
+    title:
+      row?.child_title ??
+      row?.child_conversation?.title ??
+      row?.childConversation?.title ??
+      row?.title ??
+      'Sub-room',
+  };
+};
+
 type ExtendedChatRoomPageProps = ChatRoomPageProps & {
   hideHeader?: boolean;
   onOpenInfo?: (payload: { chat: ChatRoomPageProps['chat']; currentUserId: string | null }) => void;
+  onOpenChat?: (chat: NonNullable<ChatRoomPageProps['chat']>) => void;
+  initialTargetMessageId?: string | null;
   headerContextLabel?: string | null;
   onPressHeaderContext?: () => void;
   safeAreaTopInsetOverride?: number;
@@ -134,6 +159,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   onForwardMessages,
   hideHeader,
   onOpenInfo,
+  onOpenChat,
+  initialTargetMessageId,
   headerContextLabel,
   onPressHeaderContext,
   safeAreaTopInsetOverride,
@@ -156,9 +183,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /*                               AUTH CONTEXT                                */
   /* ------------------------------------------------------------------------ */
 
-  const { authToken, currentUserId, currentUserName } =
+  const { authToken, currentUserId: authCurrentUserId, currentUserName } =
     useChatAuth(chat);
-  const { typingByConversation, presenceByUser, socket, startCall } = useSocket();
+  const { typingByConversation, presenceByUser, socket, startCall, currentUserId: socketCurrentUserId } = useSocket();
+  const currentUserId = authCurrentUserId || String(socketCurrentUserId ?? '');
 
   /* ------------------------------------------------------------------------ */
   /*                         CONVERSATION BOOTSTRAP                            */
@@ -234,6 +262,24 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [menuVisible, setMenuVisible] = useState(false);
 
   const [subRooms, setSubRooms] = useState<SubRoom[]>([]);
+  const loadSubRooms = useCallback(async () => {
+    const convId = String(conversationId ?? chat?.conversationId ?? chat?.id ?? '');
+    if (!convId || convId.startsWith('newContact-')) return;
+    const res = await getRequest(
+      `${ROUTES.chat.threads}?parent_conversation=${encodeURIComponent(convId)}`,
+      { errorMessage: 'Unable to load sub-rooms.' },
+    );
+    const rows = res?.data?.results ?? res?.data ?? res?.results ?? [];
+    if (!Array.isArray(rows)) return;
+    const normalized = rows
+      .map((row: any) => normalizeSubRoom(row, convId))
+      .filter(Boolean) as SubRoom[];
+    setSubRooms(normalized);
+  }, [chat?.conversationId, chat?.id, conversationId]);
+
+  useEffect(() => {
+    loadSubRooms();
+  }, [loadSubRooms]);
   const [messageLocator, setMessageLocator] =
     useState<MessageLocator | null>(null);
   const initialUnreadJumpRef = useRef<string | null>(null);
@@ -245,6 +291,27 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [groupAction, setGroupAction] = useState<'add' | 'remove' | 'role' | null>(null);
   const [groupUserIdInput, setGroupUserIdInput] = useState('');
   const [groupRoleInput, setGroupRoleInput] = useState('member');
+
+  const handleOpenSubRoom = useCallback(
+    (subRoom: SubRoom) => {
+      const chatPayload: NonNullable<ChatRoomPageProps['chat']> = {
+        id: subRoom.conversationId,
+        conversationId: subRoom.conversationId,
+        name: subRoom.title || 'Sub-room',
+        title: subRoom.title || 'Sub-room',
+        kind: 'thread',
+        isGroup: true,
+        isGroupChat: true,
+      } as NonNullable<ChatRoomPageProps['chat']>;
+      setSubRoomsSheetVisible(false);
+      if (onOpenChat) {
+        onOpenChat(chatPayload);
+        return;
+      }
+      DeviceEventEmitter.emit('chat.open', chatPayload);
+    },
+    [onOpenChat],
+  );
 
   const handleReactMessage = useCallback(
     (message: ChatMessage, emoji: string) => {
@@ -444,24 +511,48 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         pinned,
       });
     },
-    onContinueInSubRoom: (message) => {
-      const rootId = message.serverId ?? message.id;
-      if (!rootId) return;
+    onContinueInSubRoom: async (message) => {
+      const rootId =
+        message.serverId ??
+        (message.id && message.id.startsWith('client_') ? null : message.id);
+      const convId = String(message.conversationId ?? conversationId ?? chat?.conversationId ?? chat?.id ?? '');
+      if (!rootId) {
+        Alert.alert('Sub-room', 'Please wait for this message to be delivered before opening a sub-room.');
+        return;
+      }
+      if (!convId || convId.startsWith('newContact-')) {
+        Alert.alert('Sub-room', 'The conversation is still being prepared. Please try again in a moment.');
+        return;
+      }
       const title =
         message.text ||
         message.styledText?.text ||
         (message.sticker ? 'Sticker' : '') ||
         (message.voice ? 'Voice message' : '') ||
         'Sub-room';
-      setSubRooms((prev) => [
-        ...prev,
+      const res = await postRequest(
+        ROUTES.chat.threads,
         {
-          id: `sub_${rootId}`,
-          parentRoomId: String(storageRoomId),
-          rootMessageId: rootId,
+          parent_conversation: convId,
+          parent_message_key: String(rootId),
           title,
         },
-      ]);
+        { errorMessage: 'Unable to open sub-room.' },
+      );
+      const row = res?.data ?? res;
+      const next = normalizeSubRoom(row, convId);
+      if (!next) {
+        Alert.alert('Sub-room', 'Unable to open the sub-room for this message.');
+        return;
+      }
+      setSubRooms((prev) => {
+        const withoutDuplicate = prev.filter(
+          (item) =>
+            item.rootMessageId !== next.rootMessageId &&
+            item.conversationId !== next.conversationId,
+        );
+        return [next, ...withoutDuplicate];
+      });
       setSubRoomsSheetVisible(true);
     },
   });
@@ -554,6 +645,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   useEffect(() => {
     initialUnreadJumpRef.current = null;
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!initialTargetMessageId || !messageLocator) return;
+    const timer = setTimeout(() => {
+      messageLocator.scrollToMessage(String(initialTargetMessageId));
+      messageLocator.highlightMessage(String(initialTargetMessageId));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [initialTargetMessageId, messageLocator]);
 
   useEffect(() => {
     if (startAtBottom) return;
@@ -883,6 +983,20 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       sendRichMessage,
     });
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('chat.sendPendingAttachment', (payload: any) => {
+      const targetId = String(payload?.targetId ?? '');
+      const chatId = String((chat as any)?.conversationId ?? (chat as any)?.id ?? '');
+      if (!targetId || !chatId || targetId !== chatId) return;
+      const attachment = payload?.attachment as AttachmentFilePayload | undefined;
+      if (!attachment) return;
+      void handleSendAttachment(attachment);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [chat?.conversationId, chat?.id, handleSendAttachment]);
+
   const handleSendContacts = (contacts: SimpleContact[]) =>
     Handlers.handleSendContacts({
       contacts,
@@ -1143,6 +1257,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         subRoomsSheetVisible={subRoomsSheetVisible}
         onCloseSubRooms={() => setSubRoomsSheetVisible(false)}
         subRooms={subRooms}
+        onOpenSubRoom={handleOpenSubRoom}
       />
     </View>
   );

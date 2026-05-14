@@ -96,6 +96,12 @@ export type KISIconName =
   | 'phone'
   | 'document'
   | 'shield'
+  | 'download'
+  | 'archive'
+  | 'group'
+  | 'channel'
+  | 'call-history'
+  | 'volume-mute'
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -264,6 +270,12 @@ const ion: IonMap = {
   phone: { filled: 'call', outline: 'call-outline' },
   document: { filled: 'document', outline: 'document-outline' },
   shield: { filled: 'shield-checkmark', outline: 'shield-checkmark-outline' },
+  download: { filled: 'archive', outline: 'archive-outline' },
+  archive: { filled: 'archive', outline: 'archive-outline' },
+  group: { filled: 'people', outline: 'people-outline' },
+  channel: { filled: 'radio', outline: 'radio-outline' },
+  'call-history': { filled: 'time', outline: 'time-outline' },
+  'volume-mute': { filled: 'volume-mute', outline: 'volume-mute-outline' },
 };
 
 export interface KISIconProps {

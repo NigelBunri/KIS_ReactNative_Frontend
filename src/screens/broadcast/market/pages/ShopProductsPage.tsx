@@ -18,10 +18,6 @@ import ROUTES from '@/network';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import {
-  KIS_COIN_CODE,
-  KIS_TO_USD_RATE,
-} from '@/screens/market/market.constants';
-import {
   buildCartProductIndex,
   cartHasProduct,
   CartProductVariantIndex,
@@ -221,7 +217,7 @@ const ShopProductsPage = () => {
                     { color: palette.primaryStrong },
                   ]}
                 >
-                  {`${price.toFixed(2)} ${item.currency ?? KIS_COIN_CODE}`}
+                  {`USD ${price.toFixed(2)}`}
                 </Text>
                 {comparePrice > price ? (
                   <Text
@@ -230,9 +226,7 @@ const ShopProductsPage = () => {
                       { color: palette.subtext },
                     ]}
                   >
-                    {`${comparePrice.toFixed(2)} ${
-                      item.currency ?? KIS_COIN_CODE
-                    }`}
+                    {`USD ${comparePrice.toFixed(2)}`}
                   </Text>
                 ) : null}
               </View>
@@ -242,7 +236,7 @@ const ShopProductsPage = () => {
                   { color: palette.subtext },
                 ]}
               >
-                ≈ ${(price * KIS_TO_USD_RATE).toFixed(2)} USD
+                USD direct checkout
               </Text>
               <Text
                 style={[

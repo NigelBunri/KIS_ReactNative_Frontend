@@ -83,6 +83,18 @@ const getFeedSource = (item: any) =>
 
 const getFeedBody = (item: any) => getFeedPlainText(item) || item?.body || '';
 
+
+const getChannelContentId = (item: any): string | null => {
+  const value =
+    item?.channel_content_id ??
+    item?.channelContentId ??
+    item?.metadata?.channel_content_id ??
+    item?.metadata?.channelContentId ??
+    item?.channel_content?.id ??
+    null;
+  return value ? String(value) : null;
+};
+
 const getFirstFeedImageUrl = (item: any) => {
   const attachments = Array.isArray(item?.attachments)
     ? item.attachments.filter(Boolean)
@@ -128,6 +140,17 @@ export default function BroadcastDetailScreen() {
       ? null
       : 'Broadcast details are only available when navigating from the feed list.',
   );
+
+  const normalizedChannelContentId = getChannelContentId(broadcastItem);
+
+  useEffect(() => {
+    if (!normalizedChannelContentId || !broadcastItem) return;
+    navigation.replace('ChannelContentDetail', {
+      contentId: normalizedChannelContentId,
+      item: broadcastItem,
+      channel: broadcastItem.channel || broadcastItem.source || null,
+    });
+  }, [broadcastItem, navigation, normalizedChannelContentId]);
   const broadcastId = broadcastItem?.id ?? route.params?.id;
   const reactionCount = Number(
     broadcastItem?.reaction_count ?? broadcastItem?.engagement?.reactions ?? 0,
