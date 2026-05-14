@@ -14,9 +14,15 @@ export default function BroadcastHeaderBar({
   tierLabel = 'Business Pro',
   onCreate,
 }: Props) {
-  const { palette, tokens } = useKISTheme();
+  const { palette, tokens, tone } = useKISTheme();
   const headerTextColor = palette.ivory ?? '#FFFFFF';
-  const headerMutedColor = palette.goldSoft ?? 'rgba(255,244,184,0.86)';
+  const headerMutedColor = tone === 'dark' ? '#FFF4B8' : '#FFFFFF';
+  const isDark = tone === 'dark';
+  const controlBg = isDark ? palette.primarySoft : 'rgba(255,255,255,0.9)';
+  const controlBorder = isDark ? palette.goldMuted : palette.goldLight;
+  const controlText = isDark ? palette.primaryStrong : palette.primaryStrong;
+  const createBg = isDark ? palette.primarySoft : palette.primaryStrong;
+  const createText = isDark ? palette.primaryStrong : '#FFFFFF';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
@@ -25,10 +31,10 @@ export default function BroadcastHeaderBar({
         <View
           style={[
             styles.mark,
-            { backgroundColor: 'rgba(255,255,255,0.92)', borderColor: palette.goldLight },
+            { backgroundColor: controlBg, borderColor: controlBorder },
           ]}
         >
-          <KISIcon name="megaphone" size={18} color={palette.primaryStrong} />
+          <KISIcon name="megaphone" size={18} color={controlText} />
         </View>
         <View>
           <Text style={[styles.eyebrow, { color: headerMutedColor }]}>
@@ -40,15 +46,15 @@ export default function BroadcastHeaderBar({
           style={[
             styles.badge,
             {
-              backgroundColor: 'rgba(255,255,255,0.9)',
-              borderColor: palette.goldLight,
+              backgroundColor: controlBg,
+              borderColor: controlBorder,
             },
           ]}
         >
-          <KISIcon name="shield" size={12} color={palette.primaryStrong} />
+          <KISIcon name="shield" size={12} color={controlText} />
           <Text
             style={{
-              color: palette.primaryStrong,
+              color: controlText,
               fontWeight: '900',
               fontSize: 11,
             }}
@@ -60,11 +66,18 @@ export default function BroadcastHeaderBar({
 
       <Pressable
         onPress={onCreate}
-        style={[styles.createBtn, { backgroundColor: palette.primaryStrong }]}
+        style={[
+          styles.createBtn,
+          {
+            backgroundColor: createBg,
+            borderColor: isDark ? palette.goldMuted : 'transparent',
+            borderWidth: isDark ? 1 : 0,
+          },
+        ]}
         accessibilityRole="button"
       >
-        <KISIcon name="plus" size={16} color="#fff" />
-        <Text style={{ color: '#fff', fontWeight: '900', lineHeight: 16 }}>
+        <KISIcon name="plus" size={16} color={createText} />
+        <Text style={{ color: createText, fontWeight: '900', lineHeight: 16 }}>
           Create
         </Text>
       </Pressable>

@@ -51,7 +51,7 @@ const EMPTY_FORM: ChannelForm = {
 const normalizeHandle = (value: string) => value.toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
 export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onCreate }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -291,7 +291,14 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             <Pressable
               onPress={handleToggleChannelBroadcast}
               disabled={channelBroadcasting}
-              style={[styles.headerBroadcastButton, { borderColor: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primary, opacity: channelBroadcasting ? 0.72 : 1 }]}
+              style={[
+                styles.headerBroadcastButton,
+                {
+                  backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5',
+                  borderColor: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primary,
+                  opacity: channelBroadcasting ? 0.72 : 1,
+                },
+              ]}
             >
               {channelBroadcasting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
               <Text style={[styles.broadcastText, { color: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>
@@ -307,15 +314,15 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       </View>
       {selectedChannel ? (
         <View style={styles.studioMetrics}>
-          <View style={[styles.metricTile, { borderColor: '#E8DDC7', backgroundColor: '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{contents.length}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Studio items</Text>
           </View>
-          <View style={[styles.metricTile, { borderColor: '#E8DDC7', backgroundColor: '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.is_broadcast ? 'Live' : 'Private'}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Broadcast state</Text>
           </View>
-          <View style={[styles.metricTile, { borderColor: '#E8DDC7', backgroundColor: '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.subscriber_count || 0}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Subscribers</Text>
           </View>

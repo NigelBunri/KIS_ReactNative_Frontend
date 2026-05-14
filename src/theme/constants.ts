@@ -195,6 +195,8 @@ export const createPalette = (tone: KISTone): KISPalette => {
   const lightTanGold = '#D9A875';
   const darkReadableGold = '#E7C76D';
   const darkReadableGoldStrong = '#FFF0A8';
+  const darkGoldSoftSurface = 'rgba(231,199,109,0.18)';
+  const darkGoldMutedBorder = 'rgba(231,199,109,0.42)';
 
   // Soft tint derived from the active primary color.
   const primarySoft =
@@ -313,8 +315,8 @@ export const createPalette = (tone: KISTone): KISPalette => {
     goldRose: c.brand.goldRose,
     goldDeep: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
     goldShadow: tone === 'dark' ? '#B9852E' : c.brand.goldShadow,
-    goldSoft: c.brand.goldSoft,
-    goldMuted: c.brand.goldMuted,
+    goldSoft: tone === 'dark' ? darkGoldSoftSurface : c.brand.goldSoft,
+    goldMuted: tone === 'dark' ? darkGoldMutedBorder : c.brand.goldMuted,
     goldGradientStart: c.brand.goldGradientStart,
     goldGradientMid: c.brand.goldGradientMid,
     goldGradientEnd: c.brand.goldGradientEnd,

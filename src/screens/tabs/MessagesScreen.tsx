@@ -1576,7 +1576,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 </Text>
                 <Text
                   style={{
-                    color: palette.goldSoft,
+                    color: '#FFF4B8',
                     fontSize: 11,
                     fontWeight: '800',
                     marginTop: 2,
@@ -1680,7 +1680,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 </Text>
                 <Text
                   style={{
-                    color: palette.goldSoft,
+                    color: '#FFF4B8',
                     marginTop: 2,
                     fontSize: 12,
                     fontWeight: '800',

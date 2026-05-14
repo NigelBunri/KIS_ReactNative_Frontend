@@ -54,7 +54,7 @@ const compactNumber = (value?: number) => {
 };
 
 function ChannelAvatar({ channel, size = 48 }: { channel: BroadcastChannelSummary; size?: number }) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   if (channel.avatar_url) {
     return (
       <Image
@@ -69,7 +69,7 @@ function ChannelAvatar({ channel, size = 48 }: { channel: BroadcastChannelSummar
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: '#F8F2E4',
+        backgroundColor: tone === 'dark' ? palette.primarySoft : '#F8F2E4',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
@@ -82,9 +82,17 @@ function ChannelAvatar({ channel, size = 48 }: { channel: BroadcastChannelSummar
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   return (
-    <View style={styles.metricBox}>
+    <View
+      style={[
+        styles.metricBox,
+        {
+          backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5',
+          borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7',
+        },
+      ]}
+    >
       <Text style={[styles.metricValue, { color: palette.text }]}>{value}</Text>
       <Text style={[styles.metricLabel, { color: palette.subtext }]}>{label}</Text>
     </View>
@@ -132,11 +140,11 @@ function FeaturedChannelCard({ channel, onOpen }: { channel: BroadcastChannelSum
 }
 
 function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary; onOpen: (channel: BroadcastChannelSummary) => void }) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   return (
-    <Pressable onPress={() => onOpen(channel)} style={[styles.listRow, { backgroundColor: palette.surface, borderColor: '#E8DDC7' }]}> 
+    <Pressable onPress={() => onOpen(channel)} style={[styles.listRow, { backgroundColor: palette.surface, borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7' }]}> 
       <View style={styles.rowBannerSlot}>
-        {channel.banner_url ? <Image source={{ uri: channel.banner_url }} style={styles.rowBanner} /> : <View style={styles.rowBannerFallback} />}
+        {channel.banner_url ? <Image source={{ uri: channel.banner_url }} style={styles.rowBanner} /> : <View style={[styles.rowBannerFallback, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#F5EBD3' }]} />}
         <View style={styles.rowAvatar}><ChannelAvatar channel={channel} size={48} /></View>
       </View>
       <View style={styles.rowContent}>
@@ -147,8 +155,8 @@ function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary;
         <Text numberOfLines={1} style={[styles.handleText, { color: palette.subtext }]}>@{channel.handle} · {compactNumber(channel.subscriber_count)} subscribers</Text>
         <Text numberOfLines={2} style={[styles.descriptionText, { color: palette.subtext }]}>{channel.description || channel.category || 'Channel'}</Text>
         <View style={styles.rowTags}>
-          {channel.category ? <Text style={styles.rowTag}>{String(channel.category).toUpperCase()}</Text> : null}
-          {channel.is_broadcast ? <Text style={styles.rowTag}>BROADCASTING</Text> : null}
+          {channel.category ? <Text style={[styles.rowTag, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7', color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>{String(channel.category).toUpperCase()}</Text> : null}
+          {channel.is_broadcast ? <Text style={[styles.rowTag, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7', color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>BROADCASTING</Text> : null}
         </View>
       </View>
       <KISIcon name="chevron-right" size={18} color={palette.subtext} />
@@ -157,7 +165,7 @@ function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary;
 }
 
 export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 'all' }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const activeCategory = searchContext || 'all';
   const { channels, loading, refreshing, error, loadMore } = useChannelsData({
@@ -193,12 +201,12 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
               style={[
                 styles.categoryPill,
                 {
-                  backgroundColor: active ? '#F8F2E4' : palette.surface,
+                  backgroundColor: active ? (tone === 'dark' ? palette.primarySoft : '#F8F2E4') : palette.surface,
                   borderColor: active ? GOLD : palette.border,
                 },
               ]}
             >
-              <Text style={{ color: active ? INK : palette.text, fontWeight: '900', fontSize: 12 }}>{item.label}</Text>
+              <Text style={{ color: active ? (tone === 'dark' ? palette.primaryStrong : INK) : palette.text, fontWeight: '900', fontSize: 12 }}>{item.label}</Text>
             </View>
           );
         })}
@@ -229,8 +237,8 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
           <Text style={[styles.sectionSubtitle, { color: palette.subtext }]}>A reserved rail for streams, replays, and premieres.</Text>
         </View>
       </View>
-      <View style={[styles.liveStrip, { backgroundColor: '#FFF8E7', borderColor: '#E6D7B2' }]}> 
-        <View style={styles.liveIconFrame}><KISIcon name="play" size={18} color={GOLD} /></View>
+      <View style={[styles.liveStrip, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7', borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2' }]}> 
+        <View style={[styles.liveIconFrame, { backgroundColor: tone === 'dark' ? palette.surface : '#FFFFFF' }]}><KISIcon name="play" size={18} color={tone === 'dark' ? palette.primaryStrong : GOLD} /></View>
         <Text style={[styles.liveText, { color: palette.text }]}>Live streams, premieres, and replays will collect here as channels publish them.</Text>
       </View>
 
