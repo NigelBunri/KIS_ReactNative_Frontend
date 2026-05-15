@@ -682,6 +682,28 @@ export const useProfileController = (opts: {
       if (extras.link) form.append('link', extras.link);
       if (extras.composerType)
         form.append('composer_type', extras.composerType);
+      const channelId = extras.channel_id ?? extras.channelId;
+      if (channelId) form.append('channel_id', String(channelId));
+      const contentType = extras.content_type ?? extras.contentType;
+      if (contentType) form.append('content_type', String(contentType));
+      if (extras.visibility) form.append('visibility', String(extras.visibility));
+      const scheduledAt = extras.scheduled_at ?? extras.scheduledAt;
+      if (scheduledAt) form.append('scheduled_at', String(scheduledAt));
+      const thumbnail = extras.thumbnail_url ?? extras.thumbnail;
+      if (thumbnail) form.append('thumbnail_url', String(thumbnail));
+      const playlistIds = extras.playlist_ids ?? extras.playlistIds;
+      if (Array.isArray(playlistIds)) {
+        form.append('playlist_ids', JSON.stringify(playlistIds));
+      }
+      if (extras.captions !== undefined) {
+        form.append('captions', JSON.stringify(extras.captions));
+      }
+      if (extras.embed_allowed !== undefined || extras.embedAllowed !== undefined) {
+        form.append(
+          'embed_allowed',
+          String(Boolean(extras.embed_allowed ?? extras.embedAllowed)),
+        );
+      }
       const attachmentPayloads =
         extras.attachmentPayloads ??
         (extras.attachments ?? []).filter((attachment: any) => {

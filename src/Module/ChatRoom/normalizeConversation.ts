@@ -231,7 +231,9 @@ async function refreshConversationsAndHandleEmpty(currentUserId?: string): Promi
     }
     const dedupedRawList = Array.from(map.values());
 
-    // ── Store ONLY the deduped list under the main conversations key ──────
+    // ── Store ONLY the deduped list under the main conversations key.
+    // Clear first so deleted/hidden conversations do not survive by merge.
+    await clearCacheByKey(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId));
     await setCache(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId), dedupedRawList);
 
     console.log(

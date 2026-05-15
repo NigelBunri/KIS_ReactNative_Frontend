@@ -73,6 +73,39 @@ export default function PartnersCenterPane({
     () => getVerificationSummary(selectedPartner),
     [selectedPartner],
   );
+  const discordSummary = selectedPartner?.discord_summary ?? null;
+  const discordCounts = discordSummary?.counts ?? {};
+  const discordReadiness = discordSummary?.readiness ?? {};
+  const workspaceStats = useMemo(
+    () => [
+      {
+        label: 'Members',
+        value: String(discordCounts.active_members ?? 0),
+      },
+      {
+        label: 'Channels',
+        value: String(discordCounts.visible_channels ?? rootChannels.length),
+      },
+      {
+        label: 'Unread',
+        value:
+          (discordCounts.unread_messages ?? 0) > 99
+            ? '99+'
+            : String(discordCounts.unread_messages ?? 0),
+      },
+      {
+        label: 'Moderation',
+        value: String(discordCounts.open_moderation_actions ?? 0),
+      },
+    ],
+    [
+      discordCounts.active_members,
+      discordCounts.open_moderation_actions,
+      discordCounts.unread_messages,
+      discordCounts.visible_channels,
+      rootChannels.length,
+    ],
+  );
 
   const sectionHeaders = useMemo(
     () => ({
@@ -149,6 +182,126 @@ export default function PartnersCenterPane({
           summary={partnerVerificationSummary}
           compact
         />
+
+        <View
+          style={[
+            styles.workspaceCommandCard,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.goldLight,
+              shadowColor: palette.shadow ?? '#000',
+            },
+          ]}
+        >
+          <View style={styles.workspaceCommandHeader}>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.workspaceCommandTitle,
+                  { color: palette.text },
+                ]}
+              >
+                Workspace command
+              </Text>
+              <Text
+                style={[
+                  styles.workspaceCommandSubtitle,
+                  { color: palette.subtext },
+                ]}
+              >
+                Roles, rooms, safety, and member activity in one view.
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.workspaceCommandBadge,
+                { backgroundColor: palette.primarySoft },
+              ]}
+            >
+              <Text
+                style={{
+                  color: palette.primaryStrong,
+                  fontSize: 11,
+                  fontWeight: '900',
+                }}
+              >
+                120
+              </Text>
+            </View>
+          </View>
+          <View style={styles.workspaceStatsGrid}>
+            {workspaceStats.map(item => (
+              <View
+                key={item.label}
+                style={[
+                  styles.workspaceStatTile,
+                  {
+                    backgroundColor: palette.card,
+                    borderColor: palette.goldLight,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.workspaceStatValue,
+                    { color: palette.text },
+                  ]}
+                >
+                  {item.value}
+                </Text>
+                <Text
+                  style={[
+                    styles.workspaceStatLabel,
+                    { color: palette.subtext },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.workspaceSignalRow}>
+            {[
+              {
+                label: discordReadiness.family_safe_media
+                  ? 'Family-safe media'
+                  : 'Media review ready',
+              },
+              {
+                label: discordReadiness.low_bandwidth_ready
+                  ? 'Low-bandwidth ready'
+                  : 'Online-first',
+              },
+              {
+                label: discordReadiness.moderation_ready
+                  ? 'Moderation active'
+                  : 'Moderation pending',
+              },
+              {
+                label: discordReadiness.legacy_wallet_disabled
+                  ? 'USD-safe workspace'
+                  : 'Payment review',
+              },
+            ].map(item => (
+              <View
+                key={item.label}
+                style={[
+                  styles.workspaceSignalPill,
+                  { borderColor: palette.goldLight },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.workspaceSignalText,
+                    { color: palette.text },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
         <PartnerAdminsStrip admins={selectedPartner?.admins ?? []} />
 
         {/* General feed */}

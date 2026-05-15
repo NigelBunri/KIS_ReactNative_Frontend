@@ -49,6 +49,8 @@ type LearnerContent = EducationContentItem & {
   } | null;
   viewerState?: any;
   faqs?: Array<{ question: string; answer: string }>;
+  reviews?: Array<any>;
+  questions?: Array<any>;
 };
 
 type Props = {
@@ -520,6 +522,12 @@ export default function EducationDetailSheet({
     : null;
   const detailSummary =
     (content as any)?.detailSummary ?? (content as any)?.detail_summary ?? null;
+  const reviewSummary = (content as any)?.reviewSummary || {};
+  const questionSummary = (content as any)?.questionSummary || {};
+  const paymentSummary = (content as any)?.paymentSummary || {};
+  const offlineSummary = (content as any)?.offlineSummary || {};
+  const trustSummary = (content as any)?.trustSummary || {};
+  const safetySummary = (content as any)?.safetySummary || {};
 
   useEffect(() => {
     const fetchCertificate = async () => {
@@ -2773,6 +2781,157 @@ export default function EducationDetailSheet({
             {workspaceSection === 'overview'
               ? renderRequirements((content as EducationCourse).requirements)
               : null}
+            {workspaceSection === 'overview' ? (
+              <View
+                style={{
+                  marginTop: 18,
+                  borderRadius: 20,
+                  padding: 14,
+                  backgroundColor: palette.card,
+                  borderWidth: 1,
+                  borderColor: palette.divider,
+                }}
+              >
+                <Text
+                  style={{
+                    color: palette.text,
+                    fontWeight: '900',
+                    marginBottom: 10,
+                  }}
+                >
+                  Course confidence
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    trustSummary?.verified ? 'Verified institution' : 'Institution profile',
+                    reviewSummary?.reviewCount
+                      ? `${Number(reviewSummary.rating || 0).toFixed(1)} stars`
+                      : 'New course',
+                    questionSummary?.questionCount
+                      ? `${questionSummary.questionCount} Q&A`
+                      : 'Q&A ready',
+                    offlineSummary?.offlineReady
+                      ? 'Low-bandwidth ready'
+                      : 'Online learning',
+                    paymentSummary?.isFree
+                      ? 'Free enrollment'
+                      : paymentSummary?.copy || 'Secure USD checkout',
+                    safetySummary?.quarantineEnabled
+                      ? 'Media safety checked'
+                      : 'Safety policy active',
+                  ].map(label => (
+                    <View
+                      key={label}
+                      style={{
+                        borderRadius: 999,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        backgroundColor: palette.surface,
+                        borderWidth: 1,
+                        borderColor: palette.divider,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: palette.text,
+                          fontSize: 11,
+                          fontWeight: '800',
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {workspaceSection === 'overview' &&
+            Array.isArray((content as any)?.reviews) &&
+            (content as any).reviews.length ? (
+              <View style={{ marginTop: 18 }}>
+                <Text
+                  style={{
+                    color: palette.text,
+                    fontWeight: '800',
+                    marginBottom: 8,
+                  }}
+                >
+                  Learner reviews
+                </Text>
+                {(content as any).reviews.slice(0, 3).map((review: any) => (
+                  <View
+                    key={String(review.id)}
+                    style={{
+                      marginBottom: 10,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: palette.divider,
+                      backgroundColor: palette.card,
+                      padding: 12,
+                    }}
+                  >
+                    <Text style={{ color: palette.text, fontWeight: '900' }}>
+                      {Number(review.rating || 0).toFixed(0)} stars ·{' '}
+                      {review.author_name || 'Learner'}
+                    </Text>
+                    {review.comment ? (
+                      <Text
+                        style={{
+                          color: palette.subtext,
+                          marginTop: 5,
+                          lineHeight: 18,
+                        }}
+                      >
+                        {review.comment}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {workspaceSection === 'overview' &&
+            Array.isArray((content as any)?.questions) &&
+            (content as any).questions.length ? (
+              <View style={{ marginTop: 18 }}>
+                <Text
+                  style={{
+                    color: palette.text,
+                    fontWeight: '800',
+                    marginBottom: 8,
+                  }}
+                >
+                  Course Q&A
+                </Text>
+                {(content as any).questions.slice(0, 3).map((question: any) => (
+                  <View key={String(question.id)} style={{ marginBottom: 12 }}>
+                    <Text style={{ color: palette.text, fontWeight: '800' }}>
+                      {question.question}
+                    </Text>
+                    {question.answer ? (
+                      <Text
+                        style={{
+                          color: palette.subtext,
+                          marginTop: 4,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {question.answer}
+                      </Text>
+                    ) : (
+                      <Text
+                        style={{
+                          color: palette.subtext,
+                          marginTop: 4,
+                          fontWeight: '700',
+                        }}
+                      >
+                        Awaiting instructor answer
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {workspaceSection === 'overview' &&
             Array.isArray((content as any)?.faqs) &&
             (content as any).faqs.length ? (

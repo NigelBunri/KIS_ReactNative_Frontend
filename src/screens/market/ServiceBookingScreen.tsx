@@ -1246,7 +1246,7 @@ const ServiceBookingScreen = () => {
               }}
             >
               <Text style={{ color: palette.subtext }}>
-                {quoteOrNegotiationFlow ? 'Due now' : 'Deposit (wallet)'}
+                {quoteOrNegotiationFlow ? 'Due now' : 'Deposit (Flutterwave)'}
               </Text>
               <Text style={{ color: palette.text }}>
                 {formatMoneyLabel(estimatedDepositValue)}

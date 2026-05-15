@@ -23,6 +23,7 @@ type Props = {
   institutionType: HealthDashboardInstitutionType;
   loading: boolean;
   analytics: InstitutionDashboardAnalyticsResult | null;
+  careSummary?: Record<string, any> | null;
   timeRange: TimeRange;
   onTimeRangeChange: (value: TimeRange) => void;
   onEditProfilePage: () => void;
@@ -46,6 +47,7 @@ export default function InstitutionDashboardShell({
   institutionType,
   loading,
   analytics,
+  careSummary,
   timeRange,
   onTimeRangeChange,
   onEditProfilePage,
@@ -83,6 +85,28 @@ export default function InstitutionDashboardShell({
   const canManageSchedules = accessControls?.schedules ?? true;
   const canManageServices = accessControls?.services ?? true;
   const canManageMembers = accessControls?.members ?? true;
+  const careCards = [
+    {
+      id: 'open_workflows',
+      label: 'Open care flows',
+      value: careSummary?.openWorkflowCount ?? 0,
+    },
+    {
+      id: 'care_plans',
+      label: 'Care plans',
+      value: careSummary?.activeCarePlanCount ?? 0,
+    },
+    {
+      id: 'reminders',
+      label: 'Reminders',
+      value: careSummary?.activeReminderCount ?? 0,
+    },
+    {
+      id: 'vitals',
+      label: 'Vitals',
+      value: careSummary?.recentVitalCount ?? 0,
+    },
+  ];
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
@@ -153,6 +177,64 @@ export default function InstitutionDashboardShell({
               ))}
             </View>
           )}
+        </View>
+      </View>
+
+      <View
+        style={{
+          marginTop: spacing.lg,
+          borderRadius: spacing.lg,
+          padding: spacing.md,
+          backgroundColor: palette.card,
+          ...borders.card,
+        }}
+      >
+        <Text style={{ ...typography.h2, color: palette.text }}>Care Overview</Text>
+        <Text style={{ ...typography.body, color: palette.subtext, marginTop: 4 }}>
+          Patient-friendly care plans, reminders, vitals, secure messaging, and video care readiness.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+          {careCards.map((item) => (
+            <View
+              key={item.id}
+              style={{
+                width: '48%',
+                minWidth: 136,
+                borderRadius: spacing.md,
+                backgroundColor: palette.surface,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                padding: spacing.sm,
+              }}
+            >
+              <Text style={{ ...typography.label, color: palette.subtext }}>{item.label}</Text>
+              <Text style={{ ...typography.h3, color: palette.text, marginTop: 4 }}>
+                {String(item.value)}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md }}>
+          {[
+            careSummary?.providerMessagingReady ? 'Provider messaging ready' : 'Provider messaging prepared',
+            careSummary?.videoCareReady ? 'Video care ready' : 'Video care prepared',
+            careSummary?.lowBandwidthReady ? 'Low-bandwidth ready' : 'Online-first',
+            careSummary?.familySafeCare ? 'Family-safe care' : 'Safety policy active',
+          ].map((label) => (
+            <View
+              key={label}
+              style={{
+                borderRadius: 999,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.xs,
+                backgroundColor: palette.surface,
+                borderWidth: 1,
+                borderColor: palette.divider,
+              }}
+            >
+              <Text style={{ ...typography.label, color: palette.text }}>{label}</Text>
+            </View>
+          ))}
         </View>
       </View>
 

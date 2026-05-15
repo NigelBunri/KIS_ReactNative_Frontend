@@ -7,9 +7,11 @@ import {
   fetchVerificationExpiryReminders,
   fetchVerificationStaffAuditEvents,
   fetchVerificationStaffCases,
+  fetchUnifiedTrustOverview,
   issueVerificationStaffBadge,
   revokeVerificationStaffBadge,
   updateVerificationStaffCaseStatus,
+  type UnifiedTrustOverview,
   type VerificationStaffAuditEvent,
   type VerificationStaffCase,
 } from '@/services/verificationService';
@@ -74,6 +76,7 @@ export function VerificationStaffConsole({
 }) {
   const [cases, setCases] = useState<VerificationStaffCase[]>([]);
   const [auditEvents, setAuditEvents] = useState<VerificationStaffAuditEvent[]>([]);
+  const [trustOverview, setTrustOverview] = useState<UnifiedTrustOverview | null>(null);
   const [expiryCount, setExpiryCount] = useState(0);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [subjectFilter, setSubjectFilter] = useState('');
@@ -102,8 +105,10 @@ export function VerificationStaffConsole({
         fetchVerificationStaffAuditEvents(15),
         fetchVerificationExpiryReminders(30),
       ]);
+      const overview = await fetchUnifiedTrustOverview().catch(() => null);
       setCases(queue);
       setAuditEvents(audit);
+      setTrustOverview(overview);
       setExpiryCount((expiry?.cases?.length || 0) + (expiry?.badges?.length || 0));
       if (!selectedCaseId && queue[0]?.id) setSelectedCaseId(queue[0].id);
     } catch (error: any) {
@@ -194,6 +199,25 @@ export function VerificationStaffConsole({
           </View>
           {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
           <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 26 }} showsVerticalScrollIndicator={false}>
+            <View style={[styles.detailCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <View style={styles.trustGrid}>
+                <View style={styles.trustMetric}>
+                  <Text style={[styles.trustMetricValue, { color: palette.text }]}>{trustOverview?.counts?.verified_subjects ?? 0}</Text>
+                  <Text style={[styles.trustMetricLabel, { color: palette.subtext }]}>Verified</Text>
+                </View>
+                <View style={styles.trustMetric}>
+                  <Text style={[styles.trustMetricValue, { color: palette.text }]}>{trustOverview?.staff_evidence?.open_case_count ?? cases.length}</Text>
+                  <Text style={[styles.trustMetricLabel, { color: palette.subtext }]}>Open cases</Text>
+                </View>
+                <View style={styles.trustMetric}>
+                  <Text style={[styles.trustMetricValue, { color: palette.text }]}>{expiryCount}</Text>
+                  <Text style={[styles.trustMetricLabel, { color: palette.subtext }]}>Expiring</Text>
+                </View>
+              </View>
+              <Text style={[styles.detailBody, { color: palette.subtext }]}>
+                Public trust summaries hide raw documents, provider payloads, storage paths, and revoke reasons.
+              </Text>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {SUBJECT_FILTERS.map(item => (
                 <Pressable
@@ -357,6 +381,10 @@ const styles = StyleSheet.create({
   notes: { minHeight: 78, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: 'top' },
   badgeActionBox: { gap: 8, paddingTop: 4 },
   badgeRow: { minHeight: 42, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  trustGrid: { flexDirection: 'row', gap: 8 },
+  trustMetric: { flex: 1, minHeight: 64, borderRadius: 16, padding: 10, backgroundColor: 'rgba(198,149,61,0.10)', justifyContent: 'center' },
+  trustMetricValue: { fontSize: 20, fontWeight: '900' },
+  trustMetricLabel: { fontSize: 11, fontWeight: '800', marginTop: 2 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   auditRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   auditDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },

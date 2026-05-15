@@ -153,6 +153,9 @@ const healthRoutes = {
     availability: (id: string) => `${API_BASE_URL}/api/v1/health-dashboard/institutions/${id}/availability/`,
   },
   healthOps: {
+    careSummary: `${API_BASE_URL}/api/v1/health-ops/care-summary/`,
+    carePlans: `${API_BASE_URL}/api/v1/health-ops/care-plans/`,
+    vitals: `${API_BASE_URL}/api/v1/health-ops/vitals/`,
     walletMe: `${API_BASE_URL}/api/v1/wallet/me/`,
     walletTransactions: `${API_BASE_URL}/api/v1/wallet/ledger/`,
     institutionServices: (institutionId: string) =>

@@ -91,6 +91,7 @@ const broadcastRoutes = {
     contentAudit: `${API_BASE_URL}/api/v1/bible/content-audit/`,
     crossReferences: `${API_BASE_URL}/api/v1/bible/cross-references/`,
     stats: `${API_BASE_URL}/api/v1/bible/stats/`,
+    spiritualGrowthSummary: `${API_BASE_URL}/api/v1/bible/spiritual-growth-summary/`,
   },
   education: {
     discovery: `${API_BASE_URL}/api/v1/education/discovery/`,
@@ -108,6 +109,8 @@ const broadcastRoutes = {
     review: `${API_BASE_URL}/api/v1/education/reviews/`,
     contentReviews: (id: string) =>
       `${API_BASE_URL}/api/v1/education/contents/${id}/reviews/`,
+    contentQuestions: (id: string) =>
+      `${API_BASE_URL}/api/v1/education/contents/${id}/questions/`,
     bookingSatisfy: (institutionId: string, bookingId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/bookings/${bookingId}/satisfy/`,
     partnerLinks: (partnerId: string) =>
@@ -120,6 +123,8 @@ const broadcastRoutes = {
     list: `${API_BASE_URL}/api/v1/partners/`,
     create: `${API_BASE_URL}/api/v1/partners/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/`,
+    discordSummary: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/discord-summary/`,
     discover: `${API_BASE_URL}/api/v1/partners/discover/`,
     apply: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/apply/`,
     subscribe: (id: string) =>
@@ -265,6 +270,12 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/embed/contents/${contentId}/`,
     embedContentOembed: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/embed/contents/${contentId}/oembed/`,
+    publicChannelLanding: (handle: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/public/channels/${handle}/`,
+    publicContentLanding: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/public/contents/${contentId}/`,
+    publicSitemapPlan: `${API_BASE_URL}/api/v1/broadcasts/public/sitemap-plan/`,
+    publicRobots: `${API_BASE_URL}/api/v1/broadcasts/public/robots.txt`,
     channelContentEmbedToken: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/embed-token/`,
     channelContentReact: (contentId: string) =>
@@ -494,6 +505,9 @@ const broadcastRoutes = {
     shopVerificationStart: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/request_verification/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
+    discovery: `${API_BASE_URL}/api/v1/commerce/discovery/`,
+    productReviews: `${API_BASE_URL}/api/v1/commerce/product-reviews/`,
+    productQuestions: `${API_BASE_URL}/api/v1/commerce/product-questions/`,
     productBroadcast: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/products/${id}/broadcast/`,
     productSubscribe: (id: string) =>

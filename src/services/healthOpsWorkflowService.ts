@@ -8,6 +8,21 @@ export const fetchHealthOpsWorkflowSession = (workflowSessionId: string) =>
     errorMessage: 'Unable to load workflow session.',
   });
 
+export const fetchHealthOpsCareSummary = () =>
+  getRequest(ROUTES.healthOps.careSummary, {
+    errorMessage: 'Unable to load care summary.',
+  });
+
+export const createHealthOpsCarePlan = (payload: Record<string, any>) =>
+  postRequest(ROUTES.healthOps.carePlans, payload, {
+    errorMessage: 'Unable to create care plan.',
+  });
+
+export const createHealthOpsVitalReading = (payload: Record<string, any>) =>
+  postRequest(ROUTES.healthOps.vitals, payload, {
+    errorMessage: 'Unable to save vital reading.',
+  });
+
 export const updateHealthOpsWorkflowStep = (
   workflowSessionId: string,
   options: {

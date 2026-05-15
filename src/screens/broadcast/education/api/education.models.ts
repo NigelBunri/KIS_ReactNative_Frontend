@@ -39,6 +39,8 @@ export interface EducationInstitutionSpotlight {
   eventCount?: number;
   publishedBroadcastCount?: number;
   memberCount?: number;
+  verificationSummary?: Record<string, any> | null;
+  trustSummary?: EducationTrustSummary | null;
 }
 
 export interface EducationTrustSignals {
@@ -50,6 +52,57 @@ export interface EducationTrustSignals {
   assessmentCount?: number;
   materialCount?: number;
   previewItemCount?: number;
+}
+
+export interface EducationReviewSummary {
+  rating?: number;
+  reviewCount?: number;
+  label?: string;
+}
+
+export interface EducationQuestionSummary {
+  questionCount?: number;
+  answeredCount?: number;
+  openCount?: number;
+}
+
+export interface EducationPaymentSummary {
+  currency?: string;
+  amountCents?: number;
+  isFree?: boolean;
+  provider?: string;
+  providerRequired?: boolean;
+  legacyWalletDisabled?: boolean;
+  copy?: string;
+}
+
+export interface EducationOfflineSummary {
+  downloadableItemCount?: number;
+  lowBandwidthItemCount?: number;
+  offlineReady?: boolean;
+  placeholder?: string;
+}
+
+export interface EducationCertificateSummary {
+  available?: boolean;
+  issuer?: string;
+  type?: string;
+  shareable?: boolean;
+}
+
+export interface EducationTrustSummary {
+  verified?: boolean;
+  badges?: any[];
+  rating?: number;
+  reviewCount?: number;
+  moderationSafe?: boolean;
+}
+
+export interface EducationSafetySummary {
+  status?: string;
+  providerLiveCallsEnabled?: boolean;
+  quarantineEnabled?: boolean;
+  blockedIfUnsafe?: boolean;
 }
 
 export interface EducationDetailSummaryItem {
@@ -106,6 +159,13 @@ export interface EducationBase {
   targetLabel?: string;
   detailSummary?: EducationDetailSummary | null;
   detail_summary?: EducationDetailSummary | null;
+  reviewSummary?: EducationReviewSummary | null;
+  questionSummary?: EducationQuestionSummary | null;
+  paymentSummary?: EducationPaymentSummary | null;
+  offlineSummary?: EducationOfflineSummary | null;
+  certificateSummary?: EducationCertificateSummary | null;
+  trustSummary?: EducationTrustSummary | null;
+  safetySummary?: EducationSafetySummary | null;
   type: EducationContentType;
 }
 
@@ -333,6 +393,18 @@ export interface EducationReview {
   rating: number;
   comment?: string;
   createdAt: string;
+}
+
+export interface EducationQuestion {
+  id: string;
+  contentId?: string;
+  authorId?: string;
+  authorName?: string;
+  question: string;
+  answer?: string;
+  answeredByName?: string;
+  status?: string;
+  createdAt?: string;
 }
 
 export interface PartnerProfileLink {

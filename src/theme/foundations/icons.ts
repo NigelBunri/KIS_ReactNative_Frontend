@@ -14,9 +14,9 @@ export type IconTone = 'muted' | 'primary' | 'secondary' | 'danger';
 export const getIconColor = (palette: KISPalette, tone: IconTone = 'muted') => {
   switch (tone) {
     case 'primary':
-      return palette.primary;
+      return palette.goldReadable;
     case 'secondary':
-      return palette.secondary;
+      return palette.selectedText;
     case 'danger':
       return palette.danger;
     default:

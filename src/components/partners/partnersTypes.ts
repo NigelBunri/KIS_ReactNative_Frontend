@@ -22,10 +22,65 @@ export type PartnerApi = {
   updated_at?: string;
 };
 
+export type PartnerDiscordSummary = {
+  partner_id?: string;
+  workspace?: {
+    name?: string;
+    slug?: string;
+    is_active?: boolean;
+    main_conversation_id?: string | null;
+  };
+  membership?: {
+    status?: string | null;
+    role?: string | null;
+    roles?: string[];
+    can_manage?: boolean;
+    permissions?: string[];
+    is_muted?: boolean;
+    is_banned?: boolean;
+    timed_out_until?: string | null;
+  };
+  counts?: {
+    active_members?: number;
+    pending_members?: number;
+    categories?: number;
+    visible_channels?: number;
+    total_channels?: number;
+    roles?: number;
+    apps?: number;
+    open_applications?: number;
+    open_moderation_actions?: number;
+    unread_messages?: number;
+  };
+  readiness?: {
+    roles_ready?: boolean;
+    channels_ready?: boolean;
+    onboarding_ready?: boolean;
+    audit_ready?: boolean;
+    moderation_ready?: boolean;
+    apps_ready?: boolean;
+    low_bandwidth_ready?: boolean;
+    family_safe_media?: boolean;
+    legacy_wallet_disabled?: boolean;
+  };
+  safety?: {
+    media_gate?: string;
+    explicit_content_provider_live_calls?: boolean;
+    quarantine_supported?: boolean;
+    policy?: Record<string, any>;
+  };
+  next_actions?: {
+    key: string;
+    label: string;
+    enabled?: boolean;
+  }[];
+};
+
 export type Partner = PartnerApi & {
   initials: string;
   tagline: string;
   admins: PartnerAdmin[];
+  discord_summary?: PartnerDiscordSummary | null;
 };
 
 export type PartnerJoinConfig = {

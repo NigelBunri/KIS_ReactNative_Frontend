@@ -20,6 +20,7 @@ import {
 import { fetchHealthProfileState } from '@/services/healthProfileService';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { fetchHealthOpsCareSummary } from '@/services/healthOpsWorkflowService';
 import {
   HEALTH_DASHBOARD_INSTITUTION_TYPES,
   type HealthDashboardInstitutionType,
@@ -61,6 +62,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
   const institutionName = routeInstitutionName || 'Health Institution';
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [analytics, setAnalytics] = useState<InstitutionDashboardAnalyticsResult | null>(null);
+  const [careSummary, setCareSummary] = useState<Record<string, any> | null>(null);
   const [accessControls, setAccessControls] = useState({
     profile: true,
     schedules: true,
@@ -94,11 +96,14 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
       if (!bootstrap?.success) {
         throw new Error(bootstrap?.message || 'Unable to initialize institution dashboard.');
       }
-      const [analyticsRes, healthState, meRes] = await Promise.all([
+      const [analyticsRes, healthState, meRes, careSummaryRes] = await Promise.all([
         fetchInstitutionDashboardAnalytics(institutionId, timeRange),
         fetchHealthProfileState(),
         getRequest(ROUTES.auth.checkLogin),
+        fetchHealthOpsCareSummary(),
       ]);
+      const carePayload = (careSummaryRes as any)?.data ?? careSummaryRes ?? {};
+      setCareSummary(carePayload?.summary ?? null);
 
       const meRequestOk = !!(meRes as any)?.success;
       if (!meRequestOk) {
@@ -282,6 +287,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
           institutionType={dashboardType}
           loading={loading}
           analytics={analytics}
+          careSummary={careSummary}
           timeRange={timeRange}
           onTimeRangeChange={setTimeRange}
           onEditProfilePage={handleEditProfilePage}

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
+import { KIS_COMPONENT_TOKENS, KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
 import type { MainTabsParamList } from '@/navigation/types';
 
@@ -96,12 +97,12 @@ function AnimatedKISTabBar({
 
   const { palette: p, tone } = theme;
   const isRoyalLightBar = tone === 'light';
-  const focusedTextColor = isRoyalLightBar ? p.goldDeep : p.text;
+  const focusedTextColor = isRoyalLightBar ? p.goldReadable : p.text;
   const unfocusedTextColor = p.subtext;
   const barBg = isRoyalLightBar ? '#FFFFFF' : (p.bar ?? p.surface);
   const selectedGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', p.goldDeep, p.gold, '#7A4B3E'];
+    ? [...KIS_ROYAL_GRADIENTS.goldDark]
+    : [...KIS_ROYAL_GRADIENTS.goldLight];
 
   // 🔒 If hidNav is true, don’t render the bar at all
   if (hidNav) {
@@ -171,7 +172,15 @@ function AnimatedKISTabBar({
                     focused={focused}
                   />
                   {badgeCount > 0 ? (
-                    <View style={styles.badge}>
+                    <View
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: p.badgeBg,
+                          borderColor: barBg,
+                        },
+                      ]}
+                    >
                       <Text style={styles.badgeLabel}>
                         {badgeCount > 99 ? '99+' : String(badgeCount)}
                       </Text>
@@ -645,16 +654,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 18,
+    width: KIS_COMPONENT_TOKENS.tab.iconSize,
+    height: KIS_COMPONENT_TOKENS.tab.iconSize,
+    borderRadius: KIS_COMPONENT_TOKENS.tab.selectedRadius,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'visible',
   },
   selectedTabGradient: {
-    borderRadius: 18,
+    borderRadius: KIS_COMPONENT_TOKENS.tab.selectedRadius,
   },
   goldSheen: {
     position: 'absolute',
@@ -667,15 +676,13 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    right: -10,
-    top: -8,
-    minWidth: 19,
-    height: 19,
-    borderRadius: 999,
+    right: KIS_COMPONENT_TOKENS.tab.badgeOffset,
+    top: KIS_COMPONENT_TOKENS.tab.badgeOffset,
+    minWidth: KIS_COMPONENT_TOKENS.badge.minSize,
+    height: KIS_COMPONENT_TOKENS.badge.minSize,
+    borderRadius: KIS_COMPONENT_TOKENS.badge.radius,
     paddingHorizontal: 5,
-    backgroundColor: '#EF4444',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderWidth: KIS_COMPONENT_TOKENS.badge.borderWidth,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,

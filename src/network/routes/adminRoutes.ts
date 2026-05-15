@@ -28,6 +28,7 @@ const adminRoutes = {
   media: {
     assets: `${API_BASE_URL}/api/v1/assets/`,
     jobs: `${API_BASE_URL}/api/v1/jobs/`,
+    safetyScans: `${API_BASE_URL}/api/v1/media-safety-scans/`,
   },
   bridge: {
     accounts: `${API_BASE_URL}/api/v1/accounts/`,
@@ -64,6 +65,8 @@ const adminRoutes = {
     mainTabBadgeCounts: `${API_BASE_URL}/api/v1/notifications/main-tab-badge-counts/`,
     markSourceRead: `${API_BASE_URL}/api/v1/notifications/mark-source-read/`,
     markAllRead: `${API_BASE_URL}/api/v1/notifications/mark-all-read/`,
+    attentionSummary: `${API_BASE_URL}/api/v1/notifications/attention-summary/`,
+    attentionPreferences: `${API_BASE_URL}/api/v1/notifications/attention-preferences/`,
   },
 };
 

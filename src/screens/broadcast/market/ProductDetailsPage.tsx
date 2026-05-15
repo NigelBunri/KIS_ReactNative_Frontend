@@ -108,6 +108,32 @@ type ProductDetail = {
   height?: number | string | null;
   weight?: number | string | null;
   attributes?: ProductAttributes | null;
+  seller_trust?: {
+    verified?: boolean;
+    label?: string;
+    badges?: string[];
+    rating_avg?: number;
+    rating_count?: number;
+  };
+  review_summary?: {
+    count?: number;
+    average?: number;
+    label?: string;
+  };
+  question_summary?: {
+    count?: number;
+    answered_count?: number;
+  };
+  fulfillment_summary?: {
+    stock_status?: string;
+    delivery_estimate?: string;
+    requires_shipping?: boolean;
+    pickup_available?: boolean;
+  };
+  recommendation_context?: {
+    reason?: string;
+    signals?: Record<string, unknown>;
+  };
 };
 
 const formatAttributeLabel = (key: string) =>
@@ -297,6 +323,10 @@ export default function ProductDetailsPage() {
   const currentProductId = product?.id ? String(product.id) : '';
   const hasVariants = variants.length > 0;
   const selectedVariantId = selectedVariant?.id ?? null;
+  const sellerTrust = product?.seller_trust;
+  const reviewSummary = product?.review_summary;
+  const questionSummary = product?.question_summary;
+  const fulfillmentSummary = product?.fulfillment_summary;
 
   const variantAlreadyInCart =
     hasVariants && selectedVariantId
@@ -1126,8 +1156,49 @@ export default function ProductDetailsPage() {
             </View>
 
             <Text style={[styles.usdText, { color: palette.subtext }]}>
-              USD direct checkout
+              USD direct checkout through Flutterwave
             </Text>
+          </View>
+
+          <View style={styles.trustGrid}>
+            <View style={[styles.trustTile, { backgroundColor: palette.inputBg }]}>
+              <Text style={[styles.trustLabel, { color: palette.subtext }]}>Seller</Text>
+              <Text style={[styles.trustValue, { color: palette.text }]}>
+                {sellerTrust?.label ?? 'Seller'}
+              </Text>
+              {sellerTrust?.verified ? (
+                <Text style={[styles.trustMeta, { color: palette.primaryStrong }]}>
+                  Verified merchant
+                </Text>
+              ) : null}
+            </View>
+            <View style={[styles.trustTile, { backgroundColor: palette.inputBg }]}>
+              <Text style={[styles.trustLabel, { color: palette.subtext }]}>Reviews</Text>
+              <Text style={[styles.trustValue, { color: palette.text }]}>
+                {reviewSummary?.label ?? 'No reviews yet'}
+              </Text>
+              <Text style={[styles.trustMeta, { color: palette.subtext }]}>
+                {Number(reviewSummary?.count ?? 0)} review{Number(reviewSummary?.count ?? 0) === 1 ? '' : 's'}
+              </Text>
+            </View>
+            <View style={[styles.trustTile, { backgroundColor: palette.inputBg }]}>
+              <Text style={[styles.trustLabel, { color: palette.subtext }]}>Questions</Text>
+              <Text style={[styles.trustValue, { color: palette.text }]}>
+                {Number(questionSummary?.answered_count ?? 0)} answered
+              </Text>
+              <Text style={[styles.trustMeta, { color: palette.subtext }]}>
+                {Number(questionSummary?.count ?? 0)} asked
+              </Text>
+            </View>
+            <View style={[styles.trustTile, { backgroundColor: palette.inputBg }]}>
+              <Text style={[styles.trustLabel, { color: palette.subtext }]}>Fulfillment</Text>
+              <Text style={[styles.trustValue, { color: palette.text }]}>
+                {fulfillmentSummary?.delivery_estimate ?? 'Seller fulfillment'}
+              </Text>
+              <Text style={[styles.trustMeta, { color: palette.subtext }]}>
+                {fulfillmentSummary?.pickup_available ? 'Pickup available' : 'Tracked in KIS'}
+              </Text>
+            </View>
           </View>
 
           {product.condition ? (
@@ -2001,6 +2072,35 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderRadius: 18,
       paddingHorizontal: 14,
       paddingVertical: 12,
+    },
+    trustGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginTop: 16,
+    },
+    trustTile: {
+      width: '48%',
+      minWidth: 142,
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    trustLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    trustValue: {
+      fontSize: 13,
+      fontWeight: '900',
+      marginTop: 5,
+    },
+    trustMeta: {
+      fontSize: 11,
+      fontWeight: '700',
+      marginTop: 4,
     },
     metaCardLabel: {
       fontSize: 11,

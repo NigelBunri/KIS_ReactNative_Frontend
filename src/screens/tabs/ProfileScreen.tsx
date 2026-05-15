@@ -27,7 +27,15 @@ import {
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import KISButton from '@/constants/KISButton';
+import { MainTabStateBlock } from '@/components/common/MainTabScaffold';
 import Skeleton from '@/components/common/Skeleton';
+import AIAssistanceSafetyCard from '@/components/dashboard/AIAssistanceSafetyCard';
+import MonetizationSafetyCard from '@/components/dashboard/MonetizationSafetyCard';
+import PerformanceOfflineCard from '@/components/dashboard/PerformanceOfflineCard';
+import PublicGrowthReadinessCard from '@/components/dashboard/PublicGrowthReadinessCard';
+import SafetyCommandCenterCard from '@/components/dashboard/SafetyCommandCenterCard';
+import SecurityLaunchGateCard from '@/components/dashboard/SecurityLaunchGateCard';
+import UnifiedDashboardSummaryCard from '@/components/dashboard/UnifiedDashboardSummaryCard';
 import PartnerCreateSlide from '@/components/partners/CreatePartnerScreen';
 import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
@@ -61,6 +69,12 @@ import type {
   VerificationSubjectRef,
   VerificationSummary,
 } from '@/services/verificationService';
+import {
+  fetchFamilyAccessibilityPreferences,
+  saveFamilyAccessibilityPreferences,
+  type FamilyAccessibilityPayload,
+  type KISAgeMode,
+} from '@/services/familyAccessibilityService';
 
 import BottomSheet from './profile/sheets/BottomSheet';
 import SheetHeader from './profile/sheets/SheetHeader';
@@ -480,6 +494,8 @@ export default function ProfileScreen() {
   const [verificationCenterTarget, setVerificationCenterTarget] =
     useState<VerificationCenterTarget | null>(null);
   const [verificationStaffConsoleVisible, setVerificationStaffConsoleVisible] = useState(false);
+  const [familyAccessibility, setFamilyAccessibility] = useState<FamilyAccessibilityPayload | null>(null);
+  const [familyAccessibilitySaving, setFamilyAccessibilitySaving] = useState(false);
   const userVerificationSummary = useMemo(
     () =>
       normalizeVerificationSummary(c.profile?.user) ||
@@ -495,6 +511,31 @@ export default function ProfileScreen() {
       profileUserAny?.is_admin ||
       profileAccountAny?.is_staff,
   );
+  useEffect(() => {
+    let active = true;
+    fetchFamilyAccessibilityPreferences()
+      .then(payload => {
+        if (active) setFamilyAccessibility(payload);
+      })
+      .catch(() => {
+        if (active) setFamilyAccessibility(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const applyAgeMode = useCallback(async (ageMode: KISAgeMode) => {
+    setFamilyAccessibilitySaving(true);
+    try {
+      const payload = await saveFamilyAccessibilityPreferences({ age_mode: ageMode });
+      setFamilyAccessibility(payload);
+    } catch (error: any) {
+      Alert.alert('Family experience', error?.message || 'Unable to save family accessibility settings.');
+    } finally {
+      setFamilyAccessibilitySaving(false);
+    }
+  }, []);
   const editGalleryItems = useMemo(() => {
     const gallery: Array<{
       id: string;
@@ -2232,19 +2273,13 @@ export default function ProfileScreen() {
             </View>
           </View>
         ) : !c.profile ? (
-          <View style={[styles.card, { backgroundColor: palette.card }]}>
-            <Text style={[styles.title, { color: palette.text }]}>
-              Profile not available
-            </Text>
-            <Text
-              style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}
-            >
-              Pull to refresh or try again.
-            </Text>
-            <View style={{ marginTop: 12 }}>
-              <KISButton title="Retry" onPress={c.loadProfile} />
-            </View>
-          </View>
+          <MainTabStateBlock
+            title="Profile not available"
+            message="Pull to refresh or try again."
+            icon="person"
+            actionLabel="Retry"
+            onAction={c.loadProfile}
+          />
         ) : (
           <>
             <ProfileHeroCard
@@ -2335,6 +2370,11 @@ export default function ProfileScreen() {
                     variant="outline"
                     onPress={() => c.openSheet('privacy')}
                   />
+                  <KISButton
+                    title="KIS Principles"
+                    variant="outline"
+                    onPress={() => rootNavigation?.navigate('KISPrinciples')}
+                  />
                   {canOpenVerificationStaffConsole ? (
                     <KISButton
                       title="Verification review"
@@ -2343,6 +2383,68 @@ export default function ProfileScreen() {
                     />
                   ) : null}
                 </View>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: palette.goldBorder || palette.divider,
+                    borderRadius: 18,
+                    backgroundColor: palette.surface,
+                    padding: 14,
+                    marginTop: 12,
+                    gap: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: palette.primarySoft,
+                      }}
+                    >
+                      <KISIcon name="shield" size={20} color={palette.primaryStrong} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>
+                        Family and accessibility mode
+                      </Text>
+                      <Text style={[styles.subtext, { color: palette.subtext }]}>
+                        {familyAccessibility?.preferences?.age_mode
+                          ? `${familyAccessibility.preferences.age_mode.replace('_', ' ')} mode · ${familyAccessibility.accessibility.min_touch_target}px tap targets`
+                          : 'Family-safe defaults, larger tap targets, and simpler journeys.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.actionRow, { gap: 8, flexWrap: 'wrap' }]}>
+                    {(['child', 'youth', 'adult', 'older_adult'] as KISAgeMode[]).map(mode => (
+                      <KISButton
+                        key={mode}
+                        title={mode === 'older_adult' ? 'Older adult' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                        size="sm"
+                        variant={familyAccessibility?.preferences?.age_mode === mode ? 'secondary' : 'outline'}
+                        disabled={familyAccessibilitySaving}
+                        onPress={() => applyAgeMode(mode)}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.subtext, { color: palette.subtext }]}>
+                    KIS keeps explicit content blocked, safe recommendations on, and child mode guided by default.
+                  </Text>
+                </View>
+                <UnifiedDashboardSummaryCard />
+                <PerformanceOfflineCard />
+                <MonetizationSafetyCard />
+                <AIAssistanceSafetyCard />
+                <PublicGrowthReadinessCard />
+                {canOpenVerificationStaffConsole ? (
+                  <>
+                    <SafetyCommandCenterCard />
+                    <SecurityLaunchGateCard />
+                  </>
+                ) : null}
               </View>
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>

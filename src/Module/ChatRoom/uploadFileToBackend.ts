@@ -1,5 +1,12 @@
 // src/screens/chat/uploadFileToBackend.ts
 import { API_BASE_URL } from '@/network';
+import {
+  getMediaSafetyMessage,
+  isMediaSafetyBlocked,
+  isMediaSafetyPendingReview,
+  normalizeUploadContext,
+  type MediaSafetyPayload,
+} from '@/services/mediaSafety';
 export type AttachmentKind =
   | 'image'
   | 'video'
@@ -18,6 +25,11 @@ export type AttachmentMeta = {
   kind: AttachmentKind;
   private?: boolean;
   scanStatus?: 'pending' | 'passed' | 'failed' | 'not_configured' | string;
+  quarantined?: boolean;
+  requiresReview?: boolean;
+  safetyScanId?: string;
+  safety?: MediaSafetyPayload;
+  safetyMessage?: string | null;
   width?: number;
   height?: number;
   durationMs?: number;
@@ -35,6 +47,7 @@ export async function uploadFileToBackend(opts: {
   conversationId?: string;
   clientId?: string;
   metadata?: Record<string, string | number>;
+  context?: string;
 }): Promise<AttachmentMeta> {
   const {
     file,
@@ -54,6 +67,8 @@ export async function uploadFileToBackend(opts: {
     name: file.name || 'file',
     type: file.type || 'application/octet-stream',
   } as any);
+  const uploadContext = normalizeUploadContext(opts.context || 'chat');
+  form.append('context', uploadContext);
 
   onStatus?.('uploading');
   onProgress?.(0);
@@ -62,6 +77,7 @@ export async function uploadFileToBackend(opts: {
   if (conversationId) params.set('conversationId', conversationId);
   if (clientId) params.set('clientId', clientId);
   if (opts.deviceId) params.set('device_id', opts.deviceId);
+  params.set('context', uploadContext);
   const durationSecondsFromFile =
     typeof file.durationMs === 'number' && Number.isFinite(file.durationMs)
       ? Math.round(file.durationMs / 1000)
@@ -126,6 +142,16 @@ export async function uploadFileToBackend(opts: {
   onProgress?.(1);
   onStatus?.('done');
   const attachment = json?.attachment ?? json;
+  const safety = attachment.safety as MediaSafetyPayload | undefined;
+  if (isMediaSafetyBlocked(safety)) {
+    throw new Error(getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.');
+  }
+  if (
+    ['chat', 'dm', 'group', 'partner', 'status'].includes(uploadContext) &&
+    isMediaSafetyPendingReview(safety)
+  ) {
+    throw new Error(getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.');
+  }
   const durationSeconds =
     typeof attachment.duration_seconds === 'number'
       ? attachment.duration_seconds
@@ -146,6 +172,11 @@ export async function uploadFileToBackend(opts: {
     kind,
     private: attachment.private,
     scanStatus: attachment.scanStatus,
+    quarantined: attachment.quarantined,
+    requiresReview: attachment.requiresReview,
+    safetyScanId: attachment.safetyScanId,
+    safety,
+    safetyMessage: getMediaSafetyMessage(safety),
     width: attachment.width,
     height: attachment.height,
     durationMs: attachment.durationMs,

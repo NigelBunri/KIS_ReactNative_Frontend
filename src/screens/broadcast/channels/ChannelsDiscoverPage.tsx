@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,6 +14,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import {
+  fetchSocialRecommendationFoundation,
+  type RecommendationItem,
+  type SocialRecommendationFoundation,
+} from '@/services/socialRecommendationService';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 
@@ -164,9 +169,21 @@ function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary;
   );
 }
 
+function RecommendationChip({ item }: { item: RecommendationItem }) {
+  const { palette, tone } = useKISTheme();
+  return (
+    <View style={[styles.recommendationChip, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7', borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2' }]}>
+      <Text style={[styles.recommendationKind, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>{String(item.kind || '').replace(/_/g, ' ').toUpperCase()}</Text>
+      <Text numberOfLines={1} style={[styles.recommendationTitle, { color: palette.text }]}>{item.title}</Text>
+      {item.subtitle ? <Text numberOfLines={1} style={[styles.recommendationSubtitle, { color: palette.subtext }]}>{item.subtitle}</Text> : null}
+    </View>
+  );
+}
+
 export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 'all' }: Props) {
   const { palette, tone } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [recommendations, setRecommendations] = useState<SocialRecommendationFoundation | null>(null);
   const activeCategory = searchContext || 'all';
   const { channels, loading, refreshing, error, loadMore } = useChannelsData({
     q: searchTerm,
@@ -174,9 +191,33 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
   });
   const featured = channels.slice(0, 6);
   const recommended = channels.slice(6);
+  const recommendedItems = useMemo(() => {
+    const sections = recommendations?.sections || {};
+    return [
+      ...(sections.channels || []),
+      ...(sections.bible || []),
+      ...(sections.education || []),
+      ...(sections.commerce || []),
+      ...(sections.people || []),
+    ].slice(0, 8);
+  }, [recommendations?.sections]);
   const openChannel = useCallback((channel: BroadcastChannelSummary) => {
     navigation.navigate('ChannelHome', { channelId: channel.id, handle: channel.handle, channel });
   }, [navigation]);
+
+  useEffect(() => {
+    let active = true;
+    fetchSocialRecommendationFoundation(8)
+      .then(payload => {
+        if (active) setRecommendations(payload);
+      })
+      .catch(() => {
+        if (active) setRecommendations(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -190,6 +231,30 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
           <Metric label="Channels" value={compactNumber(channels.length)} />
           <Metric label="Featured" value={compactNumber(featured.length)} />
         </View>
+      </View>
+
+      <View style={[styles.recommendationPanel, { backgroundColor: palette.surface, borderColor: '#E6D7B2' }]}>
+        <View style={styles.sectionHeaderCompact}>
+          <View>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>For your kingdom journey</Text>
+            <Text style={[styles.sectionSubtitle, { color: palette.subtext }]}>
+              Privacy-safe suggestions using public, family-safe, and blocked-user-aware signals.
+            </Text>
+          </View>
+          {recommendations?.controls?.christian_content_safe_ranking ? (
+            <View style={[styles.safeBadge, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7' }]}>
+              <KISIcon name="shield" size={13} color={tone === 'dark' ? palette.primaryStrong : GOLD} />
+              <Text style={[styles.safeBadgeText, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>Safe</Text>
+            </View>
+          ) : null}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendationRow}>
+          {recommendedItems.length ? recommendedItems.map(item => (
+            <RecommendationChip key={`${item.kind}-${item.target_type}-${item.target_id}`} item={item} />
+          )) : (
+            <Text style={[styles.emptyText, { color: palette.subtext }]}>Recommendations will appear as you subscribe, read, save, enroll, and shop safely.</Text>
+          )}
+        </ScrollView>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
@@ -278,6 +343,15 @@ const styles = StyleSheet.create({
   heroStats: { flexDirection: 'row', gap: 10, marginTop: 14 },
   categoryRow: { paddingVertical: 6, paddingRight: 10 },
   categoryPill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 },
+  recommendationPanel: { borderWidth: 1, borderRadius: 8, padding: 14, marginBottom: 12 },
+  sectionHeaderCompact: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  safeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 },
+  safeBadgeText: { fontSize: 10, fontWeight: '900' },
+  recommendationRow: { gap: 8, paddingTop: 10, paddingRight: 10 },
+  recommendationChip: { width: 172, minHeight: 78, borderWidth: 1, borderRadius: 8, padding: 10 },
+  recommendationKind: { fontSize: 9, fontWeight: '900' },
+  recommendationTitle: { marginTop: 5, fontSize: 13, fontWeight: '900' },
+  recommendationSubtitle: { marginTop: 3, fontSize: 11, fontWeight: '700' },
   sectionHeader: { marginTop: 18, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 17, fontWeight: '900' },
   sectionSubtitle: { marginTop: 2, fontSize: 11, lineHeight: 15, fontWeight: '700' },

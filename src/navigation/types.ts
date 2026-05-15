@@ -142,6 +142,7 @@ export type RootStackParamList = {
     notificationId: string;
     notification?: any;
   };
+  KISPrinciples: undefined;
   ProfileLandingEditor: {
     kind: 'market' | 'education' | 'partner';
     profileLabel?: string;

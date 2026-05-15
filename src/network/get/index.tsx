@@ -1,10 +1,11 @@
 // src/network/routes/get/index.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../../services/apiService';
-import { setCache } from '../cache';
+import { getOfflineCache, setCache, setOfflineCache } from '../cache';
 import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
 import { getAccessToken } from '@/security/authStorage';
+import { recordRedactedPerformanceEvent } from '@/services/performanceOfflineService';
 
 export type GetResponse<T = any> = ApiResult<T>;
 
@@ -51,6 +52,8 @@ export const getRequest = async (
     errorMessage?: string;
     params?: Record<string, any>;
     forceNetwork?: boolean;
+    offlineTtlSeconds?: number;
+    staleWhileRevalidate?: boolean;
   } = {}
 ) => {
   const execute = async (): Promise<GetResponse> => {
@@ -105,14 +108,26 @@ export const getRequest = async (
         };
       }
     }
+    const startedAt = Date.now();
     const response = await apiService.get(finalUrl, headers);
     const responseData = await response.json().catch(() => ({}));
+    void recordRedactedPerformanceEvent({
+      event: 'request_completed',
+      at: new Date().toISOString(),
+      domain: pathname,
+      durationMs: Date.now() - startedAt,
+      status: String(response.status),
+    });
 
     if (response.ok) {
       recentSuccessByUrl.set(finalUrl, { at: Date.now(), payload: responseData });
       if (options.cacheKey) {
         const cType = options.cacheType || CacheTypes.DEFAULT;
-        await setCache(cType, options.cacheKey, responseData);
+        if (options.offlineTtlSeconds) {
+          await setOfflineCache(cType, options.cacheKey, responseData, options.offlineTtlSeconds);
+        } else {
+          await setCache(cType, options.cacheKey, responseData);
+        }
       }
       return { success: true, data: responseData, message: options.successMessage || '' };
     }
@@ -131,6 +146,28 @@ export const getRequest = async (
 
     return { success: false, message: msg, status: response.status, data: responseData };
   } catch (error: any) {
+    if (options.cacheKey) {
+      const cached = await getOfflineCache(
+        options.cacheType || CacheTypes.DEFAULT,
+        options.cacheKey,
+        { allowExpired: Boolean(options.staleWhileRevalidate) },
+      );
+      if (cached) {
+        void recordRedactedPerformanceEvent({
+          event: cached.stale ? 'offline_cache_stale_hit' : 'offline_cache_hit',
+          at: new Date().toISOString(),
+          domain: getPathname(url),
+          status: 'cache',
+        });
+        return {
+          success: true,
+          data: cached.value,
+          message: options.successMessage || 'Showing saved data.',
+          offline: true,
+          stale: cached.stale,
+        };
+      }
+    }
     return { success: false, message: error?.message || options.errorMessage || 'An error occurred.' };
   }
   };

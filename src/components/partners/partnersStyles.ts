@@ -219,6 +219,77 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0,
   },
+  workspaceCommandCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 16,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  workspaceCommandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  workspaceCommandTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  workspaceCommandSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  workspaceCommandBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workspaceStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  workspaceStatTile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
+  workspaceStatValue: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  workspaceStatLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  workspaceSignalRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 10,
+  },
+  workspaceSignalPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  workspaceSignalText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
 
   // Admins
   adminsSection: {

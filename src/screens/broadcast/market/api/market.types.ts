@@ -7,6 +7,13 @@ export type MarketShop = {
   employee_slots?: number;
   owner?: string;
   verified?: boolean;
+  is_verified?: boolean;
+  seller_trust?: {
+    verified?: boolean;
+    label?: string;
+    badges?: string[];
+  };
+  trust_badges?: string[];
   join_policy?: 'open' | 'request' | string;
   is_member?: boolean;
 };
@@ -37,6 +44,26 @@ export type MarketProduct = {
   images?: MarketProductImage[];
   image_file?: string | null;
   main_image_url?: string | null;
+  seller_trust?: {
+    verified?: boolean;
+    label?: string;
+    badges?: string[];
+  };
+  review_summary?: {
+    count?: number;
+    average?: number;
+    label?: string;
+  };
+  question_summary?: {
+    count?: number;
+    answered_count?: number;
+  };
+  fulfillment_summary?: {
+    stock_status?: string;
+    delivery_estimate?: string;
+    requires_shipping?: boolean;
+    pickup_available?: boolean;
+  };
 };
 
 export type MarketProductImage = {
@@ -81,10 +108,19 @@ export const normalizeList = <T,>(raw: any): T[] => {
 
 export const normalizeHome = (raw: any): MarketHomePayload => {
   const d = raw?.data ?? raw ?? {};
+  const sections = d.sections ?? {};
   return {
     featured_drop: d.featured_drop ?? null,
-    trending_products: Array.isArray(d.trending_products) ? d.trending_products : [],
-    popular_shops: Array.isArray(d.popular_shops) ? d.popular_shops : [],
+    trending_products: Array.isArray(d.trending_products)
+      ? d.trending_products
+      : Array.isArray(sections.featured_products)
+      ? sections.featured_products
+      : [],
+    popular_shops: Array.isArray(d.popular_shops)
+      ? d.popular_shops
+      : Array.isArray(sections.trusted_shops)
+      ? sections.trusted_shops
+      : [],
     drops: Array.isArray(d.drops) ? d.drops : [],
   };
 };

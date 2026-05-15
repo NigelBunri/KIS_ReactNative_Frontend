@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { createButtonStyles } from '@/theme/foundations/buttons';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useKISTheme } from '@/theme/useTheme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -67,8 +68,8 @@ export default function KISButton({
   const spinnerColor =
     (variantStyles.text as TextStyle | undefined)?.color || palette.text;
   const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', palette.goldDeep, palette.gold, '#7A4B3E'];
+    ? [...KIS_ROYAL_GRADIENTS.goldDark]
+    : [...KIS_ROYAL_GRADIENTS.goldLight];
   const shouldUseGoldGradient = variant === 'primary' && !isDisabled;
 
   return (

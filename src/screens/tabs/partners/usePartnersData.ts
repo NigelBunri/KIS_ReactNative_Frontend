@@ -6,6 +6,7 @@ import {
   Partner,
   PartnerChannel,
   PartnerCommunity,
+  PartnerDiscordSummary,
   PartnerGroup,
 } from '@/components/partners/partnersTypes';
 
@@ -31,6 +32,7 @@ const mapPartner = (raw: any): Partner => ({
   role: raw.role ?? raw.member_role ?? raw.access_level ?? null,
   member_role: raw.member_role ?? null,
   access_level: raw.access_level ?? null,
+  discord_summary: raw.discord_summary ?? raw.discordSummary ?? null,
 });
 
 export const usePartnersData = () => {
@@ -107,6 +109,19 @@ export const usePartnersData = () => {
     );
   }, []);
 
+  const loadPartnerDiscordSummary = useCallback(async (partnerId: string) => {
+    const res = await getRequest(ROUTES.partners.discordSummary(partnerId), {
+      errorMessage: 'Unable to load partner workspace summary.',
+    });
+    if (!res?.success || !res?.data) return;
+    const summary = res.data as PartnerDiscordSummary;
+    setPartners((prev) =>
+      prev.map((p) =>
+        p.id === partnerId ? { ...p, discord_summary: summary } : p,
+      ),
+    );
+  }, []);
+
   const loadPartnerCommunities = useCallback(async (partnerId: string) => {
     const res = await getRequest(`${ROUTES.community.list}?partner=${partnerId}`, {
       errorMessage: 'Unable to load partner communities.',
@@ -140,6 +155,7 @@ export const usePartnersData = () => {
   useEffect(() => {
     if (!selectedPartnerId) return;
     loadPartnerDetail(selectedPartnerId);
+    loadPartnerDiscordSummary(selectedPartnerId);
     loadPartnerCommunities(selectedPartnerId);
     loadPartnerGroups(selectedPartnerId);
     loadPartnerChannels(selectedPartnerId);
@@ -153,11 +169,13 @@ export const usePartnersData = () => {
     loadPartnerCommunities,
     loadPartnerGroups,
     loadPartnerChannels,
+    loadPartnerDiscordSummary,
   ]);
 
   const reloadSelectedPartner = useCallback(() => {
     if (!selectedPartnerId) return;
     loadPartnerDetail(selectedPartnerId);
+    loadPartnerDiscordSummary(selectedPartnerId);
     loadPartnerCommunities(selectedPartnerId);
     loadPartnerGroups(selectedPartnerId);
     loadPartnerChannels(selectedPartnerId);
@@ -167,6 +185,7 @@ export const usePartnersData = () => {
     loadPartnerCommunities,
     loadPartnerGroups,
     loadPartnerChannels,
+    loadPartnerDiscordSummary,
   ]);
 
   useEffect(() => {

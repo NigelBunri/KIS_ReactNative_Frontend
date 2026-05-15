@@ -120,7 +120,7 @@ const toMoney = (cents?: number) => {
   return `${usd.toFixed(2).replace(/\.?0+$/, '')} USD`;
 };
 
-const toKisc = (micro?: number) => {
+const toUsdFromMicro = (micro?: number) => {
   if (!Number.isFinite(Number(micro))) return '0.00';
   return (Number(micro) / 1000).toFixed(2);
 };
@@ -3025,7 +3025,7 @@ export default function HealthServiceSessionScreen({
           nextPayload.payment_provider = 'flutterwave';
           nextPayload.payment_method = 'provider_checkout';
           nextPayload.amount_paid_micro = payableMicro;
-          nextPayload.amount_paid_kisc = toKisc(payableMicro);
+          nextPayload.amount_paid_kisc = toUsdFromMicro(payableMicro);
         }
         const response = await updateHealthOpsBillingStep(
           billingSessionId,
@@ -4153,7 +4153,7 @@ export default function HealthServiceSessionScreen({
                   marginTop: 4,
                 }}
               >
-                Remaining USD: {toKisc(viewerWalletMicro)} USD
+                Remaining USD: {toUsdFromMicro(viewerWalletMicro)} USD
               </Text>
             ) : null}
           </View>
@@ -6628,7 +6628,7 @@ export default function HealthServiceSessionScreen({
                     style={{ ...typography.caption, color: palette.subtext }}
                   >
                     Payable:{' '}
-                    {toKisc(Number(billingSession?.payable_amount_micro || 0))}{' '}
+                    {toUsdFromMicro(Number(billingSession?.payable_amount_micro || 0))}{' '}
                     USD
                   </Text>
                   <Text

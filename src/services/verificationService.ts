@@ -39,6 +39,45 @@ export type VerificationSummary = {
   next_review_at?: string | null;
 };
 
+export type TrustSurfaceSummary = VerificationSummary & {
+  display_name?: string;
+  trust_tier?: string;
+  trust_label?: string;
+  badge_count?: number;
+  expiry?: {
+    expires_soon?: boolean;
+    days_until?: number | null;
+  };
+  privacy?: {
+    public_safe?: boolean;
+    raw_documents_exposed?: boolean;
+    provider_payload_exposed?: boolean;
+    storage_paths_exposed?: boolean;
+    staff_only_evidence_visible?: boolean;
+  };
+  staff_evidence?: Record<string, any>;
+};
+
+export type UnifiedTrustOverview = {
+  generated_at?: string;
+  viewer?: { is_staff?: boolean };
+  counts?: {
+    subjects?: number;
+    verified_subjects?: number;
+    active_public_badges?: number;
+    expiring_badges_30d?: number;
+    channels?: number;
+    verified_channels?: number;
+  };
+  by_type?: Record<string, { total?: number; verified?: number; open?: number; expiring?: number }>;
+  subjects?: TrustSurfaceSummary[];
+  channels?: TrustSurfaceSummary[];
+  bible_kcan_publisher?: TrustSurfaceSummary | null;
+  surfaces_ready?: Record<string, boolean>;
+  privacy?: TrustSurfaceSummary['privacy'];
+  staff_evidence?: Record<string, any>;
+};
+
 export type VerificationStartPayload = {
   level?: string;
   provider?: string;
@@ -177,6 +216,32 @@ export const fetchVerificationStatus = async (
   return unwrapStatus(response.data);
 };
 
+export const fetchUnifiedTrustOverview = async (): Promise<UnifiedTrustOverview | null> => {
+  const response = await getRequest(ROUTES.verification.trustOverview, {
+    forceNetwork: true,
+    errorMessage: 'Unable to load trust overview.',
+  });
+  if (!response.success) {
+    throw new Error(response.message || 'Unable to load trust overview.');
+  }
+  return response.data || null;
+};
+
+export const fetchPublicTrustSummary = async (
+  subjectType: string,
+  subjectId: string,
+): Promise<TrustSurfaceSummary | null> => {
+  if (!subjectType || !subjectId) return null;
+  const response = await getRequest(ROUTES.verification.publicTrustSummary(subjectType, subjectId), {
+    forceNetwork: true,
+    errorMessage: 'Unable to load public trust summary.',
+  });
+  if (!response.success) {
+    throw new Error(response.message || 'Unable to load public trust summary.');
+  }
+  return response.data || null;
+};
+
 export const startVerificationCase = async (
   subject: VerificationSubjectRef,
   payload: VerificationStartPayload,
@@ -214,6 +279,7 @@ export const uploadVerificationEvidenceMedia = async (
   const form = new FormData();
   form.append('visibility', 'private');
   form.append('purpose', 'verification_evidence');
+  form.append('context', 'verification');
   form.append('file', {
     uri: file.uri,
     name: file.name || `verification-evidence-${Date.now()}`,

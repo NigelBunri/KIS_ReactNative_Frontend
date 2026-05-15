@@ -17,7 +17,7 @@ export type HealthThemeColors = {
 };
 
 const darkPalette: HealthThemeColors = {
-  gradientStart: '#2A0F45',
+  gradientStart: '#211331',
   gradientEnd: '#09070D',
   background: '#09070D',
   surface: '#15101F',
@@ -26,29 +26,29 @@ const darkPalette: HealthThemeColors = {
   cardAccent: '#20112F',
   text: '#F7F1E3',
   subtext: '#C8BFD6',
-  accentPrimary: '#C9A24A',
+  accentPrimary: '#E7C76D',
   accentSecondary: '#6E35B7',
-  primary: '#9A6A14',
+  primary: '#E7C76D',
   textSecondary: '#C8BFD6',
-  divider: '#30213F',
+  divider: 'rgba(231,199,109,0.34)',
   shadow: 'rgba(0, 0, 0, 0.88)',
 };
 
 const lightPalette: HealthThemeColors = {
-  gradientStart: '#FFFBF2',
-  gradientEnd: '#F8F1E3',
-  background: '#FFFBF2',
+  gradientStart: '#FFFFFF',
+  gradientEnd: '#FFF9EE',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
   chrome: 'transparent',
   card: '#FFFFFF',
-  cardAccent: '#F8F1E3',
-  text: '#19110A',
-  subtext: '#675E71',
-  accentPrimary: '#C9A24A',
+  cardAccent: '#FFF9EE',
+  text: '#4B2F2A',
+  subtext: '#7A6258',
+  accentPrimary: '#9A6A14',
   accentSecondary: '#4B1D78',
-  primary: '#9A6A14',
-  textSecondary: '#675E71',
-  divider: '#E6D7B2',
+  primary: '#5E3B0A',
+  textSecondary: '#7A6258',
+  divider: '#D9A875',
   shadow: 'rgba(23, 17, 31, 0.10)',
 };
 

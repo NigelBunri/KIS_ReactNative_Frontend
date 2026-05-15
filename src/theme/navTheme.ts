@@ -1,6 +1,6 @@
 // src/theme/navTheme.ts
 import { DefaultTheme, DarkTheme, Theme as NavTheme } from '@react-navigation/native';
-import { KIS_COLORS, KISTone } from './constants';
+import { createPalette, KISTone } from './constants';
 
 type FontStyle = { fontFamily: string; fontWeight: 'normal' | '400' | '500' | '600' | '700' | '800' | 'bold' };
 type KISNavTheme = NavTheme & {
@@ -14,19 +14,19 @@ type KISNavTheme = NavTheme & {
 
 export function makeNavTheme(tone: KISTone): KISNavTheme {
   const base = tone === 'dark' ? DarkTheme : DefaultTheme;
-  const c = tone === 'dark' ? KIS_COLORS.dark : KIS_COLORS.light;
+  const palette = createPalette(tone);
   const isLight = tone === 'light';
 
   return {
     ...base,
     colors: {
       ...base.colors,
-      primary: KIS_COLORS.brand.primary,
-      background: c.bg,
-      card: isLight ? KIS_COLORS.brand.purpleDeep : c.card,
-      text: isLight ? KIS_COLORS.brand.ivory : c.text,
-      border: isLight ? KIS_COLORS.brand.goldDeep : c.divider,
-      notification: isLight ? KIS_COLORS.brand.gold : KIS_COLORS.brand.secondary,
+      primary: palette.goldReadable,
+      background: palette.bg,
+      card: isLight ? '#FFFFFF' : palette.card,
+      text: palette.text,
+      border: palette.goldBorder,
+      notification: palette.badgeBg,
     },
     fonts: {
       regular: { fontFamily: 'System', fontWeight: '400' },

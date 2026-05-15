@@ -880,11 +880,22 @@ useEffect(() => {
       })();
     }
   };
+  const onConversationUpdated = (payload: any) => {
+    const convId = String(payload?.conversationId ?? payload?.conversation_id ?? '');
+    if (convId) {
+      queueMetaRefresh(convId);
+    }
+    refreshConversations(true).catch(() => {});
+  };
   socket.on('chat.message', onMessage);
+  socket.on('conversation.updated', onConversationUpdated);
+  socket.on('conversation.created', onConversationUpdated);
   return () => {
     socket.off('chat.message', onMessage);
+    socket.off('conversation.updated', onConversationUpdated);
+    socket.off('conversation.created', onConversationUpdated);
   };
-}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations]);
+}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations, refreshConversations]);
 
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('message.status', (payload: any) => {

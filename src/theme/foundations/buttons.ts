@@ -1,5 +1,5 @@
 import { TextStyle, ViewStyle } from 'react-native';
-import { KIS_TOKENS, KISTone, KISPalette } from '../constants';
+import { KIS_COMPONENT_TOKENS, KIS_TOKENS, KISTone, KISPalette } from '../constants';
 import { FONT_FAMILIES } from './fonts';
 
 export type ButtonVariant =
@@ -25,12 +25,12 @@ export const createButtonStyles = (
   tokens: typeof KIS_TOKENS,
 ): ButtonRecipes => {
   const secondarySoft =
-    tone === 'dark' ? 'rgba(201,162,74,0.18)' : 'rgba(217,168,117,0.22)';
+    tone === 'dark' ? 'rgba(201,162,74,0.18)' : 'rgba(75,29,120,0.08)';
 
   const baseContainer: ViewStyle = {
-    height: tokens.controlHeights.md,
-    paddingHorizontal: 16,
-    borderRadius: tokens.radius.lg,
+    minHeight: KIS_COMPONENT_TOKENS.button.minHeight,
+    paddingHorizontal: KIS_COMPONENT_TOKENS.button.horizontalPadding,
+    borderRadius: KIS_COMPONENT_TOKENS.button.radius,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -52,19 +52,19 @@ export const createButtonStyles = (
       container: {
         ...baseContainer,
         backgroundColor: secondarySoft,
-        borderWidth: 2,
-        borderColor: palette.goldDeep,
+        borderWidth: KIS_COMPONENT_TOKENS.button.borderWidth,
+        borderColor: palette.goldBorder,
       },
-      text: { ...textBase, color: palette.goldDeep },
+      text: { ...textBase, color: tone === 'dark' ? palette.goldReadable : palette.selectedText },
     },
     outline: {
       container: {
         ...baseContainer,
         backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: palette.primaryStrong,
+        borderWidth: KIS_COMPONENT_TOKENS.button.borderWidth,
+        borderColor: palette.goldBorder,
       },
-      text: { ...textBase, color: palette.primaryStrong },
+      text: { ...textBase, color: tone === 'dark' ? palette.goldReadable : palette.selectedText },
     },
     ghost: {
       container: { ...baseContainer, backgroundColor: 'transparent' },
@@ -79,20 +79,20 @@ export const createButtonStyles = (
     },
     sizes: {
       xs: {
-        height: 32,
+        minHeight: tokens.controlHeights.xs,
         paddingHorizontal: 10,
         borderRadius: tokens.radius.sm,
       },
       sm: {
-        height: tokens.controlHeights.sm,
+        minHeight: tokens.controlHeights.sm,
         paddingHorizontal: 12,
         borderRadius: tokens.radius.md,
       },
       md: {
-        height: tokens.controlHeights.md,
+        minHeight: tokens.controlHeights.md,
       },
       lg: {
-        height: tokens.controlHeights.lg,
+        minHeight: tokens.controlHeights.lg,
         paddingHorizontal: 20,
         borderRadius: tokens.radius.xl,
       },

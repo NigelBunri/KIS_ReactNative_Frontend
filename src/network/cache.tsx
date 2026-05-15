@@ -85,6 +85,18 @@ const isPaginated = (value: any) =>
   'meta' in value &&
   Array.isArray(value.results);
 
+type OfflineCacheEnvelope = {
+  value: any;
+  cachedAt: string;
+  expiresAt?: string | null;
+};
+
+const isOfflineCacheEnvelope = (value: any): value is OfflineCacheEnvelope =>
+  value &&
+  typeof value === 'object' &&
+  value.__kisOfflineCache === true &&
+  'value' in value;
+
 const toPaginatedShape = (value: any): { meta?: any; results: any[] } => {
   if (!value) {
     return { meta: undefined, results: [] };
@@ -104,12 +116,44 @@ const toPaginatedShape = (value: any): { meta?: any; results: any[] } => {
   return { meta: undefined, results: [value] };
 };
 
+const cacheItemIdentity = (item: any) => {
+  if (!item || typeof item !== 'object') return Symbol();
+  const candidates = [
+    item.id,
+    item.conversationId,
+    item.conversation_id,
+    item.uuid,
+    item.pk,
+    item.clientId,
+  ];
+  const found = candidates.find((value) => {
+    if (value === null || value === undefined) return false;
+    const text = String(value).trim();
+    return text.length > 0 && text !== 'null' && text !== 'undefined';
+  });
+  return found != null ? String(found) : Symbol();
+};
+
 export const getCache = async (type: string, key: string) => {
   try {
     const file = getCacheFilePath(type, key);
-    return await readJson(file);
+    const payload = await readJson(file);
+    return isOfflineCacheEnvelope(payload) ? payload.value : payload;
   } catch (error) {
     console.warn(`[cache] getCache failed for ${type}/${key}:`, error);
+    return null;
+  }
+};
+
+export const getCacheEnvelope = async (type: string, key: string): Promise<OfflineCacheEnvelope | null> => {
+  try {
+    const file = getCacheFilePath(type, key);
+    const payload = await readJson(file);
+    if (isOfflineCacheEnvelope(payload)) return payload;
+    if (payload == null) return null;
+    return { value: payload, cachedAt: '', expiresAt: null };
+  } catch (error) {
+    console.warn(`[cache] getCacheEnvelope failed for ${type}/${key}:`, error);
     return null;
   }
 };
@@ -134,8 +178,7 @@ export const setCache = async (type: string, key: string, data: any) => {
 
       const addToMap = (item: any) => {
         if (item == null) return;
-        const id = typeof item === 'object' && item.id != null ? item.id : Symbol();
-        map.set(id, item);
+        map.set(cacheItemIdentity(item), item);
       };
 
       oldResults.forEach(addToMap);
@@ -167,8 +210,7 @@ export const setCache = async (type: string, key: string, data: any) => {
       const addToMap = (item: any) => {
         if (item == null) return;
         if (typeof item === 'object') {
-          const id = item.id != null ? item.id : Symbol();
-          map.set(id, item);
+          map.set(cacheItemIdentity(item), item);
         } else {
           // primitive value
           map.set(Symbol(), item);
@@ -188,6 +230,52 @@ export const setCache = async (type: string, key: string, data: any) => {
   } catch (error) {
     console.warn(`[cache] setCache failed for ${type}/${key}:`, error);
   }
+};
+
+export const setOfflineCache = async (
+  type: string,
+  key: string,
+  data: any,
+  ttlSeconds?: number,
+) => {
+  try {
+    await ensureCacheRootExists();
+    const dir = getSubDirectoryPath(type);
+    const file = getCacheFilePath(type, key);
+    await ensureDirectoryExists(getBaseDirectoryPath(type));
+    await ensureDirectoryExists(dir);
+    const now = new Date();
+    const envelope = {
+      __kisOfflineCache: true,
+      value: data,
+      cachedAt: now.toISOString(),
+      expiresAt: ttlSeconds ? new Date(now.getTime() + ttlSeconds * 1000).toISOString() : null,
+    };
+    await writeJson(file, envelope);
+  } catch (error) {
+    console.warn(`[cache] setOfflineCache failed for ${type}/${key}:`, error);
+  }
+};
+
+export const getOfflineCache = async (
+  type: string,
+  key: string,
+  options: { allowExpired?: boolean } = {},
+) => {
+  const envelope = await getCacheEnvelope(type, key);
+  if (!envelope) return null;
+  if (!options.allowExpired && envelope.expiresAt) {
+    const expiresAt = Date.parse(envelope.expiresAt);
+    if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+      return null;
+    }
+  }
+  return {
+    value: envelope.value,
+    cachedAt: envelope.cachedAt,
+    expiresAt: envelope.expiresAt || null,
+    stale: envelope.expiresAt ? Date.parse(envelope.expiresAt) < Date.now() : false,
+  };
 };
 
 export const clearCacheByKey = async (type: string, key: string) => {

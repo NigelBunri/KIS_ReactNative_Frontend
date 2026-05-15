@@ -24,7 +24,6 @@ import {
 } from '@/screens/market/cart/shopCartManager';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { KIS_COIN_CODE } from '@/screens/market/market.constants';
 
 type CartDetailRoute = RouteProp<RootStackParamList, 'CartDetail'>;
 type CartDetailNavigation = NativeStackNavigationProp<
@@ -236,7 +235,7 @@ const CartDetailPage = () => {
           style={[cartDetailStyles.headerSubtitle, { color: palette.subtext }]}
         >{`${items.length} items · ${totalAmount.toFixed(
           2,
-        )} ${KIS_COIN_CODE}`}</Text>
+        )} USD`}</Text>
       </View>
       {shopAwaitingSatisfaction ? (
         <View

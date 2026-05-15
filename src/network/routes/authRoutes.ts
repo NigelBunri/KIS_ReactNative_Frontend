@@ -42,6 +42,7 @@ const authRoutes = {
     list: `${API_BASE_URL}/api/v1/profile-preferences/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/profile-preferences/${id}/`,
     me: `${API_BASE_URL}/api/v1/profile-preferences/me/`,
+    familyAccessibility: `${API_BASE_URL}/api/v1/profile-preferences/family-accessibility/`,
   },
   profileShowcases: {
     list: `${API_BASE_URL}/api/v1/profile-showcases/`,
@@ -66,6 +67,9 @@ const authRoutes = {
   },
   verification: {
     userStatus: `${API_BASE_URL}/api/v1/verification/user/status/`,
+    trustOverview: `${API_BASE_URL}/api/v1/verification/trust/overview/`,
+    publicTrustSummary: (subjectType: string, subjectId: string) =>
+      `${API_BASE_URL}/api/v1/verification/trust/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectId)}/`,
     userStart: `${API_BASE_URL}/api/v1/verification/user/start/`,
     staffCases: `${API_BASE_URL}/api/v1/verification/staff/cases/`,
     staffCase: (caseId: string) => `${API_BASE_URL}/api/v1/verification/staff/cases/${caseId}/`,

@@ -22,7 +22,6 @@ import {
   refreshShopCartForShop,
   setShopCartStatus,
 } from '@/screens/market/cart/shopCartManager';
-import { KIS_COIN_CODE } from '@/screens/market/market.constants';
 import { getRequest } from '@/network/get';
 import { frontendKiscMajorToBackendCents } from '@/utils/currency';
 
@@ -270,7 +269,7 @@ const CartsListPage = () => {
         <View style={styles.footerRow}>
           <Text
             style={[styles.total, { color: palette.primaryStrong }]}
-          >{`${totalValue.toFixed(2)} ${KIS_COIN_CODE}`}</Text>
+          >{`${totalValue.toFixed(2)} USD`}</Text>
           <View style={styles.footerButtons}>
             <KISButton
               size="xs"

@@ -1,6 +1,6 @@
 // src/screens/chat/ChatRoomHandlers.ts
 
-import { DeviceEventEmitter } from 'react-native';
+import { Alert, DeviceEventEmitter } from 'react-native';
 import {
   uploadFileToBackend,
   AttachmentMeta,
@@ -34,6 +34,14 @@ type SendTextMessage = (text: string, meta: any) => Promise<void>;
 
 const notifyConversationRefresh = () => {
   DeviceEventEmitter.emit('conversation.refresh');
+};
+
+const showMediaSafetyError = (error: unknown) => {
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : 'This media cannot be sent until it passes KIS family-safety checks.';
+  Alert.alert('Media safety check', message);
 };
 
 /* =========================================================
@@ -204,7 +212,10 @@ export const handleSendVoice = async ({
       authToken,
       conversationId: String(convId),
     });
-  } catch {}
+  } catch (error) {
+    showMediaSafetyError(error);
+    return;
+  }
 
   await sendRichMessage({
     kind: 'voice',
@@ -255,7 +266,10 @@ export const handleSendSticker = async ({
       authToken,
       conversationId: String(convId),
     });
-  } catch {}
+  } catch (error) {
+    showMediaSafetyError(error);
+    return;
+  }
 
   await sendRichMessage({
     kind: 'sticker',
@@ -316,10 +330,11 @@ export const handleSendAttachment = async ({
             }
           },
         });
-      } catch {
+      } catch (error) {
         if (file?.uri) {
           input?.onStatus?.(file.uri, 'failed');
         }
+        showMediaSafetyError(error);
         return null;
       }
     }),

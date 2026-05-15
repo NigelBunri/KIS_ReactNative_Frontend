@@ -94,6 +94,7 @@ import ProfileRecentActivityScreen from '@/screens/profile/ProfileRecentActivity
 import ProfileImpactSnapshotScreen from '@/screens/profile/ProfileImpactSnapshotScreen';
 import ProfileNotificationsScreen from '@/screens/profile/ProfileNotificationsScreen';
 import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificationDetailScreen';
+import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
 
@@ -591,6 +592,14 @@ function AppContent() {
                       name="ProfileNotificationDetail"
                       component={ProfileNotificationDetailScreen}
                       options={{ presentation: 'modal', title: 'Notification' }}
+                    />
+                    <RootStack.Screen
+                      name="KISPrinciples"
+                      component={KISPrinciplesScreen}
+                      options={{
+                        presentation: 'modal',
+                        title: 'KIS Principles',
+                      }}
                     />
                     <RootStack.Screen
                       name="ServiceBookingDetails"

@@ -87,5 +87,12 @@ export const mapServerVideoAttachment = (serverData: any, kind: string, fallback
   video_category: serverData?.video_category ?? (serverData?.type === 'short' ? 'shorts' : 'videos'),
   thumbUrl: serverData?.thumbnail_url ?? fallbackThumbnail ?? null,
   transcript_segments: serverData?.transcript_segments ?? [],
+  captions: serverData?.captions ?? serverData?.caption_tracks ?? [],
+  processing_status: serverData?.processing_status ?? (serverData?.requires_review || serverData?.quarantined ? 'pending_review' : 'ready'),
+  scan_status: serverData?.scan_status,
+  quarantined: Boolean(serverData?.quarantined),
+  requiresReview: Boolean(serverData?.requires_review ?? serverData?.requiresReview),
+  safety: serverData?.safety,
+  pipeline: serverData?.pipeline,
   originalName: serverData?.title ?? serverData?.id,
 });

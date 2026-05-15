@@ -95,6 +95,60 @@ export type MeditationEntry = {
   partner_name?: string;
 };
 
+export type BibleSpiritualGrowthSummary = {
+  counts?: {
+    reading_sessions?: number;
+    bookmarks?: number;
+    highlights?: number;
+    notes?: number;
+    memory_verses?: number;
+    active_reading_plans?: number;
+    scheduled_reading_events?: number;
+    missed_reading_events?: number;
+    active_courses?: number;
+    completed_courses?: number;
+    upcoming_live_sessions?: number;
+    public_translations?: number;
+  };
+  journey?: {
+    streak?: number;
+    today?: string;
+    today_passage?: DailyDevotional | null;
+    latest_meditation?: MeditationEntry | null;
+    prayer_focus?: any | null;
+    next_reading_event?: any | null;
+  };
+  readiness?: {
+    licensed_translations_ready?: boolean;
+    offline_scripture_ready?: boolean;
+    audio_sync_ready?: boolean;
+    reading_plans_ready?: boolean;
+    highlights_notes_ready?: boolean;
+    prayer_calendar_ready?: boolean;
+    study_courses_ready?: boolean;
+    live_devotionals_ready?: boolean;
+    family_safe_journey?: boolean;
+    low_bandwidth_ready?: boolean;
+  };
+  publishing?: {
+    partner?: string;
+    daily_passages?: number;
+    meditation_posts?: number;
+    prayer_months?: number;
+    content_audit_events?: number;
+    admin_evidence_ready?: boolean;
+  };
+  safety?: {
+    christian_principles?: string;
+    media_gate?: string;
+    explicit_content_provider_live_calls?: boolean;
+    quarantine_supported?: boolean;
+    child_youth_defaults?: string;
+    moderation_safe_spiritual_content?: boolean;
+    raw_storage_paths_exposed?: boolean;
+  };
+};
+
 const listFromResponse = (data: any) => {
   const payload = data?.results ?? data ?? [];
   return Array.isArray(payload) ? payload : [];
@@ -185,6 +239,8 @@ export function useBibleData() {
   const [loadingReader, setLoadingReader] = useState(false);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [loadingMeditations, setLoadingMeditations] = useState(false);
+  const [spiritualGrowthSummary, setSpiritualGrowthSummary] =
+    useState<BibleSpiritualGrowthSummary | null>(null);
   const [offlineManifest, setOfflineManifest] = useState<BibleOfflineManifest>({});
   const [offlineManifestLoaded, setOfflineManifestLoaded] = useState(false);
   const [preferredTranslationCode, setPreferredTranslationCode] = useState<string | null>(null);
@@ -297,12 +353,22 @@ export function useBibleData() {
     }
   }, []);
 
+  const loadSpiritualGrowthSummary = useCallback(async () => {
+    const res = await getRequest(ROUTES.bible.spiritualGrowthSummary, {
+      errorMessage: 'Unable to load spiritual growth summary.',
+    });
+    if (res?.success && res?.data) {
+      setSpiritualGrowthSummary(res.data as BibleSpiritualGrowthSummary);
+    }
+  }, []);
+
   useEffect(() => {
     loadTranslations();
     loadBooks();
     loadDevotionals();
     loadMeditations();
-  }, [loadTranslations, loadBooks, loadDevotionals, loadMeditations]);
+    loadSpiritualGrowthSummary();
+  }, [loadTranslations, loadBooks, loadDevotionals, loadMeditations, loadSpiritualGrowthSummary]);
 
   const orderedTranslations = useMemo(
     () => sortTranslationsByOfflinePriority(translations, offlineManifest),
@@ -329,6 +395,8 @@ export function useBibleData() {
     loadingReader,
     loadingDaily,
     loadingMeditations,
+    spiritualGrowthSummary,
     loadReader,
+    loadSpiritualGrowthSummary,
   };
 }

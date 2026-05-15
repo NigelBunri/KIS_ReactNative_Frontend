@@ -90,6 +90,9 @@ export default function EducationContentCard({
   const metadata = [
     formatPrice(item),
     item.durationMinutes ? `${item.durationMinutes} mins` : null,
+    item.reviewSummary?.reviewCount
+      ? `${Number(item.reviewSummary.rating || 0).toFixed(1)} stars`
+      : null,
     formatSchedule(item),
     item.deliveryMode ? String(item.deliveryMode).replace(/_/g, ' ') : null,
   ].filter(Boolean);
@@ -253,6 +256,46 @@ export default function EducationContentCard({
             ))}
           </View>
         ) : null}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          {item.trustSummary?.verified ? (
+            <View
+              style={{
+                borderRadius: 999,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                backgroundColor: palette.primarySoft,
+                borderWidth: 1,
+                borderColor: palette.primary,
+              }}
+            >
+              <Text
+                style={{
+                  color: palette.primaryStrong,
+                  fontSize: 10,
+                  fontWeight: '900',
+                }}
+              >
+                Verified institution
+              </Text>
+            </View>
+          ) : null}
+          {item.offlineSummary?.offlineReady ? (
+            <Text
+              style={{ color: palette.subtext, fontSize: 10, fontWeight: '800' }}
+              numberOfLines={1}
+            >
+              Low-bandwidth ready
+            </Text>
+          ) : null}
+        </View>
         <View
           style={{
             flexDirection: 'row',
