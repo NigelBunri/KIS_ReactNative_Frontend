@@ -16,7 +16,11 @@ import { fetchHealthProfileState } from '@/services/healthProfileService';
 import type { RootStackParamList } from '@/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HealthInstitutionType } from '@/screens/tabs/profile-screen/types';
-import { filterInstitutionsForVisibleRoles, type HealthAccessUser } from './accessControl';
+import {
+  filterInstitutionsForVisibleRoles,
+  resolveHealthAccessUser,
+  type HealthAccessUser,
+} from './accessControl';
 
 const SUPPORTED_TYPES = new Set([
   'clinic',
@@ -52,12 +56,7 @@ export default function HealthInstitutionsScreen() {
         getRequest(ROUTES.auth.checkLogin, { forceNetwork: !!options?.forceNetwork }),
         fetchHealthProfileState({ forceNetwork: !!options?.forceNetwork }),
       ]);
-      const me = (meRes as any)?.data ?? {};
-      const meUser: HealthAccessUser = {
-        id: me?.id ? String(me.id) : undefined,
-        phone: String(me?.phone || '').trim() || undefined,
-        email: String(me?.email || '').trim() || undefined,
-      };
+      const meUser = resolveHealthAccessUser(meRes);
       setCurrentUser(meUser);
       const data: HealthInstitution[] = Array.isArray(result.profile?.institutions)
         ? result.profile!.institutions

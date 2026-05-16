@@ -466,7 +466,6 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,
-    padding: 14,
   },
   statusIcon: {
     width: 42,

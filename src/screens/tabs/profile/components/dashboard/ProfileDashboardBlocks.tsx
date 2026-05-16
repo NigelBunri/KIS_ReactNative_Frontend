@@ -213,6 +213,7 @@ export const ProfileHeroCard = ({
   onVerificationPress?: () => void;
 }) => {
   const { palette, dashboardTheme, isDark } = useDashboardTheme();
+  const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
 
   return (
     <View style={[dashboardStyles.heroShell, getProfileDashboardCardStyle(dashboardTheme, 'dashboard')]}>
@@ -298,8 +299,8 @@ export const ProfileHeroCard = ({
             <View style={dashboardStyles.heroBadgeRow}>
               {tierLabel ? (
                 <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.primary]}>
-                  <KISIcon name="star" size={12} color={palette.primaryStrong} />
-                  <Text style={[dashboardTheme.content.badge, { color: palette.primaryStrong }]} numberOfLines={1}>
+                  <KISIcon name="star" size={12} color={tierBadgeTextColor} />
+                  <Text style={[dashboardTheme.content.badge, { color: tierBadgeTextColor }]} numberOfLines={1}>
                     {tierLabel}
                   </Text>
                 </View>

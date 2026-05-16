@@ -280,7 +280,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
       ? lightTanGold
       : lightCoffeePrimary;
 
-  const onPrimary = tone === 'dark' ? '#FFFFFF' : '#FFFBF2';
+  const onPrimary = tone === 'dark' ? '#FFFFFF' : '#3D2710';
   const onPrimaryMuted =
     tone === 'dark'
       ? c.brand.goldSoft

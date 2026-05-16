@@ -2308,7 +2308,14 @@ export default function ProfileScreen() {
                 })
               }
             />
-            <View style={{ top: -82, paddingHorizontal: 18, gap: 12 }}>
+            <View
+              style={{
+                marginTop: -64,
+                paddingHorizontal: 18,
+                paddingBottom: 18,
+                gap: 14,
+              }}
+            >
               <View
                 style={[
                   styles.card,
@@ -2346,7 +2353,16 @@ export default function ProfileScreen() {
                   {c.profile.profile?.bio ||
                     'Add a short bio that explains your work.'}
                 </Text>
-                <View style={[styles.actionRow, { gap: 10, flexWrap: 'wrap' }]}>
+                <View
+                  style={[
+                    styles.actionRow,
+                    {
+                      alignItems: 'stretch',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                    },
+                  ]}
+                >
                   <VerificationStatusCard
                     palette={palette}
                     summary={userVerificationSummary}
@@ -2364,22 +2380,26 @@ export default function ProfileScreen() {
                   <KISButton
                     title="Complete Profile"
                     onPress={c.openEditProfile}
+                   style={{ flexGrow: 1, flexBasis: '47%', minWidth: 120 }}
                   />
                   <KISButton
                     title="Privacy"
                     variant="outline"
                     onPress={() => c.openSheet('privacy')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 120 }}
                   />
                   <KISButton
                     title="KIS Principles"
                     variant="outline"
                     onPress={() => rootNavigation?.navigate('KISPrinciples')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 148 }}
                   />
                   {canOpenVerificationStaffConsole ? (
                     <KISButton
                       title="Verification review"
                       variant="secondary"
                       onPress={() => setVerificationStaffConsoleVisible(true)}
+                      style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
                     />
                   ) : null}
                 </View>
@@ -2390,7 +2410,7 @@ export default function ProfileScreen() {
                     borderRadius: 18,
                     backgroundColor: palette.surface,
                     padding: 14,
-                    marginTop: 12,
+                    marginTop: -70,
                     gap: 10,
                   }}
                 >

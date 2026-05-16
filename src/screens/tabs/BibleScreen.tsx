@@ -1,6 +1,6 @@
 // src/screens/tabs/BibleScreen.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useBibleData } from './bible/useBibleData';
@@ -22,6 +22,8 @@ export default function BibleScreen() {
     : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
+  const headerScrollY = useRef(new Animated.Value(0)).current;
+  const [topChromeHeight, setTopChromeHeight] = useState(240);
   const {
     translations,
     books,
@@ -54,6 +56,33 @@ export default function BibleScreen() {
     setOpenReadFilters(() => open);
   }, []);
 
+  const handleContentScroll = useMemo(
+    () =>
+      Animated.event(
+        [{ nativeEvent: { contentOffset: { y: headerScrollY } } }],
+        { useNativeDriver: false },
+      ),
+    [headerScrollY],
+  );
+
+  useEffect(() => {
+    headerScrollY.setValue(0);
+  }, [activeTab, headerScrollY]);
+
+  const topChromeCollapseDistance = Math.max(topChromeHeight, 1);
+  const topChromeAnimatedStyle = {
+    height: headerScrollY.interpolate({
+      inputRange: [0, topChromeCollapseDistance],
+      outputRange: [topChromeHeight, 0],
+      extrapolate: 'clamp',
+    }),
+    opacity: headerScrollY.interpolate({
+      inputRange: [0, topChromeCollapseDistance * 0.8, topChromeCollapseDistance],
+      outputRange: [1, 0.18, 0],
+      extrapolate: 'clamp',
+    }),
+  };
+
   useEffect(() => {
     if (activeTab === 'daily') {
       markMainTabNotificationSourceRead({
@@ -84,6 +113,7 @@ export default function BibleScreen() {
             loading={loadingReader}
             onLoad={loadReader}
             onRegisterFilterOpener={registerReadFilterOpener}
+            onScroll={handleContentScroll}
           />
         );
       case 'daily':
@@ -105,87 +135,99 @@ export default function BibleScreen() {
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
-      <MainTabPageHeader
-        eyebrow="Spiritual growth"
-        title="Bible"
-        subtitle="Read Scripture, follow daily passages, pray, learn, and keep your personal reading plans in one calm place."
-        secondaryAction={
-          activeTab === 'read' && openReadFilters
-            ? {
-                label: 'Filters',
-                icon: 'filter',
-                onPress: openReadFilters,
-              }
-            : undefined
-        }
-      />
+      <Animated.View style={[styles.topChrome, topChromeAnimatedStyle]}>
+        <View
+          style={styles.topChromeMeasure}
+          onLayout={(event) => {
+            const nextHeight = event.nativeEvent.layout.height;
+            if (nextHeight > 0 && Math.abs(nextHeight - topChromeHeight) > 1) {
+              setTopChromeHeight(nextHeight);
+            }
+          }}
+        >
+          <MainTabPageHeader
+            eyebrow="Spiritual growth"
+            title="Bible"
+            subtitle="Read Scripture, follow daily passages, pray, learn, and keep your personal reading plans in one calm place."
+            secondaryAction={
+              activeTab === 'read' && openReadFilters
+                ? {
+                    label: 'Filters',
+                    icon: 'filter',
+                    onPress: openReadFilters,
+                  }
+                : undefined
+            }
+          />
 
-      <View
-        style={[
-          styles.growthCard,
-          {
-            backgroundColor: palette.surface,
-            borderColor: palette.goldLight,
-            shadowColor: palette.shadow ?? '#000',
-          },
-        ]}
-      >
-        <View style={styles.growthHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.growthTitle, { color: palette.text }]}>
-              Spiritual journey
-            </Text>
-            <Text style={[styles.growthSubtitle, { color: palette.subtext }]}>
-              Scripture, prayer, notes, plans, and safe discipleship in one flow.
-            </Text>
-          </View>
-          <View style={[styles.streakBadge, { backgroundColor: palette.primarySoft }]}>
-            <Text style={{ color: palette.primaryStrong, fontSize: 16, fontWeight: '900' }}>
-              {spiritualGrowthSummary?.journey?.streak ?? 0}
-            </Text>
-            <Text style={{ color: palette.primaryStrong, fontSize: 9, fontWeight: '900' }}>
-              DAY
-            </Text>
-          </View>
-        </View>
-        <View style={styles.growthStats}>
-          {[
-            { label: 'Notes', value: growthCounts.notes ?? 0 },
-            { label: 'Highlights', value: growthCounts.highlights ?? 0 },
-            { label: 'Plans', value: growthCounts.active_reading_plans ?? 0 },
-            { label: 'Missed', value: growthCounts.missed_reading_events ?? 0 },
-          ].map(item => (
-            <View
-              key={item.label}
-              style={[
-                styles.growthStat,
-                { backgroundColor: palette.card, borderColor: palette.goldLight },
-              ]}
-            >
-              <Text style={[styles.growthStatValue, { color: palette.text }]}>
-                {item.value > 99 ? '99+' : item.value}
-              </Text>
-              <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>
-                {item.label}
-              </Text>
+          <View
+            style={[
+              styles.growthCard,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.goldLight,
+                shadowColor: palette.shadow ?? '#000',
+              },
+            ]}
+          >
+            <View style={styles.growthHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.growthTitle, { color: palette.text }]}>
+                  Spiritual journey
+                </Text>
+                <Text style={[styles.growthSubtitle, { color: palette.subtext }]}>
+                  Scripture, prayer, notes, plans, and safe discipleship in one flow.
+                </Text>
+              </View>
+              <View style={[styles.streakBadge, { backgroundColor: palette.primarySoft }]}>
+                <Text style={{ color: palette.primaryStrong, fontSize: 16, fontWeight: '900' }}>
+                  {spiritualGrowthSummary?.journey?.streak ?? 0}
+                </Text>
+                <Text style={{ color: palette.primaryStrong, fontSize: 9, fontWeight: '900' }}>
+                  DAY
+                </Text>
+              </View>
             </View>
-          ))}
-        </View>
-        <View style={styles.growthSignals}>
-          {[
-            growthReadiness.family_safe_journey ? 'Family-safe' : 'Safety ready',
-            growthReadiness.low_bandwidth_ready ? 'Low-bandwidth' : 'Online-first',
-            growthReadiness.licensed_translations_ready ? 'Licensed text' : 'License review',
-            growthReadiness.study_courses_ready ? 'Study ready' : 'Study setup',
-          ].map(label => (
-            <View key={label} style={[styles.growthSignal, { borderColor: palette.goldLight }]}>
-              <Text style={[styles.growthSignalText, { color: palette.text }]}>
-                {label}
-              </Text>
+            <View style={styles.growthStats}>
+              {[
+                { label: 'Notes', value: growthCounts.notes ?? 0 },
+                { label: 'Highlights', value: growthCounts.highlights ?? 0 },
+                { label: 'Plans', value: growthCounts.active_reading_plans ?? 0 },
+                { label: 'Missed', value: growthCounts.missed_reading_events ?? 0 },
+              ].map(item => (
+                <View
+                  key={item.label}
+                  style={[
+                    styles.growthStat,
+                    { backgroundColor: palette.card, borderColor: palette.goldLight },
+                  ]}
+                >
+                  <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                    {item.value > 99 ? '99+' : item.value}
+                  </Text>
+                  <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>
+                    {item.label}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
+            <View style={styles.growthSignals}>
+              {[
+                growthReadiness.family_safe_journey ? 'Family-safe' : 'Safety ready',
+                growthReadiness.low_bandwidth_ready ? 'Low-bandwidth' : 'Online-first',
+                growthReadiness.licensed_translations_ready ? 'Licensed text' : 'License review',
+                growthReadiness.study_courses_ready ? 'Study ready' : 'Study setup',
+              ].map(label => (
+                <View key={label} style={[styles.growthSignal, { borderColor: palette.goldLight }]}>
+                  <Text style={[styles.growthSignalText, { color: palette.text }]}>
+                    {label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
       <View style={styles.tabsWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
@@ -235,13 +277,15 @@ export default function BibleScreen() {
         {activeTab === 'read' ? (
           <View style={styles.readContent}>{renderTab()}</View>
         ) : (
-          <ScrollView
+          <Animated.ScrollView
             style={styles.contentScroll}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
+            onScroll={handleContentScroll}
+            scrollEventThrottle={16}
           >
             {renderTab()}
-          </ScrollView>
+          </Animated.ScrollView>
         )}
       </View>
 
@@ -267,6 +311,8 @@ export default function BibleScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 16 },
+  topChrome: { overflow: 'hidden' },
+  topChromeMeasure: { paddingBottom: 2 },
   tabsWrapper: { paddingVertical: 8 },
   tabRow: { gap: 8, paddingVertical: 4, alignItems: 'center' },
   tabChip: {

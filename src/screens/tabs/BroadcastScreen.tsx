@@ -19,6 +19,7 @@ import type {
 } from '@/navigation/types';
 
 import BroadcastHeaderBar from '@/components/broadcast/BroadcastHeaderBar';
+import KcanVisionModal from '@/components/broadcast/KcanVisionModal';
 import BroadcastMainTabs, {
   type BroadcastMainTabId,
 } from '@/components/broadcast/BroadcastMainTabs';
@@ -126,6 +127,7 @@ export default function BroadcastScreen() {
     healthcare: '',
   });
   const [filterVisible, setFilterVisible] = useState(false);
+  const [visionVisible, setVisionVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [cartState, setCartState] = useState<ShopCartState>(getShopCartState());
   const [selectedFilters, setSelectedFilters] = useState<
@@ -290,6 +292,22 @@ export default function BroadcastScreen() {
                 tierLabel="Business Pro"
                 onCreate={handleCreate}
               />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setVisionVisible(true)}
+                style={styles.visionButton}
+              >
+                <View style={styles.visionIcon}>
+                  <KISIcon name="sparkles" size={15} color="#FFE8A3" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.visionButtonTitle}>Our Vision</Text>
+                  <Text style={styles.visionButtonText} numberOfLines={2}>
+                    Discover why KCAN exists and where Kingdom Impact Social is going.
+                  </Text>
+                </View>
+                <KISIcon name="chevron-right" size={18} color="#FFF8E6" />
+              </Pressable>
             </View>
             <View style={styles.headerSection}>
               <BroadcastMainTabs
@@ -425,6 +443,10 @@ export default function BroadcastScreen() {
           </Pressable>
         </View>
       ) : null}
+      <KcanVisionModal
+        visible={visionVisible}
+        onClose={() => setVisionVisible(false)}
+      />
     </View>
   );
 }
@@ -472,6 +494,41 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     },
     headerSection: {
       marginBottom: 12,
+    },
+    visionButton: {
+      marginTop: 12,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: 'rgba(28,18,12,0.28)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,232,163,0.38)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 11,
+    },
+    visionIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(28,18,12,0.46)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,232,163,0.38)',
+    },
+    visionButtonTitle: {
+      color: '#FFF8E6',
+      fontSize: 15,
+      fontWeight: '900',
+      letterSpacing: 0,
+    },
+    visionButtonText: {
+      color: '#FFF3D2',
+      fontSize: 12,
+      lineHeight: 17,
+      fontWeight: '700',
+      marginTop: 2,
     },
     filterPanel: {
       borderWidth: 0,

@@ -30,7 +30,11 @@ import {
   fetchHealthProfileState,
   updateHealthInstitutions,
 } from '@/services/healthProfileService';
-import { canUserManageInstitution, getInstitutionRoleForUser } from './accessControl';
+import {
+  canUserManageInstitution,
+  getInstitutionRoleForUser,
+  resolveHealthAccessUser,
+} from './accessControl';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { nanoid } from 'nanoid/non-secure';
@@ -77,6 +81,65 @@ const buildOwnerMember = (owner: {
   },
 });
 
+const normalizeOwnerIdentity = (value: unknown): string => String(value || '').trim();
+
+const normalizeOwnerPhone = (value: unknown): string => String(value || '').replace(/\D/g, '');
+
+const normalizeOwnerEmail = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const doesMemberMatchOwner = (
+  member: any,
+  owner: {
+    id?: string;
+    phone?: string;
+    email?: string;
+  },
+): boolean => {
+  const ownerId = normalizeOwnerIdentity(owner.id);
+  const memberUserId = normalizeOwnerIdentity(member?.userId || member?.user_id);
+  if (ownerId && memberUserId && ownerId === memberUserId) return true;
+
+  const ownerPhone = normalizeOwnerPhone(owner.phone);
+  const memberPhone = normalizeOwnerPhone(member?.phone);
+  if (ownerPhone && memberPhone && ownerPhone === memberPhone) return true;
+
+  const ownerEmail = normalizeOwnerEmail(owner.email);
+  const memberEmail = normalizeOwnerEmail(member?.email);
+  if (ownerEmail && memberEmail && ownerEmail === memberEmail) return true;
+
+  return false;
+};
+
+const ensureOwnerMember = (
+  source: unknown,
+  owner: {
+    id?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+  },
+): any[] => {
+  const list = Array.isArray(source) ? source.filter(Boolean) : [];
+  const ownerMember = buildOwnerMember(owner);
+  if (list.some((member) => doesMemberMatchOwner(member, owner))) {
+    return list.map((member) =>
+      doesMemberMatchOwner(member, owner)
+        ? {
+            ...ownerMember,
+            ...member,
+            userId: member?.userId || member?.user_id || owner.id,
+            user_id: member?.user_id || member?.userId || owner.id,
+            role: 'owner',
+          }
+        : member,
+    );
+  }
+  return [ownerMember, ...list];
+};
+
 const buildInstitutionPayload = (
   id: string,
   name: string,
@@ -97,6 +160,39 @@ const buildInstitutionPayload = (
     phone: String(existingOwnerContact?.phone || owner.phone || ''),
     email: String(existingOwnerContact?.email || owner.email || ''),
   };
+  const ownerUserId = String(ownerContactPayload.userId || owner.id || '').trim();
+  const currentUserOwnsPayload = doesMemberMatchOwner(
+    {
+      userId: ownerUserId,
+      phone: ownerContactPayload.phone,
+      email: ownerContactPayload.email,
+    },
+    owner,
+  );
+  const existingEmployees = Array.isArray(existing?.employees)
+    ? existing.employees
+    : Array.isArray(existing?.members)
+    ? existing.members
+    : [];
+  const existingMembers = Array.isArray(existing?.members)
+    ? existing.members
+    : Array.isArray(existing?.employees)
+    ? existing.employees
+    : [];
+  const employees = ensureOwnerMember(existingEmployees, {
+    ...owner,
+    id: ownerUserId || owner.id,
+    name: ownerContactPayload.name || owner.name,
+    phone: ownerContactPayload.phone || owner.phone,
+    email: ownerContactPayload.email || owner.email,
+  });
+  const members = ensureOwnerMember(existingMembers, {
+    ...owner,
+    id: ownerUserId || owner.id,
+    name: ownerContactPayload.name || owner.name,
+    phone: ownerContactPayload.phone || owner.phone,
+    email: ownerContactPayload.email || owner.email,
+  });
 
   return {
     ...(existing ?? {}),
@@ -105,18 +201,20 @@ const buildInstitutionPayload = (
   type: normalizeInstitutionTypeForBackend(type),
   members_target_count: Math.max(1, membersTargetCount),
   membersTargetCount: Math.max(1, membersTargetCount),
+  owner_user_id: ownerUserId,
+  ownerUserId,
+  created_by_user_id: existing?.created_by_user_id || existing?.createdByUserId || ownerUserId,
+  createdByUserId: existing?.createdByUserId || existing?.created_by_user_id || ownerUserId,
+  viewer: {
+    ...(existing?.viewer || {}),
+    role: existing?.viewer?.role || (currentUserOwnsPayload ? 'owner' : undefined),
+    can_manage: existing?.viewer?.can_manage ?? currentUserOwnsPayload,
+    canManage: existing?.viewer?.canManage ?? currentUserOwnsPayload,
+  },
   owner_contact: ownerContactPayload,
   ownerContact: ownerContactPayload,
-  employees:
-    Array.isArray(existing?.employees) && existing.employees.length > 0
-      ? existing.employees
-      : [buildOwnerMember(owner)],
-  members:
-    Array.isArray(existing?.members) && existing.members.length > 0
-      ? existing.members
-      : Array.isArray(existing?.employees)
-      ? existing.employees
-      : [buildOwnerMember(owner)],
+  employees,
+  members,
   membership_open:
     existing?.membership_open ??
     existing?.membershipOpen ??
@@ -215,12 +313,16 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     setLoading(true);
     try {
       const meRes = await getRequest(ROUTES.auth.checkLogin);
-      const me = (meRes as any)?.data ?? {};
+      const me = resolveHealthAccessUser(meRes);
+      const meData = (meRes as any)?.data ?? meRes ?? {};
+      const meRaw = meData?.user || meData?.account || meData?.profile?.user || meData?.profile || meData;
       setOwnerProfile({
-        id: me?.id ? String(me.id) : undefined,
-        name: String(me?.display_name || me?.name || me?.username || '').trim() || undefined,
-        phone: String(me?.phone || '').trim() || undefined,
-        email: String(me?.email || '').trim() || undefined,
+        id: me.id,
+        name:
+          String(meRaw?.display_name || meRaw?.name || meRaw?.username || meData?.name || '')
+            .trim() || undefined,
+        phone: me.phone,
+        email: me.email,
       });
 
       const result = await fetchHealthProfileState();
@@ -315,6 +417,14 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
         ? await updateHealthInstitutions(nextInstitutions)
         : await createHealthProfile(nextInstitutions);
       if (!res?.success) throw new Error(res?.message || 'Unable to update institution.');
+      setInstitutions(nextInstitutions);
+      setForm((prev) => ({
+        ...prev,
+        id: targetId,
+        name: payload.name,
+        type: payload.type,
+        employees: String(Math.max(count, 1)),
+      }));
       if (!hasHealthProfile) {
         setHasHealthProfile(true);
       }
@@ -328,7 +438,6 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
           institutionType: payload.type,
           employees: Math.max(count, 1),
         });
-        setForm((prev) => ({ ...prev, id: targetId }));
       }
       await loadInstitutions();
     } catch (error: any) {

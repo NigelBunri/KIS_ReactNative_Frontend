@@ -30,7 +30,7 @@ import {
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
 import type { HealthInstitutionMember } from './types';
-import { getInstitutionRoleForUser } from './accessControl';
+import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionMembers'>;
 
@@ -302,8 +302,8 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
     setLoading(true);
     try {
       const meRes = await getRequest(ROUTES.auth.checkLogin);
-      const me = (meRes as any)?.data ?? {};
-      setCurrentUserId(me?.id != null ? String(me.id) : '');
+      const me = resolveHealthAccessUser(meRes);
+      setCurrentUserId(me.id || '');
 
       const state = await fetchHealthProfileState();
       setHasHealthProfile(state.exists);

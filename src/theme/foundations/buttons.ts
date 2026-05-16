@@ -41,6 +41,9 @@ export const createButtonStyles = (
     fontSize: tokens.typography.title,
     fontWeight: tokens.typography.weight.bold,
     fontFamily: FONT_FAMILIES.body,
+    flexShrink: 1,
+    textAlign: 'center',
+    includeFontPadding: false,
   };
 
   return {

@@ -80,6 +80,7 @@ type Props = {
   reader: BibleReaderPayload | null;
   loading: boolean;
   onRegisterFilterOpener?: (open: () => void) => void;
+  onScroll?: NonNullable<React.ComponentProps<typeof ScrollView>['onScroll']>;
   onLoad: (
     translation?: string,
     book?: string,
@@ -141,6 +142,7 @@ export default function BibleReaderPanel({
   loading,
   onLoad,
   onRegisterFilterOpener,
+  onScroll,
 }: Props) {
   const { palette, isDark } = useKISTheme();
   const solidSheetBg = palette.bg || palette.surface || '#FFFFFF';
@@ -1901,6 +1903,8 @@ export default function BibleReaderPanel({
         style={styles.readerScroll}
         contentContainerStyle={styles.readerScrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         <BibleSectionCard>
           <View style={styles.headerRow}>

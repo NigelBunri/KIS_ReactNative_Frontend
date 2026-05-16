@@ -35,7 +35,7 @@ import {
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
-import { getInstitutionRoleForUser } from './accessControl';
+import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionDetail'>;
 
@@ -112,16 +112,16 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
         return;
       }
 
-      const me = (meRes as any)?.data ?? {};
-      const currentUserId = me?.id != null ? String(me.id) : '';
-      const currentUserPhone = normalizePhone(me?.phone);
+      const me = resolveHealthAccessUser(meRes);
+      const currentUserId = me.id || '';
+      const currentUserPhone = normalizePhone(me.phone);
       const institutions = Array.isArray(healthState.profile?.institutions) ? healthState.profile.institutions : [];
       const institution = institutions.find((item: any) => String(item?.id) === String(institutionId));
       const actorRole = String(
         getInstitutionRoleForUser(institution, {
           id: currentUserId || undefined,
           phone: currentUserPhone || undefined,
-          email: String(me?.email || '').trim() || undefined,
+          email: me.email,
         }) || 'unassigned',
       ).toLowerCase();
 

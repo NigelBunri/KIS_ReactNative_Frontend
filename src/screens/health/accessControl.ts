@@ -30,6 +30,32 @@ const normalizePhone = (value: unknown): string => String(value || '').replace(/
 
 const normalizeEmail = (value: unknown): string => String(value || '').trim().toLowerCase();
 
+export const resolveHealthAccessUser = (payload: any): HealthAccessUser => {
+  const data = payload?.data ?? payload ?? {};
+  const user =
+    data?.user ||
+    data?.account ||
+    data?.profile?.user ||
+    data?.profile ||
+    data;
+  return {
+    id:
+      user?.id != null
+        ? String(user.id)
+        : user?.user_id != null
+        ? String(user.user_id)
+        : user?.userId != null
+        ? String(user.userId)
+        : undefined,
+    phone:
+      String(user?.phone || user?.phone_number || user?.phoneNumber || data?.phone || '')
+        .trim() || undefined,
+    email:
+      String(user?.email || data?.email || '')
+        .trim() || undefined,
+  };
+};
+
 const doesMemberMatchUser = (member: any, user: HealthAccessUser): boolean => {
   const memberUserId = String(member?.userId || member?.user_id || '').trim();
   const userId = String(user?.id || '').trim();
@@ -52,9 +78,18 @@ export const getInstitutionRoleForUser = (
 ): string | null => {
   if (!institution || !user) return null;
 
+  const directOwnerUserId = String(
+    institution?.owner_user_id ||
+      institution?.ownerUserId ||
+      institution?.created_by_user_id ||
+      institution?.createdByUserId ||
+      '',
+  ).trim();
+  const userId = String(user.id || '').trim();
+  if (directOwnerUserId && userId && directOwnerUserId === userId) return 'owner';
+
   const ownerContact = institution?.owner_contact || institution?.ownerContact || {};
   const ownerUserId = String(ownerContact?.userId || ownerContact?.user_id || '').trim();
-  const userId = String(user.id || '').trim();
   if (ownerUserId && userId && ownerUserId === userId) return 'owner';
 
   const ownerPhone = normalizePhone(ownerContact?.phone);
@@ -64,6 +99,15 @@ export const getInstitutionRoleForUser = (
   const ownerEmail = normalizeEmail(ownerContact?.email);
   const userEmail = normalizeEmail(user.email);
   if (ownerEmail && userEmail && ownerEmail === userEmail) return 'owner';
+
+  const viewerRole = normalizeInstitutionRole(
+    institution?.viewer?.role ||
+      institution?.access?.role ||
+      institution?.permissions?.role ||
+      institution?.current_user_role ||
+      institution?.currentUserRole,
+  );
+  if (viewerRole !== 'unassigned') return viewerRole;
 
   const members = [
     ...(Array.isArray(institution?.members) ? institution.members : []),
