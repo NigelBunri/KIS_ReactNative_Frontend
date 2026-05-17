@@ -1,6 +1,6 @@
 // src/screens/chat/hooks/useChatAuth.ts
 import { useEffect, useState } from 'react';
-import { getCache } from '@/network/cache';
+import { getCache, getUserData } from '@/network/cache';
 import { getAccessToken } from '@/security/authStorage';
 import type { ChatRoomPageProps } from '../chatTypes';
 
@@ -44,6 +44,12 @@ export function useChatAuth(chat: ChatType | undefined) {
         } else {
           extract(loggedIn);
         }
+
+        const cachedUserData = await getUserData();
+        extract({
+          ...(cachedUserData?.user || {}),
+          token: cachedUserData?.token?.access ?? cachedUserData?.token?.access_token ?? cachedUserData?.token?.token,
+        });
       } catch (err) {
         console.warn('[ChatRoomPage] Failed to load auth cache', err);
       }

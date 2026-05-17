@@ -758,7 +758,7 @@ export default function MarketStudioSection({
               </View>
 
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                All transactions settle in credits. Keep wallets funded so checkout is instant.
+                Buyer payments use secure USD provider checkout. Promotional credits are not cash and do not transfer between users.
               </Text>
             </View>
           ))}
