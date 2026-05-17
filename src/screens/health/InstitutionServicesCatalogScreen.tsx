@@ -46,6 +46,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
+import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
 import EngineModal from './HealthEnginesDashboads/EngineModal';
 
 type EngineData = {
@@ -1253,6 +1254,15 @@ export default function InstitutionServicesCatalogScreen({
                 onPress={loadServices}
               />
             </View>
+          </View>
+
+          <View style={{ marginTop: spacing.md }}>
+            <HealthRevenuePreviewCard
+              palette={palette}
+              kind="service_catalog"
+              title="Service revenue preview"
+              subtitle="Service fee visibility, provider analytics, booking payment state, and promotion packages are preview-only and do not block free catalog management."
+            />
           </View>
 
           <View

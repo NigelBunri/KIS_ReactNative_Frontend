@@ -556,9 +556,7 @@ export default function MarketStudioSection({
     return (
       <View style={{ borderWidth: 2, borderColor: palette.divider, borderRadius: 18, padding: 14, backgroundColor: palette.surface }}>
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Marketplace studio</Text>
-        <Text style={{ color: palette.subtext, marginTop: 6 }}>
-          Upgrade to a Business tier to open a shop, manage listings, and broadcast products.
-        </Text>
+        <Text style={{ color: palette.subtext, marginTop: 6 }}>Upgrade</Text>
 
         <KISButton title="Upgrade to Business" onPress={onUpgrade ?? (() => {})} style={{ marginTop: 10 }} />
 
@@ -931,7 +929,7 @@ export default function MarketStudioSection({
 
         {!isEditingShop && shopLimit !== null && !canCreateShop && (
           <Text style={{ color: palette.subtext, fontSize: 12 }}>
-            Reach your shop limit ({shopLimit}). Upgrade to Business Pro for unlimited stores.
+            Shop limit reached.
           </Text>
         )}
       </View>
@@ -1003,7 +1001,7 @@ export default function MarketStudioSection({
 
         {!isEditingProduct && productLimit !== null && !canAddProduct && (
           <Text style={{ color: palette.subtext, fontSize: 12 }}>
-            You've maxed {productLimit} items for this shop. Upgrade to Business Pro for a larger catalog.
+            Product limit reached.
           </Text>
         )}
       </View>
@@ -1066,7 +1064,7 @@ export default function MarketStudioSection({
     <Card>
       <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Market intelligence</Text>
       <Text style={{ color: palette.subtext, fontSize: 12 }}>
-        {hasAnalyticsAccess ? 'Analytics are active; insights reflect your tier.' : 'Upgrade to Business Pro to unlock Market Pro intelligence.'}
+        {hasAnalyticsAccess ? 'Analytics active.' : 'Upgrade'}
       </Text>
 
       <View style={{ gap: 6, marginTop: 10 }}>

@@ -298,7 +298,7 @@ export const ProfileHeroCard = ({
             ) : null}
             <View style={dashboardStyles.heroBadgeRow}>
               {tierLabel ? (
-                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.primary]}>
+                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.glass]}>
                   <KISIcon name="star" size={12} color={tierBadgeTextColor} />
                   <Text style={[dashboardTheme.content.badge, { color: tierBadgeTextColor }]} numberOfLines={1}>
                     {tierLabel}

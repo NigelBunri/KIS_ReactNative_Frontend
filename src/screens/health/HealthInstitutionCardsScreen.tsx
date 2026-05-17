@@ -54,6 +54,7 @@ import {
   HEALTH_THEME_SPACING,
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
+import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -2341,9 +2342,18 @@ export default function HealthInstitutionCardsScreen({
                           {toMoney(memberPriceCents)}
                         </Text>
                       ) : null}
-                    </View>
+          </View>
 
-                    <View
+          <View style={{ marginTop: spacing.md }}>
+            <HealthRevenuePreviewCard
+              palette={palette}
+              kind="patient_booking"
+              title="Health booking revenue preview"
+              subtitle="USD booking state, provider-confirmed payment, service fee visibility, and reviewed promotion are preview-only."
+            />
+          </View>
+
+          <View
                       style={{
                         marginTop: spacing.sm,
                         borderRadius: spacing.md,

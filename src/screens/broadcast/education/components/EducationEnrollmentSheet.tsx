@@ -4,6 +4,7 @@ import { Animated, Linking, Modal, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import type {
   EducationContentItem,
   EducationPricing,
@@ -116,6 +117,14 @@ export default function EducationEnrollmentSheet({
                 Education payments use USD direct provider checkout. Access is
                 confirmed after the provider payment status is verified.
               </Text>
+            </View>
+            <View style={{ marginTop: 14 }}>
+              <EducationRevenuePreviewCard
+                palette={palette}
+                kind="learner_checkout"
+                title="Paid learning preview"
+                subtitle="Course commissions, certificate processing, and instructor payouts are not live. This sheet only prepares clear USD payment expectations."
+              />
             </View>
             <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>
               {pricing?.isFree ? (

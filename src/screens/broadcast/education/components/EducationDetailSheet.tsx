@@ -24,6 +24,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
+import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import {
   EducationContentItem,
   EducationCourse,
@@ -1874,6 +1875,7 @@ export default function EducationDetailSheet({
                   </View>
                 ) : null}
                 {viewerEnrollment || viewerBooking ? (
+                  <>
                   <View
                     style={{
                       marginTop: 14,
@@ -1930,6 +1932,15 @@ export default function EducationDetailSheet({
                       </View>
                     ) : null}
                   </View>
+                  <View style={{ marginTop: 14 }}>
+                    <EducationRevenuePreviewCard
+                      palette={palette}
+                      kind="learner_checkout"
+                      title="Enrollment revenue preview"
+                      subtitle="Course commission, provider fees, refunds, instructor payout, and access state are preview-only."
+                    />
+                  </View>
+                  </>
                 ) : null}
               </View>
             </View>
@@ -2508,6 +2519,14 @@ export default function EducationDetailSheet({
                     Certificate ID: {certificateId}
                   </Text>
                 ) : null}
+                <View style={{ marginTop: 14 }}>
+                  <EducationRevenuePreviewCard
+                    palette={palette}
+                    kind="certificate"
+                    title="Certificate processing preview"
+                    subtitle="Certificate sharing, verification, and optional processing fees are prepared but not chargeable."
+                  />
+                </View>
                 <View
                   style={{
                     marginTop: 14,

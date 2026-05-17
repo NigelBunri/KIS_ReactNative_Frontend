@@ -19,6 +19,7 @@ import EducationContentCard from '@/screens/broadcast/education/components/Educa
 import EducationContinueLearning from '@/screens/broadcast/education/components/EducationContinueLearning';
 import EducationDetailSheet from '@/screens/broadcast/education/components/EducationDetailSheet';
 import EducationEnrollmentSheet from '@/screens/broadcast/education/components/EducationEnrollmentSheet';
+import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
 import useEducationOfflineStore from '@/screens/broadcast/education/hooks/useEducationOfflineStore';
 import { getDirectPaymentInfo, openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
@@ -1365,6 +1366,14 @@ export default function EducationV2DiscoverPage({
           <>
             {renderLearningOverview()}
             {renderHero()}
+            <View style={{ marginBottom: 24 }}>
+              <EducationRevenuePreviewCard
+                palette={palette}
+                kind="learner_checkout"
+                title="Education payment preview"
+                subtitle="Paid courses, certificates, and promotion packages are preview-only. Learning checkout remains USD/direct-provider first when enabled."
+              />
+            </View>
             {renderInstitutionSpotlights()}
 
             <View style={{ marginBottom: 24 }}>

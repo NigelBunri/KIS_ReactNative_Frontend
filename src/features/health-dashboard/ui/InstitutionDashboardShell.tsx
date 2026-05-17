@@ -9,6 +9,7 @@ import {
   HEALTH_DASHBOARD_DEFAULT_SERVICES,
 } from '@/features/health-dashboard/defaults';
 import type { InstitutionDashboardAnalyticsResult } from '@/services/healthDashboardService';
+import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
 import {
   getHealthThemeBorders,
   getHealthThemeColors,
@@ -178,6 +179,15 @@ export default function InstitutionDashboardShell({
             </View>
           )}
         </View>
+      </View>
+
+      <View style={{ marginTop: spacing.lg }}>
+        <HealthRevenuePreviewCard
+          palette={palette}
+          kind="provider_dashboard"
+          title="Provider growth preview"
+          subtitle="Health Provider Pro and Health Institution Growth are preview-only. Analytics, service fees, care plans, and promotions do not enable charges."
+        />
       </View>
 
       <View

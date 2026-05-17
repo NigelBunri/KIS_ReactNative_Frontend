@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 const KCAN_CITY_IMAGE = require('@/assets/KCAN_city.jpg');
 
@@ -632,6 +633,12 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
                 becomes Kingdom ambassadorship.
               </Text>
             </View>
+            <EnterpriseKcanRevenuePreviewCard
+              palette={palette}
+              kind="kcan_vision"
+              title="KCAN enterprise and investor packaging preview"
+              subtitle="Annual contracts, KCAN network packaging, verified trust, implementation support, and launch evidence are visible for planning only."
+            />
           </View>
         </ScrollView>
 

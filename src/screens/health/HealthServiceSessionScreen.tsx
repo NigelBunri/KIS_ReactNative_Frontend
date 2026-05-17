@@ -69,6 +69,7 @@ import {
   updateHealthOpsWellnessActivity,
   updateHealthOpsWellnessStep,
 } from '@/services/healthOpsPhase6Service';
+import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import {
   endHealthOpsClinicalSession,
   endHealthOpsMessagingSession,
@@ -111,6 +112,7 @@ import {
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
 import { RootStackParamList } from '@/navigation/types';
+import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthServiceSession'>;
 
@@ -4078,6 +4080,15 @@ export default function HealthServiceSessionScreen({
             </TouchableOpacity>
           </View>
 
+          <View style={{ marginTop: spacing.md }}>
+            <HealthRevenuePreviewCard
+              palette={palette}
+              kind="service_session"
+              title="Service session revenue preview"
+              subtitle="Session workflow value, USD payment state, care-plan readiness, and provider analytics are preview-only and do not change this session."
+            />
+          </View>
+
           <View
             style={{
               marginTop: spacing.md,
@@ -6606,6 +6617,15 @@ export default function HealthServiceSessionScreen({
                 </View>
               </View>
 
+              <View style={{ marginTop: spacing.sm }}>
+                <HealthRevenuePreviewCard
+                  palette={palette}
+                  kind="billing"
+                  title="Billing visibility preview"
+                  subtitle="Provider fees, KIS platform fee policy, refund impact, payment references, and audit-safe payment status are preview-only."
+                />
+              </View>
+
               {billingEngineMapped === false ? (
                 <Text
                   style={{
@@ -7589,6 +7609,15 @@ export default function HealthServiceSessionScreen({
                   Reminder engine is not mapped to this service workflow yet.
                 </Text>
               ) : null}
+
+              <View style={{ marginTop: spacing.md }}>
+                <NotificationRetentionPreviewCard
+                  palette={palette}
+                  kind="health"
+                  title="Health reminder revenue preview"
+                  subtitle="Care reminders, delivery analytics, and provider operation summaries are preview-only and never make diagnosis claims."
+                />
+              </View>
 
               {reminderSession ? (
                 <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>

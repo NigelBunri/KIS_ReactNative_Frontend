@@ -14,6 +14,8 @@ import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
 import { KISIcon } from '../../constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { MainTabPageHeader } from '@/components/common/MainTabScaffold';
+import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/ConsumerSpiritualRevenuePreviewCard';
+import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 
 export default function BibleScreen() {
   const { palette, tone } = useKISTheme();
@@ -226,6 +228,18 @@ export default function BibleScreen() {
               ))}
             </View>
           </View>
+          <ConsumerSpiritualRevenuePreviewCard
+            palette={palette}
+            kind="bible_home"
+            title="Bible and family growth preview"
+            subtitle="Consumer Plus and Family Plus are visible here for planning only; current Bible, prayer, meditation, and reading features stay available."
+          />
+          <NotificationRetentionPreviewCard
+            palette={palette}
+            kind="bible"
+            title="Spiritual reminder preview"
+            subtitle="Smarter reading, prayer, meditation, and family devotional reminders are preview-only."
+          />
         </View>
       </Animated.View>
 

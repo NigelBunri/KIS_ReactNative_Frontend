@@ -36,7 +36,7 @@ export function WalletModal(props: WalletModalProps) {
   return (
     <View style={{ gap: 12 }}>
       <Text style={[styles.subtext, { color: palette.subtext }]}>
-        KIS promotional credits are gift/reward credits for eligible platform benefits. They cannot be bought, transferred, withdrawn, sold, or converted to cash.
+        Promotional credits
       </Text>
       <Text style={[styles.subtext, { color: palette.subtext }]}>
         Historical wallet, ledger, billing, and receipt records remain available for review.
@@ -74,9 +74,7 @@ export function WalletModal(props: WalletModalProps) {
           <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>
             This wallet action is unavailable
           </Text>
-          <Text style={[styles.subtext, { color: palette.subtext }]}>
-            Buying, sending, withdrawing, or converting KIS promotional credits is disabled. Use secure USD checkout for paid account upgrades.
-          </Text>
+          <Text style={[styles.subtext, { color: palette.subtext }]}>Locked</Text>
         </View>
       ) : (
         <View

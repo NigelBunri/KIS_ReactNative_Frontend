@@ -29,13 +29,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import KISButton from '@/constants/KISButton';
 import { MainTabStateBlock } from '@/components/common/MainTabScaffold';
 import Skeleton from '@/components/common/Skeleton';
-import AIAssistanceSafetyCard from '@/components/dashboard/AIAssistanceSafetyCard';
 import MonetizationSafetyCard from '@/components/dashboard/MonetizationSafetyCard';
-import PerformanceOfflineCard from '@/components/dashboard/PerformanceOfflineCard';
-import PublicGrowthReadinessCard from '@/components/dashboard/PublicGrowthReadinessCard';
+import ProfitabilityCommandCenterCard from '@/components/dashboard/ProfitabilityCommandCenterCard';
+import ProfitabilityLaunchGateCard from '@/components/dashboard/ProfitabilityLaunchGateCard';
+import ProfitabilitySubscriptionLifecycleCard from '@/components/dashboard/ProfitabilitySubscriptionLifecycleCard';
+import RevenueOpsEvidenceCard from '@/components/dashboard/RevenueOpsEvidenceCard';
+import RevenueEvidenceAdminPanel from '@/components/dashboard/RevenueEvidenceAdminPanel';
 import SafetyCommandCenterCard from '@/components/dashboard/SafetyCommandCenterCard';
 import SecurityLaunchGateCard from '@/components/dashboard/SecurityLaunchGateCard';
-import UnifiedDashboardSummaryCard from '@/components/dashboard/UnifiedDashboardSummaryCard';
 import PartnerCreateSlide from '@/components/partners/CreatePartnerScreen';
 import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
@@ -54,6 +55,7 @@ import {
   markInAppNotificationAsRead,
   type InAppNotification,
 } from '@/services/inAppNotificationService';
+import EvidenceWorkflowPlanCard from '@/components/dashboard/EvidenceWorkflowPlanCard';
 import { filterInstitutionsForVisibleRoles } from '@/screens/health/accessControl';
 import FeedComposerSheet, {
   type FeedComposerPayload,
@@ -2409,8 +2411,8 @@ export default function ProfileScreen() {
                     borderColor: palette.goldBorder || palette.divider,
                     borderRadius: 18,
                     backgroundColor: palette.surface,
+                    marginTop: 15,
                     padding: 14,
-                    marginTop: -70,
                     gap: 10,
                   }}
                 >
@@ -2454,13 +2456,15 @@ export default function ProfileScreen() {
                     KIS keeps explicit content blocked, safe recommendations on, and child mode guided by default.
                   </Text>
                 </View>
-                <UnifiedDashboardSummaryCard />
-                <PerformanceOfflineCard />
-                <MonetizationSafetyCard />
-                <AIAssistanceSafetyCard />
-                <PublicGrowthReadinessCard />
                 {canOpenVerificationStaffConsole ? (
                   <>
+                    <RevenueEvidenceAdminPanel />
+                    <MonetizationSafetyCard />
+                    <ProfitabilityCommandCenterCard />
+                    <ProfitabilityLaunchGateCard />
+                    <ProfitabilitySubscriptionLifecycleCard />
+                    <RevenueOpsEvidenceCard />
+                    <EvidenceWorkflowPlanCard />
                     <SafetyCommandCenterCard />
                     <SecurityLaunchGateCard />
                   </>

@@ -18,6 +18,7 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import type { RootStackParamList } from '@/navigation/types';
+import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 
 type Props = {
   isOpen: boolean;
@@ -275,6 +276,12 @@ export default function PartnerOrganizationAppsPanel({
           contentContainerStyle={styles.settingsPanelBody}
           showsVerticalScrollIndicator={false}
         >
+          <PartnerRevenuePreviewCard
+            palette={palette}
+            kind="organization_apps"
+            title="Organization apps revenue preview"
+            subtitle="App launchers, role visibility, data scopes, and audit-ready access logs are preview-only."
+          />
           {canManageApps ? (
             <View
               style={{

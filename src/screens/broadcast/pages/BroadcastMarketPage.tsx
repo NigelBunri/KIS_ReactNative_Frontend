@@ -24,6 +24,7 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { formatKiscAmount } from '@/utils/currency';
+import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
 import {
   resolveShopDescription,
   resolveShopImageUri,
@@ -1381,6 +1382,12 @@ export default function BroadcastMarketPage({
             contentContainerStyle={styles.productsList}
             showsVerticalScrollIndicator={false}
           >
+            <CommerceRevenuePreviewCard
+              palette={palette}
+              kind="buyer_market"
+              title="Marketplace growth preview"
+              subtitle="Featured placement and promotion packages are visible for planning only. Buyer checkout remains USD/direct-provider first."
+            />
             {filteredProducts.map((item, index) => {
               const source = item.source ?? {};
               const cachedLanding = source.id

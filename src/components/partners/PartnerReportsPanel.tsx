@@ -16,6 +16,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import PartnerExportSchedulesSection from '@/components/partners/reports/PartnerExportSchedulesSection';
 import PartnerAnalyticsCharts from '@/components/partners/reports/PartnerAnalyticsCharts';
+import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 
 type Props = {
   isOpen: boolean;
@@ -222,6 +223,12 @@ export default function PartnerReportsPanel({
             <ActivityIndicator size="small" color={palette.primary} />
           ) : (
             <>
+              <PartnerRevenuePreviewCard
+                palette={palette}
+                kind="analytics"
+                title="Partner analytics revenue preview"
+                subtitle="Advanced analytics, scheduled exports, enterprise evidence, and USD billing readiness are preview-only."
+              />
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>
                 Summary
               </Text>

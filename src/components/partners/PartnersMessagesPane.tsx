@@ -13,6 +13,7 @@ import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
 import { KISIcon } from '@/constants/kisIcons';
+import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 
 type Props = {
   width: number;
@@ -158,6 +159,12 @@ export default function PartnersMessagesPane({
       </View>
       {!hasDestination ? (
         <View style={[styles.messagesBody, { paddingHorizontal: 10 }]}>
+          <PartnerRevenuePreviewCard
+            palette={palette}
+            kind="messaging"
+            title="Partner messaging revenue preview"
+            subtitle="Unread analytics, premium moderation, channel/subroom scale, and family-safe media controls are preview-only."
+          />
           <Text
             style={[styles.messagesPlaceholderTitle, { color: palette.text }]}
           >

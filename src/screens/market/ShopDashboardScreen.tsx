@@ -43,6 +43,7 @@ import { getUserData } from '@/network/cache';
 import { resolveShopImageUri } from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
 import { collectProductImageUris } from '@/utils/productImages';
+import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
 
 type PickedImage = { uri: string; name: string; type: string };
 const toUploadFile = (picked: PickedImage) => ({
@@ -3072,6 +3073,13 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             </View>
           ))}
         </View>
+
+        <CommerceRevenuePreviewCard
+          palette={palette}
+          kind="seller_dashboard"
+          title="Seller Pro revenue preview"
+          subtitle="Analytics, featured listings, transaction-fee visibility, and promotion packages are preview-only and do not block current free selling."
+        />
 
         <View style={[styles.tabBar, { backgroundColor: palette.surface }]}>
           {TAB_DEFINITIONS.map(tab => (

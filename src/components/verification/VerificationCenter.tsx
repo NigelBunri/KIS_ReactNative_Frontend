@@ -139,17 +139,10 @@ export function VerificationStatusCard({
     >
       <View style={[styles.statusIcon, { backgroundColor: colors.bg }]}>
         <KISIcon name="shield" size={20} color={colors.text} />
+        <Text style={[styles.statusTitle, { color: palette.text }]}>Verification</Text>
+        <KISIcon name="chevron-right" size={18} color={palette.subtext} />
       </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text style={[styles.statusTitle, { color: palette.text }]}>{title}</Text>
-        <Text style={[styles.statusMeta, { color: colors.text }]}>{statusLabel}</Text>
-        {subtitle ? (
-          <Text style={[styles.statusBody, { color: palette.subtext }]} numberOfLines={2}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      {onOpen ? <KISIcon name="chevron-right" size={18} color={palette.subtext} /> : null}
+        
     </Pressable>
   );
 }
@@ -468,11 +461,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusIcon: {
-    width: 42,
-    height: 42,
+    padding: 5,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   statusTitle: { fontSize: 14, fontWeight: '900' },
   statusMeta: { fontSize: 12, fontWeight: '800' },

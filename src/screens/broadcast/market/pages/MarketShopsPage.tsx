@@ -131,9 +131,7 @@ export default function MarketShopsPage({ ownerId = null, canUseMarket = false, 
       <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
         <View style={{ borderWidth: 2, borderColor: palette.divider, borderRadius: 22, padding: 12, backgroundColor: palette.card, gap: 10 }}>
           <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Marketplace studio</Text>
-          <Text style={{ color: palette.subtext, fontWeight: '700' }}>
-            Upgrade to a Business tier to open a shop, manage listings, and broadcast products.
-          </Text>
+          <Text style={{ color: palette.subtext, fontWeight: '700' }}>Upgrade</Text>
 
           <Pressable
             onPress={onUpgrade}

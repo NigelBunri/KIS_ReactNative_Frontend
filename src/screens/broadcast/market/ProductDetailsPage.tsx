@@ -38,6 +38,7 @@ import {
   resolveProductImageUri,
 } from '@/utils/productImages';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
+import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
 
 const normalizeListInput = (value?: string[] | string | null) => {
   if (!value) return [];
@@ -1159,6 +1160,13 @@ export default function ProductDetailsPage() {
               USD direct checkout through Flutterwave
             </Text>
           </View>
+
+          <CommerceRevenuePreviewCard
+            palette={palette}
+            kind="product_detail"
+            title="Seller promotion preview"
+            subtitle="Featured product placement, trust signals, and fee visibility are preview-only and do not change checkout."
+          />
 
           <View style={styles.trustGrid}>
             <View style={[styles.trustTile, { backgroundColor: palette.inputBg }]}>

@@ -11,6 +11,7 @@ import {
   markInAppNotificationAsRead,
   type InAppNotification,
 } from '@/services/inAppNotificationService';
+import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 
 export default function ProfileNotificationsScreen() {
   const { palette } = useKISTheme();
@@ -68,6 +69,12 @@ export default function ProfileNotificationsScreen() {
         <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>Notifications</Text>
         <Text style={{ color: palette.subtext }}>{unreadCount} unread notification{unreadCount === 1 ? '' : 's'}.</Text>
       </View>
+      <NotificationRetentionPreviewCard
+        palette={palette}
+        kind="profile"
+        title="Notification and digest preview"
+        subtitle="Smarter digests, saved-content nudges, and attention controls are visible for planning only."
+      />
 
       {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       {error ? <Text style={{ color: palette.error || '#E53935' }}>{error}</Text> : null}
