@@ -210,19 +210,28 @@ function mergeMessages(
   const byClientId = new Map<string, string>();
 
   for (const msg of existing) {
-    map.set(getIdentityKey(msg), msg);
+    const k = getIdentityKey(msg);
+    map.set(k, msg);
     if (msg.clientId) {
-      byClientId.set(msg.clientId, getIdentityKey(msg));
+      byClientId.set(msg.clientId, k);
     }
   }
 
   for (const msg of incoming) {
     const key = getIdentityKey(msg);
     let prev = map.get(key);
+    let oldKey: string | undefined;
+
     if (!prev && msg.clientId) {
       const clientKey = byClientId.get(msg.clientId);
       if (clientKey) {
         prev = map.get(clientKey);
+        // Track the old key so we can remove it after promotion.
+        // Without this, both 'clientId-key' and 'serverId-key' entries
+        // remain in the map and render as two identical messages.
+        if (prev && clientKey !== key) {
+          oldKey = clientKey;
+        }
       }
     }
 
@@ -234,6 +243,11 @@ function mergeMessages(
       continue;
     }
 
+    // Remove the stale clientId-keyed entry BEFORE writing the serverId-keyed one.
+    if (oldKey) {
+      map.delete(oldKey);
+    }
+
     if (
       prev.status === STATUS_QUEUED &&
       msg.status === STATUS_SENT
@@ -243,11 +257,14 @@ function mergeMessages(
         ...msg,
         fromMe: prev.fromMe,
       });
+      if (msg.clientId) {
+        byClientId.set(msg.clientId, key);
+      }
       continue;
     }
 
     if (msg.serverId) {
-      map.set(key, { ...prev, ...msg });
+      map.set(key, { ...prev, ...msg, fromMe: prev.fromMe ?? msg.fromMe });
       if (msg.clientId) {
         byClientId.set(msg.clientId, key);
       }
@@ -402,33 +419,34 @@ export function useChatPersistence(
       );
 
       if (!result.ok) {
-        const failed = sending.map((m) =>
-          m.clientId === clientId
-            ? {
-                ...m,
-                status: STATUS_FAILED,
-                isLocalOnly: true,
-              }
+        // Re-read current state — an echo-back may have already updated it.
+        const afterFail = messagesRef.current.map((m) =>
+          m.clientId === clientId && m.status !== STATUS_SENT && m.status !== 'delivered' && m.status !== 'read'
+            ? { ...m, status: STATUS_FAILED, isLocalOnly: true }
             : m,
         );
-        await persist(failed);
+        await persist(afterFail);
         return;
       }
 
-      const reconciled = sending.map((m) =>
-        m.clientId === clientId
-          ? {
-              ...m,
-              serverId: result.serverId,
-              seq: typeof result.seq === 'number' ? result.seq : m.seq,
-              createdAt: result.createdAt ?? m.createdAt,
-              status: STATUS_SENT,
-              isLocalOnly: false,
-            }
-          : m,
-      );
+      // Re-read the LATEST snapshot from the ref — the socket echo-back may have
+      // already reconciled this message while we awaited the ACK.  Using the stale
+      // `sending` array here would overwrite those changes and cause a duplicate.
+      const afterAck = messagesRef.current.map((m) => {
+        if (m.clientId !== clientId) return m;
+        // If a socket echo already marked this sent/delivered/read, leave it alone.
+        if (m.status === STATUS_SENT || m.status === 'delivered' || m.status === 'read') return m;
+        return {
+          ...m,
+          serverId: m.serverId ?? result.serverId,
+          seq: typeof result.seq === 'number' ? result.seq : m.seq,
+          createdAt: result.createdAt ?? m.createdAt,
+          status: STATUS_SENT,
+          isLocalOnly: false,
+        };
+      });
 
-      await persist(reconciled);
+      await persist(afterAck);
     },
     [persist, roomId, currentUserId, sendOverNetwork],
   );
@@ -535,59 +553,44 @@ export function useChatPersistence(
       flushInFlightRef.current = true;
 
       try {
-        let next = [...messagesRef.current];
+        // Snapshot the queue to iterate — but always reconcile against
+        // messagesRef.current (live) so we never lose messages that arrive
+        // via socket while we're awaiting a network call.
+        const queue = messagesRef.current
+          .filter((m) => m.status === STATUS_QUEUED || m.status === STATUS_FAILED)
+          .map((m) => ({ ...m }));
 
-        for (const msg of next) {
-          if (
-            msg.status !== STATUS_QUEUED &&
-            msg.status !== STATUS_FAILED
-          ) {
-            continue;
-          }
-
-          const sending = silent
-            ? next
-            : next.map((m) =>
-                m.clientId === msg.clientId
-                  ? { ...m, status: 'sending' as MessageStatus }
-                  : m,
-              );
+        for (const msg of queue) {
           if (!silent) {
-            await persist(sending);
+            const marking = messagesRef.current.map((m) =>
+              m.clientId === msg.clientId
+                ? { ...m, status: 'sending' as MessageStatus }
+                : m,
+            );
+            await persist(marking);
           }
 
           const result = await sendOverNetwork(msg).catch(
             () => ({ ok: false } as SendOverNetworkNack),
           );
 
-          next = sending.map((m) =>
-            m.clientId === msg.clientId
-              ? {
-                  ...m,
-                status: result.ok
-                  ? STATUS_SENT
-                  : silent
-                    ? m.status
-                    : STATUS_FAILED,
-                serverId:
-                  result.ok
-                    ? result.serverId
-                    : m.serverId,
-                seq:
-                  result.ok && typeof result.seq === 'number'
-                    ? result.seq
-                    : m.seq,
-                createdAt:
-                  result.ok && result.createdAt
-                    ? result.createdAt
-                    : m.createdAt,
-                isLocalOnly: result.ok ? false : m.isLocalOnly,
-              }
-            : m,
-        );
+          // Re-read the live ref — incoming socket messages may have arrived
+          // during the await and must NOT be overwritten with a stale snapshot.
+          const reconciled = messagesRef.current.map((m) => {
+            if (m.clientId !== msg.clientId) return m;
+            // Already confirmed by an echo-back — don't downgrade.
+            if (m.status === STATUS_SENT || m.status === 'delivered' || m.status === 'read') return m;
+            return {
+              ...m,
+              status: result.ok ? STATUS_SENT : silent ? m.status : STATUS_FAILED,
+              serverId: result.ok ? (m.serverId ?? result.serverId) : m.serverId,
+              seq: result.ok && typeof result.seq === 'number' ? result.seq : m.seq,
+              createdAt: result.ok && result.createdAt ? result.createdAt : m.createdAt,
+              isLocalOnly: result.ok ? false : m.isLocalOnly,
+            };
+          });
+          await persist(reconciled);
         }
-
-        await persist(next);
       } finally {
         flushInFlightRef.current = false;
       }

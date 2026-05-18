@@ -231,7 +231,7 @@ export default function ChannelContentDetailPage() {
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => {}} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
-            <ActionButton icon="link" label="Embed" value="Soon" onPress={() => Alert.alert('Embed coming soon', 'Embeddable channel content will be enabled after the embed security policy is approved.')} />
+            <ActionButton icon="link" label="Embed" value="Soon" onPress={() => Alert.alert('Coming soon', 'Content embedding will be available in an upcoming update.')} />
             <ActionButton icon="report" label="Report" value="Report" onPress={handleReport} />
           </View>
         </View>

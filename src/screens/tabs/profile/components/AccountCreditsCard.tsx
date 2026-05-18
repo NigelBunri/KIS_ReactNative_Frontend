@@ -13,6 +13,8 @@ import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { styles } from '../profile.styles';
 import coin from '../../../../assets/KIS-Coin.png';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 const MICROS_PER_PROMO_CREDIT = 1000;
 
 const formatUsd = (cents?: number) => {
@@ -426,6 +428,41 @@ export default function AccountCreditsCard({
                       Linking.openURL(url).catch(() => {
                         Alert.alert('Receipt', 'Unable to open receipt.');
                       });
+                    }}
+                  />
+                )}
+                {entry.tx_ref && entry.status === 'success' && (
+                  <KISButton
+                    title="Refund"
+                    size="xs"
+                    variant="outline"
+                    onPress={() => {
+                      Alert.alert(
+                        'Request refund',
+                        'Are you sure you want to request a refund for this transaction?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Request refund',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                const res = await postRequest(
+                                  (ROUTES.billing as any).walletRefund,
+                                  { tx_ref: entry.tx_ref, reason: 'Customer requested refund' },
+                                );
+                                if (res.success || res.data) {
+                                  Alert.alert('Refund initiated', 'Your refund request has been submitted and will be processed within 5–10 business days.');
+                                } else {
+                                  Alert.alert('Refund failed', res.message || 'Unable to process refund. Please contact support.');
+                                }
+                              } catch {
+                                Alert.alert('Refund failed', 'Unable to process refund. Please contact support.');
+                              }
+                            },
+                          },
+                        ],
+                      );
                     }}
                   />
                 )}

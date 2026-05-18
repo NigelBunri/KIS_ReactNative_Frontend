@@ -44,7 +44,6 @@ export async function loadMessages(roomId: string): Promise<ChatMessage[]> {
     const rawV2 = await AsyncStorage.getItem(buildKeyV2(roomId));
     if (rawV2) {
       const parsed = JSON.parse(rawV2);
-      console.log("normalized data to see well 55555555: ", parsed)
       return normalizeParsedMessages(parsed);
     }
 
@@ -59,8 +58,6 @@ export async function loadMessages(roomId: string): Promise<ChatMessage[]> {
 
       // (optional) You can also remove the legacy key if you want:
       // await AsyncStorage.removeItem(buildLegacyKeyV1(roomId));
-
-      console.log("normalized data to see well: ", normalized)
 
       return normalized;
     }

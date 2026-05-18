@@ -47,7 +47,8 @@ export type MessageKind =
   | 'system'
   | 'contacts'
   | 'poll'
-  | 'event';
+  | 'event'
+  | 'location';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)

@@ -718,14 +718,14 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                         size="sm"
                         variant="secondary"
                         onPress={() =>
-                          Alert.alert('Schedule', 'Drop scheduling hook ready.')
+                          Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')
                         }
                       />
                       <KISButton
                         title="Pin"
                         size="sm"
                         variant="secondary"
-                        onPress={() => Alert.alert('Pinned', 'Pin hook ready.')}
+                        onPress={() => Alert.alert('Coming soon', 'Product pinning will be available in an upcoming update.')}
                       />
                     </View>
                   </View>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, DeviceEventEmitter, Image, Pressable, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
@@ -192,6 +193,21 @@ export default function MarketStudioSection({
   const [productImagePreview, setProductImagePreview] = useState('');
 
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabId>(initialTab);
+
+  const SAVED_PRODUCTS_KEY = 'kis.market.saved_products.v1';
+  const [savedProductIds, setSavedProductIds] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_PRODUCTS_KEY).then((raw) => {
+      if (raw) try { setSavedProductIds(JSON.parse(raw)); } catch { /* ignore */ }
+    });
+  }, []);
+  const toggleSavedProduct = useCallback((productId: string) => {
+    setSavedProductIds((prev) => {
+      const next = { ...prev, [productId]: !prev[productId] };
+      AsyncStorage.setItem(SAVED_PRODUCTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const tierFeatures = useMemo(() => profile?.tier?.features_json ?? {}, [profile?.tier?.features_json]);
   const isMarketPro = Boolean(tierFeatures.market_pro_insights);
@@ -549,7 +565,7 @@ export default function MarketStudioSection({
   );
 
   const handleGoLiveDrop = () => {
-    Alert.alert('Live drop', 'Live product drops studio coming next. (entry wired)');
+    Alert.alert('Coming soon', 'Live drop studio will be available in an upcoming update.');
   };
 
   if (!canUseMarket) {
@@ -754,7 +770,15 @@ export default function MarketStudioSection({
               <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                 <KISButton title="Subscribe" size="sm" onPress={() => handleProductSubscribe(product.id)} />
                 <KISButton title="Join shop" size="sm" variant="secondary" onPress={() => handleJoinShop(product.shop)} />
-                <KISButton title="Save" size="sm" variant="secondary" onPress={() => Alert.alert('Saved', 'Wishlist hook ready.')} />
+                <KISButton
+                  title={savedProductIds[product.id] ? 'Saved ✓' : 'Save'}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    toggleSavedProduct(product.id);
+                    Alert.alert(savedProductIds[product.id] ? 'Removed' : 'Saved', savedProductIds[product.id] ? 'Removed from saved products.' : 'Product saved to your library.');
+                  }}
+                />
               </View>
 
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
@@ -790,7 +814,7 @@ export default function MarketStudioSection({
         </Pressable>
 
         <Pressable
-          onPress={() => Alert.alert('Schedule', 'Schedule drop UI hook ready.')}
+          onPress={() => Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')}
           style={{
             borderWidth: 2,
             borderColor: palette.divider,
@@ -1050,8 +1074,16 @@ export default function MarketStudioSection({
 
               <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                 <KISButton title="Broadcast" size="sm" onPress={() => handleBroadcastProduct(product.id)} />
-                <KISButton title="Schedule" size="sm" variant="secondary" onPress={() => Alert.alert('Schedule', 'Drop scheduling hook ready.')} />
-                <KISButton title="Pin" size="sm" variant="secondary" onPress={() => Alert.alert('Pinned', 'Pin hook ready.')} />
+                <KISButton title="Schedule" size="sm" variant="secondary" onPress={() => Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')} />
+                <KISButton
+                  title={savedProductIds[product.id] ? 'Pinned ✓' : 'Pin'}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    toggleSavedProduct(product.id);
+                    Alert.alert(savedProductIds[product.id] ? 'Unpinned' : 'Pinned', savedProductIds[product.id] ? 'Removed from pinned products.' : 'Product pinned to your library.');
+                  }}
+                />
               </View>
             </View>
           ))
@@ -1122,14 +1154,14 @@ export default function MarketStudioSection({
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
         <Pressable
-          onPress={() => Alert.alert('Lesson studio', 'Lesson creation flow coming next.')}
+          onPress={() => Alert.alert('Coming soon', 'Lesson creation will be available in an upcoming update.')}
           style={{ borderWidth: 2, borderColor: palette.primary, backgroundColor: palette.primarySoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Create Lesson</Text>
         </Pressable>
 
         <Pressable
-          onPress={() => Alert.alert('Attach kit', 'Attach product kit hook ready.')}
+          onPress={() => Alert.alert('Coming soon', 'Product kit bundling will be available in an upcoming update.')}
           style={{ borderWidth: 2, borderColor: palette.divider, backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Text style={{ color: palette.text, fontWeight: '900' }}>Attach Kit</Text>

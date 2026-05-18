@@ -92,6 +92,12 @@ const broadcastRoutes = {
     crossReferences: `${API_BASE_URL}/api/v1/bible/cross-references/`,
     stats: `${API_BASE_URL}/api/v1/bible/stats/`,
     spiritualGrowthSummary: `${API_BASE_URL}/api/v1/bible/spiritual-growth-summary/`,
+    kcanBooks: `${API_BASE_URL}/api/v1/bible/kcan-books/`,
+    kcanBook: (id: string | number) => `${API_BASE_URL}/api/v1/bible/kcan-books/${id}/`,
+    kcanMessageTopics: `${API_BASE_URL}/api/v1/bible/kcan-message-topics/`,
+    kcanMinisters: `${API_BASE_URL}/api/v1/bible/kcan-ministers/`,
+    kcanMessages: `${API_BASE_URL}/api/v1/bible/kcan-messages/`,
+    kcanMessageView: (id: string | number) => `${API_BASE_URL}/api/v1/bible/kcan-messages/${id}/view/`,
   },
   education: {
     discovery: `${API_BASE_URL}/api/v1/education/discovery/`,

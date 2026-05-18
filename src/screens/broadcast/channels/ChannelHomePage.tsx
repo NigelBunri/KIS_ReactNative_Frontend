@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -88,10 +91,21 @@ function ChannelAvatar({ channel, size }: { channel?: BroadcastChannelSummary | 
   );
 }
 
+const formatDuration = (seconds?: number) => {
+  if (!seconds || seconds <= 0) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
 function ContentTile({ content, mode = 'grid', onPress }: { content: BroadcastChannelContent; mode?: 'grid' | 'wide'; onPress: () => void }) {
   const { palette } = useKISTheme();
   const imageUrl = assetUrlFor(content);
   const counts = content.engagement_counts || {};
+  const duration = formatDuration(content.duration_seconds);
+  const isLive = content.content_type === 'live_stream' || content.status === 'live';
   return (
     <Pressable onPress={onPress} style={[mode === 'wide' ? styles.wideTile : styles.contentTile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
       <View style={mode === 'wide' ? styles.wideMedia : styles.tileMedia}>
@@ -101,6 +115,16 @@ function ContentTile({ content, mode = 'grid', onPress }: { content: BroadcastCh
           <KISIcon name={content.content_type === 'audio' ? 'audio' : content.content_type === 'document' ? 'file' : 'play'} size={13} color="#fff" />
           <Text style={styles.mediaBadgeText}>{contentLabel(content.content_type)}</Text>
         </View>
+        {isLive && (
+          <View style={[styles.liveBadge, { backgroundColor: '#e74c3c' }]}>
+            <Text style={styles.liveBadgeText}>LIVE</Text>
+          </View>
+        )}
+        {duration && !isLive && (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>{duration}</Text>
+          </View>
+        )}
       </View>
       <View style={mode === 'wide' ? styles.wideBody : styles.tileBody}>
         <Text numberOfLines={2} style={[styles.tileTitle, { color: palette.text }]}>{content.title || content.text_plain_preview || 'Untitled content'}</Text>
@@ -126,6 +150,8 @@ export default function ChannelHomePage() {
   const [playlists, setPlaylists] = useState<BroadcastChannelPlaylist[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [loading, setLoading] = useState(true);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
 
   const load = useCallback(async () => {
@@ -156,13 +182,28 @@ export default function ChannelHomePage() {
     navigation.navigate('ChannelContentDetail', { contentId: content.id, item: content, channel });
   }, [channel, navigation]);
 
+  const handleShare = useCallback(async () => {
+    const url = `https://kis.app/channels/${channel?.handle || channel?.id}`;
+    try {
+      await Share.share({ message: `${channel?.display_name || 'KIS Channel'} - ${url}`, url, title: channel?.display_name });
+    } catch { /* ignore */ }
+  }, [channel]);
+
   const bannerUrl = channel?.banner_url ? resolveBackendAssetUrl(channel.banner_url) : '';
   const featured = contents[0];
-  const latest = contents.slice(0, 12);
-  const shorts = contents.filter(item => item.content_type === 'short_video');
-  const videos = contents.filter(item => ['video', 'short_video'].includes(item.content_type));
-  const posts = contents.filter(item => ['text', 'rich_text', 'post', 'image', 'gallery', 'document', 'audio'].includes(item.content_type));
-  const live = contents.filter(item => item.content_type === 'live_stream' || item.status === 'scheduled');
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return contents;
+    const q = searchQuery.toLowerCase();
+    return contents.filter(c =>
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.text_plain_preview || '').toLowerCase().includes(q),
+    );
+  }, [contents, searchQuery]);
+  const latest = filtered.slice(0, 12);
+  const shorts = filtered.filter(item => item.content_type === 'short_video');
+  const videos = filtered.filter(item => ['video', 'short_video'].includes(item.content_type));
+  const posts = filtered.filter(item => ['text', 'rich_text', 'post', 'image', 'gallery', 'document', 'audio'].includes(item.content_type));
+  const live = filtered.filter(item => item.content_type === 'live_stream' || item.status === 'scheduled' || item.status === 'live');
 
   const tabContents = activeTab === 'videos' ? videos : activeTab === 'shorts' ? shorts : activeTab === 'posts' ? posts : activeTab === 'live' ? live : latest;
 
@@ -201,6 +242,32 @@ export default function ChannelHomePage() {
             <SubscribeBellButton channelId={channel?.id} initialSubscribed={Boolean(channel?.is_subscribed)} />
           </View>
           <Text numberOfLines={3} style={[styles.channelDescription, { color: palette.subtext }]}>{channel?.description || 'Original broadcasts, live sessions, posts, files, and updates from this KIS channel.'}</Text>
+          <View style={styles.channelActions}>
+            <Pressable onPress={handleShare} style={[styles.actionChip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <KISIcon name="share" size={14} color={palette.text} />
+              <Text style={[styles.actionChipText, { color: palette.text }]}>Share</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setSearchVisible(v => !v);
+                if (searchVisible) setSearchQuery('');
+              }}
+              style={[styles.actionChip, { backgroundColor: searchVisible ? palette.primarySoft : palette.surface, borderColor: searchVisible ? palette.primary : palette.border }]}
+            >
+              <KISIcon name="search" size={14} color={searchVisible ? palette.primaryStrong : palette.text} />
+              <Text style={[styles.actionChipText, { color: searchVisible ? palette.primaryStrong : palette.text }]}>Search</Text>
+            </Pressable>
+          </View>
+          {searchVisible && (
+            <TextInput
+              autoFocus
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search this channel…"
+              placeholderTextColor={palette.subtext}
+              style={[styles.searchInput, { backgroundColor: palette.bar, color: palette.text, borderColor: palette.border }]}
+            />
+          )}
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
@@ -312,6 +379,14 @@ const styles = StyleSheet.create({
   playlistCard: { borderWidth: 1, borderRadius: 8, padding: 13, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
   playlistTitle: { fontSize: 14, fontWeight: '900' },
   emptyText: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  liveBadge: { position: 'absolute', left: 8, top: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  durationBadge: { position: 'absolute', right: 8, bottom: 8, backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5 },
+  durationText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  channelActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  actionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  actionChipText: { fontSize: 13, fontWeight: '800' },
+  searchInput: { marginTop: 10, borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14 },
 });
 
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => StyleSheet.create({

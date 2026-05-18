@@ -23,6 +23,7 @@ type NewCommunityFormProps = {
     text: string;
     subtext: string;
     primary: string;
+    onPrimary: string;
     inputBorder: string;
     error?: string;
   };
@@ -317,13 +318,13 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
         })}
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={palette.onPrimary} />
         ) : (
           <>
-            <KISIcon name="megaphone" size={16} color="#fff" />
+            <KISIcon name="megaphone" size={16} color={palette.onPrimary} />
             <Text
               style={{
-                color: '#fff',
+                color: palette.onPrimary,
                 fontSize: 14,
                 fontWeight: '600',
                 marginLeft: 6,

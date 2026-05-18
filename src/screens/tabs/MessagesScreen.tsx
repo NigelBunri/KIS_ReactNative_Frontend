@@ -982,6 +982,23 @@ const handleClearSelection = useCallback(() => {
   setMenuVisible(false);
 }, []);
 
+const handleOpenChat = useCallback((chat: Chat) => {
+  const convId = String((chat as any).conversationId ?? chat.id ?? '');
+  if (convId) {
+    setConversationMeta(prev => ({
+      ...prev,
+      [convId]: { ...prev[convId], unreadCount: 0 },
+    }));
+    setConversations(prev =>
+      prev.map(c => {
+        const cId = String((c as any).conversationId ?? c.id ?? '');
+        return cId === convId ? { ...c, unreadCount: 0 } : c;
+      })
+    );
+  }
+  onOpenChat(chat);
+}, [onOpenChat]);
+
 const updateSelectedConversations = useCallback(
   (updater: (chat: Chat) => Chat | null) => {
     const selectedIds = new Set(selectedConversationIds);
@@ -1478,9 +1495,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             initialTargetMessageId: result.messageId,
           } as Chat)
         : result.chat;
-      onOpenChat(chat);
+      handleOpenChat(chat);
     },
-    [onOpenChat],
+    [handleOpenChat],
   );
 
   useEffect(() => {
@@ -2035,7 +2052,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 }}
                 onScroll={handleChatsScroll}
                 onEndReached={handleChatsEndReached}
-                onOpenChat={onOpenChat}
+                onOpenChat={handleOpenChat}
                 selectedChat={selectedChat}
                 setSelectedChat={setSelectedChat}
                 conversations={conversations}

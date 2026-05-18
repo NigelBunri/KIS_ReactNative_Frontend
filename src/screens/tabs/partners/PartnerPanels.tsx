@@ -45,7 +45,7 @@ type Props = {
     kind: any;
     onClose: () => void;
     onSwitchKind: (kind: any) => void;
-    onCreated: () => void;
+    onCreated: (kind: any, data: any) => void;
   };
   discoveryPanel: {
     isOpen: boolean;

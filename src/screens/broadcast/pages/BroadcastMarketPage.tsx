@@ -3,6 +3,7 @@ import {
   DeviceEventEmitter,
   View,
   Text,
+  TextInput,
   ScrollView,
   Pressable,
   Image,
@@ -226,6 +227,10 @@ const BroadcastProductCard = ({
   const primaryImage = gallery[0] ?? '';
   const [activeImage, setActiveImage] = useState(primaryImage);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [ratingModal, setRatingModal] = useState(false);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
   useEffect(() => {
     setActiveImage(primaryImage);
   }, [primaryImage]);
@@ -278,8 +283,28 @@ const BroadcastProductCard = ({
     );
   }, [source, viewerIsMember]);
   const handleRateProduct = useCallback(() => {
-    Alert.alert('Rate product', 'Rating capability will open soon.');
+    setRatingScore(5);
+    setRatingComment('');
+    setRatingModal(true);
   }, []);
+
+  const submitRating = useCallback(async () => {
+    if (!product?.id) return;
+    setSubmittingRating(true);
+    try {
+      const res = await postRequest(ROUTES.commerce.productRatings, { product: product.id, score: ratingScore, comment: ratingComment.trim() || undefined }, {});
+      if (res?.success || res?.data?.id) {
+        setRatingModal(false);
+        Alert.alert('Thank you!', 'Your rating has been submitted.');
+      } else {
+        Alert.alert('Error', res?.message || 'Could not submit rating.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not submit rating.');
+    } finally {
+      setSubmittingRating(false);
+    }
+  }, [product?.id, ratingScore, ratingComment]);
 
   const stockQty = Number.isFinite(
     Number(product?.stock_qty ?? product?.stock ?? 0),
@@ -632,6 +657,29 @@ const BroadcastProductCard = ({
             />
           ) : null}
         </Pressable>
+      </Modal>
+      <Modal visible={ratingModal} transparent animationType="slide" onRequestClose={() => setRatingModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ backgroundColor: palette.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 }}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>Rate this product</Text>
+            <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <Pressable key={n} onPress={() => setRatingScore(n)}>
+                  <Text style={{ fontSize: 32, color: n <= ratingScore ? '#f59e0b' : palette.divider }}>★</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput value={ratingComment} onChangeText={setRatingComment} placeholder="Leave a comment (optional)" placeholderTextColor={palette.subtext} multiline numberOfLines={3} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: palette.text, fontSize: 14 }} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => setRatingModal(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: palette.divider }}>
+                <Text style={{ color: palette.text, fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={submitRating} disabled={submittingRating} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primaryStrong }}>
+                <Text style={{ color: '#fff', fontWeight: '900' }}>{submittingRating ? 'Submitting…' : 'Submit'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

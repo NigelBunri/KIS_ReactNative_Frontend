@@ -275,12 +275,10 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
   const onTimestamp = '#FFFFFF';
 
-  const readStatus =
-    tone === 'dark'
-      ? lightTanGold
-      : lightCoffeePrimary;
+  // A distinct teal-blue so "read" ticks are clearly different from grey "delivered" ticks
+  const readStatus = tone === 'dark' ? '#34D1BF' : '#1A9E8F';
 
-  const onPrimary = tone === 'dark' ? '#FFFFFF' : '#3D2710';
+  const onPrimary = tone === 'dark' ? base.bg : '#3D2710';
   const onPrimaryMuted =
     tone === 'dark'
       ? c.brand.goldSoft

@@ -75,6 +75,10 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const [createVisible, setCreateVisible] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createDesc, setCreateDesc] = useState('');
+  const [discoverVisible, setDiscoverVisible] = useState(false);
+  const [discoverQuery, setDiscoverQuery] = useState('');
+  const [discoverResults, setDiscoverResults] = useState<Community[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
   const [groupCreateVisible, setGroupCreateVisible] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupContacts, setGroupContacts] = useState<KISContact[]>([]);
@@ -209,6 +213,37 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
     }
   }, [selected, composerText]);
 
+  const joinCommunity = useCallback(async (community: Community) => {
+    const res = await postRequest(ROUTES.community.join(community.id), {}, {
+      errorMessage: 'Failed to join community',
+    });
+    if (res?.success) loadCommunityDetail(community);
+  }, [loadCommunityDetail]);
+
+  const searchPublicCommunities = useCallback(async (q: string) => {
+    setDiscoverLoading(true);
+    try {
+      const url = q.trim()
+        ? `${ROUTES.community.list}?search=${encodeURIComponent(q.trim())}`
+        : ROUTES.community.list;
+      const res = await getRequest(url, { errorMessage: '' });
+      const list = Array.isArray(res?.data?.results)
+        ? res.data.results
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      setDiscoverResults(list as Community[]);
+    } finally {
+      setDiscoverLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!discoverVisible) return;
+    const timer = setTimeout(() => void searchPublicCommunities(discoverQuery), 300);
+    return () => clearTimeout(timer);
+  }, [discoverQuery, discoverVisible, searchPublicCommunities]);
+
   const loadGroupContacts = useCallback(async () => {
     setGroupContactsLoading(true);
     setGroupCreateError('');
@@ -314,9 +349,14 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       return (
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>Communities</Text>
-          <Pressable onPress={() => setCreateVisible(true)} style={styles.iconBtn}>
-            <KISIcon name="add" size={18} color={palette.text} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={() => { setDiscoverVisible(true); void searchPublicCommunities(''); }} style={styles.iconBtn}>
+              <KISIcon name="search" size={18} color={palette.text} />
+            </Pressable>
+            <Pressable onPress={() => setCreateVisible(true)} style={styles.iconBtn}>
+              <KISIcon name="add" size={18} color={palette.text} />
+            </Pressable>
+          </View>
         </View>
       );
     }
@@ -328,7 +368,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         <Text style={[styles.title, { color: palette.text }]}>{selected.name}</Text>
       </View>
     );
-  }, [selected, palette.text]);
+  }, [selected, palette.text, searchPublicCommunities]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]}> 
@@ -457,7 +497,15 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                   {item.description || 'No description'}
                 </Text>
               </View>
-              <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <Pressable
+                  onPress={() => joinCommunity(item)}
+                  style={[styles.joinBtn, { backgroundColor: palette.primary }]}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Join</Text>
+                </Pressable>
+                <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              </View>
             </Pressable>
           )}
           ListEmptyComponent={<Text style={{ color: palette.subtext }}>No communities yet.</Text>}
@@ -598,6 +646,65 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
           />
         ) : null}
       </Animated.View>
+
+      {/* ── Discover Communities Modal ── */}
+      <Modal visible={discoverVisible} animationType="slide" onRequestClose={() => setDiscoverVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: palette.bg }}>
+          <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder }]}>
+            <Pressable onPress={() => setDiscoverVisible(false)} style={styles.iconBtn}>
+              <KISIcon name="close" size={20} color={palette.text} />
+            </Pressable>
+            <Text style={[styles.title, { color: palette.text }]}>Discover Communities</Text>
+          </View>
+          <View style={{ padding: 12 }}>
+            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', borderColor: palette.inputBorder, paddingVertical: 8, paddingHorizontal: 12 }]}>
+              <KISIcon name="search" size={16} color={palette.subtext} />
+              <TextInput
+                style={{ flex: 1, marginLeft: 8, color: palette.text }}
+                placeholder="Search communities…"
+                placeholderTextColor={palette.subtext}
+                value={discoverQuery}
+                onChangeText={setDiscoverQuery}
+                autoFocus
+              />
+            </View>
+          </View>
+          {discoverLoading ? (
+            <ActivityIndicator color={palette.primary} style={{ marginTop: 24 }} />
+          ) : (
+            <FlatList
+              data={discoverResults}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 12, gap: 10 }}
+              ListEmptyComponent={
+                <Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 24 }}>
+                  {discoverQuery ? 'No communities found.' : 'Start typing to search communities.'}
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <View style={[chatListStyles.row, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
+                  <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[chatListStyles.name, { color: palette.text }]}>{item.name}</Text>
+                    <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={2}>
+                      {item.description || 'No description'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      void joinCommunity(item);
+                      setDiscoverVisible(false);
+                    }}
+                    style={[styles.joinBtn, { backgroundColor: palette.primary }]}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Join</Text>
+                  </Pressable>
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -620,4 +727,5 @@ const styles = StyleSheet.create({
   modalCard: { width: '88%', borderRadius: 14, borderWidth: 2, padding: 16 },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   memberRow: { paddingVertical: 8, paddingHorizontal: 10, borderWidth: 2, borderRadius: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  joinBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
 });

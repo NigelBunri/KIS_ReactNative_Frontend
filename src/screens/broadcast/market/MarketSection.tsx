@@ -30,7 +30,7 @@ export default function MarketSection({
   const [tab, setTab] = useState<MarketTabId>('home');
 
   const body = useMemo(() => {
-    if (tab === 'home') return <MarketHomePage ownerId={ownerId} searchTerm={searchTerm} />;
+    if (tab === 'home') return <MarketHomePage ownerId={ownerId} searchTerm={searchTerm} onSeeAllProducts={() => setTab('products')} onSeeAllShops={() => setTab('shops')} />;
     if (tab === 'drops') return <MarketDropsPage ownerId={ownerId} searchTerm={searchTerm} />;
     if (tab === 'shops') return <MarketShopsPage ownerId={ownerId} canUseMarket={canUseMarket} onUpgrade={onUpgrade} />;
     if (tab === 'products') return <MarketProductsPage ownerId={ownerId} />;

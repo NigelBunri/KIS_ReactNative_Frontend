@@ -10,8 +10,12 @@ type Props = {
   description?: string;
   coverUrl?: string | null;
   verified?: boolean;
+  trustLabel?: string;
+  trustBadges?: string[];
+  memberCount?: number;
   onPress?: () => void;
   ctaLabel?: string;
+  isMember?: boolean;
   onCTA?: () => void;
 };
 
@@ -20,8 +24,12 @@ export default function MarketShopCard({
   description,
   coverUrl,
   verified,
+  trustLabel,
+  trustBadges,
+  memberCount,
   onPress,
   ctaLabel = 'Join shop',
+  isMember = false,
   onCTA,
 }: Props) {
   const { palette } = useKISTheme();
@@ -31,62 +39,124 @@ export default function MarketShopCard({
     return fallbackCover;
   }, [coverUrl]);
 
+  const badgesToShow = trustBadges?.slice(0, 3) ?? [];
+
   return (
     <Pressable
       onPress={onPress}
       style={{
-        borderWidth: 2,
+        borderWidth: 1.5,
         borderColor: palette.divider,
         backgroundColor: palette.surface,
-        borderRadius: 20,
+        borderRadius: 18,
         overflow: 'hidden',
       }}
     >
-      <View style={{ height: 100 }}>
+      <View style={{ height: 90 }}>
         <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-      </View>
-
-      <View style={{ padding: 12, gap: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: palette.text, fontWeight: '900', flex: 1 }} numberOfLines={1}>
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.25)',
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 12,
+            right: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{ color: '#fff', fontWeight: '900', fontSize: 15, flex: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 }}
+            numberOfLines={1}
+          >
             {name}
           </Text>
-          {verified ? (
+          {(verified || trustLabel) && (
             <View
               style={{
-                width: 18,
-                height: 18,
-                borderRadius: 9,
-                backgroundColor: palette.primaryStrong,
+                flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: 4,
+                backgroundColor: verified ? '#27ae60' : '#2980b9',
+                borderRadius: 8,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
               }}
             >
-              <KISIcon name="check" size={12} color="#fff" />
+              <KISIcon name="check" size={10} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
+                {trustLabel ?? 'Verified'}
+              </Text>
             </View>
-          ) : null}
+          )}
         </View>
+      </View>
 
-        {description ? (
-          <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }} numberOfLines={2}>
+      <View style={{ padding: 10, gap: 6 }}>
+        {description && (
+          <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 12 }} numberOfLines={2}>
             {description}
           </Text>
-        ) : null}
+        )}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {memberCount !== undefined && memberCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <KISIcon name="people" size={12} color={palette.subtext} />
+              <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 11 }}>
+                {memberCount >= 1000 ? `${(memberCount / 1000).toFixed(1)}k` : memberCount} members
+              </Text>
+            </View>
+          )}
+          {badgesToShow.map((badge) => (
+            <View
+              key={badge}
+              style={{
+                backgroundColor: palette.primarySoft,
+                borderRadius: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 10 }}>
+                {badge}
+              </Text>
+            </View>
+          ))}
+        </View>
 
         <Pressable
           onPress={onCTA}
           style={{
             marginTop: 2,
-            borderWidth: 2,
-            borderColor: palette.primary,
-            backgroundColor: palette.primarySoft,
-            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: isMember ? palette.divider : palette.primary,
+            backgroundColor: isMember ? palette.card : palette.primarySoft,
+            borderRadius: 10,
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingVertical: 8,
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>{ctaLabel}</Text>
+          <Text
+            style={{
+              color: isMember ? palette.subtext : palette.primaryStrong,
+              fontWeight: '900',
+              fontSize: 13,
+            }}
+          >
+            {isMember ? 'View shop' : ctaLabel}
+          </Text>
         </Pressable>
       </View>
     </Pressable>

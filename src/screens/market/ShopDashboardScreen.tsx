@@ -2350,6 +2350,40 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     [handleServiceDelete],
   );
 
+  const handleProductDelete = useCallback(
+    async (productId: string) => {
+      if (!productId) return;
+      try {
+        const response = await deleteRequest(`${ROUTES.commerce.products}${productId}/`, {
+          errorMessage: 'Unable to delete product.',
+        });
+        if (!response?.success) {
+          throw new Error(response?.message || 'Unable to delete product.');
+        }
+        Alert.alert('Products', 'Product deleted.');
+        await loadShopDetails();
+      } catch (error: any) {
+        Alert.alert('Products', error?.message || 'Unable to delete product.');
+      }
+    },
+    [loadShopDetails],
+  );
+
+  const confirmProductDelete = useCallback(
+    (productId: string, productName?: string) => {
+      if (!productId) return;
+      Alert.alert(
+        'Delete product',
+        `Are you sure you want to delete ${productName ? `"${productName}"` : 'this product'}? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => handleProductDelete(productId) },
+        ],
+      );
+    },
+    [handleProductDelete],
+  );
+
   const handleOpenLandingPage = () => {
     navigation.navigate('ProfileLandingEditor', {
       kind: 'market',
@@ -2457,7 +2491,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
               palette={palette}
               onEdit={() => openProductEditor('edit', product)}
               onDelete={() =>
-                Alert.alert('Products', 'Delete flow coming soon.')
+                confirmProductDelete(product.id, product.name)
               }
               onRate={score => {
                 if (!product.id) {

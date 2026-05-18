@@ -18,6 +18,8 @@ import type { KISPalette } from '@/theme/constants';
 import { styles } from '../profile/profile.styles';
 import { FEED_MEDIA_TYPES } from './types';
 import type { FeedMediaType, FeedMediaOptions } from './types';
+import RichTextRenderer from '@/components/feeds/RichTextRenderer';
+import { getFeedRichTextValue, getFeedPlainText } from '@/components/feeds/richTextValue';
 import { KISIcon } from '@/constants/kisIcons';
 import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import { getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
@@ -673,14 +675,21 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                     </View>
                   </View>
 
-                  <Text
-                    style={[
-                      modalStyles.feedSummary,
-                      { color: palette.subtext },
-                    ]}
-                  >
-                    {feedSummary}
-                  </Text>
+                  {getFeedRichTextValue(feed) ? (
+                    <RichTextRenderer
+                      value={getFeedRichTextValue(feed)}
+                      style={{ color: palette.subtext, fontSize: 13, lineHeight: 19 }}
+                    />
+                  ) : (
+                    <Text
+                      style={[
+                        modalStyles.feedSummary,
+                        { color: palette.subtext },
+                      ]}
+                    >
+                      {feedSummary}
+                    </Text>
+                  )}
 
                   {attachments.length > 0 ? (
                     <AttachmentCarousel

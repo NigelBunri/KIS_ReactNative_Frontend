@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform } from 'react-native';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
 
@@ -257,7 +257,60 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
   const width = Dimensions.get('window').width;
+
+  // Translation
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const handleTranslate = async () => {
+    if (!text || translating) return;
+    setTranslating(true);
+    try {
+      const { postRequest: post } = await import('@/network/post');
+      const ROUTES_mod = await import('@/network');
+      const res = await post(ROUTES_mod.default.translate, { text, target_lang: 'en' }, {});
+      if (res?.data?.translated && res.data.translated !== text) {
+        setTranslatedText(res.data.translated);
+      }
+    } catch { /* silent */ } finally {
+      setTranslating(false);
+    }
+  };
+
+  // Link preview
+  const serverLinkPreview = (message as any).linkPreview as
+    | { title?: string; description?: string; image?: string; site_name?: string; url?: string }
+    | undefined;
+  const [linkPreview, setLinkPreview] = useState<
+    { title?: string; description?: string; image?: string; site_name?: string; url?: string } | null
+  >(serverLinkPreview ?? null);
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (serverLinkPreview) { setLinkPreview(serverLinkPreview); return; }
+    if (!text || isMe) return;
+    const urlMatch = text.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/);
+    if (!urlMatch) return;
+    const url = urlMatch[0];
+    setLinkPreviewUrl(url);
+    let cancelled = false;
+    (async () => {
+      try {
+        const ROUTES_mod = await import('@/network');
+        const { getRequest } = await import('@/network/get');
+        const res = await getRequest(
+          `${ROUTES_mod.default.linkPreview}?url=${encodeURIComponent(url)}`,
+          { errorMessage: '' },
+        );
+        if (!cancelled && (res?.data?.title || res?.data?.description)) {
+          setLinkPreview({ ...res.data, url });
+        }
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [text, isMe, serverLinkPreview]);
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
+  const [reactionViewerVisible, setReactionViewerVisible] = useState(false);
+  const [reactionViewerEmoji, setReactionViewerEmoji] = useState<string | null>(null);
 
   // ✅ local state for selected poll option
   const [selectedPollOptionKey, setSelectedPollOptionKey] = useState<
@@ -529,6 +582,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Pressable
               key={`${emoji}-${count}`}
               onPress={() => onReact?.(message as ChatMessage, emoji)}
+              onLongPress={() => {
+                setReactionViewerEmoji(emoji);
+                setReactionViewerVisible(true);
+              }}
               style={{
                 paddingHorizontal: 8,
                 paddingVertical: 4,
@@ -631,6 +688,143 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 onReact(message as ChatMessage, emoji);
               }}
             />
+          </View>
+        </Pressable>
+      </Modal>
+    );
+  };
+
+  const renderReactionViewerSheet = () => {
+    if (!reactionEntries.length) return null;
+
+    // Determine which emoji tab to show; default to first available
+    const activeEmoji =
+      reactionViewerEmoji &&
+      reactionEntries.some(([e]) => e === reactionViewerEmoji)
+        ? reactionViewerEmoji
+        : reactionEntries[0]?.[0] ?? null;
+
+    const activeUsers = activeEmoji
+      ? (reactions?.[activeEmoji] ?? [])
+      : [];
+
+    return (
+      <Modal
+        transparent
+        visible={reactionViewerVisible}
+        animationType="slide"
+        onRequestClose={() => setReactionViewerVisible(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            justifyContent: 'flex-end',
+          }}
+          onPress={() => setReactionViewerVisible(false)}
+        >
+          <View
+            style={{
+              maxHeight: '55%',
+              backgroundColor: palette.surface ?? '#fff',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              paddingBottom: 24,
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            {/* Tab row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingHorizontal: 16,
+                paddingTop: 12,
+                paddingBottom: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: palette.divider ?? '#00000011',
+              }}
+            >
+              {reactionEntries.map(([emoji, users]) => {
+                const isActive = emoji === activeEmoji;
+                return (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => setReactionViewerEmoji(emoji)}
+                    style={{
+                      marginRight: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 12,
+                      backgroundColor: isActive
+                        ? palette.reactionActiveBg ?? '#00000022'
+                        : 'transparent',
+                      borderWidth: isActive ? 1 : 0,
+                      borderColor: isActive
+                        ? palette.reactionActiveBorder ?? palette.primary
+                        : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>
+                      {emoji}{' '}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: palette.subtext ?? '#888',
+                        }}
+                      >
+                        {Array.isArray(users) ? users.length : 0}
+                      </Text>
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* User list */}
+            {activeUsers.map((userId) => {
+              const isCurrentUser =
+                currentUserId && String(userId) === String(currentUserId);
+              const displayName = isCurrentUser
+                ? 'You'
+                : `User ${String(userId).slice(0, 6)}`;
+              return (
+                <View
+                  key={String(userId)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: palette.divider ?? '#00000011',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor:
+                        palette.surfaceSoft ?? palette.surface ?? '#eee',
+                      marginRight: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <KISIcon name="person" size={18} color={palette.subtext ?? '#888'} />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: isCurrentUser ? '700' : '400',
+                      color: palette.text ?? '#111',
+                    }}
+                  >
+                    {displayName}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
@@ -1204,6 +1398,101 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /* ─────────────────────────────────────────
+   * Helper: location card
+   * ──────────────────────────────────────── */
+  const renderLocationCard = () => {
+    const locationData = (message as any).location as
+      | { lat: number; lng: number; label?: string }
+      | undefined;
+    if (!locationData) return null;
+
+    const { lat, lng, label } = locationData;
+
+    const titleColor = isMe ? outgoingTextColor : palette.text;
+    const metaTextColor = isMe ? outgoingMetaColor : palette.subtext;
+
+    const mapsUrl = Platform.select({
+      ios: `maps://?q=${lat},${lng}`,
+      default: `https://maps.google.com/?q=${lat},${lng}`,
+    });
+
+    return (
+      <View
+        style={{
+          marginTop: text ? 8 : 0,
+          paddingVertical: 4,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 6,
+          }}
+        >
+          <KISIcon name="pin" size={14} color={titleColor} />
+          <Text
+            style={{
+              marginLeft: 4,
+              fontSize: 12,
+              fontWeight: '600',
+              color: titleColor,
+            }}
+          >
+            Location
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: titleColor,
+            marginBottom: 4,
+          }}
+        >
+          {label || 'Shared location'}
+        </Text>
+
+        <Text
+          style={{
+            fontSize: 12,
+            color: metaTextColor,
+            marginBottom: 4,
+          }}
+        >
+          {lat.toFixed(6)}, {lng.toFixed(6)}
+        </Text>
+
+        <Pressable
+          onPress={() => {
+            Linking.openURL(mapsUrl).catch(() => {});
+          }}
+          style={{
+            alignSelf: 'flex-start',
+            marginTop: 4,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 12,
+            borderWidth: 2,
+            borderColor: titleColor,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              color: titleColor,
+              fontWeight: '600',
+            }}
+          >
+            Open in Maps
+          </Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  /* ─────────────────────────────────────────
    * -1) Deleted message placeholder
    * ──────────────────────────────────────── */
   if (isDeleted) {
@@ -1271,6 +1560,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
 
         {renderReactionPicker()}
+        {renderReactionViewerSheet()}
       </View>
     );
   }
@@ -1351,6 +1641,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
 
         {renderReactionPicker()}
+        {renderReactionViewerSheet()}
       </View>
     );
   }
@@ -1430,6 +1721,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
 
         {renderReactionPicker()}
+        {renderReactionViewerSheet()}
       </View>
     );
   }
@@ -1542,6 +1834,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
 
         {renderReactionPicker()}
+        {renderReactionViewerSheet()}
       </View>
     );
   }
@@ -1579,10 +1872,71 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         )}
 
-        {/* Contacts / Poll / Event cards */}
+        {/* Translation */}
+        {!isMe && text && text.length > 15 && !translatedText && (
+          <Pressable
+            onPress={() => void handleTranslate()}
+            style={{ marginTop: 4, opacity: translating ? 0.5 : 1 }}
+            disabled={translating}
+          >
+            <Text style={{ color: palette.subtext ?? '#888', fontSize: 11 }}>
+              {translating ? '🌐 Translating…' : '🌐 Translate'}
+            </Text>
+          </Pressable>
+        )}
+        {translatedText && (
+          <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)' }}>
+            <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginBottom: 2 }}>Translation</Text>
+            <Text style={{ color: isMe ? '#fff' : (palette.text ?? '#000'), fontSize: 14 }}>{translatedText}</Text>
+            <Pressable onPress={() => setTranslatedText(null)}>
+              <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginTop: 2 }}>Hide</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Link preview card */}
+        {linkPreview && linkPreview.title && (
+          <Pressable
+            onPress={() => { const u = linkPreview.url ?? linkPreviewUrl; if (u) Linking.openURL(u).catch(() => {}); }}
+            style={{
+              marginTop: 6,
+              borderRadius: 10,
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: isMe ? 'rgba(255,255,255,0.2)' : (palette.divider ?? '#e0e0e0'),
+              backgroundColor: isMe ? 'rgba(0,0,0,0.08)' : (palette.surface ?? '#f5f5f5'),
+            }}
+          >
+            {linkPreview.image ? (
+              <Image
+                source={{ uri: linkPreview.image }}
+                style={{ width: '100%', height: 120 }}
+                resizeMode="cover"
+              />
+            ) : null}
+            <View style={{ padding: 8, gap: 2 }}>
+              {linkPreview.site_name ? (
+                <Text style={{ fontSize: 10, color: palette.primary ?? '#2196F3', fontWeight: '700', textTransform: 'uppercase' }}>
+                  {linkPreview.site_name}
+                </Text>
+              ) : null}
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isMe ? '#fff' : (palette.text ?? '#000') }} numberOfLines={2}>
+                {linkPreview.title}
+              </Text>
+              {linkPreview.description ? (
+                <Text style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.7)' : (palette.subtext ?? '#666') }} numberOfLines={2}>
+                  {linkPreview.description}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        )}
+
+        {/* Contacts / Poll / Event / Location cards */}
         {renderContactsCard()}
         {renderPollCard()}
         {renderEventCard()}
+        {renderLocationCard()}
 
         {/* Attachments (images, files, etc.) */}
         {renderAttachments()}
@@ -1622,6 +1976,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       </View>
 
       {renderReactionPicker()}
+      {renderReactionViewerSheet()}
     </View>
   );
 };

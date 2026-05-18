@@ -302,15 +302,30 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           )}
 
           <View style={{ marginLeft: 10, flex: 1 }}>
-            <Text
-              style={[
-                styles.headerTitle,
-                { color: palette.onHeader ?? palette.text },
-              ]}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text
+                style={[
+                  styles.headerTitle,
+                  { color: palette.onHeader ?? palette.text, flexShrink: 1 },
+                ]}
+                numberOfLines={1}
+              >
+                {title}
+              </Text>
+              {chat?.isPartner && (
+                <View style={{
+                  backgroundColor: palette.primary ?? '#2196F3',
+                  borderRadius: 10,
+                  paddingHorizontal: 5,
+                  paddingVertical: 1,
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>✓ PARTNER</Text>
+                </View>
+              )}
+              {chat?.isVerified && !chat?.isPartner && (
+                <KISIcon name="check" size={14} color={palette.primary ?? '#2196F3'} />
+              )}
+            </View>
             {contextLabel ? (
               <Pressable
                 onPress={onPressContext}

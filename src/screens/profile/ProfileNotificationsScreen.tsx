@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -12,6 +12,127 @@ import {
   type InAppNotification,
 } from '@/services/inAppNotificationService';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
+import { getRequest } from '@/network/get';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
+
+type NotificationRule = {
+  id: string;
+  type: string | null;
+  enabled: boolean;
+  channels_json?: string[];
+};
+
+const RULE_LABELS: Record<string, string> = {
+  message: 'Direct messages',
+  chat: 'Chat',
+  community: 'Community activity',
+  partner: 'Partner updates',
+  broadcast: 'Broadcasts',
+  channel: 'Channel posts',
+  social: 'Social (likes, comments)',
+  follow: 'New followers',
+  mention: 'Mentions',
+  system: 'System alerts',
+};
+
+const DEFAULT_TYPES = ['message', 'community', 'partner', 'broadcast', 'social', 'follow', 'mention'];
+
+function NotificationPreferencesPanel() {
+  const { palette } = useKISTheme();
+  const [rules, setRules] = useState<NotificationRule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const loadRules = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getRequest(ROUTES.notificationRules.list, { errorMessage: 'Could not load preferences' });
+      const list: NotificationRule[] = Array.isArray(res?.data?.results)
+        ? res.data.results
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      setRules(list);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadRules(); }, [loadRules]));
+
+  const toggle = useCallback(async (rule: NotificationRule) => {
+    setToggling(rule.id);
+    const newEnabled = !rule.enabled;
+    setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: newEnabled } : r));
+    try {
+      await patchRequest(ROUTES.notificationRules.detail(rule.id), { enabled: newEnabled }, {});
+    } catch {
+      setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: rule.enabled } : r));
+    } finally {
+      setToggling(null);
+    }
+  }, []);
+
+  const displayRules = useMemo(() => {
+    if (rules.length > 0) return rules;
+    return DEFAULT_TYPES.map((t) => ({ id: t, type: t, enabled: true }));
+  }, [rules]);
+
+  return (
+    <View style={{ gap: 0 }}>
+      <Text style={{ color: palette.text, fontSize: 17, fontWeight: '700', marginBottom: 10 }}>
+        Notification preferences
+      </Text>
+      {loading ? (
+        <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 8 }} />
+      ) : (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: palette.divider,
+            borderRadius: 16,
+            overflow: 'hidden',
+          }}
+        >
+          {displayRules.map((rule, idx) => {
+            const label = RULE_LABELS[rule.type ?? ''] ?? (rule.type ?? 'Unknown');
+            const isLast = idx === displayRules.length - 1;
+            return (
+              <View
+                key={rule.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 14,
+                  paddingVertical: 13,
+                  backgroundColor: palette.surface,
+                  borderBottomWidth: isLast ? 0 : 1,
+                  borderBottomColor: palette.divider,
+                }}
+              >
+                <Text style={{ color: palette.text, fontSize: 14 }}>{label}</Text>
+                <Switch
+                  value={rule.enabled}
+                  onValueChange={() => toggle(rule)}
+                  disabled={toggling === rule.id || rules.length === 0}
+                  trackColor={{ false: palette.divider, true: palette.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {rules.length === 0 && !loading && (
+        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+          Preferences are saved per type once your account has rules configured.
+        </Text>
+      )}
+    </View>
+  );
+}
 
 export default function ProfileNotificationsScreen() {
   const { palette } = useKISTheme();
@@ -69,6 +190,9 @@ export default function ProfileNotificationsScreen() {
         <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>Notifications</Text>
         <Text style={{ color: palette.subtext }}>{unreadCount} unread notification{unreadCount === 1 ? '' : 's'}.</Text>
       </View>
+
+      <NotificationPreferencesPanel />
+
       <NotificationRetentionPreviewCard
         palette={palette}
         kind="profile"

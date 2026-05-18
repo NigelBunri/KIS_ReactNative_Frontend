@@ -80,6 +80,8 @@ export type Chat = {
   isMuted?: boolean;
   isPinned?: boolean;
   isHidden?: boolean;
+  isPartner?: boolean;
+  isVerified?: boolean;
 };
 
 export type CustomFilterRule = {

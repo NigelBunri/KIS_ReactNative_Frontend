@@ -17,6 +17,10 @@ const authRoutes = {
     listDevices: `${API_BASE_URL}/api/v1/auth/devices/`,
     revokeDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/`,
     checkContact: `${API_BASE_URL}/api/v1/users/check-contacts/`,
+    twoFactorSetup: `${API_BASE_URL}/api/v1/auth/2fa/setup/`,
+    twoFactorEnable: `${API_BASE_URL}/api/v1/auth/2fa/enable/`,
+    twoFactorDisable: `${API_BASE_URL}/api/v1/auth/2fa/disable/`,
+    twoFactorStatus: `${API_BASE_URL}/api/v1/auth/2fa/status/`,
   },
   user: {
     profile: `${API_BASE_URL}/user-info/`,

@@ -75,6 +75,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     channelsForPartner,
     communitiesForPartner,
     reloadSelectedPartner,
+    handlePartnerItemCreated,
     reloadPartners,
   } = usePartnersData();
   const {
@@ -452,7 +453,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             kind: createKind,
             onClose: closeCreatePanel,
             onSwitchKind: openCreatePanel,
-            onCreated: reloadSelectedPartner,
+            onCreated: handlePartnerItemCreated,
           },
           discoveryPanel: {
             isOpen: isDiscoverPanelOpen,

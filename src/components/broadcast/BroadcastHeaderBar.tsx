@@ -7,12 +7,14 @@ type Props = {
   title: string;
   tierLabel?: string;
   onCreate?: () => void;
+  onSearch?: () => void;
 };
 
 export default function BroadcastHeaderBar({
   title,
   tierLabel = 'Business Pro',
   onCreate,
+  onSearch,
 }: Props) {
   const { palette, tokens, tone } = useKISTheme();
   const headerTextColor = palette.ivory ?? '#FFFFFF';
@@ -64,23 +66,43 @@ export default function BroadcastHeaderBar({
         </View>
       </View>
 
-      <Pressable
-        onPress={onCreate}
-        style={[
-          styles.createBtn,
-          {
-            backgroundColor: createBg,
-            borderColor: isDark ? palette.goldMuted : 'transparent',
-            borderWidth: isDark ? 1 : 0,
-          },
-        ]}
-        accessibilityRole="button"
-      >
-        <KISIcon name="plus" size={16} color={createText} />
-        <Text style={{ color: createText, fontWeight: '900', lineHeight: 16 }}>
-          Create
-        </Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {onSearch && (
+          <Pressable
+            onPress={onSearch}
+            style={[
+              styles.createBtn,
+              {
+                backgroundColor: controlBg,
+                borderColor: controlBorder,
+                borderWidth: 1,
+                paddingHorizontal: 12,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Search"
+          >
+            <KISIcon name="search" size={16} color={controlText} />
+          </Pressable>
+        )}
+        <Pressable
+          onPress={onCreate}
+          style={[
+            styles.createBtn,
+            {
+              backgroundColor: createBg,
+              borderColor: isDark ? palette.goldMuted : 'transparent',
+              borderWidth: isDark ? 1 : 0,
+            },
+          ]}
+          accessibilityRole="button"
+        >
+          <KISIcon name="plus" size={16} color={createText} />
+          <Text style={{ color: createText, fontWeight: '900', lineHeight: 16 }}>
+            Create
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

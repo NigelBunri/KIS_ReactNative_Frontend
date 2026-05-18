@@ -69,7 +69,8 @@ export type ImageTool =
   | 'zoom'
   | 'filter'
   | 'text'
-  | 'crop';
+  | 'crop'
+  | 'bg-remove';
 
 export type CropDragMode =
   | 'move'

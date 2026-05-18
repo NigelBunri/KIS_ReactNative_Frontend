@@ -22,238 +22,183 @@ type Props = {
   onClose: () => void;
 };
 
-type CardItem = {
-  title: string;
-  body: string;
-};
-
-type PathwayItem = {
+type AchievementStep = {
   step: string;
+  key: string;
   title: string;
+  subtitle: string;
   body: string;
+  scripture: string;
+  icon: string;
 };
 
-type StatItem = {
-  value: string;
-  label: string;
-  body: string;
+type SimpleCard = {
+  title: string;
+  scripture: string;
+  icon: string;
 };
 
 const KCAN_PURPOSE =
   'To help people discover their God-given purpose, create the best environment for that purpose to be expressed, and raise them through transformation: from men and women of purpose, to Kingdom citizens, and then to Kingdom ambassadors sent into the world for Kingdom expansion.';
 
+const PURPOSE_SCRIPTURE =
+  '“For we are His workmanship, created in Christ Jesus for good works...” — Ephesians 2:10';
+
 const KCAN_VISION =
-  'To build a lawful, covenant-based, city-like Kingdom ecosystem where God-given purpose can be discovered, formed, expressed, multiplied, and sent into the world through Kingdom Ambassadors, a people who have come to the stature of the fullness of Christ, institutions, products, and services for Kingdom expansion.';
+  'To build a lawful, covenant-based, city-like Kingdom ecosystem where God-given purpose can be discovered, formed, expressed, multiplied, and sent into the world through Kingdom Ambassadors, a people who have come to the stature of the fullness of Christ, through institutions, products, and services for Kingdom expansion.';
 
-const pillars: CardItem[] = [
-  {
-    title: 'A covenant community',
-    body:
-      'KCAN is a Christian covenant network where people do not only attend services or use an app. They are formed into a shared life of worship, discipleship, family dignity, service, accountability, work, stewardship, and Kingdom purpose.',
-  },
-  {
-    title: 'A city-like environment',
-    body:
-      'The long-term picture is a master-planned environment that functions like a city: homes, schools, clinics, farms, workshops, logistics, digital systems, businesses, worship spaces, training centers, and productive communities working together.',
-  },
-  {
-    title: 'A productive mission economy',
-    body:
-      'KCAN is not imagined as a place where people only live together. It is a place where people are trained, employed, mentored, and released to produce excellent products and services that can serve Cameroon, Africa, and the wider world.',
-  },
-  {
-    title: 'A lawful institutional structure',
-    body:
-      'KCAN is not a parallel state and it is not a disguised private government. It is designed as a lawful faith-based residential, productive, educational, health, agricultural, and enterprise estate operating under Cameroonian and regional law.',
-  },
-  {
-    title: 'A digital backbone',
-    body:
-      'KIS is the first visible public layer of the KCAN vision: a trusted digital social, administrative, learning, commerce, member-care, and communication platform for churches, schools, ministries, families, creators, businesses, and diaspora communities.',
-  },
-  {
-    title: 'A sending network',
-    body:
-      'The goal is not isolation. KCAN forms people inside a covenant culture, equips them with practical capacity, and sends them as Kingdom ambassadors into media, technology, education, business, health, governance, agriculture, and the nations.',
-  },
-];
+const VISION_SCRIPTURE =
+  '“...unto the measure of the stature of the fullness of Christ.” — Ephesians 4:13';
 
-const cityLayers: CardItem[] = [
-  {
-    title: 'Homes and family stability',
-    body:
-      'The city-like model gives families a stable environment where daily life is supported by community standards, safe relationships, shared values, and access to practical services that reduce pressure and disorder.',
-  },
-  {
-    title: 'Schools and formation',
-    body:
-      'Education is not treated as a side project. KCAN forms children, youth, workers, and leaders through schools, training institutes, online learning, mentorship, and a culture of excellence rooted in Christ.',
-  },
-  {
-    title: 'Workshops, farms, and enterprise',
-    body:
-      'The physical economy includes agriculture, food processing, furniture, light manufacturing, logistics, construction services, media, technology, retail, and other businesses that create real work and external revenue.',
-  },
-  {
-    title: 'Health, care, and restoration',
-    body:
-      'The health vision combines responsible medical care, prevention, counseling, family support, and spiritual care so that people are helped in body, soul, family, and purpose.',
-  },
-  {
-    title: 'Digital administration',
-    body:
-      'KIS supports identity, communication, groups, teaching, verified accounts, payments or allocations where lawful, announcements, member care, records, marketplace activity, and coordination across the ecosystem.',
-  },
-  {
-    title: 'Governance and peace',
-    body:
-      'A covenant city cannot survive by emotion alone. It needs written rules, accountable leadership, conflict resolution, financial controls, lawful entities, community participation, and clear separation between ministry, business, and resident life.',
-  },
-];
+const CITY_DECLARATION =
+  'A virtual city through KIS. A physical city through KCAN. One Kingdom vision.';
 
-const pathway: PathwayItem[] = [
+const FINAL_DECLARATION =
+  'KCAN is building a people, a platform, and a city where purpose is discovered, formed, expressed, multiplied, and sent into the world for Kingdom expansion.';
+
+const achievementSteps: AchievementStep[] = [
   {
     step: '01',
-    title: 'Purpose discovered',
-    body:
-      'KCAN begins with the belief that every person carries a God-given assignment. The system helps people discover that assignment through discipleship, teaching, mentorship, community, and practical exposure.',
+    key: 'KIS',
+    title: 'KIS — Kingdom Impact Social',
+    subtitle: 'The Digital Kingdom City',
+    icon: 'school',
+    scripture: '“Whom shall he teach knowledge? and whom shall he make to understand doctrine? them that are weaned from the milk, and drawn from the breasts. For precept must be upon precept, precept upon precept; line upon line, line upon line; here a little, and there a little:” — Isaiah 28:9-10',
+    body: 'A Kingdom-centered, verified social operating system where people, families, creators, churches, educators, health providers, shops, companies, and communities communicate, publish, learn, care, sell, serve, and grow under clear Christian principles.',
   },
   {
     step: '02',
-    title: 'Purpose formed',
+    key: 'KIE + KIM',
+    title: 'KIE & KIM',
+    subtitle: 'Education and Market Restored',
+    icon: 'storefront',
+    scripture: '“Neither was there any among them that lacked.” — Acts 4:34',
     body:
-      'Discovery must become discipline. People are formed through education, work culture, spiritual accountability, family support, leadership development, and practical service inside a structured covenant environment.',
+      'Revenue from KIS and Kingdom Impact Education helps build a marketplace of fairness, excellence, covenant living, love, and stewardship instead of manipulation.',
   },
   {
     step: '03',
-    title: 'Purpose expressed',
+    key: 'KIH',
+    title: 'KIH — Kingdom Impact Health',
+    subtitle: 'Health With Truth, Compassion, and Power',
+    icon: 'heart',
+    scripture: '“The prayer of faith shall save the sick.” — James 5:15',
     body:
-      'The city-like environment gives people places to serve and build: classrooms, farms, clinics, teams, startups, workshops, media studios, digital products, businesses, and community programs.',
+      'A health system where science becomes a vessel for wisdom, compassion, prayer, excellent treatment, and genuine care for the whole person.',
   },
   {
     step: '04',
-    title: 'Citizens established',
+    key: 'CITY',
+    title: 'Kingdom Accommodations',
+    subtitle: 'A Physical Covenant Community',
+    icon: 'home',
+    scripture: '“And all that believed were together...” — Acts 2:44',
     body:
-      'KCAN citizenship is not political citizenship. It describes a people who live by Kingdom identity, covenant responsibility, shared stewardship, excellence, service, and love within lawful national structures.',
-  },
-  {
-    step: '05',
-    title: 'Ambassadors sent',
-    body:
-      'The end of the process is sending. KCAN raises ambassadors who carry Christ, competence, character, and solutions into the world through products, services, missions, institutions, and leadership.',
+      'A long-term physical city vision to provide stability, basic necessities, productive work, services, and Kingdom programs that help eliminate poverty from thousands of Christians.',
   },
 ];
 
-const lawfulPoints: CardItem[] = [
+const commitments: SimpleCard[] = [
   {
-    title: 'Not a parallel state',
-    body:
-      'KCAN should never be presented as a sovereign city or separate jurisdiction. Cameroon remains fully sovereign. KCAN is better described as a private, master-planned, faith-based residential and productive estate under the law.',
+    title: 'We will pray for you.',
+    icon: 'sparkles',
+    scripture: 'James 5:16',
   },
   {
-    title: 'Not one company pretending residents are workers',
-    body:
-      'Some residents may be employees, some may be students, children, spouses, retirees, volunteers, entrepreneurs, ministry workers, or cooperative members. The structure should respect each category instead of forcing everyone into one legal box.',
+    title: 'We will protect the city from illicit and harmful materials.',
+    icon: 'shield',
+    scripture: '1 Peter 1:16',
   },
   {
-    title: 'Separate but united entities',
-    body:
-      'The stronger design separates ministry, business, and community-benefit stewardship: Shekina Global for spiritual life, KIV for enterprise and production, and a resident cooperative or benefit vehicle for shared community functions.',
+    title: 'We will provide verified materials for structured growth.',
+    icon: 'book',
+    scripture: '2 Timothy 2:15',
   },
   {
-    title: 'Accountability protects the vision',
-    body:
-      'Boards, councils, financial controls, audit practices, succession rules, procurement discipline, and conflict-resolution systems do not weaken the spiritual vision. They make the vision durable, financeable, and trustworthy.',
-  },
-];
-
-const kisRoles: CardItem[] = [
-  {
-    title: 'Communication',
-    body:
-      'KIS gives churches, ministries, families, departments, teams, schools, and communities a trusted space for messaging, groups, announcements, media, teaching, events, and coordination.',
+    title: 'We will build a safe environment for Kingdom growth.',
+    icon: 'people',
+    scripture: 'Ephesians 4:13',
   },
   {
-    title: 'Digital administration',
-    body:
-      'KIS can become the digital office for verified profiles, member records, roles, groups, permissions, learning access, community updates, giving channels, support requests, and transparent operations.',
+    title: 'No ads that distract from purpose.',
+    icon: 'close',
+    scripture: '1 Corinthians 14:40',
   },
   {
-    title: 'Learning and formation',
-    body:
-      'KIS can host lessons, devotionals, leadership courses, school content, mentorship programs, ministry training, professional training, and purpose-development pathways.',
+    title: 'This remains holy ground.',
+    icon: 'flame',
+    scripture: 'Exodus 3:5',
   },
   {
-    title: 'Commerce and services',
-    body:
-      'KIS can connect KCAN products, marketplace activity, creators, shops, services, education, health information, and trusted vendors while keeping the culture orderly and values-driven.',
+    title: 'Every action can support Kingdom advancement.',
+    icon: 'star',
+    scripture: 'Daniel 12:3',
   },
 ];
 
-const outcomes: string[] = [
-  'Purpose-driven people who discover, refine, and express their God-given assignment.',
-  'Families supported by worship, work, education, health access, care, and trusted community.',
-  'A lawful Christian ecosystem that demonstrates discipline, productivity, excellence, and compassion.',
-  'A production-centered environment where residents and partners build products and services for the world.',
-  'A Cameroon launch model that can become a disciplined template for other nations without pretending to be a separate state.',
+const userRoles: SimpleCard[] = [
+  {
+    title: 'Support the vision through account tiers.',
+    icon: 'card',
+    scripture: 'Luke 10:7',
+  },
+  {
+    title: 'Give only as led by the Spirit.',
+    icon: 'gift',
+    scripture: '2 Corinthians 9:7',
+  },
+  {
+    title: 'Do not post corrupt or harmful materials.',
+    icon: 'warning',
+    scripture: 'Matthew 18:6',
+  },
+  {
+    title: 'See yourself as a Kingdom citizen becoming an ambassador.',
+    icon: 'crown',
+    scripture: '2 Corinthians 5:20',
+  },
+  {
+    title: 'Send prayer requests freely.',
+    icon: 'message',
+    scripture: 'Galatians 6:2',
+  },
+  {
+    title: 'Love everyone, even when boundaries are needed.',
+    icon: 'heart',
+    scripture: 'John 13:35',
+  },
+  {
+    title: 'Report security and safety issues quickly.',
+    icon: 'lock',
+    scripture: 'Ephesians 5:15',
+  },
 ];
 
-const partnerStats: StatItem[] = [
-  {
-    value: 'KIS',
-    label: 'First public layer',
-    body:
-      'The app introduces people to the KCAN culture before the full physical estate exists.',
-  },
-  {
-    value: 'KIV',
-    label: 'Enterprise engine',
-    body:
-      'The business arm produces goods, services, employment, and revenue for mission durability.',
-  },
-  {
-    value: 'SG',
-    label: 'Spiritual formation',
-    body:
-      'Shekina Global guards worship, discipleship, pastoral care, mission, and covenant identity.',
-  },
-];
-
-const operatingPrinciples: CardItem[] = [
-  {
-    title: 'Faith with structure',
-    body:
-      'The spiritual life gives KCAN its heart, but structure gives the vision endurance. The system must be prayerful, lawful, documented, auditable, and operationally clear.',
-  },
-  {
-    title: 'Production with compassion',
-    body:
-      'KCAN is not only about earning money. Work exists to serve people, develop gifts, create dignity, provide stability, and send excellent solutions into the world.',
-  },
-  {
-    title: 'Community without confusion',
-    body:
-      'Covenant life should never erase legal clarity. Residents, employees, students, ministers, investors, and cooperative members need clear rights, duties, protections, and responsibilities.',
-  },
-  {
-    title: 'Growth without losing identity',
-    body:
-      'As KCAN grows from digital community to physical estate and global network, its identity must remain Christ-centered, purpose-driven, accountable, and service-oriented.',
-  },
+const resourceUses = [
+  'Education and structured learning',
+  'Healthcare and care systems',
+  'Missions and Kingdom outreaches',
+  'Accommodations and basic necessities',
+  'Jobs, products, and services',
+  'The long-term covenant city ecosystem',
 ];
 
 const SectionHeader = ({
   label,
   title,
   body,
+  scripture,
   palette,
+  centered = false,
 }: {
   label: string;
   title: string;
   body?: string;
+  scripture?: string;
   palette: ReturnType<typeof useKISTheme>['palette'];
+  centered?: boolean;
 }) => (
-  <View style={stylesStatic.headerBlock}>
+  <View style={[stylesStatic.headerBlock, centered && stylesStatic.centered]}>
     <Text style={[stylesStatic.sectionLabel, { color: palette.primaryStrong }]}>
       {label}
     </Text>
@@ -263,6 +208,11 @@ const SectionHeader = ({
     {body ? (
       <Text style={[stylesStatic.sectionBody, { color: palette.subtext }]}>
         {body}
+      </Text>
+    ) : null}
+    {scripture ? (
+      <Text style={[stylesStatic.scriptureText, { color: palette.primaryStrong }]}>
+        {scripture}
       </Text>
     ) : null}
   </View>
@@ -303,7 +253,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
               imageStyle={styles.heroImage}
             >
               <LinearGradient
-                colors={['rgba(17,10,7,0.12)', 'rgba(17,10,7,0.82)']}
+                colors={['rgba(17,10,7,0.12)', 'rgba(17,10,7,0.84)']}
                 style={StyleSheet.absoluteFillObject}
               />
 
@@ -327,9 +277,9 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
                 <Text style={styles.kicker}>
                   Kingdom Citizens &amp; Ambassadors Network
                 </Text>
-                <Text style={styles.heroSubtitle}>
-                 {KCAN_PURPOSE}
-                </Text>
+                <Text style={styles.heroSubtitle}>{KCAN_PURPOSE}</Text>
+                <Text style={styles.heroScripture}>{PURPOSE_SCRIPTURE}</Text>
+
                 <View style={styles.imageHint}>
                   <KISIcon name="fullscreen" size={14} color="#FFE8A3" />
                   <Text style={styles.imageHintText}>Tap the city to view and zoom</Text>
@@ -348,296 +298,207 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
               <View style={styles.statementInner}>
                 <Text style={styles.statementEyebrow}>KCAN vision</Text>
                 <Text style={styles.statementText}>{KCAN_VISION}</Text>
+                <Text style={styles.statementScripture}>{VISION_SCRIPTURE}</Text>
               </View>
             </LinearGradient>
 
             <View style={[styles.section, { backgroundColor: palette.surface }]}>
               <SectionHeader
-                label="How the vision flows from the purpose"
-                title="Because purpose needs an environment, KCAN becomes a covenant city-like ecosystem."
-                body="The purpose is not only to tell people that they have a God-given assignment. KCAN must also create the kind of environment where that assignment can be discovered, trained, expressed, tested, matured, and released. That is why the vision naturally becomes city-like: families live in covenant, workers produce with excellence, schools form minds, farms and workshops supply needs, health systems care for people, and digital systems coordinate everything."
+                label="Steps of achievement"
+                title="How the vision will be built"
+                body="The vision grows in clear stages: social, education, market, health, and physical community."
                 palette={palette}
               />
             </View>
 
-            <View style={styles.pillarGrid}>
-              {pillars.map(item => (
+            <View style={styles.achievementList}>
+              {achievementSteps.map(item => (
                 <View
-                  key={item.title}
+                  key={item.step}
                   style={[
-                    styles.pillarCard,
+                    styles.achievementCard,
                     {
                       backgroundColor: palette.card,
                       borderColor: palette.goldLight,
                     },
                   ]}
                 >
-                  <View style={[styles.pillarIcon, { backgroundColor: palette.primarySoft }]}>
-                    <KISIcon name="shield" size={18} color={palette.primaryStrong} />
-                  </View>
-                  <Text style={[styles.pillarTitle, { color: palette.text }]}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.pillarBody, { color: palette.subtext }]}>
-                    {item.body}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={[styles.section, { backgroundColor: palette.surface }]}>
-              <SectionHeader
-                label="KIS in the KCAN vision"
-                title="Kingdom Impact Social is the first digital city gate."
-                body="KIS introduces the world to KCAN before the physical estate is fully built. It is the trusted digital layer where people communicate, learn, publish, organize, care, trade, give, and grow under clear Christian principles. KIS is not replacing KCAN; it is the first visible platform that carries the KCAN culture into homes, churches, schools, ministries, businesses, and diaspora communities."
-                palette={palette}
-              />
-            </View>
-
-            <View style={styles.roleGrid}>
-              {kisRoles.map(item => (
-                <View
-                  key={item.title}
-                  style={[
-                    styles.roleCard,
-                    {
-                      backgroundColor: palette.card,
-                      borderColor: palette.goldLight,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.roleTitle, { color: palette.text }]}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.roleBody, { color: palette.subtext }]}>
-                    {item.body}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={[styles.cityCard, { backgroundColor: palette.card }]}>
-              <SectionHeader
-                label="How the covenant city works"
-                title="A complete environment for life, work, worship, and production."
-                body="The KCAN estate is envisioned as a place where the spiritual and practical parts of life are not separated. Worship forms the heart. Education forms the mind. Work forms discipline. Enterprise creates value. Health and care protect the people. Digital systems connect the whole community. Governance keeps the system lawful and accountable."
-                palette={palette}
-              />
-
-              <View style={styles.cityLayerGrid}>
-                {cityLayers.map(item => (
-                  <View
-                    key={item.title}
-                    style={[
-                      styles.cityLayerCard,
-                      {
-                        backgroundColor: palette.surface,
-                        borderColor: palette.goldLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.cityLayerTitle, { color: palette.text }]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[styles.cityLayerBody, { color: palette.subtext }]}>
-                      {item.body}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View style={[styles.section, { backgroundColor: palette.surface }]}>
-              <SectionHeader
-                label="Purpose pathway"
-                title="The purpose becomes a transformation journey."
-                body={KCAN_PURPOSE}
-                palette={palette}
-              />
-            </View>
-
-            <View style={styles.timeline}>
-              {pathway.map((item, index) => (
-                <View key={item.step} style={styles.timelineRow}>
-                  <View style={styles.timelineRail}>
-                    <View style={[styles.timelineDot, { backgroundColor: palette.primaryStrong }]}>
-                      <Text style={styles.timelineStep}>{item.step}</Text>
+                  <View style={styles.achievementTop}>
+                    <View
+                      style={[
+                        styles.stepBadge,
+                        {
+                          backgroundColor: palette.primaryStrong,
+                          borderColor: palette.goldLight,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.stepBadgeText}>{item.step}</Text>
                     </View>
-                    {index < pathway.length - 1 ? (
-                      <View style={[styles.timelineLine, { backgroundColor: palette.goldLight }]} />
-                    ) : null}
+                    <View style={[styles.iconBox, { backgroundColor: palette.primaryStrong }]}>
+                      <KISIcon
+                        name={item.icon as never}
+                        size={19}
+                        color={palette.onPrimary}
+                      />
+                    </View>
                   </View>
 
-                  <View
-                    style={[
-                      styles.timelineCard,
-                      {
-                        backgroundColor: palette.card,
-                        borderColor: palette.goldLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.timelineTitle, { color: palette.text }]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[styles.timelineBody, { color: palette.subtext }]}>
-                      {item.body}
-                    </Text>
-                  </View>
+                  <Text style={[styles.achievementKey, { color: palette.primaryStrong }]}>
+                    {item.key}
+                  </Text>
+                  <Text style={[styles.achievementTitle, { color: palette.text }]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.achievementSubtitle, { color: palette.text }]}>
+                    {item.subtitle}
+                  </Text>
+                  <Text style={[styles.achievementBody, { color: palette.subtext }]}>
+                    {item.body}
+                  </Text>
+                  <Text style={[styles.cardScripture, { color: palette.primaryStrong }]}>
+                    {item.scripture}
+                  </Text>
                 </View>
               ))}
             </View>
 
-            <View style={[styles.lawfulCard, { backgroundColor: palette.surface }]}> 
+            <LinearGradient
+              colors={goldGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cityDeclarationCard}
+            >
+              <Text style={styles.cityDeclarationLabel}>Virtual + physical city</Text>
+              <Text style={styles.cityDeclarationText}>{CITY_DECLARATION}</Text>
+              <Text style={styles.cityDeclarationScripture}>
+                “Your Kingdom come. Your will be done on earth as it is in heaven.” — Matthew 6:10
+              </Text>
+            </LinearGradient>
+
+            <View style={[styles.section, { backgroundColor: palette.surface }]}>
               <SectionHeader
-                label="Lawful, not confusing"
-                title="The legal structure protects the city vision."
-                body="The lawful section should now feel natural because the page has already explained the city-like environment. KCAN is a covenant community, but it must be organized in a way that regulators, banks, investors, residents, workers, and partners can understand. The stronger structure is not one confused entity. It is a coordinated ecosystem."
+                label="Our commitment"
+                title="What KCAN promises to protect"
+                body="A holy, safe, prayerful, and purpose-centered environment for growth."
                 palette={palette}
               />
+            </View>
 
-              <View style={styles.lawfulGrid}>
-                {lawfulPoints.map(item => (
-                  <View
-                    key={item.title}
-                    style={[
-                      styles.lawfulPoint,
-                      {
-                        backgroundColor: palette.card,
-                        borderColor: palette.goldLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.lawfulTitle, { color: palette.text }]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[styles.lawfulBody, { color: palette.subtext }]}>
-                      {item.body}
-                    </Text>
+            <View style={styles.simpleGrid}>
+              {commitments.map(item => (
+                <View
+                  key={item.title}
+                  style={[
+                    styles.simpleCard,
+                    {
+                      backgroundColor: palette.card,
+                      borderColor: palette.goldLight,
+                    },
+                  ]}
+                >
+                  <View style={[styles.simpleIcon, { backgroundColor: palette.primaryStrong }]}>
+                    <KISIcon
+                      name={item.icon as never}
+                      size={16}
+                      color={palette.onPrimary}
+                    />
                   </View>
-                ))}
-              </View>
+                  <Text style={[styles.simpleTitle, { color: palette.text }]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.simpleScripture, { color: palette.primaryStrong }]}>
+                    {item.scripture}
+                  </Text>
+                </View>
+              ))}
             </View>
 
             <View style={[styles.section, { backgroundColor: palette.surface }]}>
               <SectionHeader
-                label="Why Cameroon first"
-                title="A launch ground where purpose, youth, need, and opportunity meet."
-                body="Cameroon gives KCAN a meaningful first ground because the need is both spiritual and practical: youth need purpose, families need stability, communities need trustworthy institutions, and the economy needs productive systems. KCAN answers by combining covenant life, lawful structure, education, work, digital community, agriculture, health, and enterprise."
+                label="Your role"
+                title="How users help keep the city holy and strong"
+                body="KCAN is not only a platform to consume. It is a city-like Kingdom environment to build, protect, and serve."
                 palette={palette}
               />
             </View>
 
-            <View style={[styles.statsCard, { backgroundColor: palette.card }]}> 
+            <View style={styles.simpleGrid}>
+              {userRoles.map(item => (
+                <View
+                  key={item.title}
+                  style={[
+                    styles.simpleCard,
+                    {
+                      backgroundColor: palette.card,
+                      borderColor: palette.goldLight,
+                    },
+                  ]}
+                >
+                  <View style={[styles.simpleIcon, { backgroundColor: palette.primaryStrong }]}>
+                    <KISIcon
+                      name={item.icon as never}
+                      size={16}
+                      color={palette.onPrimary}
+                    />
+                  </View>
+                  <Text style={[styles.simpleTitle, { color: palette.text }]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.simpleScripture, { color: palette.primaryStrong }]}>
+                    {item.scripture}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={[styles.moneyCard, { backgroundColor: palette.card }]}>
               <SectionHeader
-                label="Three connected arms"
-                title="One vision, clear responsibilities."
+                label="Financial transparency"
+                title="How resources advance the vision"
+                body="Revenue generated through subscriptions, products, services, partnerships, and business systems will be reinvested into Kingdom work and the long-term building of the covenant city ecosystem."
+                scripture="“Seek first the Kingdom of God...” — Matthew 6:33  •  “It is required in stewards, that a man be found faithful.” — 1 Corinthians 4:2"
                 palette={palette}
               />
 
-              <View style={styles.statsGrid}>
-                {partnerStats.map(item => (
+              <View style={styles.resourceGrid}>
+                {resourceUses.map(item => (
                   <View
-                    key={item.value}
+                    key={item}
                     style={[
-                      styles.statBox,
+                      styles.resourcePill,
                       {
                         backgroundColor: palette.surface,
                         borderColor: palette.goldLight,
                       },
                     ]}
                   >
-                    <Text style={[styles.statValue, { color: palette.primaryStrong }]}>
-                      {item.value}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: palette.text }]}>
-                      {item.label}
-                    </Text>
-                    <Text style={[styles.statBody, { color: palette.subtext }]}>
-                      {item.body}
+                    <KISIcon name="check" size={14} color={palette.primaryStrong} />
+                    <Text style={[styles.resourceText, { color: palette.text }]}>
+                      {item}
                     </Text>
                   </View>
                 ))}
               </View>
             </View>
 
-            <View style={[styles.principlesCard, { backgroundColor: palette.surface }]}> 
-              <SectionHeader
-                label="Operating principles"
-                title="The culture that keeps KCAN coherent."
-                body="This page should make the vision feel serious, beautiful, and understandable. KCAN is not emotional noise. It is a disciplined call to build a place, a platform, and a people who can serve Christ with excellence in every sphere of life."
-                palette={palette}
-              />
-
-              <View style={styles.principleGrid}>
-                {operatingPrinciples.map(item => (
-                  <View
-                    key={item.title}
-                    style={[
-                      styles.principleCard,
-                      {
-                        backgroundColor: palette.card,
-                        borderColor: palette.goldLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.principleTitle, { color: palette.text }]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[styles.principleBody, { color: palette.subtext }]}>
-                      {item.body}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View style={[styles.outcomesCard, { borderColor: palette.goldLight }]}> 
-              <Text style={[styles.sectionLabel, { color: palette.primaryStrong }]}> 
-                What to expect
+            <View style={[styles.finalCard, { borderColor: palette.goldLight }]}>
+              <Text style={[styles.finalLabel, { color: palette.primaryStrong }]}>
+                Final declaration
               </Text>
-              {outcomes.map((item, index) => (
-                <View key={item} style={styles.outcomeRow}>
-                  <View style={[styles.outcomeNumber, { backgroundColor: palette.primarySoft }]}> 
-                    <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
-                      {index + 1}
-                    </Text>
-                  </View>
-                  <Text style={[styles.outcomeText, { color: palette.text }]}> 
-                    {item}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={[styles.investorCard, { backgroundColor: palette.card }]}> 
-              <Text style={[styles.sectionLabel, { color: palette.primaryStrong }]}> 
-                For serious partners
+              <Text style={[styles.finalText, { color: palette.text }]}>
+                {FINAL_DECLARATION}
               </Text>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}> 
-                KCAN is designed for builders, not spectators.
-              </Text>
-              <Text style={[styles.sectionBody, { color: palette.subtext }]}> 
-                The invitation is to visionary builders, churches, families,
-                institutions, investors, workers, educators, health partners,
-                creators, and diaspora communities who want to help prove that
-                faith, lawfulness, productivity, care, excellence, and governance
-                can stand together. KIS can grow as a technology venture. KIV can
-                grow as an enterprise engine. Shekina Global can guard spiritual
-                formation. KCAN is the broader Kingdom impact ecosystem that
-                holds the mission together.
-              </Text>
-              <Text style={[styles.closingLine, { color: palette.text }]}> 
-                We are building a covenant network where purpose becomes
-                transformation, transformation becomes citizenship, and citizenship
-                becomes Kingdom ambassadorship.
+              <Text style={[styles.finalScripture, { color: palette.primaryStrong }]}>
+                “Your Kingdom come. Your will be done...” — Matthew 6:10
               </Text>
             </View>
+
             <EnterpriseKcanRevenuePreviewCard
               palette={palette}
               kind="kcan_vision"
               title="KCAN enterprise and investor packaging preview"
-              subtitle="Annual contracts, KCAN network packaging, verified trust, implementation support, and launch evidence are visible for planning only."
+              subtitle="This preview shows how subscriptions, services, partnerships, and business systems can help fund the wider Kingdom city vision."
             />
           </View>
         </ScrollView>
@@ -647,7 +508,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
           onPress={onClose}
           style={[styles.bottomCloseButton, { backgroundColor: palette.primaryStrong }]}
         >
-          <KISIcon name="close" size={18} color={palette.bg} />
+          <KISIcon name="close" size={18} color={palette.onPrimary} />
           <Text style={styles.bottomCloseText}>Close vision</Text>
         </Pressable>
       </SafeAreaView>
@@ -727,6 +588,9 @@ const stylesStatic = StyleSheet.create({
   headerBlock: {
     gap: 0,
   },
+  centered: {
+    alignItems: 'center',
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '900',
@@ -745,6 +609,13 @@ const stylesStatic = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '700',
     marginTop: 9,
+  },
+  scriptureText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '900',
+    marginTop: 10,
+    fontStyle: 'italic',
   },
 });
 
@@ -825,6 +696,14 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       fontWeight: '700',
       maxWidth: 640,
     },
+    heroScripture: {
+      color: '#FFE8A3',
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '900',
+      fontStyle: 'italic',
+      maxWidth: 640,
+    },
     imageHint: {
       alignSelf: 'flex-start',
       flexDirection: 'row',
@@ -860,27 +739,14 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     },
     statementInner: {
       flex: 1,
-      paddingBottom: 28,
-      paddingRight: 20,
-    },
-    statementDivider: {
-      height: 1,
-      backgroundColor: 'rgba(255,232,163,0.24)',
-      marginVertical: 18,
+      paddingRight: 25,
+      paddingBottom: 25,
     },
     statementEyebrow: {
       color: '#FFE8A3',
       fontSize: 11,
       fontWeight: '900',
       textTransform: 'uppercase',
-      letterSpacing: 0,
-    },
-    statementTitle: {
-      color: '#FFF8E6',
-      fontSize: 24,
-      lineHeight: 30,
-      fontWeight: '900',
-      marginTop: 8,
       letterSpacing: 0,
     },
     statementText: {
@@ -890,270 +756,195 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       fontWeight: '700',
       marginTop: 10,
     },
+    statementScripture: {
+      color: '#FFE8A3',
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '900',
+      fontStyle: 'italic',
+      marginTop: 12,
+    },
     section: {
       borderRadius: 22,
       padding: 16,
       borderWidth: 1,
       borderColor: palette.goldLight,
     },
-    sectionLabel: {
+    achievementList: {
+      gap: 12,
+    },
+    achievementCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 16,
+    },
+    achievementTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    stepBadge: {
+      minWidth: 45,
+      height: 32,
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepBadgeText: {
+      color: palette.onPrimary,
+      fontSize: 12,
+      fontWeight: '900',
+    },
+    iconBox: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    achievementKey: {
       fontSize: 11,
       fontWeight: '900',
       textTransform: 'uppercase',
       letterSpacing: 0,
     },
-    sectionTitle: {
-      fontSize: 21,
-      lineHeight: 27,
+    achievementTitle: {
+      fontSize: 19,
+      lineHeight: 24,
       fontWeight: '900',
-      marginTop: 6,
-      letterSpacing: 0,
+      marginTop: 4,
     },
-    sectionBody: {
-      fontSize: 14,
-      lineHeight: 22,
-      fontWeight: '700',
-      marginTop: 9,
-    },
-    pillarGrid: {
-      gap: 10,
-    },
-    pillarCard: {
-      borderRadius: 20,
-      borderWidth: 1,
-      padding: 15,
-    },
-    pillarIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 10,
-    },
-    pillarTitle: {
-      fontSize: 16,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    pillarBody: {
+    achievementSubtitle: {
       fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 6,
-    },
-    roleGrid: {
-      gap: 10,
-    },
-    roleCard: {
-      borderRadius: 18,
-      borderWidth: 1,
-      padding: 15,
-    },
-    roleTitle: {
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    roleBody: {
-      fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 7,
-    },
-    cityCard: {
-      borderRadius: 24,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: palette.goldLight,
-    },
-    cityLayerGrid: {
-      gap: 10,
-      marginTop: 14,
-    },
-    cityLayerCard: {
-      borderRadius: 18,
-      borderWidth: 1,
-      padding: 14,
-    },
-    cityLayerTitle: {
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    cityLayerBody: {
-      fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 7,
-    },
-    timeline: {
-      gap: 0,
-    },
-    timelineRow: {
-      flexDirection: 'row',
-      alignItems: 'stretch',
-    },
-    timelineRail: {
-      width: 50,
-      alignItems: 'center',
-    },
-    timelineDot: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 2,
-    },
-    timelineStep: {
-      color: '#FFF8E6',
-      fontSize: 11,
-      fontWeight: '900',
-    },
-    timelineLine: {
-      flex: 1,
-      width: 2,
-      marginVertical: 4,
-      opacity: 0.9,
-    },
-    timelineCard: {
-      flex: 1,
-      borderRadius: 20,
-      borderWidth: 1,
-      padding: 14,
-      marginBottom: 12,
-    },
-    timelineTitle: {
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    timelineBody: {
-      fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 7,
-    },
-    lawfulCard: {
-      borderRadius: 24,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: palette.goldLight,
-    },
-    lawfulGrid: {
-      gap: 10,
-      marginTop: 14,
-    },
-    lawfulPoint: {
-      borderRadius: 18,
-      borderWidth: 1,
-      padding: 14,
-    },
-    lawfulTitle: {
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    lawfulBody: {
-      fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 7,
-    },
-    statsCard: {
-      borderRadius: 24,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: palette.goldLight,
-    },
-    statsGrid: {
-      gap: 10,
-      marginTop: 14,
-    },
-    statBox: {
-      borderRadius: 18,
-      borderWidth: 1,
-      padding: 14,
-    },
-    statValue: {
-      fontSize: 24,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    statLabel: {
-      fontSize: 14,
+      lineHeight: 19,
       fontWeight: '900',
       marginTop: 2,
+      opacity: 0.88,
     },
-    statBody: {
+    achievementBody: {
+      fontSize: 13,
+      lineHeight: 20,
+      fontWeight: '700',
+      marginTop: 8,
+    },
+    cardScripture: {
       fontSize: 12,
       lineHeight: 18,
-      fontWeight: '700',
-      marginTop: 7,
+      fontWeight: '900',
+      fontStyle: 'italic',
+      marginTop: 10,
     },
-    principlesCard: {
-      borderRadius: 24,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: palette.goldLight,
+    cityDeclarationCard: {
+      borderRadius: 26,
+      paddingRight: 25,
+      paddingBottom: 20,
+      alignItems: 'center',
+      overflow: 'hidden',
     },
-    principleGrid: {
+    cityDeclarationLabel: {
+      color: '#FFE8A3',
+      fontSize: 11,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+    },
+    cityDeclarationText: {
+      color: '#FFF8E6',
+      fontSize: 18,
+      lineHeight: 31,
+      fontWeight: '900',
+      textAlign: 'center',
+      marginTop: 8,
+    },
+    cityDeclarationScripture: {
+      color: '#FFE8A3',
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '900',
+      fontStyle: 'italic',
+      textAlign: 'center',
+      marginTop: 12,
+    },
+    simpleGrid: {
       gap: 10,
-      marginTop: 14,
     },
-    principleCard: {
+    simpleCard: {
       borderRadius: 18,
       borderWidth: 1,
       padding: 14,
-    },
-    principleTitle: {
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0,
-    },
-    principleBody: {
-      fontSize: 13,
-      lineHeight: 20,
-      fontWeight: '700',
-      marginTop: 7,
-    },
-    outcomesCard: {
-      borderRadius: 22,
-      borderWidth: 1,
-      padding: 16,
-      backgroundColor: 'rgba(217,168,117,0.1)',
-      gap: 12,
-    },
-    outcomeRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 10,
+      alignItems: 'center',
+      gap: 11,
     },
-    outcomeNumber: {
-      width: 30,
-      height: 30,
+    simpleIcon: {
+      width: 38,
+      height: 38,
       borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 1,
     },
-    outcomeText: {
+    simpleTitle: {
       flex: 1,
-      fontSize: 14,
-      lineHeight: 20,
-      fontWeight: '800',
+      fontSize: 13,
+      lineHeight: 19,
+      fontWeight: '900',
     },
-    investorCard: {
+    simpleScripture: {
+      fontSize: 11,
+      fontWeight: '900',
+      fontStyle: 'italic',
+      maxWidth: 92,
+      textAlign: 'right',
+    },
+    moneyCard: {
       borderRadius: 24,
-      padding: 18,
+      padding: 16,
       borderWidth: 1,
       borderColor: palette.goldLight,
     },
-    closingLine: {
-      fontSize: 15,
-      lineHeight: 22,
+    resourceGrid: {
+      gap: 9,
+      marginTop: 15,
+    },
+    resourcePill: {
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+    },
+    resourceText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
       fontWeight: '900',
+    },
+    finalCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 18,
+      backgroundColor: 'rgba(217,168,117,0.1)',
+    },
+    finalLabel: {
+      fontSize: 11,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+    },
+    finalText: {
+      fontSize: 20,
+      lineHeight: 28,
+      fontWeight: '900',
+      marginTop: 8,
+    },
+    finalScripture: {
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '900',
+      fontStyle: 'italic',
       marginTop: 12,
     },
     bottomCloseButton: {
@@ -1174,7 +965,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       elevation: 8,
     },
     bottomCloseText: {
-      color: palette.bg,
+      color: palette.onPrimary,
       fontSize: 13,
       fontWeight: '900',
     },

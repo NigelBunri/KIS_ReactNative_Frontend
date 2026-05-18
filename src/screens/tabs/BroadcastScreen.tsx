@@ -208,6 +208,10 @@ export default function BroadcastScreen() {
     navigation.navigate('Profile', { broadcastProfileKey: profileKey });
   }, [activeMainTab, navigation]);
 
+  const handleOpenSearch = useCallback(() => {
+    (navigation as any).navigate('GlobalSearch');
+  }, [navigation]);
+
   const handlePullToRefresh = useCallback(async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -291,6 +295,7 @@ export default function BroadcastScreen() {
                 title="Broadcast"
                 tierLabel="Business Pro"
                 onCreate={handleCreate}
+                onSearch={handleOpenSearch}
               />
               <Pressable
                 accessibilityRole="button"
@@ -342,7 +347,7 @@ export default function BroadcastScreen() {
                             : palette.divider,
                         backgroundColor:
                           option.key === currentFilter
-                            ? palette.primarySoft
+                            ? palette.primaryStrong
                             : palette.surface,
                       },
                     ]}
@@ -353,7 +358,7 @@ export default function BroadcastScreen() {
                         {
                           color:
                             option.key === currentFilter
-                              ? palette.primaryStrong
+                              ? palette.onPrimary
                               : palette.text,
                         },
                       ]}
@@ -363,7 +368,7 @@ export default function BroadcastScreen() {
                     <Text
                       style={[
                         styles.filterOptionDescription,
-                        { color: palette.subtext },
+                        { color: option.key === currentFilter ? palette.onPrimary : palette.subtext },
                       ]}
                     >
                       {option.description}

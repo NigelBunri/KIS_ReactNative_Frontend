@@ -151,32 +151,33 @@ class SignalProtocolStore {
 
   async loadSession(identifier: string) {
     const data = await this.get(`session:${identifier}`);
-    if (!data) {
-      console.log('[E2EE] loadSession:miss', { identifier });
-      return undefined;
-    }
+    if (!data) return undefined;
+
     if (typeof data === 'string') {
       const trimmed = data.trim();
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        console.log('[E2EE] loadSession:hit', { identifier, format: 'json' });
-        return trimmed;
-      }
-      try {
-        const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
-        console.log('[E2EE] loadSession:hit', { identifier, format: 'base64' });
-        return decoded;
-      } catch {
-        console.log('[E2EE] loadSession:hit', { identifier, format: 'raw' });
-        return trimmed;
-      }
+      // JSON session record — the libsignal library serialises sessions as JSON.
+      if (trimmed.startsWith('{')) return trimmed;
+      // Base64-encoded binary (stored by the new storeSession path).
+      // We return it as a base64 string; libsignal treats it as an opaque record.
+      return trimmed;
     }
-    console.log('[E2EE] loadSession:hit', { identifier, format: 'unknown' });
     return data;
   }
 
   async storeSession(identifier: string, record: any) {
-    const payload = typeof record === 'string' ? record : Buffer.from(new Uint8Array(record)).toString('utf8');
-    console.log('[E2EE] storeSession', { identifier, bytes: payload.length, format: typeof record === 'string' ? 'json' : 'buffer' });
+    let payload: string;
+    if (typeof record === 'string') {
+      // libsignal-protocol-typescript serialises sessions as JSON strings — pass through.
+      payload = record;
+    } else {
+      // Guard against arbitrary binary objects: encode as base64 to prevent
+      // UTF-8 corruption of non-ASCII bytes (e.g. cipher key material).
+      const bytes =
+        record instanceof Uint8Array
+          ? record
+          : new Uint8Array(record instanceof ArrayBuffer ? record : Buffer.from(record));
+      payload = fromByteArray(bytes);
+    }
     await this.put(`session:${identifier}`, payload);
   }
 

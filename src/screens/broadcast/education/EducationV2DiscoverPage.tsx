@@ -4,14 +4,17 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import EducationInstitutionManagementScreen from '@/screens/broadcast/education/EducationInstitutionManagementScreen';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
+import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
@@ -181,6 +184,7 @@ export default function EducationV2DiscoverPage({
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [expandedList, setExpandedList] =
     useState<ExpandedEducationList | null>(null);
+  const [showInstitutionManagement, setShowInstitutionManagement] = useState(false);
 
   useEffect(() => {
     setSearch(searchTerm || '');
@@ -1365,6 +1369,57 @@ export default function EducationV2DiscoverPage({
         ) : (
           <>
             {renderLearningOverview()}
+
+            {/* Institution Management Entry */}
+            <Pressable
+              onPress={() => setShowInstitutionManagement(true)}
+              style={{
+                borderWidth: 1.5,
+                borderColor: palette.primary,
+                backgroundColor: palette.primarySoft,
+                borderRadius: 20,
+                padding: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: palette.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <KISIcon name="school-outline" size={22} color="#fff" />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>
+                  Manage Your Institution
+                </Text>
+                <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 12, opacity: 0.8 }}>
+                  Create & manage schools, colleges, academies and more
+                </Text>
+              </View>
+              <KISIcon name="chevron-forward-outline" size={18} color={palette.primaryStrong} />
+            </Pressable>
+
+            {/* Institution Management Modal */}
+            <Modal
+              visible={showInstitutionManagement}
+              animationType="slide"
+              presentationStyle="pageSheet"
+              onRequestClose={() => setShowInstitutionManagement(false)}
+            >
+              <EducationInstitutionManagementScreen
+                onClose={() => setShowInstitutionManagement(false)}
+              />
+            </Modal>
+
             {renderHero()}
             <View style={{ marginBottom: 24 }}>
               <EducationRevenuePreviewCard

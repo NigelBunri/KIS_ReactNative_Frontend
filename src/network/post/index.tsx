@@ -5,6 +5,7 @@ import { setCache } from '../cache';
 import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
 import { getAccessToken } from '@/security/authStorage';
+import { refreshAccessToken } from '@/security/tokenRefresh';
 
 const sanitizeFileData = (obj: any): any => {
   if (Array.isArray(obj)) return obj.map(sanitizeFileData);
@@ -84,6 +85,21 @@ export const postRequest = async (
         data: payload,
         message: successMessage,
       };
+    }
+
+    // Attempt a silent token refresh on 401, then retry once.
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
+        const retryResponse = await apiService.post(url, payload, retryHeaders);
+        const retryData = await retryResponse.json().catch(() => ({}));
+        if (retryResponse.ok) {
+          return { success: true, data: unwrapPayload(retryData), message: successMessage };
+        }
+        return { success: false, message: options.errorMessage || 'Session expired.', status: retryResponse.status, data: retryData };
+      }
+      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
     }
 
     const msg =

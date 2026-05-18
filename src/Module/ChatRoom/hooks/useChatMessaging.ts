@@ -972,10 +972,22 @@ export function useChatMessaging({
         return;
       }
 
+      const incomingServerId = serverMsg.id ?? serverMsg._id;
       const matchIndex = messagesRef.current.findIndex((m) => {
+        // 1. Exact clientId match — most reliable
         if (serverMsg.clientId && m.clientId && m.clientId === serverMsg.clientId) return true;
-        if ((serverMsg.id ?? serverMsg._id) && m.serverId && m.serverId === (serverMsg.id ?? serverMsg._id)) return true;
-        if (!serverMsg.clientId && String(serverMsg.senderId ?? serverMsg.sender_id ?? '') === String(currentUserId) && m.fromMe && m.status === 'pending') return true;
+        // 2. serverId already assigned by a prior ACK — prevent second duplicate
+        if (incomingServerId && m.serverId && m.serverId === incomingServerId) return true;
+        // 3. Last-resort: echo has no clientId but sender is us and we have an
+        //    in-flight message.  Match 'sending' AND 'pending' — sendRichMessage
+        //    flips status to 'sending' before the network call so the echo-back
+        //    would never match if we checked only 'pending'.
+        if (
+          !serverMsg.clientId &&
+          String(serverMsg.senderId ?? serverMsg.sender_id ?? '') === String(currentUserId) &&
+          m.fromMe &&
+          (m.status === 'pending' || m.status === 'sending')
+        ) return true;
         return false;
       });
 

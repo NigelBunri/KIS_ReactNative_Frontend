@@ -24,21 +24,35 @@ async function loadConversationKey(
   const now = Date.now();
   const cached = keyCache.get(conversationId);
 
-  if (
-    cached &&
-    now - cached.fetchedAt < KEY_TTL &&
-    (!versionHint || cached.version === versionHint)
-  ) {
-    return cached;
+  // Serve cache only when fresh AND the version matches what the message was encrypted with.
+  // A version mismatch means the key was rotated — we must re-fetch rather than silently
+  // decrypt with the wrong key (which would produce garbled or auth-failed output).
+  if (cached && now - cached.fetchedAt < KEY_TTL) {
+    if (!versionHint || cached.version === versionHint) {
+      return cached;
+    }
+    // Version mismatch: evict stale entry and fall through to a fresh fetch.
+    keyCache.delete(conversationId);
   }
 
+  // Deduplicate concurrent requests for the same conversation.
   if (inflight.has(conversationId)) {
-    return inflight.get(conversationId)!;
+    const result = await inflight.get(conversationId)!;
+    // If the inflight request returned a different version, retry once.
+    if (versionHint && result.version !== versionHint) {
+      keyCache.delete(conversationId);
+    } else {
+      return result;
+    }
   }
+
+  const url = versionHint
+    ? `${ROUTES.e2ee.conversationKey(conversationId)}?version=${encodeURIComponent(versionHint)}`
+    : ROUTES.e2ee.conversationKey(conversationId);
 
   const promise = (async () => {
     try {
-      const res = await getRequest(ROUTES.e2ee.conversationKey(conversationId));
+      const res = await getRequest(url);
       if (!res.success || !res.data?.key || !res.data?.version) {
         throw new Error(res.message || 'Failed to fetch E2EE key');
       }
@@ -48,11 +62,14 @@ async function loadConversationKey(
         fetchedAt: Date.now(),
       };
       if (versionHint && entry.version !== versionHint) {
-        console.log(
-          `[customE2EE] version mismatch for ${conversationId}: client hint=${versionHint} server=${entry.version}`,
+        // Server returned a different version than requested — still use it but
+        // don't cache under the wrong version to avoid serving stale data later.
+        console.warn(
+          `[customE2EE] key version mismatch for ${conversationId}: requested=${versionHint} got=${entry.version}`,
         );
+      } else {
+        keyCache.set(conversationId, entry);
       }
-      keyCache.set(conversationId, entry);
       return entry;
     } finally {
       inflight.delete(conversationId);

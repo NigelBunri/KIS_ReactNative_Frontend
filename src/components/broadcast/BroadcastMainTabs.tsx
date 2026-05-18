@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 
 export type BroadcastMainTabId =
@@ -27,7 +28,7 @@ const TABS: TabDef[] = [
 ];
 
 export default function BroadcastMainTabs({ value, onChange }: Props) {
-  const { palette, tokens } = useKISTheme();
+  const { palette, tokens, tone } = useKISTheme();
   const inactiveTextColor = palette.ivory ?? '#FFFFFF';
   const inactiveIconColor = palette.goldSoft ?? 'rgba(255,244,184,0.86)';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
@@ -61,7 +62,7 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
             >
               {active ? (
                 <LinearGradient
-                  colors={[palette.primarySoft, palette.surface]}
+                  colors={tone === 'dark' ? [...KIS_ROYAL_GRADIENTS.goldDark] : [...KIS_ROYAL_GRADIENTS.goldLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
@@ -70,11 +71,11 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
               <KISIcon
                 name={t.icon as any}
                 size={15}
-                color={active ? palette.primaryStrong : inactiveIconColor}
+                color={active ? palette.onPrimary : inactiveIconColor}
               />
               <Text
                 style={{
-                  color: active ? palette.primaryStrong : inactiveTextColor,
+                  color: active ? palette.onPrimary : inactiveTextColor,
                   fontWeight: '900',
                   marginLeft: 6,
                   fontSize: 13,

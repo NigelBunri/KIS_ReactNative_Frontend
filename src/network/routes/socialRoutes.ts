@@ -1,6 +1,24 @@
 import { API_BASE_URL, NEST_API_BASE_URL } from '../config';
 
 const socialRoutes = {
+  content: {
+    list: `${API_BASE_URL}/api/v1/contents/`,
+    create: `${API_BASE_URL}/api/v1/contents/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/contents/${id}/`,
+    react: (id: string) => `${API_BASE_URL}/api/v1/contents/${id}/react/`,
+    metrics: (id: string) => `${API_BASE_URL}/api/v1/contents/${id}/metrics/`,
+  },
+  events: {
+    list: `${API_BASE_URL}/api/v1/api/events/`,
+    create: `${API_BASE_URL}/api/v1/api/events/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/api/events/${id}/`,
+    rsvp: `${API_BASE_URL}/api/v1/api/attendances/`,
+    tickets: `${API_BASE_URL}/api/v1/api/tickets/`,
+  },
+  notificationRules: {
+    list: `${API_BASE_URL}/api/v1/notification-rules/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/notification-rules/${id}/`,
+  },
   messaging: {
     getMessages: `${API_BASE_URL}/messages/fetch_messages/`,
     sendMessage: `${API_BASE_URL}/messages/send_message/`,
@@ -66,6 +84,7 @@ const socialRoutes = {
     view: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/view/`,
     viewers: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/viewers/`,
     report: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/report/`,
+    reply: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reply/`,
     mute: `${API_BASE_URL}/api/v1/statuses/mute/`,
     unmute: `${API_BASE_URL}/api/v1/statuses/unmute/`,
   },
@@ -75,6 +94,8 @@ const socialRoutes = {
     searchParticipants: `${API_BASE_URL}/api/v1/chats/conversations/participant-search/`,
     directConversation: `${API_BASE_URL}/api/v1/chats/conversations/direct/`,
     threads: `${API_BASE_URL}/api/v1/chats/threads/`,
+    setMemberRole: (conversationId: string) =>
+      `${API_BASE_URL}/api/v1/chats/conversations/${conversationId}/members/role/`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>

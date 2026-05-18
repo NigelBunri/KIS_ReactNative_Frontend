@@ -30,6 +30,10 @@ const billingRoutes = {
   revenueLaunchEvidenceReject: (id: string) => `${API_BASE_URL}/api/v1/billing/revenue-launch-evidence/${id}/reject/`,
   revenueLaunchEvidenceRevoke: (id: string) => `${API_BASE_URL}/api/v1/billing/revenue-launch-evidence/${id}/revoke/`,
   walletReceipt: `${API_BASE_URL}/api/v1/billing/wallet/receipt/`,
+  walletRefund: `${API_BASE_URL}/api/v1/billing/wallet/refund/`,
+  invoices: `${API_BASE_URL}/api/v1/tiers/invoices/`,
+  loyalty: `${API_BASE_URL}/api/v1/commerce/loyalty/`,
+  loyaltyBalance: `${API_BASE_URL}/api/v1/commerce/loyalty/balance/`,
 };
 
 export default billingRoutes;

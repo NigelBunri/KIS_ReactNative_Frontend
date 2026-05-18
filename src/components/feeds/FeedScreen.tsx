@@ -998,7 +998,11 @@ export default function FeedScreen<T extends FeedPost>({
 
                 <View style={{ marginTop: 10 }}>
                   <RichTextRenderer
-                    doc={(post.text ?? post.text_doc) ?? undefined}
+                    doc={
+                      (post.text_doc && typeof post.text_doc === 'object'
+                        ? post.text_doc
+                        : post.text ?? post.text_doc) ?? undefined
+                    }
                     fallback={
                       post.text_plain ??
                       (typeof post.text === 'string' ? post.text : '') ??

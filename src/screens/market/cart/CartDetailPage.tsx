@@ -24,6 +24,7 @@ import {
 } from '@/screens/market/cart/shopCartManager';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 
 type CartDetailRoute = RouteProp<RootStackParamList, 'CartDetail'>;
 type CartDetailNavigation = NativeStackNavigationProp<
@@ -41,6 +42,7 @@ const CartDetailPage = () => {
   const [cartState, setCartState] = useState(getShopCartState());
   const [shopAwaitingSatisfaction, setShopAwaitingSatisfaction] =
     useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -148,6 +150,53 @@ const CartDetailPage = () => {
       },
     ]);
   }, [navigation, shopId]);
+
+  const handleCheckout = useCallback(async () => {
+    if (!shopId || !items.length || checkingOut) return;
+    setCheckingOut(true);
+    try {
+      const orderItems = items.map(item => ({
+        product_id: item.productId,
+        variant_id: item.variantId || undefined,
+        quantity: item.quantity,
+        unit_price: item.price,
+        size: item.size || undefined,
+        color: item.color || undefined,
+      }));
+      const res = await postRequest(ROUTES.commerce.marketplaceOrders, {
+        shop_id: shopId,
+        items: orderItems,
+        metadata: { source: 'cart' },
+      });
+      if (res.success || res.data?.id) {
+        const orderId = res.data?.id;
+        void deleteShopCart(shopId);
+        Alert.alert(
+          'Order placed!',
+          'Your order has been submitted. Track it in your orders.',
+          [
+            {
+              text: 'View order',
+              onPress: () => {
+                if (orderId) {
+                  navigation.replace('MarketplaceOrderDetail', { orderId, mode: 'buyer' });
+                } else {
+                  navigation.navigate('MarketplaceOrders');
+                }
+              },
+            },
+            { text: 'OK', style: 'cancel', onPress: () => navigation.goBack() },
+          ],
+        );
+      } else {
+        Alert.alert('Order failed', res.message || 'Unable to place order. Please try again.');
+      }
+    } catch (e: any) {
+      Alert.alert('Order failed', e?.message || 'Unable to place order. Please try again.');
+    } finally {
+      setCheckingOut(false);
+    }
+  }, [shopId, items, checkingOut, navigation]);
 
   const renderOptionChips = (
     item: ShopCartItem,
@@ -370,15 +419,31 @@ const CartDetailPage = () => {
         </ScrollView>
       )}
       <View style={cartDetailStyles.footer}>
-        <Text style={[cartDetailStyles.footerText, { color: palette.text }]}>
-          Total · {formatUsdAmount(totalAmount)}
-        </Text>
-        <KISButton
-          title="Delete cart"
-          size="sm"
-          variant="outline"
-          onPress={handleDeleteCart}
-        />
+        <View style={{ flex: 1 }}>
+          <Text style={[cartDetailStyles.footerText, { color: palette.text }]}>
+            Total · {formatUsdAmount(totalAmount)}
+          </Text>
+          <Text style={{ color: (palette as any).subtext, fontSize: 11, marginTop: 2 }}>
+            {items.length} item{items.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <KISButton
+            title="Delete"
+            size="sm"
+            variant="outline"
+            onPress={handleDeleteCart}
+          />
+          {items.length > 0 && !cartIsCheckedOut && (
+            <KISButton
+              title={checkingOut ? 'Placing order…' : 'Checkout'}
+              size="sm"
+              variant="primary"
+              disabled={checkingOut}
+              onPress={handleCheckout}
+            />
+          )}
+        </View>
       </View>
     </View>
   );

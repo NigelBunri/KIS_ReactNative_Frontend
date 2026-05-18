@@ -45,6 +45,7 @@ import LiveWatchPage from '@/screens/broadcast/channels/LiveWatchPage';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
+import ModerationConsoleScreen from './src/screens/insights/ModerationConsoleScreen';
 import AnalyticsDashboardScreen from './src/screens/insights/AnalyticsDashboardScreen';
 import EventsDashboardScreen from './src/screens/insights/EventsDashboardScreen';
 import ContentDashboardScreen from './src/screens/insights/ContentDashboardScreen';
@@ -85,6 +86,8 @@ import {
   resolveLocationCountry,
 } from '@/services/locationCountryService';
 import { cleanIrrelevantStorage } from '@/utils/storageCleaner';
+import type { KISUser } from '@/types/user';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import CartsListPage from '@/screens/market/cart/CartsListPage';
 import CartDetailPage from '@/screens/market/cart/CartDetailPage';
 import MyOrdersPage from '@/screens/market/orders/MyOrdersPage';
@@ -95,6 +98,8 @@ import ProfileImpactSnapshotScreen from '@/screens/profile/ProfileImpactSnapshot
 import ProfileNotificationsScreen from '@/screens/profile/ProfileNotificationsScreen';
 import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificationDetailScreen';
 import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
+import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
+import EventsScreen from '@/screens/EventsScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
 
@@ -106,8 +111,8 @@ type AuthCtx = {
   countryISO?: string;
   callingCode?: string;
   refreshLocation?: (requestPermission?: boolean) => Promise<boolean>;
-  user?: any | null;
-  setUser?: (user: any | null) => void;
+  user?: KISUser | null;
+  setUser?: (user: KISUser | null) => void;
 };
 const AuthContext = createContext<AuthCtx>({
   isAuth: false,
@@ -133,7 +138,7 @@ function AppContent() {
   const [isAuth, setAuth] = useState(false);
   const [load, setLoad] = useState(false);
   const [_phone, setPhone] = useState<string | null>(null);
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<KISUser | null>(null);
   const [locationReady, setLocationReady] = useState(false);
   const [locationChecking, setLocationChecking] = useState(true);
   const [locationCountryISO, setLocationCountryISO] =
@@ -288,20 +293,31 @@ function AppContent() {
   }, [load, syncLocationCountry, checkAuth]);
 
   useEffect(() => {
+    if (!locationReady) return;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => syncLocationCountry(false), 60000);
+    };
+
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         syncLocationCountry(false);
+        startInterval();
+      } else {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
       }
     });
-    return () => subscription.remove();
-  }, [syncLocationCountry]);
 
-  useEffect(() => {
-    if (!locationReady) return;
-    const intervalId = setInterval(() => {
-      syncLocationCountry(false);
-    }, 60000);
-    return () => clearInterval(intervalId);
+    startInterval();
+    return () => {
+      subscription.remove();
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [locationReady, syncLocationCountry]);
 
   useEffect(() => {
@@ -475,6 +491,21 @@ function AppContent() {
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
+                      name="ModerationConsole"
+                      component={ModerationConsoleScreen}
+                      options={{ presentation: 'modal', title: 'Moderation Console' }}
+                    />
+                    <RootStack.Screen
+                      name="GlobalSearch"
+                      component={GlobalSearchScreen}
+                      options={{ presentation: 'modal', title: 'Search' }}
+                    />
+                    <RootStack.Screen
+                      name="Events"
+                      component={EventsScreen}
+                      options={{ presentation: 'modal', title: 'Events' }}
+                    />
+                    <RootStack.Screen
                       name="AnalyticsDashboard"
                       component={AnalyticsDashboardScreen}
                       options={{ presentation: 'modal' }}
@@ -556,6 +587,11 @@ function AppContent() {
                     />
                     <RootStack.Screen
                       name="MarketplaceProviderOrders"
+                      component={ProviderOrdersPage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="MarketplaceReceivedOrders"
                       component={ProviderOrdersPage}
                       options={{ presentation: 'modal' }}
                     />
@@ -686,9 +722,11 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AppContent />
-      </LanguageProvider>
+      <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
+        <LanguageProvider>
+          <AppContent />
+        </LanguageProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

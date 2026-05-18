@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -157,6 +158,10 @@ export default function UpdatesTab({
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef(0);
+  const videoRef = useRef<any>(null);
+  const seekBarWidthRef = useRef(0);
+  const [viewerReplyText, setViewerReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const channelsLoadInFlightRef = useRef(false);
   const statusesLoadInFlightRef = useRef(false);
   const channelsLastLoadAtRef = useRef(0);
@@ -661,6 +666,42 @@ export default function UpdatesTab({
       }
     }
   };
+
+  const handleSendReply = useCallback(async () => {
+    const text = viewerReplyText.trim();
+    if (!text || !currentItem?.id) return;
+    setSendingReply(true);
+    try {
+      await postRequest(ROUTES.statuses.reply(currentItem.id), { text });
+      setViewerReplyText('');
+    } finally {
+      setSendingReply(false);
+    }
+  }, [currentItem?.id, viewerReplyText]);
+
+  const seekPanResponder = useMemo(() => {
+    if (currentItem?.type !== 'video') return null;
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const w = seekBarWidthRef.current;
+        if (!w || !mediaDurationRef.current) return;
+        const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / w));
+        const seekTo = ratio * mediaDurationRef.current;
+        videoRef.current?.seek?.(seekTo);
+        setViewerProgress(ratio);
+      },
+      onPanResponderMove: (evt) => {
+        const w = seekBarWidthRef.current;
+        if (!w || !mediaDurationRef.current) return;
+        const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / w));
+        const seekTo = ratio * mediaDurationRef.current;
+        videoRef.current?.seek?.(seekTo);
+        setViewerProgress(ratio);
+      },
+    });
+  }, [currentItem?.type]);
 
   React.useEffect(() => {
     setViewerProgress(0);
@@ -1740,7 +1781,7 @@ export default function UpdatesTab({
 
           <Pressable style={styles.viewerTapZone} onPress={handlePrev} />
           <Pressable
-            style={[styles.viewerTapZone, { right: 0 }]}
+            style={[styles.viewerTapZone, { left: '50%' }]}
             onPress={handleNext}
           />
 
@@ -1768,6 +1809,7 @@ export default function UpdatesTab({
               </View>
             ) : currentItem?.type === 'video' && currentItem?.uri ? (
               <Video
+                ref={videoRef}
                 source={viewerMediaSource ?? { uri: currentItem.uri }}
                 style={styles.viewerImage}
                 resizeMode="cover"
@@ -1853,6 +1895,73 @@ export default function UpdatesTab({
               </View>
             )}
           </View>
+
+          {/* Seekable video progress bar — only shown for video items */}
+          {currentItem?.type === 'video' && seekPanResponder && (
+            <View
+              style={styles.videoSeekRow}
+              onLayout={e => { seekBarWidthRef.current = e.nativeEvent.layout.width; }}
+              {...seekPanResponder.panHandlers}
+            >
+              <View style={[styles.videoSeekTrack, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                <View
+                  style={[
+                    styles.videoSeekFill,
+                    { width: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%`, backgroundColor: '#fff' },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.videoSeekThumb,
+                    { left: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Status reply input — shown for other users' statuses when replies are allowed */}
+          {activeUser && activeUser.id !== 'me' && activeUser.userId !== currentUserId && currentItem?.replyPermission !== 'nobody' && (
+            <View style={[styles.viewerReplyRow, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
+              <TextInput
+                value={viewerReplyText}
+                onChangeText={setViewerReplyText}
+                placeholder={`Reply to ${activeUser.name}…`}
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                style={[styles.viewerReplyInput, { color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }]}
+                returnKeyType="send"
+                onSubmitEditing={handleSendReply}
+              />
+              <Pressable
+                onPress={handleSendReply}
+                disabled={sendingReply || !viewerReplyText.trim()}
+                style={[styles.viewerReplySend, { backgroundColor: palette.primary }]}
+              >
+                <KISIcon name="send" size={16} color="#fff" />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Seen-by count for own statuses */}
+          {activeUser && (activeUser.id === 'me' || activeUser.userId === currentUserId) && currentItem && (
+            <Pressable
+              style={styles.viewerSeenRow}
+              onPress={async () => {
+                const res = await getRequest(ROUTES.statuses.viewers(currentItem.id), {});
+                const viewers: any[] = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
+                if (viewers.length === 0) {
+                  Alert.alert('Views', 'No one has viewed this status yet.');
+                } else {
+                  Alert.alert('Seen by', viewers.map((v: any) => v.viewer_name ?? v.viewer_id ?? 'Someone').join('\n'));
+                }
+              }}
+            >
+              <KISIcon name="eye" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginLeft: 4 }}>
+                {currentItem.viewed ? 'Seen' : 'Not yet seen'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </Modal>
     </View>
@@ -2088,6 +2197,63 @@ const styles = StyleSheet.create({
     width: '50%',
     left: 0,
     zIndex: 5,
+  },
+  videoSeekRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    zIndex: 15,
+  },
+  videoSeekTrack: {
+    height: 4,
+    borderRadius: 999,
+    overflow: 'visible',
+    justifyContent: 'center',
+  },
+  videoSeekFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: 4,
+    borderRadius: 999,
+  },
+  videoSeekThumb: {
+    position: 'absolute',
+    top: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginLeft: -8,
+  },
+  viewerReplyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    zIndex: 15,
+  },
+  viewerReplyInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  viewerReplySend: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerSeenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    zIndex: 15,
   },
   viewerContent: {
     flex: 1,

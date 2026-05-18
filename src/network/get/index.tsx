@@ -5,6 +5,7 @@ import { getOfflineCache, setCache, setOfflineCache } from '../cache';
 import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
 import { getAccessToken } from '@/security/authStorage';
+import { refreshAccessToken } from '@/security/tokenRefresh';
 import { recordRedactedPerformanceEvent } from '@/services/performanceOfflineService';
 
 export type GetResponse<T = any> = ApiResult<T>;
@@ -130,6 +131,22 @@ export const getRequest = async (
         }
       }
       return { success: true, data: responseData, message: options.successMessage || '' };
+    }
+
+    // Attempt a silent token refresh on 401, then retry once.
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
+        const retryResponse = await apiService.get(finalUrl, retryHeaders);
+        const retryData = await retryResponse.json().catch(() => ({}));
+        if (retryResponse.ok) {
+          recentSuccessByUrl.set(finalUrl, { at: Date.now(), payload: retryData });
+          return { success: true, data: retryData, message: options.successMessage || '' };
+        }
+        return { success: false, message: options.errorMessage || 'Session expired.', status: retryResponse.status, data: retryData };
+      }
+      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
     }
 
     if (response.status === 429) {

@@ -1711,12 +1711,21 @@ export default function ProfileScreen() {
         tone: 'info' as const,
         onPress: openShopEditorForCreate,
       },
+      {
+        key: 'view-events',
+        title: 'Community Events',
+        subtitle: 'Browse and RSVP to events',
+        icon: 'calendar' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('Events'),
+      },
     ],
     [
       c.openCreatePartner,
       canCreatePartner,
       openManagementPanel,
       openShopEditorForCreate,
+      rootNavigation,
     ],
   );
 
@@ -2458,6 +2467,12 @@ export default function ProfileScreen() {
                 </View>
                 {canOpenVerificationStaffConsole ? (
                   <>
+                    <KISButton
+                      title="Moderation console"
+                      variant="secondary"
+                      onPress={() => rootNavigation?.navigate('ModerationConsole')}
+                      style={{ marginBottom: 4 }}
+                    />
                     <RevenueEvidenceAdminPanel />
                     <MonetizationSafetyCard />
                     <ProfitabilityCommandCenterCard />

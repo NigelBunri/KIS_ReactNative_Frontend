@@ -555,7 +555,7 @@ export default function EducationProfileManager({ initialProfileId = null }: Pro
             <KISButton
               size="xs"
               title="View analytics"
-              onPress={() => Alert.alert('Analytics', 'Federated analytics coming soon.')}
+              onPress={() => Alert.alert('Coming soon', 'Education analytics will be available in an upcoming update.')}
             />
             <KISButton
               size="xs"

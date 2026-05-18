@@ -76,6 +76,14 @@ export type KISIconName =
   | 'link'
   | 'sparkles'
   | 'school'
+  | 'storefront'
+  | 'flame'
+  | 'card'
+  | 'gift'
+  | 'warning'
+  | 'crown'
+  | 'message'
+  | 'lock'
   | 'list'
   // NEW — specific file types
   | 'file-pdf'
@@ -260,6 +268,13 @@ const ion: IonMap = {
   link: { filled: 'link', outline: 'link-outline' },
   sparkles: { filled: 'sparkles', outline: 'sparkles-outline' },
   school: { filled: 'school', outline: 'school-outline' },
+  storefront: { filled: 'storefront', outline: 'storefront-outline' },
+  flame: { filled: 'flame', outline: 'flame-outline' },
+  card: { filled: 'card', outline: 'card-outline' },
+  gift: { filled: 'gift', outline: 'gift-outline' },
+  warning: { filled: 'warning', outline: 'warning-outline' },
+  message: { filled: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
+  lock: { filled: 'lock-closed', outline: 'lock-closed-outline' },
   list: { filled: 'list', outline: 'list-outline' },
   plus: { filled: 'add', outline: 'add-outline' },
   bookmark: { filled: 'bookmark', outline: 'bookmark-outline' },
@@ -326,6 +341,17 @@ export const KISIcon: React.FC<KISIconProps> = ({
     return (
       <MaterialCommunityIcons
         name="rotate-right"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'crown') {
+    return (
+      <MaterialCommunityIcons
+        name={focused ? 'crown' : 'crown-outline'}
         size={resolvedSize}
         color={iconColor}
         style={style}

@@ -25,6 +25,20 @@ import TrendingClipsSection from '@/screens/broadcast/feeds/sections/TrendingCli
 import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
 import type { BroadcastFeedItem } from '@/screens/broadcast/feeds/api/feeds.types';
 import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroadcastPosterId';
+import { KISIcon } from '@/constants/kisIcons';
+
+type FeedCategory = 'for_you' | 'following' | 'trending' | 'live' | 'channels' | 'community' | 'market' | 'education';
+
+const CATEGORIES: Array<{ id: FeedCategory; label: string; icon?: string }> = [
+  { id: 'for_you', label: 'For You', icon: 'star' },
+  { id: 'following', label: 'Following', icon: 'person' },
+  { id: 'trending', label: 'Trending', icon: 'fire' },
+  { id: 'live', label: 'Live', icon: 'broadcast' },
+  { id: 'channels', label: 'Channels', icon: 'play' },
+  { id: 'community', label: 'Community', icon: 'people' },
+  { id: 'market', label: 'Market', icon: 'bag' },
+  { id: 'education', label: 'Education', icon: 'book' },
+];
 
 type Props = {
   searchTerm?: string;
@@ -43,7 +57,7 @@ export default function FeedsDiscoverPage({
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
-  const styles = useMemo(() => makeStyles(), []);
+  const [activeCategory, setActiveCategory] = useState<FeedCategory>('for_you');
 
   const {
     items,
@@ -62,43 +76,78 @@ export default function FeedsDiscoverPage({
   } = useFeedsData({ q: searchTerm, code });
 
   const filteredFeed = useMemo(() => {
-    // backend already filters by q, but keep safety for local quick filtering
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(it => {
-      const hay = `${it.title ?? ''} ${it.text_plain ?? ''} ${
-        it.source?.name ?? ''
-      } ${it.author?.display_name ?? ''}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [items, searchTerm]);
-
-  const displayItems = useMemo(() => {
-    const nonHealthcare = filteredFeed.filter(
+    const nonHealthcare = items.filter(
       item =>
         String(item.source_type || '').toLowerCase() !== 'healthcare' &&
         String(item.source?.type || '').toLowerCase() !== 'healthcare',
     );
-    const context = (searchContext ?? '').trim().toLowerCase();
-    if (!context || context === 'latest') {
-      return nonHealthcare;
+    if (q) {
+      return nonHealthcare.filter(it => {
+        const hay = `${it.title ?? ''} ${it.text_plain ?? ''} ${
+          it.source?.name ?? ''
+        } ${it.author?.display_name ?? ''}`.toLowerCase();
+        return hay.includes(q);
+      });
     }
-
-    if (context === 'saved') {
-      return nonHealthcare.filter(item => Boolean(item.viewer_saved));
-    }
-
-    if (context === 'trending') {
-      return [...nonHealthcare].sort(
-        (a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0),
-      );
-    }
-
     return nonHealthcare;
-  }, [filteredFeed, searchContext]);
+  }, [items, searchTerm]);
+
+  const displayItems = useMemo(() => {
+    const context = (searchContext ?? '').trim().toLowerCase();
+    const category = showTrendingOnly ? 'trending' : activeCategory;
+
+    // Apply search context first
+    let base = filteredFeed;
+    if (context === 'saved') return base.filter(item => Boolean(item.viewer_saved));
+
+    switch (category) {
+      case 'trending':
+        return [...base].sort(
+          (a, b) =>
+            (b.reaction_count ?? 0) + (b.comment_count ?? 0) * 2 -
+            ((a.reaction_count ?? 0) + (a.comment_count ?? 0) * 2),
+        );
+      case 'live':
+        return base.filter(item => Boolean(item.is_live));
+      case 'channels':
+        return base.filter(item =>
+          ['channel', 'channel_content', 'broadcast_channel'].includes(
+            String(item.source_type || '').toLowerCase(),
+          ),
+        );
+      case 'community':
+        return base.filter(item =>
+          String(item.source_type || '').toLowerCase() === 'community',
+        );
+      case 'market':
+        return base.filter(item =>
+          ['market', 'market_product', 'market_service'].includes(
+            String(item.source_type || '').toLowerCase(),
+          ),
+        );
+      case 'education':
+        return base.filter(item =>
+          ['education', 'lesson', 'broadcast_education'].includes(
+            String(item.source_type || '').toLowerCase(),
+          ),
+        );
+      case 'following':
+        return base.filter(item => Boolean(item.source?.is_subscribed || item.source?.is_member));
+      case 'for_you':
+      default:
+        return base;
+    }
+  }, [filteredFeed, searchContext, showTrendingOnly, activeCategory]);
+
+  const liveItems = useMemo(
+    () => filteredFeed.filter(item => Boolean(item.is_live)),
+    [filteredFeed],
+  );
 
   const handleTrendingSeeAll = () => {
     setShowTrendingOnly(true);
+    setActiveCategory('trending');
     if (typeof onTrendingSeeAll === 'function') {
       onTrendingSeeAll();
     }
@@ -106,6 +155,7 @@ export default function FeedsDiscoverPage({
 
   const handleTrendingBack = () => {
     setShowTrendingOnly(false);
+    setActiveCategory('for_you');
   };
 
   const activeFeedItems = showTrendingOnly ? trendingFeeds : displayItems;
@@ -342,15 +392,76 @@ export default function FeedsDiscoverPage({
       }}
       scrollEventThrottle={16}
     >
+      {/* Category filter tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryRow}
+        style={{ flexShrink: 0 }}
+      >
+        {CATEGORIES.map(cat => {
+          const active = !showTrendingOnly && activeCategory === cat.id;
+          return (
+            <Pressable
+              key={cat.id}
+              onPress={() => {
+                setShowTrendingOnly(false);
+                setActiveCategory(cat.id);
+              }}
+              style={[
+                styles.categoryPill,
+                {
+                  backgroundColor: active
+                    ? palette.primaryStrong
+                    : palette.surface,
+                  borderColor: active
+                    ? palette.primaryStrong
+                    : palette.divider,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryLabel,
+                  { color: active ? '#fff' : palette.text },
+                ]}
+              >
+                {cat.label}
+              </Text>
+              {cat.id === 'live' && liveItems.length > 0 && (
+                <View style={styles.liveDot} />
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       <View style={{ paddingHorizontal: 12, gap: 12 }}>
-        {!showTrendingOnly ? (
+        {/* Live items banner */}
+        {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
+          <Pressable
+            onPress={() => setActiveCategory('live')}
+            style={[
+              styles.liveBanner,
+              { backgroundColor: palette.surface, borderColor: palette.error ?? '#e74c3c' },
+            ]}
+          >
+            <View style={styles.livePulse} />
+            <Text style={[styles.liveBannerText, { color: palette.error ?? '#e74c3c' }]}>
+              {liveItems.length} live {liveItems.length === 1 ? 'broadcast' : 'broadcasts'} now
+            </Text>
+            <KISIcon name="arrow-right" size={14} color={palette.error ?? '#e74c3c'} />
+          </Pressable>
+        )}
+
+        {!showTrendingOnly && activeCategory === 'for_you' ? (
           <TrendingClipsSection
             items={trending}
             onSeeAll={handleTrendingSeeAll}
             onOpen={() => {}}
             onReact={() => {}}
           />
-        ) : (
+        ) : showTrendingOnly ? (
           <View style={styles.trendingButtonRow}>
             <Pressable
               onPress={handleTrendingBack}
@@ -362,10 +473,33 @@ export default function FeedsDiscoverPage({
                 },
               ]}
             >
+              <KISIcon name="arrow-left" size={14} color={palette.primaryStrong} />
               <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
-                Trending feeds
+                Back to feed
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {/* Empty state for filtered categories */}
+        {!loading && activeFeedItems.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, { color: palette.text }]}>
+              {activeCategory === 'live'
+                ? 'No live broadcasts right now'
+                : activeCategory === 'following'
+                ? 'Follow channels and communities to see their posts here'
+                : activeCategory === 'market'
+                ? 'No market broadcasts in your feed'
+                : 'Nothing here yet'}
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>
+              {activeCategory === 'live'
+                ? 'Check back soon — live sessions will appear when they start'
+                : activeCategory === 'following'
+                ? 'Subscribe to channels and join communities to build your feed'
+                : 'Pull down to refresh'}
+            </Text>
           </View>
         )}
 
@@ -427,16 +561,79 @@ export default function FeedsDiscoverPage({
   );
 }
 
-const makeStyles = () =>
-  StyleSheet.create({
-    trendingButtonRow: {
-      alignItems: 'center',
-      marginVertical: 12,
-    },
-    trendingButton: {
-      paddingHorizontal: 28,
-      paddingVertical: 10,
-      borderRadius: 999,
-      borderWidth: 2,
-    },
-  });
+const styles = StyleSheet.create({
+  categoryRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    gap: 5,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#e74c3c',
+  },
+  liveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  livePulse: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#e74c3c',
+  },
+  liveBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  trendingButtonRow: {
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  trendingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 2,
+  },
+  emptyState: {
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+});

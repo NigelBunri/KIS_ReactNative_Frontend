@@ -33,6 +33,9 @@ export type RootStackParamList = {
   PartnerInsights: undefined;
   AdminTools: undefined;
   AdminDashboard: { target: string; title: string };
+  ModerationConsole: undefined;
+  GlobalSearch: undefined;
+  Events: undefined;
   AnalyticsDashboard: undefined;
   EventsDashboard: undefined;
   ContentDashboard: undefined;

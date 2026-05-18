@@ -60,8 +60,7 @@ export type AddContactsPageProps = {
 
 const CONTACTS_CACHE_KEY = 'kis.contacts.cache.v1';
 
-// 🔗 TODO: replace with real public download / invite link
-const KIS_INVITE_LINK = 'https://your-kis-download-link';
+const KIS_INVITE_LINK = 'https://kis.app';
 
 // Small helper to normalize phone numbers for matching
 const normalizePhone = (phone: string) => phone.replace(/[^0-9+]/g, '');

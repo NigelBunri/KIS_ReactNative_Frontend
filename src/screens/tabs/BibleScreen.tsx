@@ -1,6 +1,6 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useBibleData } from './bible/useBibleData';
@@ -11,6 +11,8 @@ import BiblePlansPanel from '../../components/Bible/BiblePlansPanel';
 import PrayerPanel from '../../components/Bible/PrayerPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
+import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
+import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
 import { KISIcon } from '../../constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { MainTabPageHeader } from '@/components/common/MainTabScaffold';
@@ -18,14 +20,6 @@ import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/Cons
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 
 export default function BibleScreen() {
-  const { palette, tone } = useKISTheme();
-  const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
-  const [activeTab, setActiveTab] = useState('read');
-  const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
-  const headerScrollY = useRef(new Animated.Value(0)).current;
-  const [topChromeHeight, setTopChromeHeight] = useState(240);
   const {
     translations,
     books,
@@ -38,6 +32,16 @@ export default function BibleScreen() {
     spiritualGrowthSummary,
     loadReader,
   } = useBibleData();
+  const { palette, tone } = useKISTheme();
+  const metallicGoldGradient = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const [activeTab, setActiveTab] = useState('read');
+  const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
+  const headerScrollY = useRef(new Animated.Value(0)).current;
+  const headerScrollOffsetRef = useRef(0);
+  const gestureStartOffsetRef = useRef(0);
+  const [topChromeHeight, setTopChromeHeight] = useState(240);
   const growthCounts = spiritualGrowthSummary?.counts ?? {};
   const growthReadiness = spiritualGrowthSummary?.readiness ?? {};
 
@@ -49,6 +53,8 @@ export default function BibleScreen() {
       { key: 'prayer-calendar', label: 'Prayer Calendar', icon: 'heart' },
       { key: 'reading-planner', label: 'Reading Planner', icon: 'list' },
       { key: 'lessons', label: 'Lessons', icon: 'layers' },
+      { key: 'books', label: 'Books', icon: 'library' },
+      { key: 'messages', label: 'Messages', icon: 'videocam' },
       { key: 'settings', label: 'Settings', icon: 'settings' },
     ],
     [],
@@ -71,7 +77,58 @@ export default function BibleScreen() {
     headerScrollY.setValue(0);
   }, [activeTab, headerScrollY]);
 
+  useEffect(() => {
+    const listenerId = headerScrollY.addListener(({ value }) => {
+      headerScrollOffsetRef.current = value;
+    });
+    return () => headerScrollY.removeListener(listenerId);
+  }, [headerScrollY]);
+
   const topChromeCollapseDistance = Math.max(topChromeHeight, 1);
+  const clampHeaderOffset = useCallback(
+    (value: number) => Math.max(0, Math.min(topChromeCollapseDistance, value)),
+    [topChromeCollapseDistance],
+  );
+  const topAreaPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dy) > 8 &&
+          Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
+        onPanResponderGrant: () => {
+          gestureStartOffsetRef.current = headerScrollOffsetRef.current;
+        },
+        onPanResponderMove: (_, gesture) => {
+          headerScrollY.setValue(
+            clampHeaderOffset(gestureStartOffsetRef.current - gesture.dy),
+          );
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const nextOffset = clampHeaderOffset(
+            gestureStartOffsetRef.current - gesture.dy,
+          );
+          const shouldCollapse =
+            gesture.vy < -0.35 || nextOffset > topChromeCollapseDistance * 0.45;
+          const shouldExpand =
+            gesture.vy > 0.35 || nextOffset < topChromeCollapseDistance * 0.18;
+          Animated.spring(headerScrollY, {
+            toValue: shouldExpand ? 0 : shouldCollapse ? topChromeCollapseDistance : nextOffset,
+            useNativeDriver: false,
+            friction: 9,
+            tension: 90,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(headerScrollY, {
+            toValue: clampHeaderOffset(headerScrollOffsetRef.current),
+            useNativeDriver: false,
+            friction: 9,
+            tension: 90,
+          }).start();
+        },
+      }),
+    [clampHeaderOffset, headerScrollY, topChromeCollapseDistance],
+  );
   const topChromeAnimatedStyle = {
     height: headerScrollY.interpolate({
       inputRange: [0, topChromeCollapseDistance],
@@ -128,6 +185,10 @@ export default function BibleScreen() {
         return <BiblePlansPanel />;
       case 'lessons':
         return <BibleLessonsPanel />;
+      case 'books':
+        return <BibleBooksPanel />;
+      case 'messages':
+        return <BibleMessagesPanel />;
       case 'settings':
         return <BibleSettingsPanel translations={translations} />;
       default:
@@ -137,7 +198,10 @@ export default function BibleScreen() {
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
-      <Animated.View style={[styles.topChrome, topChromeAnimatedStyle]}>
+      <Animated.View
+        {...topAreaPanResponder.panHandlers}
+        style={[styles.topChrome, topChromeAnimatedStyle]}
+      >
         <View
           style={styles.topChromeMeasure}
           onLayout={(event) => {
@@ -243,48 +307,53 @@ export default function BibleScreen() {
         </View>
       </Animated.View>
 
-      <View style={styles.tabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
-          {tabs.map((tab) => {
-            const isActive = tab.key === activeTab;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[
-                  styles.tabChip,
-                  {
-                    backgroundColor: isActive ? palette.goldDeep : palette.surface,
-                    borderColor: isActive ? palette.goldLight : palette.divider,
-                  },
-                ]}
-              >
-                {isActive ? (
-                  <LinearGradient
-                    colors={metallicGoldGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                ) : null}
-                {isActive ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
-                <View style={styles.tabLabel}>
-                  <KISIcon
-                    name={tab.icon as any}
-                    size={14}
-                    color={isActive ? palette.ivory : palette.subtext}
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={{ color: isActive ? palette.ivory : palette.text, fontWeight: '800' }}
-                  >
-                    {tab.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+      <View
+        {...topAreaPanResponder.panHandlers}
+        style={[styles.stickyTabsOuter, { backgroundColor: palette.bg }]}
+      >
+        <View style={styles.tabsWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+            {tabs.map((tab) => {
+              const isActive = tab.key === activeTab;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[
+                    styles.tabChip,
+                    {
+                      backgroundColor: isActive ? palette.goldDeep : palette.surface,
+                      borderColor: isActive ? palette.goldLight : palette.divider,
+                    },
+                  ]}
+                >
+                  {isActive ? (
+                    <LinearGradient
+                      colors={metallicGoldGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  ) : null}
+                  {isActive ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
+                  <View style={styles.tabLabel}>
+                    <KISIcon
+                      name={tab.icon as any}
+                      size={14}
+                      color={isActive ? palette.ivory : palette.subtext}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: isActive ? palette.ivory : palette.text, fontWeight: '800' }}
+                    >
+                      {tab.label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
 
       <View style={styles.contentWrap}>
@@ -327,6 +396,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 16 },
   topChrome: { overflow: 'hidden' },
   topChromeMeasure: { paddingBottom: 2 },
+  stickyTabsOuter: { zIndex: 10, paddingTop: 2, paddingBottom: 2 },
   tabsWrapper: { paddingVertical: 8 },
   tabRow: { gap: 8, paddingVertical: 4, alignItems: 'center' },
   tabChip: {

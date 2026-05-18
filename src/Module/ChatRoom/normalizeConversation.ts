@@ -160,6 +160,8 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
     isMuted,
     isPinned,
     isHidden,
+    isPartner: !!(raw.is_partner ?? raw.isPartner ?? raw.partner_id ?? raw.partnerId ?? String(raw.kind ?? '').includes('partner') ?? String(raw.type ?? '').includes('partner')),
+    isVerified: !!(raw.is_verified ?? raw.isVerified),
   };
 }
 

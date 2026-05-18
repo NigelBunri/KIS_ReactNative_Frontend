@@ -25,6 +25,7 @@ type NewGroupFormProps = {
     text: string;
     subtext: string;
     primary: string;
+    onPrimary: string;
     inputBorder: string;
     error?: string;
   };
@@ -450,13 +451,13 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
         })}
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={palette.onPrimary} />
         ) : (
           <>
-            <KISIcon name="people" size={16} color="#fff" />
+            <KISIcon name="people" size={16} color={palette.onPrimary} />
             <Text
               style={{
-                color: '#fff',
+                color: palette.onPrimary,
                 fontSize: 14,
                 fontWeight: '600',
                 marginLeft: 6,

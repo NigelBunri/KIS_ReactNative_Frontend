@@ -3,11 +3,14 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import SoloPractitionerDashboard from '@/screens/health/SoloPractitionerDashboard';
 import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
@@ -253,6 +256,7 @@ export default function BroadcastHealthcarePage({
     Record<string, InstitutionCardDetails>
   >({});
   const [joiningInstitutionId, setJoiningInstitutionId] = useState('');
+  const [showPractitionerDashboard, setShowPractitionerDashboard] = useState(false);
 
   useEffect(() => {
     const nextFilter = String(searchContext || '')
@@ -644,6 +648,53 @@ export default function BroadcastHealthcarePage({
         gap: 12,
       }}
     >
+      {/* Solo Practitioner Entry Card */}
+      <Pressable
+        onPress={() => setShowPractitionerDashboard(true)}
+        style={{
+          borderWidth: 1.5,
+          borderColor: palette.primary,
+          backgroundColor: palette.primarySoft,
+          borderRadius: 18,
+          padding: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: palette.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <KISIcon name="person-circle-outline" size={24} color="#fff" />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>
+            I'm an Individual Practitioner
+          </Text>
+          <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 12, opacity: 0.8 }}>
+            Offer e-consultations, video sessions & more as a solo provider
+          </Text>
+        </View>
+        <KISIcon name="chevron-forward-outline" size={18} color={palette.primaryStrong} />
+      </Pressable>
+
+      {/* Solo Practitioner Dashboard Modal */}
+      <Modal
+        visible={showPractitionerDashboard}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPractitionerDashboard(false)}
+      >
+        <SoloPractitionerDashboard onClose={() => setShowPractitionerDashboard(false)} />
+      </Modal>
+
       {withTimeFilter.map(item => {
         const card = item.health_card || {};
         const statusKey = String(card.status || 'available').toLowerCase();

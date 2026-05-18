@@ -58,17 +58,17 @@ export const usePartnersData = () => {
   );
 
   const groupsForPartner: PartnerGroup[] = useMemo(
-    () => partnerGroups.filter((g) => g.partner === selectedPartner?.id),
+    () => partnerGroups.filter((g) => String(g.partner ?? '') === String(selectedPartner?.id ?? '')),
     [partnerGroups, selectedPartner?.id],
   );
 
   const communitiesForPartner: PartnerCommunity[] = useMemo(
-    () => partnerCommunities.filter((c) => c.partner === selectedPartner?.id),
+    () => partnerCommunities.filter((c) => String(c.partner ?? '') === String(selectedPartner?.id ?? '')),
     [partnerCommunities, selectedPartner?.id],
   );
 
   const channelsForPartner: PartnerChannel[] = useMemo(
-    () => partnerChannels.filter((c) => c.partner === selectedPartner?.id),
+    () => partnerChannels.filter((c) => String(c.partner ?? '') === String(selectedPartner?.id ?? '')),
     [partnerChannels, selectedPartner?.id],
   );
 
@@ -188,6 +188,31 @@ export const usePartnersData = () => {
     loadPartnerDiscordSummary,
   ]);
 
+  const handlePartnerItemCreated = useCallback(
+    (kind: 'group' | 'channel' | 'community', data: any) => {
+      if (!data?.id) return;
+      if (kind === 'group') {
+        setPartnerGroups((prev) =>
+          prev.some((g) => g.id === data.id) ? prev : [...prev, data as PartnerGroup],
+        );
+      } else if (kind === 'channel') {
+        setPartnerChannels((prev) =>
+          prev.some((c) => c.id === data.id) ? prev : [...prev, data as PartnerChannel],
+        );
+      } else if (kind === 'community') {
+        setPartnerCommunities((prev) =>
+          prev.some((c) => c.id === data.id) ? prev : [...prev, data as PartnerCommunity],
+        );
+      }
+      if (selectedPartnerId) {
+        loadPartnerGroups(selectedPartnerId);
+        loadPartnerChannels(selectedPartnerId);
+        loadPartnerCommunities(selectedPartnerId);
+      }
+    },
+    [selectedPartnerId, loadPartnerGroups, loadPartnerChannels, loadPartnerCommunities],
+  );
+
   useEffect(() => {
     const initial: Record<string, boolean> = {};
     communitiesForPartner.forEach((c) => {
@@ -227,6 +252,7 @@ export const usePartnersData = () => {
     channelsForPartner,
     communitiesForPartner,
     reloadSelectedPartner,
+    handlePartnerItemCreated,
     reloadPartners: loadPartners,
   };
 };

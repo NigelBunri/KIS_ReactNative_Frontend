@@ -7,11 +7,13 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
   DeviceEventEmitter,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +25,8 @@ import type { Chat, ParticipantWire, UserWire } from './messagesUtils';
 import { directConversationAvatar, participantsToIds } from './messagesUtils';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
+import { handleRemoveGroupMember } from './ChatRoomHandlers';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from './uploadFileToBackend';
 import Skeleton from '@/components/common/Skeleton';
@@ -88,6 +92,9 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const [avatarPreview, setAvatarPreview] = useState<{ uri: string } | null>(null);
   const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
   const avatarAnim = useMemo(() => new Animated.Value(0), []);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [roleChanging, setRoleChanging] = useState<string | null>(null);
 
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
@@ -308,6 +315,96 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFetchInviteLink = async () => {
+    if (!groupId || inviteLinkLoading) return;
+    setInviteLinkLoading(true);
+    try {
+      const res = await postRequest(
+        `${ROUTES.groups.detail(groupId)}invite-link/`,
+        {},
+        { errorMessage: 'Failed to generate invite link' },
+      );
+      const link =
+        res?.data?.link ??
+        res?.data?.invite_link ??
+        res?.data?.url ??
+        (typeof res?.data === 'string' ? res.data : null);
+      if (link) {
+        setInviteLink(String(link));
+      } else {
+        Alert.alert('Invite link', 'Could not retrieve an invite link.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to fetch invite link.');
+    } finally {
+      setInviteLinkLoading(false);
+    }
+  };
+
+  const handleSetMemberRole = async (memberId: string, userId: string, newRole: string) => {
+    const conversationId = String(chat.conversationId ?? chat.id ?? '');
+    if (!conversationId || !userId || roleChanging) return;
+    setRoleChanging(userId);
+    try {
+      await postRequest(ROUTES.chat.setMemberRole(conversationId), { user_id: userId, base_role: newRole }, {});
+      setMemberList(prev =>
+        prev.map(m => {
+          const mId = resolveUserId(m.user);
+          return mId === userId ? { ...m, base_role: newRole } : m;
+        }),
+      );
+    } catch {
+      Alert.alert('Error', 'Could not change member role.');
+    } finally {
+      setRoleChanging(null);
+    }
+  };
+
+  const showMemberActions = (p: ParticipantWire) => {
+    const userId = resolveUserId(p.user);
+    if (!userId || !isAdmin) return;
+    if (userId === currentUserId) return;
+    const currentRole = String(p.base_role ?? 'member').toLowerCase();
+    const isTargetAdmin = currentRole === 'admin' || currentRole === 'owner';
+    const memberId = String(p.id ?? userId);
+    Alert.alert(
+      resolveUserName(p.user) || 'Member',
+      'Manage this member',
+      [
+        isTargetAdmin
+          ? { text: 'Demote to member', onPress: () => void handleSetMemberRole(memberId, userId, 'member') }
+          : { text: 'Promote to admin', onPress: () => void handleSetMemberRole(memberId, userId, 'admin') },
+        {
+          text: 'Remove from group',
+          style: 'destructive',
+          onPress: () => {
+            const conversationId = String(chat.conversationId ?? chat.id ?? '');
+            Alert.alert(
+              'Remove member',
+              `Remove ${resolveUserName(p.user) || 'this member'} from the group?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Remove',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await handleRemoveGroupMember({ conversationId, userId });
+                      setMemberList(prev => prev.filter(m => resolveUserId(m.user) !== userId));
+                    } catch {
+                      Alert.alert('Error', 'Could not remove member. Please try again.');
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const groupMembers = memberList.length ? memberList : participants;
@@ -795,6 +892,75 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         {isGroup && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Invite link
+            </Text>
+            <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+              {inviteLink ? (
+                <>
+                  <Text
+                    style={[styles.infoValue, { color: palette.text }]}
+                    numberOfLines={2}
+                    selectable
+                  >
+                    {inviteLink}
+                  </Text>
+                  <View style={styles.inviteLinkActions}>
+                    <Pressable
+                      onPress={() => {
+                        try {
+                          Clipboard.setString(inviteLink);
+                          Alert.alert('Copied', 'Invite link copied to clipboard.');
+                        } catch {
+                          Share.share({ message: inviteLink }).catch(() => {});
+                        }
+                      }}
+                      style={({ pressed }) => [
+                        styles.inviteLinkBtn,
+                        { backgroundColor: palette.primary, opacity: pressed ? 0.7 : 1 },
+                      ]}
+                    >
+                      <KISIcon name="copy" size={14} color={palette.onPrimary ?? '#fff'} />
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                        Copy
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        Share.share({ message: inviteLink }).catch(() => {});
+                      }}
+                      style={({ pressed }) => [
+                        styles.inviteLinkBtn,
+                        { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider, opacity: pressed ? 0.7 : 1 },
+                      ]}
+                    >
+                      <KISIcon name="share" size={14} color={palette.text} />
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>
+                        Share
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <Pressable
+                  onPress={handleFetchInviteLink}
+                  style={({ pressed }) => [
+                    styles.inviteLinkBtn,
+                    { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading ? 0.7 : 1 },
+                  ]}
+                >
+                  <KISIcon name="link" size={14} color={palette.onPrimary ?? '#fff'} />
+                  <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                    {inviteLinkLoading ? 'Loading...' : 'Generate invite link'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
+        {isGroup && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Members
             </Text>
             {membersLoading ? (
@@ -813,21 +979,42 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   'Member';
                 const roleLabel = p.base_role ? String(p.base_role) : '';
                 const phone = resolveUserPhone(p.user);
+                const membUserId = resolveUserId(p.user);
+                const isChanging = roleChanging === membUserId;
+                const isAdminOrOwner = roleLabel === 'admin' || roleLabel === 'owner';
                 return (
-                  <View
-                    key={`${resolveUserId(p.user) ?? index}`}
-                    style={[styles.memberRow, { borderBottomColor: palette.divider }]}
+                  <Pressable
+                    key={`${membUserId ?? index}`}
+                    style={({ pressed }) => [
+                      styles.memberRow,
+                      { borderBottomColor: palette.divider, backgroundColor: pressed ? palette.surface : 'transparent' },
+                    ]}
+                    onPress={() => showMemberActions(p)}
+                    disabled={!isAdmin || membUserId === currentUserId}
                   >
                     <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface }]} />
-                    <View style={styles.memberInfo}>
+                    <View style={[styles.memberInfo, { flex: 1 }]}>
                       <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
                         {label}
                       </Text>
                       <Text style={[styles.memberRole, { color: palette.subtext }]} numberOfLines={1}>
-                        {phone || 'No phone'}{roleLabel ? ` • ${roleLabel}` : ''}
+                        {phone || 'No phone'}
                       </Text>
                     </View>
-                  </View>
+                    {(isAdminOrOwner || isChanging) && (
+                      <View style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 10,
+                        backgroundColor: palette.primarySoft ?? palette.surface,
+                        marginLeft: 8,
+                      }}>
+                        <Text style={{ color: palette.primaryStrong ?? palette.primary, fontSize: 11, fontWeight: '700' }}>
+                          {isChanging ? '…' : roleLabel}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
                 );
               })
             )}
@@ -1064,6 +1251,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  inviteLinkActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  inviteLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  inviteLinkBtnText: { fontSize: 13, fontWeight: '600' },
 });
 
 export default ChatInfoPage;

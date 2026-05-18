@@ -23,7 +23,7 @@ type Props = {
   partnerId?: string | null;
   onClose: () => void;
   onSwitchKind: (next: PartnerCreateKind) => void;
-  onCreated: () => void;
+  onCreated: (kind: PartnerCreateKind, data: any) => void;
 };
 
 export default function PartnerCreatePanel({
@@ -122,9 +122,9 @@ export default function PartnerCreatePanel({
           {kind === 'community' ? (
             <NewCommunityForm
               palette={palette}
-              onSuccess={() => {
+              onSuccess={(data) => {
                 Alert.alert('Partner', 'Community created.');
-                onCreated();
+                onCreated('community', data);
                 onClose();
               }}
               selectedMemberIds={[]}
@@ -138,9 +138,9 @@ export default function PartnerCreatePanel({
             <NewChannelForm
               palette={palette}
               partnerId={partnerId}
-              onSuccess={() => {
+              onSuccess={(data) => {
                 Alert.alert('Partner', 'Channel created.');
-                onCreated();
+                onCreated('channel', data);
                 onClose();
               }}
             />
@@ -149,9 +149,9 @@ export default function PartnerCreatePanel({
           {kind === 'group' ? (
             <NewGroupForm
               palette={palette}
-              onSuccess={() => {
+              onSuccess={(data) => {
                 Alert.alert('Partner', 'Group created.');
-                onCreated();
+                onCreated('group', data);
                 onClose();
               }}
               selectedMemberIds={[]}

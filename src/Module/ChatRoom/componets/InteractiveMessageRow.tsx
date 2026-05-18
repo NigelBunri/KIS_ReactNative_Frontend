@@ -4,7 +4,10 @@ import {
   PanResponder,
   GestureResponderEvent,
   Animated,
+  Alert,
+  Share,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 import type { ChatMessage } from '../chatTypes';
 import { MessageBubble } from './MessageBubble';
@@ -105,7 +108,51 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   };
 
   const handleLongPress = () => {
-    // Long press sets selection mode and selects the message
+    const messageText: string =
+      typeof (message as any).text === 'string' ? (message as any).text : '';
+
+    const buttons: {
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }[] = [];
+
+    if (messageText) {
+      buttons.push({
+        text: 'Copy text',
+        onPress: () => {
+          try {
+            Clipboard.setString(messageText);
+          } catch {
+            Share.share({ message: messageText }).catch(() => {});
+          }
+        },
+      });
+    }
+
+    if (onReplyToMessage) {
+      buttons.push({
+        text: 'Reply',
+        onPress: () => onReplyToMessage(message),
+      });
+    }
+
+    if (onLongPressMessage) {
+      buttons.push({
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => onLongPressMessage(message),
+      });
+    }
+
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+
+    if (buttons.length > 1) {
+      Alert.alert('Message', undefined, buttons);
+      return;
+    }
+
+    // Fallback: enter selection mode
     if (onStartSelection) {
       onStartSelection(message);
       return;

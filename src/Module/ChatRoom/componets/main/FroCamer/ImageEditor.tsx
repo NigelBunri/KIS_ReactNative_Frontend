@@ -16,6 +16,7 @@ import { editorStyles } from './ImageEditor.styles';
 import { useImageEditor } from './useImageEditor';
 import { EditorCanvas } from './EditorCanvas';
 import { ImageEditorProps, ImageTool } from './ImageEditor.types';
+import { StickerBackgroundRemovalScreen } from '../FroSticker/StickerBackgroundRemovalScreen';
 
 type ToolButtonProps = {
   palette: KISPalette;
@@ -146,6 +147,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
 
   const [isFilterPickerVisible, setIsFilterPickerVisible] =
     useState(false);
+  const [bgRemoveVisible, setBgRemoveVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -693,7 +695,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
           </View>
         )}
 
-        {/* TOOLBAR 3 - CROP */}
+        {/* TOOLBAR 3 - CROP + BG REMOVE */}
         <View
           style={[
             editorStyles.toolsRow,
@@ -716,7 +718,44 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
               }
             }}
           />
+          <ToolButton
+            palette={palette}
+            icon="cut"
+            label="Remove BG"
+            active={activeTool === 'bg-remove'}
+            onPress={() => {
+              setActiveTool('bg-remove');
+              setBgRemoveVisible(true);
+            }}
+          />
         </View>
+
+        {/* BG REMOVAL OVERLAY */}
+        {bgRemoveVisible && (
+          <Modal
+            visible={bgRemoveVisible}
+            animationType="slide"
+            transparent={false}
+            onRequestClose={() => setBgRemoveVisible(false)}
+          >
+            <StickerBackgroundRemovalScreen
+              palette={palette}
+              originalUri={asset.uri ?? ''}
+              originalBase64={asset.base64 ?? null}
+              onDone={(newUri) => {
+                setBgRemoveVisible(false);
+                setActiveTool('brush');
+                const updated = { ...asset, uri: newUri, base64: undefined };
+                onSaveAsset(index, updated);
+                onDoneAll(index, updated);
+              }}
+              onCancel={() => {
+                setBgRemoveVisible(false);
+                setActiveTool('brush');
+              }}
+            />
+          </Modal>
+        )}
 
         {/* FOOTER */}
         <View

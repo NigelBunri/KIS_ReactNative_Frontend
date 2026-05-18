@@ -1089,8 +1089,19 @@ export default function BroadcastFeedSection({
     );
   };
 
-  const handleJoinLesson = async (_item: BroadcastFeedItem) => {
-    Alert.alert('Lesson', 'Joining lesson… (hook ready)');
+  const handleJoinLesson = async (item: BroadcastFeedItem) => {
+    const lessonId = item.id;
+    if (!lessonId) return;
+    const res = await postRequest(
+      ROUTES.broadcasts.lessonEnroll(lessonId),
+      {},
+      { errorMessage: 'Unable to enroll in lesson.' },
+    );
+    if (res?.success) {
+      Alert.alert('Enrolled', 'You have been enrolled in this lesson.');
+    } else {
+      Alert.alert('Lesson', res?.message || 'Unable to join lesson. Please try again.');
+    }
   };
 
   /* ─────────────────────────
@@ -1248,7 +1259,7 @@ export default function BroadcastFeedSection({
               hasVideoAttachment(item) && openVideoModal(item)
             }
             onOpenMarket={() =>
-              Alert.alert('Market', 'Opening storefront… (wired next)')
+              Alert.alert('Coming soon', 'Storefront browsing will be available in an upcoming update.')
             }
             onMenuPress={() => openActionMenu(item)}
             onSave={() => toggleSaved(item)}
@@ -1326,7 +1337,7 @@ export default function BroadcastFeedSection({
           </Pressable>
           <Pressable
             onPress={() =>
-              Alert.alert('Create lesson', 'Lesson studio coming next.')
+              Alert.alert('Coming soon', 'Lesson creation will be available in an upcoming update.')
             }
             style={[
               styles.heroBtn,
@@ -1413,25 +1424,27 @@ export default function BroadcastFeedSection({
             key: 'follow',
             label: 'Follow broadcaster',
             onPress: () =>
-              Alert.alert('Follow', 'Follow system is ready (hook next).'),
+              Alert.alert('Coming soon', 'Broadcaster follow will be available in an upcoming update.'),
           },
           {
             key: 'pin',
-            label: 'Pin broadcast',
-            onPress: () =>
-              Alert.alert('Pinned', 'Pinned locally (feature hook ready).'),
+            label: 'Save broadcast',
+            onPress: () => {
+              toggleSaved(menuItem);
+              Alert.alert('Saved', 'Broadcast saved to your library.');
+            },
           },
           {
             key: 'schedule',
             label: 'Schedule reminder',
             onPress: () =>
-              Alert.alert('Scheduled', 'Reminder scheduling hook ready.'),
+              Alert.alert('Coming soon', 'Reminder scheduling will be available in an upcoming update.'),
           },
           {
             key: 'analytics',
             label: 'View insights',
             onPress: () =>
-              Alert.alert('Insights', 'Analytics screen hook ready.'),
+              Alert.alert('Coming soon', 'Broadcast analytics will be available in an upcoming update.'),
           },
         );
 

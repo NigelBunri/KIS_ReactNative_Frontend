@@ -72,7 +72,7 @@ export default function BroadcastSearchRow({
                 ? palette.primaryStrong
                 : palette.border,
               backgroundColor: filterActive
-                ? palette.primarySoft
+                ? palette.primaryStrong
                 : 'transparent',
             },
           ]}
@@ -80,11 +80,11 @@ export default function BroadcastSearchRow({
           <KISIcon
             name="filter"
             size={16}
-            color={filterActive ? palette.primaryStrong : palette.subtext}
+            color={filterActive ? palette.onPrimary : palette.subtext}
           />
           <Text
             style={{
-              color: filterActive ? palette.primaryStrong : palette.text,
+              color: filterActive ? palette.onPrimary : palette.text,
               fontWeight: '800',
               fontSize: 12,
             }}

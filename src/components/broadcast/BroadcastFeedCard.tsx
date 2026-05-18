@@ -286,7 +286,7 @@ export default function BroadcastFeedCard({
                   { backgroundColor: palette.primaryStrong },
                 ]}
               >
-                <KISIcon name="check" size={12} color="#fff" />
+                <KISIcon name="check" size={12} color={palette.onPrimary} />
               </View>
             ) : null}
           </View>
@@ -388,7 +388,7 @@ export default function BroadcastFeedCard({
       ) : item.text_doc || item.text ? (
         <View style={{ marginTop: 2 }}>
           <RichTextRenderer
-            value={item.text ?? item.text_doc}
+            value={item.text_doc ?? item.text}
             style={{
               color: palette.subtext,
               fontSize: 14,
@@ -540,7 +540,7 @@ export default function BroadcastFeedCard({
               { backgroundColor: palette.primaryStrong },
             ]}
           >
-            <Text style={{ color: '#fff', fontWeight: '900' }}>Enroll</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Enroll</Text>
           </Pressable>
         ) : null}
 
@@ -552,7 +552,7 @@ export default function BroadcastFeedCard({
               { backgroundColor: palette.primaryStrong },
             ]}
           >
-            <Text style={{ color: '#fff', fontWeight: '900' }}>Shop</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Shop</Text>
           </Pressable>
         ) : null}
       </View>
