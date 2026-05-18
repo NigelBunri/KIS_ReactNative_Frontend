@@ -381,3 +381,29 @@ export const revokeVerificationStaffBadge = async (
   if (!response.success) throw new Error(response.message || 'Unable to revoke verification badge.');
   return response.data;
 };
+
+export const submitCaseEvidence = async (
+  caseId: string,
+  evidenceMetadata: Record<string, any>,
+): Promise<any> => {
+  const response = await postRequest(
+    ROUTES.verification.userEvidence(caseId),
+    { evidence_metadata: evidenceMetadata },
+    { errorMessage: 'Unable to submit evidence.' },
+  );
+  if (!response.success) throw new Error(response.message || 'Unable to submit evidence.');
+  return response.data;
+};
+
+export const reviewVerificationStaffCase = async (
+  caseId: string,
+  payload: { action: string; notes?: string; badge_code?: string },
+): Promise<any> => {
+  const response = await postRequest(
+    ROUTES.verification.staffUserReview(caseId),
+    payload,
+    { errorMessage: 'Unable to review verification case.' },
+  );
+  if (!response.success) throw new Error(response.message || 'Unable to review verification case.');
+  return response.data;
+};

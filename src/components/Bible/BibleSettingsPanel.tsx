@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import TranslationPicker from './TranslationPicker';
 import KISButton from '@/constants/KISButton';
@@ -68,6 +69,8 @@ const boolText = (value?: boolean) => (value ? 'Yes' : 'No');
 
 export default function BibleSettingsPanel({ translations }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const [preference, setPreference] = useState<Preference | null>(null);
   const [loadingPreference, setLoadingPreference] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -194,7 +197,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
   const audioSpeed = Number(preference?.audio_speed || 1);
 
   const renderToggle = (label: string, value: boolean, key: keyof Preference, helper?: string) => (
-    <View style={[styles.settingRow, { borderColor: palette.divider }]}>
+    <View style={[styles.settingRow, compact && styles.wrapRow, { borderColor: palette.divider }]}>
       <View style={{ flex: 1 }}>
         <Text style={{ color: palette.text, fontWeight: '900' }}>{label}</Text>
         {helper ? <Text style={{ color: palette.subtext, marginTop: 3 }}>{helper}</Text> : null}
@@ -206,9 +209,9 @@ export default function BibleSettingsPanel({ translations }: Props) {
   return (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>Settings</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Settings</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               Bible preferences, notification readiness, and KCAN-governed controls.
             </Text>
@@ -231,7 +234,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
             <Text style={[styles.label, { color: palette.subtext }]}>Default public/licensed translation</Text>
             <TranslationPicker translations={translations} selected={selectedTranslationCode} onSelect={setDefaultTranslation} />
 
-            <View style={[styles.settingRow, { borderColor: palette.divider }]}>
+            <View style={[styles.settingRow, compact && styles.wrapRow, { borderColor: palette.divider }]}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontWeight: '900' }}>Font size</Text>
                 <Text style={{ color: palette.subtext, marginTop: 3 }}>{fontSize}px reader text</Text>
@@ -243,7 +246,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
               </View>
             </View>
 
-            <View style={[styles.settingRow, { borderColor: palette.divider }]}>
+            <View style={[styles.settingRow, compact && styles.wrapRow, { borderColor: palette.divider }]}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontWeight: '900' }}>Audio speed</Text>
                 <Text style={{ color: palette.subtext, marginTop: 3 }}>{audioSpeed.toFixed(2)}x playback speed</Text>
@@ -296,7 +299,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
         </BibleSectionCard>
       ) : controlRoomAllowed ? (
         <BibleSectionCard>
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, compact && styles.wrapRow]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, { color: palette.text }]}>KCAN Control Room</Text>
               <Text style={{ color: palette.subtext, marginTop: 4 }}>
@@ -309,7 +312,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
           <Text style={[styles.label, { color: palette.subtext }]}>Translation registry</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.registryRail}>
             {registry.slice(0, 12).map((item) => (
-              <View key={item.id} style={[styles.registryCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+              <View key={item.id} style={[styles.registryCard, { width: compact ? 240 : 280, borderColor: palette.divider, backgroundColor: palette.surface }]}>
                 <Text style={{ color: palette.text, fontWeight: '900' }} numberOfLines={2}>
                   {item.full_name || item.translation_name || item.code}
                 </Text>
@@ -404,6 +407,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform } from 'react-native';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
@@ -6,9 +6,12 @@ import { chatRoomStyles as styles } from '../chatRoomStyles';
 import AudioRecorderPlayer, {
   PlayBackType,
 } from 'react-native-audio-recorder-player';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KISIcon } from '@/constants/kisIcons';
 import { ChatMessage } from '../chatTypes';
 import { EmojiPicker } from './EmojiPicker';
+import { useResponsiveLayout } from '@/theme/responsive';
+import { useLanguage } from '@/languages';
 
 // Use a shared player instance for all bubbles
 const audioPlayer = new AudioRecorderPlayer();
@@ -66,6 +69,7 @@ type MessageBubbleProps = {
   palette: any;
   currentUserId?: string;
   onReact?: (message: ChatMessage, emoji: string) => void;
+  onVotePoll?: (messageId: string, optionId: string) => void;
   onRetry?: (message: ChatMessage) => void;
 
   // reply preview
@@ -77,6 +81,10 @@ type MessageBubbleProps = {
 
   // selection visual
   isSelected?: boolean;
+
+  // group bubble context
+  isFirstInGroup?: boolean;
+  isLastInGroup?: boolean;
 };
 
 const formatTimeFromMs = (ms: number) => {
@@ -113,15 +121,28 @@ const getAttachmentIconName = (att: AttachmentMeta): string => {
   return 'file';
 };
 
-const statusToSymbol = (status?: ChatMessage['status'] | string) => {
-  if (!status) return '';
-  if (status === 'local_only' || status === 'pending' || status === 'sending')
-    return '⏳';
-  if (status === 'sent') return '✓';
-  if (status === 'delivered') return '✓✓';
-  if (status === 'read') return '✓✓';
-  if (status === 'failed') return '!';
-  return '';
+const renderStatusIcon = (
+  status?: ChatMessage['status'] | string,
+  color?: string,
+  size: number = 13,
+) => {
+  if (!status) return null;
+  if (status === 'local_only' || status === 'pending' || status === 'sending') {
+    return <Ionicons name="time-outline" size={size} color={color ?? '#aaa'} />;
+  }
+  if (status === 'sent') {
+    return <Ionicons name="checkmark" size={size} color={color ?? '#aaa'} />;
+  }
+  if (status === 'delivered') {
+    return <Ionicons name="checkmark-done-outline" size={size} color={color ?? '#aaa'} />;
+  }
+  if (status === 'read') {
+    return <Ionicons name="checkmark-done" size={size} color={color ?? '#34B7F1'} />;
+  }
+  if (status === 'failed') {
+    return <Ionicons name="alert-circle" size={size} color="#DC2626" />;
+  }
+  return null;
 };
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -129,11 +150,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   palette,
   currentUserId,
   onReact,
+  onVotePoll,
   onRetry,
   replySource,
   onPressReplySource,
   isHighlighted,
   isSelected = false,
+  isFirstInGroup = true,
+  isLastInGroup = true,
 }) => {
   // ─────────────────────────────────────
   // 🔁 Normalize fields so both shapes work
@@ -185,6 +209,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       }
     | undefined;
 
+  const senderName = (message as any).senderName as string | undefined;
   const isPinned = !!(message as any).isPinned;
   const isDeleted = !!(message as any).isDeleted;
   const reactions = (message as any).reactions as
@@ -256,25 +281,55 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
-  const width = Dimensions.get('window').width;
+  const responsive = useResponsiveLayout();
+  const width = responsive.width || Dimensions.get('window').width;
+  const bubbleMaxWidth = responsive.isTablet ? '68%' : responsive.isWatch ? '92%' : responsive.isCompactPhone ? '88%' : '80%';
+  const bubblePaddingX = responsive.isWatch ? 8 : 10;
+  const bubbleTextSize = responsive.bodyFontSize;
 
-  // Translation
+  const { language: userLanguage } = useLanguage();
+
+  // Read-more state for long messages
+  const READ_MORE_THRESHOLD = 300;
+  const isLongText = !!text && text.length > READ_MORE_THRESHOLD;
+  const [expanded, setExpanded] = useState(false);
+  const displayText = isLongText && !expanded ? text!.slice(0, READ_MORE_THRESHOLD) : text;
+
+  // Translation — uses the language the user set in their profile
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
-  const handleTranslate = async () => {
+
+  const handleTranslate = useCallback(async () => {
     if (!text || translating) return;
     setTranslating(true);
     try {
       const { postRequest: post } = await import('@/network/post');
       const ROUTES_mod = await import('@/network');
-      const res = await post(ROUTES_mod.default.translate, { text, target_lang: 'en' }, {});
+      const res = await post(
+        ROUTES_mod.default.translate,
+        { text, target_lang: userLanguage },
+        {},
+      );
       if (res?.data?.translated && res.data.translated !== text) {
         setTranslatedText(res.data.translated);
       }
     } catch { /* silent */ } finally {
       setTranslating(false);
     }
-  };
+  }, [text, translating, userLanguage]);
+
+  // Auto-translate incoming messages when the user's language is not English
+  useEffect(() => {
+    if (!text || isMe || translatedText || userLanguage === 'en') return;
+    handleTranslate();
+  // Only run when language changes or a new message arrives (text changes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, userLanguage]);
+
+  // Reset translation when language changes so it is re-fetched in the new language
+  useEffect(() => {
+    setTranslatedText(null);
+  }, [userLanguage]);
 
   // Link preview
   const serverLinkPreview = (message as any).linkPreview as
@@ -366,16 +421,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  // ✅ handle tap on poll option (local-only for now)
-  const handlePollOptionPress = (optionKey: string) => {
+  const handlePollOptionPress = (optionKey: string, rawOptionId: string) => {
     setSelectedPollOptionKey(optionKey);
-
-    console.log('[MessageBubble] poll option selected', {
-      messageId: (message as any).id,
-      optionKey,
-    });
-
-    // 🔜 later: call a prop or hook here to send the vote to backend
+    const messageId = (message as any).serverId ?? (message as any).id;
+    if (messageId) {
+      onVotePoll?.(messageId, rawOptionId);
+    }
   };
 
   useEffect(() => {
@@ -462,7 +513,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const textColor = isMe ? outgoingTextColor : palette.text;
   const metaColor = isMe ? outgoingMetaColor : palette.subtext;
 
-  const statusSymbol = statusToSymbol(status);
   const statusColor =
     status === 'read'
       ? palette.readStatus ?? palette.primary ?? '#34B7F1'
@@ -474,6 +524,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ([emoji, users]) => !!emoji && Array.isArray(users) && users.length > 0,
       )
     : [];
+
+  /* ─────────────────────────────────────────
+   * Helper: sender name (group chats)
+   * ──────────────────────────────────────── */
+  const renderSenderName = () => {
+    if (isMe || !senderName || !isFirstInGroup) return null;
+    return (
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '700',
+          color: palette.senderNameColor ?? palette.primary ?? '#4F46E5',
+          marginBottom: 2,
+          marginLeft: 2,
+        }}
+        numberOfLines={1}
+      >
+        {senderName}
+      </Text>
+    );
+  };
 
   /* ─────────────────────────────────────────
    * Helper: small "Pinned" icon next to time
@@ -838,7 +909,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderAttachments = () => {
     if (!hasAttachments) return null;
 
-    const maxBubbleWidth = width * 0.7;
+    const maxBubbleWidth = width * (responsive.isWatch ? 0.78 : responsive.isCompactPhone ? 0.74 : responsive.isTablet ? 0.52 : 0.7);
 
     const imageAtts = attachments.filter((a) => {
       const mime = a.mimeType ?? '';
@@ -911,9 +982,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 >
                   <View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
+                      width: responsive.isWatch ? 28 : 32,
+                      height: responsive.isWatch ? 28 : 32,
+                      borderRadius: responsive.isWatch ? 7 : 8,
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginRight: 10,
@@ -924,7 +995,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   >
                     <KISIcon
                       name={iconName}
-                      size={18}
+                      size={responsive.isWatch ? 15 : 18}
                       color={
                         isMe ? palette.onPrimary ?? '#fff' : palette.primary
                       }
@@ -1122,7 +1193,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           const percentage =
             totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
 
-          // ✅ stable key + local selection key
+          const rawOptionId =
+            typeof opt.id === 'string' && opt.id.length > 0 ? opt.id : String(idx);
           const optionKey =
             typeof opt.id === 'string' && opt.id.length > 0
               ? `poll-opt-${opt.id}`
@@ -1133,7 +1205,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           return (
             <Pressable
               key={optionKey}
-              onPress={() => handlePollOptionPress(optionKey)}
+              onPress={() => handlePollOptionPress(optionKey, rawOptionId)}
               style={{ marginBottom: 6 }}
             >
               <View
@@ -1146,45 +1218,46 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   borderColor: isSelected
                     ? palette.pollOptionSelectedBorder ?? palette.primary
                     : 'transparent',
-                  flexDirection: 'row',
-                  alignItems: 'center',
+                  overflow: 'hidden',
                 }}
               >
-                {/* Option text + meta */}
-                <View style={{ flex: 1 }}>
-                  <Text
+                {/* Percentage fill bar behind content */}
+                {totalVotes > 0 && (
+                  <View
                     style={{
-                      fontSize: 13,
-                      color: optionTextColor,
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${percentage}%`,
+                      backgroundColor: isSelected
+                        ? (palette.pollBarSelected ?? (palette.primary ?? '#4F46E5') + '44')
+                        : (palette.pollBarBg ?? '#00000011'),
+                      borderRadius: 10,
                     }}
-                  >
-                    {opt.text}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: metaTextColor,
-                      marginTop: 2,
-                    }}
-                  >
-                    {votes} vote{votes === 1 ? '' : 's'}
-                    {totalVotes > 0 ? ` • ${percentage}%` : ''}
-                  </Text>
-                </View>
-
-                {/* Simple check mark for selected option */}
-                {isSelected && (
-                  <Text
-                    style={{
-                      marginLeft: 8,
-                      fontSize: 14,
-                      color: palette.primary ?? '#4F46E5',
-                      fontWeight: '700',
-                    }}
-                  >
-                    ✓
-                  </Text>
+                  />
                 )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, color: optionTextColor, fontWeight: isSelected ? '700' : '400' }}>
+                      {opt.text}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: metaTextColor, marginTop: 2 }}>
+                      {votes} vote{votes === 1 ? '' : 's'}
+                      {totalVotes > 0 ? ` • ${percentage}%` : ''}
+                    </Text>
+                  </View>
+
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color={palette.primary ?? '#4F46E5'}
+                      style={{ marginLeft: 8 }}
+                    />
+                  )}
+                </View>
               </View>
             </Pressable>
           );
@@ -1545,16 +1618,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <Text
-                style={[
-                  styles.messageStatus,
-                  {
-                    color: statusColor,
-                  },
-                ]}
-              >
-                {statusSymbol}
-              </Text>
+              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+                {renderStatusIcon(status, statusColor, 13)}
+              </View>
             )}
           </View>
         </View>
@@ -1592,6 +1658,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             highlightedStyle || undefined,
           ]}
         >
+          {renderSenderName()}
           {renderReplyPreview()}
 
           <Image
@@ -1626,16 +1693,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <Text
-                style={[
-                  styles.messageStatus,
-                  {
-                    color: statusColor,
-                  },
-                ]}
-              >
-                {statusSymbol}
-              </Text>
+              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+                {renderStatusIcon(status, statusColor, 13)}
+              </View>
             )}
           </View>
         </View>
@@ -1672,6 +1732,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             highlightedStyle || undefined,
           ]}
         >
+          {renderSenderName()}
           {renderReplyPreview()}
 
           <Text
@@ -1706,16 +1767,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <Text
-                style={[
-                  styles.messageStatus,
-                  {
-                    color: statusColor,
-                  },
-                ]}
-              >
-                {statusSymbol}
-              </Text>
+              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+                {renderStatusIcon(status, statusColor, 13)}
+              </View>
             )}
           </View>
         </View>
@@ -1748,6 +1802,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             { width: width / 2 },
           ]}
         >
+          {renderSenderName()}
           {renderReplyPreview()}
 
           <Pressable
@@ -1819,16 +1874,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <Text
-                style={[
-                  styles.messageStatus,
-                  {
-                    color: statusColor,
-                  },
-                ]}
-              >
-                {statusSymbol}
-              </Text>
+              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+                {renderStatusIcon(status, statusColor, 13)}
+              </View>
             )}
           </View>
         </View>
@@ -1855,25 +1903,38 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           pinnedStyle || undefined,
           selectedStyle || undefined,
           highlightedStyle || undefined,
+          { maxWidth: bubbleMaxWidth, paddingHorizontal: bubblePaddingX },
         ]}
       >
+        {renderSenderName()}
         {renderReplyPreview()}
 
         {!!text && (
-          <Text
-            style={[
-              styles.messageText,
-              {
-                color: textColor,
-              },
-            ]}
-          >
-            {text}
-          </Text>
+          <View>
+            <Text
+              style={[
+                styles.messageText,
+                {
+                  color: textColor,
+                  fontSize: bubbleTextSize,
+                },
+              ]}
+            >
+              {displayText}
+              {isLongText && !expanded ? '…' : ''}
+            </Text>
+            {isLongText && (
+              <Pressable onPress={() => setExpanded(prev => !prev)} style={{ marginTop: 2 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary ?? '#2196F3') }}>
+                  {expanded ? 'Show less' : 'Read more'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         )}
 
         {/* Translation */}
-        {!isMe && text && text.length > 15 && !translatedText && (
+        {text && text.length > 15 && userLanguage === 'en' && !translatedText && (
           <Pressable
             onPress={() => void handleTranslate()}
             style={{ marginTop: 4, opacity: translating ? 0.5 : 1 }}
@@ -1884,12 +1945,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Text>
           </Pressable>
         )}
+        {translating && userLanguage !== 'en' && (
+          <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>🌐 Translating…</Text>
+        )}
         {translatedText && (
           <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)' }}>
-            <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginBottom: 2 }}>Translation</Text>
+            <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginBottom: 2 }}>
+              🌐 {userLanguage === 'es' ? 'Traducción' : 'Translation'}
+            </Text>
             <Text style={{ color: isMe ? '#fff' : (palette.text ?? '#000'), fontSize: 14 }}>{translatedText}</Text>
             <Pressable onPress={() => setTranslatedText(null)}>
-              <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginTop: 2 }}>Hide</Text>
+              <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginTop: 2 }}>
+                {userLanguage === 'es' ? 'Ocultar' : 'Hide'}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -1961,16 +2029,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
 
           {isMe && status && (
-            <Text
-              style={[
-                styles.messageStatus,
-                {
-                  color: statusColor,
-                },
-              ]}
-            >
-              {statusSymbol}
-            </Text>
+            <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              {renderStatusIcon(status, statusColor, 13)}
+            </View>
           )}
         </View>
       </View>

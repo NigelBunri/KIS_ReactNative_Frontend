@@ -45,6 +45,36 @@ const miscRoutes = {
   },
   linkPreview: `${API_BASE_URL}/api/v1/link-preview/`,
   translate: `${API_BASE_URL}/api/v1/translate/`,
+  surveys: {
+    list: `${API_BASE_URL}/api/v1/surveys/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/surveys/${id}/`,
+    questions: `${API_BASE_URL}/api/v1/questions/`,
+    question: (id: string) => `${API_BASE_URL}/api/v1/questions/${id}/`,
+    responses: `${API_BASE_URL}/api/v1/responses/`,
+    response: (id: string) => `${API_BASE_URL}/api/v1/responses/${id}/`,
+  },
+  bridge: {
+    accounts: `${API_BASE_URL}/api/v1/bridge/accounts/`,
+    account: (id: string) => `${API_BASE_URL}/api/v1/bridge/accounts/${id}/`,
+    threads: `${API_BASE_URL}/api/v1/bridge/threads/`,
+    thread: (id: string) => `${API_BASE_URL}/api/v1/bridge/threads/${id}/`,
+    messages: `${API_BASE_URL}/api/v1/bridge/messages/`,
+    message: (id: string) => `${API_BASE_URL}/api/v1/bridge/messages/${id}/`,
+    automations: `${API_BASE_URL}/api/v1/bridge/automations/`,
+    analytics: `${API_BASE_URL}/api/v1/bridge/analytics/`,
+  },
+  aiIntegration: {
+    models: `${API_BASE_URL}/api/v1/ai-models/`,
+    jobs: `${API_BASE_URL}/api/v1/ai-jobs/`,
+    translations: `${API_BASE_URL}/api/v1/translations/`,
+    qnaSessions: `${API_BASE_URL}/api/v1/qna-sessions/`,
+  },
+  mediaAssets: {
+    assets: `${API_BASE_URL}/api/v1/media/assets/`,
+    asset: (id: string) => `${API_BASE_URL}/api/v1/media/assets/${id}/`,
+    jobs: `${API_BASE_URL}/api/v1/media/jobs/`,
+    safetyScan: (id: string) => `${API_BASE_URL}/api/v1/media/media-safety-scans/${id}/`,
+  },
 };
 
 export default miscRoutes;

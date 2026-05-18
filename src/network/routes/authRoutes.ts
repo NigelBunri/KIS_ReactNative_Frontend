@@ -83,6 +83,8 @@ const authRoutes = {
     staffProviderCallbacks: `${API_BASE_URL}/api/v1/verification/staff/provider-callbacks/`,
     staffSuspiciousSignals: `${API_BASE_URL}/api/v1/verification/staff/suspicious-signals/`,
     staffExpiryReminders: `${API_BASE_URL}/api/v1/verification/staff/expiry-reminders/`,
+    userEvidence: (caseId: string) => `${API_BASE_URL}/api/v1/verification/user/cases/${caseId}/evidence/`,
+    staffUserReview: (caseId: string) => `${API_BASE_URL}/api/v1/verification/staff/user/cases/${caseId}/review/`,
   },
   contacts: {
     check: `${API_BASE_URL}/api/v1/users/check-contacts/`,

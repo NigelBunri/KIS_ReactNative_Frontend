@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 // ─── Dev-only host config ─────────────────────────────────────────────────────
 // These are only active when __DEV__ === true (metro dev server / debug builds).
 // Update DEV_BACKEND_HOST to your machine's LAN IP when running on a physical device.
-export const DEV_BACKEND_HOST = '10.24.145.99';
+export const DEV_BACKEND_HOST = '10.219.211.99';
 export const API_PORT = 8000;
 export const CHAT_PORT = 4000;
 

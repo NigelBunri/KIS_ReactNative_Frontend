@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     opacity: 0.18,
   },
+  wrapRow: { flexWrap: 'wrap' },
 
   appLaunchBar: {
     position: 'absolute',
@@ -642,6 +643,7 @@ const styles = StyleSheet.create({
   },
   settingsSectionActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 10,
   },
@@ -677,6 +679,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
   },
   settingsPanelTitle: {
@@ -689,6 +692,7 @@ const styles = StyleSheet.create({
   },
   settingsPanelBody: {
     padding: 16,
+    paddingBottom: 44,
   },
   settingsFeatureRow: {
     borderRadius: 10,
@@ -724,7 +728,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   overviewCard: {
-    width: '48%',
+    minWidth: 132,
+    flexGrow: 1,
     borderRadius: 12,
     borderWidth: 2,
     padding: 10,

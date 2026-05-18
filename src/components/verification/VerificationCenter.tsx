@@ -17,6 +17,7 @@ import {
   fetchVerificationStatus,
   getVerificationSummary,
   startVerificationCase,
+  submitCaseEvidence,
   uploadVerificationEvidenceMedia,
   type VerificationEvidencePrivateRef,
   type VerificationSubjectRef,
@@ -254,6 +255,13 @@ export function VerificationCenterSheet({
     }
   };
 
+  const pendingCaseId = summary?.latest_case?.id &&
+    ['submitted', 'pending', 'under_review', 'more_info_required'].includes(
+      String(summary?.latest_case?.status || '').toLowerCase(),
+    )
+    ? summary.latest_case.id
+    : null;
+
   const submit = async () => {
     const refs = Array.from(new Set([
       ...referenceIds
@@ -279,13 +287,18 @@ export function VerificationCenterSheet({
         expires_at: expiresAt.trim() || undefined,
         applicant_notes: notes.trim() || undefined,
       };
-      const response = await startVerificationCase(subject, {
-        provider: provider.trim(),
-        evidence_metadata,
-      });
+      let response: any;
+      if (pendingCaseId) {
+        response = await submitCaseEvidence(String(pendingCaseId), evidence_metadata);
+      } else {
+        response = await startVerificationCase(subject, {
+          provider: provider.trim(),
+          evidence_metadata,
+        });
+      }
       const nextSummary = response?.status || response?.verification_summary || response?.summary || summary;
       setSummary(nextSummary ?? summary);
-      setMessage('Verification request submitted for review.');
+      setMessage(pendingCaseId ? 'Evidence added to your existing case.' : 'Verification request submitted for review.');
       onSubmitted?.(nextSummary ?? summary);
     } catch (error: any) {
       setMessage(error?.message || 'Unable to submit verification request.');
@@ -422,14 +435,23 @@ export function VerificationCenterSheet({
               ))}
             </View>
 
+            {pendingCaseId ? (
+              <View style={[styles.providerBox, { backgroundColor: 'rgba(217,119,6,0.08)', borderColor: '#D97706' }]}>
+                <Text style={[styles.blockTitle, { color: '#B45309' }]}>Pending case — add evidence</Text>
+                <Text style={[styles.statusBody, { color: '#92400E' }]}>
+                  You have an open verification case. Submitting here adds evidence to that case instead of starting a new one.
+                </Text>
+              </View>
+            ) : null}
+
             {message ? (
-              <Text style={{ color: message.includes('submitted') ? palette.primaryStrong : '#DC2626', fontWeight: '700' }}>
+              <Text style={{ color: message.includes('submitted') || message.includes('added') ? palette.primaryStrong : '#DC2626', fontWeight: '700' }}>
                 {message}
               </Text>
             ) : null}
 
             <KISButton
-              title={submitting ? 'Submitting...' : 'Submit verification metadata'}
+              title={submitting ? 'Submitting...' : pendingCaseId ? 'Add evidence to case' : 'Submit verification request'}
               onPress={submit}
               disabled={submitting}
             />

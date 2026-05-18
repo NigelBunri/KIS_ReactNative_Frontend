@@ -310,6 +310,10 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/`,
     channelContentPublish: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/publish/`,
+    channelContentSchedule: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/schedule/`,
+    channelContentUnpublish: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/unpublish/`,
     channelContentAssets: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/assets/`,
     videos: (type?: string) =>
@@ -572,6 +576,14 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/`,
     marketplaceOrderReceipt: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/receipt/`,
+    promotions: `${API_BASE_URL}/api/v1/commerce/promotions/`,
+    promotion: (id: string) => `${API_BASE_URL}/api/v1/commerce/promotions/${id}/`,
+    shopVerifications: `${API_BASE_URL}/api/v1/commerce/shop-verifications/`,
+    shopVerification: (id: string) => `${API_BASE_URL}/api/v1/commerce/shop-verifications/${id}/`,
+    productAuthChecks: `${API_BASE_URL}/api/v1/commerce/product-auth-checks/`,
+    productAuthCheck: (id: string) => `${API_BASE_URL}/api/v1/commerce/product-auth-checks/${id}/`,
+    marketplaceComplaints: `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/`,
+    marketplaceComplaint: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/`,
   },
   feeds: {
     create: `${NEST_API_BASE_URL}/api/v1/feeds`,

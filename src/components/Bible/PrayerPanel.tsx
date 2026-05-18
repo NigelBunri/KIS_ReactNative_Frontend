@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
@@ -43,6 +44,8 @@ const stringList = (value: unknown): string[] => {
 
 export default function PrayerPanel() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const now = new Date();
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState<PrayerMonth | null>(null);
@@ -113,9 +116,9 @@ export default function PrayerPanel() {
   return (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>Prayer Calendar</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Prayer Calendar</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               Monthly KCAN prayer points with exhortations and scripture references.
             </Text>
@@ -139,7 +142,7 @@ export default function PrayerPanel() {
       ) : (
         <>
           <BibleSectionCard>
-            <Text style={[styles.monthTitle, { color: palette.text }]}>
+            <Text style={[styles.monthTitle, { color: palette.text, fontSize: compact ? 18 : 22 }]}>
               {month.title || `${monthName(month.month)} ${month.year}`}
             </Text>
             <Text style={{ color: palette.primaryStrong, fontWeight: '800', marginTop: 4 }}>
@@ -233,6 +236,7 @@ export default function PrayerPanel() {
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   monthTitle: { fontSize: 22, fontWeight: '900' },

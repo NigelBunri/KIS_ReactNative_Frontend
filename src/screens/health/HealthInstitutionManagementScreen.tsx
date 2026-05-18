@@ -16,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   getHealthThemeBorders,
   getHealthThemeColors,
@@ -499,6 +500,8 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     setForm((prev) => ({ ...prev, type: nextType }));
   }, [form.type]);
 
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
@@ -532,10 +535,27 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: HEALTH_THEME_SPACING.lg }}>
-          <View style={[styles.headerRow, { marginBottom: HEALTH_THEME_SPACING.sm }]}
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: responsive.pageGutter,
+            paddingTop: compact ? HEALTH_THEME_SPACING.sm : HEALTH_THEME_SPACING.lg,
+            paddingBottom: HEALTH_THEME_SPACING.xl,
+            alignSelf: 'center',
+            width: '100%',
+            maxWidth: responsive.contentMaxWidth,
+          }}
+        >
+          <View
+            style={[
+              styles.headerRow,
+              {
+                marginBottom: HEALTH_THEME_SPACING.sm,
+                alignItems: compact ? 'flex-start' : 'center',
+                gap: HEALTH_THEME_SPACING.sm,
+              },
+            ]}
           >
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h1, color: palette.text }}>Manage institution</Text>
               <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.subtext, marginTop: 4 }}>
                 {currentInstitution?.name || form.name}
@@ -553,7 +573,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
           <View
             style={{
               marginTop: HEALTH_THEME_SPACING.lg,
-              padding: HEALTH_THEME_SPACING.md,
+              padding: compact ? HEALTH_THEME_SPACING.sm : HEALTH_THEME_SPACING.md,
               backgroundColor: palette.card,
               borderRadius: HEALTH_THEME_SPACING.lg,
               ...borders.card,
@@ -588,7 +608,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
               onChangeText={(value) => setForm((prev) => ({ ...prev, employees: value }))}
               style={{ marginTop: HEALTH_THEME_SPACING.sm }}
             />
-            <View style={{ flexDirection: 'row', marginTop: HEALTH_THEME_SPACING.lg, gap: HEALTH_THEME_SPACING.sm }}>
+            <View style={{ flexDirection: compact ? 'column' : 'row', marginTop: HEALTH_THEME_SPACING.lg, gap: HEALTH_THEME_SPACING.sm }}>
               <KISButton title="Save changes" onPress={handleSave} disabled={submitting} />
               <KISButton title="Delete" variant="outline" onPress={handleDelete} disabled={submitting || !canDeleteInstitution} />
             </View>
@@ -600,7 +620,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
           <View
             style={{
               marginTop: HEALTH_THEME_SPACING.lg,
-              padding: HEALTH_THEME_SPACING.md,
+              padding: compact ? HEALTH_THEME_SPACING.sm : HEALTH_THEME_SPACING.md,
               backgroundColor: palette.card,
               borderRadius: HEALTH_THEME_SPACING.lg,
               ...borders.card,

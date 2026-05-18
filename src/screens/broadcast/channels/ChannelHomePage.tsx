@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -21,6 +20,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { BroadcastChannelContent, BroadcastChannelDetail, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import {
   fetchChannelContents,
@@ -102,13 +102,15 @@ const formatDuration = (seconds?: number) => {
 
 function ContentTile({ content, mode = 'grid', onPress }: { content: BroadcastChannelContent; mode?: 'grid' | 'wide'; onPress: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const imageUrl = assetUrlFor(content);
   const counts = content.engagement_counts || {};
   const duration = formatDuration(content.duration_seconds);
   const isLive = content.content_type === 'live_stream' || content.status === 'live';
   return (
-    <Pressable onPress={onPress} style={[mode === 'wide' ? styles.wideTile : styles.contentTile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-      <View style={mode === 'wide' ? styles.wideMedia : styles.tileMedia}>
+    <Pressable onPress={onPress} style={[mode === 'wide' ? styles.wideTile : styles.contentTile, { backgroundColor: palette.surface, borderColor: palette.border, marginBottom: compact ? 10 : 12 }]}>
+      <View style={[mode === 'wide' ? styles.wideMedia : styles.tileMedia, { height: mode === 'wide' ? (compact ? 150 : 196) : (compact ? 106 : 126) }]}>
         {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
         <View style={styles.mediaScrim} />
         <View style={styles.mediaBadge}>
@@ -140,6 +142,9 @@ export default function ChannelHomePage() {
   const route = useRoute<RouteProp<RootStackParamList, 'ChannelHome'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'ChannelHome'>>();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const columns = compact ? 1 : responsive.isTablet && responsive.isLandscape ? 3 : 2;
   const insets = useSafeAreaInsets();
   const themed = useMemo(() => makeStyles(palette), [palette]);
   const initialChannel = route.params?.channel || null;
@@ -217,9 +222,9 @@ export default function ChannelHomePage() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}>
-        <View style={styles.heroWrap}>
-          <View style={styles.banner}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
+        <View style={[styles.heroWrap, { height: compact ? 144 : 184 }]}>
+          <View style={[styles.banner, { height: compact ? 144 : 184 }]}>
             {bannerUrl ? <Image source={{ uri: bannerUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
             <View style={styles.heroShade} />
           </View>
@@ -228,12 +233,12 @@ export default function ChannelHomePage() {
           </Pressable>
         </View>
 
-        <View style={themed.headerCard}>
-          <View style={styles.avatarOverlap}><ChannelAvatar channel={channel} size={88} /></View>
-          <View style={styles.headerTopRow}>
+        <View style={[themed.headerCard, { marginHorizontal: responsive.pageGutter, paddingHorizontal: compact ? 12 : 16, paddingBottom: compact ? 12 : 16 }]}>
+          <View style={[styles.avatarOverlap, { marginTop: compact ? -38 : -50 }]}><ChannelAvatar channel={channel} size={compact ? 68 : 88} /></View>
+          <View style={[styles.headerTopRow, compact && { flexWrap: 'wrap', gap: 10 }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={styles.titleRow}>
-                <Text numberOfLines={1} style={[styles.channelTitle, { color: palette.text }]}>{channel?.display_name || 'KIS Channel'}</Text>
+                <Text numberOfLines={compact ? 2 : 1} style={[styles.channelTitle, { color: palette.text, fontSize: compact ? 20 : 26 }]}>{channel?.display_name || 'KIS Channel'}</Text>
                 {channel?.is_verified ? <KISIcon name="check" size={16} color={palette.primaryStrong} /> : null}
               </View>
               <Text style={[styles.handle, { color: palette.subtext }]}>@{channel?.handle || 'channel'}</Text>
@@ -270,7 +275,7 @@ export default function ChannelHomePage() {
           )}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabRow, { paddingHorizontal: responsive.pageGutter, paddingVertical: compact ? 10 : 14 }]}>
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -282,13 +287,13 @@ export default function ChannelHomePage() {
         </ScrollView>
 
         {activeTab === 'about' ? (
-          <View style={[styles.aboutBox, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
+          <View style={[styles.aboutBox, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}> 
             <Text style={[styles.sectionTitle, { color: palette.text }]}>About</Text>
             <Text style={[styles.aboutText, { color: palette.subtext }]}>{channel?.description || 'No public channel description yet.'}</Text>
             <Text style={[styles.aboutMetric, { color: palette.text }]}>{compactNumber(channel?.subscriber_count)} subscribers</Text>
           </View>
         ) : activeTab === 'playlists' ? (
-          <View style={styles.sectionBlock}>
+          <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>Playlists</Text>
             {playlists.length ? playlists.map(item => (
               <View key={item.id} style={[styles.playlistCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
@@ -303,8 +308,8 @@ export default function ChannelHomePage() {
         ) : (
           <>
             {activeTab === 'home' && featured ? (
-              <Pressable onPress={() => openContent(featured)} style={[styles.featuredHero, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-                <View style={styles.featuredMedia}>{assetUrlFor(featured) ? <Image source={{ uri: assetUrlFor(featured) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}</View>
+              <Pressable onPress={() => openContent(featured)} style={[styles.featuredHero, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter }]}> 
+                <View style={[styles.featuredMedia, { height: compact ? 150 : 190 }]}>{assetUrlFor(featured) ? <Image source={{ uri: assetUrlFor(featured) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}</View>
                 <View style={styles.featuredCopy}>
                   <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>Featured</Text>
                   <Text numberOfLines={2} style={[styles.featuredTitle, { color: palette.text }]}>{featured.title || featured.text_plain_preview || 'Channel feature'}</Text>
@@ -314,15 +319,15 @@ export default function ChannelHomePage() {
             ) : null}
 
             {activeTab === 'home' ? <PlaylistRail playlists={playlists} onSeeAll={() => setActiveTab('playlists')} /> : null}
-            <View style={styles.sectionBlock}>
+            <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
               <Text style={[styles.sectionTitle, { color: palette.text }]}>{activeTab === 'home' ? 'Latest uploads' : TABS.find(tab => tab.id === activeTab)?.label}</Text>
               {tabContents.length ? (
                 <FlatList
                   data={tabContents}
                   keyExtractor={item => item.id}
-                  numColumns={2}
+                  numColumns={columns}
                   scrollEnabled={false}
-                  columnWrapperStyle={styles.gridRow}
+                  columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
                   renderItem={({ item }) => <ContentTile content={item} onPress={() => openContent(item)} />}
                 />
               ) : <Text style={[styles.emptyText, { color: palette.subtext }]}>Nothing published here yet.</Text>}

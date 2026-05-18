@@ -10,7 +10,10 @@ export type PartnerFeatureMeta = {
 export const usePartnerFeaturePanel = (width: number) => {
   const [isOpen, setIsOpen] = useState(false);
   const [feature, setFeature] = useState<PartnerFeatureMeta | null>(null);
-  const panelWidth = useMemo(() => width, [width]);
+  const panelWidth = useMemo(() => {
+    if (width < 600) return width;
+    return Math.min(760, Math.max(520, Math.round(width * 0.72)));
+  }, [width]);
   const panelTranslateX = useRef(new Animated.Value(panelWidth)).current;
 
   useEffect(() => {

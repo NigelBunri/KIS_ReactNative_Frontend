@@ -6,6 +6,7 @@ import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import { LEFT_RAIL_WIDTH, Partner } from './partnersTypes';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type Props = {
   partners: Partner[];
@@ -21,6 +22,10 @@ export default function PartnersLeftRail({
   onAddPartnerPress,
 }: Props) {
   const { palette, isDark, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const railWidth = responsive.isWatch ? 52 : responsive.isCompactPhone ? 60 : LEFT_RAIL_WIDTH;
+  const avatarSize = responsive.isWatch ? 38 : responsive.isCompactPhone ? 42 : 48;
   const metallicGoldGradient = tone === 'dark'
     ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
     : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
@@ -42,7 +47,7 @@ export default function PartnersLeftRail({
       style={[
         styles.leftRail,
         {
-          width: LEFT_RAIL_WIDTH,
+          width: railWidth,
           backgroundColor: isDark ? 'rgba(10,9,14,0.92)' : '#FFFFFF',
           borderRightColor: palette.divider,
           opacity: entrance,
@@ -63,6 +68,9 @@ export default function PartnersLeftRail({
           styles.addPartnerButton,
           {
             backgroundColor: palette.goldDeep,
+            width: avatarSize,
+            height: avatarSize,
+            borderRadius: avatarSize / 2,
             borderColor: palette.goldLight,
             shadowColor: palette.goldDeep,
             overflow: 'hidden',
@@ -78,7 +86,7 @@ export default function PartnersLeftRail({
           style={StyleSheet.absoluteFillObject}
         />
         <View pointerEvents="none" style={localStyles.goldSheen} />
-        <KISIcon name="add" size={24} color={palette.ivory ?? '#fff'} />
+        <KISIcon name="add" size={compact ? 20 : 24} color={palette.ivory ?? '#fff'} />
       </Pressable>
 
       <FlatList
@@ -95,6 +103,10 @@ export default function PartnersLeftRail({
               style={({ pressed }) => [
                 styles.partnerAvatarWrap,
                 {
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2,
+                  marginBottom: compact ? 9 : 12,
                   backgroundColor: isActive
                     ? palette.goldDeep
                     : isDark
@@ -142,7 +154,7 @@ export default function PartnersLeftRail({
                       color: isActive
                         ? palette.ivory ?? '#fff'
                         : palette.text,
-                      fontSize: 14,
+                      fontSize: compact ? 12 : 14,
                       fontWeight: '900',
                     }}
                   >

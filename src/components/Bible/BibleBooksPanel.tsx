@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
@@ -44,12 +45,14 @@ const GENRES = [
 
 function BookCard({ book, onOpen }: { book: KCANBook; onOpen: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const cardWidth = responsive.isWatch || responsive.isCompactPhone ? '100%' : responsive.isTablet ? '31%' : '47%';
   return (
     <Pressable
       onPress={onOpen}
-      style={[styles.bookCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+      style={[styles.bookCard, { width: cardWidth, backgroundColor: palette.surface, borderColor: palette.divider }]}
     >
-      <View style={[styles.bookCover, { backgroundColor: palette.card }]}>
+      <View style={[styles.bookCover, { height: responsive.isWatch ? 120 : responsive.isTablet ? 170 : 150, backgroundColor: palette.card }]}>
         {book.cover_image ? (
           <Image source={{ uri: book.cover_image }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         ) : (
@@ -83,6 +86,7 @@ function BookCard({ book, onOpen }: { book: KCANBook; onOpen: () => void }) {
 
 function PDFReader({ book, onClose }: { book: KCANBook; onClose: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -90,7 +94,7 @@ function PDFReader({ book, onClose }: { book: KCANBook; onClose: () => void }) {
 
   return (
     <View style={[styles.readerWrap, { backgroundColor: palette.bg }]}>
-      <View style={[styles.readerHeader, { backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
+      <View style={[styles.readerHeader, { paddingHorizontal: responsive.pageGutter, backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
         <TouchableOpacity onPress={onClose} style={styles.readerBack}>
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </TouchableOpacity>
@@ -127,6 +131,7 @@ function PDFReader({ book, onClose }: { book: KCANBook; onClose: () => void }) {
 
 export default function BibleBooksPanel() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [books, setBooks] = useState<KCANBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [genre, setGenre] = useState('');
@@ -155,7 +160,7 @@ export default function BibleBooksPanel() {
 
   useEffect(() => {
     fetchBooks(genre, query);
-  }, [genre, fetchBooks]);
+  }, [fetchBooks, genre, query]);
 
   const handleSearch = (text: string) => {
     setQuery(text);
@@ -225,7 +230,7 @@ export default function BibleBooksPanel() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.grid}>
+        <ScrollView contentContainerStyle={[styles.grid, { gap: responsive.cardGap }]}>
           {books.map((book) => (
             <BookCard key={book.id} book={book} onOpen={() => setSelectedBook(book)} />
           ))}

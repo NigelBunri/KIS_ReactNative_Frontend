@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -15,6 +16,8 @@ const typeLabel = (type?: string) => (type === 'video' ? 'Video' : 'Message');
 
 export default function MeditationPanel({ meditations, loading = false }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const [filter, setFilter] = useState<'all' | 'message' | 'video'>('all');
 
   const filtered = useMemo(
@@ -40,9 +43,9 @@ export default function MeditationPanel({ meditations, loading = false }: Props)
   return (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>Meditations</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Meditations</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               KCAN-only video and message feed. Manual content from official publishers.
             </Text>
@@ -81,7 +84,7 @@ export default function MeditationPanel({ meditations, loading = false }: Props)
           const isVideo = entry.content_type === 'video';
           return (
             <BibleSectionCard key={entry.id}>
-              <View style={styles.headerRow}>
+              <View style={[styles.headerRow, compact && styles.wrapRow]}>
                 <View style={[styles.typeIcon, { backgroundColor: palette.primarySoft }]}>
                   <KISIcon name={isVideo ? 'play' : 'book'} size={18} color={palette.primaryStrong} />
                 </View>
@@ -153,6 +156,7 @@ export default function MeditationPanel({ meditations, loading = false }: Props)
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
   title: { fontSize: 22, fontWeight: '900' },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },

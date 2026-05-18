@@ -25,6 +25,7 @@ import type { SimpleContact } from './ForAttachments/ContactsModal';
 import type { PollDraft } from './ForAttachments/PollModal';
 import type { EventDraft } from './ForAttachments/EventModal';
 import { AttachmentFilePayload } from '../../ChatRoomPage';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 /* -------------------------------------------------------------------------- */
 /*                          STICKER PICKER (BOTTOM PANEL)                     */
@@ -130,6 +131,9 @@ type MessageComposerProps = {
   onSendContacts?: (contacts: SimpleContact[]) => void;
   onCreatePoll?: (poll: PollDraft) => void;
   onCreateEvent?: (event: EventDraft) => void;
+
+  // @mention autocomplete
+  mentionParticipants?: { id: string; name: string }[];
 };
 
 /* -------------------------------------------------------------------------- */
@@ -156,9 +160,15 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSendContacts,
   onCreatePoll,
   onCreateEvent,
+  mentionParticipants,
 }) => {
   /* ----------------------------- VOICE STATE ----------------------------- */
   const [isRecording, setIsRecording] = useState(false);
+  const responsive = useResponsiveLayout();
+  const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
+  const composerIconSize = responsive.isWatch ? 32 : responsive.isCompactPhone ? 34 : 36;
+  const sendButtonSize = responsive.isWatch ? 40 : responsive.isCompactPhone ? 44 : 50;
+  const composerIconGlyph = responsive.isWatch ? 18 : 22;
 
   const previewVisible = false;
 
@@ -274,12 +284,38 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
   const lastSendRef = useRef<number | null>(null);
 
+  /* ----------------------------- @MENTION --------------------------------- */
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+
+  const handleTextChange = (text: string) => {
+    onChangeText(text);
+    if (!mentionParticipants?.length) return;
+    const match = text.match(/@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1].toLowerCase());
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const mentionSuggestions =
+    mentionQuery !== null && mentionParticipants
+      ? mentionParticipants.filter((p) =>
+          p.name.toLowerCase().startsWith(mentionQuery),
+        )
+      : [];
+
+  const insertMention = (name: string) => {
+    const updated = value.replace(/@\w*$/, `@${name} `);
+    onChangeText(updated);
+    setMentionQuery(null);
+  };
+
   const handleTextSend = () => {
     if (!canSend || disabled) return;
 
     const now = Date.now();
     if (lastSendRef.current && now - lastSendRef.current < 400) {
-      console.log('[MessageComposer] Ignored duplicate send (too fast)');
       return;
     }
     lastSendRef.current = now;
@@ -372,8 +408,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           flexDirection: 'row',
           borderBottomWidth: 1,
           borderColor: palette.divider,
-          paddingHorizontal: 8,
-          paddingVertical: 6,
+          paddingHorizontal: responsive.isWatch ? 4 : 8,
+          paddingVertical: responsive.isWatch ? 4 : 6,
         }}
       >
         {tabs.map((t) => {
@@ -392,7 +428,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             >
               <Text
                 style={{
-                  fontSize: 13,
+                  fontSize: responsive.labelFontSize,
                   color: active ? palette.onPrimary : palette.text,
                 }}
               >
@@ -553,19 +589,68 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         },
       ]}
     >
+      {/* @mention autocomplete dropdown */}
+      {mentionSuggestions.length > 0 && (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: palette.divider ?? '#e0e0e0',
+            backgroundColor: palette.surface ?? '#fff',
+            maxHeight: 180,
+          }}
+        >
+          {mentionSuggestions.slice(0, 6).map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => insertMention(p.name)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                backgroundColor: pressed
+                  ? (palette.surfaceSoft ?? '#f5f5f5')
+                  : 'transparent',
+                borderBottomWidth: 1,
+                borderBottomColor: palette.divider ?? '#f0f0f0',
+              })}
+            >
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: palette.primary ?? '#4F46E5',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                  {p.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, color: palette.text, fontWeight: '600' }}>
+                @{p.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {renderReplyOrEditBanner()}
 
       {/* MAIN INPUT ROW */}
-      <View style={styles.composerMainRow}>
+      <View style={[styles.composerMainRow, { paddingVertical: responsive.isWatch ? 5 : responsive.isCompactPhone ? 7 : 10 }]}>
         {!isVoiceActive && (
           <>
             <Pressable
               onPress={toggleEmojiKeyboard}
-              style={styles.iconTextButton}
+              style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
             >
               <KISIcon
                 name={keyboardMode ? 'smiley' : 'keyboard'}
-                size={22}
+                size={composerIconGlyph}
                 color={palette.subtext}
               />
             </Pressable>
@@ -574,6 +659,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               style={[
                 styles.composerInputWrapper,
                 {
+                  marginHorizontal: responsive.isWatch ? 2 : 4,
+                  paddingHorizontal: responsive.isWatch ? 8 : 12,
+                  paddingVertical: responsive.isWatch ? 4 : 6,
+                  borderRadius: responsive.isWatch ? 15 : 18,
                   backgroundColor: palette.composerInputBg,
                   borderColor:
                     palette.composerInputBorder ?? 'transparent',
@@ -584,7 +673,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 ref={textInputRef}
                 value={value}
                 editable={!disabled}
-                onChangeText={onChangeText}
+                onChangeText={handleTextChange}
                 placeholder={
                   editing
                     ? 'Edit message'
@@ -594,32 +683,32 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 }
                 placeholderTextColor={palette.subtext}
                 multiline
-                style={[styles.composerInput, { color: palette.text }]}
+                style={[styles.composerInput, { color: palette.text, fontSize: responsive.bodyFontSize }]}
               />
             </View>
 
             {/* "+" → attachment sheet */}
             <Pressable
-              style={styles.iconTextButton}
+              style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
               disabled={!!disabled}
               onPress={openAttachmentMenu}
             >
               <KISIcon
                 name="add"
-                size={22}
+                size={composerIconGlyph}
                 color={palette.subtext}
               />
             </Pressable>
 
             {/* Camera → open full-screen camera modal (ONLY place for images/videos) */}
             <Pressable
-              style={styles.iconTextButton}
+              style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2, display: isTinyDevice && value.trim().length > 0 ? 'none' : 'flex' }]}
               disabled={!!disabled}
               onPress={openCameraModal}
             >
               <KISIcon
                 name="camera"
-                size={22}
+                size={composerIconGlyph}
                 color={palette.subtext}
               />
             </Pressable>
@@ -638,16 +727,16 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                   !canSend || disabled
                     ? palette.subtext
                     : palette.primary,
-                marginRight: 12,
-                height: 50,
-                width: 50,
+                marginRight: responsive.isWatch ? 4 : 12,
+                height: sendButtonSize,
+                width: sendButtonSize,
                 opacity: !canSend || disabled ? 0.6 : 1,
               },
             ]}
           >
             <KISIcon
               name="send"
-              size={18}
+              size={responsive.isWatch ? 16 : 18}
               color={palette.onPrimary}
             />
           </Pressable>
@@ -674,10 +763,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         palette={palette}
         onClose={closeAttachmentMenu}
         onSendFiles={async (files, callbacks) => {
-          console.log(
-            '[MessageComposer] onSendFiles from sheet:',
-            files,
-          );
           const res = await onSendAttachment?.({
             ...files,
             onProgress: callbacks?.onProgress,
@@ -686,18 +771,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           return res !== false;
         }}
         onSendContacts={(contacts) => {
-          console.log(
-            '[MessageComposer] contacts selected:',
-            contacts,
-          );
           onSendContacts?.(contacts);
         }}
         onCreatePoll={(poll) => {
-          console.log('[MessageComposer] poll created:', poll);
           onCreatePoll?.(poll);
         }}
         onCreateEvent={(event) => {
-          console.log('[MessageComposer] event created:', event);
           onCreateEvent?.(event);
         }}
       />
@@ -708,10 +787,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         palette={palette}
         onClose={closeCameraModal}
         onCapture={(files) => {
-          console.log(
-            '[MessageComposer] camera captured files (images/videos):',
-            files,
-          );
           onSendAttachment?.(files);
         }}
       />

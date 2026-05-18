@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import KISTextInput from '@/constants/KISTextInput';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type Props = {
   searchPlaceholder: string;
@@ -22,6 +23,8 @@ export default function BroadcastSearchRow({
   filterActive,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(), []);
 
   return (
@@ -33,6 +36,9 @@ export default function BroadcastSearchRow({
             backgroundColor: palette.surface,
             borderColor: filterActive ? palette.primary : palette.border,
             shadowColor: palette.shadow ?? '#000',
+            paddingHorizontal: compact ? 7 : 10,
+            paddingVertical: compact ? 5 : 7,
+            minHeight: compact ? 46 : 54,
           },
         ]}
       >
@@ -50,8 +56,8 @@ export default function BroadcastSearchRow({
             layout={{
               size: 'sm',
               bordered: false,
-              height: 40,
-              minHeight: 40,
+              height: compact ? 36 : 40,
+              minHeight: compact ? 36 : 40,
               paddingHorizontal: 0,
               paddingVertical: 0,
               wrapStyle: styles.inputWrap,
@@ -82,15 +88,18 @@ export default function BroadcastSearchRow({
             size={16}
             color={filterActive ? palette.onPrimary : palette.subtext}
           />
-          <Text
-            style={{
-              color: filterActive ? palette.onPrimary : palette.text,
-              fontWeight: '800',
-              fontSize: 12,
-            }}
-          >
-            {filterLabel}
-          </Text>
+          {responsive.isWatch ? null : (
+            <Text
+              style={{
+                color: filterActive ? palette.onPrimary : palette.text,
+                fontWeight: '800',
+                fontSize: responsive.labelFontSize,
+              }}
+              numberOfLines={1}
+            >
+              {filterLabel}
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>

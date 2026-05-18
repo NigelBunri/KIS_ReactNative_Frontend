@@ -25,6 +25,7 @@ import ViewShot from 'react-native-view-shot';
 import Video from 'react-native-video';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
@@ -213,6 +214,8 @@ export default function BroadcastFeedSection({
   onSubscribeToSource,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation();
   const mediaHeaders = useMediaHeaders();
   const {
@@ -1232,7 +1235,7 @@ export default function BroadcastFeedSection({
    * ───────────────────────── */
 
   const renderFeedBody = () => (
-    <View style={{ paddingHorizontal: 12, paddingBottom: 90, gap: 12 }}>
+    <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90, gap: responsive.cardGap }}>
       {loadingBroadcasts ? (
         <View style={{ marginTop: 12, gap: 10 }}>
           <Skeleton height={140} radius={16} />
@@ -1290,7 +1293,7 @@ export default function BroadcastFeedSection({
   );
 
   const renderMarketBody = () => (
-    <View style={{ paddingHorizontal: 12, paddingBottom: 90 }}>
+    <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90 }}>
       <MarketStudioSection
         profile={profile}
         canUseMarket={canUseMarket}
@@ -1300,7 +1303,7 @@ export default function BroadcastFeedSection({
   );
 
   const renderLessonsBody = () => (
-    <View style={{ paddingHorizontal: 12, paddingBottom: 90, gap: 12 }}>
+    <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90, gap: responsive.cardGap }}>
       <View
         style={[
           styles.lessonHero,
@@ -1485,7 +1488,7 @@ export default function BroadcastFeedSection({
               >
                 <Pressable
                   onPress={closeVideoModal}
-                  style={styles.videoCloseButton}
+                  style={[styles.videoCloseButton, { left: responsive.pageGutter, width: compact ? 38 : 44, height: compact ? 38 : 44, borderRadius: compact ? 19 : 22 }]}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <KISIcon name="close" size={24} color="#fff" />
@@ -1525,7 +1528,7 @@ export default function BroadcastFeedSection({
               </Animated.View>
 
               {currentVideoItem && (
-                <View style={styles.videoFloatingActions}>
+                <View style={[styles.videoFloatingActions, { right: responsive.pageGutter, bottom: compact ? 104 : 140 }]}>
                   <Pressable
                     onPress={() => handleShare(currentVideoItem)}
                     style={styles.videoFloatingActionButton}
@@ -1561,10 +1564,10 @@ export default function BroadcastFeedSection({
                 </View>
               )}
 
-              <View style={styles.videoControls}>
+              <View style={[styles.videoControls, compact && { bottom: 14, left: responsive.pageGutter, right: responsive.pageGutter }]}>
                 <Pressable
                   onPress={() => setAutoplayEnabled(p => !p)}
-                  style={styles.videoControlButton}
+                  style={[styles.videoControlButton, compact && { paddingHorizontal: 10, paddingVertical: 8 }]}
                 >
                   <Text style={{ color: '#fff', fontWeight: '800' }}>
                     Autoplay {autoplayEnabled ? 'On' : 'Off'}
@@ -1572,7 +1575,7 @@ export default function BroadcastFeedSection({
                 </Pressable>
                 <Pressable
                   onPress={() => setIsVideoPlaying(p => !p)}
-                  style={styles.videoControlButton}
+                  style={[styles.videoControlButton, compact && { paddingHorizontal: 10, paddingVertical: 8 }]}
                 >
                   <Text style={{ color: '#fff', fontWeight: '800' }}>
                     {isVideoPlaying ? 'Pause' : 'Play'}

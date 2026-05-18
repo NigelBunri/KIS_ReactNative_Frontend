@@ -13,6 +13,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -740,36 +741,74 @@ function InstitutionDashboard({
     </View>
   );
 
-  const renderPlaceholder = (label: string, icon: string) => (
-    <View
-      style={{
-        backgroundColor: palette.surface,
-        borderRadius: 20,
-        padding: 32,
-        alignItems: 'center',
-        gap: 12,
-        borderWidth: 1,
-        borderColor: palette.divider,
-      }}
-    >
-      <KISIcon name={icon as any} size={40} color={palette.subtext} />
-      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>{label}</Text>
-      <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
-        Full {label.toLowerCase()} management is coming soon.
-      </Text>
-      <Pressable
-        onPress={() => Alert.alert('Coming soon', `${label} management will be available in an upcoming update.`)}
-        style={{
-          backgroundColor: palette.primarySoft,
-          borderRadius: 12,
-          paddingHorizontal: 20,
-          paddingVertical: 10,
-          borderWidth: 1,
-          borderColor: palette.primary,
-        }}
-      >
-        <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Explore {label}</Text>
-      </Pressable>
+  const renderAnalytics = () => {
+    const d = dashboard ?? {};
+    const kpis = [
+      { label: 'Enrolled', value: d.enrollment_count ?? enrollmentCount },
+      { label: 'Members', value: d.member_count ?? memberCount },
+      { label: 'Courses', value: d.course_count ?? courseCount },
+      { label: 'Programs', value: d.program_count ?? programCount },
+      { label: 'Completion rate', value: d.completion_rate != null ? `${Math.round(Number(d.completion_rate) * 100)}%` : '—' },
+      { label: 'Avg rating', value: d.avg_rating != null ? Number(d.avg_rating).toFixed(1) : '—' },
+      { label: 'Active learners', value: d.active_learner_count ?? '—' },
+      { label: 'Revenue', value: d.revenue_total != null ? `$${Number(d.revenue_total).toFixed(2)}` : '—' },
+    ];
+    return (
+      <View style={{ gap: 12 }}>
+        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Institution analytics</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {kpis.map(kpi => (
+            <View
+              key={kpi.label}
+              style={{
+                flex: 1,
+                minWidth: 120,
+                backgroundColor: palette.surface,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                padding: 14,
+                gap: 4,
+              }}
+            >
+              <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>{String(kpi.value ?? '—')}</Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>{kpi.label}</Text>
+            </View>
+          ))}
+        </View>
+        {loading ? (
+          <Text style={{ color: palette.subtext, textAlign: 'center' }}>Loading dashboard…</Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderSettings = () => (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Institution info</Text>
+      {[
+        { label: 'Name', value: institution.name },
+        { label: 'Type', value: institution.institution_type ?? institution.institutionType ?? '—' },
+        { label: 'Verification', value: institution.verification_status ?? institution.verificationStatus ?? 'unverified' },
+        { label: 'Partner connected', value: isPartnerConnected ? 'Yes' : 'No' },
+        { label: 'Members', value: String(memberCount) },
+        { label: 'Courses', value: String(courseCount) },
+        { label: 'Enrollments', value: String(enrollmentCount) },
+      ].map(row => (
+        <View
+          key={row.label}
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingVertical: 12,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: palette.divider,
+          }}
+        >
+          <Text style={{ color: palette.subtext, fontSize: 14 }}>{row.label}</Text>
+          <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>{row.value ?? '—'}</Text>
+        </View>
+      ))}
     </View>
   );
 
@@ -938,8 +977,8 @@ function InstitutionDashboard({
       case 'courses': return renderCourses();
       case 'programs': return renderPrograms();
       case 'members': return renderMembers();
-      case 'analytics': return renderPlaceholder('Analytics', 'bar-chart-outline');
-      case 'settings': return renderPlaceholder('Settings', 'settings-outline');
+      case 'analytics': return renderAnalytics();
+      case 'settings': return renderSettings();
     }
   }, [tab, dashboard, institution]);
 

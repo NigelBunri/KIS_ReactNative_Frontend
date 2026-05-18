@@ -4,6 +4,7 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { cardStyles, KIS_TOKENS, selectedControlStyles } from '@/theme/constants';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type HeaderAction = {
   label: string;
@@ -26,6 +27,7 @@ export function MainTabPageHeader({
   secondaryAction?: HeaderAction;
 }) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const selected = selectedControlStyles(tone);
 
   return (
@@ -36,6 +38,9 @@ export function MainTabPageHeader({
         {
           backgroundColor: palette.royalSurface,
           borderColor: palette.goldBorder,
+          borderRadius: responsive.isWatch ? 16 : responsive.isCompactPhone ? 20 : 24,
+          padding: responsive.isWatch ? 10 : responsive.isCompactPhone ? 12 : 16,
+          gap: responsive.isWatch ? 8 : 14,
         },
       ]}
     >
@@ -45,23 +50,44 @@ export function MainTabPageHeader({
             {eyebrow}
           </Text>
         ) : null}
-        <Text style={[styles.title, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: palette.text,
+              fontSize: responsive.headerTitleSize,
+              lineHeight: Math.round(responsive.headerTitleSize * 1.2),
+            },
+          ]}
+          numberOfLines={responsive.isWatch ? 2 : 1}
+          adjustsFontSizeToFit
+        >
           {title}
         </Text>
         {subtitle ? (
-          <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={2}>
+          <Text
+            style={[
+              styles.subtitle,
+              {
+                color: palette.subtext,
+                fontSize: responsive.bodyFontSize,
+                lineHeight: Math.round(responsive.bodyFontSize * 1.42),
+              },
+            ]}
+            numberOfLines={responsive.isWatch ? 3 : 2}
+          >
             {subtitle}
           </Text>
         ) : null}
       </View>
       {(primaryAction || secondaryAction) ? (
-        <View style={styles.actions}>
+        <View style={[styles.actions, responsive.isWatch && styles.actionsCompact]}>
           {secondaryAction ? (
             <Pressable
               onPress={secondaryAction.onPress}
               accessibilityRole="button"
               accessibilityLabel={secondaryAction.accessibilityLabel || secondaryAction.label}
-              style={[selected.container, styles.headerAction]}
+              style={[selected.container, styles.headerAction, responsive.isWatch && styles.headerActionCompact]}
             >
               {secondaryAction.icon ? (
                 <KISIcon name={secondaryAction.icon} size={16} color={palette.selectedText} />
@@ -105,10 +131,11 @@ export function MainTabStateBlock({
   onAction?: () => void;
 }) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const cards = cardStyles(tone);
 
   return (
-    <View style={[cards.base, styles.stateBlock]}>
+    <View style={[cards.base, styles.stateBlock, { minHeight: responsive.isWatch ? 96 : 132, gap: responsive.cardGap }]}>
       <View style={[styles.stateIcon, { backgroundColor: palette.selectedBg }]}>
         {loading ? (
           <ActivityIndicator color={palette.goldReadable} />
@@ -117,8 +144,8 @@ export function MainTabStateBlock({
         )}
       </View>
       <View style={styles.stateCopy}>
-        <Text style={[styles.stateTitle, { color: palette.text }]}>{title}</Text>
-        {message ? <Text style={[styles.stateMessage, { color: palette.subtext }]}>{message}</Text> : null}
+        <Text style={[styles.stateTitle, { color: palette.text, fontSize: responsive.isWatch ? 15 : 18 }]}>{title}</Text>
+        {message ? <Text style={[styles.stateMessage, { color: palette.subtext, fontSize: responsive.bodyFontSize }]}>{message}</Text> : null}
       </View>
       {actionLabel ? (
         <KISButton title={actionLabel} size="sm" variant="outline" onPress={onAction} />
@@ -159,8 +186,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  actionsCompact: {
+    alignItems: 'stretch',
+  },
   headerAction: {
     maxWidth: '100%',
+  },
+  headerActionCompact: {
+    flexGrow: 1,
   },
   stateBlock: {
     minHeight: 132,

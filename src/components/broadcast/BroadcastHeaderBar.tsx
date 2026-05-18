@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type Props = {
   title: string;
@@ -17,6 +18,8 @@ export default function BroadcastHeaderBar({
   onSearch,
 }: Props) {
   const { palette, tokens, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const headerTextColor = palette.ivory ?? '#FFFFFF';
   const headerMutedColor = tone === 'dark' ? '#FFF4B8' : '#FFFFFF';
   const isDark = tone === 'dark';
@@ -28,80 +31,89 @@ export default function BroadcastHeaderBar({
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
-    <View style={styles.row}>
-      <View style={styles.left}>
-        <View
-          style={[
-            styles.mark,
-            { backgroundColor: controlBg, borderColor: controlBorder },
-          ]}
-        >
-          <KISIcon name="megaphone" size={18} color={controlText} />
-        </View>
-        <View>
-          <Text style={[styles.eyebrow, { color: headerMutedColor }]}>
-            Studio signal
-          </Text>
-          <Text style={[styles.title, { color: headerTextColor }]}>{title}</Text>
-        </View>
-        <View
-          style={[
-            styles.badge,
-            {
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            },
-          ]}
-        >
-          <KISIcon name="shield" size={12} color={controlText} />
-          <Text
-            style={{
-              color: controlText,
-              fontWeight: '900',
-              fontSize: 11,
-            }}
+    <View style={styles.shell}>
+      <View style={[styles.row, compact && styles.rowCompact]}>
+        <View style={styles.leftCluster}>
+          <View
+            style={[
+              styles.mark,
+              { backgroundColor: controlBg, borderColor: controlBorder, width: compact ? 34 : 40, height: compact ? 34 : 40, borderRadius: compact ? 14 : 16 },
+            ]}
           >
-            {tierLabel}
-          </Text>
+            <KISIcon name="megaphone" size={18} color={controlText} />
+          </View>
+          <View style={styles.titleBlock}>
+            <Text style={[styles.title, { color: headerTextColor, fontSize: compact ? 18 : 22 }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <View style={styles.metaRow}>
+              <Text style={[styles.eyebrow, { color: headerMutedColor }]} numberOfLines={1}>
+                Studio signal
+              </Text>
+              <View
+                style={[
+                  styles.badge,
+                  {
+                    backgroundColor: controlBg,
+                    borderColor: controlBorder,
+                  },
+                ]}
+              >
+                <KISIcon name="shield" size={9} color={controlText} />
+                <Text
+                  style={{
+                    color: controlText,
+                    fontWeight: '900',
+                    fontSize: 8,
+                  }}
+                  numberOfLines={1}
+                >
+                  {tierLabel}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {onSearch && (
+        <View style={[styles.actions, compact && styles.actionsCompact]}>
+          {onSearch && (
+            <Pressable
+              onPress={onSearch}
+              style={[
+                styles.createBtn,
+                {
+                  backgroundColor: controlBg,
+                  borderColor: controlBorder,
+                  borderWidth: 1,
+                  paddingHorizontal: compact ? 9 : 12,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+            >
+              <KISIcon name="search" size={16} color={controlText} />
+            </Pressable>
+          )}
           <Pressable
-            onPress={onSearch}
+            onPress={onCreate}
             style={[
               styles.createBtn,
               {
-                backgroundColor: controlBg,
-                borderColor: controlBorder,
-                borderWidth: 1,
-                paddingHorizontal: 12,
+                backgroundColor: createBg,
+                borderColor: isDark ? palette.goldMuted : 'transparent',
+                borderWidth: isDark ? 1 : 0,
               },
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Search"
           >
-            <KISIcon name="search" size={16} color={controlText} />
+            <KISIcon name="plus" size={16} color={createText} />
+            {responsive.isWatch ? null : (
+              <Text style={{ color: createText, fontWeight: '900', lineHeight: 16 }}>
+                Create
+              </Text>
+            )}
           </Pressable>
-        )}
-        <Pressable
-          onPress={onCreate}
-          style={[
-            styles.createBtn,
-            {
-              backgroundColor: createBg,
-              borderColor: isDark ? palette.goldMuted : 'transparent',
-              borderWidth: isDark ? 1 : 0,
-            },
-          ]}
-          accessibilityRole="button"
-        >
-          <KISIcon name="plus" size={16} color={createText} />
-          <Text style={{ color: createText, fontWeight: '900', lineHeight: 16 }}>
-            Create
-          </Text>
-        </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -109,18 +121,47 @@ export default function BroadcastHeaderBar({
 
 const makeStyles = (_tokens: any) =>
   StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+    shell: {
       paddingHorizontal: 2,
     },
-    left: {
+    row: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+      minWidth: 0,
+    },
+    rowCompact: {
+      gap: 8,
+    },
+    leftCluster: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       gap: 9,
       flex: 1,
       minWidth: 0,
+      flexShrink: 1,
+    },
+    titleBlock: {
+      flex: 1,
+      minWidth: 0,
+      gap: 3,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+      minWidth: 0,
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 0,
+    },
+    actionsCompact: {
+      gap: 5,
     },
     mark: {
       width: 40,
@@ -144,11 +185,13 @@ const makeStyles = (_tokens: any) =>
     badge: {
       borderWidth: 1,
       borderRadius: 999,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 2,
+      minHeight: 14,
+      maxWidth: 96,
     },
     createBtn: {
       borderRadius: 999,

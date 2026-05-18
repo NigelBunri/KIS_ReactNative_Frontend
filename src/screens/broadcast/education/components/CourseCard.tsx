@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type Props = {
   title: string;
@@ -22,6 +23,8 @@ export default function CourseCard({
   onPress,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const isTiny = responsive.isWatch || responsive.isCompactPhone;
 
   const imgSource = useMemo(() => {
     if (coverUrl) return { uri: coverUrl };
@@ -35,15 +38,16 @@ export default function CourseCard({
         borderWidth: 2,
         borderColor: palette.divider,
         backgroundColor: palette.surface,
-        borderRadius: 20,
+        borderRadius: isTiny ? 16 : 20,
         overflow: 'hidden',
+        minWidth: 0,
       }}
     >
-      <View style={{ height: 120 }}>
+      <View style={{ height: isTiny ? 92 : responsive.isTablet ? 144 : 120 }}>
         <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
       </View>
 
-      <View style={{ padding: 12, gap: 6 }}>
+      <View style={{ padding: isTiny ? 10 : 12, gap: 6 }}>
         <Text style={{ color: palette.text, fontWeight: '900' }} numberOfLines={1}>
           {title}
         </Text>
@@ -54,7 +58,7 @@ export default function CourseCard({
           </Text>
         ) : null}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, gap: 8, flexWrap: 'wrap' }}>
           <Text style={{ color: palette.subtext, fontWeight: '900' }}>{priceLabel ?? ''}</Text>
 
           <View

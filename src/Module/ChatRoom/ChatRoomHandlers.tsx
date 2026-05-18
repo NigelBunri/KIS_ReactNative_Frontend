@@ -83,14 +83,12 @@ export const handleSend = async ({
   setReplyTo: (v: ChatMessage | null) => void;
   setHasLocallyAcceptedRequest: (v: boolean) => void;
 }) => {
-   console.log("I am chcking for messagein here: ", chat)
   const text = draft.trim();
   if (!text || !chat) return;
-  
- console.log("I am chcking for messagein here 333: ", chat)
+
   const convId = await ensureConversationId(text);
   if (!convId) return;
-console.log("I am chcking for messagein here 4444: ", chat)
+
   if (editing) {
     await editMessage(editing.id, {
       text,
@@ -112,9 +110,6 @@ console.log("I am chcking for messagein here 4444: ", chat)
       setHasLocallyAcceptedRequest(true);
     }
   } else {
-
-    console.log("I am chcking for messagein here 55555: ", chat)
-
     await sendTextMessage(text, {
       kind: 'text',
       fromMe: true,
@@ -122,8 +117,6 @@ console.log("I am chcking for messagein here 4444: ", chat)
       conversationId: convId,
     });
   }
-
-  console.log("I am chcking for messagein here 666: ", chat)
 
   setDraft('');
   setDraftsByKey((prev: any) => ({

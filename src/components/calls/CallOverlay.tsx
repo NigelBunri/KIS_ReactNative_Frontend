@@ -9,6 +9,7 @@ import {
 
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 export type CallOverlayState =
   | 'dialing'
@@ -80,6 +81,10 @@ export default function CallOverlay({
   onToggleVideo,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const actionSize = responsive.isWatch ? 50 : responsive.isCompactPhone ? 56 : 64;
+  const controlSize = responsive.isWatch ? 40 : responsive.isCompactPhone ? 44 : 48;
 
   if (!session) return null;
 
@@ -93,11 +98,13 @@ export default function CallOverlay({
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { padding: responsive.pageGutter }]}> 
         <View
           style={[
             styles.card,
             {
+              padding: compact ? 16 : 24,
+              borderRadius: compact ? 20 : 24,
               backgroundColor: palette.card,
               borderColor: palette.inputBorder,
             },
@@ -107,6 +114,9 @@ export default function CallOverlay({
             style={[
               styles.hero,
               {
+                width: compact ? 72 : 92,
+                height: compact ? 72 : 92,
+                borderRadius: compact ? 36 : 46,
                 backgroundColor: session.media === 'video'
                   ? (palette.primarySoft ?? palette.surface)
                   : (palette.surface ?? palette.card),
@@ -115,12 +125,12 @@ export default function CallOverlay({
           >
             <KISIcon
               name={session.media === 'video' ? 'video' : 'phone'}
-              size={42}
+              size={compact ? 34 : 42}
               color={palette.primary}
             />
           </View>
 
-          <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 24 }]} numberOfLines={compact ? 2 : 1}>
             {session.title || 'Call'}
           </Text>
           <Text style={[styles.subtitle, { color: palette.subtext }]}>
@@ -132,6 +142,7 @@ export default function CallOverlay({
               style={[
                 styles.videoPlaceholder,
                 {
+                  height: compact ? 120 : 180,
                   backgroundColor: palette.surface,
                   borderColor: palette.inputBorder,
                 },
@@ -147,13 +158,13 @@ export default function CallOverlay({
             <View style={styles.actionRow}>
               <Pressable
                 onPress={onReject}
-                style={[styles.roundAction, { backgroundColor: '#D64545' }]}
+                style={[styles.roundAction, { backgroundColor: '#D64545', width: actionSize, height: actionSize, borderRadius: actionSize / 2 }]}
               >
                 <KISIcon name="phone" size={20} color="#fff" />
               </Pressable>
               <Pressable
                 onPress={onAnswer}
-                style={[styles.roundAction, { backgroundColor: '#1E9E5A' }]}
+                style={[styles.roundAction, { backgroundColor: '#1E9E5A', width: actionSize, height: actionSize, borderRadius: actionSize / 2 }]}
               >
                 <KISIcon name={session.media === 'video' ? 'video' : 'phone'} size={20} color="#fff" />
               </Pressable>
@@ -178,6 +189,9 @@ export default function CallOverlay({
                   style={[
                     styles.controlButton,
                     {
+                      width: controlSize,
+                      height: controlSize,
+                      borderRadius: controlSize / 2,
                       backgroundColor: session.muted ? (palette.primarySoft ?? palette.surface) : palette.surface,
                       borderColor: palette.inputBorder,
                     },
@@ -190,6 +204,9 @@ export default function CallOverlay({
                   style={[
                     styles.controlButton,
                     {
+                      width: controlSize,
+                      height: controlSize,
+                      borderRadius: controlSize / 2,
                       backgroundColor: session.speakerOn ? (palette.primarySoft ?? palette.surface) : palette.surface,
                       borderColor: palette.inputBorder,
                     },
@@ -203,6 +220,9 @@ export default function CallOverlay({
                     style={[
                       styles.controlButton,
                       {
+                        width: controlSize,
+                        height: controlSize,
+                        borderRadius: controlSize / 2,
                         backgroundColor: session.videoEnabled ? (palette.primarySoft ?? palette.surface) : palette.surface,
                         borderColor: palette.inputBorder,
                       },

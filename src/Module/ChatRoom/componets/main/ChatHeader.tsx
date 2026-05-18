@@ -41,6 +41,8 @@ type ChatHeaderProps = {
   // NEW: DM request / lock status (for direct chats)
   dmStatusLabel?: string | null;
   dmStatusVariant?: 'pending' | 'locked' | 'rejected' | 'normal';
+  dmRole?: 'initiator' | 'recipient' | null;
+  onAcceptRequest?: () => void;
 
   // NEW: presence/typing status
   statusText?: string | null;
@@ -78,6 +80,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   dmStatusLabel,
   dmStatusVariant = 'normal',
+  dmRole,
+  onAcceptRequest,
   statusText,
   contextLabel,
   onPressContext,
@@ -400,30 +404,52 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         >
           {/* DM REQUEST / LOCK PILL */}
           {dmStatusLabel && (
-            <View
-              style={[
+            <Pressable
+              onPress={() => {
+                if (dmStatusVariant === 'pending' && dmRole === 'recipient' && onAcceptRequest) {
+                  onAcceptRequest();
+                }
+              }}
+              style={({ pressed }) => [
                 pillBaseStyle,
                 {
                   backgroundColor: dmBgColor,
+                  opacity: pressed ? 0.7 : 1,
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
                 },
               ]}
             >
-              <KISIcon
-                name="info"
-                size={14}
-                color={dmTextColor}
-              />
-              <Text
-                style={{
-                  marginLeft: 6,
-                  fontSize: 12,
-                  color: dmTextColor,
-                }}
-                numberOfLines={1}
-              >
-                {dmStatusLabel}
-              </Text>
-            </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <KISIcon
+                  name="info"
+                  size={14}
+                  color={dmTextColor}
+                />
+                <Text
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 12,
+                    color: dmTextColor,
+                  }}
+                  numberOfLines={1}
+                >
+                  {dmStatusLabel}
+                </Text>
+              </View>
+              {dmStatusVariant === 'pending' && dmRole === 'recipient' && onAcceptRequest && (
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: dmTextColor,
+                    marginTop: 2,
+                    opacity: 0.8,
+                  }}
+                >
+                  Tap to accept →
+                </Text>
+              )}
+            </Pressable>
           )}
 
           {/* PINNED PILL */}

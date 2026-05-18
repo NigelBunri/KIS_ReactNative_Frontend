@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import KISText from '@/components/common/KISText';
 import { resolveBackendAssetUrl } from '@/network';
@@ -158,6 +159,8 @@ export default function BroadcastFeedCard({
   onSubscribe,
 }: Props) {
   const { palette, tokens } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const [excerptExpanded, setExcerptExpanded] = useState(false);
   const [authorBioExpanded, setAuthorBioExpanded] = useState(false);
@@ -243,14 +246,14 @@ export default function BroadcastFeedCard({
     <View
       style={[
         styles.card,
-        { backgroundColor: palette.card, borderColor: palette.primaryStrong },
+        { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
       ]}
     >
       {/* ───── Header (avatar + source + time + menu) ───── */}
       <View style={styles.headerRow}>
         <Image
           source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
-          style={[styles.avatar, { backgroundColor: palette.bar }]}
+          style={[styles.avatar, { backgroundColor: palette.bar, width: compact ? 36 : 44, height: compact ? 36 : 44, borderRadius: compact ? 14 : 16 }]}
         />
 
         <View style={{ flex: 1 }}>
@@ -263,7 +266,7 @@ export default function BroadcastFeedCard({
               >
                 <KISText
                   autoLinkHandles={false}
-                  style={[styles.headerName, { color: palette.text }]}
+                  style={[styles.headerName, { color: palette.text, fontSize: compact ? 13 : 15 }]}
                   numberOfLines={1}
                 >
                   {headerName}
@@ -272,7 +275,7 @@ export default function BroadcastFeedCard({
             ) : (
               <KISText
                 autoLinkHandles={false}
-                style={[styles.headerName, { color: palette.text }]}
+                style={[styles.headerName, { color: palette.text, fontSize: compact ? 13 : 15 }]}
                 numberOfLines={1}
               >
                 {headerName}
@@ -338,7 +341,7 @@ export default function BroadcastFeedCard({
       {/* ───── Title + body (mockup-style) ───── */}
       {showTitle ? (
         <KISText
-          style={[styles.title, { color: palette.text }]}
+          style={[styles.title, { color: palette.text, fontSize: compact ? 15 : 18 }]}
           numberOfLines={2}
         >
           {item.title}
@@ -369,7 +372,7 @@ export default function BroadcastFeedCard({
       ) : showExcerpt ? (
         <View style={{ marginTop: 4 }}>
           <KISText
-            style={[styles.bodyText, { color: palette.subtext }]}
+            style={[styles.bodyText, { color: palette.subtext, fontSize: responsive.bodyFontSize }]}
             numberOfLines={excerptExpanded ? undefined : 3}
           >
             {excerpt}
@@ -403,7 +406,7 @@ export default function BroadcastFeedCard({
         <View
           style={[
             styles.slideshowWrap,
-            { borderColor: palette.divider, backgroundColor: palette.surface },
+            { borderColor: palette.divider, backgroundColor: palette.surface, aspectRatio: compact ? 4 / 3 : 16 / 9 },
           ]}
         >
           <Pressable onPress={onPressPrimary} style={styles.slideshowPressable}>
@@ -507,7 +510,7 @@ export default function BroadcastFeedCard({
       ) : null}
 
       {/* ───── Subscribe row (like mockup buttons under media) ───── */}
-      <View style={styles.ctaRow}>
+      <View style={[styles.ctaRow, compact && { flexWrap: 'wrap' }]}>
         {canSubscribe ? (
           <Pressable
             onPress={onSubscribe ?? onOpenSource}
@@ -558,7 +561,7 @@ export default function BroadcastFeedCard({
       </View>
 
       {/* ───── Engagement row (icons + counts like mockup bottom bar) ───── */}
-      <View style={[styles.engagementRow, { borderTopColor: palette.divider }]}>
+      <View style={[styles.engagementRow, { borderTopColor: palette.divider }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
         {onSave ? (
           <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
             <KISIcon

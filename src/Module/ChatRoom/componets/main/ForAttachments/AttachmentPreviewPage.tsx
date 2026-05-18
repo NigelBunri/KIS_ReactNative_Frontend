@@ -20,6 +20,7 @@ import {
   KISPalette,
 } from '@/theme/constants';
 import type { FilesType } from '../AttachmentSheet';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 export type PreviewKind = 'file' | 'audio';
 
@@ -95,6 +96,9 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
   onSend,
 }) => {
   const cardRadius = kisRadius.xl ?? 20;
+  const responsive = useResponsiveLayout();
+  const modalPadding = responsive.isWatch ? 8 : responsive.isCompactPhone ? 12 : KIS_TOKENS.spacing.lg;
+  const previewListMaxHeight = responsive.isWatch ? 170 : responsive.isCompactPhone ? 220 : 260;
   const [captionText, setCaptionText] = useState('');
   const [localItems, setLocalItems] = useState<FilesType[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -270,7 +274,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
           flex: 1,
           backgroundColor: palette.backdrop || 'rgba(0,0,0,0.5)',
           justifyContent: 'center',
-          paddingHorizontal: KIS_TOKENS.spacing.lg,
+          paddingHorizontal: modalPadding,
         }}
         onPress={() => {
           console.log(
@@ -292,9 +296,9 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
               (palette.surface as string) ||
               '#ffffff',
             borderRadius: cardRadius,
-            padding: KIS_TOKENS.spacing.lg,
+            padding: responsive.isWatch ? 12 : KIS_TOKENS.spacing.lg,
             ...KIS_TOKENS.elevation.modal,
-            maxHeight: '85%',
+            maxHeight: responsive.isWatch ? '94%' : '85%',
           }}
         >
           {/* Header */}
@@ -313,7 +317,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
             <Text
               style={{
                 marginLeft: 8,
-                fontSize: KIS_TOKENS.typography.title,
+                fontSize: responsive.isWatch ? 15 : KIS_TOKENS.typography.title,
                 fontWeight: KIS_TOKENS.typography.weight.bold,
                 color: palette.text,
               }}
@@ -372,7 +376,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
 
           {/* Items list (files + audio) */}
           <ScrollView
-            style={{ maxHeight: 260, marginBottom: KIS_TOKENS.spacing.md }}
+            style={{ maxHeight: previewListMaxHeight, marginBottom: KIS_TOKENS.spacing.md }}
           >
             {localItems.map((item, index) => {
               const isAudio =
@@ -396,9 +400,9 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                     <Pressable
                       onPress={() => playAudio(item)}
                       style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
+                        width: responsive.isWatch ? 36 : 44,
+                        height: responsive.isWatch ? 36 : 44,
+                        borderRadius: responsive.isWatch ? 18 : 22,
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginRight: KIS_TOKENS.spacing.sm,
@@ -520,8 +524,8 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                 >
                   <View
                     style={{
-                      width: 56,
-                      height: 56,
+                      width: responsive.isWatch ? 42 : 56,
+                      height: responsive.isWatch ? 42 : 56,
                       borderRadius: kisRadius.md,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -681,7 +685,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
               }}
               disabled={isUploading}
               style={({ pressed }) => ({
-                paddingHorizontal: KIS_TOKENS.spacing.lg,
+                paddingHorizontal: modalPadding,
                 paddingVertical: KIS_TOKENS.spacing.sm,
                 borderRadius: kisRadius.md,
                 backgroundColor: palette.primary,

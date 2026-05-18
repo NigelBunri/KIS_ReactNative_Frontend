@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_COMPONENT_TOKENS, KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
 import type { MainTabsParamList } from '@/navigation/types';
@@ -92,8 +93,13 @@ function AnimatedKISTabBar({
 
   // ✅ Responsive width that updates on orientation / size change
   const { width } = useWindowDimensions();
+  const responsive = useResponsiveLayout();
   const count = state.routes.length;
   const tabWidth = width / count;
+  const isTinyTabBar = responsive.isWatch || responsive.shortestSide < 330;
+  const iconCircleSize = responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : KIS_COMPONENT_TOKENS.tab.iconSize;
+  const iconSize = responsive.isWatch ? 19 : responsive.isCompactPhone ? 21 : 24;
+  const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 60 : 70;
 
   const { palette: p, tone } = theme;
   const isRoyalLightBar = tone === 'light';
@@ -113,7 +119,7 @@ function AnimatedKISTabBar({
     <View
       style={[
         styles.wrap,
-        { backgroundColor: barBg, paddingBottom: Math.max(insets.bottom, 0) },
+        { backgroundColor: barBg, paddingBottom: Math.max(insets.bottom, 0), paddingHorizontal: responsive.isWatch ? 2 : 6 },
       ]}
     >
       <View
@@ -145,13 +151,16 @@ function AnimatedKISTabBar({
             <Pressable
               key={route.key}
               onPress={onPress}
-              style={[styles.tab, { width: tabWidth }]}
+              style={[styles.tab, { width: tabWidth, height: tabBarHeight }]}
             >
-              <View style={styles.tabInner}>
+              <View style={[styles.tabInner, { gap: isTinyTabBar ? 0 : 6 }]}>
                 <View
                   style={[
                     styles.iconCircle,
                     {
+                      width: iconCircleSize,
+                      height: iconCircleSize,
+                      borderRadius: responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius,
                       backgroundColor: focused ? p.goldDeep : (isRoyalLightBar ? p.card : p.surfaceElevated),
                     },
                   ]}
@@ -161,13 +170,17 @@ function AnimatedKISTabBar({
                       colors={selectedGoldGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={[StyleSheet.absoluteFillObject, styles.selectedTabGradient]}
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        styles.selectedTabGradient,
+                        { borderRadius: responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius },
+                      ]}
                     />
                   ) : null}
                   {focused ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
                   <KISIcon
                     name={routeIconMap[route.name as RouteKey]}
-                    size={24}
+                    size={iconSize}
                     color={focused ? p.onPrimary : unfocusedTextColor}
                     focused={focused}
                   />
@@ -188,14 +201,21 @@ function AnimatedKISTabBar({
                   ) : null}
                 </View>
 
-                <Text
-                  style={[
-                    styles.label,
-                    { color: focused ? focusedTextColor : unfocusedTextColor },
-                  ]}
-                >
-                  {label}
-                </Text>
+                {!isTinyTabBar ? (
+                  <Text
+                    style={[
+                      styles.label,
+                      {
+                        color: focused ? focusedTextColor : unfocusedTextColor,
+                        fontSize: responsive.isCompactPhone ? 10 : 11,
+                      },
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {label}
+                  </Text>
+                ) : null}
               </View>
             </Pressable>
           );
@@ -214,10 +234,16 @@ export function MainTabs() {
   // ✅ Responsive width for overlay slide
   const { width } = useWindowDimensions();
 
-  // 🔥 Chat room overlay state lives here so it can cover the bottom tabs
-  const [activeChat, setActiveChat] = useState<Chat | null>(null);
-  const [chatVisible, setChatVisible] = useState(false);
-  const chatSlide = useRef(new RNAnimated.Value(0)).current; // 0 = off-screen, 1 = on-screen
+  // 🔥 Chat room overlay — stack so sub-rooms push on top of the parent room
+  const [chatHistory, setChatHistory] = useState<Chat[]>([]);
+  const chatSlide = useRef(new RNAnimated.Value(0)).current;    // main layer (first chat)
+  const subRoomSlide = useRef(new RNAnimated.Value(0)).current; // sub-room layer (depth ≥ 2)
+
+  // Derived convenience values
+  const chatVisible = chatHistory.length > 0;
+  const activeChat = chatHistory[0] ?? null;
+  const subRoomVisible = chatHistory.length > 1;
+  const activeSubRoom = subRoomVisible ? chatHistory[chatHistory.length - 1] : null;
   const [activeInfo, setActiveInfo] = useState<{ chat: Chat; currentUserId: string | null } | null>(null);
   const [infoVisible, setInfoVisible] = useState(false);
   const infoSlide = useRef(new RNAnimated.Value(0)).current;
@@ -376,15 +402,27 @@ export function MainTabs() {
       });
       return;
     }
-    setActiveChat(chat);
-    setChatVisible(true);
 
-    RNAnimated.timing(chatSlide, {
-      toValue: 1,
-      duration: 260,
-      useNativeDriver: true,
-    }).start();
-  }, [chatSlide, communityByConversationId, openCommunity]);
+    setChatHistory(prev => {
+      if (prev.length === 0) {
+        // First open: animate main layer in
+        RNAnimated.timing(chatSlide, {
+          toValue: 1,
+          duration: 260,
+          useNativeDriver: true,
+        }).start();
+        return [chat];
+      }
+      // Already in a chat: push sub-room and animate the sub-room layer in
+      subRoomSlide.setValue(0);
+      RNAnimated.timing(subRoomSlide, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }).start();
+      return [...prev, chat];
+    });
+  }, [chatSlide, subRoomSlide, communityByConversationId, openCommunity]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat.open', (payload: any) => {
@@ -406,16 +444,30 @@ export function MainTabs() {
     };
   }, [openChat]);
 
-  const closeChat = () => {
-    RNAnimated.timing(chatSlide, {
-      toValue: 0,
-      duration: 260,
-      useNativeDriver: true,
-    }).start(() => {
-      setChatVisible(false);
-      setActiveChat(null);
+  const closeChat = useCallback(() => {
+    setChatHistory(prev => {
+      if (prev.length > 1) {
+        // Pop the sub-room: animate back then remove from stack
+        RNAnimated.timing(subRoomSlide, {
+          toValue: 0,
+          duration: 260,
+          useNativeDriver: true,
+        }).start(() => {
+          setChatHistory(current => current.slice(0, -1));
+        });
+        return prev; // state stays unchanged until animation ends
+      }
+      // Close the main chat
+      RNAnimated.timing(chatSlide, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start(() => {
+        setChatHistory([]);
+      });
+      return prev;
     });
-  };
+  }, [chatSlide, subRoomSlide]);
 
   const openInfo = (payload: { chat: Chat | null; currentUserId: string | null }) => {
     if (!payload.chat) return;
@@ -473,7 +525,12 @@ export function MainTabs() {
 
   const chatTranslateX = chatSlide.interpolate({
     inputRange: [0, 1],
-    outputRange: [width, 0], // slide in from right, using current width
+    outputRange: [width, 0],
+  });
+
+  const subRoomTranslateX = subRoomSlide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [width, 0],
   });
 
   const communityTranslateX = communitySlide.interpolate({
@@ -554,6 +611,31 @@ export function MainTabs() {
         />
       </RNAnimated.View>
 
+      {/* Sub-room layer — slides in on top when user taps a sub-room from inside a chat */}
+      <RNAnimated.View
+        pointerEvents={subRoomVisible ? 'auto' : 'none'}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          transform: [{ translateX: subRoomTranslateX }],
+          zIndex: 1002,
+          backgroundColor: palette.bg,
+        }}
+      >
+        {activeSubRoom && (
+          <ChatRoomPage
+            chat={activeSubRoom}
+            onBack={closeChat}
+            onOpenInfo={openInfo}
+            onOpenChat={openChat}
+            initialTargetMessageId={(activeSubRoom as any)?.initialTargetMessageId ?? null}
+          />
+        )}
+      </RNAnimated.View>
+
       <RNAnimated.View
         pointerEvents={infoVisible ? 'auto' : 'none'}
         style={{
@@ -573,10 +655,9 @@ export function MainTabs() {
             currentUserId={activeInfo.currentUserId}
             onBack={closeInfo}
             onChatUpdated={(updated) => {
-              setActiveChat((prev) => {
-                if (!prev || prev.id !== updated.id) return prev;
-                return { ...prev, ...updated };
-              });
+              setChatHistory((prev: Chat[]) =>
+                prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
+              );
               setActiveInfo((prev) => {
                 if (!prev) return prev;
                 return { ...prev, chat: { ...prev.chat, ...updated } };
@@ -638,13 +719,13 @@ export function MainTabs() {
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 6 },
   bar: {
-    height: 70,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   tab: {
-    height: 70,
+    minHeight: 52,
     justifyContent: 'center',
     alignItems: 'center',
   },

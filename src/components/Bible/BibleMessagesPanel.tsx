@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -63,10 +64,12 @@ function formatDuration(seconds: number): string {
 
 function TopicCard({ topic, onPress }: { topic: Topic; onPress: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const cardWidth = responsive.isWatch || responsive.isCompactPhone ? '100%' : responsive.isTablet ? '31%' : '47%';
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.topicCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+      style={[styles.topicCard, { width: cardWidth, backgroundColor: palette.surface, borderColor: palette.divider }]}
     >
       <View style={[styles.topicImage, { backgroundColor: palette.card }]}>
         {topic.cover_image ? (
@@ -119,12 +122,14 @@ function MinisterCard({ minister, onPress }: { minister: Minister; onPress: () =
 
 function MessageCard({ message, onPlay }: { message: Message; onPlay: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   return (
     <Pressable
       onPress={onPlay}
-      style={[styles.messageCard, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+      style={[styles.messageCard, compact && styles.messageCardCompact, { backgroundColor: palette.surface, borderColor: palette.divider }]}
     >
-      <View style={[styles.messageThumbnail, { backgroundColor: palette.card }]}>
+      <View style={[styles.messageThumbnail, compact && styles.messageThumbnailCompact, { backgroundColor: palette.card }]}>
         {message.thumbnail_url_resolved ? (
           <Image source={{ uri: message.thumbnail_url_resolved }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         ) : (
@@ -161,6 +166,7 @@ function MessageCard({ message, onPlay }: { message: Message; onPlay: () => void
 
 function VideoPlayer({ message, onClose }: { message: Message; onClose: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
 
   useEffect(() => {
     postRequest(ROUTES.bible.kcanMessageView(message.id), {}).catch(() => undefined);
@@ -205,7 +211,7 @@ function VideoPlayer({ message, onClose }: { message: Message; onClose: () => vo
         )}
       </Pressable>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+      <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 10 }}>
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>{message.title}</Text>
         {!!message.minister_name && (
           <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 13 }}>{message.minister_name}</Text>
@@ -241,6 +247,7 @@ type ViewMode = 'topics' | 'ministers' | 'messages';
 
 export default function BibleMessagesPanel() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [viewMode, setViewMode] = useState<ViewMode>('topics');
   const [topics, setTopics] = useState<Topic[]>([]);
   const [ministers, setMinisters] = useState<Minister[]>([]);
@@ -438,7 +445,7 @@ export default function BibleMessagesPanel() {
                   </Text>
                 </View>
               ) : (
-                <View style={styles.topicGrid}>
+                <View style={[styles.topicGrid, { gap: responsive.cardGap }]}>
                   {topics.map((t) => (
                     <TopicCard key={t.id} topic={t} onPress={() => handleSelectTopic(t)} />
                   ))}
@@ -589,12 +596,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
+  messageCardCompact: { flexDirection: 'column' },
   messageThumbnail: {
     width: 110,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
+  messageThumbnailCompact: { width: '100%', aspectRatio: 16 / 9 },
   playOverlay: {
     position: 'absolute',
     width: 36,

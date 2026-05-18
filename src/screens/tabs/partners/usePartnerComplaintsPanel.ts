@@ -3,7 +3,10 @@ import { Animated } from 'react-native';
 
 export const usePartnerComplaintsPanel = (width: number) => {
   const [isOpen, setIsOpen] = useState(false);
-  const panelWidth = useMemo(() => width, [width]);
+  const panelWidth = useMemo(() => {
+    if (width < 600) return width;
+    return Math.min(760, Math.max(520, Math.round(width * 0.72)));
+  }, [width]);
   const panelTranslateX = useRef(new Animated.Value(panelWidth)).current;
 
   useEffect(() => {

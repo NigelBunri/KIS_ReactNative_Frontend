@@ -27,6 +27,7 @@ import {
 } from '@react-navigation/material-top-tabs';
 import { useKISTheme } from '../../theme/useTheme';
 import { KIS_TOKENS } from '../../theme/constants';
+import { useResponsiveLayout } from '../../theme/responsive';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
 import { KISIcon } from '@/constants/kisIcons';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
@@ -114,6 +115,13 @@ export default function MessagesScreen({ onOpenChat, onOpenInfo }: MessagesScree
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const responsive = useResponsiveLayout();
+  const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
+  const messageHeaderIconSize = responsive.isWatch ? 30 : responsive.isCompactPhone ? 34 : 38;
+  const messageHeaderTitleSize = responsive.isWatch ? 18 : responsive.isCompactPhone ? 20 : 22;
+  const messageHeaderSubtitleSize = responsive.isWatch ? 0 : responsive.isCompactPhone ? 10 : 12;
+  const messageHeaderPaddingX = responsive.pageGutter;
+  const messageFabSize = responsive.isWatch ? 46 : responsive.isCompactPhone ? 50 : 56;
   // Search & menus
   const [query, setQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
@@ -155,6 +163,46 @@ const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
 const mountedRef = useRef(true);
 const metaRefreshQueue = useRef(new Set<string>());
 const metaRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+const metaPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+// On mount: restore persisted unread counts into conversationMeta
+useEffect(() => {
+  AsyncStorage.getItem('KIS_CONV_META_V1').then((raw) => {
+    if (!raw) return;
+    try {
+      const saved: Record<string, number> = JSON.parse(raw);
+      setConversationMeta((prev) => {
+        if (Object.keys(prev).length > 0) return prev; // don't overwrite fresh server data
+        const merged: Record<string, ConversationMetaEntry> = {};
+        for (const [convId, unreadCount] of Object.entries(saved)) {
+          merged[convId] = { unreadCount };
+        }
+        return merged;
+      });
+    } catch { /* silent */ }
+  }).catch(() => {});
+}, []);
+
+// Debounced persistence of unreadCount whenever conversationMeta changes
+useEffect(() => {
+  if (metaPersistTimer.current) {
+    clearTimeout(metaPersistTimer.current);
+  }
+  metaPersistTimer.current = setTimeout(() => {
+    const toSave: Record<string, number> = {};
+    for (const [convId, entry] of Object.entries(conversationMeta)) {
+      if (typeof entry.unreadCount === 'number') {
+        toSave[convId] = entry.unreadCount;
+      }
+    }
+    AsyncStorage.setItem('KIS_CONV_META_V1', JSON.stringify(toSave)).catch(() => {});
+  }, 1500);
+  return () => {
+    if (metaPersistTimer.current) {
+      clearTimeout(metaPersistTimer.current);
+    }
+  };
+}, [conversationMeta]);
 
 useEffect(() => {
   return () => {
@@ -1372,7 +1420,7 @@ const handleSelectAllChats = useCallback(() => {
           {...tabProps}
           style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
           indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
-          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: 14 }}
+          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 11 : responsive.isCompactPhone ? 12 : 14 }}
           activeTintColor={palette.ivory}
           inactiveTintColor={palette.goldSoft}
         />
@@ -1575,9 +1623,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 hitSlop={10}
                 style={({ pressed }) => [
                   {
-                    width: 38,
-                    height: 38,
-                    borderRadius: 19,
+                    width: messageHeaderIconSize,
+                    height: messageHeaderIconSize,
+                    borderRadius: messageHeaderIconSize / 2,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: 'rgba(255,255,255,0.13)',
@@ -1594,7 +1642,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 <Text
                   style={{
                     color: palette.ivory,
-                    fontSize: 18,
+                    fontSize: responsive.isWatch ? 15 : 18,
                     fontWeight: '900',
                     letterSpacing: 0.2,
                   }}
@@ -1605,7 +1653,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 <Text
                   style={{
                     color: '#FFF4B8',
-                    fontSize: 11,
+                    fontSize: responsive.isWatch ? 0 : 11,
                     fontWeight: '800',
                     marginTop: 2,
                   }}
@@ -1616,7 +1664,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               </View>
             </View>
 
-            <View style={styles.appBarRight}>
+            <View style={[styles.appBarRight, isTinyDevice && { gap: 4 }]}>
               {[
                 { key: 'archive', icon: 'download', onPress: handleArchiveSelected },
                 { key: 'pin', icon: 'pin', onPress: handlePinSelected },
@@ -1629,9 +1677,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   hitSlop={8}
                   style={({ pressed }) => [
                     {
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
+                      width: responsive.isWatch ? 30 : 36,
+                      height: responsive.isWatch ? 30 : 36,
+                      borderRadius: responsive.isWatch ? 15 : 18,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: 'rgba(255,255,255,0.13)',
@@ -1682,9 +1730,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <View
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 18,
+                  width: responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : 42,
+                  height: responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : 42,
+                  borderRadius: responsive.isWatch ? 14 : 18,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: 'rgba(255,255,255,0.14)',
@@ -1692,13 +1740,13 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   borderColor: 'rgba(255,244,184,0.30)',
                 }}
               >
-                <Text style={{ color: palette.ivory, fontSize: 18, fontWeight: '900' }}>K</Text>
+                <Text style={{ color: palette.ivory, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>K</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   style={{
                     color: palette.ivory,
-                    fontSize: 22,
+                    fontSize: messageHeaderTitleSize,
                     fontWeight: '900',
                     letterSpacing: 0.3,
                   }}
@@ -1710,7 +1758,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   style={{
                     color: '#FFF4B8',
                     marginTop: 2,
-                    fontSize: 12,
+                    fontSize: messageHeaderSubtitleSize || 1,
                     fontWeight: '800',
                     letterSpacing: 0.2,
                   }}
@@ -1721,7 +1769,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               </View>
             </View>
 
-            <View style={styles.appBarRight}>
+            <View style={[styles.appBarRight, isTinyDevice && { gap: 4 }]}>
               {[
                 {
                   key: 'camera-search',
@@ -1736,9 +1784,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   hitSlop={8}
                   style={({ pressed }) => [
                     {
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
+                      width: messageHeaderIconSize,
+                      height: messageHeaderIconSize,
+                      borderRadius: messageHeaderIconSize / 2,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: 'rgba(255,255,255,0.13)',
@@ -1777,8 +1825,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             styles.menuBox,
             {
               position: 'absolute',
-              right: 12,
-              top: insets.top + 62,
+              right: messageHeaderPaddingX,
+              top: insets.top + (isTinyDevice ? 52 : 62),
               borderColor: palette.gold,
               backgroundColor: palette.card,
               shadowColor: palette.shadow,
@@ -1826,7 +1874,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           style={{
             transform: [{ translateY: translateHeaderY }],
             marginBottom: headerNegMargin, // collapse space so list moves up
-            paddingHorizontal: 12,
+            paddingHorizontal: messageHeaderPaddingX,
             paddingTop: 4,
             paddingBottom: 8,
             marginTop: -1,
@@ -2078,11 +2126,11 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             style={({ pressed }) => [
               {
                 position: 'absolute',
-                right: 16,
-                bottom: 16 + 64, // 64-ish to sit above bottom tab bar
-                width: 56,
-                height: 56,
-                borderRadius: 28,
+                right: responsive.pageGutter,
+                bottom: (responsive.isWatch ? 10 : 16) + 64, // 64-ish to sit above bottom tab bar
+                width: messageFabSize,
+                height: messageFabSize,
+                borderRadius: messageFabSize / 2,
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: palette.goldDeep,

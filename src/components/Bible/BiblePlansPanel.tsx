@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import TranslationPicker from './TranslationPicker';
 import KISButton from '@/constants/KISButton';
@@ -100,6 +101,8 @@ const tomorrowAt = (hour: number) => {
 
 export default function BiblePlansPanel() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const [view, setView] = useState<PlannerView>('month');
   const [cursor, setCursor] = useState(startOfDay(new Date()));
   const [events, setEvents] = useState<PlannerEvent[]>([]);
@@ -475,9 +478,9 @@ export default function BiblePlansPanel() {
   return (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>
               Reading Planner
             </Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
@@ -523,7 +526,7 @@ export default function BiblePlansPanel() {
           })}
         </View>
 
-        <View style={styles.navRow}>
+        <View style={[styles.navRow, compact && styles.centerWrapRow]}>
           <KISButton
             title="Previous"
             size="xs"
@@ -633,7 +636,7 @@ export default function BiblePlansPanel() {
                 key={event.id}
                 style={[styles.eventCard, { borderColor: palette.divider }]}
               >
-                <View style={styles.headerRow}>
+                <View style={[styles.headerRow, compact && styles.wrapRow]}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: palette.text, fontWeight: '900' }}>
                       {event.passage_ref}
@@ -773,7 +776,7 @@ export default function BiblePlansPanel() {
               selected={selectedTranslation}
               onSelect={setSelectedTranslation}
             />
-            <View style={styles.referenceRow}>
+            <View style={[styles.referenceRow, compact && styles.wrapRow]}>
               <TextInput
                 value={reference}
                 onChangeText={setReference}
@@ -801,7 +804,7 @@ export default function BiblePlansPanel() {
                   },
                 ]}
               >
-                <View style={styles.headerRow}>
+                <View style={[styles.headerRow, compact && styles.wrapRow]}>
                   <Text
                     style={{ color: palette.text, fontWeight: '900', flex: 1 }}
                   >
@@ -981,7 +984,7 @@ export default function BiblePlansPanel() {
           })}
         </View>
 
-        <View style={styles.navRow}>
+        <View style={[styles.navRow, compact && styles.centerWrapRow]}>
           <KISButton
             title={editingEventId ? 'Update event' : 'Create event'}
             size="sm"
@@ -1010,11 +1013,13 @@ export default function BiblePlansPanel() {
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
+  centerWrapRow: { justifyContent: 'center' },
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   monthTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '900' },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  segmentRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  segmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   segment: {
     flex: 1,
     borderWidth: 2,
@@ -1050,6 +1055,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
   },
@@ -1060,7 +1066,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   input: {
     flex: 1,
     borderWidth: 2,

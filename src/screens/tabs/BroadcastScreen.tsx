@@ -30,6 +30,7 @@ import BroadcastEducationPage from '../broadcast/pages/BroadcastEducationPage';
 import BroadcastMarketPage from '../broadcast/pages/BroadcastMarketPage';
 import BroadcastHealthcarePage from '../broadcast/pages/BroadcastHealthcarePage';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   getShopCartState,
   refreshShopCartFromBackend,
@@ -110,6 +111,8 @@ const TAB_SWIPE_DIRECTION_RATIO = 2.5;
 
 export default function BroadcastScreen() {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const broadcastGoldGradient = tone === 'dark'
     ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
@@ -269,7 +272,7 @@ export default function BroadcastScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: compactBroadcast ? 92 : 120 }}
         keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: palette.bg }}
         refreshControl={
@@ -289,7 +292,7 @@ export default function BroadcastScreen() {
         >
           <View style={styles.headerHalo} />
           
-          <View style={styles.headerInner}>
+          <View style={[styles.headerInner, { paddingHorizontal: responsive.pageGutter, paddingTop: compactBroadcast ? 8 : 12, paddingBottom: compactBroadcast ? 16 : 22 }]}>
             <View style={styles.headerSection}>
               <BroadcastHeaderBar
                 title="Broadcast"
@@ -300,7 +303,7 @@ export default function BroadcastScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setVisionVisible(true)}
-                style={styles.visionButton}
+                style={[styles.visionButton, { paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 9 : 12, borderRadius: compactBroadcast ? 16 : 20 }]}
               >
                 <View style={styles.visionIcon}>
                   <KISIcon name="sparkles" size={15} color="#FFE8A3" />
@@ -308,7 +311,7 @@ export default function BroadcastScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.visionButtonTitle}>Our Vision</Text>
                   <Text style={styles.visionButtonText} numberOfLines={2}>
-                    Discover why KCAN exists and where Kingdom Impact Social is going.
+                    {compactBroadcast ? 'KCAN purpose and direction.' : 'Discover why KCAN exists and where Kingdom Impact Social is going.'}
                   </Text>
                 </View>
                 <KISIcon name="chevron-right" size={18} color="#FFF8E6" />
@@ -333,7 +336,7 @@ export default function BroadcastScreen() {
               />
             </View>
             {showFilterPanel ? (
-              <View style={[styles.headerSection, styles.filterPanel]}>
+              <View style={[styles.headerSection, styles.filterPanel, { padding: compactBroadcast ? 6 : 8 }]}>
                 {FILTER_OPTIONS[activeMainTab].map(option => (
                   <Pressable
                     key={option.key}
@@ -341,6 +344,9 @@ export default function BroadcastScreen() {
                     style={[
                       styles.filterOption,
                       {
+                        minWidth: compactBroadcast ? 96 : 120,
+                        paddingHorizontal: compactBroadcast ? 10 : 14,
+                        paddingVertical: compactBroadcast ? 8 : 10,
                         borderColor:
                           option.key === currentFilter
                             ? palette.primary
@@ -371,7 +377,7 @@ export default function BroadcastScreen() {
                         { color: option.key === currentFilter ? palette.onPrimary : palette.subtext },
                       ]}
                     >
-                      {option.description}
+                      {compactBroadcast ? '' : option.description}
                     </Text>
                   </Pressable>
                 ))}
@@ -380,7 +386,7 @@ export default function BroadcastScreen() {
           </View>
         </LinearGradient>
         <View
-          style={{ paddingHorizontal: 12 }}
+          style={{ paddingHorizontal: responsive.pageGutter }}
           {...tabSwipeResponder.panHandlers}
         >
           {activeMainTab === 'feeds' && (
@@ -428,6 +434,8 @@ export default function BroadcastScreen() {
               {
                 backgroundColor: palette.primarySoft,
                 borderColor: palette.primary,
+                width: compactBroadcast ? 48 : 56,
+                height: compactBroadcast ? 48 : 56,
                 shadowColor: palette.shadow ?? '#000',
               },
             ]}

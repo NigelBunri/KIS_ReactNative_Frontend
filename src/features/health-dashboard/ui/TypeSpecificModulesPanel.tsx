@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { HealthDashboardInstitutionType } from '@/features/health-dashboard/models';
 import type { InstitutionDashboardAnalyticsResult } from '@/services/healthDashboardService';
 import {
@@ -106,6 +107,8 @@ const buildTypeSpecificMetrics = (
 };
 
 export default function TypeSpecificModulesPanel({ scheme, institutionType, analytics }: Props) {
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const palette = getHealthThemeColors(scheme);
   const borders = getHealthThemeBorders(palette);
   const spacing = HEALTH_THEME_SPACING;
@@ -131,7 +134,7 @@ export default function TypeSpecificModulesPanel({ scheme, institutionType, anal
         Dynamic operational modules tailored for {institutionType.replace('_', ' ')} workflows.
       </Text>
 
-      <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+      <View style={{ marginTop: spacing.md, flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap }}>
         {metrics.map((metric) => (
           <View
             key={metric.id}
@@ -141,6 +144,9 @@ export default function TypeSpecificModulesPanel({ scheme, institutionType, anal
               borderColor: palette.divider,
               backgroundColor: palette.surface,
               padding: spacing.sm,
+              flexGrow: 1,
+              flexBasis: compact ? '100%' : responsive.isTablet ? '31%' : '48%',
+              minWidth: compact ? '100%' : 160,
             }}
           >
             <Text style={{ ...typography.label, color: palette.text }}>{metric.label}</Text>

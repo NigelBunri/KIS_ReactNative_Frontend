@@ -23,6 +23,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -145,6 +146,9 @@ export default function BibleReaderPanel({
   onScroll,
 }: Props) {
   const { palette, isDark } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactReader = responsive.isWatch || responsive.isCompactPhone;
+  const tinyReader = responsive.isWatch;
   const solidSheetBg = palette.bg || palette.surface || '#FFFFFF';
   const [selectedTranslation, setSelectedTranslation] = useState<
     string | undefined
@@ -177,7 +181,7 @@ export default function BibleReaderPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
-  const [fontSize, setFontSize] = useState(17);
+  const [fontSize, setFontSize] = useState(responsive.isWatch ? 15 : responsive.isCompactPhone ? 16 : 17);
   const [savingPreference, setSavingPreference] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [actionVerse, setActionVerse] = useState<BibleVerse | null>(null);
@@ -852,12 +856,17 @@ export default function BibleReaderPanel({
         <View
           style={[
             styles.bottomSheet,
-            { backgroundColor: solidSheetBg, borderColor: palette.divider },
+            {
+              backgroundColor: solidSheetBg,
+              borderColor: palette.divider,
+              paddingHorizontal: compactReader ? 12 : 16,
+              maxHeight: responsive.isLandscape && responsive.isTablet ? '88%' : '92%',
+            },
           ]}
           {...sheetPanResponder.panHandlers}
         >
           <View style={styles.sheetHandle} />
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: palette.text }]}>
                 Reader filters
@@ -1245,7 +1254,7 @@ export default function BibleReaderPanel({
               <Text style={[styles.sectionTitle, { color: palette.text }]}>
                 Passage
               </Text>
-              <View style={styles.referenceRow}>
+              <View style={[styles.referenceRow, compactReader && styles.wrapHeaderRow]}>
                 <TextInput
                   value={referenceInput}
                   onChangeText={setReferenceInput}
@@ -1420,7 +1429,7 @@ export default function BibleReaderPanel({
               <Text style={[styles.sectionTitle, { color: palette.text }]}>
                 Search
               </Text>
-              <View style={styles.referenceRow}>
+              <View style={[styles.referenceRow, compactReader && styles.wrapHeaderRow]}>
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -1599,7 +1608,7 @@ export default function BibleReaderPanel({
                   onPress={() => openSavedLibraryVerse(item)}
                   style={[styles.libraryItem, { borderColor: palette.divider }]}
                 >
-                  <View style={styles.headerRow}>
+                  <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
                     <Text
                       style={{
                         color: palette.primaryStrong,
@@ -1663,7 +1672,7 @@ export default function BibleReaderPanel({
               <Text style={[styles.sectionTitle, { color: palette.text }]}>
                 Reader preferences
               </Text>
-              <View style={styles.prefRow}>
+              <View style={[styles.prefRow, compactReader && styles.wrapHeaderRow]}>
                 <Text style={{ color: palette.text, fontWeight: '700' }}>
                   Font size
                 </Text>
@@ -1724,7 +1733,12 @@ export default function BibleReaderPanel({
         <View
           style={[
             styles.actionSheet,
-            { backgroundColor: solidSheetBg, borderColor: palette.divider },
+            {
+              backgroundColor: solidSheetBg,
+              borderColor: palette.divider,
+              paddingHorizontal: compactReader ? 12 : 16,
+              maxHeight: responsive.isLandscape && responsive.isTablet ? '88%' : '92%',
+            },
           ]}
         >
           <Text style={[styles.sectionTitle, { color: palette.text }]}>
@@ -1901,13 +1915,16 @@ export default function BibleReaderPanel({
       <ScrollView
         ref={readerScrollRef}
         style={styles.readerScroll}
-        contentContainerStyle={styles.readerScrollContent}
+        contentContainerStyle={[
+          styles.readerScrollContent,
+          { gap: responsive.cardGap, paddingBottom: compactReader ? 28 : 40 },
+        ]}
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
         <BibleSectionCard>
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: palette.text }]}>Read</Text>
               <Text style={{ color: palette.subtext, marginTop: 4 }}>
@@ -1956,7 +1973,7 @@ export default function BibleReaderPanel({
                 fontWeight: '700',
               }}
             >
-              Pull right for previous · Pull left for next
+              {tinyReader ? 'Swipe chapters' : 'Pull right for previous · Pull left for next'}
             </Text>
             <Animated.View
               style={{
@@ -1985,6 +2002,8 @@ export default function BibleReaderPanel({
                   {
                     backgroundColor: palette.surface,
                     borderColor: palette.divider,
+                    paddingHorizontal: compactReader ? 8 : 14,
+                    paddingVertical: compactReader ? 10 : 16,
                   },
                 ]}
               >
@@ -2042,7 +2061,11 @@ export default function BibleReaderPanel({
                             <Text
                               style={[
                                 styles.bibleVerseText,
-                                { color: markedTextColor, fontSize },
+                                {
+                                  color: markedTextColor,
+                                  fontSize: Math.max(tinyReader ? 14 : 15, fontSize),
+                                  lineHeight: Math.max(24, fontSize + (compactReader ? 8 : 11)),
+                                },
                               ]}
                             >
                               <Text
@@ -2061,7 +2084,11 @@ export default function BibleReaderPanel({
                         <Text
                           style={[
                             styles.bibleVerseText,
-                            { color: markedTextColor, fontSize },
+                            {
+                              color: markedTextColor,
+                              fontSize: Math.max(tinyReader ? 14 : 15, fontSize),
+                              lineHeight: Math.max(24, fontSize + (compactReader ? 8 : 11)),
+                            },
                           ]}
                         >
                           <Text
@@ -2104,12 +2131,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   headerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  wrapHeaderRow: { flexWrap: 'wrap' },
   kcanBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 8 },
   readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
   translationLabel: { fontSize: 12, textTransform: 'uppercase' },
   chapterTitle: { fontSize: 20, fontWeight: '900', marginTop: 4 },
-  referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   input: {
     flex: 1,
     borderWidth: 2,
@@ -2214,8 +2242,8 @@ const styles = StyleSheet.create({
   },
   dropCap: {
     fontFamily: 'serif',
-    fontSize: 52,
-    lineHeight: 54,
+    fontSize: 46,
+    lineHeight: 50,
     fontWeight: '900',
     marginRight: 6,
     marginTop: -2,
@@ -2305,6 +2333,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
   },

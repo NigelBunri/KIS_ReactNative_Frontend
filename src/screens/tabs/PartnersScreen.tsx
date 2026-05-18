@@ -74,7 +74,6 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     groupsForPartner,
     channelsForPartner,
     communitiesForPartner,
-    reloadSelectedPartner,
     handlePartnerItemCreated,
     reloadPartners,
   } = usePartnersData();

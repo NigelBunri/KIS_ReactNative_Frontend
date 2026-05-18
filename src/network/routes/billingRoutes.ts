@@ -34,6 +34,18 @@ const billingRoutes = {
   invoices: `${API_BASE_URL}/api/v1/tiers/invoices/`,
   loyalty: `${API_BASE_URL}/api/v1/commerce/loyalty/`,
   loyaltyBalance: `${API_BASE_URL}/api/v1/commerce/loyalty/balance/`,
+  promoCodes: `${API_BASE_URL}/api/v1/promo-codes/`,
+  promoCode: (id: string) => `${API_BASE_URL}/api/v1/promo-codes/${id}/`,
+  directPaymentIntents: `${API_BASE_URL}/api/v1/direct-payments/intents/`,
+  directPaymentAudit: `${API_BASE_URL}/api/v1/direct-payment-audit/`,
+  tierPlans: `${API_BASE_URL}/api/v1/tiers/plans/`,
+  tierPlan: (id: string) => `${API_BASE_URL}/api/v1/tiers/plans/${id}/`,
+  tierSubscriptions: `${API_BASE_URL}/api/v1/tiers/subscriptions/`,
+  tierSubscription: (id: string) => `${API_BASE_URL}/api/v1/tiers/subscriptions/${id}/`,
+  tierEntitlements: `${API_BASE_URL}/api/v1/tiers/entitlements/`,
+  tierUsage: `${API_BASE_URL}/api/v1/tiers/usage/`,
+  tierCampaigns: `${API_BASE_URL}/api/v1/tiers/campaigns/`,
+  tierCampaign: (id: string) => `${API_BASE_URL}/api/v1/tiers/campaigns/${id}/`,
 };
 
 export default billingRoutes;

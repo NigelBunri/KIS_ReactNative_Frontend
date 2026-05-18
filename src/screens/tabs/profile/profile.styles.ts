@@ -66,6 +66,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  wrapRow: { flexWrap: 'wrap' },
 
   /** ─────────────────────────
    *  Hero
@@ -243,11 +244,13 @@ export const styles = StyleSheet.create({
   },
   managementStatsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
   },
   managementStat: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
     borderWidth: 2,
     borderRadius: 14,
     padding: 10,

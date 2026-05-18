@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  AppState,
   useWindowDimensions,
   TextInput,
   Linking,
@@ -30,11 +31,15 @@ import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import { KIS_TOKENS } from '../../theme/constants';
+import { useResponsiveLayout } from '../../theme/responsive';
 import {
   KISContact,
   KISDeviceContact,
+  ContactsPermissionStatus,
   markRegisteredOnBackend,
   refreshFromDeviceAndBackendWithOptions,
+  getContactsPermissionStatus,
+  requestContactsPermission,
   saveContactToDevice,
 } from './contactsService';
 import { EntryActionRow } from './components/EntryActionRow';
@@ -291,11 +296,15 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const responsive = useResponsiveLayout();
+  const pagePadding = responsive.pageGutter;
 
   const [contacts, setContacts] = useState<KISContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionStatus, setPermissionStatus] =
+    useState<ContactsPermissionStatus | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroupMemberIds, setSelectedGroupMemberIds] = useState<Set<string>>(new Set());
@@ -344,6 +353,39 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     }).start();
   }, [mode, SCREEN_WIDTH, slideX]);
 
+  // Check permission on mount and when returning from Settings
+  const checkPermission = useCallback(async () => {
+    const status = await getContactsPermissionStatus();
+    setPermissionStatus(status);
+    return status;
+  }, []);
+
+  useEffect(() => {
+    checkPermission();
+  }, [checkPermission]);
+
+  // Re-check when app comes back to foreground (user may have changed Settings)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        checkPermission();
+      }
+    });
+    return () => sub.remove();
+  }, [checkPermission]);
+
+  const loadContactsRef = useRef<() => Promise<void>>(async () => {});
+
+  const handleRequestPermission = useCallback(async () => {
+    const status = await requestContactsPermission();
+    setPermissionStatus(status);
+    if (status === 'granted') {
+      loadContactsRef.current();
+    } else if (status === 'never_ask_again' || (Platform.OS === 'ios' && status === 'denied')) {
+      Linking.openSettings();
+    }
+  }, []);
+
   // Load contacts from cache, then refresh from device + backend
   const loadContacts = useCallback(async () => {
     setError(null);
@@ -387,6 +429,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     }
   }, []);
 
+  // Keep the ref in sync so handleRequestPermission always calls the latest version
+  useEffect(() => {
+    loadContactsRef.current = loadContacts;
+  }, [loadContacts]);
+
   const onRefresh = async () => {
     setError(null);
     setRefreshing(true);
@@ -410,8 +457,13 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
   };
 
   useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
+    if (permissionStatus === 'granted') {
+      loadContacts();
+    } else if (permissionStatus !== null) {
+      // Permission not granted — stop showing the loading spinner
+      setLoading(false);
+    }
+  }, [permissionStatus, loadContacts]);
 
   const onOpenAddContact = () => {
     setMode('addContact');
@@ -790,7 +842,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             color={palette.text}
           />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>
+        <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 15 : 18 }]} numberOfLines={1}>
           {headerTitle}
         </Text>
       </View>
@@ -807,8 +859,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
         {/* ENTRY PAGE: actions + CONTACT LIST */}
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView
-            style={styles.body}
-            contentContainerStyle={{ paddingBottom: 32 }}
+            style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16 }]}
+            contentContainerStyle={{ paddingBottom: responsive.isWatch ? 20 : 32 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -844,7 +896,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             {/* 🔍 Search box */}
             <View
               style={{
-                marginTop: 16,
+                marginTop: responsive.isWatch ? 10 : 16,
                 borderRadius: 999,
                 borderWidth: 2,
                 borderColor: palette.inputBorder,
@@ -866,7 +918,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
                   marginLeft: 6,
                   paddingVertical: 4,
                   color: palette.text,
-                  fontSize: 14,
+                  fontSize: responsive.bodyFontSize,
                 }}
               />
               {hasSearch && (
@@ -882,8 +934,89 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
               )}
             </View>
 
+            {/* Contacts permission prompt */}
+            {permissionStatus !== null && permissionStatus !== 'granted' ? (
+              <View
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: 40,
+                  paddingHorizontal: 24,
+                  gap: 16,
+                }}
+              >
+                <View
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: (palette.primary ?? '#4F46E5') + '18',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <KISIcon name="contacts" size={36} color={palette.primary ?? '#4F46E5'} />
+                </View>
+
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: '800',
+                    color: palette.text,
+                    textAlign: 'center',
+                  }}
+                >
+                  Allow access to contacts
+                </Text>
+
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: palette.subtext,
+                    textAlign: 'center',
+                    lineHeight: 20,
+                  }}
+                >
+                  KIS needs access to your contacts so you can see which of your
+                  friends are already on the app and start chatting with them.
+                </Text>
+
+                <Pressable
+                  onPress={handleRequestPermission}
+                  style={({ pressed }) => ({
+                    marginTop: 8,
+                    paddingHorizontal: 28,
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    backgroundColor: pressed
+                      ? (palette.primaryStrong ?? palette.primary ?? '#3730A3')
+                      : (palette.primary ?? '#4F46E5'),
+                  })}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
+                    {permissionStatus === 'never_ask_again' ||
+                    (Platform.OS === 'ios' && permissionStatus === 'denied')
+                      ? 'Open Settings'
+                      : 'Allow Access'}
+                  </Text>
+                </Pressable>
+
+                {(permissionStatus === 'never_ask_again' ||
+                  (Platform.OS === 'ios' && permissionStatus === 'denied')) && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: palette.subtext,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Enable Contacts in Settings, then come back here.
+                  </Text>
+                )}
+              </View>
+            ) : null}
+
             {/* Error / loading hints */}
-            {error ? (
+            {permissionStatus === 'granted' && error ? (
               <Text
                 style={[
                   styles.errorText,
@@ -893,7 +1026,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
                 {error}
               </Text>
             ) : null}
-            {loading && !refreshing ? (
+            {permissionStatus === 'granted' && loading && !refreshing ? (
               <Text
                 style={{
                   color: palette.subtext,
@@ -904,7 +1037,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
                 Loading contacts…
               </Text>
             ) : null}
-            {loading && !refreshing ? (
+            {permissionStatus === 'granted' && loading && !refreshing ? (
               <View style={{ marginTop: 12, gap: 10 }}>
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <View
@@ -925,7 +1058,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             ) : null}
 
             {/* No results for search */}
-            {noSearchResults && !loading && !error && (
+            {permissionStatus === 'granted' && noSearchResults && !loading && !error && (
               <View style={{ marginTop: 24 }}>
                 <Text
                   style={{
@@ -939,7 +1072,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             )}
 
             {/* ON KIS SECTION */}
-            {kisContacts.length > 0 && (
+            {permissionStatus === 'granted' && kisContacts.length > 0 && (
               <View style={{ marginTop: 24 }}>
                 <Text
                   style={[
@@ -962,7 +1095,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             )}
 
             {/* INVITE SECTION */}
-            {inviteContacts.length > 0 && (
+            {permissionStatus === 'granted' && inviteContacts.length > 0 && (
               <View style={{ marginTop: 24 }}>
                 <Text
                   style={[
@@ -985,7 +1118,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             )}
 
             {/* No contacts at all */}
-            {!loading &&
+            {permissionStatus === 'granted' &&
+              !loading &&
               contacts.length === 0 &&
               !error &&
               !hasSearch && (
@@ -1008,8 +1142,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
-              style={styles.body}
-              contentContainerStyle={{ paddingBottom: 32 }}
+              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16 }]}
+              contentContainerStyle={{ paddingBottom: responsive.isWatch ? 20 : 32 }}
               keyboardShouldPersistTaps="handled"
             >
               {mode === 'selectGroupMembers' || mode === 'selectCommunityMembers' ? (

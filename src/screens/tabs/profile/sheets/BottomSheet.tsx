@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
 import { styles } from '../profile.styles';
 
@@ -21,6 +22,8 @@ export default function BottomSheet({
   onBackdropPress?: () => void;
 }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: Boolean(onBackdropPress),
     onClose: onBackdropPress ?? (() => undefined),
@@ -32,7 +35,7 @@ export default function BottomSheet({
         styles.sheetWrap,
         {
           transform: [{ translateY: Animated.add(sheetY, dragY) }],
-          paddingHorizontal: 18,
+          paddingHorizontal: responsive.pageGutter,
         },
       ]}
     >
@@ -42,7 +45,17 @@ export default function BottomSheet({
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.sheet, { backgroundColor: palette.bg }]}
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: palette.bg,
+            maxWidth: responsive.isTablet ? 760 : undefined,
+            alignSelf: 'center',
+            width: '100%',
+            borderTopLeftRadius: compact ? 18 : 24,
+            borderTopRightRadius: compact ? 18 : 24,
+          },
+        ]}
       >
         <View
           {...panHandlers}

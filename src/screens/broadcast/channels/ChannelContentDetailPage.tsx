@@ -17,9 +17,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KISIcon } from '@/constants/kisIcons';
-import { resolveBackendAssetUrl } from '@/network';
+import ROUTES, { resolveBackendAssetUrl } from '@/network';
+import { getRequest } from '@/network/get';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
 import type { ComponentProps } from 'react';
 import type { BroadcastChannelContent, BroadcastChannelContentAsset, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
@@ -57,6 +59,9 @@ function TypeBadge({ type }: { type?: string }) {
 
 function MediaStage({ content }: { content: BroadcastChannelContent }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const stageHeight = compact ? 240 : responsive.isTablet && responsive.isLandscape ? 420 : 340;
   const assets = content.assets?.length ? content.assets : content.first_asset ? [content.first_asset] : [];
   const primary = assets[0];
   const imageUrl = resolveThumbUrl(content) || resolveAssetUrl(primary);
@@ -64,7 +69,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
 
   if (type === 'text' || type === 'rich_text' || (!imageUrl && !primary && content.text_plain)) {
     return (
-      <View style={[styles.textStage, { backgroundColor: palette.surface }]}> 
+      <View style={[styles.textStage, { backgroundColor: palette.surface, minHeight: stageHeight, paddingHorizontal: responsive.pageGutter }]}> 
         <RichTextRenderer
           value={(content.text_doc || null) as ComponentProps<typeof RichTextRenderer>['value']}
           fallback={content.text_plain || content.title || ''}
@@ -76,7 +81,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
 
   if (type === 'audio') {
     return (
-      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated }]}> 
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}> 
         <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
         <View style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}> 
           <KISIcon name="audio" size={42} color={palette.primaryStrong} />
@@ -88,7 +93,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
 
   if (type === 'document') {
     return (
-      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated }]}> 
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}> 
         <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
         <View style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}> 
           <KISIcon name="file" size={42} color={palette.primaryStrong} />
@@ -101,7 +106,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
 
   if (type === 'live_stream') {
     return (
-      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated }]}> 
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}> 
         {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
         <View style={styles.mediaOverlay} />
         <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>{content.status === 'scheduled' ? 'Scheduled' : 'Live'}</Text></View>
@@ -111,7 +116,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
   }
 
   return (
-    <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated }]}> 
+    <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}> 
       {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
       <View style={styles.mediaOverlay} />
       {['video', 'short_video'].includes(type) ? <View style={styles.playBubble}><KISIcon name="play" size={30} color="#fff" /></View> : null}
@@ -124,6 +129,8 @@ export default function ChannelContentDetailPage() {
   const route = useRoute<RouteProp<RootStackParamList, 'ChannelContentDetail'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'ChannelContentDetail'>>();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const insets = useSafeAreaInsets();
   const themed = useMemo(() => makeStyles(palette), [palette]);
   const [content, setContent] = useState<BroadcastChannelContent | null>(route.params?.item || null);
@@ -184,6 +191,23 @@ export default function ChannelContentDetailPage() {
     ]);
   }, [content?.id]);
 
+  const handleEmbed = useCallback(async () => {
+    if (!content?.id) return;
+    try {
+      const res = await getRequest(ROUTES.broadcasts.channelContentEmbedToken(content.id), {
+        errorMessage: 'Unable to generate embed token.',
+      });
+      const token: string = res.data?.token || res.data?.embed_token || '';
+      if (token) {
+        Alert.alert('Embed token', `Use this token to embed the content:\n\n${token}`, [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Embed', 'Embedding is not available for this content.');
+      }
+    } catch {
+      Alert.alert('Embed', 'Unable to generate embed token. Please try again.');
+    }
+  }, [content?.id]);
+
   if (loading && !content) {
     return <SafeAreaView style={[styles.centered, { backgroundColor: palette.background }]}><ActivityIndicator color={palette.primaryStrong} /></SafeAreaView>;
   }
@@ -199,18 +223,18 @@ export default function ChannelContentDetailPage() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}>
-        <View style={styles.stageWrap}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
+        <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
           <MediaStage content={content} />
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color="#fff" /></Pressable>
         </View>
 
-        <View style={themed.contentCard}>
+        <View style={[themed.contentCard, { marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}>
           <View style={styles.titleTopRow}>
             <TypeBadge type={content.content_type} />
             <Text style={[styles.dateText, { color: palette.subtext }]}>{content.published_at ? new Date(content.published_at).toLocaleDateString() : content.status || 'Draft'}</Text>
           </View>
-          <Text style={[styles.title, { color: palette.text }]}>{content.title || content.text_plain_preview || 'Untitled content'}</Text>
+          <Text style={[styles.title, { color: palette.text, fontSize: compact ? 19 : 24, lineHeight: compact ? 25 : 31 }]}>{content.title || content.text_plain_preview || 'Untitled content'}</Text>
           {content.content_type !== 'text' && content.content_type !== 'rich_text' && (content.description || content.text_plain) ? (
             <Text style={[styles.description, { color: palette.subtext }]}>{content.description || content.text_plain}</Text>
           ) : null}
@@ -226,12 +250,12 @@ export default function ChannelContentDetailPage() {
             </Pressable>
           ) : null}
 
-          <View style={styles.actionGrid}>
+          <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => {}} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
-            <ActionButton icon="link" label="Embed" value="Soon" onPress={() => Alert.alert('Coming soon', 'Content embedding will be available in an upcoming update.')} />
+            <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />
             <ActionButton icon="report" label="Report" value="Report" onPress={handleReport} />
           </View>
         </View>
@@ -239,7 +263,7 @@ export default function ChannelContentDetailPage() {
         <ChannelCommentsPanel contentId={content.id} onCountChange={count => setCounts(prev => ({ ...prev, comments: count }))} />
 
         {content.assets?.length ? (
-          <View style={styles.assetsBlock}>
+          <View style={[styles.assetsBlock, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>Files</Text>
             {content.assets.map(asset => (
               <View key={asset.id || asset.url} style={[styles.assetRow, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
@@ -259,8 +283,10 @@ export default function ChannelContentDetailPage() {
 
 function ActionButton({ icon, label, value, onPress }: { icon: string; label: string; value: string; onPress: () => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   return (
-    <Pressable onPress={onPress} style={[styles.actionButton, { backgroundColor: palette.surfaceElevated, borderColor: palette.border }]}> 
+    <Pressable onPress={onPress} style={[styles.actionButton, { backgroundColor: palette.surfaceElevated, borderColor: palette.border, width: compact ? '47%' : '30.5%', minHeight: compact ? 68 : 76 }]}> 
       <KISIcon name={icon} size={18} color={palette.primaryStrong} />
       <Text style={[styles.actionLabel, { color: palette.text }]}>{label}</Text>
       <Text style={[styles.actionValue, { color: palette.subtext }]}>{value}</Text>

@@ -202,6 +202,24 @@ function normalizeSender(
  * ============================================================================
  */
 
+// Merge two message versions without letting a partial server update
+// (e.g. a status receipt that lacks rich fields) clobber the locally-stored
+// replyTo / sticker / voice / attachments that the full message already has.
+function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage {
+  const merged = { ...prev, ...next } as any;
+  const p = prev as any;
+  const n = next as any;
+  if (!n.replyTo && p.replyTo) merged.replyTo = p.replyTo;
+  if (!n.sticker && p.sticker) merged.sticker = p.sticker;
+  if (!n.voice && p.voice) merged.voice = p.voice;
+  if (!(n.attachments?.length) && p.attachments?.length) merged.attachments = p.attachments;
+  if (!n.poll && p.poll) merged.poll = p.poll;
+  if (!n.event && p.event) merged.event = p.event;
+  if (!(n.contacts?.length) && p.contacts?.length) merged.contacts = p.contacts;
+  if (!n.styledText && p.styledText) merged.styledText = p.styledText;
+  return merged as ChatMessage;
+}
+
 function mergeMessages(
   existing: ChatMessage[],
   incoming: ChatMessage[],
@@ -253,8 +271,7 @@ function mergeMessages(
       msg.status === STATUS_SENT
     ) {
       map.set(key, {
-        ...prev,
-        ...msg,
+        ...mergePreservingRich(prev, msg),
         fromMe: prev.fromMe,
       });
       if (msg.clientId) {
@@ -264,7 +281,11 @@ function mergeMessages(
     }
 
     if (msg.serverId) {
-      map.set(key, { ...prev, ...msg, fromMe: prev.fromMe ?? msg.fromMe });
+      const statusOrder: Record<string, number> = { pending: 0, sending: 0, local_only: 0, sent: 1, delivered: 2, read: 3, failed: -1 };
+      const prevRank = statusOrder[prev.status ?? ''] ?? 0;
+      const nextRank = statusOrder[msg.status ?? ''] ?? 0;
+      const preservedStatus = prevRank >= nextRank ? prev.status : msg.status;
+      map.set(key, { ...mergePreservingRich(prev, msg), status: preservedStatus, fromMe: prev.fromMe ?? msg.fromMe });
       if (msg.clientId) {
         byClientId.set(msg.clientId, key);
       }

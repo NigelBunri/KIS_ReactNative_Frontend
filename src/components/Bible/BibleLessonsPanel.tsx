@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -93,6 +94,8 @@ const attachmentList = (value: any): Array<{ title: string; url: string }> => {
 
 export default function BibleLessonsPanel() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const [courses, setCourses] = useState<Course[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -167,9 +170,9 @@ export default function BibleLessonsPanel() {
   const renderCourseList = () => (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>Lessons</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Lessons</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               KCAN foundational lessons for discipleship and biblical growth.
             </Text>
@@ -210,7 +213,7 @@ export default function BibleLessonsPanel() {
             style={[styles.courseCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}
           >
             {course.cover_image ? <Image source={{ uri: course.cover_image }} style={styles.cover} resizeMode="cover" /> : null}
-            <View style={styles.headerRow}>
+            <View style={[styles.headerRow, compact && styles.wrapRow]}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontSize: 18, fontWeight: '900' }}>{course.title}</Text>
                 <Text style={{ color: palette.subtext, marginTop: 4 }} numberOfLines={2}>
@@ -250,10 +253,10 @@ export default function BibleLessonsPanel() {
     return (
       <View style={styles.stack}>
         <BibleSectionCard>
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, compact && styles.wrapRow]}>
             <KISButton title="Courses" size="xs" variant="outline" onPress={() => setSelectedCourse(null)} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: palette.text }]}>{selectedCourse.title}</Text>
+              <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>{selectedCourse.title}</Text>
               <Text style={{ color: palette.subtext, marginTop: 4 }}>
                 {selectedCourse.partner_display_name || selectedCourse.partner_name || 'KCAN'}
               </Text>
@@ -340,7 +343,7 @@ export default function BibleLessonsPanel() {
 
         {selectedLesson ? (
           <BibleSectionCard>
-            <Text style={[styles.lessonTitle, { color: palette.text }]}>{selectedLesson.title}</Text>
+            <Text style={[styles.lessonTitle, { color: palette.text, fontSize: compact ? 20 : 24, lineHeight: compact ? 26 : 30 }]}>{selectedLesson.title}</Text>
             <Text style={{ color: palette.subtext }}>
               {selectedLesson.module_detail?.title ? `${selectedLesson.module_detail.title} · ` : ''}
               {selectedLesson.duration_minutes || 0} min · {selectedLesson.language || 'en'}
@@ -349,7 +352,7 @@ export default function BibleLessonsPanel() {
             {selectedLesson.video_url ? (
               <TouchableOpacity
                 onPress={() => Linking.openURL(selectedLesson.video_url as string)}
-                style={[styles.mediaBox, { borderColor: palette.divider, backgroundColor: palette.surface }]}
+                style={[styles.mediaBox, { minHeight: compact ? 110 : 150, borderColor: palette.divider, backgroundColor: palette.surface }]}
               >
                 <KISIcon name="play" size={28} color={palette.primaryStrong} />
                 <Text style={{ color: palette.text, fontWeight: '900' }}>Open lesson video</Text>
@@ -440,6 +443,7 @@ export default function BibleLessonsPanel() {
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   lessonTitle: { fontSize: 24, fontWeight: '900', lineHeight: 30 },

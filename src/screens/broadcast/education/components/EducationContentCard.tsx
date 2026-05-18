@@ -2,6 +2,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import {
@@ -78,6 +79,11 @@ export default function EducationContentCard({
   progress,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const stackCard = responsive.isWatch || responsive.width < 340;
+  const cardWidth: number | '100%' = stackCard ? '100%' : responsive.isTablet ? 336 : 304;
+  const thumbWidth = stackCard ? '100%' : responsive.isCompactPhone ? 68 : 78;
+  const thumbHeight = stackCard ? 132 : responsive.isCompactPhone ? 92 : 106;
 
   const handlePrimary = () => {
     if (onPrimaryAction) {
@@ -105,16 +111,16 @@ export default function EducationContentCard({
       }`}
       onPress={handlePrimary}
       style={{
-        width: 304,
-        minHeight: 186,
+        width: cardWidth,
+        minHeight: stackCard ? 0 : 186,
         borderWidth: 1,
         borderColor: palette.border,
         borderRadius: 24,
         backgroundColor: palette.surface,
-        padding: 12,
+        padding: responsive.isWatch ? 10 : 12,
         marginBottom: 12,
         marginRight: 12,
-        flexDirection: 'row',
+        flexDirection: stackCard ? 'column' : 'row',
         gap: 10,
         shadowColor: palette.shadow ?? '#000',
         shadowOpacity: 0.08,
@@ -126,14 +132,14 @@ export default function EducationContentCard({
       {item.coverUrl ? (
         <Image
           source={{ uri: item.coverUrl }}
-          style={{ width: 78, height: 106, borderRadius: 18 }}
+          style={{ width: thumbWidth, height: thumbHeight, borderRadius: 18 }}
           resizeMode="cover"
         />
       ) : (
         <View
           style={{
-            width: 78,
-            height: 106,
+            width: thumbWidth,
+            height: thumbHeight,
             borderRadius: 18,
             backgroundColor: palette.primarySoft,
             alignItems: 'center',
@@ -148,7 +154,7 @@ export default function EducationContentCard({
       <View style={{ flex: 1 }}>
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: stackCard ? 'column' : 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 6,
@@ -175,7 +181,7 @@ export default function EducationContentCard({
                 borderWidth: 1,
                 borderColor: palette.primary,
                 backgroundColor: palette.primarySoft,
-                maxWidth: 82,
+                maxWidth: responsive.isWatch ? 70 : 82,
               }}
             >
               <Text
@@ -223,13 +229,13 @@ export default function EducationContentCard({
         {metadata.length ? (
           <View
             style={{
-              flexDirection: 'row',
+              flexDirection: stackCard ? 'column' : 'row',
               alignItems: 'center',
               gap: 6,
               marginTop: 8,
             }}
           >
-            {metadata.slice(0, 2).map((value, index) => (
+            {metadata.slice(0, responsive.isWatch ? 1 : 2).map((value, index) => (
               <View
                 key={`${String(value)}-${index}`}
                 style={{
@@ -258,7 +264,7 @@ export default function EducationContentCard({
         ) : null}
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: stackCard ? 'column' : 'row',
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: 6,
@@ -298,7 +304,7 @@ export default function EducationContentCard({
         </View>
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: stackCard ? 'column' : 'row',
             alignItems: 'center',
             marginTop: 10,
             gap: 6,

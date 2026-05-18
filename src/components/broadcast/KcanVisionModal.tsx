@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 const KCAN_CITY_IMAGE = require('@/assets/KCAN_city.jpg');
@@ -220,6 +221,8 @@ const SectionHeader = ({
 
 export default function KcanVisionModal({ visible, onClose }: Props) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -239,7 +242,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
       <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: compact ? 94 : 128 }]}
         >
           <Pressable
             accessibilityRole="imagebutton"
@@ -249,7 +252,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
             <ImageBackground
               source={KCAN_CITY_IMAGE}
               resizeMode="cover"
-              style={styles.hero}
+              style={[styles.hero, { minHeight: compact ? 430 : 560 }]}
               imageStyle={styles.heroImage}
             >
               <LinearGradient
@@ -288,12 +291,12 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
             </ImageBackground>
           </Pressable>
 
-          <View style={styles.body}>
+          <View style={[styles.body, { paddingHorizontal: responsive.pageGutter }]}>
             <LinearGradient
               colors={goldGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.statementCard}
+              style={[styles.statementCard, { borderRadius: compact ? 20 : 28 }]}
             >
               <View style={styles.statementInner}>
                 <Text style={styles.statementEyebrow}>KCAN vision</Text>
@@ -311,13 +314,14 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
               />
             </View>
 
-            <View style={styles.achievementList}>
+            <View style={[styles.achievementList, compact && { gap: 10 }]}>
               {achievementSteps.map(item => (
                 <View
                   key={item.step}
                   style={[
                     styles.achievementCard,
                     {
+                      padding: compact ? 14 : 18,
                       backgroundColor: palette.card,
                       borderColor: palette.goldLight,
                     },
@@ -385,13 +389,14 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
               />
             </View>
 
-            <View style={styles.simpleGrid}>
+            <View style={[styles.simpleGrid, compact && { gap: 9 }]}>
               {commitments.map(item => (
                 <View
                   key={item.title}
                   style={[
                     styles.simpleCard,
                     {
+                      minWidth: compact ? '100%' : 150,
                       backgroundColor: palette.card,
                       borderColor: palette.goldLight,
                     },
@@ -423,13 +428,14 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
               />
             </View>
 
-            <View style={styles.simpleGrid}>
+            <View style={[styles.simpleGrid, compact && { gap: 9 }]}>
               {userRoles.map(item => (
                 <View
                   key={item.title}
                   style={[
                     styles.simpleCard,
                     {
+                      minWidth: compact ? '100%' : 150,
                       backgroundColor: palette.card,
                       borderColor: palette.goldLight,
                     },

@@ -10,10 +10,11 @@ import {
 import { Asset, launchImageLibrary } from 'react-native-image-picker';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { KISIcon } from '@/constants/kisIcons';
-import { marketLayout, marketStyles } from './market.styles';
+import { marketStyles } from './market.styles';
 import { KIS_COIN_CODE, KIS_TO_USD_RATE } from '@/screens/market/market.constants';
 import { resolveBackendAssetUrl } from '@/network';
 import AvailabilityScheduler from './AvailabilityScheduler';
@@ -264,7 +265,13 @@ export default function ServiceEditorDrawer({
   onSave,
 }: ServiceEditorDrawerProps) {
   const { palette } = useKISTheme();
-  const slide = useRef(new Animated.Value(marketLayout.drawerWidth)).current;
+  const responsive = useResponsiveLayout();
+  const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
+  const drawerWidth = compactDrawer
+    ? responsive.width
+    : Math.min(780, Math.max(540, Math.round(responsive.width * 0.74)));
+  const drawerPadding = responsive.isWatch ? 10 : responsive.pageGutter;
+  const slide = useRef(new Animated.Value(drawerWidth)).current;
 
   const helperTextStyle = {
     color: palette.subtext,
@@ -297,11 +304,11 @@ export default function ServiceEditorDrawer({
 
   useEffect(() => {
     Animated.timing(slide, {
-      toValue: visible ? 0 : marketLayout.drawerWidth,
+      toValue: visible ? 0 : drawerWidth,
       duration: 280,
       useNativeDriver: true,
     }).start();
-  }, [visible, slide]);
+  }, [visible, slide, drawerWidth]);
 
   useEffect(() => {
     if (!visible) return;
@@ -609,6 +616,8 @@ export default function ServiceEditorDrawer({
           marketStyles.drawerContainer,
           marketStyles.drawerContent,
           {
+            width: drawerWidth,
+            left: compactDrawer ? 0 : undefined,
             transform: [{ translateX: slide }],
             backgroundColor: palette.card,
           },
@@ -630,7 +639,10 @@ export default function ServiceEditorDrawer({
 
           <ScrollView
             style={marketStyles.drawerScroll}
-            contentContainerStyle={marketStyles.drawerBody}
+            contentContainerStyle={[
+              marketStyles.drawerBody,
+              { paddingHorizontal: drawerPadding, paddingBottom: compactDrawer ? 140 : 180 },
+            ]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={{ gap: 16 }}>
@@ -1220,7 +1232,16 @@ export default function ServiceEditorDrawer({
 
           </ScrollView>
 
-          <View style={[marketStyles.drawerFooter, { borderTopColor: palette.divider }]}>            
+          <View
+            style={[
+              marketStyles.drawerFooter,
+              {
+                borderTopColor: palette.divider,
+                flexDirection: compactDrawer ? 'column' : 'row',
+                alignItems: compactDrawer ? 'stretch' : 'center',
+              },
+            ]}
+          >
             <View style={marketStyles.drawerFooterActions}>
               <KISButton title="Cancel" variant="ghost" size="sm" onPress={onClose} />
               <KISButton

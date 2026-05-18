@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -119,6 +120,8 @@ const CREATOR_PREMIUM_FEATURES = [
 
 export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onCreate }: Props) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -452,18 +455,18 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   };
 
   return (
-    <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border }]}> 
-      <View style={styles.headerRow}>
-        <View style={[styles.logo, { backgroundColor: palette.primarySoft }]}> 
+    <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}> 
+      <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
+        <View style={[styles.logo, { backgroundColor: palette.primarySoft, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}> 
           <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>CHANNEL STUDIO</Text>
-          <Text style={[styles.title, { color: palette.text }]}>{selectedChannel?.display_name || 'Creator workspace'}</Text>
-          <Text style={[styles.subtitle, { color: palette.subtext }]}>{selectedChannel ? `@${selectedChannel.handle} · ${expiresAt} cycle` : 'Create a channel to start publishing channel-scoped feeds.'}</Text>
+          <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>{selectedChannel?.display_name || 'Creator workspace'}</Text>
+          <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>{selectedChannel ? `@${selectedChannel.handle} · ${expiresAt} cycle` : 'Create a channel to start publishing channel-scoped feeds.'}</Text>
         </View>
         {selectedChannel ? (
-          <View style={styles.headerActions}>
+          <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
             <Pressable
               onPress={handleToggleChannelBroadcast}
               disabled={channelBroadcasting}
@@ -478,12 +481,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             >
               {channelBroadcasting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
               <Text style={[styles.broadcastText, { color: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>
-                {selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel'}
+                {compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
               </Text>
             </Pressable>
             <Pressable onPress={() => onCreate(selectedChannel)} style={[styles.headerCreateButton, { backgroundColor: palette.text }]}> 
               <KISIcon name="add" size={16} color={palette.surface} />
-              <Text style={[styles.primaryText, { color: palette.surface }]}>{createLabel}</Text>
+              <Text style={[styles.primaryText, { color: palette.surface }]} numberOfLines={1}>{compact ? 'Create' : createLabel}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -505,11 +508,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
       ) : null}
       {channels.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.channelPills}> 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.channelPills, { paddingTop: compact ? 10 : 14 }]}> 
           {channels.map(channel => {
             const active = channel.id === selectedChannel?.id;
             return (
-              <Pressable key={channel.id} onPress={() => setSelectedChannelId(channel.id)} style={[styles.channelPill, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border }]}> 
+              <Pressable key={channel.id} onPress={() => setSelectedChannelId(channel.id)} style={[styles.channelPill, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12 }]}> 
                 <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 12 }}>@{channel.handle}{channel.is_broadcast ? ' · LIVE' : ''}</Text>
               </Pressable>
             );
@@ -520,11 +523,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </ScrollView>
       ) : null}
       {createFormVisible && selectedChannel ? renderCreateChannelForm() : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}> 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 10 : 14 }]}> 
         {TABS.map(tab => {
           const active = activeTab === tab.id;
           return (
-            <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tab, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border }]}> 
+            <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tab, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12, paddingVertical: compact ? 7 : 9 }]}> 
               <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 11 }}>{tab.label}</Text>
             </Pressable>
           );

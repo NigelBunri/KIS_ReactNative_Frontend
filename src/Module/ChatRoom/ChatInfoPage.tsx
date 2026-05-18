@@ -19,6 +19,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '../../theme/useTheme';
+import { useResponsiveLayout } from '../../theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import type { Chat, ParticipantWire, UserWire } from './messagesUtils';
@@ -74,6 +75,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   onChatUpdated,
 }) => {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
   const { startCall } = useSocket();
 
@@ -487,7 +489,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     if (!items?.length) return null;
     const limited = items.slice(0, 3);
     return (
-      <View style={styles.section}>
+      <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
         <Text style={[styles.sectionTitle, { color: palette.text }]}>{title}</Text>
         <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
           {limited.map((item, index) => (
@@ -524,7 +526,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     if (!items?.length) return null;
     const limited = items.slice(0, 3);
     return (
-      <View style={styles.section}>
+      <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
         <Text style={[styles.sectionTitle, { color: palette.text }]}>{title}</Text>
         <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
           {limited.map((item, index) => {
@@ -600,7 +602,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
-      <View style={[styles.header, { borderBottomColor: palette.divider }]}>
+      <View style={[styles.header, { borderBottomColor: palette.divider, paddingHorizontal: responsive.pageGutter }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
@@ -609,8 +611,8 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: responsive.isWatch ? 24 : 40 }]}>
+        <View style={[styles.hero, { paddingHorizontal: responsive.pageGutter, paddingVertical: responsive.isWatch ? 14 : 20 }]}>
           <Pressable
             onPress={() => {
               if (!avatarUrl) return;
@@ -669,7 +671,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           )}
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>
             Details
           </Text>
@@ -684,7 +686,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         </View>
 
         {!isGroup && (
-          <View style={styles.section}>
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Contact
             </Text>
@@ -717,7 +719,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         )}
 
         {!isGroup && (
-          <View style={styles.section}>
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Public profile
             </Text>
@@ -842,7 +844,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               (item) => item.description || item.project_url || '',
             )}
             {skillItems.length > 0 && (
-              <View style={styles.section}>
+              <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
                 <Text style={[styles.sectionTitle, { color: palette.text }]}>Skills</Text>
                 <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
                   <View style={styles.chipRow}>
@@ -890,7 +892,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         )}
 
         {isGroup && (
-          <View style={styles.section}>
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Invite link
             </Text>
@@ -959,7 +961,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         )}
 
         {isGroup && (
-          <View style={styles.section}>
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Members
             </Text>

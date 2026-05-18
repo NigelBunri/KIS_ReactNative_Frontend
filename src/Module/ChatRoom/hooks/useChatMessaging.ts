@@ -413,7 +413,12 @@ export function useChatMessaging({
           ? mapAttachments(serverMsg.attachments)
           : [],
         replyToId: serverMsg.replyToId ?? null,
-        status: 'sent' as MessageStatus,
+        status: (
+          serverMsg.status === 'read' ? 'read' :
+          serverMsg.status === 'delivered' ? 'delivered' :
+          serverMsg.status === 'sent' ? 'sent' :
+          'sent'
+        ) as MessageStatus,
         roomId: String(storageRoomId),
         fromMe: senderId !== '' && senderId === String(currentUserId),
         reactions: normalizeReactions(serverMsg.reactions),
@@ -1365,6 +1370,17 @@ export function useChatMessaging({
         conversationId: String(resolvedConvId),
         messageId,
         emoji,
+      });
+    },
+    votePoll: (messageId: string, optionId: string) => {
+      const resolvedConvId =
+        conversationIdRef.current ??
+        String(storageRoomId);
+      if (!socket || !resolvedConvId || !messageId) return;
+      socket.emit('chat.vote_poll', {
+        conversationId: String(resolvedConvId),
+        messageId,
+        optionId,
       });
     },
     markMessagesRead,

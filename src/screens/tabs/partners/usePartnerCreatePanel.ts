@@ -4,7 +4,10 @@ import { PartnerCreateKind } from '@/components/partners/PartnerCreatePanel';
 
 export const usePartnerCreatePanel = (width: number) => {
   const [kind, setKind] = useState<PartnerCreateKind>(null);
-  const panelWidth = useMemo(() => width, [width]);
+  const panelWidth = useMemo(() => {
+    if (width < 600) return width;
+    return Math.min(760, Math.max(520, Math.round(width * 0.72)));
+  }, [width]);
   const panelTranslateX = useRef(new Animated.Value(panelWidth)).current;
 
   useEffect(() => {

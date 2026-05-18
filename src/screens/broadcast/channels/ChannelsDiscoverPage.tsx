@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   fetchSocialRecommendationFoundation,
@@ -106,8 +107,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function FeaturedChannelCard({ channel, onOpen }: { channel: BroadcastChannelSummary; onOpen: (channel: BroadcastChannelSummary) => void }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   return (
-    <Pressable onPress={() => onOpen(channel)} style={[styles.featuredCard, { backgroundColor: palette.surface, borderColor: '#E6D7B2' }]}> 
+    <Pressable onPress={() => onOpen(channel)} style={[styles.featuredCard, { backgroundColor: palette.surface, borderColor: '#E6D7B2', width: compact ? Math.max(190, responsive.width - responsive.pageGutter * 3) : 258 }]}> 
       <View style={styles.bannerWrap}>
         {channel.banner_url ? (
           <Image source={{ uri: channel.banner_url }} style={styles.bannerImage} />
@@ -146,12 +149,16 @@ function FeaturedChannelCard({ channel, onOpen }: { channel: BroadcastChannelSum
 
 function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary; onOpen: (channel: BroadcastChannelSummary) => void }) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   return (
-    <Pressable onPress={() => onOpen(channel)} style={[styles.listRow, { backgroundColor: palette.surface, borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7' }]}> 
+    <Pressable onPress={() => onOpen(channel)} style={[styles.listRow, { backgroundColor: palette.surface, borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', padding: compact ? 8 : 10 }]}> 
+      {responsive.isWatch ? null : (
       <View style={styles.rowBannerSlot}>
         {channel.banner_url ? <Image source={{ uri: channel.banner_url }} style={styles.rowBanner} /> : <View style={[styles.rowBannerFallback, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#F5EBD3' }]} />}
-        <View style={styles.rowAvatar}><ChannelAvatar channel={channel} size={48} /></View>
+        <View style={styles.rowAvatar}><ChannelAvatar channel={channel} size={compact ? 40 : 48} /></View>
       </View>
+      )}
       <View style={styles.rowContent}>
         <View style={styles.rowTitleLine}>
           <Text numberOfLines={1} style={[styles.rowTitle, { color: palette.text }]}>{channel.display_name}</Text>
@@ -182,6 +189,8 @@ function RecommendationChip({ item }: { item: RecommendationItem }) {
 
 export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 'all' }: Props) {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [recommendations, setRecommendations] = useState<SocialRecommendationFoundation | null>(null);
   const activeCategory = searchContext || 'all';
@@ -220,8 +229,8 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
   }, []);
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.heroPanel, { backgroundColor: palette.surface, borderColor: '#E6D7B2' }]}> 
+    <View style={[styles.container, { marginTop: compact ? 6 : 10 }]}>
+      <View style={[styles.heroPanel, { backgroundColor: palette.surface, borderColor: '#E6D7B2', padding: compact ? 11 : 16 }]}> 
         <View style={styles.heroTextBlock}>
           <Text style={styles.eyebrow}>KIS CHANNELS</Text>
           <Text style={[styles.heroTitle, { color: palette.text }]}>Creator channels built for video, files, live, and feeds.</Text>
@@ -233,10 +242,10 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
         </View>
       </View>
 
-      <View style={[styles.recommendationPanel, { backgroundColor: palette.surface, borderColor: '#E6D7B2' }]}>
+      <View style={[styles.recommendationPanel, { backgroundColor: palette.surface, borderColor: '#E6D7B2', padding: compact ? 10 : 14 }]}>
         <View style={styles.sectionHeaderCompact}>
           <View>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>For your kingdom journey</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text, fontSize: compact ? 15 : 17 }]}>For your kingdom journey</Text>
             <Text style={[styles.sectionSubtitle, { color: palette.subtext }]}>
               Privacy-safe suggestions using public, family-safe, and blocked-user-aware signals.
             </Text>
@@ -252,7 +261,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
           {recommendedItems.length ? recommendedItems.map(item => (
             <RecommendationChip key={`${item.kind}-${item.target_type}-${item.target_id}`} item={item} />
           )) : (
-            <Text style={[styles.emptyText, { color: palette.subtext }]}>Recommendations will appear as you subscribe, read, save, enroll, and shop safely.</Text>
+            <Text style={[styles.emptyText, { color: palette.subtext }]}>{compact ? 'Recommendations will appear here.' : 'Recommendations will appear as you subscribe, read, save, enroll, and shop safely.'}</Text>
           )}
         </ScrollView>
       </View>

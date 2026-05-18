@@ -2,6 +2,7 @@
 import React from 'react';
 import { Animated, Linking, Modal, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
 import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
@@ -36,6 +37,8 @@ export default function EducationEnrollmentSheet({
   receiptUrl,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactSheet = responsive.isWatch || responsive.isCompactPhone;
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
     onClose,
@@ -55,7 +58,10 @@ export default function EducationEnrollmentSheet({
             backgroundColor: palette.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
-            padding: 24,
+            padding: compactSheet ? 14 : responsive.pageGutter,
+            maxWidth: responsive.isTablet ? 760 : undefined,
+            alignSelf: responsive.isTablet ? 'center' : 'stretch',
+            width: responsive.isTablet ? '92%' : '100%',
             flex: 1,
             transform: [{ translateY: dragY }],
           }}
@@ -126,7 +132,7 @@ export default function EducationEnrollmentSheet({
                 subtitle="Course commissions, certificate processing, and instructor payouts are not live. This sheet only prepares clear USD payment expectations."
               />
             </View>
-            <View style={{ marginTop: 18, flexDirection: 'row', gap: 12 }}>
+            <View style={{ marginTop: 18, flexDirection: compactSheet ? 'column' : 'row', gap: 12 }}>
               {pricing?.isFree ? (
                 <KISButton
                   title="Free enroll"

@@ -15,6 +15,7 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
 import { getRequest } from '@/network/get';
@@ -105,6 +106,7 @@ export default function UpdatesTab({
   onOpenChat,
 }: UpdatesTabProps) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { currentUserId } = useSocket();
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
@@ -878,7 +880,7 @@ export default function UpdatesTab({
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}>
         {/* Status row */}
         <View style={styles.sectionHeader}>
           <KISText preset="h3" color={palette.text}>
@@ -900,7 +902,7 @@ export default function UpdatesTab({
             {Array.from({ length: 5 }).map((_, idx) => (
               <View
                 key={`status-skel-${idx}`}
-                style={{ width: 86, alignItems: 'center', gap: 6 }}
+                style={{ width: responsive.isWatch ? 68 : 86, alignItems: 'center', gap: responsive.isWatch ? 4 : 6 }}
               >
                 <Skeleton width={70} height={70} radius={18} />
                 <Skeleton width={60} height={10} radius={6} />
@@ -1074,7 +1076,7 @@ export default function UpdatesTab({
       {/* Floating create channel button */}
       <Pressable
         onPress={() => setShowCreateChannel(true)}
-        style={[styles.fab, { backgroundColor: palette.primary }]}
+        style={[styles.fab, { backgroundColor: palette.primary, right: responsive.pageGutter, width: responsive.isWatch ? 46 : 52, height: responsive.isWatch ? 46 : 52, borderRadius: responsive.isWatch ? 23 : 26 }]}
       >
         <KISIcon name="add" size={18} color={palette.onPrimary} />
       </Pressable>

@@ -28,9 +28,13 @@ type Props = {
   editing: ChatMessage | null;
   onReplyToMessage: (message: ChatMessage) => void;
   onEditMessage: (message: ChatMessage) => void;
-  onPressMessage: (message: ChatMessage) => void;
-  onLongPressMessage: (message: ChatMessage) => void;
+  onForwardMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
+  onPinMessage?: (message: ChatMessage) => void;
+  onStartSelection?: (message: ChatMessage) => void;
+  onToggleSelect?: (message: ChatMessage) => void;
   onReactMessage: (message: ChatMessage, emoji: string) => void;
+  onVotePoll?: (message: ChatMessage, optionId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onMessageLocatorReady: (helpers: {
     scrollToMessage: (messageId: string) => void;
@@ -50,6 +54,7 @@ type Props = {
   onCreatePoll: (poll: PollDraft) => void;
   onCreateEvent: (event: EventDraft) => void;
   canSend: boolean;
+  mentionParticipants?: { id: string; name: string }[];
 };
 
 export default function ChatRoomBody({
@@ -69,9 +74,13 @@ export default function ChatRoomBody({
   editing,
   onReplyToMessage,
   onEditMessage,
-  onPressMessage,
-  onLongPressMessage,
+  onForwardMessage,
+  onDeleteMessage,
+  onPinMessage,
+  onStartSelection,
+  onToggleSelect,
   onReactMessage,
+  onVotePoll,
   onRetryMessage,
   onMessageLocatorReady,
   onVisibleMessageIds,
@@ -88,6 +97,7 @@ export default function ChatRoomBody({
   onCreatePoll,
   onCreateEvent,
   canSend,
+  mentionParticipants,
 }: Props) {
   return (
     <KeyboardAvoidingView
@@ -103,9 +113,13 @@ export default function ChatRoomBody({
         selectedMessageIds={selectedIds}
         onReplyToMessage={onReplyToMessage}
         onEditMessage={onEditMessage}
-        onPressMessage={onPressMessage}
-        onLongPressMessage={onLongPressMessage}
+        onForwardMessage={onForwardMessage}
+        onDeleteMessage={onDeleteMessage}
+        onPinMessage={onPinMessage}
+        onStartSelection={onStartSelection}
+        onToggleSelect={onToggleSelect}
         onReactMessage={onReactMessage}
+        onVotePoll={onVotePoll}
         onRetryMessage={onRetryMessage}
         onMessageLocatorReady={onMessageLocatorReady}
         autoScrollEnabled={autoScrollEnabled}
@@ -147,6 +161,7 @@ export default function ChatRoomBody({
           onSendContacts={onSendContacts}
           onCreatePoll={onCreatePoll}
           onCreateEvent={onCreateEvent}
+          mentionParticipants={mentionParticipants}
         />
       )}
     </KeyboardAvoidingView>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import KISButton from '@/constants/KISButton';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KpiGrid, LineChart, BarChart, DonutChart, TimeRangeSelector, TopItemsList } from '@/components/insights';
 import type { TimeRange } from '@/api/insights/types';
 import type { HealthDashboardInstitutionType } from '@/features/health-dashboard/models';
@@ -58,6 +59,8 @@ export default function InstitutionDashboardShell({
   onOpenHealthCards,
   accessControls,
 }: Props) {
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const palette = getHealthThemeColors(scheme);
   const borders = getHealthThemeBorders(palette);
   const spacing = HEALTH_THEME_SPACING;
@@ -110,11 +113,20 @@ export default function InstitutionDashboardShell({
   ];
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: responsive.pageGutter,
+        paddingTop: compact ? spacing.sm : spacing.lg,
+        paddingBottom: spacing.xl,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: responsive.contentMaxWidth,
+      }}
+    >
       <View
         style={{
           borderRadius: spacing.lg,
-          padding: spacing.md,
+          padding: compact ? spacing.sm : spacing.md,
           backgroundColor: palette.card,
           ...borders.card,
         }}
@@ -203,13 +215,14 @@ export default function InstitutionDashboardShell({
         <Text style={{ ...typography.body, color: palette.subtext, marginTop: 4 }}>
           Patient-friendly care plans, reminders, vitals, secure messaging, and video care readiness.
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap, marginTop: spacing.md }}>
           {careCards.map((item) => (
             <View
               key={item.id}
               style={{
-                width: '48%',
-                minWidth: 136,
+                flexBasis: compact ? '100%' : responsive.isTablet ? '23%' : '48%',
+                flexGrow: 1,
+                minWidth: compact ? '100%' : 136,
                 borderRadius: spacing.md,
                 backgroundColor: palette.surface,
                 borderWidth: 1,
@@ -294,20 +307,20 @@ export default function InstitutionDashboardShell({
         <Text style={{ ...typography.body, color: palette.subtext, marginTop: 4 }}>
           Today, upcoming, and past consultation schedule controls.
         </Text>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-          <View style={{ flex: 1, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+          <View style={{ flex: 1, minWidth: compact ? '100%' : 110, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
             <Text style={{ ...typography.label, color: palette.subtext }}>Today</Text>
             <Text style={{ ...typography.h3, color: palette.text }}>
               {analytics?.analyticsHeader.pendingSchedules ?? 0}
             </Text>
           </View>
-          <View style={{ flex: 1, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
+          <View style={{ flex: 1, minWidth: compact ? '100%' : 110, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
             <Text style={{ ...typography.label, color: palette.subtext }}>Upcoming</Text>
             <Text style={{ ...typography.h3, color: palette.text }}>
               {analytics?.analyticsHeader.bookingsCount ?? 0}
             </Text>
           </View>
-          <View style={{ flex: 1, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
+          <View style={{ flex: 1, minWidth: compact ? '100%' : 110, borderRadius: spacing.md, backgroundColor: palette.surface, padding: spacing.sm }}>
             <Text style={{ ...typography.label, color: palette.subtext }}>Completed</Text>
             <Text style={{ ...typography.h3, color: palette.text }}>
               {analytics?.analyticsHeader.completedConsultations ?? 0}

@@ -224,6 +224,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     replyToMessage,
     sendTyping,
     sendReaction,
+    votePoll,
     retryMessage,
     markMessagesRead,
   } = useChatMessaging({
@@ -261,20 +262,43 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
 
+  const SUBROOMS_CACHE_PREFIX = 'KIS_SUBROOMS_V1:';
+
   const [subRooms, setSubRooms] = useState<SubRoom[]>([]);
   const loadSubRooms = useCallback(async () => {
     const convId = String(conversationId ?? chat?.conversationId ?? chat?.id ?? '');
     if (!convId || convId.startsWith('newContact-')) return;
-    const res = await getRequest(
-      `${ROUTES.chat.threads}?parent_conversation=${encodeURIComponent(convId)}`,
-      { errorMessage: 'Unable to load sub-rooms.' },
-    );
-    const rows = res?.data?.results ?? res?.data ?? res?.results ?? [];
-    if (!Array.isArray(rows)) return;
-    const normalized = rows
-      .map((row: any) => normalizeSubRoom(row, convId))
-      .filter(Boolean) as SubRoom[];
-    setSubRooms(normalized);
+
+    // 1. Load from cache immediately
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const cached = await AsyncStorage.getItem(`${SUBROOMS_CACHE_PREFIX}${convId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubRooms(parsed);
+        }
+      }
+    } catch { /* silent */ }
+
+    // 2. Fetch from backend and update
+    try {
+      const res = await getRequest(
+        `${ROUTES.chat.threads}?parent_conversation=${encodeURIComponent(convId)}`,
+        { errorMessage: 'Unable to load sub-rooms.' },
+      );
+      const rows = res?.data?.results ?? res?.data ?? res?.results ?? [];
+      if (!Array.isArray(rows)) return;
+      const normalized = rows
+        .map((row: any) => normalizeSubRoom(row, convId))
+        .filter(Boolean) as SubRoom[];
+      setSubRooms(normalized);
+      // Save to cache
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.setItem(`${SUBROOMS_CACHE_PREFIX}${convId}`, JSON.stringify(normalized));
+      } catch { /* silent */ }
+    } catch { /* silent */ }
   }, [chat?.conversationId, chat?.id, conversationId]);
 
   useEffect(() => {
@@ -328,6 +352,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     [sendReaction, conversationId, chat?.id],
   );
 
+  const handleVotePoll = useCallback(
+    (message: ChatMessage, optionId: string) => {
+      const fallbackId =
+        message.id && message.id.startsWith('client_')
+          ? null
+          : message.id;
+      const messageId = message.serverId ?? fallbackId;
+      if (!messageId) return;
+      votePoll(messageId, optionId);
+    },
+    [votePoll],
+  );
+
   /* ======================================================================== */
   /*                              SELECTION MODE                               */
   /* ======================================================================== */
@@ -352,6 +389,23 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       return id && id !== currentId;
     });
   }, [allChats, chat?.conversationId, chat?.id]);
+
+  const mentionParticipants = useMemo(() => {
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts) || parts.length === 0) return [];
+    return parts
+      .map((p: any) => {
+        const id = String(p?.id ?? p?.user?.id ?? p ?? '');
+        const name =
+          p?.display_name ??
+          p?.user?.display_name ??
+          p?.user?.username ??
+          (typeof p === 'string' ? p : null);
+        if (!name || !id) return null;
+        return { id, name: String(name) };
+      })
+      .filter(Boolean) as { id: string; name: string }[];
+  }, [chat?.participants]);
 
   const createForwardClientId = useCallback(
     () => `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
@@ -436,6 +490,40 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       storageRoomId,
     ],
   );
+
+  // ── Single-message action handlers (from long-press action sheet) ──────────
+  const handleForwardSingleMessage = useCallback(
+    (message: ChatMessage) => {
+      // Put the message into the forward targets sheet as if it were selected
+      enterSelectionMode(message);
+      setForwardSheetVisible(true);
+    },
+    [enterSelectionMode],
+  );
+
+  const handleDeleteSingleMessage = useCallback(
+    async (message: ChatMessage) => {
+      await softDeleteMessage(message.id);
+    },
+    [softDeleteMessage],
+  );
+
+  const handlePinSingleMessage = useCallback(
+    (message: ChatMessage) => {
+      const convId = message.conversationId ?? conversationId ?? chat?.id ?? null;
+      const messageId =
+        message.serverId ??
+        (message.id && !message.id.startsWith('client_') ? message.id : null);
+      if (!convId || !messageId) return;
+      Handlers.handleSetPinned({
+        conversationId: String(convId),
+        messageId: String(messageId),
+        pinned: !(message as any).isPinned,
+      });
+    },
+    [conversationId, chat?.id],
+  );
+  // ─────────────────────────────────────────────────────────────────────────
 
   const {
     handlePinSelected,
@@ -551,7 +639,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             item.rootMessageId !== next.rootMessageId &&
             item.conversationId !== next.conversationId,
         );
-        return [next, ...withoutDuplicate];
+        const updated = [next, ...withoutDuplicate];
+        // Update cache
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          AsyncStorage.setItem(`${SUBROOMS_CACHE_PREFIX}${convId}`, JSON.stringify(updated)).catch(() => {});
+        } catch { /* silent */ }
+        return updated;
       });
       setSubRoomsSheetVisible(true);
     },
@@ -1109,6 +1203,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onPressContext={onPressHeaderContext}
           dmStatusLabel={dmStatusLabel}
           dmStatusVariant={dmStatusVariant}
+          dmRole={dmRole}
+          onAcceptRequest={handleAcceptRequest}
           selectionMode={selectionMode}
           selectedCount={selectedIds.length}
           onCancelSelection={exitSelectionMode}
@@ -1196,12 +1292,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         editing={editing}
         onReplyToMessage={setReplyTo}
         onEditMessage={setEditing}
-        onPressMessage={toggleSelectMessage}
-        onLongPressMessage={enterSelectionMode}
+        onForwardMessage={handleForwardSingleMessage}
+        onDeleteMessage={handleDeleteSingleMessage}
+        onPinMessage={handlePinSingleMessage}
+        onStartSelection={enterSelectionMode}
+        onToggleSelect={toggleSelectMessage}
         onReactMessage={handleReactMessage}
+        onVotePoll={handleVotePoll}
         onRetryMessage={handleRetryMessage}
         onMessageLocatorReady={setMessageLocator}
         onVisibleMessageIds={handleVisibleMessageIds}
+        mentionParticipants={mentionParticipants}
         onChangeDraft={handleChangeDraft}
         onSend={handleSend}
         onSendVoice={handleSendVoice}

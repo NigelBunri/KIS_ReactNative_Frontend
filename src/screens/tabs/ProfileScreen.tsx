@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   useFocusEffect,
   useNavigation,
@@ -49,10 +50,8 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import {
-  deleteInAppNotification,
   fetchInAppNotifications,
   IN_APP_NOTIFICATIONS_UPDATED_EVENT,
-  markInAppNotificationAsRead,
   type InAppNotification,
 } from '@/services/inAppNotificationService';
 import EvidenceWorkflowPlanCard from '@/components/dashboard/EvidenceWorkflowPlanCard';
@@ -174,7 +173,6 @@ import {
   ImpactSnapshotCard,
   LanguageSelectorCard,
   MarketplaceOrdersSummary,
-  NotificationSummaryCard,
   PartnerOrganizationSummary,
   ProfileHeroCard,
   QuickActionGrid,
@@ -202,6 +200,9 @@ const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 
 export default function ProfileScreen() {
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactProfile = responsive.isWatch || responsive.isCompactPhone;
+  const tinyProfile = responsive.isWatch;
   const dashboardTheme = useMemo(
     () => createProfileDashboardTheme(palette, tone),
     [palette, tone],
@@ -316,8 +317,6 @@ export default function ProfileScreen() {
   const [inAppNotifications, setInAppNotifications] = useState<
     InAppNotification[]
   >([]);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [, setDeletingNotificationId] = useState<string | null>(null);
   const [deletingGalleryItemId, setDeletingGalleryItemId] = useState<
     string | null
   >(null);
@@ -329,13 +328,8 @@ export default function ProfileScreen() {
   );
 
   const loadInAppNotifications = useCallback(async () => {
-    setLoadingNotifications(true);
-    try {
-      const list = await fetchInAppNotifications();
-      setInAppNotifications(list);
-    } finally {
-      setLoadingNotifications(false);
-    }
+    const list = await fetchInAppNotifications();
+    setInAppNotifications(list);
   }, []);
 
   const userId = useMemo(() => c.profile?.user?.id, [c.profile?.user?.id]);
@@ -688,31 +682,6 @@ export default function ProfileScreen() {
     );
     return () => sub.remove();
   }, [loadInAppNotifications]);
-
-  const handleDeleteNotification = useCallback(
-    (item: InAppNotification) => {
-      Alert.alert('Delete notification', 'This will remove the notification.', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setDeletingNotificationId(item.id);
-            deleteInAppNotification(item.id)
-              .then(() => loadInAppNotifications())
-              .catch((error: any) => {
-                Alert.alert(
-                  'Notifications',
-                  error?.message || 'Unable to delete notification.',
-                );
-              })
-              .finally(() => setDeletingNotificationId(null));
-          },
-        },
-      ]);
-    },
-    [loadInAppNotifications],
-  );
 
   const openManagementPanel = useCallback(
     (key: BroadcastProfileKey) => {
@@ -1802,27 +1771,6 @@ export default function ProfileScreen() {
     [appointments, openBookingDetails],
   );
 
-  const notificationDashboardItems = useMemo(
-    () =>
-      inAppNotifications.slice(0, 5).map(item => ({
-        id: item.id,
-        title: item.title,
-        body: item.body,
-        createdAt: item.createdAt
-          ? new Date(item.createdAt).toLocaleString()
-          : undefined,
-        read: !!item.readAt,
-        onPress: () => {
-          markInAppNotificationAsRead(item.id).catch(() => undefined);
-          rootNavigation?.navigate('ProfileNotificationDetail', {
-            notificationId: item.id,
-            notification: item,
-          });
-        },
-      })),
-    [inAppNotifications, rootNavigation],
-  );
-
   const marketplaceSummaryStats = useMemo(
     () => [
       {
@@ -2259,8 +2207,9 @@ export default function ProfileScreen() {
         contentContainerStyle={[
           styles.scroll,
           {
-            gap: 18,
-            paddingBottom: 44,
+            gap: responsive.cardGap,
+            paddingHorizontal: responsive.pageGutter,
+            paddingBottom: compactProfile ? 32 : 44,
           },
         ]}
       >
@@ -2321,10 +2270,10 @@ export default function ProfileScreen() {
             />
             <View
               style={{
-                marginTop: -64,
-                paddingHorizontal: 18,
-                paddingBottom: 18,
-                gap: 14,
+                marginTop: compactProfile ? -34 : -64,
+                paddingHorizontal: compactProfile ? 0 : 18,
+                paddingBottom: compactProfile ? 12 : 18,
+                gap: responsive.cardGap,
               }}
             >
               <View
@@ -2338,7 +2287,7 @@ export default function ProfileScreen() {
                       ? 'rgba(255,255,255,0.08)'
                       : 'rgba(230,222,247,0.95)',
                     borderWidth: 1,
-                    borderRadius: 24,
+                    borderRadius: compactProfile ? 18 : 24,
                     shadowColor: palette.shadow,
                     shadowOpacity: dashboardTheme.isDark ? 0.22 : 0.08,
                     shadowRadius: dashboardTheme.isDark ? 22 : 14,
@@ -2350,7 +2299,7 @@ export default function ProfileScreen() {
                   },
                 ]}
               >
-                <View style={styles.headerRow}>
+                <View style={[styles.headerRow, compactProfile && styles.wrapRow]}>
                   <Text style={[styles.title, { color: palette.text }]}>
                     Profile overview
                   </Text>
@@ -2425,7 +2374,7 @@ export default function ProfileScreen() {
                     gap: 10,
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
                     <View
                       style={{
                         width: 42,
@@ -2486,8 +2435,8 @@ export default function ProfileScreen() {
                 ) : null}
               </View>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-                <View style={{ flex: 1, minWidth: 280 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap }}>
+                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
                   <WalletSummaryCard
                     balanceLabel={kisWalletLabel}
                     tierLabel={`${
@@ -2497,7 +2446,7 @@ export default function ProfileScreen() {
                     onViewAll={() => c.openSheet('wallet')}
                   />
                 </View>
-                <View style={{ flex: 1, minWidth: 280 }}>
+                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
                   <QuickActionGrid
                     title="Quick actions"
                     items={quickActionItems}
@@ -2512,8 +2461,8 @@ export default function ProfileScreen() {
                 }
               />
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-                <View style={{ flex: 1, minWidth: 280 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap }}>
+                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
                   <ImpactSnapshotCard
                     periodLabel="This month"
                     stats={impactSnapshotStats}
@@ -2522,7 +2471,7 @@ export default function ProfileScreen() {
                     }
                   />
                 </View>
-                <View style={{ flex: 1, minWidth: 280 }}>
+                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
                   {partnerProfiles.length === 0 ? (
                     <PartnerOrganizationSummary
                       summary="No organizations yet. Create your first partner organization and open its landing page."
@@ -2596,25 +2545,6 @@ export default function ProfileScreen() {
                 </Text>
               ) : null}
 
-              <NotificationSummaryCard
-                unreadCount={unreadNotifications.length}
-                items={notificationDashboardItems}
-                onViewAll={() =>
-                  rootNavigation?.navigate('ProfileNotifications')
-                }
-                onDeleteItem={id => {
-                  const target = inAppNotifications.find(
-                    item => item.id === id,
-                  );
-                  if (target) handleDeleteNotification(target);
-                }}
-              />
-              {loadingNotifications ? (
-                <Text style={{ color: palette.subtext, marginTop: -4 }}>
-                  Loading notifications...
-                </Text>
-              ) : null}
-
               <WorkspaceLauncherSection items={workspaceLaunchers} />
 
               <LanguageSelectorCard
@@ -2657,6 +2587,7 @@ export default function ProfileScreen() {
             styles.slideContainer,
             {
               backgroundColor: palette.bg,
+              width: responsive.width,
               transform: [{ translateX: c.slideX }],
             },
           ]}
@@ -2672,6 +2603,7 @@ export default function ProfileScreen() {
             {
               transform: [{ translateX: managementPanelOffset }],
               backgroundColor: palette.surface,
+              width: responsive.width,
             },
           ]}
         >

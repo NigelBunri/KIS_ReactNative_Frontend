@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import KISTextInput from '@/constants/KISTextInput';
@@ -39,6 +40,12 @@ export default function ShopEditorDrawer({
   canDeleteShop,
 }: ShopEditorDrawerProps) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
+  const drawerWidth = compactDrawer
+    ? responsive.width
+    : Math.min(680, Math.max(500, Math.round(responsive.width * 0.66)));
+  const drawerPadding = responsive.isWatch ? 10 : responsive.pageGutter;
   const handlePickShopImage = async () => {
     try {
       const result = await launchImageLibrary({
@@ -69,7 +76,11 @@ export default function ShopEditorDrawer({
       <View
         style={[
           marketStyles.drawerContainer,
-          { backgroundColor: palette.surface },
+          {
+            width: drawerWidth,
+            left: compactDrawer ? 0 : undefined,
+            backgroundColor: palette.surface,
+          },
         ]}
       >
         <View
@@ -106,7 +117,7 @@ export default function ShopEditorDrawer({
             style={marketStyles.drawerScroll}
             contentContainerStyle={[
               marketStyles.drawerBody,
-              { paddingBottom: 0 },
+              { paddingHorizontal: drawerPadding, paddingBottom: compactDrawer ? 12 : 0 },
             ]}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
@@ -184,6 +195,8 @@ export default function ShopEditorDrawer({
                   borderTopColor: palette.divider,
                   marginTop: 12,
                   paddingTop: 12,
+                  flexDirection: compactDrawer ? 'column' : 'row',
+                  alignItems: compactDrawer ? 'stretch' : 'center',
                 },
               ]}
             >

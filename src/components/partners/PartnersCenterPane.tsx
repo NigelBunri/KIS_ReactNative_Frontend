@@ -17,6 +17,7 @@ import PartnerCoursesSection from './center/PartnerCoursesSection';
 import PartnerGroupsSection from './center/PartnerGroupsSection';
 import PartnerHeaderSection from './center/PartnerHeaderSection';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   VerificationBadgeRow,
   VerificationCenterSheet,
@@ -65,6 +66,9 @@ export default function PartnersCenterPane({
   onPartnerHeaderPress,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const rightPeek = responsive.isWatch ? 48 : responsive.isCompactPhone ? 56 : RIGHT_PEEK_WIDTH;
   const contentAnim = useRef(new Animated.Value(0)).current;
   const [collapsed, setCollapsed] = useState({
     feed: false,
@@ -152,7 +156,8 @@ export default function PartnersCenterPane({
       style={[
         styles.centerPane,
         {
-          marginRight: RIGHT_PEEK_WIDTH,
+          marginRight: rightPeek,
+          paddingHorizontal: responsive.pageGutter,
           backgroundColor: 'transparent',
           opacity: contentAnim,
           transform: [
@@ -168,7 +173,10 @@ export default function PartnersCenterPane({
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.centerScrollContent}
+        contentContainerStyle={[
+          styles.centerScrollContent,
+          { paddingBottom: compact ? 28 : 42 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <PartnerHeaderSection
@@ -228,7 +236,7 @@ export default function PartnersCenterPane({
             },
           ]}
         >
-          <View style={styles.workspaceCommandHeader}>
+          <View style={[styles.workspaceCommandHeader, compact && styles.wrapRow]}>
             <View style={{ flex: 1 }}>
               <Text
                 style={[
@@ -272,6 +280,7 @@ export default function PartnersCenterPane({
                   styles.workspaceStatTile,
                   {
                     backgroundColor: palette.card,
+                    flexBasis: compact ? '100%' : responsive.isTablet ? '22%' : '45%',
                     borderColor: palette.goldLight,
                   },
                 ]}
@@ -342,7 +351,7 @@ export default function PartnersCenterPane({
         {/* General feed */}
         <Pressable
           onPress={() => toggleSection('feed')}
-          style={styles.sectionHeaderRow}
+          style={[styles.sectionHeaderRow, compact && styles.wrapRow]}
         >
           <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
             {sectionHeaders.feed.title}
@@ -412,7 +421,7 @@ export default function PartnersCenterPane({
 
         <Pressable
           onPress={() => toggleSection('courses')}
-          style={[styles.sectionHeaderRow, { marginTop: 12 }]}
+          style={[styles.sectionHeaderRow, compact && styles.wrapRow, { marginTop: 12 }]}
         >
           <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
             {sectionHeaders.courses.title}
@@ -447,7 +456,7 @@ export default function PartnersCenterPane({
           <>
             <Pressable
               onPress={() => toggleSection('channels')}
-              style={[styles.sectionHeaderRow, { marginTop: 12 }]}
+              style={[styles.sectionHeaderRow, compact && styles.wrapRow, { marginTop: 12 }]}
             >
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.channels.title}
@@ -484,7 +493,7 @@ export default function PartnersCenterPane({
 
             <Pressable
               onPress={() => toggleSection('groups')}
-              style={[styles.sectionHeaderRow, { marginTop: 12 }]}
+              style={[styles.sectionHeaderRow, compact && styles.wrapRow, { marginTop: 12 }]}
             >
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.groups.title}
@@ -521,7 +530,7 @@ export default function PartnersCenterPane({
 
             <Pressable
               onPress={() => toggleSection('communities')}
-              style={[styles.sectionHeaderRow, { marginTop: 12 }]}
+              style={[styles.sectionHeaderRow, compact && styles.wrapRow, { marginTop: 12 }]}
             >
               <Text style={[styles.sectionHeaderText, { color: palette.text }]}>
                 {sectionHeaders.communities.title}

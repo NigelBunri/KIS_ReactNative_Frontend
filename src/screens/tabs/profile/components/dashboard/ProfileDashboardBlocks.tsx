@@ -12,6 +12,7 @@ import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { VerificationBadgeRow } from '@/components/verification';
 import type { VerificationSummary } from '@/services/verificationService';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   createProfileDashboardTheme,
   getProfileDashboardCardStyle,
@@ -90,11 +91,13 @@ type LanguageOption = {
 
 const useDashboardTheme = () => {
   const { palette, tone, isDark } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const dashboardTheme = useMemo(
     () => createProfileDashboardTheme(palette, tone),
     [palette, tone],
   );
-  return { palette, tone, isDark, dashboardTheme };
+  return { palette, tone, isDark, dashboardTheme, responsive, compact };
 };
 
 const resolveToneColors = (
@@ -136,12 +139,16 @@ const DashboardCard = ({
   variant?: Parameters<typeof getProfileDashboardCardStyle>[1];
   style?: any;
 }) => {
-  const { dashboardTheme } = useDashboardTheme();
+  const { dashboardTheme, responsive, compact } = useDashboardTheme();
   return (
     <View
       style={[
         dashboardStyles.cardBase,
         getProfileDashboardCardStyle(dashboardTheme, variant),
+        {
+          padding: compact ? 14 : 20,
+          gap: responsive.cardGap,
+        },
         style,
       ]}
     >
@@ -161,9 +168,9 @@ const SectionHeader = ({
   actionLabel?: string;
   onAction?: () => void;
 }) => {
-  const { dashboardTheme, palette } = useDashboardTheme();
+  const { dashboardTheme, palette, compact } = useDashboardTheme();
   return (
-    <View style={dashboardStyles.sectionHeaderRow}>
+    <View style={[dashboardStyles.sectionHeaderRow, compact && dashboardStyles.wrapRow]}>
       <View style={{ flex: 1, gap: 4, paddingRight: 12 }}>
         <Text style={dashboardTheme.sectionHeader.title} numberOfLines={1}>
           {title}
@@ -212,11 +219,11 @@ export const ProfileHeroCard = ({
   verificationSummary?: VerificationSummary | null;
   onVerificationPress?: () => void;
 }) => {
-  const { palette, dashboardTheme, isDark } = useDashboardTheme();
+  const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
 
   return (
-    <View style={[dashboardStyles.heroShell, getProfileDashboardCardStyle(dashboardTheme, 'dashboard')]}>
+    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard')]}>
       <View
         style={[
           dashboardStyles.heroBackdrop,
@@ -266,14 +273,14 @@ export const ProfileHeroCard = ({
         
       </View>
 
-      <View style={dashboardStyles.heroContent}>
-        <View style={dashboardStyles.heroIdentityRow}>
-          <View style={dashboardStyles.heroAvatarWrap}>
+      <View style={[dashboardStyles.heroContent, { paddingTop: compact ? 78 : 88 }]}>
+        <View style={[dashboardStyles.heroIdentityRow, compact && dashboardStyles.heroIdentityCompact]}>
+          <View style={[dashboardStyles.heroAvatarWrap, { width: compact ? 78 : 112, height: compact ? 78 : 112, borderRadius: compact ? 39 : 56 }]}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={dashboardStyles.heroAvatar} />
+              <Image source={{ uri: avatarUrl }} style={[dashboardStyles.heroAvatar, { borderRadius: compact ? 39 : 56 }]} />
             ) : (
               <View style={[dashboardStyles.heroAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
-                <KISIcon name="person" size={40} color={palette.subtext} />
+                <KISIcon name="person" size={compact ? 30 : 40} color={palette.subtext} />
               </View>
             )}
             <Pressable
@@ -285,14 +292,14 @@ export const ProfileHeroCard = ({
           </View>
 
           <View style={dashboardStyles.heroTextBlock}>
-            <Text style={dashboardStyles.heroName} numberOfLines={1}>
+            <Text style={[dashboardStyles.heroName, { fontSize: compact ? 24 : 34 }]} numberOfLines={compact ? 2 : 1}>
               {displayName}
             </Text>
-            <Text style={dashboardStyles.heroHandle} numberOfLines={1}>
+            <Text style={[dashboardStyles.heroHandle, { fontSize: compact ? 14 : 17 }]} numberOfLines={1}>
               {handle}
             </Text>
             {headline ? (
-              <Text style={dashboardStyles.heroHeadline} numberOfLines={2}>
+              <Text style={[dashboardStyles.heroHeadline, { fontSize: compact ? 13 : 14 }]} numberOfLines={2}>
                 {headline}
               </Text>
             ) : null}
@@ -337,11 +344,14 @@ export const WalletSummaryCard = ({
   actions?: DashboardAction[];
   onViewAll?: () => void;
 }) => {
-  const { palette, dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme, compact, responsive } = useDashboardTheme();
+  const quickCardLayoutStyle = responsive.isWatch
+    ? dashboardStyles.quickActionCardTwo
+    : dashboardStyles.quickActionCardThree;
   return (
     <DashboardCard>
       <SectionHeader title={title} actionLabel="View all" onAction={onViewAll} />
-      <View style={dashboardStyles.walletTopRow}>
+      <View style={[dashboardStyles.walletTopRow, compact && dashboardStyles.wrapRow]}>
         <View style={{ flex: 1, gap: 8 }}>
           <Text style={dashboardTheme.content.meta}>Promotional credits</Text>
           <Text style={[dashboardTheme.content.heading, { fontSize: 24 }]} numberOfLines={1}>
@@ -350,7 +360,7 @@ export const WalletSummaryCard = ({
           <Text style={dashboardTheme.content.meta}>Reward credits are not cash or transferable value.</Text>
           {tierLabel ? <Text style={dashboardTheme.content.meta}>Plan: {tierLabel}</Text> : null}
         </View>
-        <View style={[dashboardStyles.walletCoinBadge, dashboardTheme.chips.primary]}>
+        <View style={[dashboardStyles.walletCoinBadge, compact && dashboardStyles.walletCoinBadgeCompact, dashboardTheme.chips.primary]}>
           <Image source={creditIcon} style={dashboardStyles.walletCoinIcon} />
         </View>
       </View>
@@ -364,6 +374,8 @@ export const WalletSummaryCard = ({
                 onPress={action.onPress}
                 style={[
                   dashboardStyles.quickActionCard,
+                  quickCardLayoutStyle,
+                  compact && dashboardStyles.quickActionCardCompact,
                   getProfileDashboardCardStyle(dashboardTheme, 'action'),
                 ]}
               >
@@ -389,7 +401,10 @@ export const QuickActionGrid = ({
   title?: string;
   items: DashboardAction[];
 }) => {
-  const { palette, dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme, compact, responsive } = useDashboardTheme();
+  const quickCardLayoutStyle = responsive.isWatch
+    ? dashboardStyles.quickActionCardTwo
+    : dashboardStyles.quickActionCardThree;
   return (
     <DashboardCard>
       <SectionHeader title={title} />
@@ -402,6 +417,8 @@ export const QuickActionGrid = ({
               onPress={item.onPress}
               style={[
                 dashboardStyles.quickActionCard,
+                quickCardLayoutStyle,
+                compact && dashboardStyles.quickActionCardCompact,
                 getProfileDashboardCardStyle(dashboardTheme, 'action'),
               ]}
             >
@@ -433,7 +450,7 @@ export const RecentActivityTimeline = ({
   items: TimelineItem[];
   onViewAll?: () => void;
 }) => {
-  const { palette, dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme, compact } = useDashboardTheme();
   return (
     <DashboardCard>
       <SectionHeader title={title} actionLabel="View all" onAction={onViewAll} />
@@ -455,7 +472,7 @@ export const RecentActivityTimeline = ({
                 ) : null}
               </View>
               <View style={[dashboardStyles.timelineCard, getProfileDashboardCardStyle(dashboardTheme, 'timeline')]}>
-                <View style={dashboardStyles.timelineTextRow}>
+                <View style={[dashboardStyles.timelineTextRow, compact && dashboardStyles.wrapRow]}>
                   <View style={{ flex: 1, gap: 4, paddingRight: 12 }}>
                     <Text style={dashboardTheme.content.heading} numberOfLines={1}>
                       {item.title}
@@ -560,7 +577,7 @@ export const MarketplaceOrdersSummary = ({
   onViewOrders?: () => void;
   onViewReceivedOrders?: () => void;
 }) => {
-  const { palette, dashboardTheme } = useDashboardTheme();
+  const { palette, dashboardTheme, compact } = useDashboardTheme();
   return (
     <DashboardCard>
       <SectionHeader title="Marketplace orders" actionLabel="View all orders" onAction={onViewOrders} />
@@ -593,7 +610,7 @@ export const MarketplaceOrdersSummary = ({
           ))}
         </View>
       ) : null}
-      <View style={dashboardStyles.dualActionRow}>
+      <View style={[dashboardStyles.dualActionRow, compact && dashboardStyles.wrapRow]}>
         <KISButton title="View Orders" onPress={onViewOrders} />
         <KISButton title="Received Orders" variant="outline" onPress={onViewReceivedOrders} />
       </View>
@@ -811,6 +828,7 @@ const dashboardStyles = StyleSheet.create({
     padding: 20,
     gap: 16,
   },
+  wrapRow: { flexWrap: 'wrap' },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -822,6 +840,7 @@ const dashboardStyles = StyleSheet.create({
     minHeight: 308,
     width: '100%',
   },
+  heroShellCompact: { minHeight: 284 },
   walletCoinIcon: {
     width: '100%',
     height: '100%',
@@ -936,6 +955,7 @@ const dashboardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingLeft: 10,
   },
+  heroIdentityCompact: { alignItems: 'flex-start', gap: 12 },
   heroAvatarWrap: {
     width: 112,
     height: 112,
@@ -1025,18 +1045,32 @@ const dashboardStyles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
   },
+  walletCoinBadgeCompact: { width: 74, height: 74, borderRadius: 37 },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   quickActionCard: {
-    minWidth: '47%',
-    flexGrow: 1,
-    padding: 16,
-    gap: 12,
-    minHeight: 132,
+    flexGrow: 0,
+    flexShrink: 1,
+    minWidth: 0,
+    padding: 12,
+    gap: 8,
+    minHeight: 108,
     justifyContent: 'space-between',
+  },
+  quickActionCardThree: {
+    flexBasis: '31.2%',
+    maxWidth: '31.2%',
+  },
+  quickActionCardTwo: {
+    flexBasis: '47.8%',
+    maxWidth: '47.8%',
+  },
+  quickActionCardCompact: {
+    padding: 10,
+    minHeight: 96,
   },
   quickActionIconWrap: {
     width: 46,
@@ -1088,7 +1122,7 @@ const dashboardStyles = StyleSheet.create({
     gap: 12,
   },
   statCard: {
-    minWidth: '47%',
+    minWidth: 132,
     flexGrow: 1,
     padding: 16,
     gap: 8,
@@ -1120,7 +1154,7 @@ const dashboardStyles = StyleSheet.create({
     gap: 10,
   },
   summaryMiniCard: {
-    minWidth: 110,
+    minWidth: 96,
     flexGrow: 1,
     padding: 14,
     gap: 6,

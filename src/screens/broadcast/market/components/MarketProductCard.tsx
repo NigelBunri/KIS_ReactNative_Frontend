@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 
 const fallbackCover = require('@/assets/logo-light.png');
@@ -26,6 +27,7 @@ type Props = {
 
 function StarRating({ rating, count }: { rating: number; count?: number }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const stars = Math.round(rating * 2) / 2;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -33,12 +35,12 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
         <KISIcon
           key={i}
           name={stars >= i ? 'star' : stars >= i - 0.5 ? 'star-half' : 'star-outline'}
-          size={11}
+          size={responsive.isWatch ? 10 : 11}
           color="#f5a623"
         />
       ))}
       {count !== undefined && count > 0 && (
-        <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '700' }}>
+        <Text style={{ color: palette.subtext, fontSize: responsive.isWatch ? 9 : 10, fontWeight: '700' }}>
           ({count})
         </Text>
       )}
@@ -65,6 +67,8 @@ export default function MarketProductCard({
   onCTA,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const tiny = responsive.isWatch || responsive.isCompactPhone;
 
   const imgSource = useMemo(() => {
     if (coverUrl) return { uri: coverUrl };
@@ -105,7 +109,7 @@ export default function MarketProductCard({
         flex: 1,
       }}
     >
-      <View style={{ height: compact ? 110 : 140 }}>
+      <View style={{ height: compact || tiny ? 110 : 140 }}>
         <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
 
         {discountPct !== null && (
@@ -161,12 +165,12 @@ export default function MarketProductCard({
         )}
       </View>
 
-      <View style={{ padding: 10, gap: 4 }}>
+      <View style={{ padding: tiny ? 8 : 10, gap: 4 }}>
         <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13 }} numberOfLines={2}>
           {title}
         </Text>
 
-        {subtitle && !compact && (
+        {subtitle && !compact && !tiny && (
           <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 11 }} numberOfLines={1}>
             {subtitle}
           </Text>
@@ -176,14 +180,14 @@ export default function MarketProductCard({
           <StarRating rating={rating} count={reviewCount} />
         )}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+        <View style={{ flexDirection: tiny ? 'column' : 'row', alignItems: tiny ? 'flex-start' : 'center', justifyContent: 'space-between', marginTop: 2, gap: tiny ? 7 : 0 }}>
           <View style={{ gap: 1 }}>
             {displayPrice !== undefined && displayPrice !== '' ? (
-              <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>
+              <Text style={{ color: palette.text, fontWeight: '900', fontSize: tiny ? 12 : 14 }}>
                 USD {displayPrice}
               </Text>
             ) : legacyPriceLabel ? (
-              <Text style={{ color: palette.text, fontWeight: '900', fontSize: 14 }}>
+              <Text style={{ color: palette.text, fontWeight: '900', fontSize: tiny ? 12 : 14 }}>
                 {legacyPriceLabel}
               </Text>
             ) : null}

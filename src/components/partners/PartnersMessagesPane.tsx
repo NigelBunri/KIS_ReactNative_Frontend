@@ -13,6 +13,7 @@ import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 
 type Props = {
@@ -51,6 +52,9 @@ export default function PartnersMessagesPane({
   onOpenInfo,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const paneWidth = Math.min(width, responsive.isTablet ? Math.max(520, Math.round(width * 0.62)) : width);
 
   const selectedGroup = useMemo(
     () =>
@@ -111,7 +115,7 @@ export default function PartnersMessagesPane({
       style={[
         styles.messagesPane,
         {
-          width,
+          width: paneWidth,
           backgroundColor: palette.chatBg,
           borderLeftColor: palette.divider,
           transform: [{ translateX: messagesOffsetAnim }],
@@ -120,7 +124,7 @@ export default function PartnersMessagesPane({
       {...messagePanHandlers}
     >
       <View
-        style={[styles.messagesHeader, { borderBottomColor: palette.divider }]}
+        style={[styles.messagesHeader, compact && styles.wrapRow, { borderBottomColor: palette.divider }]}
       >
         <Pressable
           onPress={() =>
@@ -158,7 +162,7 @@ export default function PartnersMessagesPane({
         </View>
       </View>
       {!hasDestination ? (
-        <View style={[styles.messagesBody, { paddingHorizontal: 10 }]}>
+        <View style={[styles.messagesBody, { paddingHorizontal: responsive.pageGutter }]}>
           <PartnerRevenuePreviewCard
             palette={palette}
             kind="messaging"

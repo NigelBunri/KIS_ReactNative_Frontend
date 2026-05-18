@@ -17,7 +17,10 @@
     "lint": "eslint .",
     "test:phase5": "jest --config jest.phase5.config.js --runInBand --no-watchman",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "qa:device-compatibility": "node scripts/qa/device-compatibility-smoke.cjs",
+    "ios:device-lab": "bash ./scripts/run-ios-device-lab.sh",
+    "ios:small-lab": "bash ./scripts/run-ios-small-device-lab.sh"
   },
   "dependencies": {
     "@peculiar/webcrypto": "^1.5.0",

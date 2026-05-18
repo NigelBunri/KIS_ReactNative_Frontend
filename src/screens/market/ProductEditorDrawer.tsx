@@ -11,10 +11,11 @@ import {
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { KISIcon } from '@/constants/kisIcons';
-import { marketLayout, marketStyles } from './market.styles';
+import { marketStyles } from './market.styles';
 import CategoryPickerModal from './CategoryPickerModal';
 import { useCatalogCategories } from './useCatalogCategories';
 import {
@@ -343,7 +344,13 @@ export default function ProductEditorDrawer({
   onSave,
 }: ProductEditorDrawerProps) {
   const { palette } = useKISTheme();
-  const slide = useRef(new Animated.Value(marketLayout.drawerWidth)).current;
+  const responsive = useResponsiveLayout();
+  const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
+  const drawerWidth = compactDrawer
+    ? responsive.width
+    : Math.min(760, Math.max(520, Math.round(responsive.width * 0.72)));
+  const drawerPadding = responsive.isWatch ? 10 : responsive.pageGutter;
+  const slide = useRef(new Animated.Value(drawerWidth)).current;
 
   const [form, setForm] = useState<ProductFormState>(DEFAULT_PRODUCT_FORM);
   const [attributeEntries, setAttributeEntries] = useState<AttributeEntry[]>([]);
@@ -442,11 +449,11 @@ export default function ProductEditorDrawer({
 
   useEffect(() => {
     Animated.timing(slide, {
-      toValue: visible ? 0 : marketLayout.drawerWidth,
+      toValue: visible ? 0 : drawerWidth,
       duration: 280,
       useNativeDriver: true,
     }).start();
-  }, [visible, slide]);
+  }, [visible, slide, drawerWidth]);
 
   useEffect(() => {
     if (!visible) return;
@@ -987,7 +994,12 @@ export default function ProductEditorDrawer({
       <Animated.View
         style={[
           marketStyles.drawerContainer,
-          { transform: [{ translateX: slide }], backgroundColor: palette.surface },
+          {
+            width: drawerWidth,
+            left: compactDrawer ? 0 : undefined,
+            transform: [{ translateX: slide }],
+            backgroundColor: palette.surface,
+          },
         ]}
       >
         <View style={[marketStyles.drawerContent, { backgroundColor: palette.card }]}>
@@ -1007,7 +1019,13 @@ export default function ProductEditorDrawer({
 
           <ScrollView
             style={marketStyles.drawerScroll}
-            contentContainerStyle={[marketStyles.drawerBody, { paddingBottom: 0 }]}
+            contentContainerStyle={[
+              marketStyles.drawerBody,
+              {
+                paddingHorizontal: drawerPadding,
+                paddingBottom: responsive.isWatch ? 12 : 0,
+              },
+            ]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={marketStyles.drawerSection}>
@@ -1287,7 +1305,13 @@ export default function ProductEditorDrawer({
             <View
               style={[
                 marketStyles.drawerFooter,
-                { borderTopColor: palette.divider, marginTop: 12, paddingTop: 12 },
+                {
+                  borderTopColor: palette.divider,
+                  marginTop: 12,
+                  paddingTop: 12,
+                  flexDirection: compactDrawer ? 'column' : 'row',
+                  alignItems: compactDrawer ? 'stretch' : 'center',
+                },
               ]}
             >
               <View style={marketStyles.drawerFooterActions}>

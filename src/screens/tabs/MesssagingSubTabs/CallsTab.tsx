@@ -1,4 +1,5 @@
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -33,6 +34,7 @@ type CallsTabProps = {
 
 export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { currentUserId } = useSocket();
   const [loading, setLoading] = useState(true);
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
@@ -104,6 +106,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
         : 'Ringing';
     const iconName = item.media === 'video' ? 'video' : 'mic';
 
+    const iconSize = responsive.isWatch ? 32 : 36;
     return (
       <Pressable
         style={[
@@ -111,22 +114,23 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
           {
             borderColor: palette.inputBorder,
             backgroundColor: palette.card,
+            padding: responsive.isWatch ? 8 : 12,
           },
         ]}
       >
         <View
           style={[
             styles.rowIcon,
-            { backgroundColor: palette.surface },
+            { backgroundColor: palette.surface, width: iconSize, height: iconSize, borderRadius: iconSize / 2, marginRight: responsive.isWatch ? 8 : 12 },
           ]}
         >
           <KISIcon name={iconName} size={18} color={palette.text} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowTitle, { color: palette.text }]} numberOfLines={1}>
+          <Text style={[styles.rowTitle, { color: palette.text, fontSize: responsive.bodyFontSize }]} numberOfLines={1}>
             {name}
           </Text>
-          <Text style={[styles.rowMeta, { color: palette.subtext }]} numberOfLines={1}>
+          <Text style={[styles.rowMeta, { color: palette.subtext, fontSize: responsive.labelFontSize }]} numberOfLines={responsive.isWatch ? 2 : 1}>
             {statusLabel} {timeLabel ? `• ${timeLabel}` : ''}
           </Text>
         </View>
@@ -135,9 +139,9 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, padding: responsive.pageGutter }]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>Calls</Text>
+        <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>Calls</Text>
         <Pressable onPress={loadCalls}>
           <KISIcon name="refresh" size={18} color={palette.text} />
         </Pressable>

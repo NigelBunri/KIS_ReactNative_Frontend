@@ -11,9 +11,11 @@ import {
   Image,
   Pressable,
   Linking,
+  Animated,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import Pdf from 'react-native-pdf';
 
@@ -29,9 +31,11 @@ type MessageListProps = {
 
   onReplyToMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
-  onPressMessage?: (message: ChatMessage) => void;
-  onLongPressMessage?: (message: ChatMessage) => void;
+  onForwardMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
+  onPinMessage?: (message: ChatMessage) => void;
   onReactMessage?: (message: ChatMessage, emoji: string) => void;
+  onVotePoll?: (message: ChatMessage, optionId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
 
   // Selection
@@ -111,9 +115,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   currentUserId,
   onReplyToMessage,
   onEditMessage,
-  onPressMessage,
-  onLongPressMessage,
+  onForwardMessage,
+  onDeleteMessage,
+  onPinMessage,
   onReactMessage,
+  onVotePoll,
   onRetryMessage,
   selectionMode = false,
   selectedMessageIds = [],
@@ -129,11 +135,16 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [highlightedMessageId, setHighlightedMessageId] = useState<
     string | null
   >(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const jumpBtnOpacity = useRef(new Animated.Value(0)).current;
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const visibleThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressAutoScrollRef = useRef(false);
   const isAtBottomRef = useRef(startAtBottom);
+  const prevMessageCountRef = useRef(messages.length);
   const lastStartAtBottomRef = useRef<boolean | null>(startAtBottom);
   const viewabilityConfigRef = useRef({
     viewAreaCoveragePercentThreshold: 60,
@@ -162,9 +173,8 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     return () => {
-      if (highlightTimeoutRef.current) {
-        clearTimeout(highlightTimeoutRef.current);
-      }
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      if (visibleThrottleRef.current) clearTimeout(visibleThrottleRef.current);
     };
   }, []);
 
@@ -173,6 +183,25 @@ export const MessageList: React.FC<MessageListProps> = ({
     lastStartAtBottomRef.current = startAtBottom;
     isAtBottomRef.current = !!startAtBottom;
   }, [startAtBottom]);
+
+  // Track new messages arriving while scrolled up
+  useEffect(() => {
+    const newCount = messages.length;
+    const added = newCount - prevMessageCountRef.current;
+    prevMessageCountRef.current = newCount;
+    if (added > 0 && !isAtBottomRef.current) {
+      setUnreadCount((n) => n + added);
+    }
+  }, [messages.length]);
+
+  // Animate jump-to-latest button in/out
+  useEffect(() => {
+    Animated.timing(jumpBtnOpacity, {
+      toValue: showJumpToLatest ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showJumpToLatest, jumpBtnOpacity]);
 
   useEffect(() => {
     onViewableItemsChangedRef.current = ({
@@ -184,18 +213,16 @@ export const MessageList: React.FC<MessageListProps> = ({
       const ids = viewableItems
         .map((entry) => {
           const item: any = entry.item;
-          return (
-            item?.serverId ??
-            item?.id ??
-            item?.clientId ??
-            null
-          );
+          return item?.serverId ?? item?.id ?? item?.clientId ?? null;
         })
         .filter(Boolean)
         .map((id) => String(id));
-      if (ids.length) {
+      if (!ids.length) return;
+      if (visibleThrottleRef.current) return;
+      visibleThrottleRef.current = setTimeout(() => {
+        visibleThrottleRef.current = null;
         onVisibleMessageIds(ids);
-      }
+      }, 500);
     };
   }, [onVisibleMessageIds]);
 
@@ -214,6 +241,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       const atBottom =
         layoutMeasurement.height + contentOffset.y >= contentSize.height - padding;
       isAtBottomRef.current = atBottom;
+      if (atBottom) {
+        setShowJumpToLatest(false);
+        setUnreadCount(0);
+      } else {
+        setShowJumpToLatest(true);
+      }
     },
     [],
   );
@@ -288,6 +321,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       highlightMessage,
     });
   }, [onMessageLocatorReady, scrollToMessage, highlightMessage]);
+
+  const jumpToLatest = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+    setShowJumpToLatest(false);
+    setUnreadCount(0);
+  }, []);
 
   if (isEmpty) {
     return (
@@ -676,90 +715,154 @@ export const MessageList: React.FC<MessageListProps> = ({
   };
 
   return (
-    <FlatList
-      ref={listRef}
-      data={messages}
-      keyExtractor={(item) => item.id}
-      style={styles.messagesList}
-      contentContainerStyle={styles.messagesListContent}
-      onContentSizeChange={handleContentSizeChange}
-      onScroll={handleScroll}
-      scrollEventThrottle={16}
-      onViewableItemsChanged={onViewableItemsChangedRef.current}
-      viewabilityConfig={viewabilityConfigRef.current}
-      onScrollToIndexFailed={(info) => {
-        const approximateItemHeight = 72;
-        listRef.current?.scrollToOffset({
-          offset: Math.max(0, info.index * approximateItemHeight),
-          animated: true,
-        });
-      }}
-      renderItem={({ item, index }) => {
-        const previous = messages[index - 1];
-        const showTimestampHeader = shouldShowTimestampHeader(previous, item);
+    <View style={{ flex: 1 }}>
+      <FlatList
+        ref={listRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        style={styles.messagesList}
+        contentContainerStyle={styles.messagesListContent}
+        onContentSizeChange={handleContentSizeChange}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onViewableItemsChanged={onViewableItemsChangedRef.current}
+        viewabilityConfig={viewabilityConfigRef.current}
+        onScrollToIndexFailed={(info) => {
+          const approximateItemHeight = 72;
+          listRef.current?.scrollToOffset({
+            offset: Math.max(0, info.index * approximateItemHeight),
+            animated: true,
+          });
+        }}
+        renderItem={({ item, index }) => {
+          const previous = messages[index - 1];
+          const next = messages[index + 1];
+          const showTimestampHeader = shouldShowTimestampHeader(previous, item);
 
-        const replySource =
-          item.replyToId != null
-            ? messages.find(
-                (m) =>
-                  m.id === item.replyToId ||
-                  (m as any).serverId === item.replyToId ||
-                  (m as any).clientId === item.replyToId,
-              )
-            : undefined;
+          const prevSender = previous?.senderId;
+          const nextSender = next?.senderId;
+          const thisSender = item.senderId;
+          const isFirstInGroup = prevSender !== thisSender;
+          const isLastInGroup = nextSender !== thisSender;
 
-        const isHighlighted =
-          item.id === highlightedMessageId ||
-          (item as any).serverId === highlightedMessageId;
-        const isSelected = selectedMessageIds.includes(item.id);
+          const replySource =
+            item.replyToId != null
+              ? messages.find(
+                  (m) =>
+                    m.id === item.replyToId ||
+                    (m as any).serverId === item.replyToId ||
+                    (m as any).clientId === item.replyToId,
+                )
+              : undefined;
 
-        const attachments = (item as any).attachments ?? [];
+          const isHighlighted =
+            item.id === highlightedMessageId ||
+            (item as any).serverId === highlightedMessageId;
+          const isSelected = selectedMessageIds.includes(item.id);
 
-        return (
-          <View>
-            {showTimestampHeader && (
-              <View style={styles.timestampHeaderContainer}>
-                <Text
-                  style={[
-                    styles.timestampHeaderText,
-                    {
-                      backgroundColor:
-                        palette.timestampBg ?? '#00000033',
-                      color: palette.onTimestamp ?? '#fff',
-                    },
-                  ]}
-                >
-                  {formatDayLabel(item.createdAt)}
-                </Text>
-              </View>
-            )}
+          const attachments = (item as any).attachments ?? [];
 
-            {/* Main bubble row (text / voice / sticker / styled / contacts / poll / event) */}
-            <InteractiveMessageRow
-              message={item}
-              palette={palette}
-              currentUserId={currentUserId}
-              replySource={replySource}
-              isHighlighted={isHighlighted}
-              isSelected={isSelected}
-              selectionMode={selectionMode}
-              onPressReplySource={handlePressReplySource}
-              onReplyToMessage={onReplyToMessage}
-              onEditMessage={onEditMessage}
-              onPressMessage={onPressMessage}
-              onLongPressMessage={onLongPressMessage}
-              onReactMessage={onReactMessage}
-              onRetryMessage={onRetryMessage}
-              onStartSelection={onStartSelection}
-              onToggleSelect={onToggleSelect}
-            />
+          return (
+            <View>
+              {showTimestampHeader && (
+                <View style={styles.timestampHeaderContainer}>
+                  <Text
+                    style={[
+                      styles.timestampHeaderText,
+                      {
+                        backgroundColor: palette.timestampBg ?? '#00000033',
+                        color: palette.onTimestamp ?? '#fff',
+                      },
+                    ]}
+                  >
+                    {formatDayLabel(item.createdAt)}
+                  </Text>
+                </View>
+              )}
 
-            {/* Attachment strip for this message (if any) */}
-            {renderAttachments(attachments, (item as any).fromMe)}
-          </View>
-        );
-      }}
-    />
+              <InteractiveMessageRow
+                message={item}
+                palette={palette}
+                currentUserId={currentUserId}
+                replySource={replySource}
+                isHighlighted={isHighlighted}
+                isSelected={isSelected}
+                selectionMode={selectionMode}
+                isFirstInGroup={isFirstInGroup}
+                isLastInGroup={isLastInGroup}
+                onPressReplySource={handlePressReplySource}
+                onReplyToMessage={onReplyToMessage}
+                onEditMessage={onEditMessage}
+                onForwardMessage={onForwardMessage}
+                onDeleteMessage={onDeleteMessage}
+                onPinMessage={onPinMessage}
+                onReactMessage={onReactMessage}
+                onVotePoll={onVotePoll}
+                onRetryMessage={onRetryMessage}
+                onStartSelection={onStartSelection}
+                onToggleSelect={onToggleSelect}
+              />
+
+              {renderAttachments(attachments, (item as any).fromMe)}
+            </View>
+          );
+        }}
+      />
+
+      {/* Jump-to-latest FAB */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+          opacity: jumpBtnOpacity,
+          pointerEvents: showJumpToLatest ? 'auto' : 'none',
+        }}
+      >
+        <Pressable
+          onPress={jumpToLatest}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: palette.surface ?? '#fff',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOpacity: 0.18,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 6,
+          }}
+        >
+          <Ionicons
+            name="chevron-down"
+            size={22}
+            color={palette.primaryStrong ?? palette.primary ?? '#4F46E5'}
+          />
+          {unreadCount > 0 && (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: palette.primaryStrong ?? '#4F46E5',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                {unreadCount > 99 ? '99+' : String(unreadCount)}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 };
 

@@ -50,46 +50,62 @@ const normalizePhoneForBackend = (phone: string): string => {
   return cleaned.replace(/\D/g, '');
 };
 
-/**
- * Ensure we have contact permissions on both platforms.
- */
-async function ensureContactsPermission() {
-  // iOS
-  if (Platform.OS === 'ios') {
-  const req = await Contacts.requestPermission();
-    if (req !== 'authorized') {
-      throw new Error('Contacts permission denied');
-    }
+export type ContactsPermissionStatus =
+  | 'granted'
+  | 'denied'
+  | 'never_ask_again'
+  | 'undetermined';
 
+/**
+ * Check current contacts permission WITHOUT requesting it.
+ * Returns a normalised status across iOS and Android.
+ */
+export async function getContactsPermissionStatus(): Promise<ContactsPermissionStatus> {
+  if (Platform.OS === 'ios') {
     const perm = await Contacts.checkPermission();
-    if (perm === 'authorized') return;
-    return;
+    if (perm === 'authorized') return 'granted';
+    if (perm === 'denied') return 'denied';
+    return 'undetermined';
   }
 
-   const result = await PermissionsAndroid.requestMultiple([
+  const hasRead = await PermissionsAndroid.check(
+    PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+  );
+  if (hasRead) return 'granted';
+  return 'undetermined';
+}
+
+/**
+ * Request contacts permission. Returns whether it was granted.
+ * On iOS, the system only shows the dialog once — subsequent calls
+ * return the cached result, so callers should redirect to Settings
+ * when status is 'denied'.
+ */
+export async function requestContactsPermission(): Promise<ContactsPermissionStatus> {
+  if (Platform.OS === 'ios') {
+    const req = await Contacts.requestPermission();
+    if (req === 'authorized') return 'granted';
+    return 'denied';
+  }
+
+  const result = await PermissionsAndroid.requestMultiple([
     PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
     PermissionsAndroid.PERMISSIONS.WRITE_CONTACTS,
   ]);
 
-  // ANDROID
-  const hasRead = await PermissionsAndroid.check(
-    PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
-  );
-  const hasWrite = await PermissionsAndroid.check(
-    PermissionsAndroid.PERMISSIONS.WRITE_CONTACTS,
-  );
+  const readResult = result[PermissionsAndroid.PERMISSIONS.READ_CONTACTS];
+  if (readResult === PermissionsAndroid.RESULTS.GRANTED) return 'granted';
+  if (readResult === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN)
+    return 'never_ask_again';
+  return 'denied';
+}
 
-  if (hasRead && hasWrite) return;
-
-
-  const readGranted =
-    result[PermissionsAndroid.PERMISSIONS.READ_CONTACTS] ===
-    PermissionsAndroid.RESULTS.GRANTED;
-  const writeGranted =
-    result[PermissionsAndroid.PERMISSIONS.WRITE_CONTACTS] ===
-    PermissionsAndroid.RESULTS.GRANTED;
-
-  if (!readGranted || !writeGranted) {
+/**
+ * Ensure we have contact permissions on both platforms.
+ */
+async function ensureContactsPermission() {
+  const status = await requestContactsPermission();
+  if (status !== 'granted') {
     throw new Error('Contacts permission denied');
   }
 }

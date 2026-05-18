@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { DailyDevotional } from '@/screens/tabs/bible/useBibleData';
 import BibleSectionCard from './BibleSectionCard';
 import KISButton from '@/constants/KISButton';
@@ -15,6 +16,8 @@ const refsFor = (item?: DailyDevotional | null) => item?.scripture_refs ?? item?
 
 export default function DailyDevotionsPanel({ devotionals, loading = false }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const [showAll, setShowAll] = useState(false);
   const today = devotionals[0] ?? null;
   const recent = showAll ? devotionals.slice(1) : devotionals.slice(1, 5);
@@ -34,9 +37,9 @@ export default function DailyDevotionsPanel({ devotionals, loading = false }: Pr
   return (
     <View style={styles.stack}>
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text }]}>Daily</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Daily</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               Today&apos;s official KCAN passage, exhortation, and prayer.
             </Text>
@@ -52,7 +55,7 @@ export default function DailyDevotionsPanel({ devotionals, loading = false }: Pr
           <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>
             {today.date || 'Today'} {today.partner_name ? `· ${today.partner_name}` : ''}
           </Text>
-          <Text style={[styles.heroTitle, { color: palette.text }]}>{today.title}</Text>
+          <Text style={[styles.heroTitle, { color: palette.text, fontSize: compact ? 20 : 24, lineHeight: compact ? 26 : 30 }]}>{today.title}</Text>
           <View style={[styles.referenceBox, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
             <KISIcon name="book" size={18} color={palette.primaryStrong} />
             <View style={{ flex: 1 }}>
@@ -98,7 +101,7 @@ export default function DailyDevotionsPanel({ devotionals, loading = false }: Pr
       )}
 
       <BibleSectionCard>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>Recent daily passages</Text>
           {devotionals.length > 5 ? (
             <KISButton
@@ -132,6 +135,7 @@ export default function DailyDevotionsPanel({ devotionals, loading = false }: Pr
 const styles = StyleSheet.create({
   stack: { gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  wrapRow: { flexWrap: 'wrap' },
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900', flex: 1 },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },

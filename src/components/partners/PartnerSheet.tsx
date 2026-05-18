@@ -2,6 +2,7 @@
 import React from 'react';
 import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import styles from './partnersStyles';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useKISTheme } from '../../theme/useTheme';
 import { Partner } from './partnersTypes';
 import KISButton from '@/constants/KISButton';
@@ -48,6 +49,8 @@ export default function PartnerSheet({
   animatePartnerSheet,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
   const statCards = [
     { label: 'Groups', value: groupsCount },
     { label: 'Communities', value: communitiesCount },
@@ -79,7 +82,8 @@ export default function PartnerSheet({
         style={[
           styles.sheetContainer,
           {
-            height: sheetHeight,
+            height: Math.min(sheetHeight, responsive.height - (compact ? 18 : 36)),
+            paddingHorizontal: responsive.pageGutter,
             backgroundColor: palette.surface,
             borderTopColor: palette.divider,
             shadowColor: palette.shadow ?? '#000',
@@ -101,7 +105,7 @@ export default function PartnerSheet({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.settingsSheetHeader}>
-            <View style={styles.settingsHeroTopRow}>
+            <View style={[styles.settingsHeroTopRow, compact && styles.wrapRow]}>
               <View style={styles.settingsHeroTitleWrap}>
                 <Text
                   style={[
@@ -185,6 +189,7 @@ export default function PartnerSheet({
                   styles.settingsStatCard,
                   {
                     backgroundColor: palette.surfaceElevated,
+                    width: compact ? '100%' : '48%',
                     borderColor: palette.borderMuted,
                   },
                 ]}
@@ -226,7 +231,7 @@ export default function PartnerSheet({
             <Text style={[styles.sheetSectionText, { color: palette.subtext }]}>
               Create spaces or connect this partner to public profiles.
             </Text>
-            <View style={styles.settingsActionGrid}>
+            <View style={[styles.settingsActionGrid, compact && styles.wrapRow]}>
               <KISButton
                 title="New community"
                 size="sm"
@@ -277,12 +282,13 @@ export default function PartnerSheet({
                   styles.settingsSectionCard,
                   {
                     backgroundColor: palette.surfaceElevated,
+                    width: compact ? '100%' : '48%',
                     borderColor: palette.borderMuted,
                     shadowColor: palette.shadow ?? '#000',
                   },
                 ]}
               >
-                <View style={styles.settingsSectionHeader}>
+                <View style={[styles.settingsSectionHeader, compact && styles.wrapRow]}>
                   <Text
                     style={[
                       styles.settingsSectionTitle,

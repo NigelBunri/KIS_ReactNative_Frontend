@@ -17,6 +17,7 @@ import Pdf from 'react-native-pdf';
 import RNFS from 'react-native-fs';
 import { buildMediaSource, useMediaHeaders } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
@@ -399,6 +400,11 @@ export default function EducationDetailSheet({
   onRefreshProgress,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactSheet = responsive.isWatch || responsive.isCompactPhone;
+  const sheetTop = responsive.isWatch ? '2%' : responsive.isCompactPhone ? '5%' : '10%';
+  const mediaPreviewHeight = responsive.isWatch ? 150 : responsive.isCompactPhone ? 180 : 220;
+  const pdfPreviewHeight = responsive.isWatch ? 260 : responsive.isCompactPhone ? 340 : 420;
   const mediaHeaders = useMediaHeaders();
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
@@ -928,7 +934,7 @@ export default function EducationDetailSheet({
               source={mediaSource}
               style={{
                 width: '100%',
-                height: 220,
+                height: mediaPreviewHeight,
                 borderRadius: 18,
                 backgroundColor: '#000',
               }}
@@ -955,7 +961,7 @@ export default function EducationDetailSheet({
           <View
             style={{
               marginTop: 14,
-              height: 420,
+              height: pdfPreviewHeight,
               borderRadius: 18,
               overflow: 'hidden',
             }}
@@ -972,7 +978,7 @@ export default function EducationDetailSheet({
               source={imageSource}
               style={{
                 width: '100%',
-                height: 220,
+                height: mediaPreviewHeight,
                 borderRadius: 18,
                 backgroundColor: palette.card,
               }}
@@ -1631,12 +1637,12 @@ export default function EducationDetailSheet({
       <View style={{ flex: 1, backgroundColor: palette.backdrop }}>
         <Animated.View
           style={{
-            marginTop: '10%',
+            marginTop: sheetTop,
             backgroundColor: palette.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
-            paddingHorizontal: 18,
-            paddingTop: 18,
+            paddingHorizontal: compactSheet ? 12 : responsive.pageGutter,
+            paddingTop: compactSheet ? 12 : 18,
             paddingBottom: 14,
             flex: 1,
             transform: [{ translateY: dragY }],
@@ -2295,7 +2301,7 @@ export default function EducationDetailSheet({
                           >
                             {learningItem.duration_minutes ?? 0} mins
                           </Text>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <View style={{ flexDirection: compactSheet ? 'column' : 'row', gap: 8 }}>
                             <KISButton
                               title={hasLearningAccess ? 'Open' : 'Enroll'}
                               size="xs"
@@ -2530,7 +2536,7 @@ export default function EducationDetailSheet({
                 <View
                   style={{
                     marginTop: 14,
-                    height: 420,
+                    height: pdfPreviewHeight,
                     borderRadius: 18,
                     overflow: 'hidden',
                     backgroundColor: palette.surface,
@@ -2989,14 +2995,14 @@ export default function EducationDetailSheet({
 
           <View
             style={{
-              flexDirection: 'row',
+              flexDirection: compactSheet ? 'column' : 'row',
               justifyContent: 'space-between',
               marginTop: 12,
               gap: 10,
             }}
           >
             <KISButton title="Close" variant="secondary" onPress={onClose} />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: compactSheet ? 'column' : 'row', gap: 8 }}>
               {!enrolled ? null : (
                 <KISButton
                   title="Preview"

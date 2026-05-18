@@ -1,8 +1,9 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, DeviceEventEmitter, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
+import { useResponsiveLayout } from '../../theme/responsive';
 import { useBibleData } from './bible/useBibleData';
 import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
@@ -33,6 +34,9 @@ export default function BibleScreen() {
     loadReader,
   } = useBibleData();
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compactBible = responsive.isWatch || responsive.isCompactPhone;
+  const tinyBible = responsive.isWatch;
   const metallicGoldGradient = tone === 'dark'
     ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
     : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
@@ -76,6 +80,20 @@ export default function BibleScreen() {
   useEffect(() => {
     headerScrollY.setValue(0);
   }, [activeTab, headerScrollY]);
+
+  // Listen for bible.verse.open events from global search
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('bible.verse.open', (payload: any) => {
+      setActiveTab('read');
+      if (payload?.reference) {
+        loadReader(undefined, undefined, undefined, String(payload.reference));
+      } else if (payload?.book && payload?.chapter) {
+        const startVerse = payload.verse ? Number(payload.verse) : undefined;
+        loadReader(undefined, String(payload.book), Number(payload.chapter), undefined, startVerse);
+      }
+    });
+    return () => sub.remove();
+  }, [loadReader]);
 
   useEffect(() => {
     const listenerId = headerScrollY.addListener(({ value }) => {
@@ -161,6 +179,14 @@ export default function BibleScreen() {
     }
   }, [activeTab]);
 
+  const tabLabelForDevice = (label: string, key: string) => {
+    if (!compactBible) return label;
+    if (key === 'prayer-calendar') return 'Prayer';
+    if (key === 'reading-planner') return 'Plan';
+    if (key === 'meditations') return 'Meditate';
+    return label;
+  };
+
   const renderTab = () => {
     switch (activeTab) {
       case 'read':
@@ -197,7 +223,7 @@ export default function BibleScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingHorizontal: responsive.pageGutter }]}>
       <Animated.View
         {...topAreaPanResponder.panHandlers}
         style={[styles.topChrome, topChromeAnimatedStyle]}
@@ -309,10 +335,13 @@ export default function BibleScreen() {
 
       <View
         {...topAreaPanResponder.panHandlers}
-        style={[styles.stickyTabsOuter, { backgroundColor: palette.bg }]}
+        style={[
+          styles.stickyTabsOuter,
+          { backgroundColor: palette.bg, paddingBottom: compactBible ? 0 : 2 },
+        ]}
       >
-        <View style={styles.tabsWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+        <View style={[styles.tabsWrapper, { paddingVertical: compactBible ? 5 : 8 }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabRow, { gap: compactBible ? 6 : 8 }]}>
             {tabs.map((tab) => {
               const isActive = tab.key === activeTab;
               return (
@@ -324,6 +353,9 @@ export default function BibleScreen() {
                     {
                       backgroundColor: isActive ? palette.goldDeep : palette.surface,
                       borderColor: isActive ? palette.goldLight : palette.divider,
+                      paddingHorizontal: compactBible ? 10 : 14,
+                      paddingVertical: compactBible ? 7 : 8,
+                      minHeight: tinyBible ? 30 : 34,
                     },
                   ]}
                 >
@@ -346,7 +378,7 @@ export default function BibleScreen() {
                       numberOfLines={1}
                       style={{ color: isActive ? palette.ivory : palette.text, fontWeight: '800' }}
                     >
-                      {tab.label}
+                      {tabLabelForDevice(tab.label, tab.key)}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -362,7 +394,10 @@ export default function BibleScreen() {
         ) : (
           <Animated.ScrollView
             style={styles.contentScroll}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[
+              styles.content,
+              { gap: responsive.cardGap, paddingBottom: compactBible ? 28 : 40 },
+            ]}
             showsVerticalScrollIndicator={false}
             onScroll={handleContentScroll}
             scrollEventThrottle={16}
@@ -376,7 +411,16 @@ export default function BibleScreen() {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={openReadFilters}
-          style={[styles.floatingFilter, { backgroundColor: palette.goldDeep }]}
+          style={[
+            styles.floatingFilter,
+            {
+              backgroundColor: palette.goldDeep,
+              width: compactBible ? 48 : 58,
+              height: compactBible ? 48 : 58,
+              borderRadius: compactBible ? 24 : 29,
+              right: responsive.pageGutter,
+            },
+          ]}
         >
           <LinearGradient
             colors={metallicGoldGradient}
@@ -393,7 +437,7 @@ export default function BibleScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: 16 },
+  wrap: { flex: 1, paddingVertical: 16 },
   topChrome: { overflow: 'hidden' },
   topChromeMeasure: { paddingBottom: 2 },
   stickyTabsOuter: { zIndex: 10, paddingTop: 2, paddingBottom: 2 },
