@@ -2,115 +2,86 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useKISTheme } from '@/theme/useTheme';
-import { useLanguage } from './index';
+import { useLanguage, useTranslation } from './index';
 
-export default function LanguageSwitcher() {
+type Props = {
+  /** Controlled visibility — pass to drive the modal from a parent button */
+  visible?: boolean;
+  onClose?: () => void;
+};
+
+export default function LanguageSwitcher({ visible: controlledVisible, onClose }: Props = {}) {
   const { palette } = useKISTheme();
   const { language, languages, setLanguage } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  const isOpen = controlledVisible !== undefined ? controlledVisible : internalOpen;
+  const close = () => {
+    setInternalOpen(false);
+    onClose?.();
+  };
 
   return (
-    <>
-      {/* <Pressable
-        onPress={() => setOpen(true)}
-        style={[
-          styles.fab,
-          {
-            top: insets.top + 8,
-            backgroundColor: palette.surface,
-            borderColor: palette.border,
-          },
-        ]}
-      >
-        <Text style={[styles.fabText, { color: palette.text }]}>
-          {language.toUpperCase()}
-        </Text>
-      </Pressable> */}
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={close}
+    >
+      <Pressable style={styles.backdrop} onPress={close}>
+        <Pressable style={[styles.card, { backgroundColor: palette.card }]} onPress={() => {}}>
+          <Text style={[styles.title, { color: palette.text }]}>
+            {t('Choose language')}
+          </Text>
+          <Text style={[styles.subtitle, { color: palette.subtext }]}>
+            {t('Switch the app language for supported text.')}
+          </Text>
 
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <View style={styles.backdrop}>
-          <View style={[styles.card, { backgroundColor: palette.card }]}>
-            <Text style={[styles.title, { color: palette.text }]}>
-              Choose language
-            </Text>
-            <Text style={[styles.subtitle, { color: palette.subtext }]}>
-              Switch the app language for supported text.
-            </Text>
-
-            {languages.map(entry => {
-              const selected = entry.code === language;
-              return (
-                <Pressable
-                  key={entry.code}
-                  onPress={() => {
-                    setLanguage(entry.code).catch(() => undefined);
-                    setOpen(false);
-                  }}
-                  style={[
-                    styles.option,
-                    {
-                      borderColor: selected ? palette.primary : palette.border,
-                      backgroundColor: selected
-                        ? palette.surfaceElevated
-                        : palette.surface,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.optionLabel, { color: palette.text }]}>
-                    {entry.label}
-                  </Text>
-                  <Text style={[styles.optionCode, { color: palette.subtext }]}>
-                    {entry.code.toUpperCase()}
-                  </Text>
-                </Pressable>
-              );
-            })}
-
-            <Pressable
-              onPress={() => setOpen(false)}
-              style={styles.closeButton}
-            >
-              <Text
-                style={[styles.closeLabel, { color: palette.primaryStrong }]}
+          {languages.map(entry => {
+            const selected = entry.code === language;
+            return (
+              <Pressable
+                key={entry.code}
+                onPress={() => {
+                  setLanguage(entry.code).catch(() => undefined);
+                  close();
+                }}
+                style={[
+                  styles.option,
+                  {
+                    borderColor: selected ? palette.primary : palette.border,
+                    backgroundColor: selected
+                      ? palette.surfaceElevated
+                      : palette.surface,
+                  },
+                ]}
               >
-                Close
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </>
+                <View style={styles.optionLeft}>
+                  <Text style={styles.flag}>{entry.flagEmoji}</Text>
+                  <Text style={[styles.optionLabel, { color: palette.text }]}>
+                    {entry.nativeName}
+                  </Text>
+                </View>
+                <Text style={[styles.optionCode, { color: palette.subtext }]}>
+                  {entry.code.toUpperCase()}
+                </Text>
+              </Pressable>
+            );
+          })}
+
+          <Pressable onPress={close} style={styles.closeButton}>
+            <Text style={[styles.closeLabel, { color: palette.primaryStrong }]}>
+              {t('Close')}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    right: 12,
-    zIndex: 1000,
-    minWidth: 48,
-    minHeight: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  fabText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
@@ -143,6 +114,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  flag: {
+    fontSize: 22,
   },
   optionLabel: {
     fontSize: 15,

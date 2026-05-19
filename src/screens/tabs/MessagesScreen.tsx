@@ -54,6 +54,7 @@ import { fetchConversationsForCurrentUser, searchConversationsFromServer } from 
 import { mapBackendToChatMessage } from '@/Module/ChatRoom/componets/chatMapping';
 import { MessageStatus } from '@/Module/ChatRoom/chatTypes';
 import { decryptConversationPayload, ENCRYPTION_VERSION } from '@/security/customE2EE';
+import { translateString } from '@/languages';
 
 const Tab = createMaterialTopTabNavigator();
 type MessagesScreenProps = {
@@ -69,16 +70,16 @@ const getMessagePreviewText = (message: any): string => {
   const text = typeof message.text === 'string' ? message.text.trim() : '';
   if (text.length) return text;
   if (message?.styledText?.text) return message.styledText.text;
-  if (message?.voice) return 'Voice message';
-  if (message?.sticker) return 'Sticker';
+  if (message?.voice) return translateString('Voice message');
+  if (message?.sticker) return translateString('Sticker');
   if (Array.isArray(message?.attachments) && message.attachments.length) {
-    return message.attachments.length > 1 ? 'Attachments' : 'Attachment';
+    return translateString(message.attachments.length > 1 ? 'Attachments' : 'Attachment');
   }
   if (Array.isArray(message?.contacts) && message.contacts.length) {
-    return 'Contact';
+    return translateString('Contact');
   }
-  if (message?.poll) return 'Poll';
-  if (message?.event) return 'Event';
+  if (message?.poll) return translateString('Poll');
+  if (message?.event) return translateString('Event');
   return '';
 };
 

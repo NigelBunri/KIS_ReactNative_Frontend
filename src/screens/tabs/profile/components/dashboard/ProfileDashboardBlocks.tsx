@@ -87,6 +87,8 @@ type WorkspaceLauncher = {
 type LanguageOption = {
   code: string;
   label: string;
+  nativeName?: string;
+  flagEmoji?: string;
 };
 
 const useDashboardTheme = () => {
@@ -807,13 +809,16 @@ export const LanguageSelectorCard = ({
                 selected ? dashboardTheme.chips.primary : dashboardTheme.chips.neutral,
               ]}
             >
+              {entry.flagEmoji ? (
+                <Text style={{ fontSize: 18, marginRight: 6 }}>{entry.flagEmoji}</Text>
+              ) : null}
               <Text
                 style={[
                   dashboardTheme.content.badge,
                   { color: selected ? undefined : dashboardTheme.content.body.color },
                 ]}
               >
-                {entry.label}
+                {entry.nativeName ?? entry.label}
               </Text>
             </Pressable>
           );

@@ -281,21 +281,32 @@ const EMPTY_WALLET_RECIPIENT_VERIFICATION: WalletRecipientVerificationState = {
   error: '',
 };
 
-const extractRequestErrorMessage = (result: any, fallback: string) => {
-  const direct = String(result?.message || result?.data?.detail || '').trim();
-  if (direct) return direct;
-  const payload = result?.data;
-  if (payload && typeof payload === 'object') {
-    for (const value of Object.values(payload)) {
-      if (Array.isArray(value) && value.length > 0) {
-        const first = String(value[0] || '').trim();
-        if (first) return first;
-      }
-      const text = String(value || '').trim();
-      if (text) return text;
+const extractNestedRequestErrorMessage = (value: any): string => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = extractNestedRequestErrorMessage(item);
+      if (message) return message;
+    }
+    return '';
+  }
+  if (typeof value === 'object') {
+    for (const key of ['detail', 'message', 'error', 'non_field_errors']) {
+      const message = extractNestedRequestErrorMessage(value[key]);
+      if (message) return message;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      const message = extractNestedRequestErrorMessage(item);
+      if (message) return `${key}: ${message}`;
     }
   }
-  return fallback;
+  return '';
+};
+
+const extractRequestErrorMessage = (result: any, fallback: string) => {
+  const message = extractNestedRequestErrorMessage(result?.data) || extractNestedRequestErrorMessage(result?.message);
+  return message || fallback;
 };
 
 const normalizePlanList = (payload: any): any[] => {

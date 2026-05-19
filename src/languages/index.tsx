@@ -2,19 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import RNLocalize from 'react-native-localize';
 
-import en from './en.json';
-import es from './es.json';
+import { LANGUAGE_REGISTRY, type LanguageEntry } from './registry';
 
-export type LanguageCode = 'en' | 'es';
+export type LanguageCode = string;
 
 type TranslationDictionary = Record<string, string>;
-type TranslationResources = Record<LanguageCode, TranslationDictionary>;
 
 type LanguageContextValue = {
   language: LanguageCode;
   setLanguage: (language: LanguageCode) => Promise<void>;
   ready: boolean;
-  languages: Array<{ code: LanguageCode; label: string }>;
+  languages: Array<{ code: string; label: string; nativeName: string; flagEmoji: string }>;
 };
 
 const STORAGE_KEY = 'kis_language';
@@ -31,15 +29,15 @@ const PROP_NAMES_TO_TRANSLATE = new Set([
   'message',
 ]);
 
-const LANGUAGE_OPTIONS: Array<{ code: LanguageCode; label: string }> = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Español' },
-];
+const resources: Record<string, TranslationDictionary> = {};
+const LANGUAGE_OPTIONS: Array<{ code: string; label: string; nativeName: string; flagEmoji: string }> = [];
+const VALID_CODES = new Set<string>();
 
-const resources: TranslationResources = {
-  en,
-  es,
-};
+for (const entry of LANGUAGE_REGISTRY) {
+  resources[entry.code] = entry.translations;
+  LANGUAGE_OPTIONS.push({ code: entry.code, label: entry.label, nativeName: entry.nativeName, flagEmoji: entry.flagEmoji });
+  VALID_CODES.add(entry.code);
+}
 
 const listeners = new Set<() => void>();
 let activeLanguage: LanguageCode = 'en';
@@ -69,7 +67,10 @@ const notifyListeners = () => {
 
 const normalizeLanguageCode = (value?: string | null): LanguageCode => {
   const normalized = String(value || '').trim().toLowerCase();
-  if (normalized.startsWith('es')) return 'es';
+  const exact = Array.from(VALID_CODES).find((code) => normalized === code);
+  if (exact) return exact;
+  const prefix = Array.from(VALID_CODES).find((code) => normalized.startsWith(code));
+  if (prefix) return prefix;
   return 'en';
 };
 
@@ -94,7 +95,7 @@ export const translateString = (
   language: LanguageCode = activeLanguage,
 ) => {
   if (!isProbablyTranslatable(value)) return value;
-  const fallback = resources.en[value] ?? value;
+  const fallback = resources.en?.[value] ?? value;
   const translated = resources[language]?.[value] ?? fallback;
   return interpolate(translated, params);
 };
@@ -183,3 +184,5 @@ export const useTranslation = () => {
     [language],
   );
 };
+
+export type { LanguageEntry };

@@ -1601,8 +1601,9 @@ export default function ProfileScreen() {
     .toLowerCase()
     .replace(/\s+/g, '')}`;
   const profileCompletion = c.profile?.profile?.completion_score ?? 0;
+  const currentLanguageEntry = languages.find(entry => entry.code === language);
   const currentLanguageLabel =
-    languages.find(entry => entry.code === language)?.label ?? 'English';
+    (currentLanguageEntry?.nativeName ?? currentLanguageEntry?.label) ?? 'English';
 
   const walletDashboardActions = useMemo(
     () => [
@@ -2552,7 +2553,7 @@ export default function ProfileScreen() {
                 languages={languages}
                 currentCode={language}
                 onSelect={code => {
-                  setLanguage(code as any).catch(() => undefined);
+                  setLanguage(code).catch(() => undefined);
                 }}
               />
             </View>

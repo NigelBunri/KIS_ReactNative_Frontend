@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
+import { translateString } from '@/languages';
+
 interface Props {
   children: React.ReactNode;
   fallbackLabel?: string;
@@ -34,12 +36,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Something went wrong</Text>
+        <Text style={styles.title}>{translateString('Something went wrong')}</Text>
         <Text style={styles.message}>
-          {this.props.fallbackLabel ?? 'This section encountered an error.'}
+          {translateString(this.props.fallbackLabel ?? 'This section encountered an error.')}
         </Text>
         <Pressable style={styles.button} onPress={this.reset}>
-          <Text style={styles.buttonText}>Try again</Text>
+          <Text style={styles.buttonText}>{translateString('Try again')}</Text>
         </Pressable>
       </View>
     );

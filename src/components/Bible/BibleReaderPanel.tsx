@@ -841,6 +841,35 @@ export default function BibleReaderPanel({
     setNoteText('');
   };
 
+  const canReloadCurrentPassage = Boolean(
+    currentTranslationCode && (referenceInput.trim() || currentBookCode),
+  );
+
+  const reloadCurrentPassage = useCallback(() => {
+    if (!currentTranslationCode) return;
+    if (referenceInput.trim()) {
+      onLoad(currentTranslationCode, undefined, undefined, referenceInput.trim());
+      return;
+    }
+    if (!currentBookCode) return;
+    onLoad(
+      currentTranslationCode,
+      currentBookCode,
+      currentChapter,
+      undefined,
+      startVerse ? Number(startVerse) : undefined,
+      endVerse ? Number(endVerse) : startVerse ? Number(startVerse) : undefined,
+    );
+  }, [
+    currentBookCode,
+    currentChapter,
+    currentTranslationCode,
+    endVerse,
+    onLoad,
+    referenceInput,
+    startVerse,
+  ]);
+
   const renderFilterSheet = () => (
     <Modal
       visible={filterOpen}
@@ -1878,6 +1907,24 @@ export default function BibleReaderPanel({
             Choose a public translation, book, and chapter, or enter a reference
             like John 3:16-18.
           </Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={reloadCurrentPassage}
+            disabled={!canReloadCurrentPassage}
+            style={[
+              styles.reloadButton,
+              {
+                backgroundColor: palette.goldDeep,
+                borderColor: palette.goldLight,
+                opacity: canReloadCurrentPassage ? 1 : 0.55,
+              },
+            ]}
+          >
+            <KISIcon name="refresh" size={15} color={palette.ivory} />
+            <Text style={[styles.reloadButtonText, { color: palette.ivory }]}>
+              Reload passage
+            </Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1903,12 +1950,38 @@ export default function BibleReaderPanel({
               translations[0]?.name ??
               'Public Bible'}
           </Text>
-          <Text
-            style={[styles.chapterTitle, { color: palette.text }]}
-            numberOfLines={2}
-          >
-            {currentReference}
-          </Text>
+          <View style={styles.readerHeaderTitleRow}>
+            <Text
+              style={[styles.chapterTitle, { color: palette.text }]}
+              numberOfLines={2}
+            >
+              {currentReference}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={reloadCurrentPassage}
+              disabled={!canReloadCurrentPassage}
+              style={[
+                styles.reloadIconButton,
+                {
+                  backgroundColor: palette.goldDeep,
+                  borderColor: palette.goldLight,
+                  opacity: canReloadCurrentPassage ? 1 : 0.55,
+                },
+              ]}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={palette.ivory} />
+              ) : (
+                <KISIcon name="refresh" size={17} color={palette.ivory} />
+              )}
+              {!tinyReader ? (
+                <Text style={[styles.reloadIconButtonText, { color: palette.ivory }]}>
+                  Reload
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -2135,8 +2208,40 @@ const styles = StyleSheet.create({
   kcanBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 8 },
   readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
+  readerHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 4,
+  },
   translationLabel: { fontSize: 12, textTransform: 'uppercase' },
-  chapterTitle: { fontSize: 20, fontWeight: '900', marginTop: 4 },
+  chapterTitle: { flex: 1, fontSize: 20, fontWeight: '900' },
+  reloadIconButton: {
+    minHeight: 36,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  reloadIconButtonText: { fontSize: 12, fontWeight: '900' },
+  reloadButton: {
+    marginTop: 6,
+    minHeight: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  reloadButtonText: { fontSize: 13, fontWeight: '900' },
   referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   input: {
     flex: 1,

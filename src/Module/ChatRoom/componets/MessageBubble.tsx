@@ -11,7 +11,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { ChatMessage } from '../chatTypes';
 import { EmojiPicker } from './EmojiPicker';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { useLanguage } from '@/languages';
+import { useLanguage, useTranslation } from '@/languages';
 
 // Use a shared player instance for all bubbles
 const audioPlayer = new AudioRecorderPlayer();
@@ -288,6 +288,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const bubbleTextSize = responsive.bodyFontSize;
 
   const { language: userLanguage } = useLanguage();
+  const { t } = useTranslation();
 
   // Read-more state for long messages
   const READ_MORE_THRESHOLD = 300;
@@ -1926,7 +1927,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {isLongText && (
               <Pressable onPress={() => setExpanded(prev => !prev)} style={{ marginTop: 2 }}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary ?? '#2196F3') }}>
-                  {expanded ? 'Show less' : 'Read more'}
+                  {expanded ? t('Show less') : t('Read more')}
                 </Text>
               </Pressable>
             )}
@@ -1934,29 +1935,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         {/* Translation */}
-        {text && text.length > 15 && userLanguage === 'en' && !translatedText && (
+        {text && text.length > 15 && !isMe && !translatedText && (
           <Pressable
             onPress={() => void handleTranslate()}
             style={{ marginTop: 4, opacity: translating ? 0.5 : 1 }}
             disabled={translating}
           >
             <Text style={{ color: palette.subtext ?? '#888', fontSize: 11 }}>
-              {translating ? '🌐 Translating…' : '🌐 Translate'}
+              {translating ? `🌐 ${t('Translating...')}` : `🌐 ${t('Translate')}`}
             </Text>
           </Pressable>
         )}
-        {translating && userLanguage !== 'en' && (
-          <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>🌐 Translating…</Text>
+        {translating && isMe && (
+          <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>🌐 {t('Translating...')}</Text>
         )}
         {translatedText && (
           <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)' }}>
             <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginBottom: 2 }}>
-              🌐 {userLanguage === 'es' ? 'Traducción' : 'Translation'}
+              🌐 {t('Translation')}
             </Text>
             <Text style={{ color: isMe ? '#fff' : (palette.text ?? '#000'), fontSize: 14 }}>{translatedText}</Text>
             <Pressable onPress={() => setTranslatedText(null)}>
               <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginTop: 2 }}>
-                {userLanguage === 'es' ? 'Ocultar' : 'Hide'}
+                {t('Hide')}
               </Text>
             </Pressable>
           </View>
