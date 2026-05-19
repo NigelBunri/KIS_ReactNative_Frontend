@@ -435,3 +435,12 @@ bash -n scripts/run-ios-small-device-lab.sh
 cd /Users/nigel/dev/KIS && npm run ios:small-lab
 ```
 
+## Android Global APK Test Prep - 2026-05-19
+
+Status: updated.
+
+- Confirmed release network config points to deployed Render URLs in `/Users/nigel/dev/KIS/src/network/config.ts`.
+- Added Android permissions needed by global testers for internet/network state, camera, microphone, Android 13 notifications, contacts, and media picker/upload access.
+- Added `pnpm run android:release-apk` and `pnpm run android:release-manifest` shortcuts.
+- Release APK is still debug-signed for direct sideload testing only. Use a proper release keystore before Play Store distribution.
+

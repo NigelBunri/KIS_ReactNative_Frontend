@@ -1,34 +1,42 @@
 import { Platform } from 'react-native';
 
-// ─── Dev-only host config ─────────────────────────────────────────────────────
-// These are only active when __DEV__ === true (metro dev server / debug builds).
-// Update DEV_BACKEND_HOST to your machine's LAN IP when running on a physical device.
-export const DEV_BACKEND_HOST = '10.219.211.99';
+export const DEV_BACKEND_HOST = 'kis-django-backend.onrender.com';
 export const API_PORT = 8000;
 export const CHAT_PORT = 4000;
 
-// Android emulator routes host traffic through 10.0.2.2; iOS simulator uses the LAN IP.
-const _devApiHost = Platform.OS === 'android' ? '10.0.2.2' : DEV_BACKEND_HOST;
-const _devApiBase = `http://${_devApiHost}:${API_PORT}`;
-const _devChatBase = `http://${_devApiHost}:${CHAT_PORT}`;
+const USE_DEPLOYED_DJANGO = true;
+const USE_DEPLOYED_CHAT = true;
 
-// ─── Production URLs ──────────────────────────────────────────────────────────
-// Set PROD_API_BASE_URL and PROD_CHAT_BASE_URL to your HTTPS endpoints before
-// cutting a release build. They can be injected at bundle time via
-// react-native-config (recommended) or by editing these constants directly.
+// Local dev fallback
+const _localApiHost = Platform.OS === 'android' ? '10.0.2.2' : DEV_BACKEND_HOST;
+const _localApiBase = `http://${_localApiHost}:${API_PORT}`;
+const _localChatBase = `http://${_localApiHost}:${CHAT_PORT}`;
+
+// Deployed Render backends
+const _deployedApiBase = 'https://kis-django-backend.onrender.com';
+const _deployedChatBase = 'https://kis-nest-backend.onrender.com';
+
 const _prodApiBase =
   (process.env.PROD_API_BASE_URL as string | undefined)?.trim() ||
-  'https://api.kis.app';
+  _deployedApiBase;
+
 const _prodChatBase =
   (process.env.PROD_CHAT_BASE_URL as string | undefined)?.trim() ||
-  'https://chat.kis.app';
+  _deployedChatBase;
 
-// ─── Active URLs (switch on __DEV__) ─────────────────────────────────────────
-export const API_BASE_URL = __DEV__ ? _devApiBase : _prodApiBase;
-export const MEDIA_FALLBACK_API_BASE_URL = __DEV__
-  ? `http://${DEV_BACKEND_HOST}:${API_PORT}`
+export const API_BASE_URL = __DEV__
+  ? USE_DEPLOYED_DJANGO
+    ? _deployedApiBase
+    : _localApiBase
   : _prodApiBase;
-export const CHAT_BASE_URL = __DEV__ ? _devChatBase : _prodChatBase;
+
+export const MEDIA_FALLBACK_API_BASE_URL = API_BASE_URL;
+
+export const CHAT_BASE_URL = __DEV__
+  ? USE_DEPLOYED_CHAT
+    ? _deployedChatBase
+    : _localChatBase
+  : _prodChatBase;
 
 export const CHAT_WS_URL = CHAT_BASE_URL;
 export const CHAT_WS_PATH = '/ws';
