@@ -346,7 +346,13 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     countryCode: string;
   }) => {
     try {
-      await saveContactToDevice(payload);
+      // Save to native device contacts — non-fatal if permission denied or device API fails.
+      try {
+        await saveContactToDevice(payload);
+      } catch (e) {
+        console.warn('[AddContacts] Could not save to device contacts:', e);
+      }
+
       const newDeviceContact: KISDeviceContact = {
         id: Date.now().toString(),
         name: payload.name.trim(),

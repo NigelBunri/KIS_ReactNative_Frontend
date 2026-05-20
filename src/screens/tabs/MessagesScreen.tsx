@@ -316,7 +316,7 @@ useEffect(() => {
     }
     const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined);
     if (active) setConversations(convs);
-  })();
+  })().catch(() => {});
   return () => {
     active = false;
   };

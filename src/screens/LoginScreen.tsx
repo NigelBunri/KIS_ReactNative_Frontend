@@ -181,6 +181,25 @@ export default function LoginScreen({ navigation }: any) {
       });
 
       if (!res?.success) {
+        const errorCode = res?.data?.error_code;
+        if (errorCode === 'phone_not_found') {
+          return Alert.alert(
+            'Phone not registered',
+            'This phone number is not registered. Please check the number and try again.',
+          );
+        }
+        if (errorCode === 'wrong_password') {
+          return Alert.alert(
+            'Wrong password',
+            'The password you entered is incorrect. Please try again.',
+          );
+        }
+        if (errorCode === 'account_disabled') {
+          return Alert.alert(
+            'Account disabled',
+            'This account has been disabled. Please contact support.',
+          );
+        }
         const msg =
           res?.message ||
           res?.data?.message ||

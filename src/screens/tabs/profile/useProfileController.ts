@@ -955,7 +955,10 @@ export const useProfileController = (opts: {
     void loadTierCatalog();
   }, [loadTierCatalog]);
 
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
   const logout = async () => {
+    setLogoutLoading(true);
     try {
       const server = await postRequest(
         ROUTES.auth.logout,
@@ -970,6 +973,7 @@ export const useProfileController = (opts: {
       setPhone?.(null);
       setAuth(false);
     } catch (e: any) {
+      setLogoutLoading(false);
       Alert.alert('Logout error', e?.message ?? 'Could not log out.');
     }
   };
@@ -1865,6 +1869,7 @@ export const useProfileController = (opts: {
     // actions
     loadProfile,
     logout,
+    logoutLoading,
     openSheet,
     closeSheet,
     openEditProfile,

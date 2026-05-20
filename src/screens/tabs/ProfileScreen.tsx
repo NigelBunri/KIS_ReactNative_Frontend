@@ -2623,7 +2623,7 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <LogoutSection palette={palette} onLogout={c.logout} />
+            <LogoutSection palette={palette} onLogout={c.logout} loading={c.logoutLoading} />
           </>
         )}
       </ScrollView>

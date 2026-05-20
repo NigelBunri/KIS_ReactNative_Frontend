@@ -901,7 +901,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     };
 
-    connect();
+    connect().catch(err => console.warn('[SocketProvider] connect error:', err));
 
     return () => {
       mountedRef.current = false;
