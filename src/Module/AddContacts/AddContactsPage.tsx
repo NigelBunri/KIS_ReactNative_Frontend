@@ -524,7 +524,12 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             title: c.name,
             name: c.name,
             contactPhone: c.phone,
-            participants: [c.phone],
+            // Pass the peer's KIS user ID whenever we have it — the backend
+            // then uses an exact UUID lookup instead of a phone-format lookup,
+            // and presence tracking works correctly in the chat room.
+            contactUserId: c.userId ?? null,
+            peerUserId: c.userId ?? null,
+            participants: c.userId ? [c.userId] : [c.phone],
             kind: 'direct',
             isDirect: true,
             isContactChat: true,
