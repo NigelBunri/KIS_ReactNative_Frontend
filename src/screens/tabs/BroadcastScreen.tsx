@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -112,6 +113,7 @@ const TAB_SWIPE_DIRECTION_RATIO = 2.5;
 export default function BroadcastScreen() {
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const broadcastGoldGradient = tone === 'dark'
@@ -291,8 +293,9 @@ export default function BroadcastScreen() {
           style={styles.headerContainer}
         >
           <View style={styles.headerHalo} />
-          
-          <View style={[styles.headerInner, { paddingHorizontal: responsive.pageGutter, paddingTop: compactBroadcast ? 8 : 12, paddingBottom: compactBroadcast ? 16 : 22 }]}>
+          <View style={styles.headerSheen} pointerEvents="none" />
+
+          <View style={[styles.headerInner, { paddingHorizontal: responsive.pageGutter, paddingTop: insets.top + (compactBroadcast ? 12 : 18), paddingBottom: compactBroadcast ? 16 : 24 }]}>
             <View style={styles.headerSection}>
               <BroadcastHeaderBar
                 title="Broadcast"
@@ -510,57 +513,57 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     },
     visionButton: {
       marginTop: 12,
-      borderRadius: 20,
+      borderRadius: 22,
       paddingHorizontal: 14,
-      paddingVertical: 12,
-      backgroundColor: 'rgba(28,18,12,0.28)',
+      paddingVertical: 14,
+      backgroundColor: 'rgba(28,18,12,0.32)',
       borderWidth: 1,
-      borderColor: 'rgba(255,232,163,0.38)',
+      borderColor: 'rgba(255,232,163,0.45)',
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 11,
+      gap: 12,
     },
     visionIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 14,
+      width: 40,
+      height: 40,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(28,18,12,0.46)',
+      backgroundColor: 'rgba(28,18,12,0.50)',
       borderWidth: 1,
-      borderColor: 'rgba(255,232,163,0.38)',
+      borderColor: 'rgba(255,232,163,0.42)',
     },
     visionButtonTitle: {
       color: '#FFF8E6',
       fontSize: 15,
       fontWeight: '900',
-      letterSpacing: 0,
+      letterSpacing: 0.2,
     },
     visionButtonText: {
       color: '#FFF3D2',
       fontSize: 12,
-      lineHeight: 17,
+      lineHeight: 18,
       fontWeight: '700',
-      marginTop: 2,
+      marginTop: 3,
     },
     filterPanel: {
-      borderWidth: 0,
-      borderRadius: 22,
-      borderColor: 'transparent',
-      padding: 8,
+      borderWidth: 1,
+      borderRadius: 24,
+      borderColor: palette.goldBorder,
+      padding: 10,
       backgroundColor: palette.surface,
       flexDirection: 'row',
       flexWrap: 'wrap',
       shadowColor: palette.shadow ?? '#000',
-      shadowOpacity: 0.07,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.09,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
     },
     filterOption: {
-      borderWidth: 1,
-      borderRadius: 18,
-      minWidth: 120,
-      paddingHorizontal: 14,
+      borderWidth: 1.5,
+      borderRadius: 999,
+      minWidth: 100,
+      paddingHorizontal: 16,
       paddingVertical: 10,
       marginRight: 8,
       marginBottom: 8,
@@ -568,11 +571,13 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     filterOptionLabel: {
       fontSize: 13,
       fontWeight: '900',
+      letterSpacing: 0.1,
     },
     filterOptionDescription: {
       fontSize: 11,
       fontWeight: '600',
       marginTop: 2,
+      letterSpacing: 0.05,
     },
     cartOverlay: {
       ...StyleSheet.absoluteFillObject,

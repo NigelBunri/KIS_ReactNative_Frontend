@@ -1137,7 +1137,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   }, [chat, currentUserId, onOpenInfo]);
 
   const handleStartCall = useCallback(
-    async (media: 'voice' | 'video') => {
+    async (media: 'voice' | 'video' | 'broadcast') => {
       if (!chat || !startCall) {
         Alert.alert('Call unavailable', 'Calling is not ready yet.');
         return;
@@ -1159,12 +1159,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         (id) => String(id) !== String(currentUserId ?? ''),
       );
 
-      await startCall({
-        conversationId: String(resolvedConversationId),
-        title: chat.name ?? 'Call',
-        media,
-        inviteeUserIds,
-      });
+      if (media === 'broadcast') {
+        await startCall({
+          conversationId: String(resolvedConversationId),
+          title: chat.name ?? 'Broadcast',
+          callType: 'broadcast',
+          inviteeUserIds,
+        });
+      } else {
+        await startCall({
+          conversationId: String(resolvedConversationId),
+          title: chat.name ?? 'Call',
+          media,
+          inviteeUserIds,
+        });
+      }
     },
     [chat, startCall, conversationId, ensureConversationId, currentUserId],
   );
@@ -1197,6 +1206,12 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onOpenInfo={selectionMode ? undefined : handleOpenInfo}
           onStartVoiceCall={selectionMode ? undefined : () => void handleStartCall('voice')}
           onStartVideoCall={selectionMode ? undefined : () => void handleStartCall('video')}
+          onStartBroadcast={
+            selectionMode ? undefined
+              : (chat?.participants?.length ?? 0) > 2
+                ? () => void handleStartCall('broadcast')
+                : undefined
+          }
           currentUserId={currentUserId}
           statusText={statusTextFinal}
           contextLabel={headerContextLabel}

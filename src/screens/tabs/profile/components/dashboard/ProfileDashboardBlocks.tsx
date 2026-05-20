@@ -206,6 +206,7 @@ export const ProfileHeroCard = ({
   notificationCount,
   verificationSummary,
   onVerificationPress,
+  bottomOverlap = 0,
 }: {
   coverUrl?: string | null;
   avatarUrl?: string | null;
@@ -220,6 +221,7 @@ export const ProfileHeroCard = ({
   notificationCount?: number;
   verificationSummary?: VerificationSummary | null;
   onVerificationPress?: () => void;
+  bottomOverlap?: number;
 }) => {
   const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
@@ -275,7 +277,7 @@ export const ProfileHeroCard = ({
         
       </View>
 
-      <View style={[dashboardStyles.heroContent, { paddingTop: compact ? 78 : 88 }]}>
+      <View style={[dashboardStyles.heroContent, { paddingTop: compact ? 78 : 88, paddingBottom: 16 + bottomOverlap }]}>
         <View style={[dashboardStyles.heroIdentityRow, compact && dashboardStyles.heroIdentityCompact]}>
           <View style={[dashboardStyles.heroAvatarWrap, { width: compact ? 78 : 112, height: compact ? 78 : 112, borderRadius: compact ? 39 : 56 }]}>
             {avatarUrl ? (

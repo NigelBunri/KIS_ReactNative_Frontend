@@ -27,6 +27,7 @@ import {
 } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import KISButton from '@/constants/KISButton';
 import { MainTabStateBlock } from '@/components/common/MainTabScaffold';
 import Skeleton from '@/components/common/Skeleton';
@@ -88,6 +89,10 @@ import type {
   MainTabsParamList,
   RootStackParamList,
 } from '@/navigation/types';
+
+const APPOINTMENTS_CACHE_KEY = 'kis_appointments_cache_v1';
+const SHOPS_CACHE_KEY = 'kis_shops_cache_v1';
+const ORDERS_CACHE_KEY = 'kis_orders_cache_v1';
 
 const ESCROW_PENDING_STATUSES = new Set([
   'pending',
@@ -333,14 +338,49 @@ export default function ProfileScreen() {
   }, []);
 
   const userId = useMemo(() => c.profile?.user?.id, [c.profile?.user?.id]);
+  const applyAppointmentRecords = useCallback(
+    (records: any[], normalizedUserId: string) => {
+      const activeRecords = records.filter((booking: any) => {
+        const status = ((booking?.status ?? '') as string).toLowerCase();
+        return !CANCELLED_BOOKING_STATUSES.has(status);
+      });
+      setAppointments(
+        dedupeBookingsByService(
+          activeRecords.filter(
+            (b: any) => String(b?.user) === normalizedUserId,
+          ),
+        ),
+      );
+      setProviderAppointments(
+        dedupeBookingsByService(
+          activeRecords.filter(
+            (b: any) => String(b?.provider_details?.id) === normalizedUserId,
+          ),
+        ),
+      );
+    },
+    [],
+  );
+
   const loadAppointments = useCallback(async () => {
     if (!userId) return;
+    const normalizedUserId = String(userId);
+
+    // Show cached data immediately so the screen renders without a wait
+    try {
+      const cached = await AsyncStorage.getItem(APPOINTMENTS_CACHE_KEY);
+      if (cached) {
+        const { payer, provider } = JSON.parse(cached);
+        if (Array.isArray(payer)) setAppointments(payer);
+        if (Array.isArray(provider)) setProviderAppointments(provider);
+      }
+    } catch {}
+
     setAppointmentsLoading(true);
     setAppointmentsError(null);
     try {
       const response = await getRequest(ROUTES.commerce.serviceBookings, {
         errorMessage: 'Unable to load appointments.',
-        forceNetwork: true,
       });
       if (response?.success) {
         const payload = response.data ?? response ?? {};
@@ -349,24 +389,30 @@ export default function ProfileScreen() {
           : Array.isArray((payload as any).results)
           ? (payload as any).results
           : [];
-        const normalizedUserId = String(userId);
-        const activeRecords = records.filter((booking: any) => {
-          const status = ((booking?.status ?? '') as string).toLowerCase();
-          return !CANCELLED_BOOKING_STATUSES.has(status);
-        });
-        const payerBookings = dedupeBookingsByService(
-          activeRecords.filter(
-            (booking: any) => String(booking?.user) === normalizedUserId,
-          ),
+        applyAppointmentRecords(records, normalizedUserId);
+        // Persist for next visit
+        const payer = dedupeBookingsByService(
+          records
+            .filter((b: any) => {
+              const s = ((b?.status ?? '') as string).toLowerCase();
+              return !CANCELLED_BOOKING_STATUSES.has(s);
+            })
+            .filter((b: any) => String(b?.user) === normalizedUserId),
         );
-        const providerBookings = dedupeBookingsByService(
-          activeRecords.filter(
-            (booking: any) =>
-              String(booking?.provider_details?.id) === normalizedUserId,
-          ),
+        const provider = dedupeBookingsByService(
+          records
+            .filter((b: any) => {
+              const s = ((b?.status ?? '') as string).toLowerCase();
+              return !CANCELLED_BOOKING_STATUSES.has(s);
+            })
+            .filter(
+              (b: any) => String(b?.provider_details?.id) === normalizedUserId,
+            ),
         );
-        setAppointments(payerBookings);
-        setProviderAppointments(providerBookings);
+        AsyncStorage.setItem(
+          APPOINTMENTS_CACHE_KEY,
+          JSON.stringify({ payer, provider }),
+        ).catch(() => {});
       } else {
         setAppointmentsError(
           response?.message || 'Unable to load appointments.',
@@ -377,7 +423,7 @@ export default function ProfileScreen() {
     } finally {
       setAppointmentsLoading(false);
     }
-  }, [userId]);
+  }, [userId, applyAppointmentRecords]);
 
   const pendingServicePayments = useMemo(
     () =>
@@ -1183,6 +1229,15 @@ export default function ProfileScreen() {
       setCommerceShops([]);
       return;
     }
+
+    try {
+      const cached = await AsyncStorage.getItem(SHOPS_CACHE_KEY);
+      if (cached) {
+        const shops = JSON.parse(cached);
+        if (Array.isArray(shops)) setCommerceShops(shops);
+      }
+    } catch {}
+
     setCommerceShopsLoading(true);
     try {
       const queryWithOwner = `${ROUTES.commerce.shops}`;
@@ -1287,9 +1342,9 @@ export default function ProfileScreen() {
         );
       }
       setCommerceShops(shops);
+      AsyncStorage.setItem(SHOPS_CACHE_KEY, JSON.stringify(shops)).catch(() => {});
     } catch (error: any) {
       console.warn('Unable to load commerce shops:', error?.message ?? error);
-      setCommerceShops([]);
     } finally {
       setCommerceShopsLoading(false);
     }
@@ -1490,6 +1545,14 @@ export default function ProfileScreen() {
   }, [unwrapList]);
 
   const loadMarketplaceOrders = useCallback(async () => {
+    try {
+      const cached = await AsyncStorage.getItem(ORDERS_CACHE_KEY);
+      if (cached) {
+        const orders = JSON.parse(cached);
+        if (Array.isArray(orders)) setMarketplaceOrders(orders);
+      }
+    } catch {}
+
     setMarketplaceOrdersLoading(true);
     setMarketplaceOrdersError(null);
     try {
@@ -1504,6 +1567,7 @@ export default function ProfileScreen() {
           ? payload.results
           : [];
         setMarketplaceOrders(orders);
+        AsyncStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(orders)).catch(() => {});
       } else {
         setMarketplaceOrdersError(
           response.message ?? 'Unable to load your marketplace orders.',
@@ -2268,6 +2332,7 @@ export default function ProfileScreen() {
                   summary: userVerificationSummary,
                 })
               }
+              bottomOverlap={compactProfile ? 34 : 64}
             />
             <View
               style={{

@@ -60,12 +60,19 @@ const mapSection = (section: ApiSection): PartnerSettingsSection => ({
 export const usePartnerSettingsCatalog = (
   partnerId?: string | null,
   fallbackRole: PartnerRole = 'member',
+  forceRole?: PartnerRole,
 ) => {
   const [sections, setSections] = useState<PartnerSettingsSection[]>(
     PARTNER_SETTINGS_SECTIONS,
   );
-  const [role, setRole] = useState<PartnerRole>(fallbackRole);
+  const [role, setRole] = useState<PartnerRole>(forceRole ?? fallbackRole);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (forceRole) {
+      setRole(forceRole);
+    }
+  }, [forceRole]);
 
   useEffect(() => {
     if (!partnerId) return;
@@ -83,7 +90,8 @@ export const usePartnerSettingsCatalog = (
         } else {
           setSections(PARTNER_SETTINGS_SECTIONS);
         }
-        const nextRole = normalizePartnerRole(payload?.role ?? null, fallbackRole);
+        // forceRole always wins — superadmin trumps whatever the API returns
+        const nextRole = forceRole ?? normalizePartnerRole(payload?.role ?? null, fallbackRole);
         setRole(nextRole);
       })
       .finally(() => {
@@ -92,7 +100,7 @@ export const usePartnerSettingsCatalog = (
     return () => {
       isMounted = false;
     };
-  }, [partnerId, fallbackRole]);
+  }, [partnerId, fallbackRole, forceRole]);
 
   const sectionMap = useMemo(() => {
     const map: Record<string, PartnerSettingsSection> = {};

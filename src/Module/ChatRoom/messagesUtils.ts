@@ -434,9 +434,9 @@ export const styles = StyleSheet.create({
   royalAppBar: {
     marginHorizontal: 0,
     marginTop: 0,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: 16,
+    paddingBottom: 18,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     borderBottomLeftRadius: 0,
@@ -457,35 +457,39 @@ export const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     height: KIS_TOKENS.controlHeights.md,
-    borderRadius: KIS_TOKENS.radius.xl,
-    paddingHorizontal: 12,
+    borderRadius: KIS_TOKENS.radius.pill,
+    paddingHorizontal: 14,
   },
   searchInput: {
     flex: 1,
     fontSize: KIS_TOKENS.typography.input,
     marginHorizontal: 8,
+    lineHeight: 22,
   },
   searchIconBtn: {
     paddingHorizontal: 6,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 999,
   },
-  searchDivider: { width: 1, height: 24, opacity: 0.5, marginHorizontal: 4 },
+  searchDivider: { width: 1, height: 22, opacity: 0.4, marginHorizontal: 4 },
 
   /* Chips */
   chipsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 7,
     marginTop: 10,
     flexWrap: 'wrap',
   },
   chip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
     paddingVertical: 8,
+    minHeight: 34,
     borderRadius: 999,
-    borderWidth: 2,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   /* Chat Row */
@@ -511,12 +515,12 @@ export const styles = StyleSheet.create({
   },
   menuBox: {
     position: 'absolute',
-    width: 200,
-    borderRadius: 12,
-    borderWidth: 2,
-    paddingVertical: 6,
+    width: 210,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    paddingVertical: 8,
   },
-  menuItem: { paddingHorizontal: 14, paddingVertical: 12 },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 10 },
 
   /* Centers */
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

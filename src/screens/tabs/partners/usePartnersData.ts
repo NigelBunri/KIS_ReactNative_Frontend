@@ -10,6 +10,11 @@ import {
   PartnerGroup,
 } from '@/components/partners/partnersTypes';
 
+const isKcanPartner = (p: Partner) =>
+  p.slug?.toLowerCase() === 'kcan' ||
+  p.name?.toLowerCase() === 'kcan' ||
+  p.name?.toLowerCase().includes('kingdom impact');
+
 const initialsFor = (name?: string | null) => {
   if (!name) return '??';
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -35,7 +40,7 @@ const mapPartner = (raw: any): Partner => ({
   discord_summary: raw.discord_summary ?? raw.discordSummary ?? null,
 });
 
-export const usePartnersData = () => {
+export const usePartnersData = (isSuperuser = false) => {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerCommunities, setPartnerCommunities] = useState<PartnerCommunity[]>([]);
   const [partnerGroups, setPartnerGroups] = useState<PartnerGroup[]>([]);
@@ -82,12 +87,22 @@ export const usePartnersData = () => {
     [channelsForPartner],
   );
 
+  const applyOwnerOverride = useCallback(
+    (partner: Partner): Partner =>
+      isSuperuser && isKcanPartner(partner)
+        ? { ...partner, role: 'owner', member_role: 'owner', access_level: 'owner' }
+        : partner,
+    [isSuperuser],
+  );
+
   const loadPartners = useCallback(async () => {
     const res = await getRequest(ROUTES.partners.list, {
       errorMessage: 'Unable to load partners.',
     });
     const list = (res?.data?.results ?? res?.data ?? res ?? []) as any[];
-    const mapped = Array.isArray(list) ? list.map(mapPartner) : [];
+    const mapped = Array.isArray(list)
+      ? list.map((raw) => applyOwnerOverride(mapPartner(raw)))
+      : [];
     setPartners(mapped);
     if (mapped.length > 0) {
       const exists = selectedPartnerId
@@ -97,7 +112,7 @@ export const usePartnersData = () => {
         setSelectedPartnerId(mapped[0].id);
       }
     }
-  }, [selectedPartnerId]);
+  }, [selectedPartnerId, applyOwnerOverride]);
 
   const loadPartnerDetail = useCallback(async (partnerId: string) => {
     const res = await getRequest(ROUTES.partners.detail(partnerId), {
@@ -105,9 +120,13 @@ export const usePartnersData = () => {
     });
     if (!res?.success || !res?.data) return;
     setPartners((prev) =>
-      prev.map((p) => (p.id === partnerId ? mapPartner({ ...p, ...res.data }) : p)),
+      prev.map((p) =>
+        p.id === partnerId
+          ? applyOwnerOverride(mapPartner({ ...p, ...res.data }))
+          : p,
+      ),
     );
-  }, []);
+  }, [applyOwnerOverride]);
 
   const loadPartnerDiscordSummary = useCallback(async (partnerId: string) => {
     const res = await getRequest(ROUTES.partners.discordSummary(partnerId), {

@@ -99,18 +99,21 @@ function AnimatedKISTabBar({
   const isTinyTabBar = responsive.isWatch || responsive.shortestSide < 330;
   const iconCircleSize = responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : KIS_COMPONENT_TOKENS.tab.iconSize;
   const iconSize = responsive.isWatch ? 19 : responsive.isCompactPhone ? 21 : 24;
-  const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 60 : 70;
+  const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 62 : 72;
 
   const { palette: p, tone } = theme;
   const isRoyalLightBar = tone === 'light';
-  const focusedTextColor = isRoyalLightBar ? p.goldReadable : p.text;
+  const focusedTextColor = isRoyalLightBar ? p.goldReadable : p.goldLight;
   const unfocusedTextColor = p.subtext;
   const barBg = isRoyalLightBar ? '#FFFFFF' : (p.bar ?? p.surface);
   const selectedGoldGradient = tone === 'dark'
     ? [...KIS_ROYAL_GRADIENTS.goldDark]
     : [...KIS_ROYAL_GRADIENTS.goldLight];
+  const separatorColors = tone === 'dark'
+    ? ['transparent', 'rgba(201,162,74,0.55)', 'rgba(185,133,46,0.75)', 'rgba(201,162,74,0.55)', 'transparent']
+    : ['transparent', 'rgba(185,133,46,0.30)', 'rgba(185,133,46,0.50)', 'rgba(185,133,46,0.30)', 'transparent'];
 
-  // 🔒 If hidNav is true, don’t render the bar at all
+  // 🔒 If hidNav is true, don't render the bar at all
   if (hidNav) {
     return null;
   }
@@ -119,9 +122,21 @@ function AnimatedKISTabBar({
     <View
       style={[
         styles.wrap,
-        { backgroundColor: barBg, paddingBottom: Math.max(insets.bottom, 0), paddingHorizontal: responsive.isWatch ? 2 : 6 },
+        {
+          backgroundColor: barBg,
+          paddingBottom: Math.max(insets.bottom, 0),
+          paddingHorizontal: responsive.isWatch ? 2 : 6,
+        },
       ]}
     >
+      {/* Luxury gold shimmer separator line */}
+      <LinearGradient
+        colors={separatorColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.separator}
+        pointerEvents="none"
+      />
       <View
         style={[
           styles.bar,
@@ -151,9 +166,17 @@ function AnimatedKISTabBar({
             <Pressable
               key={route.key}
               onPress={onPress}
-              style={[styles.tab, { width: tabWidth, height: tabBarHeight }]}
+              style={({ pressed }) => [
+                styles.tab,
+                {
+                  width: tabWidth,
+                  height: tabBarHeight,
+                  opacity: pressed ? 0.78 : 1,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                },
+              ]}
             >
-              <View style={[styles.tabInner, { gap: isTinyTabBar ? 0 : 6 }]}>
+              <View style={[styles.tabInner, { gap: isTinyTabBar ? 0 : 5 }]}>
                 <View
                   style={[
                     styles.iconCircle,
@@ -161,7 +184,11 @@ function AnimatedKISTabBar({
                       width: iconCircleSize,
                       height: iconCircleSize,
                       borderRadius: responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius,
-                      backgroundColor: focused ? p.goldDeep : (isRoyalLightBar ? p.card : p.surfaceElevated),
+                      backgroundColor: focused
+                        ? p.goldDeep
+                        : isRoyalLightBar
+                          ? 'rgba(184,133,46,0.09)'
+                          : 'rgba(255,255,255,0.06)',
                     },
                   ]}
                 >
@@ -207,7 +234,10 @@ function AnimatedKISTabBar({
                       styles.label,
                       {
                         color: focused ? focusedTextColor : unfocusedTextColor,
-                        fontSize: responsive.isCompactPhone ? 10 : 11,
+                        fontSize: focused
+                          ? (responsive.isCompactPhone ? 11 : 12)
+                          : (responsive.isCompactPhone ? 10 : 11),
+                        fontWeight: focused ? '800' : '600',
                       },
                     ]}
                     numberOfLines={1}
@@ -717,7 +747,18 @@ export function MainTabs() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: 6 },
+  wrap: {
+    paddingHorizontal: 6,
+    shadowColor: '#000',
+    shadowOpacity: Platform.OS === 'ios' ? 0.07 : 0,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -5 },
+    elevation: Platform.OS === 'android' ? 10 : 0,
+  },
+  separator: {
+    height: 1.5,
+    width: '100%',
+  },
   bar: {
     minHeight: 52,
     flexDirection: 'row',
@@ -732,7 +773,7 @@ const styles = StyleSheet.create({
   tabInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
   },
   iconCircle: {
     width: KIS_COMPONENT_TOKENS.tab.iconSize,
@@ -776,7 +817,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    fontWeight: Platform.select({ ios: '600', android: '700' }),
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
 });
 

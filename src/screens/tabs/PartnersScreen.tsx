@@ -30,14 +30,30 @@ import { usePartnerLinksPanel } from './partners/usePartnerLinksPanel';
 import { usePartnerComplaintsPanel } from './partners/usePartnerComplaintsPanel';
 import usePartnerProfileLinks from './partners/usePartnerProfileLinks';
 import { PartnerOrganizationAppsProvider } from '@/context/partners/PartnerOrganizationAppsContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
+
+const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 
 export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
+  const [isSuperuser, setIsSuperuser] = React.useState(false);
+  React.useEffect(() => {
+    AsyncStorage.getItem(PROFILE_CACHE_KEY)
+      .then(raw => {
+        if (!raw) return;
+        const payload = JSON.parse(raw);
+        const user = payload?.user ?? payload?.profile?.user;
+        setIsSuperuser(
+          !!(user?.is_superuser || user?.is_staff || user?.is_admin),
+        );
+      })
+      .catch(() => {});
+  }, []);
   const rootNavigation = navigation.getParent?.() as
     | NativeStackNavigationProp<RootStackParamList>
     | undefined;
@@ -76,7 +92,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     communitiesForPartner,
     handlePartnerItemCreated,
     reloadPartners,
-  } = usePartnersData();
+  } = usePartnersData(isSuperuser);
   const {
     links,
     loading: linksLoading,
@@ -91,8 +107,18 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       selectedPartner?.access_level,
     'member',
   );
+  const isSelectedKCAN =
+    selectedPartner?.slug?.toLowerCase() === 'kcan' ||
+    selectedPartner?.name?.toLowerCase() === 'kcan' ||
+    selectedPartner?.name?.toLowerCase().includes('kingdom impact');
+  const superadminRoleOverride =
+    isSuperuser && isSelectedKCAN ? ('owner' as const) : undefined;
   const { sections: settingsSections, role: settingsRole } =
-    usePartnerSettingsCatalog(selectedPartner?.id, partnerRole);
+    usePartnerSettingsCatalog(
+      selectedPartner?.id,
+      partnerRole,
+      superadminRoleOverride,
+    );
   const canManageOrganizationApps = ['owner', 'admin', 'manager'].includes(
     settingsRole,
   );

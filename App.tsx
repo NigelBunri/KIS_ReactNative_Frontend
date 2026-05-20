@@ -15,11 +15,15 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
+  FlatList,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   useColorScheme,
   View,
 } from 'react-native';
@@ -80,10 +84,15 @@ import { getAccessToken } from './src/security/authStorage';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
 import {
+  CALLING_CODE_BY_ISO,
+  COUNTRY_NAMES,
   DEFAULT_CALLING_CODE,
   DEFAULT_COUNTRY_ISO,
   LocationCountryError,
+  callingCodeForCountry,
   resolveLocationCountry,
+  wasLocationPermissionEverGranted,
+  getLastCachedLocationCountry,
 } from '@/services/locationCountryService';
 import { cleanIrrelevantStorage } from '@/utils/storageCleaner';
 import type { KISUser } from '@/types/user';
@@ -151,6 +160,8 @@ function AppContent() {
   const [locationError, setLocationError] = useState(
     'Location access is required to use KIS.',
   );
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
 
   const syncLocationCountry = useCallback(
     async (requestPermission: boolean = false) => {
@@ -162,12 +173,29 @@ function AppContent() {
         setLocationCallingCode(resolved.callingCode);
         setLocationReady(true);
         setLocationError('');
+
+        // Permission granted but the device location service (GPS) is off.
+        // The app proceeds normally (IP-based country was used), but we prompt
+        // the user once to turn location back on — no blocking screen shown.
+        if (resolved.locationServiceOff) {
+          Alert.alert(
+            'Location Services Off',
+            'Your device location is turned off. Turn it on for accurate country and calling code detection.',
+            [
+              {
+                text: 'Open Settings',
+                onPress: () => openSettings().catch(() => undefined),
+              },
+              { text: 'OK', style: 'cancel' },
+            ],
+            { cancelable: true },
+          );
+        }
+
         return true;
       } catch (error: any) {
         if (__DEV__ && Platform.OS === 'android') {
           // Android emulators frequently have no working location provider.
-          // In local development, fall back to the default dialing context so
-          // auth/bootstrap can continue instead of blocking on geolocation.
           setLocationStatus(error?.permissionStatus || null);
           setLocationCountryISO(DEFAULT_COUNTRY_ISO);
           setLocationCallingCode(DEFAULT_CALLING_CODE);
@@ -175,8 +203,31 @@ function AppContent() {
           setLocationError('');
           return true;
         }
+
         if (error instanceof LocationCountryError) {
           setLocationStatus(error.permissionStatus || null);
+
+          // GPS is off AND IP also failed — don't block the app.
+          // Use the default country and prompt to enable location services.
+          if (error.code === 'location_service_off') {
+            setLocationCountryISO(DEFAULT_COUNTRY_ISO);
+            setLocationCallingCode(DEFAULT_CALLING_CODE);
+            setLocationReady(true);
+            setLocationError('');
+            Alert.alert(
+              'Location Services Off',
+              'Your device location is turned off. Turn it on in Settings so KIS can detect your country automatically.',
+              [
+                {
+                  text: 'Open Settings',
+                  onPress: () => openSettings().catch(() => undefined),
+                },
+                { text: 'Continue', style: 'cancel' },
+              ],
+            );
+            return true;
+          }
+
           setLocationError(
             error.message || 'Location access is required to use KIS.',
           );
@@ -281,11 +332,24 @@ function AppContent() {
 
   useEffect(() => {
     (async () => {
-      // ⏳ Force splash screen for minimum 5 seconds
+      // Pre-fill from cache immediately — prevents "Location Required" screen
+      // on repeat launches when permission was already granted.
+      const [cached, hadPermission] = await Promise.all([
+        getLastCachedLocationCountry(),
+        wasLocationPermissionEverGranted(),
+      ]);
+      if (cached?.iso) {
+        setLocationCountryISO(cached.iso);
+        setLocationCallingCode(cached.callingCode);
+        setLocationReady(true);
+      }
+
       await Promise.all([
-        syncLocationCountry(true),
+        // Only request the OS permission dialog on the very first launch.
+        // On all subsequent launches, just check the current status silently.
+        syncLocationCountry(!hadPermission),
         checkAuth(),
-        new Promise(resolve => setTimeout(resolve, 3000)),
+        new Promise<void>(resolve => setTimeout(resolve, 3000)),
       ]);
 
       setBooting(false);
@@ -400,42 +464,119 @@ function AppContent() {
   }
 
   if (!locationReady) {
+    const isBlocked = locationStatus === RESULTS.BLOCKED;
+    const countryList = Object.keys(CALLING_CODE_BY_ISO)
+      .map((iso) => ({ iso, name: COUNTRY_NAMES[iso] ?? iso, code: CALLING_CODE_BY_ISO[iso] }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const filtered = countrySearch.trim()
+      ? countryList.filter(
+          (c) =>
+            c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+            c.iso.toLowerCase().includes(countrySearch.toLowerCase()) ||
+            c.code.includes(countrySearch),
+        )
+      : countryList;
+
     return (
       <View key={`location-${language}`} style={{ flex: 1 }}>
         <View style={locationStyles.root}>
           <Text style={locationStyles.title}>Location Required</Text>
           <Text style={locationStyles.message}>
-            {locationError || 'Location access is required to use KIS.'}
+            KIS uses your location to set your country and calling code automatically.
           </Text>
 
-          {locationChecking ? <ActivityIndicator size="small" /> : null}
+          {locationChecking ? (
+            <ActivityIndicator size="small" color="#111" />
+          ) : null}
 
-          <Pressable
-            style={locationStyles.primaryButton}
-            onPress={async () => {
-              if (locationStatus === RESULTS.BLOCKED) {
-                await openSettings().catch(() => undefined);
-                return;
-              }
-              await syncLocationCountry(true);
-            }}
-          >
-            <Text style={locationStyles.primaryText}>
-              {locationStatus === RESULTS.BLOCKED
-                ? 'Open Settings'
-                : 'Enable Location'}
-            </Text>
-          </Pressable>
+          {/* Primary action */}
+          {!locationChecking && (
+            <Pressable
+              style={locationStyles.primaryButton}
+              onPress={async () => {
+                if (isBlocked) {
+                  await openSettings().catch(() => undefined);
+                } else {
+                  await syncLocationCountry(true);
+                }
+              }}
+            >
+              <Text style={locationStyles.primaryText}>
+                {isBlocked ? 'Open Settings' : 'Allow Location Access'}
+              </Text>
+            </Pressable>
+          )}
 
-          <Pressable
-            style={locationStyles.secondaryButton}
-            onPress={async () => {
-              await syncLocationCountry(false);
-            }}
-          >
-            <Text style={locationStyles.secondaryText}>Retry</Text>
-          </Pressable>
+          {/* Retry (when not blocked) */}
+          {!locationChecking && !isBlocked && (
+            <Pressable
+              style={locationStyles.secondaryButton}
+              onPress={() => syncLocationCountry(false)}
+            >
+              <Text style={locationStyles.secondaryText}>Retry</Text>
+            </Pressable>
+          )}
+
+          {/* Manual country picker — always available */}
+          {!locationChecking && (
+            <Pressable
+              style={locationStyles.skipButton}
+              onPress={() => setShowCountryPicker(true)}
+            >
+              <Text style={locationStyles.skipText}>
+                Choose country manually
+              </Text>
+            </Pressable>
+          )}
         </View>
+
+        {/* Country picker modal */}
+        <Modal
+          visible={showCountryPicker}
+          animationType="slide"
+          onRequestClose={() => setShowCountryPicker(false)}
+        >
+          <View style={locationStyles.pickerContainer}>
+            <View style={locationStyles.pickerHeader}>
+              <Text style={locationStyles.pickerTitle}>Choose your country</Text>
+              <Pressable onPress={() => setShowCountryPicker(false)}>
+                <Text style={locationStyles.pickerClose}>Cancel</Text>
+              </Pressable>
+            </View>
+            <TextInput
+              style={locationStyles.searchInput}
+              placeholder="Search country…"
+              value={countrySearch}
+              onChangeText={setCountrySearch}
+              autoFocus
+              clearButtonMode="while-editing"
+            />
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.iso}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <Pressable
+                  style={locationStyles.countryRow}
+                  onPress={() => {
+                    setLocationCountryISO(item.iso);
+                    setLocationCallingCode(item.code);
+                    setLocationReady(true);
+                    setShowCountryPicker(false);
+                    setCountrySearch('');
+                  }}
+                >
+                  <Text style={locationStyles.countryName}>{item.name}</Text>
+                  <Text style={locationStyles.countryCode}>
+                    {item.iso}  {item.code}
+                  </Text>
+                </Pressable>
+              )}
+              ItemSeparatorComponent={() => <View style={locationStyles.separator} />}
+            />
+          </View>
+        </Modal>
+
         <LanguageSwitcher />
       </View>
     );
@@ -781,5 +922,72 @@ const locationStyles = StyleSheet.create({
     color: '#111111',
     fontSize: 14,
     fontWeight: '600',
+  },
+  skipButton: {
+    marginTop: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  skipText: {
+    color: '#555555',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  pickerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#DDDDDD',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  pickerClose: {
+    fontSize: 16,
+    color: '#2196F3',
+    fontWeight: '600',
+  },
+  searchInput: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    fontSize: 15,
+    backgroundColor: '#F7F7F7',
+  },
+  countryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  countryName: {
+    fontSize: 15,
+    color: '#111111',
+    flex: 1,
+  },
+  countryCode: {
+    fontSize: 13,
+    color: '#666666',
+    fontWeight: '600',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EEEEEE',
+    marginLeft: 20,
   },
 });

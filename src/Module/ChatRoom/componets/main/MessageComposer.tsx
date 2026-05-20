@@ -134,6 +134,8 @@ type MessageComposerProps = {
 
   // @mention autocomplete
   mentionParticipants?: { id: string; name: string }[];
+
+  bottomInset?: number;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -161,6 +163,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onCreatePoll,
   onCreateEvent,
   mentionParticipants,
+  bottomInset = 0,
 }) => {
   /* ----------------------------- VOICE STATE ----------------------------- */
   const [isRecording, setIsRecording] = useState(false);
@@ -586,6 +589,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         {
           borderTopColor: palette.divider,
           backgroundColor: palette.chatComposerBg ?? palette.card,
+          paddingBottom: bottomInset,
         },
       ]}
     >

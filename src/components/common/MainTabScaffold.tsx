@@ -50,20 +50,23 @@ export function MainTabPageHeader({
             {eyebrow}
           </Text>
         ) : null}
-        <Text
-          style={[
-            styles.title,
-            {
-              color: palette.text,
-              fontSize: responsive.headerTitleSize,
-              lineHeight: Math.round(responsive.headerTitleSize * 1.2),
-            },
-          ]}
-          numberOfLines={responsive.isWatch ? 2 : 1}
-          adjustsFontSizeToFit
-        >
-          {title}
-        </Text>
+        <View style={styles.titleRow}>
+          <View style={[styles.goldAccentBar, { backgroundColor: palette.gold }]} />
+          <Text
+            style={[
+              styles.title,
+              {
+                color: palette.text,
+                fontSize: responsive.headerTitleSize,
+                lineHeight: Math.round(responsive.headerTitleSize * 1.2),
+              },
+            ]}
+            numberOfLines={responsive.isWatch ? 2 : 1}
+            adjustsFontSizeToFit
+          >
+            {title}
+          </Text>
+        </View>
         {subtitle ? (
           <Text
             style={[
@@ -71,7 +74,7 @@ export function MainTabPageHeader({
               {
                 color: palette.subtext,
                 fontSize: responsive.bodyFontSize,
-                lineHeight: Math.round(responsive.bodyFontSize * 1.42),
+                lineHeight: Math.round(responsive.bodyFontSize * 1.48),
               },
             ]}
             numberOfLines={responsive.isWatch ? 3 : 2}
@@ -156,28 +159,41 @@ export function MainTabStateBlock({
 
 const styles = StyleSheet.create({
   header: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 24,
     padding: 16,
     gap: 14,
   },
   headerTextWrap: {
-    gap: 5,
+    gap: 6,
   },
   eyebrow: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0,
+    letterSpacing: 1.2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  goldAccentBar: {
+    width: 4,
+    height: '100%',
+    borderRadius: 2,
+    minHeight: 24,
+    opacity: 0.75,
   },
   title: {
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '900',
+    flex: 1,
   },
   subtitle: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
     fontWeight: '600',
   },
   actions: {

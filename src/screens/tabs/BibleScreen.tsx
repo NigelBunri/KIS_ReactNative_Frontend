@@ -271,14 +271,20 @@ export default function BibleScreen() {
                   Scripture, prayer, notes, plans, and safe discipleship in one flow.
                 </Text>
               </View>
-              <View style={[styles.streakBadge, { backgroundColor: palette.primarySoft }]}>
-                <Text style={{ color: palette.primaryStrong, fontSize: 16, fontWeight: '900' }}>
+              <LinearGradient
+                colors={metallicGoldGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.streakBadge}
+              >
+                <View pointerEvents="none" style={styles.goldSheen} />
+                <Text style={{ color: '#FFFBF2', fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
                   {spiritualGrowthSummary?.journey?.streak ?? 0}
                 </Text>
-                <Text style={{ color: palette.primaryStrong, fontSize: 9, fontWeight: '900' }}>
+                <Text style={{ color: '#FFFBF2', fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
                   DAY
                 </Text>
-              </View>
+              </LinearGradient>
             </View>
             <View style={styles.growthStats}>
               {[
@@ -445,10 +451,10 @@ const styles = StyleSheet.create({
   tabRow: { gap: 8, paddingVertical: 4, alignItems: 'center' },
   tabChip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 999,
-    borderWidth: 2,
-    minHeight: 32,
+    borderWidth: 1.5,
+    minHeight: 36,
     justifyContent: 'center',
     overflow: 'hidden',
   },
@@ -475,38 +481,46 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   growthCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 12,
+    borderWidth: 1.5,
+    borderRadius: 20,
+    padding: 14,
     marginTop: 12,
     marginBottom: 6,
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 7 },
-    shadowRadius: 15,
-    elevation: 4,
+    shadowOpacity: 0.14,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 6,
+    overflow: 'hidden',
   },
   growthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    gap: 12,
+    marginBottom: 12,
   },
   growthTitle: {
     fontSize: 16,
     fontWeight: '900',
+    letterSpacing: 0.1,
   },
   growthSubtitle: {
     fontSize: 12,
     fontWeight: '600',
-    lineHeight: 16,
+    lineHeight: 17,
     marginTop: 2,
   },
   streakBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  goldSheen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
   },
   growthStats: {
     flexDirection: 'row',
@@ -517,38 +531,35 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: '22%',
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   growthStatValue: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '900',
+    letterSpacing: 0.1,
   },
   growthStatLabel: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
+    letterSpacing: 0.1,
   },
   growthSignals: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 7,
-    marginTop: 10,
+    marginTop: 12,
   },
   growthSignal: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   growthSignalText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  goldSheen: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    transform: [{ translateX: -18 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

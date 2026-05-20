@@ -1604,7 +1604,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
         end={{ x: 1, y: 1 }}
         style={styles.messageGoldPanel}
       >
-      
+        {/* Luxury gold shimmer line at the very top of the panel */}
+        <View style={styles.messageGoldSheen} pointerEvents="none" />
+
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
           <View

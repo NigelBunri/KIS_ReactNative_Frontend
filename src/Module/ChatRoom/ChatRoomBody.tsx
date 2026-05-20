@@ -1,5 +1,6 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
 import { MessageComposer } from './componets/main/MessageComposer';
@@ -99,10 +100,13 @@ export default function ChatRoomBody({
   canSend,
   mentionParticipants,
 }: Props) {
+  const insets = useSafeAreaInsets();
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={insets.top}
     >
       <MessageList
         messages={messages}
@@ -162,6 +166,7 @@ export default function ChatRoomBody({
           onCreatePoll={onCreatePoll}
           onCreateEvent={onCreateEvent}
           mentionParticipants={mentionParticipants}
+          bottomInset={insets.bottom}
         />
       )}
     </KeyboardAvoidingView>

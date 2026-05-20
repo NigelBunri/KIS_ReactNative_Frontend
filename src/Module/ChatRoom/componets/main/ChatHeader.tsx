@@ -16,6 +16,7 @@ type ChatHeaderProps = {
   onOpenInfo?: () => void;
   onStartVoiceCall?: () => void;
   onStartVideoCall?: () => void;
+  onStartBroadcast?: () => void;
   currentUserId?: string;
 
   // Selection mode support
@@ -59,6 +60,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onOpenInfo,
   onStartVoiceCall,
   onStartVideoCall,
+  onStartBroadcast,
   currentUserId,
 
   selectionMode = false,
@@ -359,8 +361,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </View>
         </Pressable>
 
-        {/* WhatsApp-like actions: camera, mic, menu */}
+        {/* Call actions */}
         <View style={styles.headerActions}>
+          {onStartBroadcast && (
+            <Pressable style={styles.headerIconButton} onPress={onStartBroadcast}>
+              <KISIcon
+                name="radio"
+                size={20}
+                color={palette.onHeader ?? palette.text}
+              />
+            </Pressable>
+          )}
           <Pressable style={styles.headerIconButton} onPress={onStartVideoCall}>
             <KISIcon
               name="camera"
