@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   View,
   Text,
   StyleSheet,
@@ -909,7 +910,7 @@ export default function FeedScreen<T extends FeedPost>({
                       </Text>
 
                       <Pressable
-                        onPress={() => {}}
+                        onPress={() => Linking.openURL('https://kis.app').catch(() => {})}
                         style={({ pressed }) => [styles.adBtn, { opacity: pressed ? 0.9 : 1 }]}
                       >
                         <Text style={styles.adBtnText}>Learn More</Text>

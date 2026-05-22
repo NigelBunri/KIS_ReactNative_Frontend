@@ -14,8 +14,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -44,7 +44,7 @@ type LabOrder = {
   createdAt: number;
 };
 
-const toKiscLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
 
 export default function LabOrderManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
@@ -86,7 +86,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         .map((row: any, index: number) => ({
           id: String(row?.id || `lab-${index + 1}`),
           name: String(row?.name || '').trim() || `Lab Test ${index + 1}`,
-          price: microToKisc(Number(row?.amount_micro || 0)),
+          price: microToUsd(Number(row?.amount_micro || 0)),
           turnaroundHours: Math.max(1, Number(row?.value_int || 0) || 1),
           sortOrder: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : index + 1,
         }))
@@ -125,7 +125,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         const response = await createInstitutionEngineManagedItem(institutionId, engineKey, {
           item_kind: 'lab_test',
           name,
-          amount_micro: kiscToMicro(price),
+          amount_micro: usdToMicro(price),
           value_int: turnaround,
           status: 'active',
         });
@@ -135,7 +135,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
       } else {
         const response = await updateInstitutionEngineManagedItem(institutionId, engineKey, editingTestId, {
           name,
-          amount_micro: kiscToMicro(price),
+          amount_micro: usdToMicro(price),
           value_int: turnaround,
         });
         if (!response?.success) {
@@ -154,7 +154,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
   const editLabTest = useCallback((test: LabTest) => {
     setEditingTestId(test.id);
     setNewTestName(test.name);
-    setNewTestPrice(toKiscLabel(test.price));
+    setNewTestPrice(toUsdLabel(test.price));
     setNewTestTurnaround(String(test.turnaroundHours));
   }, []);
 
@@ -258,7 +258,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
           <View key={test.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{test.name}</Text>
             <Text style={{ color: palette.subtext }}>
-              {toKiscLabel(test.price)} USD • {test.turnaroundHours}h
+              {toUsdLabel(test.price)} USD • {test.turnaroundHours}h
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Test" variant="outline" onPress={() => editLabTest(test)} />
@@ -360,7 +360,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
 
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Orders: {completedOrders}</Text>
-        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} USD</Text>
+        <Text style={{ color: palette.text }}>Revenue Generated: {toUsdLabel(totalRevenue)} USD</Text>
         <Text style={{ color: palette.text }}>
           Completion Rate: {totalOrders === 0 ? 0 : Math.round((completedOrders / totalOrders) * 100)}%
         </Text>

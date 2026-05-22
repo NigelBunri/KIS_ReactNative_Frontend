@@ -316,6 +316,7 @@ export function useChatPersistence(
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const roomIdRef = useRef<string>(roomId);
+  const previousRoomIdRef = useRef<string | null>(null);
   const flushInFlightRef = useRef(false);
 
   /* ------------------------------------------------------------------------
@@ -327,6 +328,9 @@ export function useChatPersistence(
   }, [messages]);
 
   useEffect(() => {
+    if (roomIdRef.current !== roomId) {
+      previousRoomIdRef.current = roomIdRef.current;
+    }
     roomIdRef.current = roomId;
   }, [roomId, currentUserId]);
 
@@ -343,12 +347,22 @@ export function useChatPersistence(
     (async () => {
       try {
         const loaded = await loadMessages(roomId);
+        const previousRoomId = previousRoomIdRef.current;
+        const migrated =
+          previousRoomId && previousRoomId !== roomId
+            ? await loadMessages(previousRoomId)
+            : [];
         if (!mounted) return;
-        const filtered = (loaded ?? []).filter((m) => {
+        const byIdentity = new Map<string, ChatMessage>();
+        [...(loaded ?? []), ...(migrated ?? []), ...messagesRef.current].forEach((m) => {
           const convId = m.conversationId ?? m.roomId ?? '';
-          return String(convId) === String(roomId);
+          const belongsToRoom = String(convId) === String(roomId) || String(m.roomId ?? '') === String(roomId);
+          const migratedToRoom = previousRoomId && String(m.roomId ?? '') === String(previousRoomId) && String(convId) === String(roomId);
+          if (!belongsToRoom && !migratedToRoom) return;
+          const key = String(m.serverId ?? m.id ?? m.clientId ?? `${m.createdAt}-${m.senderId}`);
+          byIdentity.set(key, { ...m, roomId, conversationId: m.conversationId ?? roomId });
         });
-        const normalized = filtered.map((m) =>
+        const normalized = Array.from(byIdentity.values()).map((m) =>
           normalizeSender(m, currentUserId),
         );
         const sorted = sortMessages(normalized);
@@ -376,6 +390,11 @@ export function useChatPersistence(
   const persist = useCallback(
     async (next: ChatMessage[]) => {
       const sorted = sortMessages(next);
+      // Update the ref synchronously before the async state update so that any
+      // concurrent async operation (e.g. decrypt → patchDecryptedMessage) that
+      // reads messagesRef.current immediately after persist() will see the
+      // latest list instead of the stale pre-render snapshot.
+      messagesRef.current = sorted;
       setMessages(sorted);
       await saveMessages(roomIdRef.current, sorted);
     },

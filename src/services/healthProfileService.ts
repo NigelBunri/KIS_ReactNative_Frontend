@@ -143,6 +143,71 @@ const writeCachedHealthProfile = async (profile: any) => {
   } catch {}
 };
 
+const extractHealthOpsInstitutions = (payload: any): any[] => {
+  const data = payload?.data ?? payload ?? {};
+  const candidates = [
+    data?.results,
+    data?.institutions,
+    data?.data?.results,
+    data?.data?.institutions,
+    Array.isArray(data) ? data : null,
+  ];
+  for (const value of candidates) {
+    if (Array.isArray(value)) return value.filter((item) => item && typeof item === 'object');
+  }
+  return [];
+};
+
+const mergeInstitutionLists = (primary: any[], secondary: any[]): any[] => {
+  const merged: any[] = [];
+  const indexByKey = new Map<string, number>();
+  const keyFor = (institution: any) => {
+    const id = String(institution?.id || '').trim();
+    if (id) return `id:${id}`;
+    const name = String(institution?.name || '').trim().toLowerCase();
+    return name ? `name:${name}` : '';
+  };
+  for (const row of [...primary, ...secondary]) {
+    const key = keyFor(row);
+    if (!key) {
+      merged.push(row);
+      continue;
+    }
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex == null) {
+      indexByKey.set(key, merged.length);
+      merged.push(row);
+      continue;
+    }
+    merged[existingIndex] = {
+      ...merged[existingIndex],
+      ...row,
+    };
+  }
+  return merged;
+};
+
+const mergeHealthOpsInstitutions = async (profile: any, options?: { forceNetwork?: boolean }) => {
+  const baseProfile = profile && typeof profile === 'object' ? profile : {};
+  try {
+    const res = await getRequest(ROUTES.healthOps.institutions, {
+      forceNetwork: !!options?.forceNetwork,
+    });
+    if (!res?.success) return profile;
+    const healthOpsInstitutions = extractHealthOpsInstitutions(res);
+    if (!healthOpsInstitutions.length) return profile;
+    const existingInstitutions = Array.isArray(baseProfile?.institutions)
+      ? baseProfile.institutions
+      : resolveInstitutions(baseProfile);
+    return {
+      ...baseProfile,
+      institutions: mergeInstitutionLists(existingInstitutions, healthOpsInstitutions),
+    };
+  } catch {
+    return profile;
+  }
+};
+
 export const fetchHealthProfileState = async (options?: { forceNetwork?: boolean }) => {
   const cached = await readCachedHealthProfile();
   logHealthProfile('fetchHealthProfileState:start', {
@@ -163,13 +228,14 @@ export const fetchHealthProfileState = async (options?: { forceNetwork?: boolean
   if (canonicalRes?.success && canonicalRes?.data) {
     const canonicalNormalized = normalizeHealthProfileForCache(canonicalRes.data);
     if (canonicalNormalized) {
-      await writeCachedHealthProfile(canonicalNormalized);
+      const merged = await mergeHealthOpsInstitutions(canonicalNormalized, options);
+      await writeCachedHealthProfile(merged);
       logHealthProfile('fetchHealthProfileState:canonical-success', {
-        patientId: canonicalNormalized?.patient_id,
-        institutions: canonicalNormalized?.institutions?.length ?? 0,
+        patientId: merged?.patient_id,
+        institutions: merged?.institutions?.length ?? 0,
       });
       return {
-        profile: canonicalNormalized,
+        profile: merged,
         exists: true,
       };
     }
@@ -191,27 +257,29 @@ export const fetchHealthProfileState = async (options?: { forceNetwork?: boolean
         blockedUntil: healthProfileReadBlockedUntil,
       });
     }
+    const mergedFallback = await mergeHealthOpsInstitutions(cached ?? {}, options);
     return {
-      profile: cached,
-      exists: resolveHasOwnerProfile(cached),
+      profile: mergedFallback ?? cached,
+      exists: resolveHasOwnerProfile(mergedFallback ?? cached),
     };
   }
   const normalized = normalizeHealthProfileForCache(resolveHealthProfile(res?.data));
-  const institutions = Array.isArray(normalized?.institutions) ? normalized.institutions : [];
+  const merged = await mergeHealthOpsInstitutions(normalized ?? cached, options);
+  const institutions = Array.isArray(merged?.institutions) ? merged.institutions : [];
   logHealthProfile('fetchHealthProfileState:request-success', {
-    hasProfile: !!normalized,
+    hasProfile: !!merged,
     institutions: institutions.length,
-    profileKeys: normalized && typeof normalized === 'object' ? Object.keys(normalized).slice(0, 20) : [],
+    profileKeys: merged && typeof merged === 'object' ? Object.keys(merged).slice(0, 20) : [],
   });
-  if (normalized) {
-    await writeCachedHealthProfile(normalized);
+  if (merged) {
+    await writeCachedHealthProfile(merged);
     logHealthProfile('fetchHealthProfileState:cache-updated', {
-      institutions: normalized?.institutions?.length ?? 0,
+      institutions: merged?.institutions?.length ?? 0,
     });
   }
   return {
-    profile: normalized ?? cached,
-    exists: resolveHasOwnerProfile(normalized ?? cached),
+    profile: merged ?? cached,
+    exists: resolveHasOwnerProfile(merged ?? cached),
   };
 };
 

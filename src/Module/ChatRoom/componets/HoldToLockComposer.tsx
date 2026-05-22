@@ -426,15 +426,7 @@ export const HoldToLockComposer: React.FC<HoldToLockComposerProps> = ({
    * ──────────────────────────────────────── */
 
   return (
-    <View
-      style={[
-        styles.composerContainer,
-        {
-          borderTopColor: palette.divider,
-          backgroundColor: palette.chatComposerBg ?? palette.card,
-        },
-      ]}
-    >
+    <View style={{ flexDirection: 'column', flex: 1 }}>
       {/* Recording banner */}
       {isRecording && (
         <View style={styles.voiceRecordingBanner}>
@@ -544,13 +536,11 @@ export const HoldToLockComposer: React.FC<HoldToLockComposerProps> = ({
 
       {/* Main area: centered mic with pull-to-lock */}
       <View
-        style={[
-          styles.composerMainRow,
-          {
-            justifyContent: 'center',
-            alignItems: 'center',
-          },
-        ]}
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
       >
         <View
           {...(!disabled && voiceMode !== 'preview'

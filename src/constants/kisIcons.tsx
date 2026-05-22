@@ -110,6 +110,13 @@ export type KISIconName =
   | 'channel'
   | 'call-history'
   | 'volume-mute'
+  // Call screen icons
+  | 'phone-missed'
+  | 'phone-off'
+  | 'mic-off'
+  | 'video-off'
+  | 'volume-2'
+  | 'volume-x'
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -291,6 +298,12 @@ const ion: IonMap = {
   channel: { filled: 'radio', outline: 'radio-outline' },
   'call-history': { filled: 'time', outline: 'time-outline' },
   'volume-mute': { filled: 'volume-mute', outline: 'volume-mute-outline' },
+  'phone-missed': { filled: 'call', outline: 'call-outline' },
+  'phone-off': { filled: 'call', outline: 'call-outline' },
+  'mic-off': { filled: 'mic-off', outline: 'mic-off-outline' },
+  'video-off': { filled: 'videocam-off', outline: 'videocam-off-outline' },
+  'volume-2': { filled: 'volume-high', outline: 'volume-high-outline' },
+  'volume-x': { filled: 'volume-mute', outline: 'volume-mute-outline' },
 };
 
 export interface KISIconProps {

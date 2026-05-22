@@ -119,18 +119,12 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
     try {
       setSubmitting(true);
 
-      if (!communityId && !selectedChannelId && !partnerId) {
-        Alert.alert('Select a channel', 'Please select a channel for this group.');
-        return;
-      }
-
       const payload = {
         name: trimmedName,
         slug: finalSlug,
-        // For now: no partner / community selection in the UI
         partner: partnerId ?? null,
         community: communityId ?? null,
-        channel: communityId ? null : selectedChannelId,
+        channel: communityId ? null : (selectedChannelId ?? null),
         description: description.trim() || undefined,
       };
 

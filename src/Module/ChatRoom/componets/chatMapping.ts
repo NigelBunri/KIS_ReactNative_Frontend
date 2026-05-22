@@ -106,7 +106,7 @@ export const mapBackendToChatMessage = (
       : undefined;
 
   return {
-    id: String(payload.id ?? payload._id ?? Date.now().toString()),
+    id: String(payload.id ?? payload._id ?? payload.clientId ?? ''),
     clientId: payload.clientId ?? undefined,
     serverId: payload.id ?? payload._id ?? undefined,
     seq: typeof payload.seq === 'number' ? payload.seq : undefined,

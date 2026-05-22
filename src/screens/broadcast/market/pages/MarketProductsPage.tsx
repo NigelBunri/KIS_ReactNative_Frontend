@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
@@ -50,6 +53,7 @@ type Props = {
 
 export default function MarketProductsPage({ ownerId = null }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {
     myShops,
     myProducts,
@@ -344,7 +348,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                         Alert.alert('Broadcast', 'Unable to remove broadcast.');
                       }
                     }}
-                    onPress={() => {}}
+                    onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
                   />
                 ))}
               </View>

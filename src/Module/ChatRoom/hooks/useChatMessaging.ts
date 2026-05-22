@@ -85,6 +85,16 @@ export function useChatMessaging({
   const { socket, isConnected } = useSocket();
 
   /* ---------------------------------------------------------------------
+   * MOUNTED GUARD
+   * ------------------------------------------------------------------ */
+
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  /* ---------------------------------------------------------------------
    * SEND IMPLEMENTATION REF
    * ------------------------------------------------------------------ */
 
@@ -149,6 +159,9 @@ export function useChatMessaging({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
+  const replaceMessagesRef = useRef(replaceMessages);
+  useEffect(() => { replaceMessagesRef.current = replaceMessages; }, [replaceMessages]);
+
   useEffect(() => {
     ensureDeviceId()
       .then((value) => {
@@ -199,6 +212,7 @@ export function useChatMessaging({
 
   const patchDecryptedMessage = useCallback(
     (messageId: string, patch: Partial<ChatMessage>) => {
+      if (!mountedRef.current) return;
       const next = messagesRef.current.map((message) =>
         message.serverId === messageId || message.id === messageId
           ? { ...message, ...patch }
@@ -212,7 +226,7 @@ export function useChatMessaging({
   const decryptChatMessage = useCallback(
     async (mapped: ChatMessage) => {
       const encMeta = mapped.encryptionMeta;
-      if (!encMeta) return;
+      if (!encMeta && !mapped.ciphertext) return;
 
       try {
         if (encMeta?.e2ee === 'signal') {
@@ -291,6 +305,10 @@ export function useChatMessaging({
     },
     [currentUserId, patchDecryptedMessage],
   );
+
+  // Stable refs so the socket listener effect doesn't re-subscribe on every render
+  const decryptChatMessageRef = useRef(decryptChatMessage);
+  useEffect(() => { decryptChatMessageRef.current = decryptChatMessage; });
 
   const mapServerMessage = useCallback(
     (serverMsg: any): ChatMessage => {
@@ -438,6 +456,12 @@ export function useChatMessaging({
     [storageRoomId, currentUserId, normalizeReactions, conversationId],
   );
 
+  const mapServerMessageRef = useRef(mapServerMessage);
+  useEffect(() => { mapServerMessageRef.current = mapServerMessage; });
+
+  const normalizeReactionsRef = useRef(normalizeReactions);
+  useEffect(() => { normalizeReactionsRef.current = normalizeReactions; });
+
   /* ---------------------------------------------------------------------
    * JOIN / LEAVE CONVERSATION
    * ------------------------------------------------------------------ */
@@ -476,12 +500,13 @@ export function useChatMessaging({
           after: input.after,
           before: input.before,
         },
-        (err: any, ack?: any) => {
+        async (err: any, ack?: any) => {
           if (err || !ack?.ok) return;
           const items = Array.isArray(ack?.data?.messages) ? ack.data.messages : [];
           if (!items.length) return;
           const mapped = items.map((m: any) => mapServerMessage(m));
-          replaceMessages(mapped);
+          // Await so messagesRef is current before decryption reads it.
+          await replaceMessages(mapped);
           mapped.forEach((message: ChatMessage) => {
             void decryptChatMessage(message);
           });
@@ -534,7 +559,8 @@ export function useChatMessaging({
         rounds += 1;
       }
       if (all.length) {
-        replaceMessages(all);
+        // Await so messagesRef is current before decryption patches run.
+        await replaceMessages(all);
         all.forEach((message: ChatMessage) => {
           void decryptChatMessage(message);
         });
@@ -662,7 +688,7 @@ export function useChatMessaging({
   const sendOverNetworkImpl =
   useCallback<SendOverNetworkFn>(
     async (message) => {
-      console.log('[chat.send.debug] start', {
+      if (__DEV__) console.log('[chat.send.debug] start', {
         socketReady: !!socket,
         connected: !!(socket && (isConnected || socket.connected)),
         messageId: message.id,
@@ -676,9 +702,7 @@ export function useChatMessaging({
 
       // Socket not ready → keep message queued locally
       if (!socket || !(isConnected || socket.connected) || !chat) {
-        console.log(
-          '[sendOverNetworkImpl] socket not ready → queue',
-        );
+        if (__DEV__) console.log('[sendOverNetworkImpl] socket not ready → queue');
         return { ok: false };
       }
 
@@ -768,7 +792,7 @@ export function useChatMessaging({
       let payloadToSend: any = basePayload;
       try {
         const recipientUserIds = getRecipientUserIds();
-        console.log('[chat.send.debug] signal recipients', {
+        if (__DEV__) console.log('[chat.send.debug] signal recipients', {
           conversationId: String(convId),
           recipientUserIds,
           currentUserId: String(currentUserId),
@@ -789,7 +813,7 @@ export function useChatMessaging({
           CHAT_SIGNAL_ENCRYPTION_TIMEOUT_MS,
           'Signal encryption',
         );
-        console.log('[chat.send.debug] signal encryption ready', {
+        if (__DEV__) console.log('[chat.send.debug] signal encryption ready', {
           conversationId: String(convId),
           elapsedMs: Date.now() - signalStartedAt,
           recipientCipherCount: Array.isArray(signalEncrypted.encryptionMeta?.recipients)
@@ -811,7 +835,7 @@ export function useChatMessaging({
             CHAT_CONVERSATION_ENCRYPTION_TIMEOUT_MS,
             'Conversation encryption',
           );
-          console.log('[chat.send.debug] conversation encryption ready', {
+          if (__DEV__) console.log('[chat.send.debug] conversation encryption ready', {
             conversationId: String(convId),
             elapsedMs: Date.now() - conversationEncryptStartedAt,
           });
@@ -850,7 +874,7 @@ export function useChatMessaging({
                 ack?: any,
               ) => {
                 if (err) {
-                  console.warn('[chat.send.debug] socket ack timeout/error', {
+                  if (__DEV__) console.warn('[chat.send.debug] socket ack timeout/error', {
                     conversationId: payloadToSend?.conversationId,
                     clientId,
                     err,
@@ -861,7 +885,7 @@ export function useChatMessaging({
                 const success = ack?.ok === true;
 
                 if (!success) {
-                  console.warn('[chat.send.debug] ACK failed', {
+                  if (__DEV__) console.warn('[chat.send.debug] ACK failed', {
                     conversationId: payloadToSend?.conversationId,
                     clientId,
                     ack,
@@ -875,14 +899,11 @@ export function useChatMessaging({
                   ackPayload?.serverId ?? ack?.serverId ?? ack?.id;
 
                 if (!serverId) {
-                  console.warn(
-                    '[chat.send] ACK missing serverId',
-                    ack,
-                  );
+                  if (__DEV__) console.warn('[chat.send] ACK missing serverId', ack);
                   return resolve({ ok: false });
                 }
 
-                console.log('[chat.send.debug] ACK success', {
+                if (__DEV__) console.log('[chat.send.debug] ACK success', {
                   conversationId: payloadToSend?.conversationId,
                   clientId,
                   serverId,
@@ -924,10 +945,7 @@ export function useChatMessaging({
   useEffect(() => {
     if (!socket || !(isConnected || socket.connected)) return;
 
-    console.log(
-      '[useChatMessaging] socket connected → flush queue',
-    );
-
+    if (__DEV__) console.log('[useChatMessaging] socket connected → flush queue');
     attemptFlushQueue({ silent: true });
     syncHistory();
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
@@ -963,30 +981,22 @@ export function useChatMessaging({
   useEffect(() => {
     if (!socket) return;
 
-    const onIncomingMessage = (
+    const onIncomingMessage = async (
       serverMsg: any,
     ) => {
-      const activeConv =
-        conversationIdRef.current;
+      const activeConv = conversationIdRef.current;
 
       if (
         !activeConv ||
-        String(serverMsg.conversationId) !==
-          String(activeConv)
+        String(serverMsg.conversationId) !== String(activeConv)
       ) {
         return;
       }
 
       const incomingServerId = serverMsg.id ?? serverMsg._id;
       const matchIndex = messagesRef.current.findIndex((m) => {
-        // 1. Exact clientId match — most reliable
         if (serverMsg.clientId && m.clientId && m.clientId === serverMsg.clientId) return true;
-        // 2. serverId already assigned by a prior ACK — prevent second duplicate
         if (incomingServerId && m.serverId && m.serverId === incomingServerId) return true;
-        // 3. Last-resort: echo has no clientId but sender is us and we have an
-        //    in-flight message.  Match 'sending' AND 'pending' — sendRichMessage
-        //    flips status to 'sending' before the network call so the echo-back
-        //    would never match if we checked only 'pending'.
         if (
           !serverMsg.clientId &&
           String(serverMsg.senderId ?? serverMsg.sender_id ?? '') === String(currentUserId) &&
@@ -1007,11 +1017,11 @@ export function useChatMessaging({
               }
             : m,
         );
-        replaceMessages(next);
+        await replaceMessagesRef.current(next);
         return;
       }
 
-      const msg = mapServerMessage(serverMsg);
+      const msg = mapServerMessageRef.current(serverMsg);
 
       if (!msg.fromMe && msg.serverId) {
         try {
@@ -1023,18 +1033,11 @@ export function useChatMessaging({
         } catch {}
       }
 
-      replaceMessages([
-        ...messagesRef.current,
-        msg,
-      ]);
-      void decryptChatMessage(msg);
-
+      await replaceMessagesRef.current([...messagesRef.current, msg]);
+      void decryptChatMessageRef.current(msg);
     };
 
-    socket.on(
-      'chat.message',
-      onIncomingMessage,
-    );
+    socket.on('chat.message', onIncomingMessage);
 
     const onReceipt = async (payload: any) => {
       const conversationId = payload?.conversationId;
@@ -1044,11 +1047,9 @@ export function useChatMessaging({
 
       const roomId = String(storageRoomId);
       const status =
-        type === 'read'
-          ? 'read'
-          : type === 'delivered'
-          ? 'delivered'
-          : undefined;
+        type === 'read' ? 'read' :
+        type === 'delivered' ? 'delivered' :
+        undefined;
 
       if (!status) return;
       try {
@@ -1057,10 +1058,9 @@ export function useChatMessaging({
             ? { ...m, status }
             : m,
         );
-        replaceMessages(updated);
+        replaceMessagesRef.current(updated);
         const changed = updated.find(
-          (m) =>
-            String(m.serverId ?? m.id ?? '') === String(messageId),
+          (m) => String(m.serverId ?? m.id ?? '') === String(messageId),
         );
         DeviceEventEmitter.emit('message.status', {
           conversationId,
@@ -1076,140 +1076,105 @@ export function useChatMessaging({
     socket.on('chat.message_receipt', onReceipt);
 
     const onEdit = (serverMsg: any) => {
-      const activeConv =
-        conversationIdRef.current;
+      const activeConv = conversationIdRef.current;
       if (
         !activeConv ||
-        String(serverMsg.conversationId) !==
-          String(activeConv)
+        String(serverMsg.conversationId) !== String(activeConv)
       ) {
         return;
       }
 
-      const id =
-        serverMsg.id ??
-        serverMsg._id ??
-        serverMsg.messageId;
+      const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
 
-      const next = messagesRef.current.map(
-        (m) =>
-          m.serverId === id || m.id === id
-            ? {
-                ...m,
-                text: serverMsg.text ?? m.text,
-                styledText:
-                  serverMsg.styledText ??
-                  m.styledText,
-                ciphertext: serverMsg.ciphertext ?? m.ciphertext,
-                encryptionMeta:
-                  serverMsg.encryptionMeta ??
-                  serverMsg.encryption_meta ??
-                  m.encryptionMeta,
-                iv: serverMsg.iv ?? m.iv,
-                tag: serverMsg.tag ?? m.tag,
-                aad: serverMsg.aad ?? m.aad,
-                encryptionVersion: serverMsg.encryptionVersion ?? m.encryptionVersion,
-                encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? m.encryptionKeyVersion,
-                isEdited: true,
-                updatedAt:
-                  serverMsg.updatedAt ??
-                  new Date().toISOString(),
-              }
-            : m,
+      const next = messagesRef.current.map((m) =>
+        m.serverId === id || m.id === id
+          ? {
+              ...m,
+              text: serverMsg.text ?? m.text,
+              styledText: serverMsg.styledText ?? m.styledText,
+              ciphertext: serverMsg.ciphertext ?? m.ciphertext,
+              encryptionMeta:
+                serverMsg.encryptionMeta ??
+                serverMsg.encryption_meta ??
+                m.encryptionMeta,
+              iv: serverMsg.iv ?? m.iv,
+              tag: serverMsg.tag ?? m.tag,
+              aad: serverMsg.aad ?? m.aad,
+              encryptionVersion: serverMsg.encryptionVersion ?? m.encryptionVersion,
+              encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? m.encryptionKeyVersion,
+              isEdited: true,
+              updatedAt: serverMsg.updatedAt ?? new Date().toISOString(),
+            }
+          : m,
       );
 
-      replaceMessages(next);
+      replaceMessagesRef.current(next);
       const updated = next.find((m) => m.serverId === id || m.id === id);
       if (updated) {
-        void decryptChatMessage(updated);
+        void decryptChatMessageRef.current(updated);
       }
     };
 
     const onDelete = (serverMsg: any) => {
-      const activeConv =
-        conversationIdRef.current;
+      const activeConv = conversationIdRef.current;
       if (
         !activeConv ||
-        String(serverMsg.conversationId) !==
-          String(activeConv)
+        String(serverMsg.conversationId) !== String(activeConv)
       ) {
         return;
       }
 
-      const id =
-        serverMsg.id ??
-        serverMsg._id ??
-        serverMsg.messageId;
+      const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
 
-      const next = messagesRef.current.map(
-        (m) =>
-          m.serverId === id || m.id === id
-            ? {
-                ...m,
-                isDeleted: true,
-                text: '',
-                styledText: undefined,
-                voice: undefined,
-                sticker: undefined,
-                attachments: [],
-              }
-            : m,
+      const next = messagesRef.current.map((m) =>
+        m.serverId === id || m.id === id
+          ? {
+              ...m,
+              isDeleted: true,
+              text: '',
+              styledText: undefined,
+              voice: undefined,
+              sticker: undefined,
+              attachments: [],
+            }
+          : m,
       );
 
-      replaceMessages(next);
+      replaceMessagesRef.current(next);
     };
 
     socket.on('chat.edit', onEdit);
     socket.on('chat.delete', onDelete);
 
     const onReaction = (serverMsg: any) => {
-      const activeConv =
-        conversationIdRef.current;
+      const activeConv = conversationIdRef.current;
       if (
         !activeConv ||
-        String(serverMsg.conversationId) !==
-          String(activeConv)
+        String(serverMsg.conversationId) !== String(activeConv)
       ) {
         return;
       }
 
-      const id =
-        serverMsg.id ??
-        serverMsg._id ??
-        serverMsg.messageId;
+      const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
       if (!id) return;
 
-      const reactions = normalizeReactions(serverMsg.reactions);
+      const reactions = normalizeReactionsRef.current(serverMsg.reactions);
       const roomId = String(storageRoomId);
       bulkUpdateMessages(roomId, (m) =>
-        m.serverId === id || m.id === id
-          ? { ...m, reactions }
-          : m,
-      ).then(replaceMessages);
+        m.serverId === id || m.id === id ? { ...m, reactions } : m,
+      ).then((updated) => replaceMessagesRef.current(updated));
     };
 
     socket.on('chat.message_reaction', onReaction);
 
     return () => {
-      socket.off(
-        'chat.message',
-        onIncomingMessage,
-      );
+      socket.off('chat.message', onIncomingMessage);
       socket.off('chat.message_receipt', onReceipt);
       socket.off('chat.edit', onEdit);
       socket.off('chat.delete', onDelete);
       socket.off('chat.message_reaction', onReaction);
     };
-  }, [
-    socket,
-    replaceMessages,
-    storageRoomId,
-    mapServerMessage,
-    conversationId,
-    normalizeReactions,
-    currentUserId,
-    decryptChatMessage,
-  ]);
+  }, [socket, storageRoomId, currentUserId]);
 
   /* ---------------------------------------------------------------------
    * CONVERSATION FAN-OUT EVENTS
@@ -1218,38 +1183,27 @@ export function useChatMessaging({
   useEffect(() => {
     if (!socket) return;
 
-    const log =
-      (name: string) => (p: any) =>
-        console.log(`[WS] ${name}`, p);
+    const onConversationCreated = (payload: any) => {
+      if (__DEV__) console.log('[WS] conversation.created', payload);
+      DeviceEventEmitter.emit('conversation.refresh');
+    };
+    const onConversationUpdated = (payload: any) => {
+      if (__DEV__) console.log('[WS] conversation.updated', payload);
+      DeviceEventEmitter.emit('conversation.refresh');
+    };
+    const onConversationLastMessage = (payload: any) => {
+      if (__DEV__) console.log('[WS] conversation.last_message', payload);
+      DeviceEventEmitter.emit('conversation.refresh');
+    };
 
-    socket.on(
-      'conversation.created',
-      (payload: any) => {
-        log('conversation.created')(payload);
-        DeviceEventEmitter.emit('conversation.refresh');
-      },
-    );
-    socket.on(
-      'conversation.updated',
-      (payload: any) => {
-        log('conversation.updated')(payload);
-        DeviceEventEmitter.emit('conversation.refresh');
-      },
-    );
-    socket.on(
-      'conversation.last_message',
-      (payload: any) => {
-        log('conversation.last_message')(payload);
-        DeviceEventEmitter.emit('conversation.refresh');
-      },
-    );
+    socket.on('conversation.created', onConversationCreated);
+    socket.on('conversation.updated', onConversationUpdated);
+    socket.on('conversation.last_message', onConversationLastMessage);
 
     return () => {
-      socket.off('conversation.created');
-      socket.off('conversation.updated');
-      socket.off(
-        'conversation.last_message',
-      );
+      socket.off('conversation.created', onConversationCreated);
+      socket.off('conversation.updated', onConversationUpdated);
+      socket.off('conversation.last_message', onConversationLastMessage);
     };
   }, [socket]);
 

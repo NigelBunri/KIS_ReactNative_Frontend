@@ -100,30 +100,30 @@ const broadcastRoutes = {
     kcanMessageView: (id: string | number) => `${API_BASE_URL}/api/v1/bible/kcan-messages/${id}/view/`,
   },
   education: {
-    discovery: `${API_BASE_URL}/api/v1/education/discovery/`,
-    search: `${API_BASE_URL}/api/v1/education/search/`,
-    detail: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/`,
+    discovery: `${API_BASE_URL}/api/v1/bible/courses/`,
+    search: `${API_BASE_URL}/api/v1/bible/search/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/bible/courses/${id}/`,
     certificate: (id: string) =>
-      `${API_BASE_URL}/api/v1/education/contents/${id}/certificate/`,
+      `${API_BASE_URL}/api/v1/bible/courses/${id}/certificate/`,
     certificateShare: (token: string) =>
-      `${API_BASE_URL}/api/v1/education/certificates/share/${token}/`,
+      `${API_BASE_URL}/api/v1/bible/credentials/share/${token}/`,
     enroll: (id: string) =>
-      `${API_BASE_URL}/api/v1/education/contents/${id}/enroll/`,
+      `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
     itemAction: (contentId: string, itemId: string) =>
-      `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
-    progress: `${API_BASE_URL}/api/v1/education/progress/`,
-    review: `${API_BASE_URL}/api/v1/education/reviews/`,
+      `${API_BASE_URL}/api/v1/bible/courses/${contentId}/lessons/${itemId}/`,
+    progress: `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
+    review: `${API_BASE_URL}/api/v1/bible/peer-reviews/`,
     contentReviews: (id: string) =>
-      `${API_BASE_URL}/api/v1/education/contents/${id}/reviews/`,
+      `${API_BASE_URL}/api/v1/bible/peer-reviews/?course=${id}`,
     contentQuestions: (id: string) =>
-      `${API_BASE_URL}/api/v1/education/contents/${id}/questions/`,
+      `${API_BASE_URL}/api/v1/bible/quiz-questions/?course=${id}`,
     bookingSatisfy: (institutionId: string, bookingId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/bookings/${bookingId}/satisfy/`,
     partnerLinks: (partnerId: string) =>
       `${API_BASE_URL}/api/v1/partners/${partnerId}/links/`,
     partnerLink: (partnerId: string, profileKey: string) =>
       `${API_BASE_URL}/api/v1/partners/${partnerId}/links/${profileKey}/`,
-    enrollments: `${API_BASE_URL}/api/v1/education/enrollments/`,
+    enrollments: `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
   },
   partners: {
     list: `${API_BASE_URL}/api/v1/partners/`,

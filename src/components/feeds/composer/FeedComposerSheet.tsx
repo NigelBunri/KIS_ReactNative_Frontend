@@ -9,7 +9,9 @@ import React, {
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -335,6 +337,10 @@ export default function FeedComposerSheet({
           },
         ]}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.sheetScroll}
@@ -441,6 +447,7 @@ export default function FeedComposerSheet({
             </>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
 
         {uploadingVideo && (
           <View style={styles.uploadOverlay}>

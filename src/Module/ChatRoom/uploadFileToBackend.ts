@@ -19,6 +19,10 @@ export type AttachmentMeta = {
   url: string;
   publicUrl?: string;
   downloadUrl?: string;
+  displayUrl?: string;
+  assetId?: string;
+  mediaAssetId?: string;
+  mediaAssetRef?: string;
   originalName: string;
   mimeType: string;
   size: number;
@@ -117,7 +121,20 @@ export async function uploadFileToBackend(opts: {
           }
           return;
         }
-        reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+        let safeMessage = 'Upload failed. Please retry.';
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}');
+          const detail = parsed?.detail ?? parsed?.message ?? parsed?.error;
+          if (typeof detail === 'string' && detail.trim()) safeMessage = detail;
+          else if (Array.isArray(detail) && typeof detail[0] === 'string') safeMessage = detail[0];
+          else if (detail && typeof detail === 'object') {
+            const first = Object.values(detail).flat().find((value) => typeof value === 'string');
+            if (typeof first === 'string') safeMessage = first;
+          }
+        } catch {
+          // Keep the generic message; do not expose raw backend/storage responses.
+        }
+        reject(new Error(safeMessage));
       };
 
       xhr.onerror = () => {
@@ -161,11 +178,22 @@ export async function uploadFileToBackend(opts: {
           ? Math.round(attachment.durationMs / 1000)
           : undefined;
   const kind = (attachment.kind as string | undefined) ?? 'other';
+  const displayUrl =
+    attachment.displayUrl ??
+    attachment.url ??
+    attachment.downloadUrl ??
+    attachment.publicUrl ??
+    attachment.uri ??
+    '';
   return {
-    id: attachment.id ?? attachment.key,
-    url: attachment.url,
+    id: attachment.id ?? attachment.key ?? attachment.assetId ?? attachment.mediaAssetId,
+    url: displayUrl,
     publicUrl: attachment.publicUrl,
     downloadUrl: attachment.downloadUrl,
+    displayUrl,
+    assetId: attachment.assetId,
+    mediaAssetId: attachment.mediaAssetId,
+    mediaAssetRef: attachment.mediaAssetRef,
     originalName: attachment.originalName ?? attachment.name ?? file.name,
     mimeType: attachment.mimeType ?? attachment.mime ?? file.type ?? 'application/octet-stream',
     size: attachment.size ?? file.size ?? 0,

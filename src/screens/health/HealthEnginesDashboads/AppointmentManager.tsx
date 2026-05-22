@@ -17,8 +17,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -50,7 +50,7 @@ type Slot = {
   available: boolean;
 };
 
-const toKiscLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
 
 export default function AppointmentManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
@@ -89,7 +89,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         id: String(row?.id || `type-${index + 1}`),
         name: String(row?.name || '').trim() || `Type ${index + 1}`,
         duration: Math.max(1, Number(row?.quantity || 0) || 1),
-        price: microToKisc(Number(row?.amount_micro || 0)),
+        price: microToUsd(Number(row?.amount_micro || 0)),
         buffer: Math.max(0, Number(row?.value_int || 0) || 0),
         enabled: String(row?.status || '').trim().toLowerCase() !== 'disabled',
         sortOrder: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : index + 1,
@@ -132,7 +132,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
           name: cleanName,
           quantity: durationValue,
           value_int: bufferValue,
-          amount_micro: kiscToMicro(priceValue),
+          amount_micro: usdToMicro(priceValue),
           status: 'enabled',
         });
         if (!response?.success) {
@@ -143,7 +143,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
           name: cleanName,
           quantity: durationValue,
           value_int: bufferValue,
-          amount_micro: kiscToMicro(priceValue),
+          amount_micro: usdToMicro(priceValue),
         });
         if (!response?.success) {
           throw new Error(response?.message || 'Unable to update appointment type.');
@@ -162,7 +162,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
     setEditingTypeId(row.id);
     setTypeName(row.name);
     setDuration(String(row.duration));
-    setPrice(toKiscLabel(row.price));
+    setPrice(toUsdLabel(row.price));
     setBuffer(String(row.buffer));
   }, []);
 
@@ -309,7 +309,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         <View key={type.id} style={card(palette, spacing)}>
           <Text style={{ ...typography.h3, color: palette.text }}>{type.name}</Text>
           <Text style={{ color: palette.text }}>
-            {type.duration} mins • {toKiscLabel(type.price)} USD
+            {type.duration} mins • {toUsdLabel(type.price)} USD
           </Text>
 
           <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
@@ -358,7 +358,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Analytics</Text>
         <Text style={{ color: palette.text }}>Available Slots: {slots.filter((slot) => slot.available).length}</Text>
-        <Text style={{ color: palette.text }}>Potential Revenue: {toKiscLabel(totalPotentialRevenue)} USD</Text>
+        <Text style={{ color: palette.text }}>Potential Revenue: {toUsdLabel(totalPotentialRevenue)} USD</Text>
       </View>
     </ScrollView>
   );

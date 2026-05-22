@@ -554,14 +554,25 @@ export default function EducationProfileManager({ initialProfileId = null }: Pro
           <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
             <KISButton
               size="xs"
-              title="View analytics"
-              onPress={() => Alert.alert('Coming soon', 'Education analytics will be available in an upcoming update.')}
+              title="View summary"
+              onPress={() => {
+                Alert.alert(
+                  'Education profile summary',
+                  `${activeProfile.name}: ${activeProfile.courses?.length ?? 0} courses, ${activeProfile.modules?.length ?? 0} modules, ${activeProfile.roles?.length ?? 0} roles.`,
+                );
+              }}
             />
             <KISButton
               size="xs"
               variant="outline"
               title="Edit items"
-              onPress={() => Alert.alert('Education profile', 'Use the add commands below')}
+              onPress={() => {
+                setCourseTitle('');
+                setCourseSummary('');
+                setModuleTitle('');
+                setModuleSummary('');
+                Alert.alert('Education profile', 'Use the course, module, and role editors below.');
+              }}
             />
           </View>
           <View

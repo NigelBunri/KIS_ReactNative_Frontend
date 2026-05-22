@@ -14,6 +14,7 @@ const miscRoutes = {
     unified: `${API_BASE_URL}/api/v1/core/dashboards/unified/`,
     safetyCommandCenter: `${API_BASE_URL}/api/v1/core/admin/safety-command-center/`,
     securityLaunchGate: `${API_BASE_URL}/api/v1/core/admin/security-launch-gate/`,
+    launchOpsReadiness: `${API_BASE_URL}/api/v1/core/admin/launch-ops-readiness/`,
   },
   performance: {
     offlinePolicy: `${API_BASE_URL}/api/v1/core/performance/offline-policy/`,

@@ -9,6 +9,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 
@@ -60,11 +63,13 @@ function formatCountdown(ms: number): string {
 
 function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const remaining = useCountdown(drop.ends_at);
   const imgSource = drop.cover_url ? { uri: drop.cover_url } : fallbackCover;
 
   return (
     <Pressable
+      onPress={() => drop.shop_id ? navigation.navigate('ShopProducts', { shopId: drop.shop_id, shopName: drop.shop_name ?? undefined }) : undefined}
       style={{
         width: 200,
         borderWidth: 1.5,
@@ -173,6 +178,7 @@ type Props = {
 
 export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeAllProducts, onSeeAllShops }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { home, loadingHome, subscribeProduct, joinShop, reloadAll } = useMarketData({
     ownerId,
     q: searchTerm,
@@ -417,7 +423,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                         ctaLabel="View"
                         compact
                         onCTA={() => handleSubscribeProduct(p.id)}
-                        onPress={() => {}}
+                        onPress={() => navigation.navigate('ProductDetail', { productId: p.id })}
                       />
                     );
                   })}
@@ -471,7 +477,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                     isMember={Boolean(s.is_member)}
                     ctaLabel={s.join_policy === 'request' ? 'Request to join' : 'Join shop'}
                     onCTA={() => handleJoinShop(s.id)}
-                    onPress={() => {}}
+                    onPress={() => navigation.navigate('ShopProducts', { shopId: s.id, shopName: s.name ?? undefined })}
                   />
                 </View>
               ))}

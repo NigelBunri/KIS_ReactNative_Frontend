@@ -1,6 +1,6 @@
 // src/screens/chat/hooks/useConversationBootstrap.ts
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, DeviceEventEmitter } from 'react-native';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { getAccessToken } from '@/security/authStorage';
@@ -248,6 +248,8 @@ export function useConversationBootstrap(
 
         const idStr = String(newId);
         setConversationId(idStr);
+        DeviceEventEmitter.emit('conversation.created', { conversationId: idStr });
+        DeviceEventEmitter.emit('conversation.refresh');
         return idStr;
       } catch (e) {
         console.warn('[ChatRoomPage] ensureConversationId error', e);

@@ -475,6 +475,55 @@ export default function PartnerCoursesPanel({
     [courses],
   );
 
+  const renderCoursePicker = (
+    selectedCourseId: string,
+    onSelectCourse: (courseId: string) => void,
+  ) => {
+    if (!courseOptions.length) {
+      return (
+        <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: 6 }}>
+          Create a course first, then select it here.
+        </Text>
+      );
+    }
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingBottom: 6 }}
+      >
+        {courseOptions.map((course) => {
+          const selected = selectedCourseId === course.id;
+          return (
+            <Pressable
+              key={course.id}
+              onPress={() => onSelectCourse(course.id)}
+              style={{
+                borderWidth: 1,
+                borderColor: selected ? palette.accentPrimary : palette.divider,
+                backgroundColor: selected ? `${palette.accentPrimary}22` : palette.surface,
+                borderRadius: 999,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: selected ? palette.accentPrimary : palette.text,
+                  fontWeight: selected ? '800' : '700',
+                  maxWidth: 180,
+                }}
+              >
+                {course.title || course.id}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -571,6 +620,7 @@ export default function PartnerCoursesPanel({
             <Text style={{ color: palette.subtext, marginBottom: 6 }}>
               Choose a course and add a lesson outline.
             </Text>
+            {renderCoursePicker(lessonForm.course, (course) => setLessonForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={lessonForm.course}
               onChangeText={(value) => setLessonForm((prev) => ({ ...prev, course: value }))}
@@ -635,6 +685,7 @@ export default function PartnerCoursesPanel({
           <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
           >
             <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>Create a quiz or exam</Text>
+            {renderCoursePicker(quizForm.course, (course) => setQuizForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={quizForm.course}
               onChangeText={(value) => setQuizForm((prev) => ({ ...prev, course: value }))}
@@ -733,6 +784,7 @@ export default function PartnerCoursesPanel({
           <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
           >
             <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>Create assignment</Text>
+            {renderCoursePicker(assignmentForm.course, (course) => setAssignmentForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={assignmentForm.course}
               onChangeText={(value) => setAssignmentForm((prev) => ({ ...prev, course: value }))}
@@ -828,6 +880,7 @@ export default function PartnerCoursesPanel({
           <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
           >
             <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>Schedule live session</Text>
+            {renderCoursePicker(liveForm.course, (course) => setLiveForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={liveForm.course}
               onChangeText={(value) => setLiveForm((prev) => ({ ...prev, course: value }))}
@@ -912,6 +965,7 @@ export default function PartnerCoursesPanel({
           <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
           >
             <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>Add course to bundle</Text>
+            {renderCoursePicker(bundleItemForm.course, (course) => setBundleItemForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={bundleItemForm.bundle}
               onChangeText={(value) => setBundleItemForm((prev) => ({ ...prev, bundle: value }))}
@@ -1002,6 +1056,7 @@ export default function PartnerCoursesPanel({
           <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
           >
             <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>Create seat pool</Text>
+            {renderCoursePicker(seatPoolForm.course, (course) => setSeatPoolForm((prev) => ({ ...prev, course })))}
             <TextInput
               value={seatPoolForm.course}
               onChangeText={(value) => setSeatPoolForm((prev) => ({ ...prev, course: value }))}

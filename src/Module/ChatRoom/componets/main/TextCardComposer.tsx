@@ -8,8 +8,10 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 
 export type TextCardPayload = {
@@ -54,6 +56,7 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
   onClose,
   onSend,
 }) => {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [fontSize, setFontSize] = useState<number>(24);
   const [fontColor, setFontColor] = useState<string>(FONT_COLORS[0]);
@@ -98,13 +101,18 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
         transform: [{ translateX }],
       }}
     >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       {/* Header with back arrow */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingTop: insets.top + 8,
+          paddingBottom: 12,
           backgroundColor: 'rgba(0,0,0,0.18)',
         }}
       >
@@ -337,6 +345,7 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
               borderRadius: 20,
               backgroundColor: 'rgba(0,0,0,0.35)',
               opacity: text.trim() ? 1 : 0.6,
+              marginBottom: insets.bottom || 8,
             }}
             disabled={!text.trim()}
           >
@@ -351,6 +360,7 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
           </Pressable>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 };

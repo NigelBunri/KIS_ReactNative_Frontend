@@ -216,7 +216,7 @@ export const handleSendVoice = async ({
     senderId: currentUserId,
     conversationId: convId,
     voice: {
-      url: attachment?.url ?? uri,
+      url: attachment?.url ?? attachment?.downloadUrl ?? attachment?.displayUrl ?? uri,
       durationMs,
     },
     attachments: attachment ? [attachment] : [],
@@ -271,7 +271,7 @@ export const handleSendSticker = async ({
     conversationId: convId,
     sticker: {
       id: sticker.id,
-      uri: attachment?.url ?? sticker.uri,
+      uri: attachment?.url ?? attachment?.downloadUrl ?? attachment?.displayUrl ?? sticker.uri,
       text: sticker.text,
     },
     attachments: attachment ? [attachment] : [],

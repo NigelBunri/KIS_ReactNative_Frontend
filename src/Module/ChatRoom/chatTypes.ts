@@ -154,7 +154,7 @@ export type EventMessage = {
   title: string;
   description?: string;
   location?: string;
-  startsAt: string;
+  startsAt?: string;
   endsAt?: string;
   reminderMinutes?: number;
 };

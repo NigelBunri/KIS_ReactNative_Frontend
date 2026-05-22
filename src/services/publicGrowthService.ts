@@ -44,7 +44,7 @@ export type PublicSitemapPlan = {
 export const fetchPublicChannelLanding = async (
   handle: string,
 ): Promise<PublicGrowthMetadata | null> => {
-  const response = await getRequest(ROUTES.broadcast.publicChannelLanding(handle.replace(/^@/, '')), {
+  const response = await getRequest(ROUTES.broadcasts.publicChannelLanding(handle.replace(/^@/, '')), {
     forceNetwork: true,
     errorMessage: 'Unable to load public channel metadata.',
   });
@@ -57,7 +57,7 @@ export const fetchPublicChannelLanding = async (
 export const fetchPublicContentLanding = async (
   contentId: string,
 ): Promise<PublicGrowthMetadata | null> => {
-  const response = await getRequest(ROUTES.broadcast.publicContentLanding(contentId), {
+  const response = await getRequest(ROUTES.broadcasts.publicContentLanding(contentId), {
     forceNetwork: true,
     errorMessage: 'Unable to load public content metadata.',
   });
@@ -68,7 +68,7 @@ export const fetchPublicContentLanding = async (
 };
 
 export const fetchPublicSitemapPlan = async (): Promise<PublicSitemapPlan | null> => {
-  const response = await getRequest(ROUTES.broadcast.publicSitemapPlan, {
+  const response = await getRequest(ROUTES.broadcasts.publicSitemapPlan, {
     forceNetwork: true,
     errorMessage: 'Unable to load public growth plan.',
   });

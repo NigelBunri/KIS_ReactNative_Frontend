@@ -50,6 +50,25 @@ export default function GlobalSearchScreen() {
           break;
         }
 
+        case 'market_product':
+        case 'product':
+          navigation.navigate('ProductDetail', { productId: id });
+          break;
+
+        case 'market_shop':
+        case 'shop':
+          (navigation as any).navigate('MainTabs', { screen: 'Broadcast', params: { focusTab: 'market' } });
+          break;
+
+        case 'education_course':
+        case 'education_institution':
+          (navigation as any).navigate('MainTabs', { screen: 'Broadcast', params: { focusTab: 'education' } });
+          break;
+
+        case 'partner':
+          (navigation as any).navigate('MainTabs', { screen: 'Partners' });
+          break;
+
         case 'notification':
           navigation.navigate('ProfileNotifications');
           break;

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, DeviceEventEmitter, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
 import { getRequest } from '@/network/get';
@@ -14,7 +13,6 @@ const emptyMessage = 'Courses will appear here once your partner publishes lesso
 
 export default function PartnerCoursesSection({ partner }: { partner: Partner }) {
   const { palette } = useKISTheme();
-  const navigation = useNavigation();
   const [bibleCourses, setBibleCourses] = useState<any[]>([]);
   const [partnerCourses, setPartnerCourses] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
@@ -89,11 +87,21 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
   };
 
   const handleRequireBilling = (course: any) => {
-    DeviceEventEmitter.emit('wallet.open', {
-      mode: 'add_kisc',
-      amount: course.price_amount ?? '',
-    });
-    navigation.navigate('Profile' as never);
+    const paymentUrl =
+      course.payment_url ||
+      course.paymentUrl ||
+      course.booking?.payment_url ||
+      course.enrollment?.payment_url;
+    if (paymentUrl) {
+      Linking.openURL(String(paymentUrl)).catch(() => {
+        Alert.alert('Secure checkout', 'The USD checkout link could not be opened. Please try again.');
+      });
+      return;
+    }
+    Alert.alert(
+      'Secure USD checkout',
+      'This paid course requires provider checkout. Open the course from Education to complete payment when checkout is available.',
+    );
   };
 
   const renderCourse = (course: any) => {

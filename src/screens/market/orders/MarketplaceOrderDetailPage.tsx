@@ -5,6 +5,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -270,7 +271,10 @@ export default function MarketplaceOrderDetailPage() {
   const canComplete = mode === 'provider' && orderPaymentReady && order.status === 'temporal';
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <ScrollView
+      style={[styles.root, { backgroundColor: palette.bg }]}
+      contentContainerStyle={styles.scrollContent}
+    >
       <View
         style={[
           styles.header,
@@ -562,13 +566,16 @@ export default function MarketplaceOrderDetailPage() {
           loading={complaintSubmitting}
         />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
   },
   header: {
     flexDirection: 'row',

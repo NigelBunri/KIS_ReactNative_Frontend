@@ -1,5 +1,4 @@
 // src/screens/chat/ChatRoomPage.tsx
-/* eslint-disable react-hooks/exhaustive-deps */
 
 /**
  * ChatRoomPage
@@ -58,6 +57,7 @@ import { useChatMessaging } from './hooks/useChatMessaging';
 import { useSelectionState } from './hooks/useSelectionState';
 import { useBulkMessageActions } from './hooks/useBulkMessageActions';
 import { useSocket } from '../../../SocketProvider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
@@ -268,12 +268,12 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const loadSubRooms = useCallback(async () => {
     const convId = String(conversationId ?? chat?.conversationId ?? chat?.id ?? '');
     if (!convId || convId.startsWith('newContact-')) return;
+    let mounted = true;
 
     // 1. Load from cache immediately
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       const cached = await AsyncStorage.getItem(`${SUBROOMS_CACHE_PREFIX}${convId}`);
-      if (cached) {
+      if (cached && mounted) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setSubRooms(parsed);
@@ -287,18 +287,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         `${ROUTES.chat.threads}?parent_conversation=${encodeURIComponent(convId)}`,
         { errorMessage: 'Unable to load sub-rooms.' },
       );
+      if (!mounted) return;
       const rows = res?.data?.results ?? res?.data ?? res?.results ?? [];
       if (!Array.isArray(rows)) return;
       const normalized = rows
         .map((row: any) => normalizeSubRoom(row, convId))
         .filter(Boolean) as SubRoom[];
       setSubRooms(normalized);
-      // Save to cache
       try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
         await AsyncStorage.setItem(`${SUBROOMS_CACHE_PREFIX}${convId}`, JSON.stringify(normalized));
       } catch { /* silent */ }
     } catch { /* silent */ }
+
+    return () => { mounted = false; };
   }, [chat?.conversationId, chat?.id, conversationId]);
 
   useEffect(() => {
@@ -828,26 +829,35 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
       setSearchLoading(true);
 
-      const before = reset ? undefined : searchBefore ?? undefined;
+      const offset = reset ? 0 : searchResultsRef.current.length;
       const url = `${NEST_API_BASE_URL}/messages/search?conversationId=${encodeURIComponent(
         convId,
-      )}&q=${encodeURIComponent(q)}${before ? `&before=${encodeURIComponent(before)}` : ''}&limit=30`;
+      )}&q=${encodeURIComponent(q)}&skip=${offset}&limit=30`;
 
       const res = await getRequest(url, {
         errorMessage: 'Search failed.',
       });
 
-      const items =
+      const rawItems =
         (res?.data?.data?.messages as any[]) ??
+        (res?.data?.data?.results as any[]) ??
         (res?.data?.messages as any[]) ??
-        [];
+        (res?.data?.results as any[]) ??
+        (Array.isArray(res?.data) ? (res.data as any[]) : []);
+      const items = rawItems.map((item: any) => ({
+        id: String(item?.id ?? item?._id ?? item?.serverId ?? item?.messageId ?? ''),
+        serverId: item?.serverId ?? item?.id ?? item?._id,
+        clientId: item?.clientId,
+        text: item?.text ?? item?.previewText ?? item?.styledText?.text ?? '',
+        createdAt: item?.createdAt ?? item?.created_at ?? null,
+      })).filter((item: any) => item.id);
 
       const merged = reset ? items : [...searchResultsRef.current, ...items];
       setSearchResults(merged);
       const cacheKey = `${convId}::${q.toLowerCase()}`;
       searchCacheRef.current[cacheKey] = merged;
 
-      const oldest = items?.[0]?.createdAt ?? null;
+      const oldest = items?.[items.length - 1]?.createdAt ?? null;
       setSearchBefore(oldest);
       setSearchHasMore(items.length >= 30);
       setSearchLoading(false);

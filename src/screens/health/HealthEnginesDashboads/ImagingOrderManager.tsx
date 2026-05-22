@@ -14,8 +14,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -54,7 +54,7 @@ type ImagingOrder = {
   createdAt: number;
 };
 
-const toKiscLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
 
 export default function ImagingOrderManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
@@ -99,7 +99,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         .map((row: any, index: number) => ({
           id: String(row?.id || `imaging-${index + 1}`),
           name: String(row?.name || '').trim() || `Imaging Study ${index + 1}`,
-          price: microToKisc(Number(row?.amount_micro || 0)),
+          price: microToUsd(Number(row?.amount_micro || 0)),
           turnaroundHours: Math.max(1, Number(row?.value_int || 0) || 1),
           sortOrder: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : index + 1,
         }))
@@ -138,7 +138,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         const response = await createInstitutionEngineManagedItem(institutionId, engineKey, {
           item_kind: 'imaging_study',
           name: cleanName,
-          amount_micro: kiscToMicro(price),
+          amount_micro: usdToMicro(price),
           value_int: turnaroundHours,
           status: 'active',
         });
@@ -148,7 +148,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
       } else {
         const response = await updateInstitutionEngineManagedItem(institutionId, engineKey, editingStudyId, {
           name: cleanName,
-          amount_micro: kiscToMicro(price),
+          amount_micro: usdToMicro(price),
           value_int: turnaroundHours,
         });
         if (!response?.success) {
@@ -167,7 +167,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
   const editStudy = useCallback((study: ImagingStudy) => {
     setEditingStudyId(study.id);
     setNewStudyName(study.name);
-    setNewStudyPrice(toKiscLabel(study.price));
+    setNewStudyPrice(toUsdLabel(study.price));
     setNewStudyTurnaround(String(study.turnaroundHours));
   }, []);
 
@@ -303,7 +303,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
           <View key={study.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{study.name}</Text>
             <Text style={{ color: palette.subtext }}>
-              {toKiscLabel(study.price)} USD • {study.turnaroundHours}h
+              {toUsdLabel(study.price)} USD • {study.turnaroundHours}h
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Study" variant="outline" onPress={() => editStudy(study)} />
@@ -428,7 +428,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Reports: {completedReports}</Text>
         <Text style={{ color: palette.text }}>Urgent Cases: {urgentCases}</Text>
-        <Text style={{ color: palette.text }}>Revenue Generated: {toKiscLabel(totalRevenue)} USD</Text>
+        <Text style={{ color: palette.text }}>Revenue Generated: {toUsdLabel(totalRevenue)} USD</Text>
       </View>
     </ScrollView>
   );

@@ -29,6 +29,7 @@ import {
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
 import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
+import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
 
 type TabId = 'home' | 'videos' | 'shorts' | 'posts' | 'live' | 'playlists' | 'about';
 
@@ -188,10 +189,19 @@ export default function ChannelHomePage() {
   }, [channel, navigation]);
 
   const handleShare = useCallback(async () => {
-    const url = `https://kis.app/channels/${channel?.handle || channel?.id}`;
+    const handleOrId = channel?.handle || channel?.id || '';
+    let url = handleOrId ? `https://kis.app/channels/${handleOrId}` : 'https://kis.app/channels';
     try {
+      if (channel?.handle) {
+        const publicMeta = await fetchPublicChannelLanding(channel.handle);
+        url = publicMeta?.share_card?.url || publicMeta?.url || url;
+      }
       await Share.share({ message: `${channel?.display_name || 'KIS Channel'} - ${url}`, url, title: channel?.display_name });
-    } catch { /* ignore */ }
+    } catch {
+      try {
+        await Share.share({ message: `${channel?.display_name || 'KIS Channel'} - ${url}`, url, title: channel?.display_name });
+      } catch { /* ignore */ }
+    }
   }, [channel]);
 
   const bannerUrl = channel?.banner_url ? resolveBackendAssetUrl(channel.banner_url) : '';

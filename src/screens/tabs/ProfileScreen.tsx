@@ -37,6 +37,7 @@ import ProfitabilityLaunchGateCard from '@/components/dashboard/ProfitabilityLau
 import ProfitabilitySubscriptionLifecycleCard from '@/components/dashboard/ProfitabilitySubscriptionLifecycleCard';
 import RevenueOpsEvidenceCard from '@/components/dashboard/RevenueOpsEvidenceCard';
 import RevenueEvidenceAdminPanel from '@/components/dashboard/RevenueEvidenceAdminPanel';
+import LaunchOpsReadinessCard from '@/components/dashboard/LaunchOpsReadinessCard';
 import SafetyCommandCenterCard from '@/components/dashboard/SafetyCommandCenterCard';
 import SecurityLaunchGateCard from '@/components/dashboard/SecurityLaunchGateCard';
 import PartnerCreateSlide from '@/components/partners/CreatePartnerScreen';
@@ -696,25 +697,10 @@ export default function ProfileScreen() {
   const setWalletForm = c.setWalletForm;
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      'wallet.open',
-      (payload: any) => {
-        const normalizedMode = String(payload?.mode || '')
-          .trim()
-          .toLowerCase();
-        const mappedMode =
-          normalizedMode === 'transfer' ? 'transfer' : 'add_kisc';
-        openWalletSheet('wallet');
-        setWalletForm((prev: any) => ({
-          ...prev,
-          mode: mappedMode,
-          amount: payload?.amount ? String(payload.amount) : prev.amount,
-          reference: payload?.reference
-            ? String(payload.reference)
-            : prev.reference,
-        }));
-      },
-    );
+    const sub = DeviceEventEmitter.addListener('wallet.open', () => {
+      openWalletSheet('wallet');
+      setWalletForm((prev: any) => ({ ...prev, mode: 'history' }));
+    });
     return () => sub.remove();
   }, [openWalletSheet, setWalletForm]);
 
@@ -1672,28 +1658,8 @@ export default function ProfileScreen() {
   const walletDashboardActions = useMemo(
     () => [
       {
-        key: 'wallet-add',
-        title: 'Add Funds',
-        icon: 'plus' as const,
-        tone: 'primary' as const,
-        onPress: () => {
-          openWalletSheet('wallet');
-          setWalletForm((prev: any) => ({ ...prev, mode: 'add_kisc' }));
-        },
-      },
-      {
-        key: 'wallet-transfer',
-        title: 'Transfer',
-        icon: 'arrow-left' as const,
-        tone: 'info' as const,
-        onPress: () => {
-          openWalletSheet('wallet');
-          setWalletForm((prev: any) => ({ ...prev, mode: 'transfer' }));
-        },
-      },
-      {
         key: 'upgrade-account',
-        title: 'Upgrade Account',
+        title: 'Upgrade',
         icon: 'star' as const,
         tone: 'primary' as const,
         onPress: () => c.openSheet('upgrade'),
@@ -1703,10 +1669,20 @@ export default function ProfileScreen() {
         title: 'History',
         icon: 'calendar' as const,
         tone: 'warning' as const,
-        onPress: () => c.openSheet('wallet'),
+        onPress: () => {
+          openWalletSheet('wallet');
+          setWalletForm((prev: any) => ({ ...prev, mode: 'history' }));
+        },
+      },
+      {
+        key: 'profile-notifications',
+        title: 'Alerts',
+        icon: 'bell' as const,
+        tone: 'info' as const,
+        onPress: () => rootNavigation?.navigate('ProfileNotifications'),
       },
     ],
-    [c, openWalletSheet, setWalletForm],
+    [c, openWalletSheet, rootNavigation, setWalletForm],
   );
 
   const quickActionItems = useMemo(
@@ -2497,6 +2473,7 @@ export default function ProfileScreen() {
                     <EvidenceWorkflowPlanCard />
                     <SafetyCommandCenterCard />
                     <SecurityLaunchGateCard />
+                    <LaunchOpsReadinessCard />
                   </>
                 ) : null}
               </View>

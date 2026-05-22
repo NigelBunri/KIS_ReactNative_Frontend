@@ -17,8 +17,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -72,7 +72,7 @@ const decodeDrugMeta = (raw: string) => {
   return { strength, form, defaultDosage };
 };
 
-const toKiscLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
 
 export default function EPrescriptionManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
@@ -129,7 +129,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
             strength: meta.strength,
             form: meta.form,
             defaultDosage: meta.defaultDosage,
-            price: microToKisc(Number(row?.amount_micro || 0)),
+            price: microToUsd(Number(row?.amount_micro || 0)),
             controlled: Number(row?.value_int || 0) > 0,
             sortOrder: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : index + 1,
           } as Drug;
@@ -171,7 +171,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         item_kind: 'prescription_drug',
         name,
         description: encodeDrugMeta(strength, form, defaultDosage),
-        amount_micro: kiscToMicro(price),
+        amount_micro: usdToMicro(price),
         value_int: controlled ? 1 : 0,
         status: 'active',
       };
@@ -201,7 +201,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
     setStrength(drug.strength);
     setForm(drug.form);
     setDefaultDosage(drug.defaultDosage);
-    setDrugPrice(toKiscLabel(drug.price));
+    setDrugPrice(toUsdLabel(drug.price));
     setControlled(drug.controlled);
   }, []);
 
@@ -359,7 +359,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         {drugs.map((drug) => (
           <View key={drug.id} style={{ marginTop: spacing.sm }}>
             <Text style={{ color: palette.text }}>
-              {drug.name} • {drug.strength || 'N/A'} • {drug.form || 'N/A'} • {toKiscLabel(drug.price)} USD
+              {drug.name} • {drug.strength || 'N/A'} • {drug.form || 'N/A'} • {toUsdLabel(drug.price)} USD
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit" onPress={() => editDrug(drug)} variant="outline" />
@@ -425,7 +425,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         <Text style={{ color: palette.text }}>Active: {activeCount}</Text>
         <Text style={{ color: palette.text }}>Dispensed: {dispensedCount}</Text>
         <Text style={{ color: palette.text }}>Expired: {expiredCount}</Text>
-        <Text style={{ color: palette.text }}>Total Drug Value: {toKiscLabel(totalValue)} USD</Text>
+        <Text style={{ color: palette.text }}>Total Drug Value: {toUsdLabel(totalValue)} USD</Text>
       </View>
     </ScrollView>
   );

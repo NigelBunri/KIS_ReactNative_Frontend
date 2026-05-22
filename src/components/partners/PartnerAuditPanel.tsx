@@ -12,7 +12,6 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { PartnerAuditEvent } from '@/components/partners/partnersTypes';
-import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 
 type Props = {
   isOpen: boolean;
@@ -110,12 +109,6 @@ export default function PartnerAuditPanel({
           contentContainerStyle={styles.settingsPanelBody}
           showsVerticalScrollIndicator={false}
         >
-          <PartnerRevenuePreviewCard
-            palette={palette}
-            kind="audit"
-            title="Moderation and audit revenue preview"
-            subtitle="Premium moderation, searchable audit history, escalation, and governance reporting are preview-only."
-          />
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
           ) : events.length === 0 ? (

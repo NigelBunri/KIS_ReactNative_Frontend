@@ -48,6 +48,18 @@ import {
 } from '@/components/section-builder/types';
 import { resolveBackgroundColor } from '@/components/section-builder/backgroundOptions';
 
+const safeUploadedHealthImageUrl = (uploaded: any) => {
+  if (!uploaded || uploaded.quarantined || uploaded.requires_review) {
+    throw new Error('This image is under safety review and cannot be used yet.');
+  }
+  const remote = uploaded?.url ?? uploaded?.uri ?? uploaded?.file_url ?? uploaded?.fileUrl ?? '';
+  const normalized = String(remote || '').trim();
+  if (!normalized || normalized.startsWith('file://') || normalized.startsWith('content://') || normalized.startsWith('data:')) {
+    throw new Error('Upload did not return a safe media URL. Please retry.');
+  }
+  return normalized;
+};
+
 const buildInstitutionServicesCtaUrl = (institutionId: string) =>
   `kis://health/institutions/${encodeURIComponent(institutionId)}/services`;
 
@@ -375,19 +387,8 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      let url = asset.uri;
-      try {
-        const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_section');
-        const remote =
-          uploaded?.url ??
-          uploaded?.uri ??
-          uploaded?.file_url ??
-          uploaded?.fileUrl ??
-          uploaded?.path;
-        if (remote) url = String(remote);
-      } catch {
-        // keep local uri fallback for immediate preview
-      }
+      const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_section');
+      const url = safeUploadedHealthImageUrl(uploaded);
 
       if (selectedType === 'hero_banner') {
         setSectionDraftData((prev) => ({ ...prev, backgroundImageUrl: url }));
@@ -410,14 +411,8 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      let url = asset.uri;
-      try {
-        const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_section_background');
-        const remote = uploaded?.url ?? uploaded?.uri ?? uploaded?.file_url ?? uploaded?.fileUrl ?? uploaded?.path;
-        if (remote) url = String(remote);
-      } catch {
-        // keep local uri fallback
-      }
+      const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_section_background');
+      const url = safeUploadedHealthImageUrl(uploaded);
 
       setSectionDraftData((prev) => ({ ...prev, sectionBackgroundImageUrl: url }));
     } catch (error: any) {
@@ -440,19 +435,8 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      let url = asset.uri;
-      try {
-        const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_gallery');
-        const remote =
-          uploaded?.url ??
-          uploaded?.uri ??
-          uploaded?.file_url ??
-          uploaded?.fileUrl ??
-          uploaded?.path;
-        if (remote) url = String(remote);
-      } catch {
-        // keep local uri fallback for immediate preview
-      }
+      const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_gallery');
+      const url = safeUploadedHealthImageUrl(uploaded);
 
       setSectionDraftData((prev) => ({
         ...prev,
@@ -473,14 +457,8 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      let url = asset.uri;
-      try {
-        const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_landing_background');
-        const remote = uploaded?.url ?? uploaded?.uri ?? uploaded?.file_url ?? uploaded?.fileUrl ?? uploaded?.path;
-        if (remote) url = String(remote);
-      } catch {
-        // keep local uri fallback
-      }
+      const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_landing_background');
+      const url = safeUploadedHealthImageUrl(uploaded);
 
       setDraft((prev) => (prev ? { ...prev, landingBackgroundImageUrl: url } : prev));
     } catch (error: any) {
@@ -498,14 +476,8 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      let url = asset.uri;
-      try {
-        const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_landing_logo');
-        const remote = uploaded?.url ?? uploaded?.uri ?? uploaded?.file_url ?? uploaded?.fileUrl ?? uploaded?.path;
-        if (remote) url = String(remote);
-      } catch {
-        // keep local uri fallback
-      }
+      const uploaded = await uploadHealthDashboardImage(asset, 'health_dashboard_landing_logo');
+      const url = safeUploadedHealthImageUrl(uploaded);
 
       setDraft((prev) => (prev ? { ...prev, landingLogoUrl: url } : prev));
     } catch (error: any) {

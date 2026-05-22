@@ -24,11 +24,6 @@ import {
   VerificationStatusCard,
 } from '@/components/verification';
 import { getVerificationSummary } from '@/services/verificationService';
-import InstitutionMonetizationPreviewCard from '@/components/profitability/InstitutionMonetizationPreviewCard';
-import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
-import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPromotionRevenuePreviewCard';
-import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
-import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 type Props = {
   selectedPartner: Partner;
@@ -195,37 +190,6 @@ export default function PartnersCenterPane({
           summary={partnerVerificationSummary}
           compact
         />
-        <InstitutionMonetizationPreviewCard
-          palette={palette}
-          kind="partner"
-          title="Partner workspace growth preview"
-          subtitle="Partner Workspace Pro is preview-only until pricing and workspace billing are approved."
-        />
-        <PartnerRevenuePreviewCard
-          palette={palette}
-          kind="workspace"
-          title="Partner revenue engine preview"
-          subtitle="Workspace seats, premium moderation, events, analytics, and promotion packages are visible but not live."
-        />
-        <TrustPromotionRevenuePreviewCard
-          palette={palette}
-          kind="partner_verification"
-          title="Partner verification and trust preview"
-          subtitle="KYB review, official partner badges, renewals, and trust boosts are planning-only until billing is approved."
-        />
-        <NotificationRetentionPreviewCard
-          palette={palette}
-          kind="partners"
-          title="Partner digest and attention preview"
-          subtitle="Workspace digests, event alerts, moderation notifications, and unread analytics are preview-only."
-        />
-        <EnterpriseKcanRevenuePreviewCard
-          palette={palette}
-          kind="partners"
-          title="Partner enterprise packaging preview"
-          subtitle="Regional chapters, member seats, branch operations, support tiers, and verified network trust are preview-only."
-        />
-
         <View
           style={[
             styles.workspaceCommandCard,

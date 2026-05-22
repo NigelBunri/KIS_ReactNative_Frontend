@@ -61,6 +61,9 @@ type AttachmentMeta = {
   width?: number;
   height?: number;
   durationMs?: number;
+  downloadUrl?: string;
+  displayUrl?: string;
+  publicUrl?: string;
 };
 
 type MessageBubbleProps = {
@@ -229,8 +232,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ? att.id
           : `att-${index}-${(message as any).id ?? 'local'}`;
       const url: string =
-        typeof att.url === 'string'
+        typeof att.displayUrl === 'string'
+          ? att.displayUrl
+          : typeof att.url === 'string'
           ? att.url
+          : typeof att.downloadUrl === 'string'
+          ? att.downloadUrl
+          : typeof att.publicUrl === 'string'
+          ? att.publicUrl
+          : typeof att.uri === 'string'
+          ? att.uri
           : typeof att.path === 'string'
           ? att.path
           : '';
@@ -449,6 +460,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           backgroundColor:
             palette.incomingBubble ?? palette.surface ?? palette.card,
         },
+    !isLastInGroup
+      ? isMe
+        ? { borderBottomRightRadius: 8 }
+        : { borderBottomLeftRadius: 8 }
+      : null,
   ];
 
   const highlightedStyle = isHighlighted

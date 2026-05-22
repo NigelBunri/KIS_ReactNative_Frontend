@@ -88,6 +88,9 @@ type FlatAttachmentMeta = {
   id?: string | number;
   url?: string;
   uri?: string;
+  displayUrl?: string;
+  downloadUrl?: string;
+  publicUrl?: string;
   mimeType?: string;
   mimetype?: string;
   contentType?: string;
@@ -407,7 +410,10 @@ export const MessageList: React.FC<MessageListProps> = ({
         }
 
         const uri =
+          att.displayUrl ||
           att.url ||
+          att.downloadUrl ||
+          att.publicUrl ||
           att.uri ||
           (typeof att.path === 'string' ? att.path : '');
 
@@ -727,10 +733,14 @@ export const MessageList: React.FC<MessageListProps> = ({
         scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChangedRef.current}
         viewabilityConfig={viewabilityConfigRef.current}
+        getItemLayout={(_, index) => ({
+          length: 72,
+          offset: 72 * index,
+          index,
+        })}
         onScrollToIndexFailed={(info) => {
-          const approximateItemHeight = 72;
           listRef.current?.scrollToOffset({
-            offset: Math.max(0, info.index * approximateItemHeight),
+            offset: Math.max(0, info.averageItemLength * info.index),
             animated: true,
           });
         }}

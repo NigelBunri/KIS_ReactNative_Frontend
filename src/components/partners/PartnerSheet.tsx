@@ -6,7 +6,6 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { useKISTheme } from '../../theme/useTheme';
 import { Partner } from './partnersTypes';
 import KISButton from '@/constants/KISButton';
-import PartnerRevenuePreviewCard from '@/components/profitability/PartnerRevenuePreviewCard';
 import {
   PartnerRole,
   PartnerSettingsSection,
@@ -207,13 +206,6 @@ export default function PartnerSheet({
               </View>
             ))}
           </View>
-
-          <PartnerRevenuePreviewCard
-            palette={palette}
-            kind="settings"
-            title="Workspace upgrade preview"
-            subtitle="Partner Workspace Pro and Enterprise controls are preview-only. Current communities, groups, channels, and roles remain available."
-          />
 
           <View
             style={[

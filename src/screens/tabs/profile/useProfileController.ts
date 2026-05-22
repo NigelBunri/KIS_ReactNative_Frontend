@@ -380,7 +380,7 @@ export const useProfileController = (opts: {
   });
 
   const [walletForm, setWalletForm] = useState({
-    mode: 'add_kisc',
+    mode: 'history',
     provider: 'flutterwave',
     amount: '',
     recipient: '',

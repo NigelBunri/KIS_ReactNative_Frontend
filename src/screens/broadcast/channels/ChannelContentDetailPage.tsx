@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
-import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -36,6 +36,7 @@ import {
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
+import { fetchPublicContentLanding } from '@/services/publicGrowthService';
 
 const compactNumber = (value?: number) => {
   const num = Number(value || 0);
@@ -137,6 +138,7 @@ export default function ChannelContentDetailPage() {
   const [loading, setLoading] = useState(!route.params?.item);
   const [counts, setCounts] = useState<Record<string, number>>((route.params?.item?.engagement_counts || {}) as Record<string, number>);
   const [saved, setSaved] = useState(false);
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
   useEffect(() => {
@@ -177,7 +179,16 @@ export default function ChannelContentDetailPage() {
   const handleShare = useCallback(async () => {
     if (!content?.id) return;
     const title = content?.title || 'KIS channel content';
-    const result = await Share.share({ message: `${title}\n${channel?.display_name ? `By ${channel.display_name}` : ''}`.trim() });
+    let url = '';
+    try {
+      const publicMeta = await fetchPublicContentLanding(content.id);
+      url = publicMeta?.share_card?.url || publicMeta?.url || '';
+    } catch {
+      url = '';
+    }
+    const byline = channel?.display_name ? `By ${channel.display_name}` : '';
+    const message = [title, byline, url].filter(Boolean).join('\n');
+    const result = await Share.share({ message, url: url || undefined, title });
     const completed = result.action === Share.sharedAction;
     if (completed) applyCounts(await shareChannelContent(content.id, true));
   }, [applyCounts, channel?.display_name, content?.id, content?.title]);
@@ -194,12 +205,13 @@ export default function ChannelContentDetailPage() {
   const handleEmbed = useCallback(async () => {
     if (!content?.id) return;
     try {
-      const res = await getRequest(ROUTES.broadcasts.channelContentEmbedToken(content.id), {
+      const res = await postRequest(ROUTES.broadcasts.channelContentEmbedToken(content.id), {}, {
         errorMessage: 'Unable to generate embed token.',
       });
       const token: string = res.data?.token || res.data?.embed_token || '';
-      if (token) {
-        Alert.alert('Embed token', `Use this token to embed the content:\n\n${token}`, [{ text: 'OK' }]);
+      const embedUrl: string = res.data?.embed_url || '';
+      if (token || embedUrl) {
+        Alert.alert('Embed ready', embedUrl || `Use this token to embed the content:\n\n${token}`, [{ text: 'OK' }]);
       } else {
         Alert.alert('Embed', 'Embedding is not available for this content.');
       }
@@ -223,7 +235,7 @@ export default function ChannelContentDetailPage() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
           <MediaStage content={content} />
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color="#fff" /></Pressable>
@@ -252,7 +264,7 @@ export default function ChannelContentDetailPage() {
 
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
-            <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => {}} />
+            <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
             <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />

@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  BackHandler,
   DeviceEventEmitter,
   Platform,
   Pressable,
@@ -43,6 +44,7 @@ import { getRequest } from '@/network/get';
 import {
   startInAppNotificationRuntime,
 } from '@/services/inAppNotificationService';
+import NetInfo from '@react-native-community/netinfo';
 import {
   bindMainTabBadgeSourceEvents,
   emptyMainTabBadgeCounts,
@@ -263,6 +265,14 @@ export function MainTabs() {
   >({});
   // ✅ Responsive width for overlay slide
   const { width } = useWindowDimensions();
+
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener((state) => {
+      setIsOffline(!(state.isConnected && state.isInternetReachable !== false));
+    });
+    return () => unsub();
+  }, []);
 
   // 🔥 Chat room overlay — stack so sub-rooms push on top of the parent room
   const [chatHistory, setChatHistory] = useState<Chat[]>([]);
@@ -553,6 +563,35 @@ export function MainTabs() {
     });
   };
 
+  // Android hardware back button — dismiss visible overlays in reverse-open order
+  const backStateRef = useRef({
+    communityInfoVisible: false,
+    infoVisible: false,
+    subRoomVisible: false,
+    chatVisible: false,
+    communityVisible: false,
+  });
+  backStateRef.current = { communityInfoVisible, infoVisible, subRoomVisible, chatVisible, communityVisible };
+
+  const backHandlersRef = useRef({ closeCommunityInfo, closeInfo, closeChat, closeCommunity });
+  backHandlersRef.current = { closeCommunityInfo, closeInfo, closeChat, closeCommunity };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const handler = () => {
+      const s = backStateRef.current;
+      const h = backHandlersRef.current;
+      if (s.communityInfoVisible) { h.closeCommunityInfo(); return true; }
+      if (s.infoVisible) { h.closeInfo(); return true; }
+      if (s.subRoomVisible) { h.closeChat(); return true; }
+      if (s.chatVisible) { h.closeChat(); return true; }
+      if (s.communityVisible) { h.closeCommunity(); return true; }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', handler);
+    return () => sub.remove();
+  }, []);
+
   const chatTranslateX = chatSlide.interpolate({
     inputRange: [0, 1],
     outputRange: [width, 0],
@@ -580,6 +619,13 @@ export function MainTabs() {
 
   return (
     <View style={{ flex: 1 }}>
+      {isOffline && (
+        <View style={{ backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+            No internet connection — messages will send when reconnected
+          </Text>
+        </View>
+      )}
       <Tabs.Navigator
         initialRouteName="Messages"
         screenOptions={{

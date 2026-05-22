@@ -15,11 +15,6 @@ import { resolveShopImageUri } from '@/utils/shopAssets';
 import { formatUsdAmount } from '@/utils/currency';
 import { VerificationBadgeRow, VerificationStatusCard } from '@/components/verification';
 import { getVerificationSummary } from '@/services/verificationService';
-import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
-import InstitutionMonetizationPreviewCard from '@/components/profitability/InstitutionMonetizationPreviewCard';
-import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPromotionRevenuePreviewCard';
-import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
-import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 type MarketManagementModalProps = {
   palette: KISPalette;
@@ -200,37 +195,6 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
           onOpen={() => onOpenVerificationCenter?.(shops[0])}
         />
       ) : null}
-      <InstitutionMonetizationPreviewCard
-        palette={palette}
-        kind="shop"
-        title="Seller growth preview"
-        subtitle="Seller Pro and institution growth tools are preview-only until pricing is approved."
-      />
-      <CommerceRevenuePreviewCard
-        palette={palette}
-        kind="seller_dashboard"
-        title="Seller revenue preview"
-        subtitle="Featured listings, promotion packages, seller analytics, and fee reporting are prepared but not chargeable."
-      />
-      <TrustPromotionRevenuePreviewCard
-        palette={palette}
-        kind="shop_verification"
-        title="Shop verification and promotion preview"
-        subtitle="Seller verification fees, badge renewals, trust boosts, and sponsored placements are visible for planning only."
-      />
-      <NotificationRetentionPreviewCard
-        palette={palette}
-        kind="commerce"
-        title="Commerce reminder preview"
-        subtitle="Saved-product, order, stock, fulfillment, and campaign-safe seller alerts are preview-only."
-      />
-      <EnterpriseKcanRevenuePreviewCard
-        palette={palette}
-        kind="shop_network"
-        title="Commerce network packaging preview"
-        subtitle="Verified seller networks, regional commerce chapters, support tiers, and operational evidence are preview-only."
-      />
-
       {loading && (
         <View
           style={[

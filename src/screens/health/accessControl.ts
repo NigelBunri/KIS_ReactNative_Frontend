@@ -81,12 +81,16 @@ export const getInstitutionRoleForUser = (
   const directOwnerUserId = String(
     institution?.owner_user_id ||
       institution?.ownerUserId ||
+      institution?.owner ||
       institution?.created_by_user_id ||
       institution?.createdByUserId ||
       '',
   ).trim();
   const userId = String(user.id || '').trim();
   if (directOwnerUserId && userId && directOwnerUserId === userId) return 'owner';
+
+  const relationship = String(institution?.relationship || institution?.viewer?.relationship || '').trim().toLowerCase();
+  if (relationship === 'owner') return 'owner';
 
   const ownerContact = institution?.owner_contact || institution?.ownerContact || {};
   const ownerUserId = String(ownerContact?.userId || ownerContact?.user_id || '').trim();
@@ -102,6 +106,8 @@ export const getInstitutionRoleForUser = (
 
   const viewerRole = normalizeInstitutionRole(
     institution?.viewer?.role ||
+      institution?.current_membership?.role ||
+      institution?.currentMembership?.role ||
       institution?.access?.role ||
       institution?.permissions?.role ||
       institution?.current_user_role ||

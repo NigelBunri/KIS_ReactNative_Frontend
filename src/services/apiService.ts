@@ -46,9 +46,15 @@ const assertSecureRequestUrl = (url: string): void => {
   }
 };
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const safeFetch = (url: string, init: RequestInit) => {
   assertSecureRequestUrl(url);
-  return fetch(url, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
 };
 
 const apiService = {

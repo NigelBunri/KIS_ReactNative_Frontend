@@ -41,11 +41,6 @@ import {
 } from './education-dashboard';
 import { VerificationBadgeRow, VerificationStatusCard } from '@/components/verification';
 import { getVerificationSummary } from '@/services/verificationService';
-import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
-import InstitutionMonetizationPreviewCard from '@/components/profitability/InstitutionMonetizationPreviewCard';
-import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPromotionRevenuePreviewCard';
-import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
-import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 type EducationManagementModalProps = {
   palette: KISPalette;
@@ -238,10 +233,7 @@ const uploadInstitutionLogo = async (asset: any): Promise<string> => {
   return normalized;
 };
 
-const uploadEducationAttachment = async (
-  asset: any,
-  context: string,
-): Promise<string> => {
+const uploadEducationAttachmentPayload = async (asset: any, context: string) => {
   const form = new FormData();
   form.append('context', context);
   form.append('attachment', {
@@ -255,16 +247,21 @@ const uploadEducationAttachment = async (
   if (!res?.success) {
     throw new Error(res?.message || 'Unable to upload attachment.');
   }
-  const url =
-    res?.data?.attachment?.url ??
-    res?.data?.url ??
-    res?.data?.attachment_url ??
-    '';
+  const attachment = res?.data?.attachment ?? {};
+  const url = attachment?.url ?? res?.data?.url ?? res?.data?.attachment_url ?? '';
   const normalized = String(url || '').trim();
-  if (!normalized) {
+  if (!normalized && !attachment?.quarantined) {
     throw new Error('Attachment upload did not return a URL.');
   }
-  return normalized;
+  return { url: normalized, attachment };
+};
+
+const uploadEducationAttachment = async (
+  asset: any,
+  context: string,
+): Promise<string> => {
+  const payload = await uploadEducationAttachmentPayload(asset, context);
+  return payload.url;
 };
 
 const stripFileScheme = (value?: string | null) =>
@@ -2159,11 +2156,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             kind: normalizedKind,
           });
           let resourceUrl = toText(moduleForm.resource_url);
+          let resourceAttachment: any = null;
           if (moduleForm.resource_asset) {
-            resourceUrl = await uploadEducationAttachment(
+            const uploadPayload = await uploadEducationAttachmentPayload(
               moduleForm.resource_asset,
               'education_material',
             );
+            resourceUrl = uploadPayload.url;
+            resourceAttachment = uploadPayload.attachment;
           }
           payload = {
             title: trimmedTitle,
@@ -2171,6 +2171,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             cover_image_url: coverImageUrl,
             kind: normalizedKind || 'document',
             resource_url: resourceUrl,
+            resource_attachment: resourceAttachment || undefined,
             resource_name: toText(moduleForm.resource_name),
             resource_mime_type: normalizedMime,
             is_downloadable: Boolean(moduleForm.is_downloadable),
@@ -5435,12 +5436,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     (metrics: Record<string, any>) => (
       <View style={{ gap: 12 }}>
         {renderDetailSummaryCard(detailRecordSummary)}
-        <EducationRevenuePreviewCard
-          palette={palette}
-          kind="course_detail"
-          title="Course revenue preview"
-          subtitle="Course commissions, certificate fees, paid cohorts, and instructor analytics are preview-only and do not block current course management."
-        />
         {renderDetailMetricsBlock(metrics)}
         {renderDetailInsightsBlock()}
         {renderDetailCollection(
@@ -5499,7 +5494,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     [
       detailPayload,
       detailRecordSummary,
-      palette,
       renderDetailCollection,
       renderDetailInsightsBlock,
       renderDetailMetricsBlock,
@@ -5511,12 +5505,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     (metrics: Record<string, any>) => (
       <View style={{ gap: 12 }}>
         {renderDetailSummaryCard(detailRecordSummary)}
-        <EducationRevenuePreviewCard
-          palette={palette}
-          kind="course_detail"
-          title="Course revenue preview"
-          subtitle="Course commissions, certificate fees, paid cohorts, and instructor analytics are preview-only and do not block current course management."
-        />
         {renderDetailMetricsBlock(metrics)}
         {renderDetailInsightsBlock()}
         {renderDetailCollection(
@@ -5598,7 +5586,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       detailPayload,
       detailRecordSummary,
       getEducationRecordTitle,
-      palette,
       renderCourseModuleWorkspace,
       renderDetailCollection,
       renderDetailInsightsBlock,
@@ -7238,38 +7225,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 </View>
 
                 {renderDetailSummaryCard(selectedInstitutionDetailSummary)}
-
-                <InstitutionMonetizationPreviewCard
-                  palette={palette}
-                  kind="education"
-                  title="Education institution growth preview"
-                  subtitle="Education Institution Pro is preview-only until pricing, payment, certificates, and support approval."
-                />
-                <TrustPromotionRevenuePreviewCard
-                  palette={palette}
-                  kind="education_verification"
-                  title="Education verification and trust preview"
-                  subtitle="Accreditation review, badge renewal, certificate trust, and sponsored learning are preview-only."
-                />
-                <NotificationRetentionPreviewCard
-                  palette={palette}
-                  kind="education"
-                  title="Education reminder preview"
-                  subtitle="Learner reminders, institution digests, course return nudges, and safe course campaigns are preview-only."
-                />
-                <EnterpriseKcanRevenuePreviewCard
-                  palette={palette}
-                  kind="education_network"
-                  title="Education network packaging preview"
-                  subtitle="School networks, cohorts, certificate trust, implementation support, and launch evidence are preview-only."
-                />
-
-                <EducationRevenuePreviewCard
-                  palette={palette}
-                  kind="institution_dashboard"
-                  title="Education revenue engine preview"
-                  subtitle="Instructor Pro, paid course readiness, certificate processing, course commissions, and promotion entry points are visible but not live."
-                />
 
                 <View
                   style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}

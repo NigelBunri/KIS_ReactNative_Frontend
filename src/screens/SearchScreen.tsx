@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,7 +14,7 @@ import ROUTES from '@/network';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import { KISIcon } from '@/constants/kisIcons';
 
-type ResultKind = 'user' | 'content' | 'community' | 'group' | 'channel' | string;
+type ResultKind = 'user' | 'contact' | 'conversation' | 'content' | 'community' | 'group' | 'channel' | 'channel_content' | 'market_shop' | 'market_product' | 'education_institution' | 'education_course' | 'health_institution' | 'partner' | 'bible_verse' | string;
 
 type SearchResult = {
   kind: ResultKind;
@@ -29,10 +29,52 @@ type SearchResult = {
 
 const KIND_ICON: Record<string, string> = {
   user: 'person',
+  contact: 'person',
+  conversation: 'chat',
   content: 'document',
   community: 'people',
-  group: 'people-outline',
+  group: 'people',
   channel: 'megaphone',
+  channel_content: 'document',
+  market_shop: 'storefront',
+  market_product: 'cart',
+  education_institution: 'school',
+  education_course: 'school',
+  health_institution: 'heart',
+  partner: 'people',
+  bible_verse: 'book',
+};
+
+const SECTION_ORDER = [
+  'contact',
+  'conversation',
+  'channel',
+  'channel_content',
+  'education_institution',
+  'education_course',
+  'market_shop',
+  'market_product',
+  'health_institution',
+  'partner',
+  'bible_verse',
+  'notification',
+  'verification',
+];
+
+const SECTION_LABELS: Record<string, string> = {
+  contact: 'Contacts',
+  conversation: 'Chats',
+  channel: 'Channels',
+  channel_content: 'Feeds',
+  education_institution: 'Education institutions',
+  education_course: 'Courses',
+  market_shop: 'Shops',
+  market_product: 'Products',
+  health_institution: 'Health institutions',
+  partner: 'Partners',
+  bible_verse: 'Bible',
+  notification: 'Notifications',
+  verification: 'Verification',
 };
 
 type Props = {
@@ -49,15 +91,18 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string) => {
-    if (!q.trim()) {
+    const term = q.trim();
+    if (term.length < 2) {
       setResults([]);
+      setError('');
+      setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
     try {
       const res = await getRequest(ROUTES.search.unified, {
-        params: { q: q.trim(), limit: 30 },
+        params: { q: term, limit: 30 },
         errorMessage: 'Search failed',
       });
       const list: SearchResult[] = Array.isArray(res?.data?.results)
@@ -92,7 +137,17 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
     return map;
   }, [results]);
 
-  const sections = Object.entries(grouped);
+  const sections = useMemo(() => Object.entries(grouped).sort(([a], [b]) => {
+    const ai = SECTION_ORDER.indexOf(a);
+    const bi = SECTION_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  }), [grouped]);
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const showShortQueryHint = query.trim().length > 0 && query.trim().length < 2;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -101,7 +156,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
           <KISIcon name="search" size={18} color={palette.subtext} />
           <TextInput
             style={[styles.input, { color: palette.text }]}
-            placeholder="Search people, content, communities…"
+            placeholder="Search chats, channels, courses, shops, health, Bible…"
             placeholderTextColor={palette.subtext}
             value={query}
             onChangeText={onChangeText}
@@ -111,7 +166,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
           />
           {query.length > 0 && (
             <Pressable onPress={() => { setQuery(''); setResults([]); }}>
-              <KISIcon name="close-circle" size={16} color={palette.subtext} />
+              <KISIcon name="close" size={16} color={palette.subtext} />
             </Pressable>
           )}
         </View>
@@ -134,9 +189,17 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
         </View>
       ) : null}
 
-      {!loading && !error && query.length > 0 && results.length === 0 && (
+      {!loading && !error && showShortQueryHint && (
         <View style={styles.centered}>
-          <Text style={{ color: palette.subtext }}>No results for "{query}"</Text>
+          <Text style={[styles.emptyTitle, { color: palette.text }]}>Keep typing</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Enter at least 2 characters to search KIS quickly.</Text>
+        </View>
+      )}
+
+      {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
+        <View style={styles.centered}>
+          <Text style={[styles.emptyTitle, { color: palette.text }]}>No results</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Nothing matched "{query.trim()}" in your safe discovery results.</Text>
         </View>
       )}
 
@@ -147,7 +210,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
           renderItem={({ item: [kind, items] }) => (
             <View style={{ marginBottom: 8 }}>
               <Text style={[styles.sectionHeader, { color: palette.subtext }]}>
-                {kind.toUpperCase()}
+                {SECTION_LABELS[kind] ?? kind.replace(/_/g, ' ').toUpperCase()}
               </Text>
               {items.map((result) => (
                 <Pressable
@@ -201,6 +264,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 14, padding: 0 },
   cancelBtn: { paddingHorizontal: 4 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyTitle: { fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  emptyCopy: { marginTop: 6, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   sectionHeader: { fontSize: 11, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6, letterSpacing: 0.8 },
   row: {
     flexDirection: 'row',

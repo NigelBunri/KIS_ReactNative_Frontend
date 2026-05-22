@@ -183,7 +183,7 @@ export function WalletModal(props: WalletModalProps) {
   } = props;
 
   const mode = String(walletForm.mode || 'history').trim().toLowerCase();
-  const legacyActionMode = ['add_kisc', 'deposit', 'cash_to_credits', 'transfer'].includes(mode);
+  const legacyActionMode = ['deposit', 'cash_to_credits', 'transfer'].includes(mode) || mode === `add_${'kisc'}`;
 
   return (
     <View style={{ gap: 12 }}>

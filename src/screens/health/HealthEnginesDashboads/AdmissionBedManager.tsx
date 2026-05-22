@@ -20,8 +20,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -47,14 +47,14 @@ type Bed = {
 type Room = {
   id: string;
   name: string;
-  priceKisc: number;
+  priceUsd: number;
   image?: string;
   beds: Bed[];
   expanded?: boolean;
   sortOrder: number;
 };
 
-const toKiscLabel = (value?: number | null) => {
+const toUsdLabel = (value?: number | null) => {
   if (!Number.isFinite(Number(value))) return '0';
   return Number(value).toFixed(3).replace(/\.?0+$/, '');
 };
@@ -127,7 +127,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
           return {
             id: roomId,
             name: String(row?.name || '').trim() || `Room ${index + 1}`,
-            priceKisc: microToKisc(Number(row?.amount_micro || 0)),
+            priceUsd: microToUsd(Number(row?.amount_micro || 0)),
             image: String(row?.image_url || '').trim() || undefined,
             beds: mappedBeds,
             expanded: false,
@@ -179,10 +179,10 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
 
   const createOrUpdateRoom = useCallback(async () => {
     const name = roomName.trim();
-    const priceKisc = Number(price);
+    const priceUsd = Number(price);
     const desiredBedCount = toSafeCount(bedCount, 0);
 
-    if (!name || !Number.isFinite(priceKisc) || priceKisc < 0 || desiredBedCount <= 0) {
+    if (!name || !Number.isFinite(priceUsd) || priceUsd < 0 || desiredBedCount <= 0) {
       Alert.alert('Missing Fields', 'Provide room name, valid price, and at least one bed.');
       return;
     }
@@ -193,7 +193,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
         const createdRoomRes = await createInstitutionEngineManagedItem(institutionId, engineKey, {
           item_kind: 'room',
           name,
-          amount_micro: kiscToMicro(priceKisc),
+          amount_micro: usdToMicro(priceUsd),
           quantity: desiredBedCount,
           image_url: image || null,
           status: 'active',
@@ -225,7 +225,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
           editingRoomId,
           {
             name,
-            amount_micro: kiscToMicro(priceKisc),
+            amount_micro: usdToMicro(priceUsd),
             quantity: desiredBedCount,
             image_url: image || null,
           },
@@ -271,7 +271,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
     if (!room) return;
     setEditingRoomId(room.id);
     setRoomName(room.name);
-    setPrice(toKiscLabel(room.priceKisc));
+    setPrice(toUsdLabel(room.priceUsd));
     setBedCount(String(room.beds.length || 0));
     setImage(room.image);
   }, [rooms]);
@@ -478,7 +478,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
                   }}
                 />
               </View>
-              <Text style={{ color: palette.text }}>{toKiscLabel(room.priceKisc)} USD / Night</Text>
+              <Text style={{ color: palette.text }}>{toUsdLabel(room.priceUsd)} USD / Night</Text>
               <Text
                 style={{
                   fontWeight: '600',

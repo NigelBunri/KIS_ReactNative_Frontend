@@ -87,16 +87,35 @@ export async function saveMessages(
   }
 }
 
+const identityValues = (message: Partial<ChatMessage>): string[] =>
+  [
+    message.id,
+    message.serverId,
+    message.clientId,
+    (message as any).messageId,
+  ]
+    .filter((value): value is string | number => value != null && String(value).trim().length > 0)
+    .map((value) => String(value));
+
+const messagesShareIdentity = (
+  left: Partial<ChatMessage>,
+  right: Partial<ChatMessage>,
+): boolean => {
+  const rightIds = new Set(identityValues(right));
+  return identityValues(left).some((value) => rightIds.has(value));
+};
+
 /**
  * Insert or update a single message in storage for a room.
- * Matching is done by message.id (Mongo _id or local_...).
+ * Matching uses every stable identity we have so local client rows are promoted
+ * to server rows instead of being rendered again after socket echo / restart.
  */
 export async function upsertMessage(
   roomId: string,
   message: ChatMessage,
 ): Promise<ChatMessage[]> {
   const existing = await loadMessages(roomId);
-  const index = existing.findIndex((m) => m.id === message.id);
+  const index = existing.findIndex((m) => messagesShareIdentity(m, message));
   let next: ChatMessage[];
 
   if (index === -1) {

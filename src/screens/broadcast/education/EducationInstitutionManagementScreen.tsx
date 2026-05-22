@@ -5,7 +5,7 @@
  * to be created, configured, and managed globally from the app.
  * When connected to a partner account, management becomes global and multi-admin.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -22,11 +22,9 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import { patchRequest } from '@/network/patch';
 import { API_BASE_URL } from '@/network/config';
 
 const INSTITUTIONS_ENDPOINT = `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`;
-const INSTITUTION_ENDPOINT = (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/`;
 const INSTITUTION_DASHBOARD_ENDPOINT = (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/dashboard/`;
 const INSTITUTION_PROGRAMS_ENDPOINT = (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/programs/`;
 const INSTITUTION_COURSES_ENDPOINT = (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/courses/`;
@@ -452,11 +450,9 @@ function CreateInstitutionSheet({
 function InstitutionDashboard({
   institution,
   onClose,
-  onUpdated,
 }: {
   institution: Institution;
   onClose: () => void;
-  onUpdated: (inst: Institution) => void;
 }) {
   const { palette } = useKISTheme();
   const [tab, setTab] = useState<TabId>('overview');
@@ -483,7 +479,7 @@ function InstitutionDashboard({
     try {
       const res = await getRequest(INSTITUTION_DASHBOARD_ENDPOINT(institution.id), {});
       setDashboard(res?.data ?? res);
-    } catch (_) {}
+    } catch {}
     finally { setLoading(false); }
   }, [institution.id]);
 
@@ -496,21 +492,21 @@ function InstitutionDashboard({
         const res = await getRequest(INSTITUTION_COURSES_ENDPOINT(institution.id), {});
         const list = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
         setCourses(list);
-      } catch (_) {} finally { setTabLoading(false); }
+      } catch {} finally { setTabLoading(false); }
     } else if (tabId === 'programs') {
       setTabLoading(true);
       try {
         const res = await getRequest(INSTITUTION_PROGRAMS_ENDPOINT(institution.id), {});
         const list = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
         setPrograms(list);
-      } catch (_) {} finally { setTabLoading(false); }
+      } catch {} finally { setTabLoading(false); }
     } else if (tabId === 'members') {
       setTabLoading(true);
       try {
         const res = await getRequest(INSTITUTION_MEMBERS_ENDPOINT(institution.id), {});
         const list = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
         setMembers(list);
-      } catch (_) {} finally { setTabLoading(false); }
+      } catch {} finally { setTabLoading(false); }
     }
   }, [institution.id]);
 
@@ -598,7 +594,9 @@ function InstitutionDashboard({
                 if (action.label === 'Add Course') { setTab('courses'); setCourseForm({ title: '', description: '' }); }
                 else if (action.label === 'Add Program') { setTab('programs'); setProgramForm({ title: '', description: '' }); }
                 else if (action.label === 'Invite Staff') setTab('members');
-                else Alert.alert('Coming soon', `${action.label} will be available in an upcoming update.`);
+                else if (action.label === 'Live Class') setTab('courses');
+                else if (action.label === 'Issue Certificate') setTab('analytics');
+                else if (action.label === 'Publish Landing') setTab('settings');
               }}
               style={{
                 borderWidth: 1.5,
@@ -971,7 +969,7 @@ function InstitutionDashboard({
     </View>
   );
 
-  const content = useMemo(() => {
+  const content = (() => {
     switch (tab) {
       case 'overview': return renderOverview();
       case 'courses': return renderCourses();
@@ -980,7 +978,7 @@ function InstitutionDashboard({
       case 'analytics': return renderAnalytics();
       case 'settings': return renderSettings();
     }
-  }, [tab, dashboard, institution]);
+  })();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -1077,7 +1075,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
         ? data
         : [];
       setInstitutions(list);
-    } catch (_) {}
+    } catch {}
     finally { setLoading(false); }
   }, []);
 
@@ -1088,12 +1086,6 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
       <InstitutionDashboard
         institution={selectedInstitution}
         onClose={() => setSelectedInstitution(null)}
-        onUpdated={(updated) => {
-          setInstitutions((prev) =>
-            prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)),
-          );
-          setSelectedInstitution(updated);
-        }}
       />
     );
   }

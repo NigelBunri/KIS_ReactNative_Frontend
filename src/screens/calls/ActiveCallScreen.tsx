@@ -40,6 +40,7 @@ const CONTROLS_HIDE_AFTER = 4000;
 
 type CallActions = {
   onEnd: () => void;
+  onDismiss?: () => void;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleSpeaker: () => void;
@@ -199,7 +200,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               size={15}
               showDot={false}
             />
-            <Pressable onPress={actions.onEnd} style={styles.endedCloseBtn}>
+            <Pressable onPress={actions.onDismiss ?? actions.onEnd} style={styles.endedCloseBtn}>
               <Text style={styles.endedCloseTxt}>Close</Text>
             </Pressable>
           </View>

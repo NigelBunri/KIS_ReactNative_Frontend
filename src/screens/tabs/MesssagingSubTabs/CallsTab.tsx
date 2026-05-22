@@ -131,7 +131,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
     return (
       <Pressable
         style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
-        onPress={() => {}}
+        onPress={() => DeviceEventEmitter.emit('chat.open', { conversationId: item.conversationId, name })}
       >
         {/* Call type icon */}
         <View style={[

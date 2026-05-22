@@ -14,8 +14,8 @@ import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
-  kiscToMicro,
-  microToKisc,
+  usdToMicro,
+  microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
@@ -50,7 +50,7 @@ type PrescriptionOrder = {
   totalPrice: number;
 };
 
-const toKiscLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
 
 export default function PharmacyManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
@@ -94,7 +94,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           name: String(row?.name || '').trim() || `Medication ${index + 1}`,
           category: String(row?.description || '').split('|')[0]?.trim() || 'General',
           stock: Math.max(0, Number(row?.quantity || 0) || 0),
-          price: microToKisc(Number(row?.amount_micro || 0)),
+          price: microToUsd(Number(row?.amount_micro || 0)),
           expiryDate: String(row?.value_date || '').trim() || '',
           sortOrder: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : index + 1,
         }))
@@ -135,7 +135,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         name: cleanName,
         description: cleanCategory,
         quantity: stock,
-        amount_micro: kiscToMicro(price),
+        amount_micro: usdToMicro(price),
         value_date: expiryDate,
         status: stock > 0 ? 'in_stock' : 'out_of_stock',
       };
@@ -165,7 +165,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
       name: med.name,
       category: med.category,
       stock: String(med.stock),
-      price: toKiscLabel(med.price),
+      price: toUsdLabel(med.price),
       expiryDate: med.expiryDate,
     });
   }, []);
@@ -284,7 +284,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
               {med.name} ({med.category})
             </Text>
             <Text style={{ color: palette.subtext }}>
-              Stock: {med.stock} • Price: {toKiscLabel(med.price)} USD • Exp: {med.expiryDate}
+              Stock: {med.stock} • Price: {toUsdLabel(med.price)} USD • Exp: {med.expiryDate}
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
               <KISButton title="Edit Medication" variant="outline" onPress={() => editMedication(med)} />
@@ -386,7 +386,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           <View key={order.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>{order.patientName}</Text>
             <Text style={{ color: palette.subtext }}>
-              Priority: {order.priority} • Status: {order.status} • Price: {toKiscLabel(order.totalPrice)} USD
+              Priority: {order.priority} • Status: {order.status} • Price: {toUsdLabel(order.totalPrice)} USD
             </Text>
             {['Pending', 'Processing', 'Ready', 'Delivered', 'Cancelled'].map((statusValue) => (
               <KISButton
@@ -406,7 +406,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         <Text style={{ color: palette.text }}>Out of Stock: {outOfStock}</Text>
         <Text style={{ color: palette.text }}>Total Orders: {totalOrders}</Text>
         <Text style={{ color: palette.text }}>Completed Orders: {completedOrders}</Text>
-        <Text style={{ color: palette.text }}>Revenue: {toKiscLabel(revenue)} USD</Text>
+        <Text style={{ color: palette.text }}>Revenue: {toUsdLabel(revenue)} USD</Text>
       </View>
     </ScrollView>
   );

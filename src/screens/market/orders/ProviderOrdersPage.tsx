@@ -19,6 +19,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import type { RootStackParamList } from '@/navigation/types';
 import { backendOrderTotalToUsd } from '@/utils/currency';
+import { getDirectPaymentInfo, paymentStatusLabel } from '@/utils/directPaymentHandoff';
 
 type ProviderOrdersNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -34,6 +35,11 @@ type MarketplaceOrderSummary = {
   shop?: { name?: string } | string;
   created_at?: string;
   items?: any[];
+  metadata?: Record<string, any>;
+  payment_status?: string;
+  payment_reference?: string;
+  direct_payment_intent_id?: string;
+  payment_url?: string;
 };
 
 export default function ProviderOrdersPage() {
@@ -124,9 +130,10 @@ export default function ProviderOrdersPage() {
         ? item.buyer
         : item.buyer?.username ?? 'Buyer';
     const status = labelStatus(item.status);
-    const canComplete =
-      item.status !== 'completed' && item.status !== 'cancelled';
-    const loading = actionLoading === item.id;
+    const directPayment = getDirectPaymentInfo(item);
+    const paymentReady = ['paid', 'success', 'successful', 'satisfied'].includes(directPayment.status);
+    const canComplete = item.status === 'temporal' && paymentReady;
+    const rowLoading = actionLoading === item.id;
 
     return (
       <View
@@ -163,14 +170,17 @@ export default function ProviderOrdersPage() {
           <Text style={[styles.meta, { color: palette.subtext }]}>
             {status} · {total.toFixed(2)} USD
           </Text>
+          <Text style={[styles.meta, { color: paymentReady ? palette.success : palette.subtext }]}>
+            Payment · {paymentStatusLabel(directPayment.status)}
+          </Text>
         </Pressable>
         <View style={styles.actions}>
           {canComplete ? (
             <KISButton
-              title={loading ? 'Completing…' : 'Mark completed'}
+              title={rowLoading ? 'Completing…' : 'Mark completed'}
               size="xs"
               onPress={() => handleComplete(item.id)}
-              loading={loading}
+              loading={rowLoading}
             />
           ) : null}
           <KISButton

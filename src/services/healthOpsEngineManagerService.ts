@@ -4,7 +4,7 @@ import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 
-const MICROS_PER_KISC = 1000;
+const MICRO_UNITS_PER_USD = 1000;
 
 export const normalizeEngineKey = (value: string) =>
   String(value || '')
@@ -15,17 +15,21 @@ export const normalizeEngineKey = (value: string) =>
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-export const kiscToMicro = (kisc?: number | string | null) => {
-  const parsed = Number(kisc ?? 0);
+export const usdToMicro = (usd?: number | string | null) => {
+  const parsed = Number(usd ?? 0);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.round(parsed * MICROS_PER_KISC);
+  return Math.round(parsed * MICRO_UNITS_PER_USD);
 };
 
-export const microToKisc = (micro?: number | string | null) => {
+export const microToUsd = (micro?: number | string | null) => {
   const parsed = Number(micro ?? 0);
   if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  return parsed / MICROS_PER_KISC;
+  return parsed / MICRO_UNITS_PER_USD;
 };
+
+// Backward-compatible aliases for older health engine screens. New code should use USD naming.
+export const kiscToMicro = usdToMicro;
+export const microToKisc = microToUsd;
 
 export type EngineManagedItem = {
   id: string;
@@ -37,7 +41,8 @@ export type EngineManagedItem = {
   name: string;
   description?: string;
   amount_micro?: number;
-  amount_kisc?: string;
+  amount_usd?: string;
+  amount_kisc?: string; // legacy compatibility only
   quantity?: number | null;
   value_int?: number | null;
   value_date?: string | null;

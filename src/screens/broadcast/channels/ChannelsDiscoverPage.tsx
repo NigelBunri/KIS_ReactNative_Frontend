@@ -176,14 +176,25 @@ function ChannelListRow({ channel, onOpen }: { channel: BroadcastChannelSummary;
   );
 }
 
-function RecommendationChip({ item }: { item: RecommendationItem }) {
+function RecommendationChip({ item, onOpen }: { item: RecommendationItem; onOpen: (item: RecommendationItem) => void }) {
   const { palette, tone } = useKISTheme();
   return (
-    <View style={[styles.recommendationChip, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7', borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2' }]}>
+    <Pressable
+      onPress={() => onOpen(item)}
+      style={({ pressed }) => [
+        styles.recommendationChip,
+        {
+          backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7',
+          borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+          opacity: pressed ? 0.76 : 1,
+        },
+      ]}
+    >
       <Text style={[styles.recommendationKind, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>{String(item.kind || '').replace(/_/g, ' ').toUpperCase()}</Text>
       <Text numberOfLines={1} style={[styles.recommendationTitle, { color: palette.text }]}>{item.title}</Text>
       {item.subtitle ? <Text numberOfLines={1} style={[styles.recommendationSubtitle, { color: palette.subtext }]}>{item.subtitle}</Text> : null}
-    </View>
+      <Text style={[styles.recommendationAction, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>Open</Text>
+    </Pressable>
   );
 }
 
@@ -207,11 +218,53 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
       ...(sections.bible || []),
       ...(sections.education || []),
       ...(sections.commerce || []),
+      ...(sections.health || []),
+      ...(sections.partners || []),
       ...(sections.people || []),
     ].slice(0, 8);
   }, [recommendations?.sections]);
   const openChannel = useCallback((channel: BroadcastChannelSummary) => {
     navigation.navigate('ChannelHome', { channelId: channel.id, handle: channel.handle, channel });
+  }, [navigation]);
+
+  const openRecommendation = useCallback((item: RecommendationItem) => {
+    const kind = String(item.kind || item.target_type || '').toLowerCase();
+    const id = String(item.target_id || '');
+    const metadata = item.metadata || {};
+    if (!id) return;
+    if (kind.includes('channel')) {
+      navigation.navigate('ChannelHome', { channelId: id, handle: String(metadata.handle || '') || undefined });
+      return;
+    }
+    if (kind.includes('product')) {
+      navigation.navigate('ProductDetail', { productId: id });
+      return;
+    }
+    if (kind.includes('shop') || kind.includes('commerce')) {
+      (navigation as any).navigate('MainTabs', { screen: 'Broadcast', params: { focusTab: 'market' } });
+      return;
+    }
+    if (kind.includes('course') || kind.includes('education')) {
+      (navigation as any).navigate('MainTabs', { screen: 'Broadcast', params: { focusTab: 'education' } });
+      return;
+    }
+    if (kind.includes('health')) {
+      navigation.navigate('HealthInstitutionDetail', {
+        institutionId: id,
+        institutionType: (metadata.institution_type || 'clinic') as any,
+        institutionName: item.title,
+      });
+      return;
+    }
+    if (kind.includes('partner')) {
+      (navigation as any).navigate('MainTabs', { screen: 'Partners' });
+      return;
+    }
+    if (kind.includes('bible') || kind.includes('meditation')) {
+      (navigation as any).navigate('MainTabs', { screen: 'Bible' });
+      return;
+    }
+    (navigation as any).navigate('GlobalSearch');
   }, [navigation]);
 
   useEffect(() => {
@@ -259,9 +312,9 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendationRow}>
           {recommendedItems.length ? recommendedItems.map(item => (
-            <RecommendationChip key={`${item.kind}-${item.target_type}-${item.target_id}`} item={item} />
+            <RecommendationChip key={`${item.kind}-${item.target_type}-${item.target_id}`} item={item} onOpen={openRecommendation} />
           )) : (
-            <Text style={[styles.emptyText, { color: palette.subtext }]}>{compact ? 'Recommendations will appear here.' : 'Recommendations will appear as you subscribe, read, save, enroll, and shop safely.'}</Text>
+            <Text style={[styles.emptyText, { color: palette.subtext }]}>{compact ? 'No recommendations yet.' : 'No recommendations match your current safe discovery settings yet.'}</Text>
           )}
         </ScrollView>
       </View>
@@ -361,6 +414,7 @@ const styles = StyleSheet.create({
   recommendationKind: { fontSize: 9, fontWeight: '900' },
   recommendationTitle: { marginTop: 5, fontSize: 13, fontWeight: '900' },
   recommendationSubtitle: { marginTop: 3, fontSize: 11, fontWeight: '700' },
+  recommendationAction: { marginTop: 8, fontSize: 10, fontWeight: '900' },
   sectionHeader: { marginTop: 18, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 17, fontWeight: '900' },
   sectionSubtitle: { marginTop: 2, fontSize: 11, lineHeight: 15, fontWeight: '700' },

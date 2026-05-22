@@ -961,6 +961,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           session={activeCall}
           actions={{
             onEnd: () => void endCall(),
+            onDismiss: () => void dismissCallUi(),
             onToggleMute: toggleMute,
             onToggleVideo: toggleVideo,
             onToggleSpeaker: toggleSpeaker,
