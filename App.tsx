@@ -344,13 +344,25 @@ function AppContent() {
         setLocationReady(true);
       }
 
-      await Promise.all([
-        // Only request the OS permission dialog on the very first launch.
-        // On all subsequent launches, just check the current status silently.
-        syncLocationCountry(!hadPermission),
-        checkAuth(),
-        new Promise<void>(resolve => setTimeout(resolve, 3000)),
+      const bootStart = Date.now();
+      const BOOT_MIN_MS = 3_000;
+      // Hard cap: auth check retries up to 3×15s; cap so splash never hangs.
+      const BOOT_MAX_MS = 12_000;
+
+      await Promise.race([
+        Promise.allSettled([
+          // Only request the OS permission dialog on the very first launch.
+          syncLocationCountry(!hadPermission),
+          checkAuth(),
+        ]),
+        new Promise<void>(resolve => setTimeout(resolve, BOOT_MAX_MS)),
       ]);
+
+      // Ensure minimum splash duration regardless of how fast the checks ran.
+      const elapsed = Date.now() - bootStart;
+      if (elapsed < BOOT_MIN_MS) {
+        await new Promise<void>(resolve => setTimeout(resolve, BOOT_MIN_MS - elapsed));
+      }
 
       setBooting(false);
     })();
