@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
 import { RTCView } from '@/services/calls/webRTCService';
+import { audioRouteManager } from '@/services/calls/audioRouteManager';
 
 import CallControls from './components/CallControls';
 import VideoGrid from './components/VideoGrid';
@@ -102,6 +103,15 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       loop.start();
       return () => loop.stop();
     }
+  }, [session?.state]);
+
+  // Ringback tone: plays on the caller's side while waiting for remote to answer
+  useEffect(() => {
+    if (session?.state === 'dialing') {
+      audioRouteManager.startRingback();
+      return () => audioRouteManager.stopRingback();
+    }
+    audioRouteManager.stopRingback();
   }, [session?.state]);
 
   const scheduleHide = useCallback(() => {

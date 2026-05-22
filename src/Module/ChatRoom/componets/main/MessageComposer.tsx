@@ -5,6 +5,7 @@ import {
   Pressable,
   Text,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
@@ -167,6 +168,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 }) => {
   /* ----------------------------- VOICE STATE ----------------------------- */
   const [isRecording, setIsRecording] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const sendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const responsive = useResponsiveLayout();
   const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
   const composerIconSize = responsive.isWatch ? 32 : responsive.isCompactPhone ? 34 : 36;
@@ -272,6 +275,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   /* ----------------------------- CLEANUP EFFECT --------------------------- */
   useEffect(() => {
     return () => {
+      if (sendingTimerRef.current) clearTimeout(sendingTimerRef.current);
       try {
         audioRecorderPlayer.stopPlayer();
         audioRecorderPlayer.removePlayBackListener();
@@ -315,7 +319,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleTextSend = () => {
-    if (!canSend || disabled) return;
+    if (!canSend || disabled || isSending) return;
 
     const now = Date.now();
     if (lastSendRef.current && now - lastSendRef.current < 400) {
@@ -323,7 +327,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
     lastSendRef.current = now;
 
+    setIsSending(true);
     onSend();
+    if (sendingTimerRef.current) clearTimeout(sendingTimerRef.current);
+    sendingTimerRef.current = setTimeout(() => setIsSending(false), 600);
   };
 
   /* ----------------------------- PANEL TOGGLING --------------------------- */
@@ -723,7 +730,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         {showTextSend ? (
           <Pressable
             onPress={handleTextSend}
-            disabled={!canSend || !!disabled}
+            disabled={!canSend || !!disabled || isSending}
             style={[
               styles.composerActionButton,
               {
@@ -738,11 +745,18 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               },
             ]}
           >
-            <KISIcon
-              name="send"
-              size={responsive.isWatch ? 16 : 18}
-              color={palette.onPrimary}
-            />
+            {isSending ? (
+              <ActivityIndicator
+                size="small"
+                color={palette.onPrimary}
+              />
+            ) : (
+              <KISIcon
+                name="send"
+                size={responsive.isWatch ? 16 : 18}
+                color={palette.onPrimary}
+              />
+            )}
           </Pressable>
         ) : (
           <HoldToLockComposer

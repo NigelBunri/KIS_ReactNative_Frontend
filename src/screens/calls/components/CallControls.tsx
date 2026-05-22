@@ -90,31 +90,35 @@ export default function CallControls({
         </View>
       )}
 
-      {/* Main controls row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-        style={styles.scrollView}
-      >
-        {buttons.map(btn => (
-          <ControlButton
-            key={btn.id}
-            btn={btn}
-            onPress={() => btn.id === 'reactions' ? onToggleReactionPicker() : onAction(btn.id)}
-          />
-        ))}
-      </ScrollView>
+      {/* Controls row: scrollable device buttons + always-visible end call */}
+      <View style={styles.controlsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.row}
+          style={styles.scrollView}
+        >
+          {buttons.map(btn => (
+            <ControlButton
+              key={btn.id}
+              btn={btn}
+              onPress={() => btn.id === 'reactions' ? onToggleReactionPicker() : onAction(btn.id)}
+            />
+          ))}
+        </ScrollView>
 
-      {/* End call — always visible, centered, prominent */}
-      <Pressable
-        onPress={() => onAction('end')}
-        style={styles.endBtn}
-        android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: false, radius: 34 }}
-      >
-        <KISIcon name="phone-off" size={26} color="#fff" />
-        <Text style={styles.endLabel}>End</Text>
-      </Pressable>
+        <View style={styles.endSeparator} />
+
+        {/* End call — always visible on the right, never scrolled away */}
+        <Pressable
+          onPress={() => onAction('end')}
+          style={styles.endBtn}
+          android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: false, radius: 34 }}
+        >
+          <KISIcon name="phone-off" size={24} color="#fff" />
+          <Text style={styles.endLabel}>End</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -156,12 +160,16 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  scrollView: { flexGrow: 0 },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scrollView: { flex: 1 },
   row: {
     flexDirection: 'row',
     paddingHorizontal: 12,
     gap: 8,
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   btn: {
     width: 62,
@@ -190,9 +198,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  endSeparator: {
+    width: StyleSheet.hairlineWidth,
+    height: 48,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
   endBtn: {
-    alignSelf: 'center',
-    marginTop: 10,
     backgroundColor: '#E52B2B',
     borderRadius: 50,
     width: 68,
@@ -200,6 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
+    marginHorizontal: 12,
     shadowColor: '#E52B2B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,

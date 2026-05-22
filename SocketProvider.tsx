@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react';
 import { Alert, DeviceEventEmitter, Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { check, PERMISSIONS, request, RESULTS } from 'react-native-permissions';
@@ -624,6 +625,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       /* ── Broadcast created ── */
       s.on('broadcast.created', (payload: any) => { DeviceEventEmitter.emit('broadcast.created', payload); });
 
+      /* ── Channel live / content events ── */
+      const onChannelLiveStarted = (payload: any) => DeviceEventEmitter.emit('channel.live.started', payload);
+      const onChannelLiveEnded   = (payload: any) => DeviceEventEmitter.emit('channel.live.ended', payload);
+      const onChannelViewerCount = (payload: any) => DeviceEventEmitter.emit('channel.viewer.count', payload);
+      const onChannelChatMessage = (payload: any) => DeviceEventEmitter.emit('channel.chat.message', payload);
+      const onChannelContentPublished = (payload: any) => DeviceEventEmitter.emit('channel.content.published', payload);
+      const onChannelSubscribed  = (payload: any) => DeviceEventEmitter.emit('channel.subscribed', payload);
+
+      s.on('channel.live.started',      onChannelLiveStarted);
+      s.on('channel.live.ended',        onChannelLiveEnded);
+      s.on('channel.viewer.count',      onChannelViewerCount);
+      s.on('channel.chat.message',      onChannelChatMessage);
+      s.on('channel.content.published', onChannelContentPublished);
+      s.on('channel.subscribed',        onChannelSubscribed);
+
       /* ── CALL EVENTS ── */
 
       // Incoming call
@@ -908,6 +924,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       webRTCService.closeAll();
       audioRouteManager.stop();
       if (socketRef.current) {
+        socketRef.current.off('channel.live.started',      onChannelLiveStarted);
+        socketRef.current.off('channel.live.ended',        onChannelLiveEnded);
+        socketRef.current.off('channel.viewer.count',      onChannelViewerCount);
+        socketRef.current.off('channel.chat.message',      onChannelChatMessage);
+        socketRef.current.off('channel.content.published', onChannelContentPublished);
+        socketRef.current.off('channel.subscribed',        onChannelSubscribed);
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -919,6 +941,27 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveCall(null);
     };
   }, [isAuth]);
+
+  /* ─── NetInfo-driven reconnect ───────────────────────────────────────────── */
+  // When the device regains network, immediately prompt the socket to reconnect
+  // instead of waiting for the next exponential-backoff timer tick.
+
+  const socketRef2 = socketRef; // alias — socketRef already holds the socket instance
+  useEffect(() => {
+    let wasOnline = true;
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const online = !!(state.isConnected && state.isInternetReachable !== false);
+      if (online && !wasOnline) {
+        // Network just came back — kick the socket reconnect immediately
+        const s = socketRef2.current;
+        if (s && !s.connected) {
+          s.connect();
+        }
+      }
+      wasOnline = online;
+    });
+    return () => unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── Context value ─────────────────────────────────────────────────────── */
 

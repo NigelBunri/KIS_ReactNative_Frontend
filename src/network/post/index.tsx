@@ -6,6 +6,40 @@ import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
 import { getAccessToken } from '@/security/authStorage';
 import { refreshAccessToken } from '@/security/tokenRefresh';
+import { computeRetryDelayMs } from '@/services/performanceOfflineService';
+
+const MAX_POST_RETRIES = 2;
+
+const isTransientError = (err: any): boolean => {
+  const name = String(err?.name ?? '');
+  const msg = String(err?.message ?? '').toLowerCase();
+  return (
+    name === 'AbortError' ||
+    msg.includes('network request failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('timeout')
+  );
+};
+
+const fetchPostWithRetry = async (
+  execute: () => Promise<Response>,
+): Promise<Response> => {
+  let lastError: any;
+  for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, computeRetryDelayMs(attempt - 1, 800, 8000)));
+    }
+    try {
+      return await execute();
+    } catch (err: any) {
+      lastError = err;
+      // Only retry transient network errors — NOT 5xx (server may have processed already)
+      if (!isTransientError(err) || attempt >= MAX_POST_RETRIES) throw err;
+    }
+  }
+  throw lastError;
+};
 
 const sanitizeFileData = (obj: any): any => {
   if (Array.isArray(obj)) return obj.map(sanitizeFileData);
@@ -58,7 +92,7 @@ export const postRequest = async (
     // ❗ Do NOT sanitize FormData or convert it
     const payload = isFormData ? data : sanitizeFileData(data);
 
-    const response = await apiService.post(url, payload, headers);
+    const response = await fetchPostWithRetry(() => apiService.post(url, payload, headers));
     const responseData = await response.json().catch(() => ({}));
     const unwrapPayload = (payload: any) => {
       if (
@@ -92,7 +126,7 @@ export const postRequest = async (
       const newToken = await refreshAccessToken();
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
-        const retryResponse = await apiService.post(url, payload, retryHeaders);
+        const retryResponse = await fetchPostWithRetry(() => apiService.post(url, payload, retryHeaders));
         const retryData = await retryResponse.json().catch(() => ({}));
         if (retryResponse.ok) {
           return { success: true, data: unwrapPayload(retryData), message: successMessage };

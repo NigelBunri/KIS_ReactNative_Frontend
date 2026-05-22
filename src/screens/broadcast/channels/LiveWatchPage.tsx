@@ -1,81 +1,745 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+// src/screens/broadcast/channels/LiveWatchPage.tsx
+//
+// Full-screen live stream viewer and VOD replay page.
+// Handles four stream states: scheduled (countdown), live (HLS player),
+// ended (replay), and failed/cancelled (error card).
+//
+// Layout: Video fills the entire screen; all UI floats as overlays.
+// Chat panel anchors to the bottom-right; reactions float upward on tap.
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Video from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
-import type { BroadcastChannelLiveStream } from '@/screens/broadcast/channels/api/channels.types';
-import { fetchLiveStreamDetail } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { useLiveStream } from './hooks/useLiveStream';
+import LiveChatPanel from './components/LiveChatPanel';
+import SubscribeBellButton from './components/SubscribeBellButton';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const REACTIONS = ['❤️', '😂', '😮', '👏', '🙏'];
+
+function formatCountdown(targetIso: string): string {
+  const diff = Math.max(0, new Date(targetIso).getTime() - Date.now());
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  const s = Math.floor((diff % 60_000) / 1_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
+
+function useCountdown(targetIso?: string | null) {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    if (!targetIso) return;
+    const tick = () => setLabel(formatCountdown(targetIso));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return label;
+}
+
+// ── Floating reaction ─────────────────────────────────────────────────────────
+
+type FloatingEmoji = { id: number; emoji: string; x: number; anim: Animated.Value };
+
+function FloatingReactions({ reactions }: { reactions: FloatingEmoji[] }) {
+  return (
+    <>
+      {reactions.map(r => (
+        <Animated.Text
+          key={r.id}
+          style={[
+            styles.floatingEmoji,
+            {
+              left: r.x,
+              transform: [
+                {
+                  translateY: r.anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -180],
+                  }),
+                },
+              ],
+              opacity: r.anim.interpolate({
+                inputRange: [0, 0.7, 1],
+                outputRange: [1, 1, 0],
+              }),
+            },
+          ]}
+        >
+          {r.emoji}
+        </Animated.Text>
+      ))}
+    </>
+  );
+}
+
+// ── Status overlays ───────────────────────────────────────────────────────────
+
+function ScheduledOverlay({
+  title,
+  countdown,
+  channelName,
+  thumb,
+  palette,
+}: {
+  title: string;
+  countdown: string;
+  channelName?: string;
+  thumb?: string;
+  palette: any;
+}) {
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+      ) : (
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+      <View style={styles.scheduledContent}>
+        {channelName ? (
+          <Text style={styles.scheduledChannel}>{channelName}</Text>
+        ) : null}
+        <Text style={styles.scheduledTitle}>{title}</Text>
+        <View style={styles.countdownBox}>
+          <KISIcon name="clock" size={16} color="#fff" />
+          <Text style={styles.countdownLabel}>Starting in</Text>
+          <Text style={styles.countdownTime}>{countdown || '--:--'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function EndedOverlay({
+  title,
+  palette,
+  onPlayReplay,
+}: {
+  title: string;
+  palette: any;
+  onPlayReplay: () => void;
+}) {
+  return (
+    <View style={[styles.endedOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+      <KISIcon name="film" size={40} color="#fff" />
+      <Text style={styles.endedTitle}>{title}</Text>
+      <Text style={styles.endedSub}>This stream has ended</Text>
+      <Pressable
+        onPress={onPlayReplay}
+        style={[styles.replayBtn, { backgroundColor: palette.primary }]}
+      >
+        <KISIcon name="play" size={16} color="#fff" />
+        <Text style={styles.replayBtnText}>Watch Replay</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 export default function LiveWatchPage() {
   const route = useRoute<RouteProp<RootStackParamList, 'LiveWatch'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'LiveWatch'>>();
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
-  const [stream, setStream] = useState<BroadcastChannelLiveStream | null>(route.params?.stream || null);
-  const [loading, setLoading] = useState(!route.params?.stream);
+
+  const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
+
+  const { stream, loading, viewerCount, chatMessages, sendChatMessage } =
+    useLiveStream(streamId);
+
+  const countdown = useCountdown(stream?.scheduled_start_at);
+
+  const thumb = useMemo(
+    () => resolveBackendAssetUrl(stream?.thumbnail_url ?? ''),
+    [stream?.thumbnail_url],
+  );
+
+  // ── Player state ────────────────────────────────────────────────────────────
+  const [paused,      setPaused]      = useState(false);
+  const [buffering,   setBuffering]   = useState(false);
+  const [videoError,  setVideoError]  = useState<string | null>(null);
+  const [showReplay,  setShowReplay]  = useState(false);
+  const [chatOpen,    setChatOpen]    = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const playbackUrl = useMemo(() => {
+    if (stream?.status === 'live') return stream.playback_url ?? null;
+    if (stream?.status === 'ended' && showReplay) return stream.replay_url ?? null;
+    return null;
+  }, [stream?.status, stream?.playback_url, stream?.replay_url, showReplay]);
+
+  // ── Controls auto-hide ──────────────────────────────────────────────────────
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setControlsVisible(false), 4000);
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    fetchLiveStreamDetail(route.params.streamId)
-      .then(next => { if (mounted && next) setStream(next); })
-      .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
-  }, [route.params.streamId]);
+    showControls();
+    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, []);
 
-  const thumb = useMemo(() => resolveBackendAssetUrl(stream?.thumbnail_url || ''), [stream?.thumbnail_url]);
+  // ── Reactions ───────────────────────────────────────────────────────────────
+  const [floaters, setFloaters] = useState<FloatingEmoji[]>([]);
+  const nextId = useRef(0);
 
+  const sendReaction = useCallback((emoji: string) => {
+    const id = nextId.current++;
+    const x = 20 + Math.random() * (SCREEN_W * 0.35);
+    const anim = new Animated.Value(0);
+    setFloaters(prev => [...prev.slice(-8), { id, emoji, x, anim }]);
+    Animated.timing(anim, { toValue: 1, duration: 1400, useNativeDriver: true }).start(() => {
+      setFloaters(prev => prev.filter(r => r.id !== id));
+    });
+  }, []);
+
+  // ── Share ───────────────────────────────────────────────────────────────────
+  const handleShare = useCallback(async () => {
+    if (!stream) return;
+    await Share.share({
+      title: stream.title,
+      message: `Watch "${stream.title}" live on KIS`,
+    });
+  }, [stream]);
+
+  // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
-    return <SafeAreaView style={[styles.centered, { backgroundColor: palette.background }]}><ActivityIndicator color={palette.primaryStrong} /></SafeAreaView>;
+    return (
+      <View style={[styles.centered, { backgroundColor: '#000' }]}>
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <ActivityIndicator color="#fff" size="large" />
+      </View>
+    );
   }
 
+  const status = stream?.status ?? 'scheduled';
+  const isLive = status === 'live';
+  const isEnded = status === 'ended';
+  const isFailed = status === 'failed' || status === 'cancelled';
+
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]} edges={['top']}>
-      <View style={styles.stage}>
-        {thumb ? <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
-        <View style={styles.scrim} />
-        <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}> 
-          <KISIcon name="arrow-left" size={20} color="#fff" />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+
+      {/* ── Video / background layer ── */}
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={showControls}>
+        {playbackUrl ? (
+          <Video
+            source={{ uri: playbackUrl }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+            paused={paused}
+            controls={false}
+            repeat={false}
+            bufferConfig={{
+              minBufferMs: 1500,
+              maxBufferMs: 10000,
+              bufferForPlaybackMs: 1000,
+              bufferForPlaybackAfterRebufferMs: 2000,
+            }}
+            onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+            onError={(e) => setVideoError(e?.error?.localizedDescription ?? 'Playback error')}
+            onLoad={() => { setBuffering(false); setVideoError(null); }}
+          />
+        ) : status === 'scheduled' ? (
+          <ScheduledOverlay
+            title={stream?.title ?? 'Upcoming stream'}
+            countdown={countdown}
+            channelName={stream?.channel?.display_name}
+            thumb={thumb || undefined}
+            palette={palette}
+          />
+        ) : (
+          /* Fallback / failed / ended-not-playing thumbnail */
+          <>
+            {thumb ? (
+              <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            ) : (
+              <LinearGradient
+                colors={['#0d0d0d', '#1a1a1a']}
+                style={StyleSheet.absoluteFillObject}
+              />
+            )}
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
+          </>
+        )}
+
+        {/* Buffering spinner */}
+        {buffering && !videoError && (
+          <View style={styles.bufferWrap} pointerEvents="none">
+            <ActivityIndicator color="#fff" size="large" />
+          </View>
+        )}
+
+        {/* Video error */}
+        {videoError && (
+          <View style={styles.bufferWrap} pointerEvents="none">
+            <KISIcon name="wifi-off" size={32} color="#fff" />
+            <Text style={styles.errorText}>{videoError}</Text>
+          </View>
+        )}
+
+        {/* Ended state (no replay yet) */}
+        {isEnded && !showReplay && (
+          <EndedOverlay
+            title={stream?.title ?? 'Stream ended'}
+            palette={palette}
+            onPlayReplay={() => setShowReplay(true)}
+          />
+        )}
+
+        {/* Failed / cancelled */}
+        {isFailed && (
+          <View style={styles.bufferWrap} pointerEvents="none">
+            <KISIcon name="alert-circle" size={36} color="#EF4444" />
+            <Text style={styles.errorText}>Stream unavailable</Text>
+          </View>
+        )}
+      </Pressable>
+
+      {/* ── Floating reactions layer ── */}
+      <View style={styles.floatLayer} pointerEvents="none">
+        <FloatingReactions reactions={floaters} />
+      </View>
+
+      {/* ── Top controls overlay ── */}
+      <Animated.View
+        style={[
+          styles.topOverlay,
+          { paddingTop: insets.top + (Platform.OS === 'android' ? 28 : 8) },
+          { opacity: controlsVisible ? 1 : 0 },
+        ]}
+        pointerEvents={controlsVisible ? 'box-none' : 'none'}
+      >
+        <LinearGradient
+          colors={['rgba(0,0,0,0.65)', 'transparent']}
+          style={StyleSheet.absoluteFillObject}
+        />
+
+        <View style={styles.topRow}>
+          {/* Back */}
+          <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12}>
+            <KISIcon name="arrow-left" size={20} color="#fff" />
+          </Pressable>
+
+          {/* Title + status */}
+          <View style={styles.topCenter}>
+            {isLive && (
+              <View style={styles.liveBadge}>
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
+            {isEnded && showReplay && (
+              <View style={[styles.liveBadge, { backgroundColor: '#374151' }]}>
+                <Text style={styles.liveBadgeText}>REPLAY</Text>
+              </View>
+            )}
+            <Text style={styles.topTitle} numberOfLines={1}>
+              {stream?.title ?? ''}
+            </Text>
+          </View>
+
+          {/* Viewer count */}
+          {(isLive || isEnded) && (
+            <View style={styles.viewerPill}>
+              <KISIcon name="eye" size={12} color="#fff" />
+              <Text style={styles.viewerText}>
+                {viewerCount.toLocaleString()}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.View>
+
+      {/* ── Play/Pause center tap (live only) ── */}
+      {playbackUrl && controlsVisible && (
+        <Pressable
+          style={styles.playPauseCenter}
+          onPress={() => { setPaused(p => !p); showControls(); }}
+          hitSlop={20}
+        >
+          {paused ? (
+            <View style={styles.playPauseCircle}>
+              <KISIcon name="play" size={32} color="#fff" />
+            </View>
+          ) : null}
         </Pressable>
-        <View style={styles.playerCenter}>
-          <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>{stream?.status === 'live' ? 'LIVE' : stream?.status === 'ended' ? 'REPLAY' : 'SCHEDULED'}</Text></View>
-          <View style={styles.playCircle}><KISIcon name={stream?.status === 'live' ? 'radio' : 'play'} size={42} color="#fff" /></View>
-          <Text style={styles.playerText}>{stream?.playback_url || stream?.replay_url ? 'Playback URL ready' : 'Player provider not connected yet'}</Text>
-        </View>
+      )}
+
+      {/* ── Right-side action column ── */}
+      <View
+        style={[
+          styles.rightActions,
+          { bottom: insets.bottom + 90 },
+        ]}
+        pointerEvents="box-none"
+      >
+        <Pressable style={styles.actionBtn} onPress={handleShare}>
+          <KISIcon name="share" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>Share</Text>
+        </Pressable>
       </View>
-      <View style={[styles.infoCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-        <Text style={[styles.title, { color: palette.text }]}>{stream?.title || 'Live stream'}</Text>
-        <Text style={[styles.meta, { color: palette.subtext }]}>{stream?.viewer_count || 0} watching · peak {stream?.peak_viewer_count || 0}</Text>
-        <Text style={[styles.description, { color: palette.subtext }]}>{stream?.description || 'Live chat, moderation, reactions, and provider playback will be completed after the live provider is selected.'}</Text>
-        <View style={[styles.chatPlaceholder, { borderColor: palette.border }]}> 
-          <KISIcon name="chat" size={18} color={palette.primaryStrong} />
-          <Text style={[styles.chatText, { color: palette.text }]}>Live chat placeholder</Text>
-        </View>
+
+      {/* ── Bottom overlay: reactions + subscribe ── */}
+      <View
+        style={[
+          styles.bottomOverlay,
+          { paddingBottom: insets.bottom + 10 },
+        ]}
+        pointerEvents="box-none"
+      >
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.72)']}
+          style={StyleSheet.absoluteFillObject}
+        />
+
+        {/* Subscribe row */}
+        {stream?.channel && (
+          <View style={styles.subscribeRow} pointerEvents="box-none">
+            <View style={styles.channelInfo}>
+              {stream.channel.avatar_url ? (
+                <Image
+                  source={{ uri: resolveBackendAssetUrl(stream.channel.avatar_url) }}
+                  style={styles.channelAvatar}
+                />
+              ) : (
+                <View style={[styles.channelAvatar, { backgroundColor: palette.primary }]}>
+                  <KISIcon name="tv" size={14} color="#fff" />
+                </View>
+              )}
+              <Text style={styles.channelName} numberOfLines={1}>
+                {stream.channel.display_name}
+              </Text>
+            </View>
+            <SubscribeBellButton
+              channelId={stream.channel.id}
+              initialSubscribed={stream.channel.is_subscribed}
+              compact
+            />
+          </View>
+        )}
+
+        {/* Stream title (bottom) */}
+        <Text style={styles.bottomTitle} numberOfLines={2}>
+          {stream?.title ?? ''}
+        </Text>
+
+        {/* Reactions strip */}
+        {(isLive || isEnded) && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.reactionsRow}
+            style={styles.reactionsScroll}
+          >
+            {REACTIONS.map(emoji => (
+              <Pressable
+                key={emoji}
+                style={styles.reactionPill}
+                onPress={() => sendReaction(emoji)}
+              >
+                <Text style={styles.reactionEmoji}>{emoji}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </View>
-    </SafeAreaView>
+
+      {/* ── Live chat panel ── */}
+      {(isLive || isEnded) && (
+        <LiveChatPanel
+          messages={chatMessages}
+          onSend={sendChatMessage}
+          palette={palette}
+          disabled={!isLive}
+          collapsed={!chatOpen}
+          onToggleCollapse={() => setChatOpen(o => !o)}
+        />
+      )}
+    </View>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  stage: { height: 380, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.30)' },
-  backButton: { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
-  playerCenter: { alignItems: 'center', paddingHorizontal: 22 },
-  liveBadge: { backgroundColor: '#C0262D', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  liveBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  playCircle: { width: 92, height: 92, borderRadius: 46, backgroundColor: 'rgba(0,0,0,0.38)', alignItems: 'center', justifyContent: 'center' },
-  playerText: { color: '#fff', marginTop: 14, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  infoCard: { margin: 16, marginTop: -24, borderWidth: 1, borderRadius: 8, padding: 16 },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '900' },
-  meta: { marginTop: 6, fontSize: 12, fontWeight: '800' },
-  description: { marginTop: 12, fontSize: 13, lineHeight: 20, fontWeight: '600' },
-  chatPlaceholder: { marginTop: 16, borderWidth: 1, borderRadius: 8, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chatText: { fontSize: 13, fontWeight: '900' },
+  root: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // overlays
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingBottom: 28,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  topCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    flex: 1,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveBadge: {
+    backgroundColor: '#C0262D',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  viewerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  viewerText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 230, // leave room for chat panel
+    paddingHorizontal: 14,
+    paddingTop: 36,
+  },
+  subscribeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  channelInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  channelAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  channelName: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1,
+  },
+  bottomTitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  reactionsScroll: { flexGrow: 0 },
+  reactionsRow: { gap: 8, paddingBottom: 4 },
+  reactionPill: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionEmoji: { fontSize: 20 },
+
+  rightActions: {
+    position: 'absolute',
+    right: 10,
+    alignItems: 'center',
+    gap: 18,
+  },
+  actionBtn: { alignItems: 'center', gap: 4 },
+  actionLabel: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  // play/pause center
+  playPauseCenter: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playPauseCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // buffering/error
+  bufferWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+
+  // float layer
+  floatLayer: {
+    ...StyleSheet.absoluteFillObject,
+    bottom: 100,
+  },
+  floatingEmoji: {
+    position: 'absolute',
+    bottom: 0,
+    fontSize: 28,
+  },
+
+  // scheduled
+  scheduledContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  scheduledChannel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  scheduledTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    lineHeight: 30,
+    marginBottom: 28,
+  },
+  countdownBox: {
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+  },
+  countdownLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  countdownTime: {
+    color: '#fff',
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+
+  // ended
+  endedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  endedTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  endedSub: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  replayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  replayBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
 });

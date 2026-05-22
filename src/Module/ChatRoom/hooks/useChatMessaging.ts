@@ -7,6 +7,7 @@ import {
 } from 'react';
 import type { MutableRefObject } from 'react';
 import { AppState, DeviceEventEmitter } from 'react-native';
+import { onNetworkRecovery } from '@/services/networkMonitor';
 
 import {
   SendOverNetworkResult,
@@ -973,6 +974,18 @@ export function useChatMessaging({
     });
     return () => sub.remove();
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
+
+  // Flush immediately when network comes back — before the socket reconnects
+  // so the socket-reconnect flush doesn't have to wait for the backoff timer.
+  const attemptFlushQueueRef = useRef(attemptFlushQueue);
+  useEffect(() => { attemptFlushQueueRef.current = attemptFlushQueue; }, [attemptFlushQueue]);
+
+  useEffect(() => {
+    const unsub = onNetworkRecovery(() => {
+      attemptFlushQueueRef.current({ silent: true }).catch(() => {});
+    });
+    return unsub;
+  }, []);
 
   /* ---------------------------------------------------------------------
    * RECEIVE REALTIME MESSAGES

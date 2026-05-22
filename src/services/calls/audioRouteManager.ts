@@ -59,6 +59,15 @@ class AudioRouteManager {
   stopRingtone() {
     try { InCallManager?.stopRingtone?.(); } catch {}
   }
+
+  // Ringback tone: played on the caller's side while waiting for the remote to answer
+  startRingback() {
+    try { InCallManager?.startRingback?.('_DEFAULT_'); } catch {}
+  }
+
+  stopRingback() {
+    try { InCallManager?.stopRingback?.(); } catch {}
+  }
 }
 
 export const audioRouteManager = new AudioRouteManager();

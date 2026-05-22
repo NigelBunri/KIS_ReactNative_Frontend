@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import type { CallSession } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
+import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { KISIcon } from '@/constants/kisIcons';
 
 type Props = {
@@ -31,6 +32,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
   useEffect(() => {
     if (!session) return;
     Vibration.vibrate(PULSE_PATTERN, true);
+    audioRouteManager.startRingtone();
 
     // Staggered ripple rings
     const animate = (anim: Animated.Value, delay: number) =>
@@ -49,6 +51,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
 
     return () => {
       Vibration.cancel();
+      audioRouteManager.stopRingtone();
       a1.stop(); a2.stop(); a3.stop();
     };
   }, [!!session]);

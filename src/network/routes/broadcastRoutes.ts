@@ -272,6 +272,22 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/start/`,
     liveStreamEnd: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/end/`,
+    // Streaming credentials & ingest
+    liveStreamStreamKey: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/stream-key/`,
+    liveStreamWhip: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/whip/`,
+    // Multi-camera source management
+    liveStreamCameras: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/cameras/`,
+    liveStreamSwitchCamera: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/switch-camera/`,
+    // Live chat for a specific stream
+    liveStreamChat: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/chat/`,
+    // Per-channel notification preference (notify on live / new content)
+    channelNotificationPreference: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/notification-preference/`,
     embedContent: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/embed/contents/${contentId}/`,
     embedContentOembed: (contentId: string) =>

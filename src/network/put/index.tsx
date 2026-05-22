@@ -1,41 +1,59 @@
-/**
- * Put Data Utility Function
- *
- * Description:
- * A reusable function to send PUT requests to an API endpoint. It supports sending data,
- * custom headers, and provides mechanisms to handle success/error messages. The function is
- * designed for general-purpose usage across the project.
- *
- * Parameters:
- * - url (string): The API endpoint to send the PUT request to.
- * - data (any): The data payload to be sent in the PUT request body.
- * - options (PutDataOptions): An object to configure various options for the PUT operation:
- *   - headers (Record<string, string>): Custom headers to include in the API request.
- *   - messages (object): Customizable success and error messages:
- *     - success (string): Success message to return on successful operation.
- *     - error (string): Error message to return if the operation fails.
- *
- * Returns:
- * - A promise resolving to an object with the following properties:
- *   - success (boolean): Whether the operation succeeded.
- *   - data (any): The response data from the API.
- *   - message (string): A success or error message.
- *
- * Usage:
- * Call the function with the desired API URL, data payload, and optional configurations.
- * Example:
- * const result = await putData('/api/users/1', { name: 'John Doe' }, { messages: { success: 'User updated successfully' } });
- */
+// src/network/putRequest.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../../services/apiService';
 import type { ApiResult, HeadersInit } from '../types';
 import { getAccessToken } from '@/security/authStorage';
+import { refreshAccessToken } from '@/security/tokenRefresh';
+import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
-interface PutDataOptions {
-  headers?: HeadersInit; // Custom headers for the API request
+const MAX_PUT_RETRIES = 2;
+
+const isTransientError = (err: any): boolean => {
+  const name = String(err?.name ?? '');
+  const msg = String(err?.message ?? '').toLowerCase();
+  return (
+    name === 'AbortError' ||
+    msg.includes('network request failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('timeout')
+  );
+};
+
+const sanitizeFileData = (obj: any): any => {
+  if (Array.isArray(obj)) return obj.map(sanitizeFileData);
+  if (obj && typeof obj === 'object') {
+    if ((obj as any).uri && (obj as any).name && (obj as any).type) return (obj as any).uri;
+    const out: any = {};
+    for (const k of Object.keys(obj)) out[k] = sanitizeFileData(obj[k]);
+    return out;
+  }
+  return obj;
+};
+
+const fetchPutWithRetry = async (execute: () => Promise<Response>): Promise<Response> => {
+  let lastError: any;
+  for (let attempt = 0; attempt <= MAX_PUT_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, computeRetryDelayMs(attempt - 1, 800, 8000)));
+    }
+    try {
+      return await execute();
+    } catch (err: any) {
+      lastError = err;
+      if (!isTransientError(err) || attempt >= MAX_PUT_RETRIES) throw err;
+    }
+  }
+  throw lastError;
+};
+
+export interface PutDataOptions {
+  headers?: HeadersInit;
+  successMessage?: string;
+  errorMessage?: string;
   messages?: {
-    success?: string; // Custom success message
-    error?: string; // Custom error message
+    success?: string;
+    error?: string;
   };
 }
 
@@ -44,30 +62,55 @@ export const putData = async (
   data: any,
   options: PutDataOptions = {}
 ): Promise<ApiResult> => {
-  const { headers = {}, messages = {} } = options;
+  const successMsg = options.successMessage ?? options.messages?.success ?? 'Data updated successfully.';
+  const errorMsg = options.errorMessage ?? options.messages?.error ?? 'Failed to update data.';
 
   try {
-    const userToken = await getAccessToken();
+    const token = await getAccessToken();
     const deviceId = await AsyncStorage.getItem('device_id');
-    const requestHeaders: HeadersInit = { ...headers };
-    if (userToken) requestHeaders.Authorization = `Bearer ${userToken}`;
-    if (deviceId) requestHeaders['X-Device-Id'] = deviceId;
 
-    // Send PUT request to the API
-    const response = await apiService.put(url, data, requestHeaders);
+    const isFormData =
+      typeof FormData !== 'undefined' &&
+      (data instanceof FormData ||
+        (data &&
+          typeof data === 'object' &&
+          typeof (data as any).append === 'function' &&
+          Array.isArray((data as any)._parts)));
 
-    // Parse the API response
+    const baseHeaders: HeadersInit = { ...(options.headers ?? {}) };
+    if (!isFormData) baseHeaders['Content-Type'] = 'application/json';
+    if (token) baseHeaders.Authorization = `Bearer ${token}`;
+    if (deviceId) baseHeaders['X-Device-Id'] = deviceId;
+
+    const payload = isFormData ? data : sanitizeFileData(data);
+
+    const response = await fetchPutWithRetry(() => apiService.put(url, payload, baseHeaders));
     const responseData = await response.json().catch(() => ({}));
 
-    // Check the API response status
-    if (response.status === 200 || response.status === 204) {
-      return { success: true, data: responseData, message: messages.success || 'Data updated successfully.' };
-    } else {
-      return { success: false, message: messages.error || 'Failed to update data.' };
+    if (response.ok) {
+      return { success: true, data: responseData, message: successMsg };
     }
+
+    // Silent token refresh on 401
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        const retryHeaders = { ...baseHeaders, Authorization: `Bearer ${newToken}` };
+        const retryResponse = await fetchPutWithRetry(() => apiService.put(url, payload, retryHeaders));
+        const retryData = await retryResponse.json().catch(() => ({}));
+        if (retryResponse.ok) {
+          return { success: true, data: retryData, message: successMsg };
+        }
+        return { success: false, message: errorMsg, status: retryResponse.status, data: retryData };
+      }
+      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
+    }
+
+    const msg =
+      (responseData && (responseData.message || responseData.detail)) ||
+      errorMsg;
+    return { success: false, message: msg, status: response.status, data: responseData };
   } catch (error: any) {
-    // Handle errors during the PUT operation
-    console.error(error);
-    return { success: false, message: error.message || 'An error occurred while updating data.' };
+    return { success: false, message: error?.message || errorMsg };
   }
 };

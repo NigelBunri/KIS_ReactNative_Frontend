@@ -9,13 +9,17 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 import { KIS_TOKENS } from '../../../theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
-import ROUTES from '@/network';
+import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
+import { getAccessToken } from '@/security/authStorage';
 
 type NewGroupFormProps = {
   palette: {
@@ -78,6 +82,34 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [channels, setChannels] = useState<Array<{ id: string; name?: string }>>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handlePickAvatar = async () => {
+    if (uploadingAvatar) return;
+    const picked = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.9 });
+    if (picked.didCancel) return;
+    const asset = picked.assets?.[0];
+    if (!asset?.uri) return;
+    const token = await getAccessToken();
+    if (!token) { Alert.alert('Not signed in', 'Please log in again.'); return; }
+    try {
+      setUploadingAvatar(true);
+      setAvatarPreview(asset.uri);
+      const uploaded = await uploadFileToBackend({
+        file: { uri: asset.uri, name: asset.fileName ?? 'group-avatar.jpg', type: asset.type ?? 'image/jpeg', size: asset.fileSize },
+        authToken: token,
+        baseUrl: CHAT_BASE_URL,
+      });
+      setAvatarUrl(uploaded.url);
+    } catch (err: any) {
+      Alert.alert('Upload failed', err?.message || 'Unable to upload image.');
+      setAvatarPreview(null);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const memberCountLabel = `${selectedMemberIds.length} selected`;
 
@@ -126,6 +158,7 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
         community: communityId ?? null,
         channel: communityId ? null : (selectedChannelId ?? null),
         description: description.trim() || undefined,
+        avatar_url: avatarUrl || undefined,
       };
 
       const createdGroup = await postRequest(
@@ -172,6 +205,35 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
         </Text>
         <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
           Pick members, give it a name, and start chatting.
+        </Text>
+      </View>
+
+      {/* Group avatar */}
+      <View style={{ alignItems: 'center', marginBottom: 20 }}>
+        <Pressable
+          onPress={handlePickAvatar}
+          style={({ pressed }) => ({
+            width: 84,
+            height: 84,
+            borderRadius: 42,
+            backgroundColor: palette.card,
+            borderWidth: 2,
+            borderColor: avatarPreview ? palette.primary : palette.inputBorder,
+            borderStyle: avatarPreview ? 'solid' : 'dashed',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          {avatarPreview ? (
+            <Image source={{ uri: avatarPreview }} style={{ width: 84, height: 84 }} />
+          ) : (
+            <KISIcon name="camera" size={28} color={palette.subtext} />
+          )}
+        </Pressable>
+        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+          {uploadingAvatar ? 'Uploading…' : 'Group photo (optional)'}
         </Text>
       </View>
 
