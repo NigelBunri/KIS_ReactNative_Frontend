@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { isLocalId, localChaptersForBook } from '@/data/bibleLocalData';
 import NetInfo from '@react-native-community/netinfo';
 import {
   ActivityIndicator,
@@ -79,6 +80,7 @@ type Props = {
   translations: BibleTranslation[];
   books: BibleBook[];
   reader: BibleReaderPayload | null;
+  readerError?: string | null;
   loading: boolean;
   onRegisterFilterOpener?: (open: () => void) => void;
   onScroll?: NonNullable<React.ComponentProps<typeof ScrollView>['onScroll']>;
@@ -140,6 +142,7 @@ export default function BibleReaderPanel({
   translations,
   books,
   reader,
+  readerError,
   loading,
   onLoad,
   onRegisterFilterOpener,
@@ -184,6 +187,7 @@ export default function BibleReaderPanel({
   const [fontSize, setFontSize] = useState(responsive.isWatch ? 15 : responsive.isCompactPhone ? 16 : 17);
   const [savingPreference, setSavingPreference] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState(0);
   const [actionVerse, setActionVerse] = useState<BibleVerse | null>(null);
   const [verseActionMode, setVerseActionMode] = useState<
     'menu' | 'highlight' | 'note' | null
@@ -386,6 +390,15 @@ export default function BibleReaderPanel({
   }, [onRegisterFilterOpener]);
 
   useEffect(() => {
+    if (!readerError) { setRetryCountdown(0); return; }
+    setRetryCountdown(30);
+    const id = setInterval(() => {
+      setRetryCountdown(prev => (prev <= 1 ? 30 : prev - 1));
+    }, 1_000);
+    return () => clearInterval(id);
+  }, [readerError]);
+
+  useEffect(() => {
     if (!selectedLanguage && currentTranslation?.language)
       setSelectedLanguage(currentTranslation.language);
   }, [selectedLanguage, currentTranslation?.language]);
@@ -454,16 +467,25 @@ export default function BibleReaderPanel({
   useEffect(() => {
     const loadChapters = async () => {
       if (!selectedBookObj?.id) return;
+      if (isLocalId(selectedBookObj.id)) {
+        setChapters(localChaptersForBook(selectedBookObj.code));
+        return;
+      }
       const res = await getRequest(
         `${ROUTES.bible.chapters}?book=${selectedBookObj.id}`,
         {
           errorMessage: 'Unable to load chapters.',
         },
       );
-      setChapters(listFromResponse(res?.data));
+      const list = listFromResponse(res?.data);
+      if (list.length) {
+        setChapters(list);
+      } else {
+        setChapters(localChaptersForBook(selectedBookObj.code));
+      }
     };
     loadChapters();
-  }, [selectedBookObj?.id]);
+  }, [selectedBookObj?.id, selectedBookObj?.code]);
 
   const loadLibraries = useCallback(
     async (color?: string | null) => {
@@ -1892,6 +1914,7 @@ export default function BibleReaderPanel({
       );
     }
     if (!verses.length) {
+      const isServerWaking = Boolean(readerError);
       return (
         <View
           style={[
@@ -1899,14 +1922,20 @@ export default function BibleReaderPanel({
             { borderColor: palette.divider, backgroundColor: palette.surface },
           ]}
         >
-          <KISIcon name="book" size={22} color={palette.subtext} />
+          <KISIcon name={isServerWaking ? 'cloud' : 'book'} size={22} color={palette.subtext} />
           <Text style={{ color: palette.text, fontWeight: '800' }}>
-            No passage loaded
+            {isServerWaking ? 'Server is starting up' : 'No passage loaded'}
           </Text>
           <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-            Choose a public translation, book, and chapter, or enter a reference
-            like John 3:16-18.
+            {isServerWaking
+              ? 'The Bible server is waking from sleep (usually takes 30–60 seconds). Use the book and chapter pickers above while it starts.'
+              : 'Choose a public translation, book, and chapter, or enter a reference like John 3:16-18.'}
           </Text>
+          {isServerWaking && retryCountdown > 0 ? (
+            <Text style={{ color: palette.subtext, fontSize: 12 }}>
+              Auto-retrying in {retryCountdown}s...
+            </Text>
+          ) : null}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={reloadCurrentPassage}
@@ -1922,7 +1951,7 @@ export default function BibleReaderPanel({
           >
             <KISIcon name="refresh" size={15} color={palette.ivory} />
             <Text style={[styles.reloadButtonText, { color: palette.ivory }]}>
-              Reload passage
+              {isServerWaking ? 'Retry now' : 'Reload passage'}
             </Text>
           </TouchableOpacity>
         </View>

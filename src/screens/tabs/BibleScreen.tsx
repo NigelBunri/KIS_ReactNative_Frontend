@@ -25,6 +25,7 @@ export default function BibleScreen() {
     translations,
     books,
     reader,
+    readerError,
     devotionals,
     meditations,
     loadingReader,
@@ -195,6 +196,7 @@ export default function BibleScreen() {
             translations={translations}
             books={books}
             reader={reader}
+            readerError={readerError}
             loading={loadingReader}
             onLoad={loadReader}
             onRegisterFilterOpener={registerReadFilterOpener}

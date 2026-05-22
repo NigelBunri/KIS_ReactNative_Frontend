@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
@@ -10,6 +10,7 @@ import {
   readCachedBibleChapter,
 } from '@/services/bibleOfflineCache';
 import { BIBLE_PREFERENCES_UPDATED_EVENT, readLocalBiblePreference } from '@/services/biblePreferenceStore';
+import { LOCAL_BIBLE_BOOKS, LOCAL_KJV_TRANSLATION } from '@/data/bibleLocalData';
 
 export type BibleTranslation = {
   id: string;
@@ -231,12 +232,14 @@ const resolveDefaultTranslationCode = (
 };
 
 export function useBibleData() {
-  const [translations, setTranslations] = useState<BibleTranslation[]>([]);
-  const [books, setBooks] = useState<BibleBook[]>([]);
+  const [translations, setTranslations] = useState<BibleTranslation[]>([LOCAL_KJV_TRANSLATION]);
+  const [books, setBooks] = useState<BibleBook[]>(LOCAL_BIBLE_BOOKS);
   const [reader, setReader] = useState<BibleReaderPayload | null>(null);
+  const [readerError, setReaderError] = useState<string | null>(null);
   const [devotionals, setDevotionals] = useState<DailyDevotional[]>([]);
   const [meditations, setMeditations] = useState<MeditationEntry[]>([]);
   const [loadingReader, setLoadingReader] = useState(false);
+  const reloadCallbackRef = useRef<(() => void) | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [loadingMeditations, setLoadingMeditations] = useState(false);
   const [spiritualGrowthSummary, setSpiritualGrowthSummary] =
@@ -265,14 +268,16 @@ export function useBibleData() {
     const res = await getRequest(ROUTES.bible.translations, {
       errorMessage: 'Unable to load translations.',
     });
-    setTranslations(listFromResponse(res?.data));
+    const list = listFromResponse(res?.data);
+    if (list.length) setTranslations(list);
   }, []);
 
   const loadBooks = useCallback(async () => {
     const res = await getRequest(ROUTES.bible.books, {
       errorMessage: 'Unable to load books.',
     });
-    setBooks(listFromResponse(res?.data));
+    const list = listFromResponse(res?.data);
+    if (list.length) setBooks(list);
   }, []);
 
   const loadReader = useCallback(
@@ -284,7 +289,9 @@ export function useBibleData() {
       startVerse?: number,
       endVerse?: number,
     ) => {
+    reloadCallbackRef.current = () => loadReader(translation, book, chapter, reference, startVerse, endVerse);
     setLoadingReader(true);
+    setReaderError(null);
     try {
       if (translation && book && chapter && !reference && !startVerse && !endVerse && offlineManifest[translation]) {
         const cached = await readCachedBibleChapter(translation, book, chapter);
@@ -303,6 +310,7 @@ export function useBibleData() {
       });
       if (res?.success) {
         setReader(res.data);
+        setReaderError(null);
         const payload = res.data as BibleReaderPayload;
         const cacheTranslation = payload.translation?.code ?? translation;
         const cacheBook = payload.book?.code ?? book;
@@ -312,14 +320,32 @@ export function useBibleData() {
         }
       } else if (translation && book && chapter && !reference && !startVerse && !endVerse) {
         const cached = await readCachedBibleChapter(translation, book, chapter);
-        if (cached) setReader(cached);
+        if (cached) {
+          setReader(cached);
+          setReaderError(null);
+        } else {
+          setReaderError('server-unreachable');
+        }
+      } else {
+        setReaderError('server-unreachable');
       }
+    } catch {
+      setReaderError('server-unreachable');
     } finally {
       setLoadingReader(false);
     }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [offlineManifest],
   );
+
+  useEffect(() => {
+    if (!readerError) return;
+    const id = setInterval(() => {
+      reloadCallbackRef.current?.();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [readerError]);
 
   const loadDevotionals = useCallback(async () => {
     setLoadingDaily(true);
@@ -390,6 +416,7 @@ export function useBibleData() {
     translations: orderedTranslations,
     books,
     reader,
+    readerError,
     devotionals,
     meditations,
     loadingReader,
