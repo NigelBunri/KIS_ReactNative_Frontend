@@ -6,6 +6,7 @@
 // IDs are prefixed "local_" so the app can tell them apart from real server
 // IDs — once the API responds the real data replaces these.
 
+import kjvBible from '@/assets/bible/kjv.json';
 import type { BibleBook, BibleTranslation } from '@/screens/tabs/bible/useBibleData';
 
 export const LOCAL_KJV_TRANSLATION: BibleTranslation = {
@@ -122,6 +123,40 @@ export const isLocalId = (id: string) => String(id).startsWith('local_');
 // Included so the reader is never blank when the server is cold-starting.
 // KJV is public domain — no licensing concerns.
 
+type BundledBibleJson = Record<string, Record<string, Record<string, string>>>;
+const BUNDLED_KJV_BIBLE = kjvBible as BundledBibleJson;
+
+const normalizeBookKey = (value: string) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const BUNDLED_BOOK_ALIASES: Record<string, string> = Object.keys(BUNDLED_KJV_BIBLE).reduce((acc, name) => {
+  acc[normalizeBookKey(name)] = name;
+  return acc;
+}, {} as Record<string, string>);
+
+const bundledBookNameForCode = (bookCode: string) => {
+  const local = LOCAL_BIBLE_BOOKS.find((book) => book.code === bookCode);
+  if (!local) return undefined;
+  return BUNDLED_KJV_BIBLE[local.name]
+    ? local.name
+    : BUNDLED_BOOK_ALIASES[normalizeBookKey(local.name)]
+      ?? BUNDLED_BOOK_ALIASES[normalizeBookKey(bookCode)];
+};
+
+const getBundledKjvVerses = (bookCode: string, chapter: number) => {
+  const bookName = bundledBookNameForCode(bookCode);
+  if (!bookName) return null;
+  const rawChapter = BUNDLED_KJV_BIBLE[bookName]?.[String(chapter)];
+  if (!rawChapter) return null;
+  return Object.entries(rawChapter)
+    .map(([number, text]) => ({
+      id: `local_v_${bookCode}_${chapter}_${number}`,
+      number: Number(number),
+      text: String(text || ''),
+    }))
+    .filter((verse) => Number.isFinite(verse.number) && verse.text.trim())
+    .sort((a, b) => a.number - b.number);
+};
+
 const LOCAL_GENESIS_1_VERSES = [
   { id: 'local_v_GEN_1_1',  number: 1,  text: 'In the beginning God created the heaven and the earth.' },
   { id: 'local_v_GEN_1_2',  number: 2,  text: 'And the earth was without form, and void; and darkness was upon the face of the deep. And the Spirit of God moved upon the face of the waters.' },
@@ -173,8 +208,8 @@ export function getLocalFallbackReader(
   chapter: number,
 ): BibleReaderPayload | null {
   const key = `${bookCode}:${chapter}`;
-  const verses = LOCAL_VERSES_MAP[key];
-  if (!verses) return null;
+  const verses = getBundledKjvVerses(bookCode, chapter) ?? LOCAL_VERSES_MAP[key];
+  if (!verses?.length) return null;
 
   const book = LOCAL_BIBLE_BOOKS.find((b) => b.code === bookCode) ?? {
     id: `local_${bookCode}`,
