@@ -408,22 +408,19 @@ export default function FeedsDiscoverPage({
                 setShowTrendingOnly(false);
                 setActiveCategory(cat.id);
               }}
-              style={[
+              style={({ pressed }) => [
                 styles.categoryPill,
                 {
-                  backgroundColor: active
-                    ? palette.primaryStrong
-                    : palette.surface,
-                  borderColor: active
-                    ? palette.primaryStrong
-                    : palette.divider,
+                  backgroundColor: active ? '#FFF4B8' : palette.surface,
+                  borderColor: active ? '#C9A24A' : palette.divider,
+                  opacity: pressed ? 0.8 : 1,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.categoryLabel,
-                  { color: active ? '#fff' : palette.text },
+                  { color: active ? '#17140F' : palette.text },
                 ]}
               >
                 {cat.label}
@@ -441,15 +438,23 @@ export default function FeedsDiscoverPage({
         {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
           <Pressable
             onPress={() => setActiveCategory('live')}
-            style={[
+            style={({ pressed }) => [
               styles.liveBanner,
-              { backgroundColor: palette.surface, borderColor: palette.error ?? '#e74c3c' },
+              {
+                backgroundColor: pressed ? '#FFF0EE' : palette.surface,
+                borderColor: palette.error ?? '#e74c3c',
+              },
             ]}
           >
             <View style={styles.livePulse} />
-            <Text style={[styles.liveBannerText, { color: palette.error ?? '#e74c3c' }]}>
-              {liveItems.length} live {liveItems.length === 1 ? 'broadcast' : 'broadcasts'} now
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.liveBannerText, { color: palette.error ?? '#e74c3c' }]}>
+                {liveItems.length} live {liveItems.length === 1 ? 'broadcast' : 'broadcasts'} now
+              </Text>
+              <Text style={[styles.liveBannerSub, { color: palette.subtext }]}>
+                Tap to watch
+              </Text>
+            </View>
             <KISIcon name="arrow-right" size={14} color={palette.error ?? '#e74c3c'} />
           </Pressable>
         )}
@@ -458,8 +463,8 @@ export default function FeedsDiscoverPage({
           <TrendingClipsSection
             items={trending}
             onSeeAll={handleTrendingSeeAll}
-            onOpen={() => {}}
-            onReact={() => {}}
+            onOpen={item => handleOpenItem(item as any)}
+            onReact={item => { void handleLike(item as any); }}
           />
         ) : showTrendingOnly ? (
           <View style={styles.trendingButtonRow}>
@@ -602,9 +607,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e74c3c',
   },
   liveBannerText: {
-    flex: 1,
     fontSize: 13,
     fontWeight: '900',
+  },
+  liveBannerSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   trendingButtonRow: {
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { RefreshControl, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 
 import BroadcastFeedCard from '@/components/broadcast/BroadcastFeedCard';
@@ -94,12 +94,12 @@ export default function FeedsMainListSection({
     closeAuthorProfile,
   } = useAuthorProfilePreview();
 
-  const headerSubtitle = useMemo(() => {
-    // optional: if your backend returns a top channel/source, you can show it here
-    return 'Innovators';
-  }, []);
-
   const list = items ?? [];
+
+  const headerSubtitle = useMemo(() => {
+    if (!list.length) return '';
+    return `${list.length} post${list.length === 1 ? '' : 's'}`;
+  }, [list.length]);
 
   return (
     <View style={{ gap: 12 }}>
@@ -110,28 +110,7 @@ export default function FeedsMainListSection({
         />
       </View>
 
-      {/* Pull-to-refresh feel using a small rail wrapper */}
-      <View
-        style={{
-        }}
-      >
-        <View
-          style={{ gap: 12 }}
-          // lightweight refresh surface (so you still refresh even without FlatList)
-        >
-          <View
-            style={{
-              height: 0,
-            }}
-          />
-
-          {/* Fake refresh control hint */}
-          {onRefresh ? (
-            <View style={{ height: 0 }}>
-              <RefreshControl refreshing={loading} onRefresh={onRefresh} />
-            </View>
-          ) : null}
-
+      <View style={{ gap: 12 }}>
           {list.length === 0 && !loading ? (
             <View style={{ paddingVertical: 10 }}>
               <Text style={{ color: palette.subtext, fontWeight: '800' }}>
@@ -206,7 +185,6 @@ export default function FeedsMainListSection({
               </Text>
             </View>
           ) : null}
-        </View>
       </View>
       <BroadcastAuthorProfileSheet
         visible={authorProfileVisible}
