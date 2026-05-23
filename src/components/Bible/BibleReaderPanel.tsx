@@ -1913,8 +1913,36 @@ export default function BibleReaderPanel({
         </View>
       );
     }
+
+    // Verses are visible (local fallback or cache) but server is still waking —
+    // show a slim banner above the text instead of replacing it entirely.
+    if (verses.length > 0 && readerError) {
+      return (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: palette.warningSoft ?? '#FEF3C7',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            marginBottom: 8,
+            gap: 8,
+          }}
+        >
+          <KISIcon name="cloud" size={14} color={palette.warningText ?? '#92400E'} />
+          <Text style={{ flex: 1, fontSize: 12, color: palette.warningText ?? '#92400E' }}>
+            Showing local text — server is starting up
+            {retryCountdown > 0 ? ` (retrying in ${retryCountdown}s)` : ''}
+          </Text>
+          <TouchableOpacity onPress={reloadCurrentPassage} disabled={!canReloadCurrentPassage}>
+            <KISIcon name="refresh" size={14} color={palette.warningText ?? '#92400E'} />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     if (!verses.length) {
-      const isServerWaking = Boolean(readerError);
       return (
         <View
           style={[
@@ -1922,20 +1950,11 @@ export default function BibleReaderPanel({
             { borderColor: palette.divider, backgroundColor: palette.surface },
           ]}
         >
-          <KISIcon name={isServerWaking ? 'cloud' : 'book'} size={22} color={palette.subtext} />
-          <Text style={{ color: palette.text, fontWeight: '800' }}>
-            {isServerWaking ? 'Server is starting up' : 'No passage loaded'}
-          </Text>
+          <KISIcon name="book" size={22} color={palette.subtext} />
+          <Text style={{ color: palette.text, fontWeight: '800' }}>No passage loaded</Text>
           <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-            {isServerWaking
-              ? 'The Bible server is waking from sleep (usually takes 30–60 seconds). Use the book and chapter pickers above while it starts.'
-              : 'Choose a public translation, book, and chapter, or enter a reference like John 3:16-18.'}
+            Choose a translation, book, and chapter, or enter a reference like John 3:16-18.
           </Text>
-          {isServerWaking && retryCountdown > 0 ? (
-            <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              Auto-retrying in {retryCountdown}s...
-            </Text>
-          ) : null}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={reloadCurrentPassage}
@@ -1950,9 +1969,7 @@ export default function BibleReaderPanel({
             ]}
           >
             <KISIcon name="refresh" size={15} color={palette.ivory} />
-            <Text style={[styles.reloadButtonText, { color: palette.ivory }]}>
-              {isServerWaking ? 'Retry now' : 'Reload passage'}
-            </Text>
+            <Text style={[styles.reloadButtonText, { color: palette.ivory }]}>Reload passage</Text>
           </TouchableOpacity>
         </View>
       );

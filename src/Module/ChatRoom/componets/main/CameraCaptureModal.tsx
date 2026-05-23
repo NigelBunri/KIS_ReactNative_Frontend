@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  Linking,
 } from 'react-native';
 
 import {
@@ -53,19 +54,9 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [selectedAssetIndex, setSelectedAssetIndex] = useState<number | null>(null);
   const [_galleryAssets, setGalleryAssets] = useState<ImagePickerAsset[]>([]);
   const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
-  const [isFlashOn, setIsFlashOn] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [caption, setCaption] = useState("");
-
-  /** RESET ONLY VIEW-STATE WHEN OPENING — KEEP ORIGINAL FILES  */
-  useEffect(() => {
-    if (visible) {
-      setSelectedAssetIndex(null);
-      setEditingIndex(null);
-      setCaption("");
-      setEditedAssets(null); // 🟢 Reset edited previews each time
-    }
-  }, [visible]);
+  const [isOpeningCamera, setIsOpeningCamera] = useState(false);
 
   /** Helper to update assets after new camera/gallery selection */
   const setNewAssetsAndSelectFirst = (newAssets: ImagePickerAsset[]) => {
@@ -76,57 +67,108 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
   const openSystemCamera = useCallback(
     async (mediaType: 'photo' | 'video') => {
+      if (isOpeningCamera) return;
+      setIsOpeningCamera(true);
       try {
         const options: CameraOptions = {
           mediaType,
           cameraType,
           saveToPhotos: true,
+          includeExtra: true,
+          quality: mediaType === 'photo' ? 0.8 : undefined,
+          videoQuality: 'high',
+          durationLimit: mediaType === 'video' ? 60 : undefined,
+          presentationStyle: 'fullScreen',
         };
 
         const result = await launchCamera(options);
         if (result.didCancel) return;
         if (result.errorCode) {
-          Alert.alert("Camera error", result.errorMessage);
+          const message = result.errorMessage || 'Could not open camera.';
+          if (result.errorCode === 'permission') {
+            Alert.alert(
+              'Camera permission needed',
+              'Allow camera access in your device settings to take photos or videos in KIS.',
+              [
+                { text: 'Not now', style: 'cancel' },
+                { text: 'Open settings', onPress: () => void Linking.openSettings() },
+              ],
+            );
+          } else {
+            Alert.alert('Camera error', message);
+          }
           return;
         }
 
-        const newAssets = result.assets ?? [];
+        const newAssets = (result.assets ?? []).filter((asset) => Boolean(asset.uri));
         if (!newAssets.length) return;
 
         setNewAssetsAndSelectFirst(newAssets);
-
       } catch {
-        Alert.alert("Camera Error", "Could not open camera.");
+        Alert.alert('Camera Error', 'Could not open camera.');
+      } finally {
+        setIsOpeningCamera(false);
       }
     },
-    [cameraType],
+    [cameraType, isOpeningCamera],
   );
 
   const openGallery = useCallback(async () => {
     try {
       const options: ImageLibraryOptions = {
         mediaType: 'mixed',
-        selectionLimit: 0,
+        selectionLimit: 20,
+        includeExtra: true,
+        quality: 0.8,
+        videoQuality: 'high',
+        presentationStyle: 'fullScreen',
       };
 
       const result = await launchImageLibrary(options);
       if (result.didCancel) return;
 
       if (result.errorCode) {
-        Alert.alert("Gallery error", result.errorMessage);
+        const message = result.errorMessage || 'Could not open gallery.';
+        if (result.errorCode === 'permission') {
+          Alert.alert(
+            'Photo permission needed',
+            'Allow photo access in your device settings to share images or videos in KIS.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open settings', onPress: () => void Linking.openSettings() },
+            ],
+          );
+        } else {
+          Alert.alert('Gallery error', message);
+        }
         return;
       }
 
-      const libAssets = result.assets ?? [];
+      const libAssets = (result.assets ?? []).filter((asset) => Boolean(asset.uri));
       if (!libAssets.length) return;
 
       setGalleryAssets(libAssets);
       setNewAssetsAndSelectFirst(libAssets);
-
     } catch {
-      Alert.alert("Gallery Error", "Could not open gallery.");
+      Alert.alert('Gallery Error', 'Could not open gallery.');
     }
   }, []);
+
+  /** Reset view state and open the real system camera when the camera sheet appears. */
+  useEffect(() => {
+    if (!visible) return;
+    setAssets([]);
+    setSelectedAssetIndex(null);
+    setEditingIndex(null);
+    setCaption('');
+    setEditedAssets(null);
+
+    const timer = setTimeout(() => {
+      void openSystemCamera('photo');
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [openSystemCamera, visible]);
 
   /** Remove original AND any edited versions */
   const removeAsset = (uri: string) => {
@@ -184,7 +226,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 50 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg }]}>
 
 
         {/* HEADER */}
@@ -195,8 +237,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
           <Text style={styles.headerTitle}>Camera</Text>
 
-          <Pressable onPress={() => setIsFlashOn(f => !f)} style={styles.headerIconButton}>
-            <KISIcon name={isFlashOn ? "flash-on" : "flash-off"} size={22} color={isFlashOn ? palette.primary : palette.subtext} />
+          <Pressable onPress={openGallery} style={styles.headerIconButton}>
+            <KISIcon name="image" size={22} color={palette.subtext} />
           </Pressable>
         </View>
 
@@ -215,11 +257,31 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               ) : null}
             </>
           ) : (
-            <View style={[styles.emptyState, { borderColor: palette.divider }]}>
-              <Image
-                source={require('@/assets/demo-camera-placeholder.png')}
-                style={styles.previewImage}
-              />
+            <View style={[styles.emptyState, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: palette.primarySoft }]}>
+                <KISIcon name="camera" size={34} color={palette.primary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: palette.text }]}>Take a photo or video</Text>
+              <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>
+                Use your camera or choose from your gallery. Media is checked before it is sent.
+              </Text>
+              <View style={styles.emptyActions}>
+                <Pressable
+                  onPress={() => openSystemCamera('photo')}
+                  disabled={isOpeningCamera}
+                  style={[styles.emptyActionButton, { backgroundColor: palette.primary }]}
+                >
+                  <KISIcon name="camera" size={18} color={palette.onPrimary} />
+                  <Text style={[styles.emptyActionText, { color: palette.onPrimary }]}>Photo</Text>
+                </Pressable>
+                <Pressable
+                  onPress={openGallery}
+                  style={[styles.emptyActionButton, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1 }]}
+                >
+                  <KISIcon name="image" size={18} color={palette.text} />
+                  <Text style={[styles.emptyActionText, { color: palette.text }]}>Gallery</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </View>
@@ -317,6 +379,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               onPress={() => openSystemCamera('video')}
             >
               <KISIcon name="video" size={18} color={palette.text} />
+              <Text style={[styles.footerButtonLabel, { color: palette.text }]}>Video</Text>
             </Pressable>
 
              <Pressable
@@ -332,6 +395,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               onPress={() => setCameraType(t => (t === 'back' ? 'front' : 'back'))}
             >
               <KISIcon name="refresh" size={18} color={palette.text} />
+              <Text style={[styles.footerButtonLabel, { color: palette.text }]}>Flip</Text>
             </Pressable>
           </View>
 
@@ -397,11 +461,49 @@ const styles = StyleSheet.create({
   previewImage: { width: '100%', height: '100%', borderRadius: kisRadius.lg },
   emptyState: {
     width: '100%',
-    height: '80%',
-    borderWidth: 2,
+    minHeight: '70%',
+    borderWidth: 1,
     borderRadius: kisRadius.lg,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  emptyActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  emptyActionButton: {
+    minWidth: 108,
+    minHeight: 46,
+    borderRadius: kisRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  emptyActionText: {
+    fontWeight: '800',
   },
 
   videoPlaceholder: {
@@ -466,10 +568,17 @@ const styles = StyleSheet.create({
   footerRowMain: { flexDirection: 'row', justifyContent: 'space-between' },
   footerButton: {
     flex: 1,
+    minHeight: 52,
     marginHorizontal: 4,
-    padding: 12,
+    padding: 10,
     borderRadius: kisRadius.lg,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  footerButtonLabel: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   footerSendButton: {
     marginTop: 8,

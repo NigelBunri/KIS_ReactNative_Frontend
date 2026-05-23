@@ -283,6 +283,18 @@ export const resolveLocationCountry = async (requestIfNeeded: boolean) => {
     };
   }
 
+  // Nothing worked — try the last known cached country before giving up entirely
+  const cached = await getLastCachedLocationCountry();
+  if (cached?.iso && CALLING_CODE_BY_ISO[cached.iso]) {
+    return {
+      countryISO: cached.iso,
+      callingCode: cached.callingCode,
+      permissionStatus: permission.status,
+      source: 'cache' as const,
+      locationServiceOff,
+    };
+  }
+
   // Nothing worked — surface the most specific error
   if (locationServiceOff) {
     throw new LocationCountryError(

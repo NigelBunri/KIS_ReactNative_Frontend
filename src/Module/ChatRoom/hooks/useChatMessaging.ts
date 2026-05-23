@@ -1,5 +1,9 @@
 // src/screens/chat/hooks/useChatMessaging.ts
 
+// Set to false to send and display all messages as plaintext.
+// Flip back to true once E2EE key exchange is fully tested end-to-end.
+const E2EE_ENABLED = false;
+
 import {
   useCallback,
   useEffect,
@@ -790,8 +794,8 @@ export function useChatMessaging({
           : null,
       };
 
-      let payloadToSend: any = basePayload;
-      try {
+      let payloadToSend: any = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+      if (E2EE_ENABLED) try {
         const recipientUserIds = getRecipientUserIds();
         if (__DEV__) console.log('[chat.send.debug] signal recipients', {
           conversationId: String(convId),
@@ -1259,7 +1263,7 @@ export function useChatMessaging({
         text: patch.text,
         styledText: patch.styledText,
       };
-      if (patch.text != null || patch.styledText) {
+      if (E2EE_ENABLED && (patch.text != null || patch.styledText)) {
         try {
           const recipientUserIds = getRecipientUserIds();
           if (!recipientUserIds.length) {

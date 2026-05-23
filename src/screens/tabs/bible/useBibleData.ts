@@ -10,7 +10,7 @@ import {
   readCachedBibleChapter,
 } from '@/services/bibleOfflineCache';
 import { BIBLE_PREFERENCES_UPDATED_EVENT, readLocalBiblePreference } from '@/services/biblePreferenceStore';
-import { LOCAL_BIBLE_BOOKS, LOCAL_KJV_TRANSLATION } from '@/data/bibleLocalData';
+import { LOCAL_BIBLE_BOOKS, LOCAL_KJV_TRANSLATION, getLocalFallbackReader } from '@/data/bibleLocalData';
 
 export type BibleTranslation = {
   id: string;
@@ -324,12 +324,34 @@ export function useBibleData() {
           setReader(cached);
           setReaderError(null);
         } else {
-          setReaderError('server-unreachable');
+          // No cached chapter — use bundled local text if available so the
+          // reader is never blank while the server cold-starts.
+          const local = getLocalFallbackReader(book, chapter);
+          if (local) {
+            setReader(local);
+            setReaderError('server-unreachable'); // keep retrying in background
+          } else {
+            setReaderError('server-unreachable');
+          }
         }
       } else {
         setReaderError('server-unreachable');
       }
     } catch {
+      if (translation && book && chapter && !reference && !startVerse && !endVerse) {
+        const cached = await readCachedBibleChapter(translation, book, chapter).catch(() => null);
+        if (cached) {
+          setReader(cached);
+          setReaderError(null);
+          return;
+        }
+        const local = getLocalFallbackReader(book, chapter);
+        if (local) {
+          setReader(local);
+          setReaderError('server-unreachable');
+          return;
+        }
+      }
       setReaderError('server-unreachable');
     } finally {
       setLoadingReader(false);

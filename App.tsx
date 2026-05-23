@@ -74,6 +74,7 @@ import ShopDashboardScreen from '@/screens/market/ShopDashboardScreen';
 import ServiceBookingDetailsPage from '@/screens/market/ServiceBookingDetailsPage';
 import ServiceBookingScreen from '@/screens/market/ServiceBookingScreen';
 import ProductDetailsPage from '@/screens/broadcast/market/ProductDetailsPage';
+import NetInfo from '@react-native-community/netinfo';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
@@ -226,6 +227,26 @@ function AppContent() {
               ],
             );
             return true;
+          }
+
+          // Location could not be determined — check if device is offline.
+          // If so, unblock the app with defaults rather than showing the
+          // "Location Required" wall, which the user cannot resolve without
+          // connectivity anyway.
+          if (error.code === 'location_unavailable') {
+            const netState = await NetInfo.fetch();
+            if (!netState.isConnected) {
+              setLocationCountryISO(DEFAULT_COUNTRY_ISO);
+              setLocationCallingCode(DEFAULT_CALLING_CODE);
+              setLocationReady(true);
+              setLocationError('');
+              Alert.alert(
+                'No Internet Connection',
+                'You appear to be offline. Default country settings will be used — your location will update automatically when you reconnect.',
+                [{ text: 'OK', style: 'cancel' }],
+              );
+              return true;
+            }
           }
 
           setLocationError(

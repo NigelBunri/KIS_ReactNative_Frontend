@@ -8,6 +8,13 @@ export const chatRoomStyles = StyleSheet.create({
   },
   keyboardWrapper: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  chatWallpaper: {
+    flex: 1,
+  },
+  chatWallpaperImage: {
+    opacity: 0.96,
   },
 
   composerRight: {

@@ -28,6 +28,7 @@ import {
   View,
   Alert,
   DeviceEventEmitter,
+  ImageBackground,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,6 +74,9 @@ import type {
 } from './chatTypes';
 export type { ChatMessage } from './chatTypes';
 import { participantsToIds } from './messagesUtils';
+
+const DARK_CHAT_BACKGROUND = require('../../assets/dark_chat_background.png');
+const LIGHT_CHAT_BACKGROUND = require('../../assets/light_chat_background.png');
 
 /* -------------------------------------------------------------------------- */
 /*                        ATTACHMENTS / RICH PAYLOADS                          */
@@ -172,7 +176,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /*                               THEME / SAFE AREA                           */
   /* ------------------------------------------------------------------------ */
 
-  const { palette } = useKISTheme();
+  const { palette, isDark } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset =
     typeof safeAreaTopInsetOverride === 'number'
@@ -1133,6 +1137,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /* ======================================================================== */
 
   const bg = palette.chatBg ?? palette.bg;
+  const chatBackgroundImage = isDark ? DARK_CHAT_BACKGROUND : LIGHT_CHAT_BACKGROUND;
   const handleRetryMessage = useCallback(
     (message: ChatMessage) => {
       const messageId = message.serverId ?? message.id;
@@ -1300,48 +1305,55 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           buildSearchSnippet={buildSearchSnippet}
         />
       )}
-      <ChatRoomBody
-        chat={chat}
-        messages={messages}
-        palette={palette}
-        isChannel={isChannel}
-        canPost={canPost}
-        draft={draft}
-        selectionMode={selectionMode}
-        selectedIds={selectedIds}
-        currentUserId={currentUserId}
-        autoScrollEnabled={autoScrollEnabled}
-        startAtBottom={startAtBottom}
-        stickerLibraryVersion={stickerLibraryVersion}
-        replyTo={replyTo}
-        editing={editing}
-        onReplyToMessage={setReplyTo}
-        onEditMessage={setEditing}
-        onForwardMessage={handleForwardSingleMessage}
-        onDeleteMessage={handleDeleteSingleMessage}
-        onPinMessage={handlePinSingleMessage}
-        onStartSelection={enterSelectionMode}
-        onToggleSelect={toggleSelectMessage}
-        onReactMessage={handleReactMessage}
-        onVotePoll={handleVotePoll}
-        onRetryMessage={handleRetryMessage}
-        onMessageLocatorReady={setMessageLocator}
-        onVisibleMessageIds={handleVisibleMessageIds}
-        mentionParticipants={mentionParticipants}
-        onChangeDraft={handleChangeDraft}
-        onSend={handleSend}
-        onSendVoice={handleSendVoice}
-        onOpenStickerEditor={() => setOpenStickerEditor(true)}
-        onChooseTextBackground={setTextCardBg}
-        onSendSticker={handleSendSticker}
-        onClearReply={() => setReplyTo(null)}
-        onCancelEditing={() => setEditing(null)}
-        onSendAttachment={handleSendAttachment}
-        onSendContacts={handleSendContacts}
-        onCreatePoll={handleCreatePoll}
-        onCreateEvent={handleCreateEvent}
-        canSend={canSend}
-      />
+      <ImageBackground
+        source={chatBackgroundImage}
+        resizeMode="cover"
+        style={[styles.chatWallpaper, { backgroundColor: bg }]}
+        imageStyle={styles.chatWallpaperImage}
+      >
+        <ChatRoomBody
+          chat={chat}
+          messages={messages}
+          palette={palette}
+          isChannel={isChannel}
+          canPost={canPost}
+          draft={draft}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          currentUserId={currentUserId}
+          autoScrollEnabled={autoScrollEnabled}
+          startAtBottom={startAtBottom}
+          stickerLibraryVersion={stickerLibraryVersion}
+          replyTo={replyTo}
+          editing={editing}
+          onReplyToMessage={setReplyTo}
+          onEditMessage={setEditing}
+          onForwardMessage={handleForwardSingleMessage}
+          onDeleteMessage={handleDeleteSingleMessage}
+          onPinMessage={handlePinSingleMessage}
+          onStartSelection={enterSelectionMode}
+          onToggleSelect={toggleSelectMessage}
+          onReactMessage={handleReactMessage}
+          onVotePoll={handleVotePoll}
+          onRetryMessage={handleRetryMessage}
+          onMessageLocatorReady={setMessageLocator}
+          onVisibleMessageIds={handleVisibleMessageIds}
+          mentionParticipants={mentionParticipants}
+          onChangeDraft={handleChangeDraft}
+          onSend={handleSend}
+          onSendVoice={handleSendVoice}
+          onOpenStickerEditor={() => setOpenStickerEditor(true)}
+          onChooseTextBackground={setTextCardBg}
+          onSendSticker={handleSendSticker}
+          onClearReply={() => setReplyTo(null)}
+          onCancelEditing={() => setEditing(null)}
+          onSendAttachment={handleSendAttachment}
+          onSendContacts={handleSendContacts}
+          onCreatePoll={handleCreatePoll}
+          onCreateEvent={handleCreateEvent}
+          canSend={canSend}
+        />
+      </ImageBackground>
 
       <ChatRoomEditors
         palette={palette}

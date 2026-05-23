@@ -931,9 +931,47 @@ useEffect(() => {
   };
   const onConversationUpdated = (payload: any) => {
     const convId = String(payload?.conversationId ?? payload?.conversation_id ?? '');
-    if (convId) {
-      queueMetaRefresh(convId);
+    if (!convId) return;
+
+    // Apply preview/timestamp immediately from the payload so the list updates
+    // before the network refresh completes — avoids a blank/stale row.
+    const preview = payload?.preview ?? payload?.previewText ?? payload?.preview_text;
+    const lastAt = payload?.lastMessageAt ?? payload?.last_message_at ?? new Date().toISOString();
+    const senderId = payload?.senderId ? String(payload.senderId) : '';
+    const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
+
+    if (preview !== undefined) {
+      setConversationMeta((prev) => {
+        const prevUnread = prev[convId]?.unreadCount ?? 0;
+        return {
+          ...prev,
+          [convId]: {
+            ...prev[convId],
+            lastMessage: preview,
+            lastAt,
+            unreadCount: isFromMe ? prevUnread : prevUnread + 1,
+            lastMessageFromMe: isFromMe,
+          },
+        };
+      });
+
+      setConversations((prev) =>
+        prev.map((item: any) => {
+          const id = String(item?.conversation_id ?? item?.conversationId ?? item?.id ?? '');
+          if (id !== convId) return item;
+          return {
+            ...item,
+            last_message_preview: preview,
+            lastMessage: preview,
+            last_message_at: lastAt,
+            lastAt,
+            updated_at: lastAt,
+          };
+        }),
+      );
     }
+
+    queueMetaRefresh(convId);
     refreshConversations(true).catch(() => {});
   };
   socket.on('chat.message', onMessage);
@@ -944,7 +982,7 @@ useEffect(() => {
     socket.off('conversation.updated', onConversationUpdated);
     socket.off('conversation.created', onConversationUpdated);
   };
-}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations, refreshConversations]);
+}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations, setConversationMeta, refreshConversations]);
 
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('message.status', (payload: any) => {
