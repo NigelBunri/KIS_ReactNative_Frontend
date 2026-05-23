@@ -353,16 +353,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       media: needsVideo ? 'video' : 'voice',
     });
 
-    // Initiate WebRTC offers to all remote peers
-    if (webRTCAvailable) {
-      const remotePeers = session.participants.filter(p => !p.isLocal);
-      for (const peer of remotePeers) {
-        await startWebRTCOffer(peer.userId);
-      }
-    }
+    // The caller creates the SDP offer when it receives call.answer.
+    // The receiver must NOT proactively create offers here — doing so causes
+    // WebRTC signaling glare (both peers in "have-local-offer" state simultaneously)
+    // which crashes the native WebRTC layer, especially on Android.
 
     DeviceEventEmitter.emit('calls.refresh');
-  }, [requestCallPermissions, setupWebRTC, startWebRTCOffer]);
+  }, [requestCallPermissions, setupWebRTC]);
 
   /* ─── endCall / rejectCall ───────────────────────────────────────────────── */
 
@@ -571,20 +568,43 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const s = io(CHAT_WS_URL, {
         path: CHAT_WS_PATH,
         transports: ['websocket'],
-        auth: { token, deviceId },
-        extraHeaders: { Authorization: `Bearer ${token}`, 'x-device-id': deviceId },
+        // Use a callback so each reconnect attempt fetches a fresh token,
+        // preventing silent auth failures when the token expires mid-session.
+        auth: async (cb: (data: Record<string, string>) => void) => {
+          let freshToken = await getAccessToken().catch(() => null);
+          if (!freshToken) freshToken = token;
+          cb({ token: freshToken ?? '', deviceId });
+        },
+        extraHeaders: { 'x-device-id': deviceId },
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
+        reconnectionDelayMax: 10000,
       });
 
       socketRef.current = s;
       setSocket(s);
 
-      s.on('connect', () => { if (mountedRef.current) setIsConnected(true); });
-      s.on('disconnect', () => { if (mountedRef.current) setIsConnected(false); });
-      s.on('connect_error', err => console.warn('[WS] connect_error', err?.message));
+      s.on('connect', () => {
+        if (!mountedRef.current) return;
+        setIsConnected(true);
+        // If we had an active call when the socket dropped, request a state sync
+        // so participant list is up-to-date after reconnect.
+        const session = activeCallRef.current;
+        if (session && session.state !== 'ended' && session.state !== 'missed') {
+          s.emit('call.sync', {
+            conversationId: session.conversationId,
+            callId: session.callId,
+          });
+        }
+      });
+      s.on('disconnect', (reason) => {
+        if (mountedRef.current) setIsConnected(false);
+        if (__DEV__) console.log('[WS] disconnect', reason);
+      });
+      s.on('connect_error', (err: any) => {
+        console.warn('[WS] connect_error', err?.message);
+      });
 
       /* ── Typing ── */
       s.on('chat.typing', (payload: any) => {

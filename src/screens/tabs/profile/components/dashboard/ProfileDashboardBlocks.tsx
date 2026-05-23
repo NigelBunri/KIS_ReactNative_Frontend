@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { VerificationBadgeRow } from '@/components/verification';
@@ -225,9 +226,10 @@ export const ProfileHeroCard = ({
 }) => {
   const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
+  const { top: topInset } = useSafeAreaInsets();
 
   return (
-    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard')]}>
+    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard'), { borderRadius: 0, minHeight: (compact ? 284 : 308) + topInset }]}>
       <View
         style={[
           dashboardStyles.heroBackdrop,
@@ -249,7 +251,7 @@ export const ProfileHeroCard = ({
         <View style={[dashboardStyles.heroScrim, { backgroundColor: dashboardTheme.hero.scrim }]} />
       </View>
 
-      <View style={dashboardStyles.heroActionsRail}>
+      <View style={[dashboardStyles.heroActionsRail, { top: 16 + topInset }]}>
         <View style={[dashboardStyles.heroTopChip, getProfileDashboardCardStyle(dashboardTheme, 'heroOverlay')]}>
           <Text style={[dashboardTheme.sectionHeader.eyebrow, { color: palette.text }]}>
             Profile Dashboard
@@ -277,7 +279,7 @@ export const ProfileHeroCard = ({
         
       </View>
 
-      <View style={[dashboardStyles.heroContent, { paddingTop: compact ? 78 : 88, paddingBottom: 16 + bottomOverlap }]}>
+      <View style={[dashboardStyles.heroContent, { paddingTop: (compact ? 78 : 88) + topInset, paddingBottom: 16 + bottomOverlap }]}>
         <View style={[dashboardStyles.heroIdentityRow, compact && dashboardStyles.heroIdentityCompact]}>
           <View style={[dashboardStyles.heroAvatarWrap, { width: compact ? 78 : 112, height: compact ? 78 : 112, borderRadius: compact ? 39 : 56 }]}>
             {avatarUrl ? (

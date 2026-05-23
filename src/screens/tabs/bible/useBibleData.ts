@@ -267,6 +267,9 @@ export function useBibleData() {
   const loadTranslations = useCallback(async () => {
     const res = await getRequest(ROUTES.bible.translations, {
       errorMessage: 'Unable to load translations.',
+      cacheKey: 'bible_translations_v1',
+      staleWhileRevalidate: true,
+      offlineTtlSeconds: 7 * 24 * 3600,
     });
     const list = listFromResponse(res?.data);
     if (list.length) setTranslations(list);
@@ -275,6 +278,9 @@ export function useBibleData() {
   const loadBooks = useCallback(async () => {
     const res = await getRequest(ROUTES.bible.books, {
       errorMessage: 'Unable to load books.',
+      cacheKey: 'bible_books_v1',
+      staleWhileRevalidate: true,
+      offlineTtlSeconds: 7 * 24 * 3600,
     });
     const list = listFromResponse(res?.data);
     if (list.length) setBooks(list);

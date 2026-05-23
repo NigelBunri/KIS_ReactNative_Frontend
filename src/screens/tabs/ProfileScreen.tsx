@@ -2249,7 +2249,6 @@ export default function ProfileScreen() {
           styles.scroll,
           {
             gap: responsive.cardGap,
-            paddingHorizontal: responsive.pageGutter,
             paddingBottom: compactProfile ? 32 : 44,
           },
         ]}

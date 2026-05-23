@@ -35,6 +35,8 @@ class WebRTCService {
   private localStream: any = null;
   private peers = new Map<string, any>(); // peerId → RTCPeerConnection
   private statsIntervals = new Map<string, ReturnType<typeof setInterval>>();
+  // Candidates that arrived before setRemoteDescription — flushed once remote SDP is set.
+  private iceCandidateQueues = new Map<string, any[]>();
 
   private onIceCandidate: IceCandidateHandler = () => {};
   private onRemoteTrack: TrackHandler = () => {};
@@ -139,27 +141,55 @@ class WebRTCService {
 
   async handleOffer(peerId: string, remoteOffer: any): Promise<any | null> {
     if (!webRTCAvailable) return null;
-    const pc = this.ensurePeer(peerId);
-    await pc.setRemoteDescription(new RNW.RTCSessionDescription(remoteOffer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    return answer;
+    try {
+      const pc = this.ensurePeer(peerId);
+      await pc.setRemoteDescription(new RNW.RTCSessionDescription(remoteOffer));
+      await this.flushIceCandidateQueue(peerId, pc);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      return answer;
+    } catch (err) {
+      console.warn('[WebRTC] handleOffer failed:', err);
+      return null;
+    }
   }
 
   async handleAnswer(peerId: string, remoteAnswer: any) {
     if (!webRTCAvailable) return;
     const pc = this.peers.get(peerId);
     if (!pc) return;
-    await pc.setRemoteDescription(new RNW.RTCSessionDescription(remoteAnswer));
+    try {
+      await pc.setRemoteDescription(new RNW.RTCSessionDescription(remoteAnswer));
+      await this.flushIceCandidateQueue(peerId, pc);
+    } catch (err) {
+      console.warn('[WebRTC] handleAnswer failed:', err);
+    }
   }
 
   async addIceCandidate(peerId: string, candidate: any) {
     if (!webRTCAvailable) return;
     const pc = this.peers.get(peerId);
-    if (!pc) return;
+    if (!pc || !pc.remoteDescription) {
+      // Remote description not set yet — queue the candidate so it isn't lost.
+      const queue = this.iceCandidateQueues.get(peerId) ?? [];
+      queue.push(candidate);
+      this.iceCandidateQueues.set(peerId, queue);
+      return;
+    }
     try {
       await pc.addIceCandidate(new RNW.RTCIceCandidate(candidate));
     } catch {}
+  }
+
+  private async flushIceCandidateQueue(peerId: string, pc: any) {
+    const queue = this.iceCandidateQueues.get(peerId);
+    if (!queue?.length) return;
+    this.iceCandidateQueues.delete(peerId);
+    for (const candidate of queue) {
+      try {
+        await pc.addIceCandidate(new RNW.RTCIceCandidate(candidate));
+      } catch {}
+    }
   }
 
   private startStats(peerId: string, pc: any) {
@@ -198,6 +228,7 @@ class WebRTCService {
     if (interval) { clearInterval(interval); this.statsIntervals.delete(peerId); }
     const pc = this.peers.get(peerId);
     if (pc) { pc.close(); this.peers.delete(peerId); }
+    this.iceCandidateQueues.delete(peerId);
   }
 
   closeAll() {
@@ -205,6 +236,7 @@ class WebRTCService {
     this.statsIntervals.clear();
     this.peers.forEach(pc => { try { pc.close(); } catch {} });
     this.peers.clear();
+    this.iceCandidateQueues.clear();
     try {
       this.localStream?.getTracks?.()?.forEach?.((t: any) => t.stop());
     } catch {}

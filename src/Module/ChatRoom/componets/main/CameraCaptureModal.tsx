@@ -57,6 +57,9 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [caption, setCaption] = useState("");
   const [isOpeningCamera, setIsOpeningCamera] = useState(false);
+  // Use a ref for the guard so it doesn't cause openSystemCamera to be recreated,
+  // which would retrigger the visibility effect in an infinite loop.
+  const isOpeningCameraRef = useRef(false);
 
   /** Helper to update assets after new camera/gallery selection */
   const setNewAssetsAndSelectFirst = (newAssets: ImagePickerAsset[]) => {
@@ -67,7 +70,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
   const openSystemCamera = useCallback(
     async (mediaType: 'photo' | 'video') => {
-      if (isOpeningCamera) return;
+      if (isOpeningCameraRef.current) return;
+      isOpeningCameraRef.current = true;
       setIsOpeningCamera(true);
       try {
         const options: CameraOptions = {
@@ -107,10 +111,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       } catch {
         Alert.alert('Camera Error', 'Could not open camera.');
       } finally {
+        isOpeningCameraRef.current = false;
         setIsOpeningCamera(false);
       }
     },
-    [cameraType, isOpeningCamera],
+    [cameraType], // isOpeningCamera intentionally excluded — guarded by ref above
   );
 
   const openGallery = useCallback(async () => {
@@ -154,6 +159,12 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     }
   }, []);
 
+  // Keep a stable ref so the effect below can call the latest version of
+  // openSystemCamera without including it in the dependency array (which would
+  // cause the effect to re-fire every time isOpeningCamera changes).
+  const openSystemCameraRef = useRef(openSystemCamera);
+  useEffect(() => { openSystemCameraRef.current = openSystemCamera; });
+
   /** Reset view state and open the real system camera when the camera sheet appears. */
   useEffect(() => {
     if (!visible) return;
@@ -164,11 +175,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setEditedAssets(null);
 
     const timer = setTimeout(() => {
-      void openSystemCamera('photo');
+      void openSystemCameraRef.current('photo');
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [openSystemCamera, visible]);
+  }, [visible]); // only fire on visible toggle, not on every openSystemCamera recreation
 
   /** Remove original AND any edited versions */
   const removeAsset = (uri: string) => {
