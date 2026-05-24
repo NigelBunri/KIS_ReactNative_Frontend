@@ -2,6 +2,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useCallback,
   createContext,
@@ -94,6 +95,7 @@ import {
   resolveLocationCountry,
   wasLocationPermissionEverGranted,
   getLastCachedLocationCountry,
+  cacheLocationCountry,
 } from '@/services/locationCountryService';
 import { cleanIrrelevantStorage } from '@/utils/storageCleaner';
 import type { KISUser } from '@/types/user';
@@ -150,6 +152,7 @@ function AppContent() {
   const [_phone, setPhone] = useState<string | null>(null);
   const [user, setUser] = useState<KISUser | null>(null);
   const [locationReady, setLocationReady] = useState(false);
+  const locationReadyRef = useRef(false);
   const [locationChecking, setLocationChecking] = useState(true);
   const [locationCountryISO, setLocationCountryISO] =
     useState(DEFAULT_COUNTRY_ISO);
@@ -172,6 +175,7 @@ function AppContent() {
         setLocationStatus(resolved.permissionStatus);
         setLocationCountryISO(resolved.countryISO);
         setLocationCallingCode(resolved.callingCode);
+        locationReadyRef.current = true;
         setLocationReady(true);
         setLocationError('');
 
@@ -200,6 +204,7 @@ function AppContent() {
           setLocationStatus(error?.permissionStatus || null);
           setLocationCountryISO(DEFAULT_COUNTRY_ISO);
           setLocationCallingCode(DEFAULT_CALLING_CODE);
+          locationReadyRef.current = true;
           setLocationReady(true);
           setLocationError('');
           return true;
@@ -211,8 +216,13 @@ function AppContent() {
           // GPS is off AND IP also failed — don't block the app.
           // Use the default country and prompt to enable location services.
           if (error.code === 'location_service_off') {
-            setLocationCountryISO(DEFAULT_COUNTRY_ISO);
-            setLocationCallingCode(DEFAULT_CALLING_CODE);
+            const cachedFallback = await getLastCachedLocationCountry();
+            const iso = cachedFallback?.iso || DEFAULT_COUNTRY_ISO;
+            const code = cachedFallback?.callingCode || DEFAULT_CALLING_CODE;
+            setLocationCountryISO(iso);
+            setLocationCallingCode(code);
+            await cacheLocationCountry(iso, code);
+            locationReadyRef.current = true;
             setLocationReady(true);
             setLocationError('');
             Alert.alert(
@@ -229,24 +239,32 @@ function AppContent() {
             return true;
           }
 
-          // Location could not be determined — check if device is offline.
-          // If so, unblock the app with defaults rather than showing the
-          // "Location Required" wall, which the user cannot resolve without
-          // connectivity anyway.
+          // Location could not be determined — unblock the app regardless of
+          // connectivity. If offline, inform the user. If online but GPS and IP
+          // both failed (poor signal, API timeout, etc.), silently fall back to
+          // the last known cached country or default. The background refresh
+          // will correct the country automatically once detection succeeds.
           if (error.code === 'location_unavailable') {
-            const netState = await NetInfo.fetch();
+            const [netState, cachedFallback] = await Promise.all([
+              NetInfo.fetch(),
+              getLastCachedLocationCountry(),
+            ]);
+            const iso = cachedFallback?.iso || DEFAULT_COUNTRY_ISO;
+            const code = cachedFallback?.callingCode || DEFAULT_CALLING_CODE;
+            setLocationCountryISO(iso);
+            setLocationCallingCode(code);
+            await cacheLocationCountry(iso, code);
+            locationReadyRef.current = true;
+            setLocationReady(true);
+            setLocationError('');
             if (!netState.isConnected) {
-              setLocationCountryISO(DEFAULT_COUNTRY_ISO);
-              setLocationCallingCode(DEFAULT_CALLING_CODE);
-              setLocationReady(true);
-              setLocationError('');
               Alert.alert(
                 'No Internet Connection',
                 'You appear to be offline. Default country settings will be used — your location will update automatically when you reconnect.',
                 [{ text: 'OK', style: 'cancel' }],
               );
-              return true;
             }
+            return true;
           }
 
           setLocationError(
@@ -256,7 +274,11 @@ function AppContent() {
           setLocationStatus(null);
           setLocationError('Location access is required to use KIS.');
         }
-        setLocationReady(false);
+        // Never regress from ready → not-ready (would kick user back from login
+        // screen to location wall during background refresh or on reconnect).
+        if (!locationReadyRef.current) {
+          setLocationReady(false);
+        }
         return false;
       } finally {
         setLocationChecking(false);
@@ -362,6 +384,7 @@ function AppContent() {
       if (cached?.iso) {
         setLocationCountryISO(cached.iso);
         setLocationCallingCode(cached.callingCode);
+        locationReadyRef.current = true;
         setLocationReady(true);
       }
 
@@ -594,6 +617,8 @@ function AppContent() {
                   onPress={() => {
                     setLocationCountryISO(item.iso);
                     setLocationCallingCode(item.code);
+                    void cacheLocationCountry(item.iso, item.code);
+                    locationReadyRef.current = true;
                     setLocationReady(true);
                     setShowCountryPicker(false);
                     setCountrySearch('');
