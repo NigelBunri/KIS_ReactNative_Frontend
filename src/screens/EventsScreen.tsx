@@ -15,6 +15,8 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
+import { useAuth } from '../../App';
+import { isTierAtLeast } from '@/services/tierAccess';
 
 type Event = {
   id: string;
@@ -35,6 +37,8 @@ type Attendance = {
 
 export default function EventsScreen() {
   const { palette } = useKISTheme();
+  const { user } = useAuth();
+  const canCreateEvents = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [attending, setAttending] = useState<Set<string>>(new Set());
@@ -110,10 +114,20 @@ export default function EventsScreen() {
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>
-        <Pressable onPress={() => setCreateVisible(true)} style={[styles.addBtn, { backgroundColor: palette.primary }]}>
-          <KISIcon name="add" size={16} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Create</Text>
-        </Pressable>
+        {canCreateEvents ? (
+          <Pressable onPress={() => setCreateVisible(true)} style={[styles.addBtn, { backgroundColor: palette.primary }]}>
+            <KISIcon name="add" size={16} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Create</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => setError('Creating events requires a Partner plan or above. Upgrade your account to unlock this feature.')}
+            style={[styles.addBtn, { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }]}
+          >
+            <KISIcon name="lock" size={16} color={palette.subtext} />
+            <Text style={{ color: palette.subtext, fontSize: 13, fontWeight: '600' }}>Partner+</Text>
+          </Pressable>
+        )}
       </View>
 
       {loading ? (

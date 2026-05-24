@@ -8,6 +8,8 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { isTierAtLeast } from '@/services/tierAccess';
+import { useAuth } from '../../../../../App';
 import ChannelAnalyticsPanel from '@/screens/broadcast/channels/studio/ChannelAnalyticsPanel';
 import ChannelBrandingEditor from '@/screens/broadcast/channels/studio/ChannelBrandingEditor';
 import ChannelContentManager from '@/screens/broadcast/channels/studio/ChannelContentManager';
@@ -123,6 +125,8 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const canUseLiveStreaming = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [contents, setContents] = useState<BroadcastChannelContent[]>([]);
@@ -132,6 +136,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [channelForm, setChannelForm] = useState<ChannelForm>(EMPTY_FORM);
   const [channelError, setChannelError] = useState<string | null>(null);
+  const [lastCreatedHandle, setLastCreatedHandle] = useState<string | null>(null);
   const [channelBroadcasting, setChannelBroadcasting] = useState(false);
   const [contentBroadcastingId, setContentBroadcastingId] = useState<string | null>(null);
   const { channels, loading, refresh } = useChannelsData({ mine: true });
@@ -190,9 +195,10 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         return;
       }
       setSelectedChannelId(created.id);
+      setLastCreatedHandle(created.handle || created.display_name || 'channel');
       setChannelForm(EMPTY_FORM);
-      setCreateFormVisible(false);
-      setActiveTab('create');
+      // Keep form open so the user can immediately create another channel.
+      // Tab stays on the current view — no auto-jump.
       await refresh();
     } catch (err: any) {
       setChannelError(err?.message || 'Unable to create this channel.');
@@ -304,14 +310,25 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   };
 
   const renderCreateChannelForm = () => (
-    <View style={[styles.createCard, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
+    <View style={[styles.createCard, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+      {lastCreatedHandle ? (
+        <View style={[styles.successBanner, { backgroundColor: tone === 'dark' ? 'rgba(34,197,94,0.15)' : '#F0FDF4', borderColor: tone === 'dark' ? '#166534' : '#BBF7D0' }]}>
+          <KISIcon name="check" size={16} color={tone === 'dark' ? '#4ADE80' : '#16A34A'} />
+          <Text style={[styles.successText, { color: tone === 'dark' ? '#4ADE80' : '#15803D', flex: 1 }]}>
+            @{lastCreatedHandle} created! Fill in the form below to add another channel.
+          </Text>
+          <Pressable onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
+            <KISIcon name="close" size={16} color={palette.subtext} />
+          </Pressable>
+        </View>
+      ) : null}
       <View style={styles.formHeaderRow}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Create a channel</Text>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>{lastCreatedHandle ? 'Add another channel' : 'Create a channel'}</Text>
           <Text style={[styles.sectionText, { color: palette.subtext }]}>Feeds, videos, lives, playlists, and embeds will live under this channel.</Text>
         </View>
-        {channels.length ? (
-          <Pressable onPress={() => setCreateFormVisible(false)} style={styles.smallIconButton}>
+        {channels.length || lastCreatedHandle ? (
+          <Pressable onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
             <KISIcon name="close" size={18} color={palette.subtext} />
           </Pressable>
         ) : null}
@@ -405,6 +422,17 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       );
     }
     if (activeTab === 'live') {
+      if (!canUseLiveStreaming) {
+        return (
+          <View style={[styles.upgradePrompt, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <KISIcon name="channel" size={32} color={palette.primaryStrong} />
+            <Text style={[styles.upgradeTitle, { color: palette.text }]}>Live Streaming</Text>
+            <Text style={[styles.upgradeText, { color: palette.subtext }]}>
+              Live streaming is available on Partner plans and above. Upgrade your account to schedule and broadcast live streams to your subscribers.
+            </Text>
+          </View>
+        );
+      }
       return (
         <>
           {renderCreatorPremiumPreview('live')}
@@ -522,7 +550,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           </Pressable>
         </ScrollView>
       ) : null}
-      {createFormVisible && selectedChannel ? renderCreateChannelForm() : null}
+      {createFormVisible && (selectedChannel || lastCreatedHandle) ? renderCreateChannelForm() : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 10 : 14 }]}> 
         {TABS.map(tab => {
           const active = activeTab === tab.id;
@@ -586,6 +614,8 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 12, fontWeight: '700' },
   emptyChannel: { borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 12 },
   createCard: { borderWidth: 1, borderRadius: 8, padding: 16, marginTop: 12, gap: 10 },
+  successBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderWidth: 1, borderRadius: 8 },
+  successText: { fontSize: 12, fontWeight: '700', lineHeight: 17 },
   formHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   smallIconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontSize: 15, fontWeight: '900' },
@@ -599,4 +629,7 @@ const styles = StyleSheet.create({
   headerBroadcastButton: { minHeight: 38, borderWidth: 1, borderRadius: 8, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFCF5' },
   broadcastText: { fontSize: 11, fontWeight: '900' },
   primaryText: { fontSize: 12, fontWeight: '900' },
+  upgradePrompt: { borderWidth: 1, borderRadius: 8, padding: 24, marginBottom: 12, alignItems: 'center', gap: 12 },
+  upgradeTitle: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  upgradeText: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center' },
 });

@@ -30,6 +30,26 @@ import { usePartnerLinksPanel } from './partners/usePartnerLinksPanel';
 import { usePartnerComplaintsPanel } from './partners/usePartnerComplaintsPanel';
 import usePartnerProfileLinks from './partners/usePartnerProfileLinks';
 import { PartnerOrganizationAppsProvider } from '@/context/partners/PartnerOrganizationAppsContext';
+import { useAdminDashboardPanel } from './partners/useAdminDashboardPanel';
+import { useAdminUsersPanel } from './partners/useAdminUsersPanel';
+import { useAdminContentPanel } from './partners/useAdminContentPanel';
+import { useAdminAnalyticsPanel } from './partners/useAdminAnalyticsPanel';
+import { useAdminPartnersPanel } from './partners/useAdminPartnersPanel';
+import { useAdminVerificationPanel } from './partners/useAdminVerificationPanel';
+import { useAdminSystemHealthPanel } from './partners/useAdminSystemHealthPanel';
+import { useAdminAuditTrailPanel } from './partners/useAdminAuditTrailPanel';
+import { useAppBuilderPanel } from './partners/useAppBuilderPanel';
+import { useGeolocationPanel } from './partners/useGeolocationPanel';
+import AdminDashboardPanel from '@/components/partners/AdminDashboardPanel';
+import AdminUsersPanel from '@/components/partners/AdminUsersPanel';
+import AdminContentPanel from '@/components/partners/AdminContentPanel';
+import AdminAnalyticsPanel from '@/components/partners/AdminAnalyticsPanel';
+import AdminPartnersPanel from '@/components/partners/AdminPartnersPanel';
+import AdminVerificationPanel from '@/components/partners/AdminVerificationPanel';
+import AdminSystemHealthPanel from '@/components/partners/AdminSystemHealthPanel';
+import AdminAuditTrailPanel from '@/components/partners/AdminAuditTrailPanel';
+import AppBuilderPanel from '@/components/partners/AppBuilderPanel';
+import GeolocationPanel from '@/components/partners/GeolocationPanel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -272,6 +292,32 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeLinksPanel,
   } = usePartnerLinksPanel(width);
   const complaintsPanel = usePartnerComplaintsPanel(width);
+
+  // ── KCAN Admin Panels (superuser / GO only) ──────────────────────────────
+  const isKcanAdmin = isSuperuser && isSelectedKCAN;
+  const adminDashboard = useAdminDashboardPanel(width);
+  const adminUsers = useAdminUsersPanel(width);
+  const adminContent = useAdminContentPanel(width);
+  const adminAnalytics = useAdminAnalyticsPanel(width);
+  const adminPartners = useAdminPartnersPanel(width);
+  const adminVerification = useAdminVerificationPanel(width);
+  const adminSystemHealth = useAdminSystemHealthPanel(width);
+  const adminAuditTrail = useAdminAuditTrailPanel(width);
+
+  // ── App Builder (Partner Pro) ─────────────────────────────────────────────
+  const appBuilderPanel = useAppBuilderPanel(width);
+  const handleOpenAppBuilder = useCallback(() => {
+    closePanel();
+    setTimeout(() => appBuilderPanel.open(), 240);
+  }, [closePanel, appBuilderPanel]);
+
+  // ── Geolocation & Attendance (Partner Pro) ────────────────────────────────
+  const geolocationPanel = useGeolocationPanel(width);
+  const handleOpenGeolocation = useCallback(() => {
+    closePanel();
+    setTimeout(() => geolocationPanel.open(), 240);
+  }, [closePanel, geolocationPanel]);
+
   const { onGroupPress, onFeedPress, onCommunityFeedPress, onChannelPress } =
     usePartnerNavigationActions({
       selectedPartner: selectedPartner as any,
@@ -329,6 +375,14 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     }
     if (['org_apps_catalog', 'org_apps_bible'].includes(feature.key)) {
       handleOpenOrganizationApps();
+      return;
+    }
+    if (feature.key === 'org_apps_builder') {
+      handleOpenAppBuilder();
+      return;
+    }
+    if (['location_events', 'location_attendance_report', 'location_consent_settings'].includes(feature.key)) {
+      handleOpenGeolocation();
       return;
     }
     openFeaturePanel(feature);
@@ -576,7 +630,156 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onClose: complaintsPanel.close,
           },
         }}
+        isKcanAdmin={isKcanAdmin}
+        onOpenAdminDashboard={isKcanAdmin ? adminDashboard.open : undefined}
       />
+
+      {/* ── KCAN Super-Admin Panels ────────────────────────────────────── */}
+      {isKcanAdmin && (
+        <>
+          <AdminDashboardPanel
+            isOpen={adminDashboard.isOpen}
+            panelWidth={adminDashboard.panelWidth}
+            panelTranslateX={adminDashboard.panelTranslateX}
+            kpis={adminDashboard.kpis}
+            loading={adminDashboard.loading}
+            error={adminDashboard.error}
+            onClose={adminDashboard.close}
+            onOpenUsers={adminUsers.open}
+            onOpenContent={adminContent.open}
+            onOpenAnalytics={adminAnalytics.open}
+            onOpenPartners={adminPartners.open}
+            onOpenVerification={adminVerification.open}
+            onOpenSystemHealth={adminSystemHealth.open}
+            onOpenAuditTrail={adminAuditTrail.open}
+            onRefresh={adminDashboard.refresh}
+          />
+          <AdminUsersPanel
+            isOpen={adminUsers.isOpen}
+            panelWidth={adminUsers.panelWidth}
+            panelTranslateX={adminUsers.panelTranslateX}
+            users={adminUsers.users}
+            pagination={adminUsers.pagination}
+            loading={adminUsers.loading}
+            actionLoading={adminUsers.actionLoading}
+            error={adminUsers.error}
+            query={adminUsers.query}
+            onSearch={adminUsers.search}
+            onBan={adminUsers.banUser}
+            onUnban={adminUsers.unbanUser}
+            onSetTier={adminUsers.setUserTier}
+            onLoadPage={(p) => { adminUsers.setPage(p); void adminUsers.load({ p }); }}
+            onClose={adminUsers.close}
+          />
+          <AdminContentPanel
+            isOpen={adminContent.isOpen}
+            panelWidth={adminContent.panelWidth}
+            panelTranslateX={adminContent.panelTranslateX}
+            flags={adminContent.flags}
+            summary={adminContent.summary}
+            loading={adminContent.loading}
+            actionLoading={adminContent.actionLoading}
+            error={adminContent.error}
+            totalPages={adminContent.totalPages}
+            page={adminContent.page}
+            onLoadPage={(p) => { adminContent.setPage(p); void adminContent.loadFlags({ p }); }}
+            onTakeAction={adminContent.takeAction}
+            onClose={adminContent.close}
+          />
+          <AdminAnalyticsPanel
+            isOpen={adminAnalytics.isOpen}
+            panelWidth={adminAnalytics.panelWidth}
+            panelTranslateX={adminAnalytics.panelTranslateX}
+            revenue={adminAnalytics.revenue}
+            engagement={adminAnalytics.engagement}
+            loading={adminAnalytics.loading}
+            error={adminAnalytics.error}
+            onClose={adminAnalytics.close}
+            onRefresh={adminAnalytics.refresh}
+          />
+          <AdminPartnersPanel
+            isOpen={adminPartners.isOpen}
+            panelWidth={adminPartners.panelWidth}
+            panelTranslateX={adminPartners.panelTranslateX}
+            partners={adminPartners.partners}
+            stats={adminPartners.stats}
+            loading={adminPartners.loading}
+            actionLoading={adminPartners.actionLoading}
+            error={adminPartners.error}
+            query={adminPartners.query}
+            page={adminPartners.page}
+            totalPages={adminPartners.totalPages}
+            onSearch={adminPartners.search}
+            onSetActive={adminPartners.setPartnerActive}
+            onLoadPage={(p) => { adminPartners.setPage(p); void adminPartners.load({ p }); }}
+            onClose={adminPartners.close}
+          />
+          <AdminVerificationPanel
+            isOpen={adminVerification.isOpen}
+            panelWidth={adminVerification.panelWidth}
+            panelTranslateX={adminVerification.panelTranslateX}
+            cases={adminVerification.cases}
+            summary={adminVerification.summary}
+            loading={adminVerification.loading}
+            actionLoading={adminVerification.actionLoading}
+            error={adminVerification.error}
+            page={adminVerification.page}
+            totalPages={adminVerification.totalPages}
+            onTakeAction={adminVerification.takeAction}
+            onLoadPage={(p) => { adminVerification.setPage(p); void adminVerification.load({ p }); }}
+            onClose={adminVerification.close}
+          />
+          <AdminSystemHealthPanel
+            isOpen={adminSystemHealth.isOpen}
+            panelWidth={adminSystemHealth.panelWidth}
+            panelTranslateX={adminSystemHealth.panelTranslateX}
+            metrics={adminSystemHealth.metrics}
+            alerts={adminSystemHealth.alerts}
+            performance={adminSystemHealth.performance}
+            loading={adminSystemHealth.loading}
+            error={adminSystemHealth.error}
+            onClose={adminSystemHealth.close}
+            onRefresh={adminSystemHealth.refresh}
+          />
+          <AdminAuditTrailPanel
+            isOpen={adminAuditTrail.isOpen}
+            panelWidth={adminAuditTrail.panelWidth}
+            panelTranslateX={adminAuditTrail.panelTranslateX}
+            entries={adminAuditTrail.entries}
+            loading={adminAuditTrail.loading}
+            error={adminAuditTrail.error}
+            page={adminAuditTrail.page}
+            totalPages={adminAuditTrail.totalPages}
+            severityFilter={adminAuditTrail.severityFilter}
+            onFilterSeverity={(s) => { adminAuditTrail.setSeverityFilter(s); void adminAuditTrail.load({ severity: s, p: 1 }); }}
+            onLoadPage={(p) => { adminAuditTrail.setPage(p); void adminAuditTrail.load({ p }); }}
+            onClose={adminAuditTrail.close}
+          />
+        </>
+      )}
+
+      {/* ── App Builder (Partner Pro) ────────────────────────────────── */}
+      {canManageOrganizationApps && selectedPartner?.id && (
+        <AppBuilderPanel
+          isOpen={appBuilderPanel.isOpen}
+          panelWidth={appBuilderPanel.panelWidth}
+          panelTranslateX={appBuilderPanel.panelTranslateX}
+          partnerId={selectedPartner.id}
+          onClose={appBuilderPanel.close}
+        />
+      )}
+
+      {/* ── Geolocation & Attendance ──────────────────────────────────── */}
+      {selectedPartner?.id && (
+        <GeolocationPanel
+          isOpen={geolocationPanel.isOpen}
+          panelWidth={geolocationPanel.panelWidth}
+          panelTranslateX={geolocationPanel.panelTranslateX}
+          partnerId={selectedPartner.id}
+          isAdmin={canManageOrganizationApps}
+          onClose={geolocationPanel.close}
+        />
+      )}
     </PartnerOrganizationAppsProvider>
   );
 }

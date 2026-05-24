@@ -1,0 +1,77 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Animated } from 'react-native';
+import { getRequest } from '@/network/get';
+import ROUTES from '@/network';
+
+export type RevenueStats = {
+  revenue_30d_usd: number;
+  revenue_7d_usd: number;
+  revenue_today_usd: number;
+  total_transactions: number;
+  avg_transaction_usd: number;
+  top_tier: string | null;
+  series_30d: { date: string; amount_usd: number; transactions: number }[];
+};
+
+export type EngagementStats = {
+  posts_30d: number;
+  posts_7d: number;
+  conversations_30d: number;
+  active_users_30d: number;
+  active_users_7d: number;
+  new_users_30d: number;
+  new_users_7d: number;
+  growth_series_30d: { date: string; new_users: number; active_users: number }[];
+  content_series_30d: { date: string; posts: number; conversations: number }[];
+};
+
+export const useAdminAnalyticsPanel = (width: number) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [revenue, setRevenue] = useState<RevenueStats | null>(null);
+  const [engagement, setEngagement] = useState<EngagementStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const panelWidth = useMemo(() => {
+    if (width < 600) return width;
+    return Math.min(920, Math.max(640, Math.round(width * 0.88)));
+  }, [width]);
+  const panelTranslateX = useRef(new Animated.Value(panelWidth)).current;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [rev, eng] = await Promise.allSettled([
+        getRequest((ROUTES as any).analytics?.revenue ?? '', { errorMessage: '' }),
+        getRequest((ROUTES as any).analytics?.engagement ?? '', { errorMessage: '' }),
+      ]);
+      if (rev.status === 'fulfilled' && rev.value?.success) setRevenue(rev.value.data);
+      if (eng.status === 'fulfilled' && eng.value?.success) setEngagement(eng.value.data);
+      if (rev.status === 'rejected' && eng.status === 'rejected') {
+        setError('Failed to load analytics data.');
+      }
+    } catch {
+      setError('Failed to load analytics data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const open = () => {
+    setIsOpen(true);
+    void load();
+    requestAnimationFrame(() => {
+      panelTranslateX.setValue(panelWidth);
+      Animated.timing(panelTranslateX, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    });
+  };
+
+  const close = () => {
+    Animated.timing(panelTranslateX, { toValue: panelWidth, duration: 220, useNativeDriver: true }).start(() =>
+      setIsOpen(false),
+    );
+  };
+
+  return { panelWidth, panelTranslateX, isOpen, open, close, revenue, engagement, loading, error, refresh: load };
+};

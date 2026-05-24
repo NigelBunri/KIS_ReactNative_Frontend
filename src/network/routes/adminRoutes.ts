@@ -1,66 +1,78 @@
 import { API_BASE_URL } from '../config';
 
+const ADMIN_BASE = `${API_BASE_URL}/control/admin`;
+
 const adminRoutes = {
-  analytics: {
-    metrics: `${API_BASE_URL}/api/v1/metrics/`,
-    events: `${API_BASE_URL}/api/v1/events/`,
-    dashboards: `${API_BASE_URL}/api/v1/dashboards/`,
-    settings: `${API_BASE_URL}/api/v1/settings/`,
-    flags: `${API_BASE_URL}/api/v1/flags/`,
-    alerts: `${API_BASE_URL}/api/v1/alerts/`,
-    engagement: `${API_BASE_URL}/api/v1/engagement/`,
+  // ── Admin Control — live platform stats ───────────────────────────────
+  control: {
+    dashboardOverview: `${ADMIN_BASE}/dashboard/overview/`,
+    liveMetrics: `${ADMIN_BASE}/live/metrics/`,
+    auditEntries: `${ADMIN_BASE}/audit/entries/`,
+    activityStream: `${ADMIN_BASE}/activity/stream/`,
+    suspiciousFlags: `${ADMIN_BASE}/activity/flags/`,
+    monitoringAlerts: `${ADMIN_BASE}/monitoring/alerts/`,
+    performance: `${ADMIN_BASE}/monitoring/performance/`,
+    microApps: `${ADMIN_BASE}/micro/apps/`,
   },
-  events: {
-    list: `${API_BASE_URL}/api/v1/api/events/`,
-    tickets: `${API_BASE_URL}/api/v1/api/tickets/`,
-    attendances: `${API_BASE_URL}/api/v1/api/attendances/`,
+
+  // ── User management ───────────────────────────────────────────────────
+  users: {
+    list: `${ADMIN_BASE}/users/`,
+    platformStats: `${ADMIN_BASE}/users/platform-stats/`,
+    detail: (id: string) => `${ADMIN_BASE}/users/${id}/`,
+    ban: (id: string) => `${ADMIN_BASE}/users/${id}/ban/`,
+    unban: (id: string) => `${ADMIN_BASE}/users/${id}/unban/`,
+    setTier: (id: string) => `${ADMIN_BASE}/users/${id}/set-tier/`,
   },
+
+  // ── Content moderation ────────────────────────────────────────────────
   content: {
-    contents: `${API_BASE_URL}/api/v1/contents/`,
-    comments: `${API_BASE_URL}/api/v1/comments/`,
-    tags: `${API_BASE_URL}/api/v1/tags/`,
+    queue: `${ADMIN_BASE}/content/queue/`,
+    summary: `${ADMIN_BASE}/content/summary/`,
+    trends: `${ADMIN_BASE}/content/trends/`,
+    flagAction: (flagId: string) => `${ADMIN_BASE}/content/flags/${flagId}/action/`,
+  },
+
+  // ── Partner oversight (admin-scoped, separate from broadcastRoutes.partners) ──
+  adminPartners: {
+    list: `${ADMIN_BASE}/partners/`,
+    stats: `${ADMIN_BASE}/partners/stats/`,
+    detail: (id: string) => `${ADMIN_BASE}/partners/${id}/`,
+  },
+
+  // ── Platform analytics ────────────────────────────────────────────────
+  analytics: {
+    revenue: `${ADMIN_BASE}/analytics/revenue/`,
+    engagement: `${ADMIN_BASE}/analytics/engagement/`,
+    partnerStats: `${ADMIN_BASE}/partners/stats/`,
+    adminPartnerStats: `${ADMIN_BASE}/partners/stats/`,
+    userStats: `${ADMIN_BASE}/users/platform-stats/`,
+    contentTrends: `${ADMIN_BASE}/content/trends/`,
+  },
+
+  // ── Legacy keys (kept for backward compat with existing screens) ──────
+  events: {
+    list: `${API_BASE_URL}/api/v1/events/`,
+    create: `${API_BASE_URL}/api/v1/events/`,
+    tickets: `${API_BASE_URL}/api/v1/events/tickets/`,
+    attendances: `${API_BASE_URL}/api/v1/events/attendances/`,
   },
   surveys: {
     surveys: `${API_BASE_URL}/api/v1/surveys/`,
-    questions: `${API_BASE_URL}/api/v1/questions/`,
-    responses: `${API_BASE_URL}/api/v1/responses/`,
+    questions: `${API_BASE_URL}/api/v1/surveys/questions/`,
+    responses: `${API_BASE_URL}/api/v1/surveys/responses/`,
   },
   media: {
-    assets: `${API_BASE_URL}/api/v1/assets/`,
-    jobs: `${API_BASE_URL}/api/v1/jobs/`,
-    safetyScans: `${API_BASE_URL}/api/v1/media-safety-scans/`,
-  },
-  bridge: {
-    accounts: `${API_BASE_URL}/api/v1/accounts/`,
-    threads: `${API_BASE_URL}/api/v1/threads/`,
-    messages: `${API_BASE_URL}/api/v1/messages/`,
-    automations: `${API_BASE_URL}/api/v1/automations/`,
-    analytics: `${API_BASE_URL}/api/v1/analytics/`,
-  },
-  tiers: {
-    users: `${API_BASE_URL}/api/v1/users/`,
-    organizations: `${API_BASE_URL}/api/v1/organizations/`,
-    plans: `${API_BASE_URL}/api/v1/plans/`,
-    subscriptions: `${API_BASE_URL}/api/v1/subscriptions/`,
-    entitlements: `${API_BASE_URL}/api/v1/entitlements/`,
-    usage: `${API_BASE_URL}/api/v1/usage/`,
-    invoices: `${API_BASE_URL}/api/v1/invoices/`,
-    flags: `${API_BASE_URL}/api/v1/flags/`,
-    planFeatures: `${API_BASE_URL}/api/v1/plan-features/`,
-    partnerSettings: `${API_BASE_URL}/api/v1/partner-settings/`,
-    impactSettings: `${API_BASE_URL}/api/v1/impact-settings/`,
-    campaigns: `${API_BASE_URL}/api/v1/campaigns/`,
-    tickets: `${API_BASE_URL}/api/v1/tickets/`,
-    holograms: `${API_BASE_URL}/api/v1/holograms/`,
-    quantum: `${API_BASE_URL}/api/v1/quantum/`,
+    assets: `${API_BASE_URL}/api/v1/media/`,
+    safetyScans: `${API_BASE_URL}/api/v1/media/safety-scans/`,
   },
   notifications: {
     notifications: `${API_BASE_URL}/api/v1/notifications/`,
-    templates: `${API_BASE_URL}/api/v1/notification-templates/`,
-    rules: `${API_BASE_URL}/api/v1/notification-rules/`,
-    deviceTokens: `${API_BASE_URL}/api/v1/notification-device-tokens/`,
-    deviceTokenRegister: `${API_BASE_URL}/api/v1/notification-device-tokens/register/`,
-    deviceTokenUnregister: `${API_BASE_URL}/api/v1/notification-device-tokens/unregister/`,
+    templates: `${API_BASE_URL}/api/v1/notifications/templates/`,
+    rules: `${API_BASE_URL}/api/v1/notifications/rules/`,
+    deviceTokens: `${API_BASE_URL}/api/v1/notifications/device-tokens/`,
+    deviceTokenRegister: `${API_BASE_URL}/api/v1/notifications/device-tokens/register/`,
+    deviceTokenUnregister: `${API_BASE_URL}/api/v1/notifications/device-tokens/unregister/`,
     unreadCount: `${API_BASE_URL}/api/v1/notifications/unread-count/`,
     mainTabBadgeCounts: `${API_BASE_URL}/api/v1/notifications/main-tab-badge-counts/`,
     markSourceRead: `${API_BASE_URL}/api/v1/notifications/mark-source-read/`,

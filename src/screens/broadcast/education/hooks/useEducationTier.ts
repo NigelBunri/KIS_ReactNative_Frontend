@@ -4,23 +4,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 
-const TIER_ORDER = ['free', 'basic', 'pro', 'business', 'business pro', 'partner', 'partner pro'];
+const TIER_ORDER = ['free', 'pro', 'business', 'business pro', 'partner', 'partner pro'];
+const TIER_ALIASES: Record<string, string> = {
+  basic: 'free', // legacy name, renamed to free
+};
 
 type TierLike = string | null | undefined | { name?: string; label?: string };
 
 const normalizeTierLabel = (value: TierLike): string | null => {
   if (!value) return null;
-  if (typeof value === 'string') return value;
-  if (typeof value === 'object') {
-    return value.name ?? value.label ?? null;
-  }
-  return null;
+  const raw = typeof value === 'string' ? value : (value.name ?? value.label ?? null);
+  if (!raw) return null;
+  const cleaned = raw.trim().toLowerCase();
+  return TIER_ALIASES[cleaned] ?? cleaned;
 };
 
 const tierRank = (label?: string | null) => {
   if (!label) return 0;
   const normalized = String(label).trim().toLowerCase();
-  return TIER_ORDER.indexOf(normalized) >= 0 ? TIER_ORDER.indexOf(normalized) : 0;
+  const canonical = TIER_ALIASES[normalized] ?? normalized;
+  const idx = TIER_ORDER.indexOf(canonical);
+  return idx >= 0 ? idx : 0;
 };
 
 export default function useEducationTier() {

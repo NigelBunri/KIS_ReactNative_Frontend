@@ -8,8 +8,12 @@ export type AccountTierShape = {
   id?: string | number;
 };
 
-const TIER_ORDER = ['free', 'basic', 'pro', 'business', 'market pro', 'business pro', 'partner', 'partner pro'];
+// Canonical tier ordering — must match backend TIER_HIERARCHY exactly.
+// 'basic' was renamed to 'free'; 'market pro' was an alias for 'business pro'.
+// Both are handled as aliases so old data still resolves correctly.
+const TIER_ORDER = ['free', 'pro', 'business', 'business pro', 'partner', 'partner pro'];
 const TIER_ALIASES: Record<string, string> = {
+  'basic': 'free',            // legacy name, renamed to free
   'market pro': 'business pro',
   'market-pro': 'business pro',
   'market_pro': 'business pro',

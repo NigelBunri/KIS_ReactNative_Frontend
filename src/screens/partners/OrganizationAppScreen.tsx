@@ -27,15 +27,28 @@ import type {
   PartnerOrganizationAppContentBlock,
   PartnerOrganizationAppTab,
 } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
+import LocationAttendanceTemplate from '@/components/partners/LocationAttendanceTemplate';
 
-const TYPE_LABELS: Record<string, string> = {
-  kis: 'KIS App',
-  bible: 'Bible App',
-  external: 'Embedded App',
-};
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'OrganizationApp'>;
 type RouteProps = RouteProp<RootStackParamList, 'OrganizationApp'>;
+
+type LayoutType = 'bottom_tabs' | 'top_tabs' | 'side_tabs' | 'single_page' | 'scroll';
+
+type AppConfig = {
+  layout_type?: LayoutType;
+  brand_colors?: { primary?: string; accent?: string; background?: string };
+  theme?: 'light' | 'dark' | 'system';
+  show_tab_labels?: boolean;
+  [key: string]: unknown;
+};
+
+type TabConfig = {
+  template?: 'bible' | 'messaging' | 'workspace' | 'broadcast' | 'profile' | 'dashboard' | 'custom' | 'partner_geolocation_attendance';
+  bg_color?: string;
+  [key: string]: unknown;
+};
 
 type AccessLog = {
   id: number;
@@ -46,23 +59,45 @@ type AccessLog = {
   user_display?: string;
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  kis: 'KIS App',
+  bible: 'Bible App',
+  external: 'Embedded App',
+};
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  bible: '📖 Bible-style',
+  messaging: '💬 Messaging',
+  workspace: '🏢 Workspace',
+  broadcast: '📡 Broadcast',
+  profile: '👤 Profile',
+  dashboard: '📊 Dashboard',
+  custom: '✏️ Custom blocks',
+  partner_geolocation_attendance: '📍 Location & Attendance',
+};
+
+// ─── Screen ─────────────────────────────────────────────────────────────────
+
 export default function OrganizationAppScreen() {
   const navigation = useNavigation<NavigationProps>();
   const { params } = useRoute<RouteProps>();
   const { palette } = useKISTheme();
   const app = params.app;
 
+  const appConfig = (app.config ?? {}) as AppConfig;
+  const layoutType: LayoutType = appConfig.layout_type ?? 'bottom_tabs';
+  const brandPrimary = appConfig.brand_colors?.primary ?? palette.primaryStrong;
+  const brandBg = appConfig.brand_colors?.background ?? palette.surface;
+  const showTabLabels = appConfig.show_tab_labels !== false;
+
   const resolvedLink = useMemo(() => resolveBackendAssetUrl(app.link ?? ''), [app.link]);
   const partnerId = params.partnerId ?? app.partner_id ?? null;
-  const dataScope = useMemo(
-    () =>
-      Array.isArray(app.metadata?.dataAccess) && app.metadata.dataAccess.length
-        ? app.metadata.dataAccess
-        : app.metadata?.dataAccess
-        ? [app.metadata.dataAccess]
-        : [],
-    [app.metadata?.dataAccess],
-  );
+  const dataScope = useMemo(() => {
+    if (Array.isArray(app.metadata?.dataAccess)) return app.metadata.dataAccess;
+    if (app.metadata?.dataAccess) return [app.metadata.dataAccess];
+    return [];
+  }, [app.metadata?.dataAccess]);
+
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -76,18 +111,13 @@ export default function OrganizationAppScreen() {
     setLogsLoading(true);
     try {
       const res = await getRequest(ROUTES.partners.organizationAppAccessLog(partnerId, app.id));
-      const list = Array.isArray(res?.data?.logs) ? res.data.logs : [];
-      setLogs(list);
-    } catch (err: any) {
-      console.log('[OrganizationAppScreen] failed to load logs', err?.message);
+      setLogs(Array.isArray(res?.data?.logs) ? res.data.logs : []);
+    } catch {
+      /* silently ignored */
     } finally {
       setLogsLoading(false);
     }
   }, [app.id, partnerId]);
-
-  useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
 
   const loadTabs = useCallback(async () => {
     if (!partnerId) {
@@ -113,397 +143,433 @@ export default function OrganizationAppScreen() {
     setTabsLoading(false);
   }, [app.id, app.tabs, partnerId]);
 
-  useEffect(() => {
-    loadTabs();
-  }, [loadTabs]);
-  const metadataRows = useMemo(
-    () =>
-      Object.entries(app.metadata || {}).filter(
-        ([, value]) =>
-          ['string', 'number', 'boolean'].includes(typeof value) && value !== undefined,
-      ),
-    [app.metadata],
+  useEffect(() => { loadLogs(); }, [loadLogs]);
+  useEffect(() => { loadTabs(); }, [loadTabs]);
+
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId) ?? tabs[0] ?? null,
+    [tabs, activeTabId],
   );
 
   const handleOpenExternal = useCallback(() => {
-    if (!resolvedLink) return;
-    Linking.openURL(resolvedLink).catch(() => {
-      // Silently fail; this link should already be trusted.
-    });
+    if (resolvedLink) Linking.openURL(resolvedLink).catch(() => {});
   }, [resolvedLink]);
 
-  const typeLabel = TYPE_LABELS[String(app.type ?? '')] ?? 'Organization app';
+  const latestConsent = useMemo(() => logs.find((e) => e.consent), [logs]);
+
+  const handleConsentToggle = useCallback(async (grant: boolean) => {
+    if (!partnerId) {
+      Alert.alert('Partner required', 'Unable to update data sharing without a partner context.');
+      return;
+    }
+    setSharing(true);
+    try {
+      await postRequest(
+        ROUTES.partners.organizationAppAccessLog(partnerId, app.id),
+        { action: grant ? 'consent_granted' : 'consent_revoked', data_scope: dataScope, consent: grant },
+        { errorMessage: 'Unable to update data sharing.' },
+      );
+      loadLogs();
+    } catch (err: any) {
+      Alert.alert('Unable to update data access', err?.message || 'Try again later.');
+    } finally {
+      setSharing(false);
+    }
+  }, [app.id, dataScope, loadLogs, partnerId]);
+
+  // ── Render helpers ────────────────────────────────────────────────────────
 
   const renderBlock = (block: PartnerOrganizationAppContentBlock) => {
     const blockType = block.block_type || 'text';
     const payloadUrl = block.payload?.url || block.payload?.href || block.payload?.file;
     const url = block.media_url || payloadUrl;
     return (
-      <View key={block.id} style={[styles.blockCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
-        {block.title ? <Text style={[styles.bodyTitle, { color: palette.text }]}>{block.title}</Text> : null}
-        {blockType === 'image' && url ? (
-          <Image source={{ uri: resolveBackendAssetUrl(String(url)) || String(url) }} style={styles.blockImage} resizeMode="cover" />
+      <View
+        key={block.id}
+        style={[styles.blockCard, { borderColor: palette.divider, backgroundColor: palette.surface }]}
+      >
+        {block.title ? (
+          <Text style={[styles.blockTitle, { color: palette.text }]}>{block.title}</Text>
         ) : null}
-        {blockType === 'video' || blockType === 'file' || blockType === 'link' || blockType === 'embed' ? (
+
+        {blockType === 'image' && url ? (
+          <Image
+            source={{ uri: resolveBackendAssetUrl(String(url)) || String(url) }}
+            style={styles.blockImage}
+            resizeMode="cover"
+          />
+        ) : null}
+
+        {['video', 'file', 'link', 'embed'].includes(blockType) ? (
           <View style={styles.blockActionRow}>
             <Text style={[styles.bodyText, { color: palette.subtext, flex: 1 }]}>
-              {blockType.toUpperCase()} {url ? String(url) : 'No URL configured'}
+              {blockType.toUpperCase()}{url ? `: ${url}` : ': No URL configured'}
             </Text>
             {url ? (
               <KISButton title="Open" size="xs" variant="outline" onPress={() => Linking.openURL(String(url))} />
             ) : null}
           </View>
         ) : null}
-        {block.body ? <Text style={[styles.bodyText, { color: palette.text }]}>{block.body}</Text> : null}
+
+        {block.body ? (
+          <Text style={[styles.bodyText, { color: palette.text }]}>{block.body}</Text>
+        ) : null}
+
         {block.status ? (
-          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}>
-            Status: {block.status} · Active: {block.is_active ? 'yes' : 'no'}
+          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 4 }]}>
+            {block.status} · {block.is_active ? 'active' : 'inactive'}
           </Text>
         ) : null}
       </View>
     );
   };
 
-  const renderConfiguredTabs = () => {
-    if (tabsLoading) {
+  const renderTabContent = (tab: PartnerOrganizationAppTab | null) => {
+    if (!tab) return null;
+    const tabCfg = (tab.config ?? {}) as TabConfig;
+    const template = tabCfg.template ?? 'custom';
+    const blocks = tab.content_blocks ?? [];
+    const bgColor = tabCfg.bg_color ?? brandBg;
+
+    // Full-screen templates that manage their own layout
+    if (template === 'partner_geolocation_attendance' && partnerId) {
       return (
-        <View style={styles.section}>
-          <ActivityIndicator color={palette.primaryStrong} />
-          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 6 }]}>Loading app tabs...</Text>
-        </View>
+        <LocationAttendanceTemplate
+          partnerId={partnerId}
+          brandColors={appConfig.brand_colors}
+          theme={(appConfig.theme as 'dark' | 'light') ?? 'dark'}
+        />
       );
     }
-    if (tabsError) {
-      return (
-        <View style={styles.section}>
-          <Text style={[styles.subtext, { color: palette.danger }]}>{tabsError}</Text>
-        </View>
-      );
-    }
-    if (!tabs.length) {
-      return (
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>App content</Text>
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            This partner app has no configured tabs yet.
-          </Text>
-        </View>
-      );
-    }
-    const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
-    const blocks = activeTab?.content_blocks ?? [];
+
     return (
-      <View style={styles.section}>
-        <Text style={[styles.bodyTitle, { color: palette.text }]}>App tabs</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRail}>
-          {tabs.map((tab) => {
-            const active = tab.id === activeTab?.id;
-            return (
-              <Pressable
-                key={tab.id}
-                onPress={() => setActiveTabId(tab.id)}
-                style={[
-                  styles.tabChip,
-                  {
-                    borderColor: palette.divider,
-                    backgroundColor: active ? palette.primarySoft : palette.surface,
-                  },
-                ]}
-              >
-                <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '700' }}>
-                  {tab.title}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        {activeTab?.description ? (
-          <Text style={[styles.bodyText, { color: palette.subtext, marginBottom: 10 }]}>
-            {activeTab.description}
-          </Text>
+      <View style={{ backgroundColor: bgColor, flex: 1 }}>
+        {template !== 'custom' ? (
+          <View style={[styles.templateBanner, { backgroundColor: brandPrimary + '18', borderColor: brandPrimary + '44' }]}>
+            <Text style={[styles.templateLabel, { color: brandPrimary }]}>
+              {TEMPLATE_LABELS[template] ?? template}
+            </Text>
+          </View>
         ) : null}
+
+        {tab.description ? (
+          <Text style={[styles.tabDescription, { color: palette.subtext }]}>{tab.description}</Text>
+        ) : null}
+
         {blocks.length ? (
           blocks.map(renderBlock)
         ) : (
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            No published content blocks in this tab yet.
-          </Text>
+          <View style={styles.emptyState}>
+            <Text style={{ fontSize: 32 }}>📭</Text>
+            <Text style={[styles.bodyText, { color: palette.subtext, textAlign: 'center', marginTop: 8 }]}>
+              No published content in this tab yet.
+            </Text>
+          </View>
         )}
       </View>
     );
   };
 
-  const renderContent = () => {
-    if (app.type === 'external') {
-      return (
-        <View style={styles.embedPreview}>
-          <Text style={[styles.subtext, { color: palette.subtext, marginBottom: 6 }]}>
-            We load this app inside a secure WebView/SDK container. Once the runtime embed module is in place,
-            the experience will render directly inside this screen.
-          </Text>
-          <Text
-            style={[
-              styles.bodyText,
-              { color: palette.text, marginBottom: 8 },
-            ]}
-          >
-            URL: {resolvedLink ?? 'Link unavailable'}
-          </Text>
-          {resolvedLink ? (
-            <KISButton title="Open externally" onPress={handleOpenExternal} size="sm" />
-          ) : null}
-        </View>
-      );
-    }
+  const renderTabBar = (position: 'top' | 'bottom' | 'side') => {
+    if (!tabs.length) return null;
+    const isHorizontal = position !== 'side';
+    const containerStyle = position === 'bottom' ? styles.tabBarBottom
+      : position === 'top' ? styles.tabBarTop
+      : styles.tabBarSide;
 
     return (
-      <View style={styles.embedPreview}>
-        <Text style={[styles.subtext, { color: palette.subtext }]}>
-          {app.description || 'Internal module loaded via KIS host.'}
-        </Text>
-        <Text style={[styles.bodyText, { color: palette.text, marginTop: 12 }]}>
-          Module: {app.module || 'unspecified'}
-        </Text>
-        <Text style={[styles.bodyText, { color: palette.text, marginTop: 4 }]}>
-          Link: {resolvedLink ?? 'n/a'}
-        </Text>
-        {resolvedLink ? (
-          <KISButton
-            title="Preview in WebView"
-            size="sm"
-            onPress={handleOpenExternal}
-            style={{ marginTop: 12 }}
-          />
-        ) : null}
+      <View style={[containerStyle, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+        {isHorizontal ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 4, alignItems: 'center', paddingHorizontal: 8 }}
+          >
+            {tabs.map((tab) => renderTabChip(tab))}
+          </ScrollView>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {tabs.map((tab) => renderTabChip(tab, true))}
+          </ScrollView>
+        )}
       </View>
     );
   };
 
-  const latestConsent = useMemo(() => logs.find((entry) => entry.consent), [logs]);
-  const handleConsentToggle = useCallback(
-    async (grant: boolean) => {
-      if (!partnerId) {
-        Alert.alert('Partner required', 'Unable to update data sharing without a partner context.');
-        return;
-      }
-      setSharing(true);
-      try {
-        await postRequest(
-          ROUTES.partners.organizationAppAccessLog(partnerId, app.id),
+  const renderTabChip = (tab: PartnerOrganizationAppTab, vertical = false) => {
+    const active = tab.id === activeTab?.id;
+    return (
+      <Pressable
+        key={tab.id}
+        onPress={() => setActiveTabId(tab.id)}
+        style={[
+          vertical ? styles.tabChipVertical : styles.tabChip,
           {
-            action: grant ? 'consent_granted' : 'consent_revoked',
-            data_scope: dataScope,
-            consent: grant,
+            borderColor: active ? brandPrimary : 'transparent',
+            backgroundColor: active ? brandPrimary + '18' : 'transparent',
           },
-          { errorMessage: 'Unable to update data sharing.' },
+        ]}
+      >
+        {tab.icon ? (
+          <Text style={{ fontSize: 18 }}>{tab.icon}</Text>
+        ) : null}
+        {(showTabLabels || !tab.icon) ? (
+          <Text
+            style={{
+              color: active ? brandPrimary : palette.text,
+              fontWeight: active ? '800' : '500',
+              fontSize: 12,
+              marginTop: tab.icon && showTabLabels ? 2 : 0,
+            }}
+            numberOfLines={1}
+          >
+            {tab.title}
+          </Text>
+        ) : null}
+      </Pressable>
+    );
+  };
+
+  // ── Layout rendering ──────────────────────────────────────────────────────
+
+  const renderAppBody = () => {
+    if (tabsLoading) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator color={brandPrimary} />
+          <Text style={[styles.subtext, { color: palette.subtext, marginTop: 8 }]}>Loading…</Text>
+        </View>
+      );
+    }
+    if (tabsError) {
+      return (
+        <View style={styles.centered}>
+          <Text style={{ fontSize: 32 }}>⚠️</Text>
+          <Text style={[styles.bodyText, { color: palette.danger, textAlign: 'center', marginTop: 8 }]}>{tabsError}</Text>
+          <KISButton title="Retry" size="sm" onPress={loadTabs} style={{ marginTop: 12 }} />
+        </View>
+      );
+    }
+    if (!tabs.length) {
+      if (app.type === 'external') {
+        return (
+          <View style={styles.embedPreview}>
+            <Text style={[styles.bodyText, { color: palette.subtext, marginBottom: 8 }]}>
+              External URL: {resolvedLink || 'Not configured'}
+            </Text>
+            {resolvedLink ? (
+              <KISButton title="Open externally" onPress={handleOpenExternal} size="sm" />
+            ) : null}
+          </View>
         );
-        loadLogs();
-      } catch (err: any) {
-        Alert.alert('Unable to update data access', err?.message || 'Try again later.');
-      } finally {
-        setSharing(false);
       }
-    },
-    [app.id, dataScope, loadLogs, partnerId],
-  );
+      return (
+        <View style={styles.centered}>
+          <Text style={{ fontSize: 40 }}>🛠️</Text>
+          <Text style={[styles.bodyText, { color: palette.subtext, textAlign: 'center', marginTop: 8 }]}>
+            This app has no tabs configured yet.
+          </Text>
+        </View>
+      );
+    }
+
+    switch (layoutType) {
+      case 'top_tabs':
+        return (
+          <View style={{ flex: 1 }}>
+            {renderTabBar('top')}
+            <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+              {renderTabContent(activeTab)}
+            </ScrollView>
+          </View>
+        );
+      case 'side_tabs':
+        return (
+          <View style={{ flex: 1, flexDirection: 'row' }}>
+            {renderTabBar('side')}
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+              {renderTabContent(activeTab)}
+            </ScrollView>
+          </View>
+        );
+      case 'scroll':
+        return (
+          <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+            {tabs.map((tab) => (
+              <View key={tab.id} style={{ marginBottom: 24 }}>
+                <Text style={[styles.blockTitle, { color: brandPrimary, marginBottom: 8 }]}>{tab.title}</Text>
+                {renderTabContent(tab)}
+              </View>
+            ))}
+          </ScrollView>
+        );
+      case 'single_page':
+        return (
+          <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+            {renderTabContent(tabs[0] ?? null)}
+          </ScrollView>
+        );
+      default: // bottom_tabs
+        return (
+          <View style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+              {renderTabContent(activeTab)}
+            </ScrollView>
+            {renderTabBar('bottom')}
+          </View>
+        );
+    }
+  };
+
+  // ── Full screen layout ────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.surface }]}>
-      <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: brandBg }]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: brandPrimary + '0D' }]}>
         <Pressable
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.backButton]}
         >
-          <KISIcon name="chevron-left" size={20} color={palette.text} />
+          <KISIcon name="chevron-left" size={20} color={brandPrimary} />
         </Pressable>
         <View style={styles.headerTitleWrap}>
           <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
             {app.name}
           </Text>
-          <Text style={[styles.subtitle, { color: palette.subtext }]}>{typeLabel}</Text>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>About</Text>
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>{app.description || 'No description yet.'}</Text>
-          <View style={styles.statusRow}>
-            <Text style={[styles.statusPill, { color: palette.text, borderColor: palette.divider }]}>
-              {app.status || 'draft'}
-            </Text>
-            {app.is_promoted_global ? (
-              <Text style={[styles.statusPill, { color: palette.primaryStrong, borderColor: palette.primaryStrong }]}>
-                Global promoted
-              </Text>
-            ) : (
-              <Text style={[styles.statusPill, { color: palette.subtext, borderColor: palette.divider }]}>
-                Partner-scoped
-              </Text>
-            )}
-          </View>
-        </View>
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>Data access</Text>
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            {dataScope.length ? dataScope.join(', ') : 'No data scope recorded.'}
+          <Text style={[styles.subtitle, { color: palette.subtext }]}>
+            {TYPE_LABELS[String(app.type ?? '')] ?? 'Organization app'} · {layoutType.replace('_', ' ')}
           </Text>
-          <KISButton
-            title={latestConsent ? 'Revoke data sharing' : 'Share organization data'}
-            size="sm"
-            variant={latestConsent ? 'outline' : 'primary'}
-            onPress={() => handleConsentToggle(!latestConsent)}
-            disabled={sharing || !dataScope.length}
-            style={{ marginTop: 8 }}
-          />
         </View>
-        {renderContent()}
-        {renderConfiguredTabs()}
-        {metadataRows.length ? (
-          <View style={[styles.section, { marginTop: 10 }]}>
-            <Text style={[styles.bodyTitle, { color: palette.text }]}>Metadata</Text>
-            {metadataRows.map(([key, value]) => (
-              <View key={key} style={styles.metadataRow}>
-                <Text style={[styles.subtext, { color: palette.text }]}>{key}:</Text>
-                <Text style={[styles.bodyText, { color: palette.subtext }]}>{String(value)}</Text>
-              </View>
-            ))}
+        {app.is_promoted_global ? (
+          <View style={[styles.promotedBadge, { backgroundColor: brandPrimary }]}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>⚡ Global</Text>
           </View>
         ) : null}
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>Visibility</Text>
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            {app.visible_to?.length ? app.visible_to.join(', ') : 'Visible to everyone'}
+      </View>
+
+      {/* App body */}
+      <View style={{ flex: 1 }}>
+        {renderAppBody()}
+      </View>
+
+      {/* Data sharing footer (only when data scope configured) */}
+      {dataScope.length > 0 && (
+        <View style={[styles.footer, { borderTopColor: palette.divider, backgroundColor: palette.surface }]}>
+          <Text style={[styles.subtext, { color: palette.subtext, flex: 1 }]} numberOfLines={1}>
+            Data: {dataScope.join(', ')}
           </Text>
+          <KISButton
+            title={latestConsent ? 'Revoke' : 'Share data'}
+            size="xs"
+            variant={latestConsent ? 'outline' : 'primary'}
+            onPress={() => handleConsentToggle(!latestConsent)}
+            disabled={sharing}
+          />
         </View>
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>Configuration</Text>
-          <Text style={[styles.bodyText, { color: palette.subtext }]}>
-            Order: {app.order} · Active: {app.is_active ? 'yes' : 'no'} · Published:{' '}
-            {app.published_at ? new Date(app.published_at).toLocaleString() : 'not published'}
-          </Text>
-        </View>
-        <View style={styles.section}>
-          <Text style={[styles.bodyTitle, { color: palette.text }]}>Access Logs</Text>
-          {logsLoading ? (
-            <ActivityIndicator color={palette.primaryStrong} />
-          ) : logs.length ? (
-            logs.map((entry) => (
-              <View key={entry.id} style={styles.metadataRow}>
-                <Text style={[styles.subtext, { color: palette.text }]}>
-                  {entry.user_display ?? 'User'} · {entry.action}
-                </Text>
-                <Text style={[styles.bodyText, { color: palette.subtext }]}>
-                  {new Date(entry.created_at).toLocaleString()}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={[styles.subtext, { color: palette.subtext }]}>No access logs yet.</Text>
-          )}
-        </View>
-      </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   header: {
-    borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
+    borderBottomWidth: 1,
   },
-  backButton: {
-    padding: 6,
+  backButton: { padding: 6 },
+  headerTitleWrap: { flex: 1, marginLeft: 12 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  subtitle: { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  promotedBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 8,
   },
-  headerTitleWrap: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  body: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 18,
-  },
-  bodyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  bodyText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  subtext: {
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  embedPreview: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginBottom: 16,
-  },
-  metadataRow: {
+  footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
   },
-  statusRow: {
+  // Tab bars
+  tabBarTop: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
+    borderBottomWidth: 1,
+    paddingVertical: 6,
+    minHeight: 48,
   },
-  statusPill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    fontSize: 12,
-    fontWeight: '700',
-    overflow: 'hidden',
+  tabBarBottom: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingVertical: 6,
+    minHeight: 56,
   },
-  tabRail: {
-    gap: 8,
+  tabBarSide: {
+    width: 72,
+    borderRightWidth: 1,
     paddingVertical: 8,
   },
   tabChip: {
-    borderWidth: 2,
-    borderRadius: 999,
-    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginHorizontal: 4,
+    gap: 2,
   },
+  tabChipVertical: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginVertical: 4,
+    marginHorizontal: 6,
+    gap: 2,
+  },
+  tabContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  // Template banner
+  templateBanner: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  templateLabel: { fontSize: 12, fontWeight: '700' },
+  tabDescription: { fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  // Blocks
   blockCard: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderRadius: 14,
     padding: 12,
     marginBottom: 10,
-    gap: 8,
+    gap: 6,
   },
-  blockImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 10,
-  },
-  blockActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  blockTitle: { fontSize: 14, fontWeight: '700' },
+  blockImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10 },
+  blockActionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // States
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
+  embedPreview: { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', margin: 16 },
+  bodyText: { fontSize: 13, lineHeight: 20 },
+  subtext: { fontSize: 12, lineHeight: 18 },
 });

@@ -98,6 +98,37 @@ export const PARTNER_SETTINGS_SECTIONS: PartnerSettingsSection[] = [
         description: 'Bible experience maintained by KCAN for partner accounts.',
         access: admins,
       },
+      {
+        key: 'org_apps_builder',
+        title: 'App Builder',
+        description: 'Build custom tab apps with layouts, pages, and content blocks.',
+        access: admins,
+      },
+    ],
+  },
+  {
+    key: 'location_attendance',
+    title: 'Location & Attendance',
+    description: 'Manage geofenced attendance events for meetings, services, classes, and field assignments.',
+    features: [
+      {
+        key: 'location_events',
+        title: 'Location Events',
+        description: 'Create and manage geofenced check-in events.',
+        access: admins,
+      },
+      {
+        key: 'location_attendance_report',
+        title: 'Attendance Reports',
+        description: 'View check-in lists, arrival order, and export reports.',
+        access: managers,
+      },
+      {
+        key: 'location_consent_settings',
+        title: 'Consent Settings',
+        description: 'View member consent status for location attendance.',
+        access: admins,
+      },
     ],
   },
   {

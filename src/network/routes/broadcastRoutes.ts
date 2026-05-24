@@ -159,9 +159,34 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/tabs/`,
     organizationAppTabBlocks: (id: string, appId: string, tabId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/tabs/${tabId}/blocks/`,
+    organizationAppTab: (id: string, appId: string, tabId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/tabs/${tabId}/`,
+    organizationAppBlock: (id: string, appId: string, tabId: string, blockId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/tabs/${tabId}/blocks/${blockId}/`,
     organizationAppsGlobal: `${API_BASE_URL}/api/v1/partners/organization-apps/global/`,
     organizationAppPromote: (id: string, appId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/promote/`,
+    // Location & Attendance
+    locationEvents: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/`,
+    locationEvent: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/`,
+    locationCheckin: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/checkin/`,
+    locationMyStatus: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/my-status/`,
+    locationAttendance: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/attendance/`,
+    locationManualCheckin: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/attendance/manual-checkin/`,
+    locationAttendanceExport: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/attendance/export/`,
+    locationZones: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/events/${eventId}/zones/`,
+    locationConsent: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/consent/`,
+    locationAudit: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/location/audit/`,
     policy: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/policy/`,
     auditEvents: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/audit-events/`,

@@ -82,7 +82,7 @@ export const tierMetaFor = (tier: any) => {
       'Organizational management tools',
     ];
   } else if (!list.length && name.includes('partner')) {
-    tagline = 'Organizations, ministries & enterprises';
+    tagline = 'Organizations, ministries, and enterprises';
     badge = 'Partner';
     highlight = 'Multi-account orgs + revenue tools';
     list = [
@@ -117,7 +117,7 @@ export const tierMetaFor = (tier: any) => {
       'Faster support response',
     ];
   } else if (!list.length && name.includes('business')) {
-    tagline = 'Teams, growth & visibility';
+    tagline = 'Teams, growth, and visibility';
     highlight = 'KIS Business broadcast + storefront';
     list = [
       'Pro +',

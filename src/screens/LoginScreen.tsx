@@ -200,16 +200,27 @@ export default function LoginScreen({ navigation }: any) {
             'This account has been disabled. Please contact support.',
           );
         }
+        if (res?.data?.two_factor_required) {
+          return Alert.alert(
+            'Two-step verification',
+            'Your account has two-factor authentication enabled. Please enter your OTP code.',
+          );
+        }
         const msg =
           res?.message ||
           res?.data?.message ||
           res?.data?.detail ||
           'Invalid phone or password.';
-        return Alert.alert('Login failed', msg);
+        return Alert.alert('Login failed', String(msg));
+      }
+
+      const accessToken = res?.data?.access || res?.data?.access_token;
+      if (!accessToken) {
+        return Alert.alert('Login failed', 'No authentication token received. Please try again.');
       }
 
       await persistAuth(res.data);
-      const resolvedUser = res?.data?.user ?? res?.data ?? null;
+      const resolvedUser = res?.data?.user ?? null;
       await setUserData(resolvedUser, res.data);
       setUser?.(resolvedUser);
       setAuth(true); // App.tsx will switch to MainTabs
@@ -326,7 +337,11 @@ export default function LoginScreen({ navigation }: any) {
         </Pressable>
       </View>
 
-      <KISButton title={loading ? undefined : 'Log In'} onPress={onLogin} disabled={!canSubmit}>
+      <KISButton
+        title={loading ? undefined : 'Log In'}
+        onPress={() => onLogin().catch((e: any) => Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.'))}
+        disabled={!canSubmit}
+      >
         {loading ? <ActivityIndicator /> : null}
       </KISButton>
 
