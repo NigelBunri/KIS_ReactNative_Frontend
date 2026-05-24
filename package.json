@@ -22,7 +22,8 @@
     "ios:device-lab": "bash ./scripts/run-ios-device-lab.sh",
     "ios:small-lab": "bash ./scripts/run-ios-small-device-lab.sh",
     "android:release-apk": "cd android && ./gradlew assembleRelease",
-    "android:release-manifest": "cd android && ./gradlew :app:processReleaseMainManifest"
+    "android:release-manifest": "cd android && ./gradlew :app:processReleaseMainManifest",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@peculiar/webcrypto": "^1.5.0",
@@ -58,8 +59,8 @@
     "react-native-image-resizer": "^1.4.5",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-localize": "^3.6.0",
-    "react-native-nitro-modules": "^0.31.6",
-    "react-native-nitro-sound": "^0.2.9",
+    "react-native-nitro-modules": "^0.35.7",
+    "react-native-nitro-sound": "^0.2.14",
     "react-native-pager-view": "^6.9.1",
     "react-native-pdf": "^7.0.3",
     "react-native-permissions": "^5.4.4",
@@ -73,7 +74,7 @@
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.18.0",
     "react-native-view-shot": "^4.0.3",
-    "react-native-worklets": "^0.6.1",
+    "react-native-worklets": "^0.8.3",
     "slate": "^0.123.0",
     "slate-history": "^0.113.1",
     "slate-react": "^0.123.0",

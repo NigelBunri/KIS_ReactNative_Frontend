@@ -1,0 +1,319 @@
+diff --git a/node_modules/react-native-set-app-icon/android/build.gradle b/node_modules/react-native-set-app-icon/android/build.gradle
+index 5dd382b..7cc89da 100644
+--- a/node_modules/react-native-set-app-icon/android/build.gradle
++++ b/node_modules/react-native-set-app-icon/android/build.gradle
+@@ -1,48 +1,18 @@
+ // android/build.gradle
+ 
+-// based on:
+-//
+-// * https://github.com/facebook/react-native/blob/0.60-stable/template/android/build.gradle
+-//   original location:
+-//   - https://github.com/facebook/react-native/blob/0.58-stable/local-cli/templates/HelloWorld/android/build.gradle
+-//
+-// * https://github.com/facebook/react-native/blob/0.60-stable/template/android/app/build.gradle
+-//   original location:
+-//   - https://github.com/facebook/react-native/blob/0.58-stable/local-cli/templates/HelloWorld/android/app/build.gradle
+-
+-def DEFAULT_COMPILE_SDK_VERSION = 28
+-def DEFAULT_BUILD_TOOLS_VERSION = '28.0.3'
+-def DEFAULT_MIN_SDK_VERSION = 16
+-def DEFAULT_TARGET_SDK_VERSION = 28
++def DEFAULT_COMPILE_SDK_VERSION = 34
++def DEFAULT_BUILD_TOOLS_VERSION = '34.0.0'
++def DEFAULT_MIN_SDK_VERSION = 24
++def DEFAULT_TARGET_SDK_VERSION = 34
+ 
+ def safeExtGet(prop, fallback) {
+     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+ }
+ 
+ apply plugin: 'com.android.library'
+-apply plugin: 'maven'
+-
+-buildscript {
+-    // The Android Gradle plugin is only required when opening the android folder stand-alone.
+-    // This avoids unnecessary downloads and potential conflicts when the library is included as a
+-    // module dependency in an application project.
+-    // ref: https://docs.gradle.org/current/userguide/tutorial_using_tasks.html#sec:build_script_external_dependencies
+-    if (project == rootProject) {
+-        repositories {
+-            google()
+-            jcenter()
+-        }
+-        dependencies {
+-            classpath 'com.android.tools.build:gradle:3.4.1'
+-        }
+-    }
+-}
+-
+-apply plugin: 'com.android.library'
+-apply plugin: 'maven'
+ 
+ android {
+-    compileSdkVersion safeExtGet('compileSdkVersion', DEFAULT_COMPILE_SDK_VERSION)
++    compileSdk safeExtGet('compileSdkVersion', DEFAULT_COMPILE_SDK_VERSION)
+     buildToolsVersion safeExtGet('buildToolsVersion', DEFAULT_BUILD_TOOLS_VERSION)
+     defaultConfig {
+         minSdkVersion safeExtGet('minSdkVersion', DEFAULT_MIN_SDK_VERSION)
+@@ -53,97 +23,18 @@ android {
+     lintOptions {
+         abortOnError false
+     }
++    namespace 'com.reactnativesetappicon'
+ }
+ 
+ repositories {
+-    // ref: https://www.baeldung.com/maven-local-repository
+     mavenLocal()
+     maven {
+-        // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+         url "$rootDir/../node_modules/react-native/android"
+     }
+-    maven {
+-        // Android JSC is installed from npm
+-        url "$rootDir/../node_modules/jsc-android/dist"
+-    }
+     google()
+-    jcenter()
++    mavenCentral()
+ }
+ 
+ dependencies {
+-    //noinspection GradleDynamicVersion
+-    implementation 'com.facebook.react:react-native:+'  // From node_modules
+-}
+-
+-def configureReactNativePom(def pom) {
+-    def packageJson = new groovy.json.JsonSlurper().parseText(file('../package.json').text)
+-
+-    pom.project {
+-        name packageJson.title
+-        artifactId packageJson.name
+-        version = packageJson.version
+-        group = "com.reactlibrary"
+-        description packageJson.description
+-        url packageJson.repository.baseUrl
+-
+-        licenses {
+-            license {
+-                name packageJson.license
+-                url packageJson.repository.baseUrl + '/blob/master/' + packageJson.licenseFilename
+-                distribution 'repo'
+-            }
+-        }
+-
+-        developers {
+-            developer {
+-                id packageJson.author.username
+-                name packageJson.author.name
+-            }
+-        }
+-    }
+-}
+-
+-afterEvaluate { project ->
+-    // some Gradle build hooks ref:
+-    // https://www.oreilly.com/library/view/gradle-beyond-the/9781449373801/ch03.html
+-    task androidJavadoc(type: Javadoc) {
+-        source = android.sourceSets.main.java.srcDirs
+-        classpath += files(android.bootClasspath)
+-        classpath += files(project.getConfigurations().getByName('compile').asList())
+-        include '**/*.java'
+-    }
+-
+-    task androidJavadocJar(type: Jar, dependsOn: androidJavadoc) {
+-        classifier = 'javadoc'
+-        from androidJavadoc.destinationDir
+-    }
+-
+-    task androidSourcesJar(type: Jar) {
+-        classifier = 'sources'
+-        from android.sourceSets.main.java.srcDirs
+-        include '**/*.java'
+-    }
+-
+-    android.libraryVariants.all { variant ->
+-        def name = variant.name.capitalize()
+-        def javaCompileTask = variant.javaCompileProvider.get()
+-
+-        task "jar${name}"(type: Jar, dependsOn: javaCompileTask) {
+-            from javaCompileTask.destinationDir
+-        }
+-    }
+-
+-    artifacts {
+-        archives androidSourcesJar
+-        archives androidJavadocJar
+-    }
+-
+-    task installArchives(type: Upload) {
+-        configuration = configurations.archives
+-        repositories.mavenDeployer {
+-            // Deploy to react-native-event-bridge/maven, ready to publish to npm
+-            repository url: "file://${projectDir}/../android/maven"
+-            configureReactNativePom pom
+-        }
+-    }
++    implementation 'com.facebook.react:react-native:+'
+ }
+diff --git a/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/results.bin b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/results.bin
+new file mode 100644
+index 0000000..e1640c9
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/results.bin
+@@ -0,0 +1 @@
++o/bundleLibRuntimeToDirRelease
+diff --git a/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconModule.dex b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconModule.dex
+new file mode 100644
+index 0000000..64c0e27
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconModule.dex differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconPackage.dex b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconPackage.dex
+new file mode 100644
+index 0000000..5471f96
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactlibrary/SetAppIconPackage.dex differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactnativesetappicon/BuildConfig.dex b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactnativesetappicon/BuildConfig.dex
+new file mode 100644
+index 0000000..86075d3
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/reactnativesetappicon/BuildConfig.dex differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin
+new file mode 100644
+index 0000000..601f245
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/.transforms/fb870286870c98da47bce6414726c404/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/generated/source/buildConfig/release/com/reactnativesetappicon/BuildConfig.java b/node_modules/react-native-set-app-icon/android/build/generated/source/buildConfig/release/com/reactnativesetappicon/BuildConfig.java
+new file mode 100644
+index 0000000..0f48aee
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/generated/source/buildConfig/release/com/reactnativesetappicon/BuildConfig.java
+@@ -0,0 +1,10 @@
++/**
++ * Automatically generated file. DO NOT MODIFY
++ */
++package com.reactnativesetappicon;
++
++public final class BuildConfig {
++  public static final boolean DEBUG = false;
++  public static final String LIBRARY_PACKAGE_NAME = "com.reactnativesetappicon";
++  public static final String BUILD_TYPE = "release";
++}
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties b/node_modules/react-native-set-app-icon/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties
+new file mode 100644
+index 0000000..1211b1e
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties
+@@ -0,0 +1,6 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=1
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
++coreLibraryDesugaringEnabled=false
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json b/node_modules/react-native-set-app-icon/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar b/node_modules/react-native-set-app-icon/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar
+new file mode 100644
+index 0000000..f94e2d3
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt b/node_modules/react-native-set-app-icon/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..5e9743a
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/main/jniLibs"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/release/jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+new file mode 100644
+index 0000000..977667c
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+@@ -0,0 +1 @@
++#Sun May 24 19:18:51 WAT 2026
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+new file mode 100644
+index 0000000..8452444
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/release/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release" generated-set="release$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/src/release/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/build/generated/res/resValues/release"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nigel/dev/KIS/node_modules/react-native-set-app-icon/android/build/generated/res/resValues/release"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconModule.class b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconModule.class
+new file mode 100644
+index 0000000..6e955bf
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconModule.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconPackage.class b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconPackage.class
+new file mode 100644
+index 0000000..87977d2
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactlibrary/SetAppIconPackage.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactnativesetappicon/BuildConfig.class b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactnativesetappicon/BuildConfig.class
+new file mode 100644
+index 0000000..a49e047
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/reactnativesetappicon/BuildConfig.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt b/node_modules/react-native-set-app-icon/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt
+new file mode 100644
+index 0000000..78ac5b8
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt
+@@ -0,0 +1,2 @@
++R_DEF: Internal format may change without notice
++local
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json b/node_modules/react-native-set-app-icon/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
+new file mode 100644
+index 0000000..0637a08
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
+@@ -0,0 +1 @@
++[]
+\ No newline at end of file
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt b/node_modules/react-native-set-app-icon/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
+new file mode 100644
+index 0000000..08f4ebe
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
+@@ -0,0 +1 @@
++0 Warning/Error
+\ No newline at end of file
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconModule.class b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconModule.class
+new file mode 100644
+index 0000000..6e955bf
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconModule.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconPackage.class b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconPackage.class
+new file mode 100644
+index 0000000..87977d2
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactlibrary/SetAppIconPackage.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactnativesetappicon/BuildConfig.class b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactnativesetappicon/BuildConfig.class
+new file mode 100644
+index 0000000..a49e047
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/reactnativesetappicon/BuildConfig.class differ
+diff --git a/node_modules/react-native-set-app-icon/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt b/node_modules/react-native-set-app-icon/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt
+new file mode 100644
+index 0000000..c7e4c82
+--- /dev/null
++++ b/node_modules/react-native-set-app-icon/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt
+@@ -0,0 +1 @@
++com.reactnativesetappicon
+diff --git a/node_modules/react-native-set-app-icon/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin b/node_modules/react-native-set-app-icon/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin
+new file mode 100644
+index 0000000..6819542
+Binary files /dev/null and b/node_modules/react-native-set-app-icon/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin differ
+diff --git a/node_modules/react-native-set-app-icon/android/src/main/AndroidManifest.xml b/node_modules/react-native-set-app-icon/android/src/main/AndroidManifest.xml
+index 20c90c4..0a0938a 100644
+--- a/node_modules/react-native-set-app-icon/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-set-app-icon/android/src/main/AndroidManifest.xml
+@@ -1,4 +1,3 @@
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-          package="com.reactlibrary">
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ 
+ </manifest>
