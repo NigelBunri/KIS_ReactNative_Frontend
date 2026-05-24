@@ -8,7 +8,7 @@ const HEALTH_PROFILE_CACHE_KEY = 'kis_health_profile_cache_v1';
 let healthProfileReadBlockedUntil = 0;
 let healthProfileWriteBlockedUntil = 0;
 const logHealthProfile = (...args: any[]) => {
-  console.log('[healthProfileService]', ...args);
+  if (__DEV__) console.log('[healthProfileService]', ...args);
 };
 
 const parseThrottleDelayMs = (message: unknown): number | null => {

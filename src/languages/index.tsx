@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import RNLocalize from 'react-native-localize';
+import { getLocales } from 'react-native-localize';
 
 import { LANGUAGE_REGISTRY, type LanguageEntry } from './registry';
 
@@ -132,7 +132,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        const fallback = RNLocalize.getLocales?.()?.[0]?.languageCode ?? 'en';
+        const fallback = getLocales?.()?.[0]?.languageCode ?? 'en';
         const nextLanguage = normalizeLanguageCode(stored || fallback);
         activeLanguage = nextLanguage;
         if (mounted) setLanguageState(nextLanguage);

@@ -295,7 +295,7 @@ const getAddress = (userId: string, deviceId: string) =>
 const getSessionId = (address: any) => `${address.getName()}.${address.getDeviceId()}`;
 
 const logE2EE = (...args: any[]) => {
-  console.log('[E2EE]', ...args);
+  if (__DEV__) console.log('[E2EE]', ...args);
 };
 
 type DeviceBundle = {

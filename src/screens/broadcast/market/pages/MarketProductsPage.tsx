@@ -4,10 +4,13 @@ import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import {
@@ -70,6 +73,53 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   const [editing, setEditing] = useState<MarketProduct | null>(null);
   const [productImages, setProductImages] = useState<PickedImage[]>([]);
   const [form, setForm] = useState({ ...DEFAULT_PRODUCT_FORM });
+
+  const PINNED_PRODUCTS_KEY = 'kis.market.pinned_products.v1';
+  const [pinnedIds, setPinnedIds] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    AsyncStorage.getItem(PINNED_PRODUCTS_KEY).then(raw => {
+      if (raw) try { setPinnedIds(JSON.parse(raw)); } catch { /* ignore */ }
+    });
+  }, []);
+  const togglePin = useCallback((productId: string) => {
+    setPinnedIds(prev => {
+      const next = { ...prev, [productId]: !prev[productId] };
+      AsyncStorage.setItem(PINNED_PRODUCTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const handleScheduleProductDrop = useCallback((productId: string) => {
+    const options = [
+      { label: 'In 1 hour', ms: 60 * 60 * 1000 },
+      { label: 'In 24 hours', ms: 24 * 60 * 60 * 1000 },
+      { label: 'In 3 days', ms: 3 * 24 * 60 * 60 * 1000 },
+      { label: 'In 7 days', ms: 7 * 24 * 60 * 60 * 1000 },
+    ];
+    Alert.alert(
+      'Schedule drop',
+      'When should this product drop go live?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...options.map(opt => ({
+          text: opt.label,
+          onPress: async () => {
+            const scheduledAt = new Date(Date.now() + opt.ms).toISOString();
+            const res = await postRequest(
+              ROUTES.commerce.products,
+              { product: productId, scheduled_drop_at: scheduledAt },
+              { errorMessage: 'Unable to schedule drop.' },
+            );
+            if (res?.success || res?.id) {
+              Alert.alert('Scheduled', `Drop scheduled for ${opt.label.toLowerCase()}.`);
+            } else {
+              Alert.alert('Schedule', res?.message ?? 'Unable to schedule. Check your shop is active.');
+            }
+          },
+        })),
+      ],
+    );
+  }, []);
   const { categories: catalogCategories, loading: catalogLoading } =
     useCatalogCategories();
   const productCatalogCategories = useMemo(
@@ -721,15 +771,19 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
                         title="Schedule"
                         size="sm"
                         variant="secondary"
-                        onPress={() =>
-                          Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')
-                        }
+                        onPress={() => handleScheduleProductDrop(String(product.id))}
                       />
                       <KISButton
-                        title="Pin"
+                        title={pinnedIds[String(product.id)] ? 'Pinned ✓' : 'Pin'}
                         size="sm"
                         variant="secondary"
-                        onPress={() => Alert.alert('Coming soon', 'Product pinning will be available in an upcoming update.')}
+                        onPress={() => {
+                          togglePin(String(product.id));
+                          Alert.alert(
+                            pinnedIds[String(product.id)] ? 'Unpinned' : 'Pinned',
+                            pinnedIds[String(product.id)] ? 'Removed from pinned products.' : 'Product pinned to your library.',
+                          );
+                        }}
                       />
                     </View>
                   </View>

@@ -20,7 +20,7 @@ export function useChatAuth(chat: ChatType | undefined) {
         }
 
         const loggedIn = await getCache('AUTH_CACHE', 'USER_KEY');
-        console.log('[ChatRoomPage] Loaded AUTH_CACHE / USER_KEY:', loggedIn);
+        if (__DEV__) console.log('[ChatRoomPage] Loaded AUTH_CACHE / USER_KEY:', loggedIn);
 
         const extract = (data: any | null | undefined) => {
           if (!data) return;

@@ -210,14 +210,14 @@ async function refreshConversationsAndHandleEmpty(currentUserId?: string): Promi
       ? res.data.results
       : [];
 
-    console.log(
+    if (__DEV__) console.log(
       '[refreshConversationsAndHandleEmpty] Fetched conversations:',
       rawList.length,
     );
 
     // ── If no conversations: clear the main list cache and exit ───────────
     if (rawList.length === 0) {
-      console.log(
+      if (__DEV__) console.log(
         '[fetchConversations] Backend returned ZERO conversations → clearing local cache',
       );
       await clearCacheByKey(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId));
@@ -238,7 +238,7 @@ async function refreshConversationsAndHandleEmpty(currentUserId?: string): Promi
     await clearCacheByKey(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId));
     await setCache(CONVERSATION_CACHE_TYPE, conversationListCacheKey(currentUserId), dedupedRawList);
 
-    console.log(
+    if (__DEV__) console.log(
       '[refreshConversationsAndHandleEmpty] Cached deduped conversations list (no per-conversation payloads)',
     );
     return dedupedRawList;
@@ -265,7 +265,7 @@ export async function searchConversationsFromServer(
       ? res.data.results
       : [];
 
-    console.log("reqest_conversations: ", rawList);
+    if (__DEV__) console.log("reqest_conversations: ", rawList);
     const normalized = rawList.map((item: any) =>
       normalizeConversation(item, currentUserId),
     );
@@ -320,7 +320,7 @@ export async function fetchConversationsForCurrentUser(
     const freshRaw = await refreshConversationsAndHandleEmpty(currentUserId);
     cachedRaw = freshRaw.length ? freshRaw : await getRawConversationsFromCache(currentUserId);
   }
-  console.log('[fetchConversationsForCurrentUser] Cached raw list:', cachedRaw);
+  if (__DEV__) console.log('[fetchConversationsForCurrentUser] Cached raw list:', cachedRaw);
 
   const baseList = cachedRaw.length ? cachedRaw : fallback;
 

@@ -147,7 +147,7 @@ export function useConversationBootstrap(
 
     const initial = getInitialConversationId();
     if (initial) {
-      console.log('[ChatRoomPage] Setting conversationId from chat:', initial);
+      if (__DEV__) console.log('[ChatRoomPage] Setting conversationId from chat:', initial);
       setConversationId(initial);
     }
   }, [chat, conversationId, getInitialConversationId]);
@@ -170,7 +170,7 @@ export function useConversationBootstrap(
       let currentConversationId: string | null =
         conversationId != null ? String(conversationId) : null;
 
-      console.log('[ChatRoomPage] ensureConversationId called:', {
+      if (__DEV__) console.log('[ChatRoomPage] ensureConversationId called:', {
         reason,
         currentConversationId,
         isDirectChat,
@@ -228,7 +228,7 @@ export function useConversationBootstrap(
         },
       };
 
-      console.log('[ChatRoomPage] /direct payload:', payload);
+      if (__DEV__) console.log('[ChatRoomPage] /direct payload:', payload);
 
       try {
         const res = await postRequest(ROUTES.chat.directConversation, payload, {

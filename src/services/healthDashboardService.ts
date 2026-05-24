@@ -40,7 +40,7 @@ let healthDashboardApiUnavailable = false;
 let uploadBlockedUntil = 0;
 const PROFILE_EDITOR_CACHE_PREFIX = 'kis_health_dashboard_profile_editor_v1:';
 const logHealthDashboard = (...args: any[]) => {
-  console.log('[healthDashboardService]', ...args);
+  if (__DEV__) console.log('[healthDashboardService]', ...args);
 };
 
 const createEmptyAnalyticsHeader = () => ({

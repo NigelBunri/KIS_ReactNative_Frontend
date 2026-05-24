@@ -1,5 +1,5 @@
 // src/screens/chat/components/CameraCaptureModal.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,

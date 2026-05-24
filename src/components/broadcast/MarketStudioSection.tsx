@@ -194,6 +194,13 @@ export default function MarketStudioSection({
 
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabId>(initialTab);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('market.studio.tab', (tab: MarketTabId) => {
+      setActiveMarketTab(tab);
+    });
+    return () => sub.remove();
+  }, []);
+
   const SAVED_PRODUCTS_KEY = 'kis.market.saved_products.v1';
   const [savedProductIds, setSavedProductIds] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -565,7 +572,74 @@ export default function MarketStudioSection({
   );
 
   const handleGoLiveDrop = () => {
-    Alert.alert('Coming soon', 'Live drop studio will be available in an upcoming update.');
+    if (activeMarketTab !== 'drops') {
+      setActiveMarketTab('drops');
+    }
+    const shopName = activeShop?.name ?? 'your shop';
+    Alert.alert(
+      'Start live drop',
+      `Launch a live drop for ${shopName}? Viewers can purchase products in real time.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start now',
+          onPress: async () => {
+            const shopId = activeShop?.id;
+            if (!shopId) {
+              Alert.alert('Live drop', 'Create a shop first before going live.');
+              return;
+            }
+            const res = await postRequest(
+              ROUTES.commerce.shopLiveDrops ? ROUTES.commerce.shopLiveDrops(String(shopId)) : ROUTES.commerce.products,
+              { shop: shopId, is_live: true },
+              { errorMessage: 'Unable to start live drop.' },
+            );
+            if (res?.success || res?.id) {
+              Alert.alert('Live!', 'Your live drop has started. Viewers can now purchase from your shop.');
+            } else {
+              Alert.alert('Live drop', res?.message ?? 'Unable to start. Check your shop is verified and has active products.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleScheduleDrop = (productId?: string) => {
+    const options = [
+      { label: 'In 1 hour', ms: 60 * 60 * 1000 },
+      { label: 'In 24 hours', ms: 24 * 60 * 60 * 1000 },
+      { label: 'In 3 days', ms: 3 * 24 * 60 * 60 * 1000 },
+      { label: 'In 7 days', ms: 7 * 24 * 60 * 60 * 1000 },
+    ];
+    Alert.alert(
+      'Schedule drop',
+      'When should this drop go live?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...options.map(opt => ({
+          text: opt.label,
+          onPress: async () => {
+            const scheduledAt = new Date(Date.now() + opt.ms).toISOString();
+            const shopId = activeShop?.id;
+            if (!shopId && !productId) {
+              Alert.alert('Schedule', 'Select a shop or product first.');
+              return;
+            }
+            const res = await postRequest(
+              ROUTES.commerce.products,
+              { shop: shopId, scheduled_drop_at: scheduledAt, ...(productId ? { product: productId } : {}) },
+              { errorMessage: 'Unable to schedule drop.' },
+            );
+            if (res?.success || res?.id) {
+              Alert.alert('Scheduled', `Drop scheduled for ${opt.label.toLowerCase()}.`);
+            } else {
+              Alert.alert('Schedule', res?.message ?? 'Unable to schedule. Ensure your shop is active and verified.');
+            }
+          },
+        })),
+      ],
+    );
   };
 
   if (!canUseMarket) {
@@ -814,7 +888,7 @@ export default function MarketStudioSection({
         </Pressable>
 
         <Pressable
-          onPress={() => Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')}
+          onPress={() => handleScheduleDrop()}
           style={{
             borderWidth: 2,
             borderColor: palette.divider,
@@ -1074,7 +1148,7 @@ export default function MarketStudioSection({
 
               <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                 <KISButton title="Broadcast" size="sm" onPress={() => handleBroadcastProduct(product.id)} />
-                <KISButton title="Schedule" size="sm" variant="secondary" onPress={() => Alert.alert('Coming soon', 'Drop scheduling will be available in an upcoming update.')} />
+                <KISButton title="Schedule" size="sm" variant="secondary" onPress={() => handleScheduleDrop(String(product.id))} />
                 <KISButton
                   title={savedProductIds[product.id] ? 'Pinned ✓' : 'Pin'}
                   size="sm"
@@ -1154,14 +1228,37 @@ export default function MarketStudioSection({
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
         <Pressable
-          onPress={() => Alert.alert('Coming soon', 'Lesson creation will be available in an upcoming update.')}
+          onPress={async () => {
+            const shopId = activeShop?.id;
+            if (!shopId) {
+              Alert.alert('Create lesson', 'You need an active shop before creating a lesson drop.');
+              return;
+            }
+            const res = await postRequest(
+              ROUTES.broadcasts.lessons,
+              { shop: shopId, title: 'New lesson', status: 'draft' },
+              { errorMessage: 'Unable to create lesson.' },
+            );
+            if (res?.id) {
+              Alert.alert('Lesson created', 'Draft lesson created. Edit the title and content in the broadcasts section.');
+            } else {
+              Alert.alert('Create lesson', res?.message ?? 'Unable to create lesson. Check your shop is active.');
+            }
+          }}
           style={{ borderWidth: 2, borderColor: palette.primary, backgroundColor: palette.primarySoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Create Lesson</Text>
         </Pressable>
 
         <Pressable
-          onPress={() => Alert.alert('Coming soon', 'Product kit bundling will be available in an upcoming update.')}
+          onPress={() => {
+            if (productsForActiveShop.length === 0) {
+              Alert.alert('Attach kit', 'Add products to your shop first, then bundle them into a kit here.');
+              return;
+            }
+            setActiveMarketTab('products');
+            Alert.alert('Kit bundling', 'Select products from your list and use "Broadcast" to feature them together as a kit drop.');
+          }}
           style={{ borderWidth: 2, borderColor: palette.divider, backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
         >
           <Text style={{ color: palette.text, fontWeight: '900' }}>Attach Kit</Text>

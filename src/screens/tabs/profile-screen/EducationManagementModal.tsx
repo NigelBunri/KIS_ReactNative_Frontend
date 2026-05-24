@@ -1400,7 +1400,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       setDetailRecordId(getDetailTargetId(moduleKey, item) || null);
       setActiveModuleKey(moduleKey);
       setScreen('detail');
-      console.log('Loading detail from route:', route);
+      if (__DEV__) console.log('Loading detail from route:', route);
       try {
         const response = await getRequest(route, {
           forceNetwork: true,
@@ -2984,7 +2984,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         ? steps
         : [{ key: 'dashboard', label: 'Dashboard' }];
       const activeIndex = safeSteps.length - 1;
-      console.log('renderStickyInstitutionHeader', { title, subtitle, steps });
+      if (__DEV__) console.log('renderStickyInstitutionHeader', { title, subtitle, steps });
       return (
         <View
           style={{
@@ -8817,7 +8817,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   }
 
   if (screen === 'detail') {
-    console.log('rendering detail screen with payload', { detailPayload });
+    if (__DEV__) console.log('rendering detail screen with payload', { detailPayload });
     const detailTitle =
       detailPayload?.program?.title ??
       detailPayload?.course?.title ??
@@ -8831,7 +8831,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       detailPayload?.booking?.id ??
       detailPayload?.membership?.display_name ??
       'Details';
-    console.log("detailTitle and so on", detailPayload?.program?.title)
+    if (__DEV__) console.log("detailTitle and so on", detailPayload?.program?.title)
     const detailMetrics = detailPayload?.metrics ?? {};
     const renderDetailContent = () => {
       if (detailPayload?.program) return renderProgramDetail(detailMetrics);

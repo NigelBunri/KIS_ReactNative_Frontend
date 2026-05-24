@@ -762,7 +762,7 @@ useEffect(() => {
         payload?.sender?.phone ??
         'Direct chat';
 
-      console.log('[MessagesScreen] realtime conversation upsert', {
+      if (__DEV__) console.log('[MessagesScreen] realtime conversation upsert', {
         conversationId: convId,
         senderId,
         isFromMe,

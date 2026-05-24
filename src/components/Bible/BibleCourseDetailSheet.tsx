@@ -1268,7 +1268,7 @@ export default function BibleCourseDetailSheet({
                     style={styles.pdfViewer}
                     onError={(err) => {
                       Alert.alert('Certificate', 'Unable to render certificate preview.');
-                      console.log('certificate pdf error', err);
+                      if (__DEV__) console.log('certificate pdf error', err);
                     }}
                   />
                 ) : (

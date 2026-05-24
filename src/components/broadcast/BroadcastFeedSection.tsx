@@ -369,7 +369,7 @@ export default function BroadcastFeedSection({
     async (itemId: string) => {
       const cached = broadcastConversationIdsRef.current[itemId];
       if (cached?.startsWith?.('broadcast:')) {
-        console.log('[BroadcastFeedSection] reusing broadcast conversation', {
+        if (__DEV__) console.log('[BroadcastFeedSection] reusing broadcast conversation', {
           itemId,
           cached,
         });
@@ -377,7 +377,7 @@ export default function BroadcastFeedSection({
       }
       try {
         const url = ROUTES.broadcasts.commentRoom(itemId);
-        console.log(
+        if (__DEV__) console.log(
           '[BroadcastFeedSection] requesting broadcast conversation',
           {
             itemId,
@@ -395,7 +395,7 @@ export default function BroadcastFeedSection({
           res?.data?.conversationId ??
           res?.data?.id ??
           null;
-        console.log('[BroadcastFeedSection] received conversation id', {
+        if (__DEV__) console.log('[BroadcastFeedSection] received conversation id', {
           itemId,
           resolved,
         });
@@ -1261,9 +1261,7 @@ export default function BroadcastFeedSection({
             onVideoPress={() =>
               hasVideoAttachment(item) && openVideoModal(item)
             }
-            onOpenMarket={() =>
-              Alert.alert('Coming soon', 'Storefront browsing will be available in an upcoming update.')
-            }
+            onOpenMarket={() => setMainSection('market')}
             onMenuPress={() => openActionMenu(item)}
             onSave={() => toggleSaved(item)}
             onJoinLesson={() => handleJoinLesson(item)}
@@ -1339,9 +1337,10 @@ export default function BroadcastFeedSection({
             </Text>
           </Pressable>
           <Pressable
-            onPress={() =>
-              Alert.alert('Coming soon', 'Lesson creation will be available in an upcoming update.')
-            }
+            onPress={() => {
+              setMainSection('market');
+              DeviceEventEmitter.emit('market.studio.tab', 'lessons');
+            }}
             style={[
               styles.heroBtn,
               {
@@ -1426,8 +1425,23 @@ export default function BroadcastFeedSection({
           {
             key: 'follow',
             label: 'Follow broadcaster',
-            onPress: () =>
-              Alert.alert('Coming soon', 'Broadcaster follow will be available in an upcoming update.'),
+            onPress: async () => {
+              const source = menuItem.source;
+              if (!source?.id) {
+                Alert.alert('Follow', 'Cannot identify broadcaster.');
+                return;
+              }
+              const res = await postRequest(
+                ROUTES.commerce.follows,
+                { followed_id: String(source.id), followed_type: source.type ?? 'user' },
+                { errorMessage: 'Unable to follow broadcaster.' },
+              );
+              if (res?.success) {
+                Alert.alert('Following', `You are now following ${source.name ?? 'this broadcaster'}.`);
+              } else {
+                Alert.alert('Follow', res?.message || 'Unable to follow. Please try again.');
+              }
+            },
           },
           {
             key: 'pin',
@@ -1440,14 +1454,71 @@ export default function BroadcastFeedSection({
           {
             key: 'schedule',
             label: 'Schedule reminder',
-            onPress: () =>
-              Alert.alert('Coming soon', 'Reminder scheduling will be available in an upcoming update.'),
+            onPress: () => {
+              const source = menuItem.source;
+              const channelId = source?.type === 'channel' ? String(source.id ?? '') : '';
+              const label = source?.name ?? 'this broadcast';
+              Alert.alert(
+                'Schedule reminder',
+                `Get notified about ${label}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Notify on live',
+                    onPress: async () => {
+                      if (channelId) {
+                        await postRequest(
+                          ROUTES.broadcasts.channelNotificationPreference(channelId),
+                          { notify_on_live: true, notify_on_content: false },
+                        );
+                      }
+                      Alert.alert('Reminder set', 'You will be notified when this broadcaster goes live.');
+                    },
+                  },
+                  {
+                    text: 'All new content',
+                    onPress: async () => {
+                      if (channelId) {
+                        await postRequest(
+                          ROUTES.broadcasts.channelNotificationPreference(channelId),
+                          { notify_on_live: true, notify_on_content: true },
+                        );
+                      }
+                      Alert.alert('Reminder set', 'You will be notified for all new content from this broadcaster.');
+                    },
+                  },
+                ],
+              );
+            },
           },
           {
             key: 'analytics',
             label: 'View insights',
-            onPress: () =>
-              Alert.alert('Coming soon', 'Broadcast analytics will be available in an upcoming update.'),
+            onPress: async () => {
+              const source = menuItem.source;
+              if (source?.type !== 'channel' || !source.id) {
+                Alert.alert('Insights', 'Analytics are available for channel broadcasts only.');
+                return;
+              }
+              const res = await getRequest(
+                ROUTES.broadcasts.channelAnalytics(String(source.id)),
+                { errorMessage: 'Unable to load analytics.' },
+              );
+              if (res?.data) {
+                const d = res.data;
+                Alert.alert(
+                  `${source.name ?? 'Channel'} insights`,
+                  [
+                    `Subscribers: ${d.subscriber_count ?? '—'}`,
+                    `Views (30d): ${d.views_30d ?? '—'}`,
+                    `Avg watch time: ${d.avg_watch_time_seconds ? `${Math.round(d.avg_watch_time_seconds / 60)}m` : '—'}`,
+                    `Engagements: ${d.engagement_count ?? '—'}`,
+                  ].join('\n'),
+                );
+              } else {
+                Alert.alert('Insights', 'No analytics available yet for this channel.');
+              }
+            },
           },
         );
 

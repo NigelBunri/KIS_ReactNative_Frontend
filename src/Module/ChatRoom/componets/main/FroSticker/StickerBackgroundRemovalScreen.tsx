@@ -56,7 +56,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
   /* ------------------------------------------------------------- */
 
   const resetJobState = useCallback(() => {
-    console.log('[BGRemoval] resetJobState()');
+    if (__DEV__) console.log('[BGRemoval] resetJobState()');
     setJobId(null);
     setJobStatus('IDLE');
     setErrorMessage(null);
@@ -70,7 +70,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
 
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
-      console.log('[BGRemoval] stopPolling() – clearing interval');
+      if (__DEV__) console.log('[BGRemoval] stopPolling() – clearing interval');
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -107,14 +107,14 @@ export const StickerBackgroundRemovalScreen: React.FC<
       if (!isMountedRef.current) return;
 
       const statusUrl = BG_REMOVAL_STATUS_URL(id);
-      console.log('[BGRemoval] Polling job status for id:', id);
-      console.log('[BGRemoval] Polling job status at:', statusUrl);
+      if (__DEV__) console.log('[BGRemoval] Polling job status for id:', id);
+      if (__DEV__) console.log('[BGRemoval] Polling job status at:', statusUrl);
 
       const result = await getRequest(statusUrl);
 
       if (!isMountedRef.current) return;
 
-      console.log('[BGRemoval] status GET result for id:', id, result);
+      if (__DEV__) console.log('[BGRemoval] status GET result for id:', id, result);
 
       if (!result.success) {
         console.warn(
@@ -136,7 +136,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
       const data = result.data || {};
       const statusFromServer = (data.status as JobStatus) || 'PENDING';
 
-      console.log('[BGRemoval] Job status result:', data);
+      if (__DEV__) console.log('[BGRemoval] Job status result:', data);
       setJobStatus(statusFromServer);
 
       if (statusFromServer === 'DONE') {
@@ -227,7 +227,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
 
   const startPollingLoop = useCallback(
     (id: string) => {
-      console.log('[BGRemoval] startPollingLoop() for id:', id);
+      if (__DEV__) console.log('[BGRemoval] startPollingLoop() for id:', id);
 
       // clear any existing polling
       stopPolling();
@@ -267,7 +267,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
     }
 
     // 🔥 Reset any previous job before starting a new one
-    console.log('[BGRemoval] startBackgroundRemovalJob() – new run');
+    if (__DEV__) console.log('[BGRemoval] startBackgroundRemovalJob() – new run');
     stopPolling();
     resetJobState();
 
@@ -288,7 +288,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
         errorMessage: 'Background removal failed to start.',
       });
 
-      console.log('[BGRemoval] start job result:', result);
+      if (__DEV__) console.log('[BGRemoval] start job result:', result);
 
       if (!result.success) {
         console.warn(
@@ -308,7 +308,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
       const json = result.data || {};
       const returnedJobId: string | undefined = json.job_id;
 
-      console.log('[BGRemoval] Got job_id from backend:', returnedJobId);
+      if (__DEV__) console.log('[BGRemoval] Got job_id from backend:', returnedJobId);
 
       if (!returnedJobId) {
         console.warn('[BGRemoval] Start job API did not return job_id', json);
@@ -355,7 +355,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
 
   const handleCancel = () => {
     // Make sure we stop polling and clear state when user closes
-    console.log('[BGRemoval] handleCancel()');
+    if (__DEV__) console.log('[BGRemoval] handleCancel()');
     stopPolling();
     resetJobState();
     onCancel();

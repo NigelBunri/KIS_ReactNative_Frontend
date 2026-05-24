@@ -2551,7 +2551,7 @@ export default function EducationDetailSheet({
                           'Certificate',
                           'Unable to render certificate preview.',
                         );
-                        console.log(
+                        if (__DEV__) console.log(
                           'education certificate preview error',
                           error,
                         );

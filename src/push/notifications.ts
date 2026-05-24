@@ -52,7 +52,7 @@ export async function initPushHandlers() {
 
     const apps = getApps();
     if (!Array.isArray(apps) || apps.length === 0) {
-      console.log('[push] firebase app not initialized; skipping messaging bootstrap');
+      if (__DEV__) console.log('[push] firebase app not initialized; skipping messaging bootstrap');
       return;
     }
 
@@ -81,16 +81,16 @@ export async function initPushHandlers() {
 
     if (typeof setBackgroundMessageHandler === 'function') {
       setBackgroundMessageHandler(messaging, async (remoteMessage: any) => {
-        console.log('[push] background message', remoteMessage?.messageId ?? remoteMessage);
+        if (__DEV__) console.log('[push] background message', remoteMessage?.messageId ?? remoteMessage);
       });
     }
 
     if (typeof onMessage === 'function') {
       onMessage(messaging, async (remoteMessage: any) => {
-        console.log('[push] foreground message', remoteMessage?.messageId ?? remoteMessage);
+        if (__DEV__) console.log('[push] foreground message', remoteMessage?.messageId ?? remoteMessage);
       });
     }
   } catch (err: any) {
-    console.log('[push] messaging not available:', err?.message);
+    if (__DEV__) console.log('[push] messaging not available:', err?.message);
   }
 }

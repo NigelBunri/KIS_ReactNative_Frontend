@@ -150,7 +150,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
    *  ───────────────────────── */
   const handleSendFilesPress = async () => {
     if (pickInProgressRef.current) {
-      console.log(
+      if (__DEV__) console.log(
         '[AttachmentSheet] File picker already in progress, ignoring tap',
       );
       return;
@@ -206,9 +206,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       openPreview('file', payload);
     } catch (err: any) {
       if (DocumentPicker.isCancel(err)) {
-        console.log('[AttachmentSheet] User cancelled document picker');
+        if (__DEV__) console.log('[AttachmentSheet] User cancelled document picker');
       } else if (DocumentPicker.isInProgress?.(err)) {
-        console.log(
+        if (__DEV__) console.log(
           '[AttachmentSheet] Another picker is already in progress, skipping',
         );
       } else {
@@ -228,7 +228,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
    *  ───────────────────────── */
   const handleAudioPress = async () => {
     if (pickInProgressRef.current) {
-      console.log(
+      if (__DEV__) console.log(
         '[AttachmentSheet] Audio picker already in progress, ignoring tap',
       );
       return;
@@ -263,9 +263,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       openPreview('audio', payload);
     } catch (err: any) {
       if (DocumentPicker.isCancel(err)) {
-        console.log('[AttachmentSheet] User cancelled audio picker');
+        if (__DEV__) console.log('[AttachmentSheet] User cancelled audio picker');
       } else if (DocumentPicker.isInProgress?.(err)) {
-        console.log(
+        if (__DEV__) console.log(
           '[AttachmentSheet] Another picker is already in progress, skipping',
         );
       } else {

@@ -48,7 +48,7 @@ export function InstitutionsListScreen({
   const [loadingFallback, setLoadingFallback] = useState(false);
   const [preferFallbackData, setPreferFallbackData] = useState(false);
 
-  console.log('InstitutionsListScreen render', {
+  if (__DEV__) console.log('InstitutionsListScreen render', {
     institutions: institutions,
     fallbackCount: fallbackInstitutions.length,
     loading,
@@ -74,7 +74,7 @@ export function InstitutionsListScreen({
     loadFallbackInstitutions().catch(() => {});
   }, [institutions.length, loadFallbackInstitutions]);
 
-  console.log('InstitutionsListScreen after data load', {
+  if (__DEV__) console.log('InstitutionsListScreen after data load', {
     institutions: institutions,
     fallback: fallbackInstitutions,
     loading,

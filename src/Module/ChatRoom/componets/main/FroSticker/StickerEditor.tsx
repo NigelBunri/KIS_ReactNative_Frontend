@@ -145,7 +145,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
       }
 
       if (asset.type && !SUPPORTED_BASE_TYPES.includes(asset.type)) {
-        console.log(
+        if (__DEV__) console.log(
           '[StickerEditor] Picked non-JPEG/PNG image type:',
           asset.type,
           '- will still display in preview, but final sticker will be PNG.',

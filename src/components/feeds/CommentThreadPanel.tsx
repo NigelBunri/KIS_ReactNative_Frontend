@@ -114,7 +114,7 @@ export default function CommentThreadPanel({
         if (resolved) {
           setConversationId(resolved);
           onConversationResolved?.(resolved);
-          console.log(`${logPrefix} resolved conversationId`, {
+          if (__DEV__) console.log(`${logPrefix} resolved conversationId`, {
             resolved,
             postId,
           });
@@ -195,7 +195,7 @@ export default function CommentThreadPanel({
         console.warn(`${logPrefix} join failed`, { conversationId, ack });
       } else {
         setStatusMessage(null);
-        console.log(`${logPrefix} joined conversation`, { conversationId, ack });
+        if (__DEV__) console.log(`${logPrefix} joined conversation`, { conversationId, ack });
       }
     });
 
@@ -262,7 +262,7 @@ export default function CommentThreadPanel({
       const connected = isConnected || socket.connected;
       if (!connected) return;
 
-      console.log(`${logPrefix} fetchHistory`, {
+      if (__DEV__) console.log(`${logPrefix} fetchHistory`, {
         conversationId,
         mode: opts.mode,
         before: opts.before,
@@ -350,7 +350,7 @@ export default function CommentThreadPanel({
       replyToId,
     } as any;
 
-    console.log(`${logPrefix} dispatch send`, {
+    if (__DEV__) console.log(`${logPrefix} dispatch send`, {
       socketId: socket.id,
       connected: socket.connected,
       conversationId,
@@ -406,7 +406,7 @@ export default function CommentThreadPanel({
               } as any;
             }),
           );
-          console.log(`${logPrefix} send ack success`, {
+          if (__DEV__) console.log(`${logPrefix} send ack success`, {
             socketId: socket.id,
             conversationId,
             clientId,

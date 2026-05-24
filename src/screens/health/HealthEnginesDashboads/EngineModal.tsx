@@ -28,6 +28,7 @@ import WellnessProgramEngine from "./WellnessProgramManager";
 import NotificationReminderEngine from "./NotificationReminderManager";
 import PharmacyManager from "./PharmacyManager";
 import EHRManager from "./EHRManager";
+import PaymentBillingManager from "./PaymentBillingManager";
 import { KISIcon } from "@/constants/kisIcons";
 import { normalizeEngineKey } from "@/services/healthOpsEngineManagerService";
 
@@ -106,6 +107,9 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
 
     case "Notification & Reminder Engine":
       return <NotificationReminderEngine />;
+
+    case "Payment & Billing Engine":
+      return <PaymentBillingManager institutionId={institutionId} engineKey={engineKey} />;
 
     default:
       return (

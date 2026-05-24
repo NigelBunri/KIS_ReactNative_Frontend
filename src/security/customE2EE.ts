@@ -108,7 +108,7 @@ export async function encryptConversationPayload(
   ]);
   const tag = cipher.getAuthTag();
 
-  console.log(
+  if (__DEV__) console.log(
     '[customE2EE] encrypt',
     conversationId,
     'version',
@@ -160,7 +160,7 @@ export async function decryptConversationPayload(
     decipher.final(),
   ]);
 
-  console.log(
+  if (__DEV__) console.log(
     '[customE2EE] decrypt',
     conversationId,
     'version',

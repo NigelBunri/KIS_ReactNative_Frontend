@@ -14,5 +14,9 @@ module.exports = {
     ],
     // keep this if you use Reanimated
     'react-native-reanimated/plugin',
+    // Strip console.log in production builds; keep warn and error for diagnostics
+    ...(process.env.NODE_ENV === 'production'
+      ? [['transform-remove-console', { exclude: ['warn', 'error'] }]]
+      : []),
   ],
 };

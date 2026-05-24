@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, DeviceEventEmitter, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import { MarketDrop } from '@/screens/broadcast/market/api/market.types';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 
 const fallbackCover = require('@/assets/logo-light.png');
 
@@ -228,6 +230,33 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
   const liveDrops = (home.drops ?? []).filter((d) => d.is_live);
   const scheduled = (home.drops ?? []).filter((d) => !d.is_live);
 
+  const handleStartLiveDrop = useCallback(() => {
+    Alert.alert(
+      'Start a Live Drop',
+      'Launch a limited-time live sale. Viewers can purchase products in real time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start now',
+          onPress: async () => {
+            const res = await postRequest(
+              ROUTES.commerce.products,
+              { is_live: true, is_drop: true },
+              { errorMessage: 'Unable to start live drop.' },
+            );
+            if (res?.success || res?.id) {
+              reloadAll();
+              Alert.alert('Live!', 'Your live drop has started. Share the link with your audience.');
+            } else {
+              DeviceEventEmitter.emit('market.studio.tab', 'drops');
+              Alert.alert('Live drop', res?.message ?? 'Set up your shop and products in Market Studio first, then start a live drop.');
+            }
+          },
+        },
+      ],
+    );
+  }, [reloadAll]);
+
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={{ paddingHorizontal: 12, gap: 20 }}>
@@ -334,7 +363,7 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
 
         {/* Go live CTA */}
         <Pressable
-          onPress={() => Alert.alert('Coming soon', 'Live drop studio will be available in an upcoming update.')}
+          onPress={handleStartLiveDrop}
           style={{
             borderWidth: 1.5,
             borderColor: palette.primary,

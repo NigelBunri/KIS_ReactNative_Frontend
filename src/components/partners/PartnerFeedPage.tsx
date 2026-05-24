@@ -103,8 +103,8 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
         res ??
         []) as PartnerPost[];
       setPosts(Array.isArray(list) ? list : []);
-      console.log('[PartnerFeedPage] loadFeed payload', list);
-      console.log(
+      if (__DEV__) console.log('[PartnerFeedPage] loadFeed payload', list);
+      if (__DEV__) console.log(
         '[PartnerFeedPage] attachments preview',
         (Array.isArray(list) ? list : []).map(post =>
           post?.attachments?.slice?.(0, 1),

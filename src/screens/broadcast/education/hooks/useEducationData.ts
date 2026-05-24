@@ -156,7 +156,7 @@ export default function useEducationData({ q = '', activeProfileId = null }: Par
         setActiveEducationProfile(activeProfile);
       }
     } catch (error: any) {
-      console.log('[useEducationData] load failed', error?.message ?? error);
+      if (__DEV__) console.log('[useEducationData] load failed', error?.message ?? error);
     } finally {
       if (mountedRef.current) {
         setLoading(false);

@@ -101,7 +101,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
 
-  console.log('ChatInfoPage rendered for chat:', chat);
+  if (__DEV__) console.log('ChatInfoPage rendered for chat:', chat);
 
   const participants = useMemo(() => {
     if (!Array.isArray(chat.participants)) return [];

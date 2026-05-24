@@ -944,12 +944,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       webRTCService.closeAll();
       audioRouteManager.stop();
       if (socketRef.current) {
-        socketRef.current.off('channel.live.started',      onChannelLiveStarted);
-        socketRef.current.off('channel.live.ended',        onChannelLiveEnded);
-        socketRef.current.off('channel.viewer.count',      onChannelViewerCount);
-        socketRef.current.off('channel.chat.message',      onChannelChatMessage);
-        socketRef.current.off('channel.content.published', onChannelContentPublished);
-        socketRef.current.off('channel.subscribed',        onChannelSubscribed);
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;

@@ -139,7 +139,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
   }, []);
 
   const handleClose = () => {
-    console.log('[AttachmentPreviewPage] handleClose');
+    if (__DEV__) console.log('[AttachmentPreviewPage] handleClose');
     setCaptionText('');
     setLocalItems([]);
     setPlayingId(null);
@@ -155,7 +155,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
   };
 
   const handleSendPress = async () => {
-    console.log('[AttachmentPreviewPage] handleSendPress', {
+    if (__DEV__) console.log('[AttachmentPreviewPage] handleSendPress', {
       captionText,
       kind,
       itemsLength: localItems.length,
@@ -251,7 +251,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
 
   if (!kind || !localItems.length) {
     if (visible) {
-      console.log(
+      if (__DEV__) console.log(
         '[AttachmentPreviewPage] returning null (no kind/items)',
         {
           kind,
@@ -277,7 +277,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
           paddingHorizontal: modalPadding,
         }}
         onPress={() => {
-          console.log(
+          if (__DEV__) console.log(
             '[AttachmentPreviewPage] backdrop pressed -> close',
           );
           handleClose();
@@ -285,7 +285,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
       >
         <Pressable
           onPress={(e) => {
-            console.log(
+            if (__DEV__) console.log(
               '[AttachmentPreviewPage] inner card pressed (stop propagation)',
             );
             e.stopPropagation();
@@ -620,7 +620,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
           <TextInput
             value={captionText}
             onChangeText={(txt) => {
-              console.log(
+              if (__DEV__) console.log(
                 '[AttachmentPreviewPage] captionText changed',
                 txt,
               );
@@ -652,7 +652,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
           >
             <Pressable
               onPress={() => {
-                console.log(
+                if (__DEV__) console.log(
                   '[AttachmentPreviewPage] Cancel button pressed',
                 );
                 handleClose();
@@ -677,7 +677,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
 
             <Pressable
               onPress={() => {
-                console.log(
+                if (__DEV__) console.log(
                   '[AttachmentPreviewPage] Send button pressed',
                   { captionText },
                 );

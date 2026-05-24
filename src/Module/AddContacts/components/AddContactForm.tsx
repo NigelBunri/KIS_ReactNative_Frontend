@@ -82,7 +82,7 @@ const checkContactRegistration = async (
     const url = `${ROUTES.auth.checkContact}?phone=${encodeURIComponent(fullPhone)}`;
 
     const res = await getRequest(url);
-    console.log('checkContactRegistration: response =', res);
+    if (__DEV__) console.log('checkContactRegistration: response =', res);
 
     // getRequest returns { success, data, message, status? }
     if (!res.success) {
@@ -95,7 +95,7 @@ const checkContactRegistration = async (
     }
 
     const data = res.data as any;
-    console.log('checkContactRegistration: data =', data);
+    if (__DEV__) console.log('checkContactRegistration: data =', data);
 
     // Backend expected response:
     // { registered: boolean, userId?: number, chatId?: string | null }
