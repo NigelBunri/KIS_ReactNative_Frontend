@@ -86,18 +86,18 @@ const getPrimaryActionLabel = (
   progress?: EducationProgress | null,
 ) => {
   if (hasLearningAccessForItem(item, progress)) {
-    return progress ? 'Resume' : 'Open';
+    return progress ? 'Continue' : 'Start';
   }
   const enrollmentStatus = getEnrollmentStatus(item);
-  if (enrollmentStatus === 'waitlisted') return 'Waitlisted';
-  if (enrollmentStatus === 'pending') return 'Pending';
+  if (enrollmentStatus === 'waitlisted') return 'On the list';
+  if (enrollmentStatus === 'pending') return 'Waiting...';
   const bookingStatus = getBookingStatus(item);
-  if (bookingStatus === 'awaiting_satisfaction') return 'In review';
-  if (bookingStatus === 'confirmed') return 'Booked';
+  if (bookingStatus === 'awaiting_satisfaction') return 'Confirming';
+  if (bookingStatus === 'confirmed') return 'Reserved';
   if (bookingStatus === 'payment_pending' || bookingStatus === 'pending')
-    return 'Continue';
+    return 'Complete booking';
   const pricing = 'price' in item ? item.price : undefined;
-  return pricing?.isFree ? 'Enroll' : 'Book';
+  return pricing?.isFree ? 'Join free' : 'Book a spot';
 };
 
 const getStatusLabel = (
@@ -663,10 +663,10 @@ export default function EducationV2DiscoverPage({
               {item.summary}
             </Text>
           ) : null}
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <View style={{ marginTop: 12 }}>
             <KISButton
               title={getPrimaryActionLabel(item, progress)}
-              size="xs"
+              size="sm"
               onPress={() => {
                 if (hasLearningAccessForItem(item, progress)) {
                   void openDetails(item);
@@ -674,12 +674,6 @@ export default function EducationV2DiscoverPage({
                 }
                 enrollCourse(item);
               }}
-            />
-            <KISButton
-              title="Details"
-              size="xs"
-              variant="outline"
-              onPress={() => openDetails(item)}
             />
           </View>
         </View>
@@ -1238,19 +1232,7 @@ export default function EducationV2DiscoverPage({
                 Number(heroPricing?.amountCents || 0) / 100
               }`}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-          <KISButton
-            title="Preview"
-            size="sm"
-            variant="outline"
-            onPress={() => previewCourse(heroContent)}
-          />
-          <KISButton
-            title="Details"
-            size="sm"
-            variant="secondary"
-            onPress={() => openDetails(heroContent)}
-          />
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
           <KISButton
             title={heroPrimaryLabel}
             size="sm"
@@ -1261,6 +1243,12 @@ export default function EducationV2DiscoverPage({
               }
               enrollCourse(heroContent);
             }}
+          />
+          <KISButton
+            title="See details"
+            size="sm"
+            variant="outline"
+            onPress={() => openDetails(heroContent)}
           />
         </View>
       </View>
@@ -1295,9 +1283,10 @@ export default function EducationV2DiscoverPage({
                 items: section.items,
               })
             }
+            style={{ paddingVertical: 6, paddingLeft: 12 }}
           >
-            <Text style={{ color: palette.primaryStrong, fontSize: 12 }}>
-              See all
+            <Text style={{ color: palette.primaryStrong, fontSize: 13, fontWeight: '700' }}>
+              See all →
             </Text>
           </Pressable>
         </View>

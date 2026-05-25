@@ -5,7 +5,6 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
-import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import type {
   EducationContentItem,
   EducationPricing,
@@ -81,7 +80,7 @@ export default function EducationEnrollmentSheet({
           </View>
           <ScrollView>
             <Text style={{ color: palette.subtext, marginBottom: 4 }}>
-              Enroll now
+              Ready to join?
             </Text>
             <Text
               style={{ color: palette.text, fontWeight: '800', fontSize: 20 }}
@@ -104,47 +103,19 @@ export default function EducationEnrollmentSheet({
             <Text style={{ marginTop: 12, color: palette.subtext }}>
               {content.summary}
             </Text>
-            <View
-              style={{
-                marginTop: 14,
-                borderRadius: 16,
-                padding: 12,
-                backgroundColor: palette.card,
-                borderWidth: 1,
-                borderColor: palette.divider,
-              }}
-            >
-              <Text style={{ color: palette.text, fontWeight: '700' }}>
-                Payment flow
-              </Text>
-              <Text
-                style={{ color: palette.subtext, marginTop: 6, lineHeight: 19 }}
-              >
-                Education payments use USD direct provider checkout. Access is
-                confirmed after the provider payment status is verified.
-              </Text>
-            </View>
-            <View style={{ marginTop: 14 }}>
-              <EducationRevenuePreviewCard
-                palette={palette}
-                kind="learner_checkout"
-                title="Paid learning preview"
-                subtitle="Course commissions, certificate processing, and instructor payouts are not live. This sheet only prepares clear USD payment expectations."
-              />
-            </View>
             <View style={{ marginTop: 18, flexDirection: compactSheet ? 'column' : 'row', gap: 12 }}>
               {pricing?.isFree ? (
                 <KISButton
-                  title="Free enroll"
+                  title="Join for free"
                   onPress={() => onFreeEnroll(content)}
                 />
               ) : (
                 <KISButton
-                  title="Checkout"
+                  title="Book my spot"
                   onPress={() => onCheckout(content)}
                 />
               )}
-              <KISButton title="Close" variant="secondary" onPress={onClose} />
+              <KISButton title="Not now" variant="secondary" onPress={onClose} />
             </View>
             {paymentState === 'processing' ? (
               <Text style={{ color: palette.primary, marginTop: 14 }}>

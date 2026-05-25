@@ -693,29 +693,31 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   settingsPanelBody: {
-    padding: 16,
-    paddingBottom: 44,
+    padding: 10,
+    paddingBottom: 28,
+    gap: 8,
   },
   settingsFeatureRow: {
     borderRadius: 10,
     borderWidth: 2,
-    padding: 14,
-    marginBottom: 10,
+    padding: 10,
+    marginBottom: 0,
   },
   settingsFeatureTitle: {
     fontSize: 13,
     fontWeight: '700',
+    marginBottom: 2,
   },
   settingsFeatureDescription: {
     fontSize: 12,
-    lineHeight: 17,
-    marginTop: 5,
+    lineHeight: 16,
+    marginTop: 2,
     flexShrink: 1,
   },
   settingsFeatureMeta: {
     fontSize: 10,
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 4,
   },
   settingsTextInput: {
     borderWidth: 2,

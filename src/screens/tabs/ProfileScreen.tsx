@@ -2477,23 +2477,19 @@ export default function ProfileScreen() {
                 ) : null}
               </View>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap }}>
-                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
-                  <WalletSummaryCard
-                    balanceLabel={kisWalletLabel}
-                    tierLabel={`${
-                      tierLabel || accountTier?.name || 'Free'
-                    } • ${points} pts`}
-                    actions={walletDashboardActions}
-                    onViewAll={() => c.openSheet('wallet')}
-                  />
-                </View>
-                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
-                  <QuickActionGrid
-                    title="Quick actions"
-                    items={quickActionItems}
-                  />
-                </View>
+              <View style={{ gap: responsive.cardGap }}>
+                <WalletSummaryCard
+                  balanceLabel={kisWalletLabel}
+                  tierLabel={`${
+                    tierLabel || accountTier?.name || 'Free'
+                  } • ${points} pts`}
+                  actions={walletDashboardActions}
+                  onViewAll={() => c.openSheet('wallet')}
+                />
+                <QuickActionGrid
+                  title="Quick actions"
+                  items={quickActionItems}
+                />
               </View>
 
               <RecentActivityTimeline

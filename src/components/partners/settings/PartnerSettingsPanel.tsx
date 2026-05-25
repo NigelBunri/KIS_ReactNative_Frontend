@@ -126,107 +126,110 @@ export default function PartnerSettingsPanel({
           contentContainerStyle={styles.settingsPanelBody}
           showsVerticalScrollIndicator={false}
         >
-          {section.features.map((feature) => {
-            const allowed = feature.allowed ?? canAccessFeature(role, feature);
-            const enabled = feature.enabled ?? true;
-            const statusLabel = !allowed
-              ? 'LOCKED'
-              : enabled
-                ? 'ENABLED'
-                : 'DISABLED';
-            const statusColor = !allowed
-              ? palette.danger
-              : enabled
-                ? palette.success
-                : palette.warning;
-            return (
-              <Pressable
-                key={feature.key}
-                onPress={() => {
-                  if (!allowed) {
-                    Alert.alert(
-                      'Access restricted',
-                      'This feature is limited to higher roles.',
-                    );
-                    return;
-                  }
-                  if (feature.key === 'recruitment_pipeline') {
-                    onOpenRecruitment?.();
-                    return;
-                  }
-                  if (feature.key === 'audit_log') {
-                    onOpenAudit?.();
-                    return;
-                  }
-                  if (feature.key === 'org_profile') {
-                    onOpenOrgProfile?.();
-                    return;
-                  }
-                  if (['access_requests', 'approval_flows'].includes(feature.key)) {
-                    onOpenGovernance?.();
-                    return;
-                  }
-                  if (['org_policies', 'security_center', 'compliance_center'].includes(feature.key)) {
-                    onOpenPolicy?.();
-                    return;
-                  }
-                  if (feature.key === 'org_integrations') {
-                    onOpenIntegrations?.();
-                    return;
-                  }
-                  if (feature.key === 'automation_rules') {
-                    onOpenAutomation?.();
-                    return;
-                  }
-                  if (feature.key === 'data_exports') {
-                    onOpenReports?.();
-                    return;
-                  }
-                  if (feature.key === 'complaints') {
-                    onOpenComplaints?.();
-                    return;
-                  }
-                  if (onOpenFeature) {
-                    onOpenFeature({
-                      key: feature.key,
-                      title: feature.title,
-                      description: feature.description,
-                    });
-                    return;
-                  }
-                  Alert.alert('Partner', `${feature.title} settings open here.`);
-                }}
-                style={({ pressed }) => [
-                  styles.settingsFeatureRow,
-                  {
-                    backgroundColor: palette.surface,
-                    borderColor: allowed ? palette.borderMuted : palette.borderDanger,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>
-                  {feature.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.settingsFeatureDescription,
-                    { color: palette.subtext },
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {section.features.map((feature) => {
+              const allowed = feature.allowed ?? canAccessFeature(role, feature);
+              const enabled = feature.enabled ?? true;
+              const statusLabel = !allowed
+                ? 'LOCKED'
+                : enabled
+                  ? 'ENABLED'
+                  : 'DISABLED';
+              const statusColor = !allowed
+                ? palette.danger
+                : enabled
+                  ? palette.success
+                  : palette.warning;
+              return (
+                <Pressable
+                  key={feature.key}
+                  onPress={() => {
+                    if (!allowed) {
+                      Alert.alert(
+                        'Access restricted',
+                        'This feature is limited to higher roles.',
+                      );
+                      return;
+                    }
+                    if (feature.key === 'recruitment_pipeline') {
+                      onOpenRecruitment?.();
+                      return;
+                    }
+                    if (feature.key === 'audit_log') {
+                      onOpenAudit?.();
+                      return;
+                    }
+                    if (feature.key === 'org_profile') {
+                      onOpenOrgProfile?.();
+                      return;
+                    }
+                    if (['access_requests', 'approval_flows'].includes(feature.key)) {
+                      onOpenGovernance?.();
+                      return;
+                    }
+                    if (['org_policies', 'security_center', 'compliance_center'].includes(feature.key)) {
+                      onOpenPolicy?.();
+                      return;
+                    }
+                    if (feature.key === 'org_integrations') {
+                      onOpenIntegrations?.();
+                      return;
+                    }
+                    if (feature.key === 'automation_rules') {
+                      onOpenAutomation?.();
+                      return;
+                    }
+                    if (feature.key === 'data_exports') {
+                      onOpenReports?.();
+                      return;
+                    }
+                    if (feature.key === 'complaints') {
+                      onOpenComplaints?.();
+                      return;
+                    }
+                    if (onOpenFeature) {
+                      onOpenFeature({
+                        key: feature.key,
+                        title: feature.title,
+                        description: feature.description,
+                      });
+                      return;
+                    }
+                    Alert.alert('Partner', `${feature.title} settings open here.`);
+                  }}
+                  style={({ pressed }) => [
+                    styles.settingsFeatureRow,
+                    {
+                      width: '47.5%',
+                      backgroundColor: palette.surface,
+                      borderColor: allowed ? palette.borderMuted : palette.borderDanger,
+                      opacity: pressed ? 0.85 : 1,
+                    },
                   ]}
                 >
-                  {feature.description}
-                </Text>
-                <Text
-                  style={[
-                    styles.settingsFeatureMeta,
-                    { color: statusColor },
-                  ]}
-                >
-                  {statusLabel}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>
+                    {feature.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingsFeatureDescription,
+                      { color: palette.subtext },
+                    ]}
+                  >
+                    {feature.description}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingsFeatureMeta,
+                      { color: statusColor },
+                    ]}
+                  >
+                    {statusLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
       </Animated.View>
     </View>
