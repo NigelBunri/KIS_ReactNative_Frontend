@@ -34,6 +34,7 @@ const billingRoutes = {
   invoices: `${API_BASE_URL}/api/v1/tiers/invoices/`,
   loyalty: `${API_BASE_URL}/api/v1/commerce/loyalty/`,
   loyaltyBalance: `${API_BASE_URL}/api/v1/commerce/loyalty/balance/`,
+  loyaltyRules: `${API_BASE_URL}/api/v1/commerce/loyalty/rules/`,
   promoCodes: `${API_BASE_URL}/api/v1/promo-codes/`,
   promoCode: (id: string) => `${API_BASE_URL}/api/v1/promo-codes/${id}/`,
   directPaymentIntents: `${API_BASE_URL}/api/v1/direct-payments/intents/`,

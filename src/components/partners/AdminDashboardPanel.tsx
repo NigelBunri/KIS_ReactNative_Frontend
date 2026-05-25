@@ -31,6 +31,8 @@ type Props = {
   onOpenVerification: () => void;
   onOpenSystemHealth: () => void;
   onOpenAuditTrail: () => void;
+  onOpenBibleAdmin: () => void;
+  onOpenKISAppAdmin: () => void;
   onRefresh: () => void;
 };
 
@@ -49,6 +51,8 @@ export default function AdminDashboardPanel({
   onOpenVerification,
   onOpenSystemHealth,
   onOpenAuditTrail,
+  onOpenBibleAdmin,
+  onOpenKISAppAdmin,
   onRefresh,
 }: Props) {
   const { palette } = useKISTheme();
@@ -210,6 +214,21 @@ export default function AdminDashboardPanel({
               description="Immutable log of all admin actions across the platform."
               palette={palette}
               onPress={onOpenAuditTrail}
+            />
+            <Text style={[styles.sectionTitle, { color: palette.text, marginTop: 8 }]}>App Management</Text>
+            <AdminNavCard
+              icon="📖"
+              title="Bible App"
+              description="Manage daily passages, meditations, courses, ministers, translations and monetisation."
+              palette={palette}
+              onPress={onOpenBibleAdmin}
+            />
+            <AdminNavCard
+              icon="⚡"
+              title="KIS App"
+              description="Feature flags, broadcast, education, market, messaging, notifications and platform analytics."
+              palette={palette}
+              onPress={onOpenKISAppAdmin}
             />
           </>
         )}

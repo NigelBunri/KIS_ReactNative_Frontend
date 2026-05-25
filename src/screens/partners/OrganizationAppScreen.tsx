@@ -7,11 +7,11 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { createAppShortcut, type ShortcutState } from '@/services/ShortcutService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -180,17 +180,39 @@ export default function OrganizationAppScreen() {
     }
   }, [app.id, dataScope, loadLogs, partnerId]);
 
+  const [shortcutState, setShortcutState] = useState<ShortcutState>('idle');
+
   const handleCreateShortcut = useCallback(async () => {
-    const deepLink = `kis://org-app/${app.id}`;
-    const message = Platform.OS === 'ios'
-      ? `To add "${app.name}" to your Home Screen:\n1. Tap Share in Safari after opening the link\n2. Select "Add to Home Screen"\n\n${deepLink}`
-      : `To pin "${app.name}" to your Home Screen:\n1. Open the link below\n2. Tap the menu → "Add to Home Screen"\n\n${deepLink}`;
-    try {
-      await Share.share({ title: app.name, message });
-    } catch {
-      /* dismissed */
+    if (shortcutState === 'loading') return;
+    setShortcutState('loading');
+    const result = await createAppShortcut({
+      appId: app.id,
+      partnerId: partnerId ?? app.partner_id ?? '',
+      partnerName: app.name,
+      label: app.name,
+      iconUrl: app.icon || undefined,
+      deepLink: `kis://org-app/${app.id}`,
+    });
+    setShortcutState(result.state);
+    if (result.state === 'success') {
+      Alert.alert(
+        'Shortcut created',
+        Platform.OS === 'android'
+          ? `"${app.name}" has been pinned to your home screen.`
+          : `Follow the instructions to add "${app.name}" to your Home Screen.`,
+        [{ text: 'OK', onPress: () => setShortcutState('idle') }],
+      );
+    } else if (result.state === 'already_pinned') {
+      Alert.alert('Already pinned', `"${app.name}" is already on your home screen.`, [
+        { text: 'OK', onPress: () => setShortcutState('idle') },
+      ]);
+    } else if (result.state === 'error') {
+      Alert.alert('Could not create shortcut', result.error || 'Please try again.', [
+        { text: 'Retry', onPress: () => setShortcutState('idle') },
+        { text: 'Cancel', style: 'cancel', onPress: () => setShortcutState('idle') },
+      ]);
     }
-  }, [app.id, app.name]);
+  }, [app.id, app.name, app.icon, partnerId, shortcutState]);
 
   // ── Render helpers ────────────────────────────────────────────────────────
 
@@ -486,8 +508,9 @@ export default function OrganizationAppScreen() {
         ) : null}
         <Pressable
           onPress={handleCreateShortcut}
+          disabled={shortcutState === 'loading'}
           style={({ pressed }) => ({
-            opacity: pressed ? 0.6 : 1,
+            opacity: pressed || shortcutState === 'loading' ? 0.5 : 1,
             paddingHorizontal: 10,
             paddingVertical: 8,
             minHeight: 44,
@@ -496,8 +519,18 @@ export default function OrganizationAppScreen() {
           })}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >
-          <Text style={{ fontSize: 18 }}>📌</Text>
-          <Text style={{ color: brandPrimary, fontSize: 9, fontWeight: '700', marginTop: 1 }}>Shortcut</Text>
+          {shortcutState === 'loading' ? (
+            <ActivityIndicator size="small" color={brandPrimary} />
+          ) : (
+            <>
+              <Text style={{ fontSize: 18 }}>
+                {shortcutState === 'success' ? '✅' : shortcutState === 'already_pinned' ? '📌' : '📌'}
+              </Text>
+              <Text style={{ color: brandPrimary, fontSize: 9, fontWeight: '700', marginTop: 1 }}>
+                {shortcutState === 'success' ? 'Pinned!' : 'Shortcut'}
+              </Text>
+            </>
+          )}
         </Pressable>
       </View>
 

@@ -1,6 +1,6 @@
 // src/screens/tabs/PartnersScreen.tsx
 import React, { useCallback, useEffect } from 'react';
-import { Alert, DeviceEventEmitter, useWindowDimensions } from 'react-native';
+import { Alert, Animated, DeviceEventEmitter, useWindowDimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../App';
 import PartnerLayout from './partners/PartnerLayout';
@@ -48,6 +48,8 @@ import AdminPartnersPanel from '@/components/partners/AdminPartnersPanel';
 import AdminVerificationPanel from '@/components/partners/AdminVerificationPanel';
 import AdminSystemHealthPanel from '@/components/partners/AdminSystemHealthPanel';
 import AdminAuditTrailPanel from '@/components/partners/AdminAuditTrailPanel';
+import AdminBiblePanel from '@/components/partners/AdminBiblePanel';
+import AdminKISAppPanel from '@/components/partners/AdminKISAppPanel';
 import AppBuilderPanel from '@/components/partners/AppBuilderPanel';
 import GeolocationPanel from '@/components/partners/GeolocationPanel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -62,7 +64,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
   const [isSuperuser, setIsSuperuser] = React.useState(false);
-  React.useEffect(() => {
+  const checkSuperuser = React.useCallback(() => {
     AsyncStorage.getItem(PROFILE_CACHE_KEY)
       .then(raw => {
         if (!raw) return;
@@ -74,6 +76,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       })
       .catch(() => {});
   }, []);
+  React.useEffect(() => { checkSuperuser(); }, [checkSuperuser]);
+  useFocusEffect(checkSuperuser);
   const rootNavigation = navigation.getParent?.() as
     | NativeStackNavigationProp<RootStackParamList>
     | undefined;
@@ -130,7 +134,9 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const isSelectedKCAN =
     selectedPartner?.slug?.toLowerCase() === 'kcan' ||
     selectedPartner?.name?.toLowerCase() === 'kcan' ||
-    selectedPartner?.name?.toLowerCase().includes('kingdom impact');
+    selectedPartner?.name?.toLowerCase().includes('kingdom citizens') ||
+    selectedPartner?.name?.toLowerCase().includes('kingdom impact') ||
+    (isSuperuser && !selectedPartner);
   const superadminRoleOverride =
     isSuperuser && isSelectedKCAN ? ('owner' as const) : undefined;
   const { sections: settingsSections, role: settingsRole } =
@@ -303,6 +309,37 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const adminVerification = useAdminVerificationPanel(width);
   const adminSystemHealth = useAdminSystemHealthPanel(width);
   const adminAuditTrail = useAdminAuditTrailPanel(width);
+
+  // Bible App Admin and KIS App Admin panels (simple open/close with animation)
+  const adminPanelWidth = React.useMemo(
+    () => (width < 600 ? width : Math.min(900, Math.max(600, Math.round(width * 0.85)))),
+    [width],
+  );
+  const [adminBibleOpen, setAdminBibleOpen] = React.useState(false);
+  const adminBibleTranslateX = React.useRef(new Animated.Value(adminPanelWidth)).current;
+  const openAdminBible = React.useCallback(() => {
+    setAdminBibleOpen(true);
+    requestAnimationFrame(() => {
+      adminBibleTranslateX.setValue(adminPanelWidth);
+      Animated.timing(adminBibleTranslateX, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    });
+  }, [adminBibleTranslateX, adminPanelWidth]);
+  const closeAdminBible = React.useCallback(() => {
+    Animated.timing(adminBibleTranslateX, { toValue: adminPanelWidth, duration: 220, useNativeDriver: true }).start(() => setAdminBibleOpen(false));
+  }, [adminBibleTranslateX, adminPanelWidth]);
+
+  const [adminKISAppOpen, setAdminKISAppOpen] = React.useState(false);
+  const adminKISAppTranslateX = React.useRef(new Animated.Value(adminPanelWidth)).current;
+  const openAdminKISApp = React.useCallback(() => {
+    setAdminKISAppOpen(true);
+    requestAnimationFrame(() => {
+      adminKISAppTranslateX.setValue(adminPanelWidth);
+      Animated.timing(adminKISAppTranslateX, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    });
+  }, [adminKISAppTranslateX, adminPanelWidth]);
+  const closeAdminKISApp = React.useCallback(() => {
+    Animated.timing(adminKISAppTranslateX, { toValue: adminPanelWidth, duration: 220, useNativeDriver: true }).start(() => setAdminKISAppOpen(false));
+  }, [adminKISAppTranslateX, adminPanelWidth]);
 
   // ── App Builder (Partner Pro) ─────────────────────────────────────────────
   const appBuilderPanel = useAppBuilderPanel(width);
@@ -652,6 +689,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onOpenVerification={adminVerification.open}
             onOpenSystemHealth={adminSystemHealth.open}
             onOpenAuditTrail={adminAuditTrail.open}
+            onOpenBibleAdmin={openAdminBible}
+            onOpenKISAppAdmin={openAdminKISApp}
             onRefresh={adminDashboard.refresh}
           />
           <AdminUsersPanel
@@ -754,6 +793,18 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onFilterSeverity={(s) => { adminAuditTrail.setSeverityFilter(s); void adminAuditTrail.load({ severity: s, p: 1 }); }}
             onLoadPage={(p) => { adminAuditTrail.setPage(p); void adminAuditTrail.load({ p }); }}
             onClose={adminAuditTrail.close}
+          />
+          <AdminBiblePanel
+            isOpen={adminBibleOpen}
+            panelWidth={adminPanelWidth}
+            panelTranslateX={adminBibleTranslateX}
+            onClose={closeAdminBible}
+          />
+          <AdminKISAppPanel
+            isOpen={adminKISAppOpen}
+            panelWidth={adminPanelWidth}
+            panelTranslateX={adminKISAppTranslateX}
+            onClose={closeAdminKISApp}
           />
         </>
       )}

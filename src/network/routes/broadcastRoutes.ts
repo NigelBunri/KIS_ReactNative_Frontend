@@ -164,6 +164,10 @@ const broadcastRoutes = {
     organizationAppBlock: (id: string, appId: string, tabId: string, blockId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/tabs/${tabId}/blocks/${blockId}/`,
     organizationAppsGlobal: `${API_BASE_URL}/api/v1/partners/organization-apps/global/`,
+    appShortcuts: `${API_BASE_URL}/api/v1/partners/app-shortcuts/`,
+    appShortcutRemove: (id: string) => `${API_BASE_URL}/api/v1/partners/app-shortcuts/${id}/`,
+    appShortcutOpened: (id: string) => `${API_BASE_URL}/api/v1/partners/app-shortcuts/${id}/opened/`,
+    appShortcutsAnalytics: `${API_BASE_URL}/api/v1/partners/app-shortcuts/analytics/`,
     organizationAppPromote: (id: string, appId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/promote/`,
     // Location & Attendance

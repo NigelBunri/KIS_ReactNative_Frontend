@@ -136,7 +136,12 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
               { color: roleTextColor },
             ]}
           >
-            Role: {partner?.member_role || partner?.role || 'Member'}
+            Role: {(() => {
+              const r = partner?.member_role || partner?.role || '';
+              if (!r) return 'Member';
+              const map: Record<string, string> = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', member: 'Member', readonly: 'Read Only' };
+              return map[r.toLowerCase()] ?? r.charAt(0).toUpperCase() + r.slice(1);
+            })()}
           </Text>
         </View>
         <View
