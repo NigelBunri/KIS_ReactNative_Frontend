@@ -494,6 +494,16 @@ export default function OrganizationAppScreen() {
           </View>
         );
       }
+      if (app.type === 'bible') {
+        // Bible-type apps with no custom tabs fall back to the full BibleScreen.
+        // These apps are considered a global shortcut for non-KCAN users or
+        // standalone partner Bible experiences.
+        return (
+          <View style={{ flex: 1 }}>
+            <BibleScreen />
+          </View>
+        );
+      }
       return (
         <View style={styles.centered}>
           <Text style={{ fontSize: 40 }}>🛠️</Text>

@@ -17,6 +17,8 @@ const broadcastRoutes = {
     meditationPosts: `${API_BASE_URL}/api/v1/bible/meditation-posts/`,
     prayers: `${API_BASE_URL}/api/v1/bible/prayers/`,
     prayersPublic: `${API_BASE_URL}/api/v1/bible/prayers/public/`,
+    prayersAdminList: `${API_BASE_URL}/api/v1/bible/prayers/admin-list/`,
+    prayerMarkPrayed: (id: string | number) => `${API_BASE_URL}/api/v1/bible/prayers/${id}/mark-prayed/`,
     prayerMonths: `${API_BASE_URL}/api/v1/bible/prayer-months/`,
     prayerMonthCurrent: `${API_BASE_URL}/api/v1/bible/prayer-months/current/`,
     prayerDays: `${API_BASE_URL}/api/v1/bible/prayer-days/`,

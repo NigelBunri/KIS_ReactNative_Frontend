@@ -15,9 +15,11 @@ import { useKISTheme } from '@/theme/useTheme';
 import useAppBuilder from '@/screens/tabs/partners/hooks/useAppBuilder';
 import type { PartnerOrganizationApp, PartnerOrganizationAppTab, PartnerOrganizationAppContentBlock } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 
+import TabTemplateManager from '@/components/partners/TabTemplateManager';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type BuilderView = 'apps' | 'app_detail' | 'tab_detail';
+type BuilderView = 'apps' | 'app_detail' | 'tab_detail' | 'template_manage';
 
 const LAYOUT_TYPES = ['bottom_tabs', 'top_tabs', 'side_tabs', 'single_page', 'scroll'] as const;
 const TEMPLATES = ['custom', 'bible', 'messaging', 'workspace', 'broadcast', 'profile', 'dashboard', 'partner_geolocation_attendance'] as const;
@@ -240,6 +242,8 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
 
   const renderTabRow = (tab: PartnerOrganizationAppTab) => {
     const blockCount = tab.content_blocks?.length ?? 0;
+    const template = (tab.config as any)?.template ?? 'custom';
+    const isRichTemplate = !['custom', 'profile'].includes(template);
     return (
       <View key={tab.id} style={[styles.tabRow, { borderColor: palette.border }]}>
         <View style={{ flex: 1 }}>
@@ -247,16 +251,29 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
             {tab.icon ? `${tab.icon} ` : ''}{tab.title}
           </Text>
           <Text style={[styles.small, { color: palette.subtext }]}>
-            {((tab.config as any)?.template ?? 'custom')} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
+            {template} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          {isRichTemplate && (
+            <Pressable
+              onPress={() => {
+                setSelectedTab(tab);
+                setView('template_manage');
+              }}
+              style={[styles.manageTabBtn, { backgroundColor: palette.primary + '18', borderColor: palette.primary }]}
+            >
+              <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 11 }}>
+                Configure
+              </Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => openTab(tab)}
             style={[styles.manageTabBtn, { backgroundColor: palette.primary + '18', borderColor: palette.primary + '44' }]}
           >
             <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 11 }}>
-              {blockCount === 0 ? '+ Add content' : 'Manage content'}
+              {blockCount === 0 ? '+ Blocks' : 'Blocks'}
             </Text>
           </Pressable>
           <Pressable
@@ -527,6 +544,14 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
       {view === 'apps' && renderAppsView()}
       {view === 'app_detail' && renderAppDetailView()}
       {view === 'tab_detail' && renderTabDetailView()}
+      {view === 'template_manage' && selectedApp && selectedTab && (
+        <TabTemplateManager
+          tab={selectedTab}
+          appId={selectedApp.id}
+          partnerId={partnerId}
+          onBack={() => { setView('app_detail'); }}
+        />
+      )}
     </Animated.View>
   );
 }
