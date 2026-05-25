@@ -4,8 +4,10 @@ import {
   Alert,
   Image,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -28,6 +30,7 @@ import type {
   PartnerOrganizationAppTab,
 } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import LocationAttendanceTemplate from '@/components/partners/LocationAttendanceTemplate';
+import BibleScreen from '@/screens/tabs/BibleScreen';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -177,6 +180,18 @@ export default function OrganizationAppScreen() {
     }
   }, [app.id, dataScope, loadLogs, partnerId]);
 
+  const handleCreateShortcut = useCallback(async () => {
+    const deepLink = `kis://org-app/${app.id}`;
+    const message = Platform.OS === 'ios'
+      ? `To add "${app.name}" to your Home Screen:\n1. Tap Share in Safari after opening the link\n2. Select "Add to Home Screen"\n\n${deepLink}`
+      : `To pin "${app.name}" to your Home Screen:\n1. Open the link below\n2. Tap the menu → "Add to Home Screen"\n\n${deepLink}`;
+    try {
+      await Share.share({ title: app.name, message });
+    } catch {
+      /* dismissed */
+    }
+  }, [app.id, app.name]);
+
   // ── Render helpers ────────────────────────────────────────────────────────
 
   const renderBlock = (block: PartnerOrganizationAppContentBlock) => {
@@ -239,6 +254,14 @@ export default function OrganizationAppScreen() {
           brandColors={appConfig.brand_colors}
           theme={(appConfig.theme as 'dark' | 'light') ?? 'dark'}
         />
+      );
+    }
+
+    if (template === 'bible') {
+      return (
+        <View style={{ flex: 1, minHeight: 600 }}>
+          <BibleScreen />
+        </View>
       );
     }
 
@@ -373,6 +396,20 @@ export default function OrganizationAppScreen() {
       );
     }
 
+    // Single-tab apps: render content directly without any tab chrome
+    if (tabs.length === 1) {
+      const singleTab = tabs[0];
+      const singleCfg = (singleTab.config ?? {}) as TabConfig;
+      if (singleCfg.template === 'partner_geolocation_attendance' || singleCfg.template === 'bible') {
+        return renderTabContent(singleTab);
+      }
+      return (
+        <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+          {renderTabContent(singleTab)}
+        </ScrollView>
+      );
+    }
+
     switch (layoutType) {
       case 'top_tabs':
         return (
@@ -429,16 +466,17 @@ export default function OrganizationAppScreen() {
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: brandPrimary + '0D' }]}>
         <Pressable
           onPress={() => navigation.goBack()}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.backButton]}
+          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }, styles.backButton]}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 8 }}
         >
-          <KISIcon name="chevron-left" size={20} color={brandPrimary} />
+          <Text style={{ color: brandPrimary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
         </Pressable>
         <View style={styles.headerTitleWrap}>
           <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
             {app.name}
           </Text>
           <Text style={[styles.subtitle, { color: palette.subtext }]}>
-            {TYPE_LABELS[String(app.type ?? '')] ?? 'Organization app'} · {layoutType.replace('_', ' ')}
+            {TYPE_LABELS[String(app.type ?? '')] ?? 'Organization app'}
           </Text>
         </View>
         {app.is_promoted_global ? (
@@ -446,6 +484,21 @@ export default function OrganizationAppScreen() {
             <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>⚡ Global</Text>
           </View>
         ) : null}
+        <Pressable
+          onPress={handleCreateShortcut}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.6 : 1,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            minHeight: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+          })}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={{ fontSize: 18 }}>📌</Text>
+          <Text style={{ color: brandPrimary, fontSize: 9, fontWeight: '700', marginTop: 1 }}>Shortcut</Text>
+        </Pressable>
       </View>
 
       {/* App body */}
@@ -483,8 +536,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
-  backButton: { padding: 6 },
-  headerTitleWrap: { flex: 1, marginLeft: 12 },
+  backButton: { padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  headerTitleWrap: { flex: 1, marginLeft: 8 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   subtitle: { fontSize: 11, fontWeight: '500', marginTop: 1 },
   promotedBadge: {

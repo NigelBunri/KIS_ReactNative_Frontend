@@ -670,25 +670,27 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    left: 0,
     borderLeftWidth: 1,
   },
   settingsPanelHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'flex-start',
+    gap: 4,
   },
   settingsPanelTitle: {
     fontSize: 16,
     fontWeight: '800',
+    flexShrink: 1,
   },
   settingsPanelDescription: {
     fontSize: 12,
-    marginTop: 2,
+    lineHeight: 16,
+    marginTop: 3,
+    flexShrink: 1,
   },
   settingsPanelBody: {
     padding: 16,
@@ -697,8 +699,8 @@ const styles = StyleSheet.create({
   settingsFeatureRow: {
     borderRadius: 10,
     borderWidth: 2,
-    padding: 10,
-    marginBottom: 8,
+    padding: 14,
+    marginBottom: 10,
   },
   settingsFeatureTitle: {
     fontSize: 13,
@@ -706,7 +708,9 @@ const styles = StyleSheet.create({
   },
   settingsFeatureDescription: {
     fontSize: 12,
-    marginTop: 4,
+    lineHeight: 17,
+    marginTop: 5,
+    flexShrink: 1,
   },
   settingsFeatureMeta: {
     fontSize: 10,

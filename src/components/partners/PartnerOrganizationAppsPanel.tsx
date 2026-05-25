@@ -58,20 +58,22 @@ export default function PartnerOrganizationAppsPanel({
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLaunchApp = useCallback(async (app: PartnerOrganizationApp) => {
-    if (!app.link) {
-      Alert.alert('Organization app', 'This app does not provide a link yet.');
-      return;
-    }
     if (onLaunchApp) {
       onLaunchApp(app);
       return;
     }
-    try {
-      await Linking.openURL(app.link);
-    } catch (err: any) {
-      Alert.alert('Open app', err?.message || 'Unable to open this app yet.');
+    // External apps with a link open the URL directly
+    if (app.type === 'external' && app.link) {
+      try {
+        await Linking.openURL(app.link);
+      } catch (err: any) {
+        Alert.alert('Open app', err?.message || 'Unable to open this app.');
+      }
+      return;
     }
-  }, [onLaunchApp]);
+    // All other apps open the in-app OrganizationAppScreen
+    navigation.navigate('OrganizationApp', { app, partnerId: partnerId ?? undefined });
+  }, [navigation, onLaunchApp, partnerId]);
 
   const handleDelete = useCallback(async (app: PartnerOrganizationApp) => {
     if (!partnerId) {
@@ -178,24 +180,17 @@ export default function PartnerOrganizationAppsPanel({
           Visible to:{' '}
           {(app.visible_to && app.visible_to.length ? app.visible_to : DEFAULT_VISIBILITY).join(', ')}
         </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            gap: 8,
-          }}
-        >
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <KISButton
-            title={app.link ? 'Open' : 'Awaiting link'}
+            title="Open"
             size="xs"
-            variant={app.link ? 'primary' : 'outline'}
-            disabled={!app.link}
+            variant="primary"
             onPress={() => handleLaunchApp(app)}
           />
           {canManageApps ? (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <>
               <KISButton
-                title="Edit"
+                title="Edit metadata"
                 size="xs"
                 variant="outline"
                 onPress={() => handleEditApp(app)}
@@ -206,7 +201,7 @@ export default function PartnerOrganizationAppsPanel({
                 variant="outline"
                 onPress={() => handleDelete(app)}
               />
-            </View>
+            </>
           ) : null}
         </View>
       </View>
@@ -251,9 +246,19 @@ export default function PartnerOrganizationAppsPanel({
         >
           <Pressable
             onPress={onClose}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.6 : 1,
+              paddingVertical: 8,
+              paddingRight: 12,
+              paddingLeft: 4,
+              minWidth: 44,
+              minHeight: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+            })}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
+            <Text style={{ color: palette.primary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.settingsPanelTitle, { color: palette.text }]}>

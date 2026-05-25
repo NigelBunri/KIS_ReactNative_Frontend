@@ -238,24 +238,38 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     </View>
   );
 
-  const renderTabRow = (tab: PartnerOrganizationAppTab) => (
-    <Pressable key={tab.id} onPress={() => openTab(tab)} style={[styles.tabRow, { borderColor: palette.border }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.label, { color: palette.text }]}>
-          {tab.icon ? `${tab.icon} ` : ''}{tab.title}
-        </Text>
-        <Text style={[styles.small, { color: palette.subtext }]}>
-          {((tab.config as any)?.template ?? 'custom')} · {tab.content_blocks?.length ?? 0} blocks
-        </Text>
+  const renderTabRow = (tab: PartnerOrganizationAppTab) => {
+    const blockCount = tab.content_blocks?.length ?? 0;
+    return (
+      <View key={tab.id} style={[styles.tabRow, { borderColor: palette.border }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.label, { color: palette.text }]}>
+            {tab.icon ? `${tab.icon} ` : ''}{tab.title}
+          </Text>
+          <Text style={[styles.small, { color: palette.subtext }]}>
+            {((tab.config as any)?.template ?? 'custom')} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <Pressable
+            onPress={() => openTab(tab)}
+            style={[styles.manageTabBtn, { backgroundColor: palette.primary + '18', borderColor: palette.primary + '44' }]}
+          >
+            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 11 }}>
+              {blockCount === 0 ? '+ Add content' : 'Manage content'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleDeleteTab(tab)}
+            style={{ padding: 6 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '700', fontSize: 13 }}>✕</Text>
+          </Pressable>
+        </View>
       </View>
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-        <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 12 }}>Edit →</Text>
-        <Pressable onPress={() => handleDeleteTab(tab)}>
-          <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '700', fontSize: 13 }}>✕</Text>
-        </Pressable>
-      </View>
-    </Pressable>
-  );
+    );
+  };
 
   const renderAppRow = (app: PartnerOrganizationApp) => (
     <Pressable key={app.id} onPress={() => openApp(app)} style={[styles.appRow, { borderColor: palette.border }]}>
@@ -660,6 +674,12 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     padding: 6,
+  },
+  manageTabBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   infoCard: {
     borderWidth: 1,

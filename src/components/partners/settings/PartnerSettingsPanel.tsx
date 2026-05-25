@@ -92,9 +92,19 @@ export default function PartnerSettingsPanel({
         >
           <Pressable
             onPress={onClose}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.6 : 1,
+              paddingVertical: 8,
+              paddingRight: 12,
+              paddingLeft: 4,
+              minWidth: 44,
+              minHeight: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+            })}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
+            <Text style={{ color: palette.primary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.settingsPanelTitle, { color: palette.text }]}>
