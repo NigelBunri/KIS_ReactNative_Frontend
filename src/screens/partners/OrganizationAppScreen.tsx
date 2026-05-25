@@ -18,6 +18,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { KISIcon } from '@/constants/kisIcons';
+import { getThemeById } from '@/constants/appColorThemes';
 import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { resolveBackendAssetUrl } from '@/network';
@@ -31,6 +32,11 @@ import type {
 } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import LocationAttendanceTemplate from '@/components/partners/LocationAttendanceTemplate';
 import BibleScreen from '@/screens/tabs/BibleScreen';
+import MessagesScreen from '@/screens/tabs/MessagesScreen';
+import BroadcastScreen from '@/screens/tabs/BroadcastScreen';
+import ProfileScreen from '@/screens/tabs/ProfileScreen';
+import { ChatRoomPage } from '@/Module/ChatRoom/ChatRoomPage';
+import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,13 +48,14 @@ type LayoutType = 'bottom_tabs' | 'top_tabs' | 'side_tabs' | 'single_page' | 'sc
 type AppConfig = {
   layout_type?: LayoutType;
   brand_colors?: { primary?: string; accent?: string; background?: string };
+  color_theme_id?: string;
   theme?: 'light' | 'dark' | 'system';
   show_tab_labels?: boolean;
   [key: string]: unknown;
 };
 
 type TabConfig = {
-  template?: 'bible' | 'messaging' | 'workspace' | 'broadcast' | 'profile' | 'dashboard' | 'custom' | 'partner_geolocation_attendance';
+  template?: 'bible' | 'messaging' | 'workspace' | 'broadcast' | 'profile' | 'dashboard' | 'partner' | 'custom' | 'partner_geolocation_attendance';
   bg_color?: string;
   [key: string]: unknown;
 };
@@ -69,15 +76,54 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  bible: '📖 Bible-style',
+  bible: '📖 Bible',
   messaging: '💬 Messaging',
   workspace: '🏢 Workspace',
-  broadcast: '📡 Broadcast',
+  broadcast: '📡 Feed',
   profile: '👤 Profile',
+  partner: '🤝 Partner',
   dashboard: '📊 Dashboard',
-  custom: '✏️ Custom blocks',
-  partner_geolocation_attendance: '📍 Location & Attendance',
+  custom: '✏️ Custom',
+  partner_geolocation_attendance: '📍 Attendance',
 };
+
+// Templates that own their own scroll/list layout and must NOT be wrapped in a ScrollView.
+const FULLSCREEN_TEMPLATES = new Set<string>([
+  'messaging', 'workspace', 'broadcast', 'profile', 'partner', 'bible', 'partner_geolocation_attendance',
+]);
+
+// ─── Embedded KIS-engine tab wrappers ────────────────────────────────────────
+// Each template renders the FULL KIS screen, not a simplified version.
+// The partner's brand colors are applied at the OrganizationAppScreen level
+// (header, tab bar). The embedded screen provides complete feature parity.
+
+function EmbeddedMessaging({
+  appName,
+  headerGradient,
+  sheenColor,
+}: {
+  appName?: string;
+  headerGradient?: readonly string[];
+  sheenColor?: string;
+}) {
+  const [activeChat, setActiveChat] = React.useState<Chat | null>(null);
+  if (activeChat) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ChatRoomPage chat={activeChat} onBack={() => setActiveChat(null)} />
+      </View>
+    );
+  }
+  return (
+    <MessagesScreen
+      onOpenChat={(chat) => setActiveChat(chat)}
+      onOpenInfo={() => {}}
+      appName={appName}
+      headerGradient={headerGradient}
+      sheenColor={sheenColor}
+    />
+  );
+}
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
@@ -89,7 +135,11 @@ export default function OrganizationAppScreen() {
 
   const appConfig = (app.config ?? {}) as AppConfig;
   const layoutType: LayoutType = appConfig.layout_type ?? 'bottom_tabs';
-  const brandPrimary = appConfig.brand_colors?.primary ?? palette.primaryStrong;
+  // Use partner-defined brand color, or fall back to royalInk (always dark/legible).
+  // Never default to palette.primaryStrong — it resolves to pale gold in dark mode,
+  // making white text invisible.
+  const colorTheme = getThemeById(appConfig.color_theme_id);
+  const brandPrimary = appConfig.brand_colors?.primary ?? colorTheme.primary;
   const brandBg = appConfig.brand_colors?.background ?? palette.surface;
   const showTabLabels = appConfig.show_tab_labels !== false;
 
@@ -199,7 +249,7 @@ export default function OrganizationAppScreen() {
         'Shortcut created',
         Platform.OS === 'android'
           ? `"${app.name}" has been pinned to your home screen.`
-          : `Follow the instructions to add "${app.name}" to your Home Screen.`,
+          : `Check the instructions — the link has been copied to your clipboard. Open the Shortcuts app and follow the steps to add "${app.name}" to your Home Screen.`,
         [{ text: 'OK', onPress: () => setShortcutState('idle') }],
       );
     } else if (result.state === 'already_pinned') {
@@ -285,6 +335,42 @@ export default function OrganizationAppScreen() {
           <BibleScreen />
         </View>
       );
+    }
+
+    // Full KIS messaging engine — conversation list, filters, floating button,
+    // create groups/channels, all status indicators. Identical to the KIS
+    // Messages tab, rendered inside the partner app's tab frame.
+    if (template === 'messaging') {
+      return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
+    }
+
+    // Workspace: full partner workspace — channels, groups, feed, communities.
+    // Uses the KIS messaging engine scoped to partner conversations.
+    if (template === 'workspace') {
+      return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
+    }
+
+    // Broadcast: full KIS broadcast/feed screen — posts, reactions, comments.
+    if (template === 'broadcast') {
+      return (
+        <View style={{ flex: 1 }}>
+          <BroadcastScreen />
+        </View>
+      );
+    }
+
+    // Profile: full KIS profile screen — bio, stats, settings, account.
+    if (template === 'profile') {
+      return (
+        <View style={{ flex: 1 }}>
+          <ProfileScreen />
+        </View>
+      );
+    }
+
+    // Partner: same as workspace — partner channels and conversations.
+    if (template === 'partner') {
+      return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
     }
 
     return (
@@ -422,8 +508,8 @@ export default function OrganizationAppScreen() {
     if (tabs.length === 1) {
       const singleTab = tabs[0];
       const singleCfg = (singleTab.config ?? {}) as TabConfig;
-      if (singleCfg.template === 'partner_geolocation_attendance' || singleCfg.template === 'bible') {
-        return renderTabContent(singleTab);
+      if (FULLSCREEN_TEMPLATES.has(singleCfg.template ?? '')) {
+        return <View style={{ flex: 1 }}>{renderTabContent(singleTab)}</View>;
       }
       return (
         <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
@@ -432,23 +518,34 @@ export default function OrganizationAppScreen() {
       );
     }
 
+    const activeTemplate = ((activeTab?.config ?? {}) as TabConfig).template ?? '';
+    const activeIsFullscreen = FULLSCREEN_TEMPLATES.has(activeTemplate);
+
     switch (layoutType) {
       case 'top_tabs':
         return (
           <View style={{ flex: 1 }}>
             {renderTabBar('top')}
-            <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
-              {renderTabContent(activeTab)}
-            </ScrollView>
+            {activeIsFullscreen ? (
+              <View style={{ flex: 1 }}>{renderTabContent(activeTab)}</View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+                {renderTabContent(activeTab)}
+              </ScrollView>
+            )}
           </View>
         );
       case 'side_tabs':
         return (
           <View style={{ flex: 1, flexDirection: 'row' }}>
             {renderTabBar('side')}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
-              {renderTabContent(activeTab)}
-            </ScrollView>
+            {activeIsFullscreen ? (
+              <View style={{ flex: 1 }}>{renderTabContent(activeTab)}</View>
+            ) : (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+                {renderTabContent(activeTab)}
+              </ScrollView>
+            )}
           </View>
         );
       case 'scroll':
@@ -462,18 +559,27 @@ export default function OrganizationAppScreen() {
             ))}
           </ScrollView>
         );
-      case 'single_page':
-        return (
+      case 'single_page': {
+        const spTab = tabs[0] ?? null;
+        const spFullscreen = FULLSCREEN_TEMPLATES.has(((spTab?.config ?? {}) as TabConfig).template ?? '');
+        return spFullscreen ? (
+          <View style={{ flex: 1 }}>{renderTabContent(spTab)}</View>
+        ) : (
           <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
-            {renderTabContent(tabs[0] ?? null)}
+            {renderTabContent(spTab)}
           </ScrollView>
         );
+      }
       default: // bottom_tabs
         return (
           <View style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
-              {renderTabContent(activeTab)}
-            </ScrollView>
+            {activeIsFullscreen ? (
+              <View style={{ flex: 1 }}>{renderTabContent(activeTab)}</View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+                {renderTabContent(activeTab)}
+              </ScrollView>
+            )}
             {renderTabBar('bottom')}
           </View>
         );

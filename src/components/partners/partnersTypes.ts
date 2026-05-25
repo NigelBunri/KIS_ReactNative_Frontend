@@ -20,6 +20,12 @@ export type PartnerApi = {
   access_level?: string | null;
   created_at?: string;
   updated_at?: string;
+  verification_summary?: {
+    verified?: boolean;
+    status?: string;
+    level?: string;
+    badges?: { code: string; label: string; public: boolean }[];
+  } | null;
 };
 
 export type PartnerDiscordSummary = {

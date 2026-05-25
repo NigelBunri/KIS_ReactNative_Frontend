@@ -9,6 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import { APP_COLOR_THEMES, DEFAULT_THEME_ID } from '@/constants/appColorThemes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -53,6 +55,7 @@ type OrganizationAppPayload = {
   badge_label: string;
   visible_to?: string[];
   icon?: string;
+  config?: Record<string, unknown>;
 };
 
 const buildPayload = (state: Record<string, string>): OrganizationAppPayload => ({
@@ -90,6 +93,9 @@ const OrganizationAppFormScreen = () => {
   const [iconPreview, setIconPreview] = useState(app?.icon ?? '');
   const [iconUploading, setIconUploading] = useState(false);
   const [iconRemoteUrl, setIconRemoteUrl] = useState(app?.icon ?? '');
+  const [colorThemeId, setColorThemeId] = useState<string>(
+    (app?.config?.color_theme_id as string | undefined) ?? DEFAULT_THEME_ID,
+  );
   const [selectedIcon, setSelectedIcon] = useState<{
     uri: string;
     fileName?: string;
@@ -176,6 +182,7 @@ const OrganizationAppFormScreen = () => {
 
     const payload = buildPayload(formState);
     payload.visible_to = visibleRoles;
+    payload.config = { ...(app?.config ?? {}), color_theme_id: colorThemeId };
     let iconUrl = iconRemoteUrl;
     if (selectedIcon) {
       try {
@@ -219,6 +226,7 @@ const OrganizationAppFormScreen = () => {
     }
   }, [
     app,
+    colorThemeId,
     formState,
     iconPreview,
     iconRemoteUrl,
@@ -367,6 +375,92 @@ const OrganizationAppFormScreen = () => {
               })}
             </View>
           </View>
+        </View>
+
+        {/* ── Color Theme Picker ─────────────────────────────────────── */}
+        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+          <View style={{ gap: 4 }}>
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }}>App colour theme</Text>
+            <Text style={{ color: palette.subtext, fontSize: 11, lineHeight: 16 }}>
+              Pick one of 12 royal themes for your app. KIS Gold is the canonical KIS colour — always available, never modified.
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10, paddingVertical: 4, paddingHorizontal: 2 }}
+          >
+            {APP_COLOR_THEMES.map((theme) => {
+              const selected = colorThemeId === theme.id;
+              return (
+                <Pressable
+                  key={theme.id}
+                  onPress={() => setColorThemeId(theme.id)}
+                  style={({ pressed }) => ({
+                    alignItems: 'center',
+                    gap: 5,
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+                  <LinearGradient
+                    colors={[theme.headerGradient[0], theme.headerGradient[2]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: selected ? 2.5 : 1,
+                      borderColor: selected ? theme.primary : 'rgba(255,255,255,0.18)',
+                    }}
+                  >
+                    {/* Shimmer line at top */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        height: 2,
+                        borderTopLeftRadius: 16,
+                        borderTopRightRadius: 16,
+                        backgroundColor: theme.sheenColor,
+                      }}
+                    />
+                    {selected ? (
+                      <Text style={{ color: theme.primary, fontSize: 22, fontWeight: '900' }}>✓</Text>
+                    ) : theme.id === 'kis' ? (
+                      <Text style={{ fontSize: 18 }}>⭐</Text>
+                    ) : (
+                      <View
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 9,
+                          backgroundColor: theme.primary,
+                          opacity: 0.85,
+                        }}
+                      />
+                    )}
+                  </LinearGradient>
+                  <Text
+                    style={{
+                      color: selected ? theme.primary : palette.subtext,
+                      fontSize: 9,
+                      fontWeight: selected ? '800' : '500',
+                      textAlign: 'center',
+                      maxWidth: 56,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {theme.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         <View style={{ marginTop: 16 }}>

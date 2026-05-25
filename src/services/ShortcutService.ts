@@ -1,4 +1,5 @@
-import { NativeModules, Platform, Alert } from 'react-native';
+import { NativeModules, Platform, Alert, Linking } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
@@ -85,17 +86,48 @@ async function createAndroidShortcut(options: ShortcutOptions): Promise<Shortcut
   }
 }
 
-function createIOSShortcut(options: ShortcutOptions): ShortcutResult {
-  // iOS doesn't expose a public API for programmatic home screen shortcuts.
-  // Best available: clear step-by-step instructions via Alert.
+async function createIOSShortcut(options: ShortcutOptions): Promise<ShortcutResult> {
   const deepLink = options.deepLink || `kis://org-app/${options.appId || options.partnerId}`;
+
+  // Check whether the kis:// scheme is registered on this device.
+  // It only registers at install time — if the app was installed before this
+  // feature was added, iOS won't know about it until the app is reinstalled.
+  let schemeReady = false;
+  try {
+    schemeReady = await Linking.canOpenURL(deepLink);
+  } catch {
+    schemeReady = false;
+  }
+
+  if (!schemeReady) {
+    // Scheme not registered yet — the app must be reinstalled.
+    Alert.alert(
+      'One-time setup required',
+      'To enable home screen shortcuts, the KIS app needs to be reinstalled once so iOS can register the required link.\n\nSteps:\n\n1. Delete KIS from your iPhone\n\n2. Reinstall it from the App Store (or rebuild from Xcode)\n\n3. Come back here and tap "Pin to Home Screen" again — it will work after that.',
+      [{ text: 'OK', style: 'default' }],
+    );
+    return { state: 'error', error: 'URL scheme not registered. App reinstall required.' };
+  }
+
+  // Scheme is registered — proceed with Shortcuts app instructions.
+  Clipboard.setString(deepLink);
+  void registerShortcutOnServer(options, false);
+
   Alert.alert(
     `Add "${options.label}" to Home Screen`,
-    `To add this app to your iOS Home Screen:\n\n1. Open Safari\n2. Go to: ${deepLink}\n3. Tap the Share button (box with arrow)\n4. Scroll down and tap "Add to Home Screen"\n5. Tap "Add"\n\nThe shortcut will open directly inside KIS.`,
-    [{ text: 'Got it', style: 'default' }],
+    `The link has been copied to your clipboard.\n\nSteps:\n\n1. Open the Shortcuts app (search for it — it comes with every iPhone)\n\n2. Tap + (top right) to create a new shortcut\n\n3. Tap "Add Action" → search "Open URLs" → select it\n\n4. Tap the URL field and paste — the link is already copied\n\n5. Tap the share icon at the top → "Add to Home Screen"\n\n6. Name it "${options.label}" → tap Add\n\nThe icon opens directly into this app inside KIS.`,
+    [
+      {
+        text: 'Open Shortcuts',
+        onPress: () =>
+          Linking.openURL('shortcuts://').catch(() =>
+            Alert.alert('Search for "Shortcuts" in your iPhone app library — it is pre-installed.'),
+          ),
+      },
+      { text: 'Done', style: 'default' },
+    ],
   );
-  // Register server-side for analytics even though we can't confirm device install
-  void registerShortcutOnServer(options, false);
+
   return { state: 'success' };
 }
 
@@ -105,6 +137,7 @@ export async function createAppShortcut(options: ShortcutOptions): Promise<Short
   }
   return createIOSShortcut(options);
 }
+
 
 export async function removeShortcutFromServer(shortcutId: string): Promise<void> {
   try {

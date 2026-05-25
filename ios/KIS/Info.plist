@@ -119,6 +119,22 @@
 	</array>
   <key>UIViewControllerBasedStatusBarAppearance</key>
   <false/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.kis.app</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>kis</string>
+      </array>
+    </dict>
+  </array>
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>kis</string>
+    <string>shortcuts</string>
+  </array>
 
 </dict>
 </plist>

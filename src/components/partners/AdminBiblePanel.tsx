@@ -23,13 +23,19 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 
 type BibleSection =
-  | 'overview'
   | 'daily_passages'
   | 'meditations'
+  | 'devotionals'
+  | 'books'
+  | 'reading_plans'
   | 'prayer_calendar'
   | 'courses'
   | 'ministers'
+  | 'push_notifications'
+  | 'community'
+  | 'notes_highlights'
   | 'translations'
+  | 'languages'
   | 'monetisation'
   | 'analytics';
 
@@ -41,14 +47,21 @@ type Props = {
 };
 
 const SECTIONS: { key: BibleSection; label: string; icon: string; description: string }[] = [
-  { key: 'daily_passages', label: 'Daily Passages', icon: '📖', description: 'Manage daily devotional passages and verse of the day' },
-  { key: 'meditations', label: 'Meditations', icon: '🧘', description: 'Audio/text meditation content' },
-  { key: 'prayer_calendar', label: 'Prayer Calendar', icon: '🗓', description: 'Monthly prayer schedules and topics' },
-  { key: 'courses', label: 'Bible Courses', icon: '🎓', description: 'Structured learning paths and lessons' },
+  { key: 'daily_passages', label: 'Daily Passages', icon: '📖', description: 'Verse of the day, daily devotional passages, scheduling' },
+  { key: 'meditations', label: 'Meditations', icon: '🧘', description: 'Audio and text meditation sessions' },
+  { key: 'devotionals', label: 'Devotionals', icon: '✝️', description: 'Short-form spiritual reading series and authors' },
+  { key: 'books', label: 'Books & Publishers', icon: '📚', description: 'Full Bible books, commentaries, study guides, publishers' },
+  { key: 'reading_plans', label: 'Reading Plans', icon: '🗺', description: 'Curated reading plans: chronological, topical, yearly' },
+  { key: 'prayer_calendar', label: 'Prayer Calendar', icon: '🗓', description: 'Monthly prayer schedules and intercession topics' },
+  { key: 'courses', label: 'Bible Courses', icon: '🎓', description: 'Structured learning paths, lessons, and quizzes' },
   { key: 'ministers', label: 'Ministers & Authors', icon: '👤', description: 'Verified minister and author profiles' },
-  { key: 'translations', label: 'Translations', icon: '🌍', description: 'Bible translation registry and availability' },
-  { key: 'monetisation', label: 'Monetisation', icon: '💰', description: 'Paid content, tiers, and revenue settings' },
-  { key: 'analytics', label: 'Analytics', icon: '📊', description: 'Reading stats, engagement, and course completion' },
+  { key: 'push_notifications', label: 'Push Notifications', icon: '🔔', description: 'Daily verse push, scheduled campaigns, delivery stats' },
+  { key: 'community', label: 'Community', icon: '💬', description: 'Passage discussions, comments, prayer requests, moderation' },
+  { key: 'notes_highlights', label: 'Notes & Highlights', icon: '🖊', description: 'User-generated notes, highlights, and bookmarks management' },
+  { key: 'translations', label: 'Bible Translations', icon: '🌍', description: 'Translation registry — KJV, NIV, NLT, local translations' },
+  { key: 'languages', label: 'Languages & L10n', icon: '🗣', description: 'UI localisation, audio language tracks, subtitle settings' },
+  { key: 'monetisation', label: 'Monetisation', icon: '💰', description: 'Paid content, premium tiers, revenue, payout settings' },
+  { key: 'analytics', label: 'Analytics', icon: '📊', description: 'Reading stats, engagement, retention, course completion' },
 ];
 
 export default function AdminBiblePanel({ isOpen, panelWidth, panelTranslateX, onClose }: Props) {
@@ -59,48 +72,47 @@ export default function AdminBiblePanel({ isOpen, panelWidth, panelTranslateX, o
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<Record<string, any> | null>(null);
 
+  const SECTION_URLS: Record<BibleSection, string> = {
+    daily_passages:    '/api/v1/bible/admin/passages/',
+    meditations:       '/api/v1/bible/meditations/',
+    devotionals:       '/api/v1/bible/admin/devotionals/',
+    books:             '/api/v1/bible/admin/books/',
+    reading_plans:     '/api/v1/bible/admin/reading-plans/',
+    prayer_calendar:   '/api/v1/bible/prayer/',
+    courses:           '/api/v1/bible/admin/courses/',
+    ministers:         '/api/v1/bible/admin/ministers/',
+    push_notifications:'/api/v1/bible/admin/push-campaigns/',
+    community:         '/api/v1/bible/admin/community/',
+    notes_highlights:  '/api/v1/bible/admin/notes/',
+    translations:      '/api/v1/bible/translations/',
+    languages:         '/api/v1/bible/admin/languages/',
+    monetisation:      '/api/v1/bible/admin/monetisation/',
+    analytics:         '/api/v1/bible/admin/analytics/',
+  };
+
+  const KPI_SECTIONS: BibleSection[] = ['analytics', 'monetisation'];
+
   const loadSection = useCallback(async (section: BibleSection) => {
     setActiveSection(section);
     setData([]);
+    setAnalytics(null);
     setError(null);
     setLoading(true);
     try {
-      if (section === 'analytics') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminAnalytics || '/api/v1/bible/admin/analytics/'}`);
-        setAnalytics(res?.data ?? res);
-      } else if (section === 'daily_passages') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminPassages || '/api/v1/bible/admin/passages/'}`);
-        const d = res?.data ?? res;
+      const url = (ROUTES as any).bible?.[section] || SECTION_URLS[section];
+      const res: any = await getRequest(url);
+      const d = res?.data ?? res;
+      if (KPI_SECTIONS.includes(section)) {
+        setAnalytics(typeof d === 'object' && !Array.isArray(d) ? d : null);
+      } else {
         setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'courses') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminCourses || '/api/v1/bible/admin/courses/'}`);
-        const d = res?.data ?? res;
-        setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'ministers') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminMinisters || '/api/v1/bible/admin/ministers/'}`);
-        const d = res?.data ?? res;
-        setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'translations') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminTranslations || '/api/v1/bible/translations/'}`);
-        const d = res?.data ?? res;
-        setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'meditations') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminMeditations || '/api/v1/bible/meditations/'}`);
-        const d = res?.data ?? res;
-        setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'prayer_calendar') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminPrayer || '/api/v1/bible/prayer/'}`);
-        const d = res?.data ?? res;
-        setData(Array.isArray(d) ? d : d?.results ?? []);
-      } else if (section === 'monetisation') {
-        const res: any = await getRequest(`${(ROUTES as any).bible?.adminMonetisation || '/api/v1/bible/admin/monetisation/'}`);
-        setAnalytics(res?.data ?? res);
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to load data.');
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isOpen) return null;
@@ -145,7 +157,7 @@ export default function AdminBiblePanel({ isOpen, panelWidth, panelTranslateX, o
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               {activeSection
                 ? (SECTIONS.find(s => s.key === activeSection)?.label ?? '')
-                : 'Full platform Bible management'}
+                : '15 management areas · content, plans, push, community'}
             </Text>
           </View>
         </View>
@@ -244,6 +256,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderLeftWidth: 1,
+    zIndex: 200,
+    elevation: 20,
   },
   header: {
     flexDirection: 'row',

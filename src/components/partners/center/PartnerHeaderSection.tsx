@@ -59,12 +59,32 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
           )}
         </LinearGradient>
         <View style={styles.partnerHeaderIdentity}>
-          <Text
-            style={[styles.partnerName, { color: titleColor }]}
-            numberOfLines={1}
-          >
-            {partner?.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text
+              style={[styles.partnerName, { color: titleColor, flexShrink: 1 }]}
+              numberOfLines={1}
+            >
+              {partner?.name}
+            </Text>
+            {partner?.verification_summary?.verified && (
+              <View style={{
+                backgroundColor: isDark ? 'rgba(217,168,117,0.22)' : '#FFF8EC',
+                borderRadius: 10,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderWidth: 1,
+                borderColor: isDark ? palette.goldSoft : palette.goldDeep,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+              }}>
+                <KISIcon name="checkmark-circle" size={11} color={isDark ? palette.goldSoft : palette.goldDeep} />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: isDark ? palette.goldSoft : palette.goldDeep }}>
+                  Verified
+                </Text>
+              </View>
+            )}
+          </View>
           <Text
             style={[styles.partnerTagline, { color: mutedColor }]}
             numberOfLines={2}

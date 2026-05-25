@@ -356,6 +356,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderLeftWidth: 1,
+    zIndex: 200,
+    elevation: 20,
   },
   header: {
     flexDirection: 'row',

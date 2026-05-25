@@ -1,5 +1,5 @@
 // src/screens/tabs/PartnersCenterPane.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
@@ -23,7 +23,8 @@ import {
   VerificationCenterSheet,
   VerificationStatusCard,
 } from '@/components/verification';
-import { getVerificationSummary } from '@/services/verificationService';
+import { fetchVerificationStatus, getVerificationSummary } from '@/services/verificationService';
+import type { VerificationSummary } from '@/services/verificationService';
 
 type Props = {
   selectedPartner: Partner;
@@ -41,6 +42,8 @@ type Props = {
   onFeedPress: () => void;
   onCommunityFeedPress: (communityId: string) => void;
   onPartnerHeaderPress: () => void;
+  isKcanAdmin?: boolean;
+  onOpenAdminDashboard?: () => void;
 };
 
 export default function PartnersCenterPane({
@@ -59,6 +62,8 @@ export default function PartnersCenterPane({
   onFeedPress,
   onCommunityFeedPress,
   onPartnerHeaderPress,
+  isKcanAdmin,
+  onOpenAdminDashboard,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -73,10 +78,24 @@ export default function PartnersCenterPane({
     communities: false,
   });
   const [verificationVisible, setVerificationVisible] = useState(false);
-  const partnerVerificationSummary = useMemo(
+  const propSummary = useMemo(
     () => getVerificationSummary(selectedPartner),
     [selectedPartner],
   );
+  const [liveSummary, setLiveSummary] = useState<VerificationSummary | null>(null);
+  useEffect(() => { setLiveSummary(null); }, [selectedPartner?.id]);
+  const partnerVerificationSummary = liveSummary ?? propSummary;
+
+  const handleVerificationClose = useCallback(async () => {
+    setVerificationVisible(false);
+    if (!selectedPartner?.id) return;
+    try {
+      const fresh = await fetchVerificationStatus({ type: 'partner', id: selectedPartner.id });
+      if (fresh) setLiveSummary(fresh);
+    } catch {
+      // silently ignore — stale data is fine
+    }
+  }, [selectedPartner?.id]);
   const discordSummary = selectedPartner?.discord_summary ?? null;
   const discordCounts = discordSummary?.counts ?? {};
   const discordReadiness = discordSummary?.readiness ?? {};
@@ -178,13 +197,45 @@ export default function PartnersCenterPane({
           partner={selectedPartner}
           onPress={onPartnerHeaderPress}
         />
-        <VerificationStatusCard
-          palette={palette}
-          summary={partnerVerificationSummary}
-          title="Partner verification"
-          subtitle="Submit company registration, representative authorization, and beneficial-owner references."
-          onOpen={() => setVerificationVisible(true)}
-        />
+        {isKcanAdmin && onOpenAdminDashboard && (
+          <Pressable
+            onPress={onOpenAdminDashboard}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 11,
+              borderRadius: 14,
+              backgroundColor: palette.royalInk,
+              borderWidth: 1,
+              borderColor: palette.goldDeep,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+              shadowColor: '#000',
+              shadowOpacity: 0.22,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 3 },
+              elevation: 4,
+            })}
+          >
+            <Text style={{ fontSize: 16 }}>⚡</Text>
+            <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 13, flex: 1 }}>
+              Admin Hub
+            </Text>
+            <KISIcon name="chevron-right" size={15} color={palette.ivory} />
+          </Pressable>
+        )}
+        {!partnerVerificationSummary?.verified && (
+          <VerificationStatusCard
+            palette={palette}
+            summary={partnerVerificationSummary}
+            title="Partner verification"
+            subtitle="Submit company registration, representative authorization, and beneficial-owner references."
+            onOpen={() => setVerificationVisible(true)}
+          />
+        )}
         <VerificationBadgeRow
           palette={palette}
           summary={partnerVerificationSummary}
@@ -542,7 +593,8 @@ export default function PartnersCenterPane({
         title="Partner verification"
         subtitle="Submit private company evidence references for staff/provider review."
         initialSummary={partnerVerificationSummary}
-        onClose={() => setVerificationVisible(false)}
+        onClose={handleVerificationClose}
+        onSubmitted={handleVerificationClose}
       />
     </Animated.View>
   );

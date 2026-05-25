@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
 import PartnersLeftRail from '@/components/partners/PartnersLeftRail';
@@ -160,28 +160,6 @@ export default function PartnerLayout({
         ]}
       />
 
-      {isKcanAdmin && onOpenAdminDashboard && (
-        <Pressable
-          onPress={onOpenAdminDashboard}
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            zIndex: 50,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            paddingHorizontal: 12,
-            paddingVertical: 7,
-            borderRadius: 20,
-            backgroundColor: palette.primaryStrong ?? palette.primary,
-          }}
-        >
-          <Text style={{ fontSize: 14 }}>⚡</Text>
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>Admin Hub</Text>
-        </Pressable>
-      )}
-
       <PartnersLeftRail
         partners={partners}
         selectedPartnerId={selectedPartnerId}
@@ -205,6 +183,8 @@ export default function PartnerLayout({
         onFeedPress={onFeedPress}
         onCommunityFeedPress={onCommunityFeedPress}
         onPartnerHeaderPress={onPartnerHeaderPress}
+        isKcanAdmin={isKcanAdmin}
+        onOpenAdminDashboard={onOpenAdminDashboard}
       />
 
       {!isMessagesExpanded ? (

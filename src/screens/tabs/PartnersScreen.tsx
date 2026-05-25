@@ -300,7 +300,11 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const complaintsPanel = usePartnerComplaintsPanel(width);
 
   // ── KCAN Admin Panels (superuser / GO only) ──────────────────────────────
-  const isKcanAdmin = isSuperuser && isSelectedKCAN;
+  // isKcanAdmin: true if superuser flag is confirmed OR if the backend already
+  // returned member_role='owner' on KCAN (which only happens for superusers/staff).
+  const isKcanAdmin =
+    isSelectedKCAN &&
+    (isSuperuser || selectedPartner?.member_role === 'owner');
   const adminDashboard = useAdminDashboardPanel(width);
   const adminUsers = useAdminUsersPanel(width);
   const adminContent = useAdminContentPanel(width);

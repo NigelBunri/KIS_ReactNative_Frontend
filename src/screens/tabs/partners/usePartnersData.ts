@@ -38,6 +38,7 @@ const mapPartner = (raw: any): Partner => ({
   member_role: raw.member_role ?? null,
   access_level: raw.access_level ?? null,
   discord_summary: raw.discord_summary ?? raw.discordSummary ?? null,
+  verification_summary: raw.verification_summary ?? null,
 });
 
 export const usePartnersData = (isSuperuser = false) => {

@@ -60,6 +60,9 @@ const Tab = createMaterialTopTabNavigator();
 type MessagesScreenProps = {
   onOpenChat: (chat: Chat) => void;
   onOpenInfo?: (payload: { chat: Chat; currentUserId: string | null }) => void;
+  appName?: string;
+  headerGradient?: readonly string[];
+  sheenColor?: string;
 };
 
 type LocalQuick = QuickChip;
@@ -112,7 +115,7 @@ type GlobalSearchResult = {
  * - Animate the overflow menu (fade + scale) instead of hard-mounting
  * - Avoid repeated setState on layout if height hasn't changed
  */
-export default function MessagesScreen({ onOpenChat, onOpenInfo }: MessagesScreenProps) {
+export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, headerGradient, sheenColor }: MessagesScreenProps) {
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -1631,19 +1634,24 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   } as const;
 
   const messageTopPanelBg = tone === 'dark' ? '#5E3B0A' : '#6B4334';
-  const messageGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334'];
+  const messageGoldGradient: readonly string[] = headerGradient ?? (
+    tone === 'dark'
+      ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+      : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334']
+  );
   return (
     <View style={[styles.wrap, { backgroundColor: tone === 'dark' ? palette.bg : '#FFFFFF' }]}>
       <LinearGradient
-        colors={messageGoldGradient}
+        colors={messageGoldGradient as string[]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.messageGoldPanel}
       >
-        {/* Luxury gold shimmer line at the very top of the panel */}
-        <View style={styles.messageGoldSheen} pointerEvents="none" />
+        {/* Luxury shimmer line at the very top of the panel */}
+        <View
+          style={[styles.messageGoldSheen, sheenColor ? { backgroundColor: sheenColor } : undefined]}
+          pointerEvents="none"
+        />
 
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
@@ -1781,7 +1789,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   borderColor: 'rgba(255,244,184,0.30)',
                 }}
               >
-                <Text style={{ color: palette.ivory, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>K</Text>
+                <Text style={{ color: palette.ivory, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>
+                  {appName ? appName[0].toUpperCase() : 'K'}
+                </Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
@@ -1793,20 +1803,22 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   }}
                   numberOfLines={1}
                 >
-                  KIS
+                  {appName ?? 'KIS'}
                 </Text>
-                <Text
-                  style={{
-                    color: '#FFF4B8',
-                    marginTop: 2,
-                    fontSize: messageHeaderSubtitleSize || 1,
-                    fontWeight: '800',
-                    letterSpacing: 0.2,
-                  }}
-                  numberOfLines={1}
-                >
-                  Kingdom Impact Social
-                </Text>
+                {!appName && (
+                  <Text
+                    style={{
+                      color: '#FFF4B8',
+                      marginTop: 2,
+                      fontSize: messageHeaderSubtitleSize || 1,
+                      fontWeight: '800',
+                      letterSpacing: 0.2,
+                    }}
+                    numberOfLines={1}
+                  >
+                    Kingdom Impact Social
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -2186,7 +2198,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             ]}
           >
             <LinearGradient
-              colors={messageGoldGradient}
+              colors={messageGoldGradient as string[]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
