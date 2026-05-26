@@ -81,7 +81,7 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       alignItems: 'center',
       gap: tokens.spacing.xs,
       borderWidth: 2,
-      borderRadius: tokens.radius.md,
+      borderRadius: tokens.radius.lg,
       paddingHorizontal: tokens.spacing.md,
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
       minWidth: 128,
@@ -423,7 +423,6 @@ export default function RegisterScreen({ navigation }: any) {
             />
 
             {/* Password Requirements */}
-            <View style={{ marginTop: 4 }}>
             <View style={styles.passwordReqList}>
               <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
                 Password must include:
@@ -433,7 +432,7 @@ export default function RegisterScreen({ navigation }: any) {
                 style={[
                   styles.passwordReqItem,
                   {
-                    color: regPassword.length >= 10 ? palette.success : palette.danger,
+                    color: regPassword.length === 0 ? palette.subtext : regPassword.length >= 10 ? palette.success : palette.danger,
                   },
                 ]}
               >
@@ -444,7 +443,7 @@ export default function RegisterScreen({ navigation }: any) {
                 style={[
                   styles.passwordReqItem,
                   {
-                    color: /[A-Z]/.test(regPassword) ? palette.success : palette.danger,
+                    color: regPassword.length === 0 ? palette.subtext : /[A-Z]/.test(regPassword) ? palette.success : palette.danger,
                   },
                 ]}
               >
@@ -455,7 +454,7 @@ export default function RegisterScreen({ navigation }: any) {
                 style={[
                   styles.passwordReqItem,
                   {
-                    color: /[a-z]/.test(regPassword) ? palette.success : palette.danger,
+                    color: regPassword.length === 0 ? palette.subtext : /[a-z]/.test(regPassword) ? palette.success : palette.danger,
                   },
                 ]}
               >
@@ -466,14 +465,13 @@ export default function RegisterScreen({ navigation }: any) {
                 style={[
                   styles.passwordReqItem,
                   {
-                    color: /[0-9]/.test(regPassword) ? palette.success : palette.danger,
+                    color: regPassword.length === 0 ? palette.subtext : /[0-9]/.test(regPassword) ? palette.success : palette.danger,
                   },
                 ]}
               >
                 • One number (0-9)
               </KISText>
             </View>
-          </View>
           </View>
 
           <View style={styles.field}>

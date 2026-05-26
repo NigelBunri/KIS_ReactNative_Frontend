@@ -451,7 +451,7 @@ export default function BroadcastScreen() {
                   { backgroundColor: palette.primaryStrong },
                 ]}
               >
-                <Text style={{ color: palette.surface, fontWeight: '800' }}>
+                <Text style={{ color: palette.surface, fontWeight: '800', fontSize: 11 }}>
                   {totalCartItems}
                 </Text>
               </View>

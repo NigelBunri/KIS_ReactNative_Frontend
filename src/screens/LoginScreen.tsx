@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -289,7 +291,14 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: palette.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.root, { backgroundColor: palette.bg }]}
+        keyboardShouldPersistTaps="handled"
+      >
       <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
         <KISText preset="label" style={[styles.backTxt, { color: palette.text }]}>
           {Platform.OS === 'ios' ? '‹' : '←'} Back
@@ -348,7 +357,7 @@ export default function LoginScreen({ navigation }: any) {
 
       <View style={styles.bottomCallout}>
         <KISText preset="helper" color={palette.subtext} style={styles.centerText}>
-          Don’t have an account?{' '}
+          Don't have an account?{' '}
           <KISText
             preset="helper"
             color={palette.text}
@@ -360,9 +369,7 @@ export default function LoginScreen({ navigation }: any) {
         </KISText>
       </View>
 
-      <KISText preset="helper" color={palette.subtext} style={[styles.centerText, { marginTop: tokens.spacing['2xl'] }]}>
-        2FA enabled
-      </KISText>
+      </ScrollView>
 
       <Modal visible={forgotVisible} transparent animationType="fade" onRequestClose={() => setForgotVisible(false)}>
         <View style={styles.modalBackdrop}>
@@ -418,6 +425,6 @@ export default function LoginScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

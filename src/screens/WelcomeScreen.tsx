@@ -243,7 +243,16 @@ export default function WelcomeScreen() {
 
             <View style={styles.statsRow}>
               {statsData.map((item) => (
-                <View key={item.label} style={styles.statCard}>
+                <View
+                  key={item.label}
+                  style={[
+                    styles.statCard,
+                    {
+                      borderColor: tone === 'dark' ? 'rgba(255,255,255,0.15)' : palette.border,
+                      backgroundColor: tone === 'dark' ? 'rgba(255,255,255,0.08)' : palette.surface,
+                    },
+                  ]}
+                >
                   <KISText preset="helper" color={palette.subtext} style={styles.statLabel}>
                     {item.label}
                   </KISText>
@@ -273,7 +282,10 @@ export default function WelcomeScreen() {
                       ? ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']
                       : ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.2)']
                   }
-                  style={styles.featureCard}
+                  style={[
+                    styles.featureCard,
+                    { borderColor: tone === 'dark' ? 'rgba(255,255,255,0.2)' : palette.border },
+                  ]}
                 >
                   <Ionicons
                     name={item.icon}
@@ -379,9 +391,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginHorizontal: 4,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   statLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValue: { fontSize: 18, fontWeight: '700', marginTop: 4 },
@@ -409,7 +419,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   featureTitle: { fontSize: 16, fontWeight: '700' },
   featureSubtitle: { fontSize: 13, lineHeight: 18 },

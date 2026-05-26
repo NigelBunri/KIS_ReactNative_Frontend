@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     gap: 12,
-    borderWidth: 3,
+    borderWidth: 1.5,
   },
   broadcastProfileCard: {
     borderRadius: 16,
@@ -93,8 +93,8 @@ export const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: "-120%",
-    backgroundColor: 'rgba(0,0,0,0.42)', // dark enough for white text
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.42)',
     },
 
   heroGlow: {

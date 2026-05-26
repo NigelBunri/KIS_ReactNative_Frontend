@@ -64,7 +64,7 @@ export default function BroadcastHeaderBar({
                   style={{
                     color: controlText,
                     fontWeight: '900',
-                    fontSize: 8,
+                    fontSize: 10,
                   }}
                   numberOfLines={1}
                 >

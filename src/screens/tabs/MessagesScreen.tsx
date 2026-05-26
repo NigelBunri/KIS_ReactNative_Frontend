@@ -1824,12 +1824,12 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 >
                   {appName ?? 'KIS'}
                 </Text>
-                {!appName && (
+                {!appName && messageHeaderSubtitleSize > 0 && (
                   <Text
                     style={{
                       color: '#FFF4B8',
                       marginTop: 2,
-                      fontSize: messageHeaderSubtitleSize || 1,
+                      fontSize: messageHeaderSubtitleSize,
                       fontWeight: '800',
                       letterSpacing: 0.2,
                     }}

@@ -2639,7 +2639,7 @@ export default function ProfileScreen() {
                   >
                     Invoices
                   </Text>
-                  <Text style={{ color: palette.subtext }}>›</Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
                 <Pressable
                   style={[
@@ -2656,7 +2656,7 @@ export default function ProfileScreen() {
                   >
                     Loyalty &amp; Points
                   </Text>
-                  <Text style={{ color: palette.subtext }}>›</Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
                 <Pressable
                   style={[
@@ -2673,7 +2673,7 @@ export default function ProfileScreen() {
                   >
                     Promo Codes
                   </Text>
-                  <Text style={{ color: palette.subtext }}>›</Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
                 <Pressable
                   style={[
@@ -2690,7 +2690,7 @@ export default function ProfileScreen() {
                   >
                     KIS Coins
                   </Text>
-                  <Text style={{ color: palette.subtext }}>›</Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
                 <Pressable
                   style={billingLinksStyles.link}
@@ -2704,7 +2704,7 @@ export default function ProfileScreen() {
                   >
                     Subscription
                   </Text>
-                  <Text style={{ color: palette.subtext }}>›</Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
               </View>
 

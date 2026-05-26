@@ -117,7 +117,7 @@ const makeStyles = (_tokens: any) =>
       borderRadius: 18,
       paddingVertical: 8,
       paddingHorizontal: 15,
-      marginRight: 2,
+      marginRight: 8,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
