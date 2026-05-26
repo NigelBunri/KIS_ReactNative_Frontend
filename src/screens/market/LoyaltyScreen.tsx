@@ -131,11 +131,11 @@ export default function LoyaltyScreen() {
   const handleRedeem = useCallback(async () => {
     const points = Number(redeemPoints);
     if (!points || points <= 0) {
-      Alert.alert('Redeem Points', 'Enter a valid number of points to redeem.');
+      Alert.alert('Spend Coins', 'Enter a valid number of coins to spend.');
       return;
     }
     if (points > balance) {
-      Alert.alert('Redeem Points', `You only have ${balance} points available.`);
+      Alert.alert('Spend Coins', `You only have ${balance} coins available.`);
       return;
     }
     setRedeeming(true);
@@ -143,21 +143,21 @@ export default function LoyaltyScreen() {
       const response = await postRequest(
         ROUTES.billing.loyalty,
         { action: 'redeem', points },
-        { errorMessage: 'Unable to redeem points.' },
+        { errorMessage: 'Unable to spend coins.' },
       );
       if (response?.success) {
-        Alert.alert('Redeem Points', 'Points redeemed successfully!');
+        Alert.alert('Spend Coins', 'Coins spent successfully!');
         setRedeemPoints('');
         setRedeemVisible(false);
         void fetchAll(true);
       } else {
         Alert.alert(
-          'Redeem Points',
-          response?.message ?? 'Unable to redeem points.',
+          'Spend Coins',
+          response?.message ?? 'Unable to spend coins.',
         );
       }
     } catch (err: any) {
-      Alert.alert('Redeem Points', err?.message ?? 'Unable to redeem points.');
+      Alert.alert('Spend Coins', err?.message ?? 'Unable to spend coins.');
     } finally {
       setRedeeming(false);
     }
@@ -180,7 +180,7 @@ export default function LoyaltyScreen() {
             </Text>
           </Pressable>
           <Text style={[s.headerTitle, { color: palette.text }]}>
-            Loyalty &amp; Points
+            KIS Coins
           </Text>
           <View style={s.backBtn} />
         </View>
@@ -221,18 +221,18 @@ export default function LoyaltyScreen() {
                 { backgroundColor: palette.primaryStrong },
               ]}
             >
-              <Text style={s.balanceLabel}>Your Points Balance</Text>
+              <Text style={s.balanceLabel}>Your Coins</Text>
               <Text style={s.balanceValue}>
                 {balance.toLocaleString()}
               </Text>
-              <Text style={s.balanceSub}>points</Text>
+              <Text style={s.balanceSub}>KIS Coins</Text>
               {balance > 0 && (
                 <Pressable
                   style={s.redeemToggleBtn}
                   onPress={() => setRedeemVisible(prev => !prev)}
                 >
                   <Text style={s.redeemToggleText}>
-                    {redeemVisible ? 'Cancel' : 'Redeem Points'}
+                    {redeemVisible ? 'Cancel' : 'Spend Coins'}
                   </Text>
                 </Pressable>
               )}
@@ -250,12 +250,12 @@ export default function LoyaltyScreen() {
                 ]}
               >
                 <Text style={[s.sectionTitle, { color: palette.text }]}>
-                  Redeem Points
+                  Spend Coins
                 </Text>
                 <Text
                   style={[s.redeemHint, { color: palette.subtext }]}
                 >
-                  Available: {balance.toLocaleString()} pts
+                  Available: {balance.toLocaleString()} coins
                 </Text>
                 <View style={s.redeemRow}>
                   <TextInput
@@ -267,7 +267,7 @@ export default function LoyaltyScreen() {
                         backgroundColor: palette.surface,
                       },
                     ]}
-                    placeholder="Points to redeem"
+                    placeholder="Coins to spend"
                     placeholderTextColor={palette.subtext}
                     keyboardType="numeric"
                     value={redeemPoints}
@@ -299,7 +299,7 @@ export default function LoyaltyScreen() {
             {/* Earning Rules */}
             <View>
               <Text style={[s.sectionTitle, { color: palette.text }]}>
-                How to Earn Points
+                How to Earn KIS Coins
               </Text>
               {rules.length === 0 ? (
                 <Text style={[s.emptyNote, { color: palette.subtext }]}>
@@ -355,7 +355,7 @@ export default function LoyaltyScreen() {
                             { color: palette.primaryStrong },
                           ]}
                         >
-                          pts
+                          coins
                         </Text>
                       </View>
                     </View>
@@ -371,7 +371,7 @@ export default function LoyaltyScreen() {
               </Text>
               {history.length === 0 ? (
                 <Text style={[s.emptyNote, { color: palette.subtext }]}>
-                  No activity yet. Start earning points today!
+                  No coins activity yet. Start engaging to earn!
                 </Text>
               ) : (
                 history.slice(0, 20).map((item, idx) => {
@@ -415,6 +415,21 @@ export default function LoyaltyScreen() {
                   );
                 })
               )}
+            </View>
+
+            {/* Disclaimer */}
+            <View
+              style={[
+                s.disclaimerCard,
+                {
+                  backgroundColor: palette.surfaceElevated ?? palette.surface,
+                  borderColor: palette.divider,
+                },
+              ]}
+            >
+              <Text style={[s.disclaimerText, { color: palette.subtext }]}>
+                KIS Coins are virtual engagement rewards. They have no monetary value and cannot be exchanged for cash.
+              </Text>
             </View>
           </ScrollView>
         )}
@@ -557,4 +572,14 @@ const s = StyleSheet.create({
   activityDesc: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
   activityDate: { fontSize: 12 },
   activityPts: { fontSize: 16, fontWeight: '800' },
+  disclaimerCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
 });

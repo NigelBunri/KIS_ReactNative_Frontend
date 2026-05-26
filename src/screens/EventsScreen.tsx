@@ -4,16 +4,19 @@ import {
   Alert,
   FlatList,
   Keyboard,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -77,6 +80,35 @@ const EMPTY_FORM: EventFormData = {
 };
 
 // ---------------------------------------------------------------------------
+// Reminder types
+// ---------------------------------------------------------------------------
+
+type ReminderOffset = 0 | 15 | 60 | 1440; // minutes before event
+
+type ReminderOption = {
+  label: string;
+  offsetMinutes: ReminderOffset;
+};
+
+const REMINDER_OPTIONS: ReminderOption[] = [
+  { label: 'At event time', offsetMinutes: 0 },
+  { label: '15 min before', offsetMinutes: 15 },
+  { label: '1 hour before', offsetMinutes: 60 },
+  { label: '1 day before', offsetMinutes: 1440 },
+];
+
+function reminderStorageKey(eventId: string) {
+  return `event_reminder_${eventId}`;
+}
+
+type StoredReminder = {
+  eventId: string;
+  eventTitle: string;
+  startDt: string;
+  offsetMinutes: ReminderOffset;
+};
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -101,6 +133,13 @@ function formatDateShort(d: Date) {
 
 function formatTime(d: Date) {
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Format a date string to Google Calendar's YYYYMMDDTHHmmssZ format */
+function formatGCal(dt?: string | null): string {
+  if (!dt) return '';
+  const d = new Date(dt);
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
 
 type EventStatus = 'past' | 'today' | 'upcoming' | 'cancelled';
@@ -290,6 +329,7 @@ export default function EventsScreen() {
   // List state
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [attending, setAttending] = useState<Set<string>>(new Set());
   // attendanceId map: event id -> attendance record id (needed for cancel)
   const [attendanceIds, setAttendanceIds] = useState<Record<string, string>>({});
@@ -318,12 +358,18 @@ export default function EventsScreen() {
   // Upgrade error message for non-partner users
   const [headerError, setHeaderError] = useState('');
 
+  // Reminder modal state
+  const [reminderModalVisible, setReminderModalVisible] = useState(false);
+  const [reminderEvent, setReminderEvent] = useState<Event | null>(null);
+  const [savedReminders, setSavedReminders] = useState<Record<string, ReminderOffset>>({});
+
   // ---------------------------------------------------------------------------
   // Data loading
   // ---------------------------------------------------------------------------
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
+    setListError(null);
     try {
       const res = await getRequest(ROUTES.events.list, { errorMessage: 'Failed to load events' });
       const list: Event[] = Array.isArray(res?.data?.results)
@@ -332,6 +378,11 @@ export default function EventsScreen() {
         ? res.data
         : [];
       setEvents(list);
+      if (!res?.success && !list.length) {
+        setListError(res?.message || 'Unable to load events.');
+      }
+    } catch (err: any) {
+      setListError(err?.message || 'Unable to load events.');
     } finally {
       setLoading(false);
     }
@@ -355,6 +406,58 @@ export default function EventsScreen() {
     loadEvents();
     loadMyAttendances();
   }, [loadEvents, loadMyAttendances]);
+
+  // ---------------------------------------------------------------------------
+  // On-mount: check stored reminders and alert for upcoming events
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    async function checkReminders() {
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const reminderKeys = keys.filter((k) => k.startsWith('event_reminder_'));
+        if (reminderKeys.length === 0) return;
+        const pairs = await AsyncStorage.multiGet(reminderKeys);
+        const now = Date.now();
+        for (const [, value] of pairs) {
+          if (!value) continue;
+          let reminder: StoredReminder;
+          try {
+            reminder = JSON.parse(value) as StoredReminder;
+          } catch {
+            continue;
+          }
+          const eventStart = new Date(reminder.startDt).getTime();
+          const reminderTime = eventStart - reminder.offsetMinutes * 60 * 1000;
+          // Alert if the reminder time is within the past 24h and the event hasn't started more than 1h ago
+          const windowMs = 24 * 60 * 60 * 1000;
+          if (reminderTime <= now && now <= eventStart + 60 * 60 * 1000 && now >= reminderTime - windowMs) {
+            const option = REMINDER_OPTIONS.find((o) => o.offsetMinutes === reminder.offsetMinutes);
+            Alert.alert(
+              '📅 Event Reminder',
+              `${reminder.eventTitle}\n${option ? option.label : ''} — ${formatDate(reminder.startDt)}`,
+              [{ text: 'Got it', style: 'default' }],
+            );
+          }
+        }
+        // Also load saved reminder offsets into state for UI display
+        const remindersMap: Record<string, ReminderOffset> = {};
+        for (const [, value] of pairs) {
+          if (!value) continue;
+          try {
+            const r = JSON.parse(value) as StoredReminder;
+            remindersMap[r.eventId] = r.offsetMinutes;
+          } catch {
+            // ignore malformed entries
+          }
+        }
+        setSavedReminders(remindersMap);
+      } catch {
+        // Non-critical — silently ignore AsyncStorage errors on mount
+      }
+    }
+    checkReminders();
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Filtered list
@@ -567,6 +670,90 @@ export default function EventsScreen() {
   const openDetail = useCallback((event: Event) => {
     setDetailEvent(event);
     setDetailVisible(true);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Share event
+  // ---------------------------------------------------------------------------
+
+  const shareEvent = useCallback(async (event: Event) => {
+    try {
+      await Share.share({
+        title: event.title,
+        message: `${event.title}\n${event.description || ''}\n📅 ${formatDate(event.start_dt)}\n📍 ${event.location || ''}\n\nJoin on KIS app`,
+      });
+    } catch {
+      // User cancelled share or platform error — ignore silently
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Add to Calendar
+  // ---------------------------------------------------------------------------
+
+  const addToCalendar = useCallback(async (event: Event) => {
+    try {
+      let calUrl: string;
+      if (Platform.OS === 'ios') {
+        const startTimestamp = new Date(event.start_dt ?? Date.now()).getTime() / 1000;
+        calUrl = `calshow:${startTimestamp}`;
+      } else {
+        const startMs = new Date(event.start_dt ?? Date.now()).getTime();
+        const endMs = event.end_dt
+          ? new Date(event.end_dt).getTime()
+          : startMs + 3_600_000;
+        const gcalStart = formatGCal(event.start_dt);
+        const gcalEnd = formatGCal(event.end_dt ?? event.start_dt);
+        // Try Google Calendar intent first; fall back to content URI
+        calUrl = `intent://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${gcalStart}/${gcalEnd}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(event.location || '')}#Intent;scheme=https;package=com.google.android.calendar;end`;
+        // Suppress unused variable warning:
+        void endMs;
+      }
+      const supported = await Linking.canOpenURL(calUrl);
+      if (supported) {
+        await Linking.openURL(calUrl);
+      } else {
+        Alert.alert(
+          'Calendar unavailable',
+          'No calendar app was found on this device. Please add the event manually.',
+          [{ text: 'OK' }],
+        );
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open the calendar app. Please try again.');
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Set Reminder
+  // ---------------------------------------------------------------------------
+
+  const openReminderModal = useCallback((event: Event) => {
+    setReminderEvent(event);
+    setReminderModalVisible(true);
+  }, []);
+
+  const saveReminder = useCallback(async (event: Event, offsetMinutes: ReminderOffset) => {
+    try {
+      const reminder: StoredReminder = {
+        eventId: event.id,
+        eventTitle: event.title,
+        startDt: event.start_dt ?? '',
+        offsetMinutes,
+      };
+      await AsyncStorage.setItem(reminderStorageKey(event.id), JSON.stringify(reminder));
+      setSavedReminders((prev) => ({ ...prev, [event.id]: offsetMinutes }));
+      const option = REMINDER_OPTIONS.find((o) => o.offsetMinutes === offsetMinutes);
+      const label = option?.label ?? 'At event time';
+      Alert.alert(
+        'Reminder Set',
+        `Reminder set for "${label}". You'll be notified when the app is open.`,
+        [{ text: 'OK' }],
+      );
+    } catch {
+      Alert.alert('Error', 'Could not save reminder. Please try again.');
+    }
+    setReminderModalVisible(false);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -792,9 +979,11 @@ export default function EventsScreen() {
           }}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <KISIcon name="calendar" size={40} color={palette.subtext} />
-              <Text style={{ color: palette.subtext, marginTop: 12, textAlign: 'center' }}>
-                {search || filter !== 'all'
+              <KISIcon name="calendar" size={40} color={listError ? (palette.danger ?? '#dc2626') : palette.subtext} />
+              <Text style={{ color: listError ? (palette.danger ?? '#dc2626') : palette.subtext, marginTop: 12, textAlign: 'center' }}>
+                {listError
+                  ? listError
+                  : search || filter !== 'all'
                   ? 'No events match your search or filter.'
                   : 'No events yet. Create the first one!'}
               </Text>
@@ -1078,6 +1267,51 @@ export default function EventsScreen() {
 
             {/* Action buttons */}
             <View style={styles.detailActions}>
+              {/* Share + Add to Calendar row */}
+              {detailEvent && (
+                <View style={styles.secondaryActionsRow}>
+                  <Pressable
+                    onPress={() => shareEvent(detailEvent)}
+                    style={[styles.secondaryActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                  >
+                    <KISIcon name="share" size={14} color={palette.text} />
+                    <Text style={{ color: palette.text, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
+                      Share
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => addToCalendar(detailEvent)}
+                    style={[styles.secondaryActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                  >
+                    <KISIcon name="calendar" size={14} color={palette.text} />
+                    <Text style={{ color: palette.text, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
+                      Add to Calendar
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Set Reminder — only when attending a future event */}
+              {detailEvent &&
+                attending.has(detailEvent.id) &&
+                getEventStatus(detailEvent) !== 'past' &&
+                getEventStatus(detailEvent) !== 'cancelled' && (
+                  <Pressable
+                    onPress={() => openReminderModal(detailEvent)}
+                    style={[
+                      styles.detailRsvpBtn,
+                      { backgroundColor: palette.surface, borderColor: palette.border },
+                    ]}
+                  >
+                    <KISIcon name="bell" size={14} color={palette.primary} />
+                    <Text style={{ color: palette.primary, fontWeight: '600', marginLeft: 6 }}>
+                      {savedReminders[detailEvent.id] != null
+                        ? `Reminder: ${REMINDER_OPTIONS.find((o) => o.offsetMinutes === savedReminders[detailEvent.id])?.label ?? 'Set'}`
+                        : 'Set Reminder'}
+                    </Text>
+                  </Pressable>
+                )}
+
               {/* RSVP / Cancel RSVP */}
               {detailEvent && getEventStatus(detailEvent) !== 'past' && getEventStatus(detailEvent) !== 'cancelled' && (
                 attending.has(detailEvent.id) ? (
@@ -1150,6 +1384,58 @@ export default function EventsScreen() {
                 </View>
               )}
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* REMINDER PICKER MODAL                                                */}
+      {/* ------------------------------------------------------------------ */}
+      <Modal
+        visible={reminderModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReminderModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
+            <View style={[styles.detailHeader, { marginBottom: 12 }]}>
+              <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
+                Set Reminder
+              </Text>
+              <Pressable onPress={() => setReminderModalVisible(false)} hitSlop={12}>
+                <KISIcon name="close" size={20} color={palette.subtext} />
+              </Pressable>
+            </View>
+            <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 16 }}>
+              You'll be notified when the app is open near the event time.
+            </Text>
+            {REMINDER_OPTIONS.map((option) => {
+              const isSelected = reminderEvent != null && savedReminders[reminderEvent.id] === option.offsetMinutes;
+              return (
+                <Pressable
+                  key={option.offsetMinutes}
+                  onPress={() => { if (reminderEvent) saveReminder(reminderEvent, option.offsetMinutes); }}
+                  style={[
+                    styles.reminderOption,
+                    {
+                      backgroundColor: isSelected ? palette.primary + '18' : palette.surface,
+                      borderColor: isSelected ? palette.primary : palette.border,
+                    },
+                  ]}
+                >
+                  <KISIcon name="bell" size={15} color={isSelected ? palette.primary : palette.subtext} />
+                  <Text style={{ color: isSelected ? palette.primary : palette.text, fontSize: 14, marginLeft: 10, fontWeight: isSelected ? '600' : '400' }}>
+                    {option.label}
+                  </Text>
+                  {isSelected && (
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <KISIcon name="check" size={14} color={palette.primary} />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </Modal>
@@ -1359,5 +1645,27 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  reminderOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
   },
 });

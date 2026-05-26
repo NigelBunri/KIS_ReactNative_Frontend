@@ -6,6 +6,11 @@ export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
+  TwoFactor: {
+    phone?: string;
+    email?: string;
+    tokens?: { access?: string; refresh?: string };
+  };
   DeviceVerification:
     | { phone?: string | null; email?: string | null }
     | undefined;
@@ -42,7 +47,11 @@ export type RootStackParamList = {
   SurveysDashboard: undefined;
   MediaDashboard: undefined;
   BridgeDashboard: undefined;
+  BridgeManagement: undefined;
   TiersDashboard: undefined;
+  AIIntegration: undefined;
+  MediaAssetManager: undefined;
+  SurveyManager: undefined;
   NotificationsDashboard: undefined;
   OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
   OrgAppLaunch: { partnerId: string; appId: string };
@@ -99,6 +108,10 @@ export type RootStackParamList = {
     basePriceCents?: number;
     memberPriceCents?: number;
     ownerPreview?: boolean;
+  };
+  ClinicalCommandCenter: {
+    institutionId: string;
+    institutionName?: string;
   };
   InstitutionLandingPreview: {
     institutionId?: string;
@@ -157,10 +170,16 @@ export type RootStackParamList = {
   };
   AccountDeletion: undefined;
   PasswordChange: undefined;
+  ComplianceSettings: undefined;
+  AdminUserManagement: undefined;
   DeviceManagement: undefined;
   InvoiceList: undefined;
   Loyalty: undefined;
   PromoCode: undefined;
+  SetupPIN: undefined;
+  QuickLock: undefined;
+  Wallet: undefined;
+  SubscriptionManagement: undefined;
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

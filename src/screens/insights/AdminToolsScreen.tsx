@@ -14,7 +14,11 @@ type DashboardScreenKey =
   | 'MediaDashboard'
   | 'BridgeDashboard'
   | 'TiersDashboard'
-  | 'NotificationsDashboard';
+  | 'NotificationsDashboard'
+  | 'AIIntegration'
+  | 'MediaAssetManager'
+  | 'SurveyManager'
+  | 'AdminUserManagement';
 
 const DASHBOARDS: { title: string; screen: DashboardScreenKey; description: string }[] = [
   {
@@ -56,6 +60,26 @@ const DASHBOARDS: { title: string; screen: DashboardScreenKey; description: stri
     title: 'Notifications',
     screen: 'NotificationsDashboard',
     description: 'Deliveries, rules, and template health.',
+  },
+  {
+    title: 'AI Integration',
+    screen: 'AIIntegration',
+    description: 'Manage AI models, processing jobs, and Q&A sessions.',
+  },
+  {
+    title: 'Media Asset Manager',
+    screen: 'MediaAssetManager',
+    description: 'Upload, browse, and manage media files with safety scanning.',
+  },
+  {
+    title: 'Survey Manager',
+    screen: 'SurveyManager',
+    description: 'Create and manage surveys, questions, and responses.',
+  },
+  {
+    title: 'User Management',
+    screen: 'AdminUserManagement',
+    description: 'Search users, view profiles, ban/unban accounts, and assign tiers.',
   },
 ];
 

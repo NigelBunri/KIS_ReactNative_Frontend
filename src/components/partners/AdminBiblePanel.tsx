@@ -327,6 +327,7 @@ function MeditationsSection({ palette }: { palette: any }) {
   const [body, setBody] = useState('');
   const [contentType, setContentType] = useState('message');
   const [videoUrl, setVideoUrl] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
   const [scriptureRefs, setScriptureRefs] = useState('');
   const [language, setLanguage] = useState('en');
 
@@ -357,11 +358,12 @@ function MeditationsSection({ palette }: { palette: any }) {
         status: 'draft',
       };
       if (contentType === 'video' && videoUrl.trim()) payload.video_url = videoUrl.trim();
+      if (audioUrl.trim()) payload.audio_url = audioUrl.trim();
       const res: any = await postRequest((ROUTES as any).bible.meditationPosts, payload);
       if (res?.id || res?.data?.id) {
         const created = res?.data ?? res;
         setItems(prev => [created, ...prev]);
-        setTitle(''); setBody(''); setVideoUrl(''); setScriptureRefs('');
+        setTitle(''); setBody(''); setVideoUrl(''); setAudioUrl(''); setScriptureRefs('');
         setShowForm(false);
       } else {
         Alert.alert('Error', res?.message || 'Could not create meditation.');
@@ -448,6 +450,7 @@ function MeditationsSection({ palette }: { palette: any }) {
                   {contentType === 'video' && (
                     <FieldInput label="Video URL" value={videoUrl} onChange={setVideoUrl} placeholder="https://youtube.com/..." palette={palette} />
                   )}
+                  <FieldInput label="Audio URL" value={audioUrl} onChange={setAudioUrl} placeholder="https://..." palette={palette} />
                   <FieldInput label="Scripture refs (comma-separated)" value={scriptureRefs} onChange={setScriptureRefs} placeholder="John 14:6, Ps 23:1" palette={palette} />
                   <Chips
                     options={[{ key: 'en', label: 'English' }, { key: 'fr', label: 'French' }, { key: 'pt', label: 'Portuguese' }, { key: 'sw', label: 'Swahili' }]}

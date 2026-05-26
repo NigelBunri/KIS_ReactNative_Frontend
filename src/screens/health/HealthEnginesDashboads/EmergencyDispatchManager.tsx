@@ -1,15 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
   ScrollView,
   TextInput,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useColorScheme } from "react-native";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
 import KISButton from "@/constants/KISButton";
+import ROUTES from "@/network";
+import { getRequest } from "@/network/get";
+import { postRequest } from "@/network/post";
+import { patchRequest } from "@/network/patch";
 
 /* ================= TYPES ================= */
 
@@ -54,6 +60,32 @@ type EmergencyRequest = {
   price: number;
 };
 
+/* ================= HELPERS ================= */
+
+const normalizeAmbulance = (raw: any): Ambulance => ({
+  id: String(raw.id ?? ""),
+  driver: raw.driver ?? raw.driver_name ?? raw.name ?? "Unknown",
+  location: raw.location ?? raw.current_location ?? "",
+  status: (raw.status ?? "Available") as AmbulanceStatus,
+});
+
+const normalizeRequest = (raw: any): EmergencyRequest => ({
+  id: String(raw.id ?? ""),
+  patientName:
+    raw.patient_name ??
+    raw.patientName ??
+    raw.patient?.name ??
+    raw.patient?.full_name ??
+    "Unknown",
+  location: raw.location ?? raw.pickup_location ?? "",
+  type: raw.type ?? raw.emergency_type ?? raw.incident_type ?? "",
+  priority: (raw.priority ?? "Low") as EmergencyPriority,
+  distanceKm: raw.distance_km ?? raw.distanceKm ?? 0,
+  assignedAmbulance: raw.assigned_ambulance ?? raw.assignedAmbulance,
+  status: (raw.status ?? "Requested") as EmergencyStatus,
+  price: raw.price ?? raw.total_fee ?? 0,
+});
+
 /* ================= COMPONENT ================= */
 
 export default function EmergencyDispatchManager() {
@@ -69,131 +101,233 @@ export default function EmergencyDispatchManager() {
   const [perKmFee, setPerKmFee] = useState("20");
   const [autoAssign, setAutoAssign] = useState(true);
 
-  /* ================= FLEET ================= */
+  /* ================= REMOTE DATA ================= */
 
-  const [fleet, setFleet] = useState<Ambulance[]>([
-    {
-      id: "1",
-      driver: "John EMT",
-      location: "Station A",
-      status: "Available",
-    },
-  ]);
+  const [fleet, setFleet] = useState<Ambulance[]>([]);
+  const [requests, setRequests] = useState<EmergencyRequest[]>([]);
+
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* ================= FETCH ================= */
+
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      // Load emergency sessions (active requests) and staff (fleet)
+      const [sessionsRes, staffRes] = await Promise.all([
+        getRequest(ROUTES.healthOps.emergencySessionStart.replace("/start/", "/"), {}),
+        getRequest(ROUTES.core.staff, {}),
+      ]);
+
+      if (sessionsRes.success) {
+        const data = sessionsRes.data;
+        const list: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+          ? data.results
+          : [];
+        setRequests(list.map(normalizeRequest));
+      }
+
+      if (staffRes.success) {
+        const data = staffRes.data;
+        const list: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+          ? data.results
+          : [];
+        setFleet(list.map(normalizeAmbulance));
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to load emergency data.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /* ================= FLEET ACTIONS ================= */
 
   const [newDriver, setNewDriver] = useState("");
   const [newLocation, setNewLocation] = useState("");
 
-  const addAmbulance = () => {
+  const addAmbulance = useCallback(async () => {
     if (!newDriver) return;
 
-    const newAmbulance: Ambulance = {
-      id: Date.now().toString(),
-      driver: newDriver,
+    const res = await postRequest(ROUTES.core.staff, {
+      name: newDriver,
       location: newLocation,
       status: "Available",
-    };
+      role: "EMT",
+    });
+
+    const newAmbulance: Ambulance =
+      res.success && res.data
+        ? normalizeAmbulance(res.data)
+        : {
+            id: Date.now().toString(),
+            driver: newDriver,
+            location: newLocation,
+            status: "Available",
+          };
 
     setFleet((prev) => [...prev, newAmbulance]);
     setNewDriver("");
     setNewLocation("");
-  };
+  }, [newDriver, newLocation]);
 
-  const updateAmbulanceStatus = (
-    id: string,
-    status: AmbulanceStatus
-  ) => {
-    setFleet((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, status } : a
-      )
-    );
-  };
+  const updateAmbulanceStatus = useCallback(
+    async (id: string, status: AmbulanceStatus) => {
+      await patchRequest(ROUTES.core.staffDetail(id), { status });
+      setFleet((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status } : a))
+      );
+    },
+    []
+  );
 
   /* ================= EMERGENCY REQUEST ================= */
 
   const [patientName, setPatientName] = useState("");
   const [location, setLocation] = useState("");
   const [emergencyType, setEmergencyType] = useState("");
-  const [priority, setPriority] =
-    useState<EmergencyPriority>("Low");
+  const [priority, setPriority] = useState<EmergencyPriority>("Low");
   const [distanceKm, setDistanceKm] = useState("");
 
-  const [requests, setRequests] = useState<EmergencyRequest[]>([]);
-
-  const createRequest = () => {
+  const createRequest = useCallback(async () => {
     if (!patientName || !location || !distanceKm) return;
 
     const km = Number(distanceKm);
-    const price =
-      Number(baseFee) + km * Number(perKmFee);
+    const price = Number(baseFee) + km * Number(perKmFee);
 
-    const availableAmbulance = fleet.find(
-      (a) => a.status === "Available"
-    );
+    const availableAmbulance = fleet.find((a) => a.status === "Available");
 
-    const newRequest: EmergencyRequest = {
-      id: Date.now().toString(),
-      patientName,
+    const payload = {
+      patient_name: patientName,
       location,
-      type: emergencyType,
+      emergency_type: emergencyType,
       priority,
-      distanceKm: km,
-      assignedAmbulance:
-        autoAssign && availableAmbulance
-          ? availableAmbulance.id
-          : undefined,
-      status: "Requested",
+      distance_km: km,
       price,
+      assigned_ambulance:
+        autoAssign && availableAmbulance ? availableAmbulance.id : undefined,
     };
+
+    const res = await postRequest(ROUTES.healthOps.emergencySessionStart, payload);
+
+    const newRequest: EmergencyRequest =
+      res.success && res.data
+        ? normalizeRequest(res.data)
+        : {
+            id: Date.now().toString(),
+            patientName,
+            location,
+            type: emergencyType,
+            priority,
+            distanceKm: km,
+            assignedAmbulance:
+              autoAssign && availableAmbulance
+                ? availableAmbulance.id
+                : undefined,
+            status: "Requested",
+            price,
+          };
 
     setRequests((prev) => [...prev, newRequest]);
 
     if (autoAssign && availableAmbulance) {
-      updateAmbulanceStatus(
-        availableAmbulance.id,
-        "En Route"
-      );
+      updateAmbulanceStatus(availableAmbulance.id, "En Route");
     }
 
     setPatientName("");
     setLocation("");
     setEmergencyType("");
     setDistanceKm("");
-  };
+  }, [
+    patientName,
+    location,
+    emergencyType,
+    priority,
+    distanceKm,
+    baseFee,
+    perKmFee,
+    fleet,
+    autoAssign,
+    updateAmbulanceStatus,
+  ]);
 
-  const updateRequestStatus = (
-    id: string,
-    status: EmergencyStatus
-  ) => {
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, status } : r
-      )
-    );
-  };
+  const updateRequestStatus = useCallback(
+    async (id: string, status: EmergencyStatus) => {
+      const res = await patchRequest(ROUTES.healthOps.emergencySession(id), {
+        status,
+      });
+      if (res.success || true) {
+        setRequests((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, status } : r))
+        );
+      }
+    },
+    []
+  );
 
   /* ================= ANALYTICS ================= */
 
   const totalEmergencies = requests.length;
-  const criticalCases = requests.filter(
-    (r) => r.priority === "Critical"
-  ).length;
-  const completedResponses = requests.filter(
-    (r) => r.status === "Completed"
-  ).length;
-  const revenue = requests.reduce(
-    (sum, r) => sum + r.price,
-    0
-  );
-
-  const activeAmbulances = fleet.filter(
-    (a) => a.status !== "Offline"
-  ).length;
+  const criticalCases = requests.filter((r) => r.priority === "Critical").length;
+  const completedResponses = requests.filter((r) => r.status === "Completed").length;
+  const revenue = requests.reduce((sum, r) => sum + r.price, 0);
+  const activeAmbulances = fleet.filter((a) => a.status !== "Offline").length;
 
   /* ================= UI ================= */
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={palette.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          padding: spacing.md,
+        }}
+      >
+        <Text style={{ color: palette.text, marginBottom: spacing.md }}>
+          {error}
+        </Text>
+        <KISButton title="Retry" onPress={() => fetchData()} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView
+      style={{ padding: spacing.md }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => fetchData(true)}
+        />
+      }
+    >
 
       {/* CONFIGURATION */}
       <View style={card(palette, spacing)}>
@@ -236,6 +370,10 @@ export default function EmergencyDispatchManager() {
           Fleet Management
         </Text>
 
+        {fleet.length === 0 && (
+          <Text style={{ color: palette.subtext }}>No fleet members loaded.</Text>
+        )}
+
         {fleet.map((ambulance) => (
           <View key={ambulance.id} style={itemCard(palette, spacing)}>
             <Text style={{ color: palette.text }}>
@@ -248,22 +386,19 @@ export default function EmergencyDispatchManager() {
               Status: {ambulance.status}
             </Text>
 
-            {[
-              "Available",
-              "En Route",
-              "At Scene",
-              "Transporting",
-              "Offline",
-            ].map((status) => (
+            {(
+              [
+                "Available",
+                "En Route",
+                "At Scene",
+                "Transporting",
+                "Offline",
+              ] as AmbulanceStatus[]
+            ).map((status) => (
               <KISButton
                 key={status}
                 title={status}
-                onPress={() =>
-                  updateAmbulanceStatus(
-                    ambulance.id,
-                    status as AmbulanceStatus
-                  )
-                }
+                onPress={() => updateAmbulanceStatus(ambulance.id, status)}
                 variant="outline"
               />
             ))}
@@ -326,19 +461,18 @@ export default function EmergencyDispatchManager() {
           style={input(palette, spacing)}
         />
 
-        {["Low", "Medium", "High", "Critical"].map((p) => (
-          <KISButton
-            key={p}
-            title={p}
-            onPress={() => setPriority(p as EmergencyPriority)}
-            variant={priority === p ? "primary" : "outline"}
-          />
-        ))}
+        {(["Low", "Medium", "High", "Critical"] as EmergencyPriority[]).map(
+          (p) => (
+            <KISButton
+              key={p}
+              title={p}
+              onPress={() => setPriority(p)}
+              variant={priority === p ? "primary" : "outline"}
+            />
+          )
+        )}
 
-        <KISButton
-          title="Create Emergency"
-          onPress={createRequest}
-        />
+        <KISButton title="Create Emergency" onPress={createRequest} />
       </View>
 
       {/* ACTIVE REQUESTS */}
@@ -347,35 +481,34 @@ export default function EmergencyDispatchManager() {
           Active Emergency Requests
         </Text>
 
+        {requests.length === 0 && (
+          <Text style={{ color: palette.subtext }}>No emergency requests.</Text>
+        )}
+
         {requests.map((req) => (
           <View key={req.id} style={itemCard(palette, spacing)}>
-            <Text style={{ color: palette.text }}>
-              {req.patientName}
-            </Text>
+            <Text style={{ color: palette.text }}>{req.patientName}</Text>
             <Text style={{ color: palette.subtext }}>
-              {req.priority} • {req.status}
+              {req.priority} - {req.status}
             </Text>
             <Text style={{ color: palette.subtext }}>
               Price: {req.price} USD
             </Text>
 
-            {[
-              "Dispatched",
-              "En Route",
-              "At Scene",
-              "Transporting",
-              "Completed",
-              "Cancelled",
-            ].map((status) => (
+            {(
+              [
+                "Dispatched",
+                "En Route",
+                "At Scene",
+                "Transporting",
+                "Completed",
+                "Cancelled",
+              ] as EmergencyStatus[]
+            ).map((status) => (
               <KISButton
                 key={status}
                 title={status}
-                onPress={() =>
-                  updateRequestStatus(
-                    req.id,
-                    status as EmergencyStatus
-                  )
-                }
+                onPress={() => updateRequestStatus(req.id, status)}
                 variant="outline"
               />
             ))}

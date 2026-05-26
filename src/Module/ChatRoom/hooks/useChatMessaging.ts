@@ -1,7 +1,6 @@
 // src/screens/chat/hooks/useChatMessaging.ts
 
-// Set to false to send and display all messages as plaintext.
-// Flip back to true once E2EE key exchange is fully tested end-to-end.
+// E2EE is deferred until key exchange protocol is validated end-to-end. Messages use server-side encryption via TLS. Flip to true when crypto module passes integration tests.
 const E2EE_ENABLED = false;
 
 import {
@@ -32,12 +31,10 @@ import { useSocket } from '../../../../SocketProvider';
 import {
   ENCRYPTION_VERSION,
   decryptConversationPayload,
-  encryptConversationPayload,
   preloadConversationKey,
 } from '@/security/customE2EE';
 import {
   decryptFromUser,
-  encryptPayloadForRecipients,
   ensureDeviceId,
 } from '@/security/e2ee';
 
@@ -53,23 +50,6 @@ type UseChatMessagingParams = {
   currentUserId: string;
   currentUserName: string | null;
   conversationId: string | null;
-};
-
-const CHAT_SIGNAL_ENCRYPTION_TIMEOUT_MS = 900;
-const CHAT_CONVERSATION_ENCRYPTION_TIMEOUT_MS = 700;
-
-const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 };
 
 /* ========================================================================
@@ -209,11 +189,6 @@ export function useChatMessaging({
     }
     return undefined;
   }, []);
-
-  const getRecipientUserIds = useCallback(() => {
-    const participantIds = participantsToIds(chat?.participants ?? []);
-    return participantIds.filter((id) => id && id !== currentUserId);
-  }, [chat?.participants, currentUserId]);
 
   const patchDecryptedMessage = useCallback(
     (messageId: string, patch: Partial<ChatMessage>) => {
@@ -479,8 +454,22 @@ export function useChatMessaging({
       socket.emit('chat.join', {
         conversationId: String(convId),
       });
+
+      // Mark conversation as read when joining — send a receipt for the last
+      // message from another user so the server updates unread counts.
+      const msgs = messagesRef.current;
+      if (msgs.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg?.serverId && lastMsg.senderId !== currentUserId) {
+          socket.emit('chat.receipt', {
+            conversationId: String(convId),
+            messageId: lastMsg.serverId,
+            status: 'read',
+          });
+        }
+      }
     },
-    [socket, isConnected],
+    [socket, isConnected, currentUserId],
   );
 
   const leaveConversation = useCallback(
@@ -794,78 +783,7 @@ export function useChatMessaging({
           : null,
       };
 
-      let payloadToSend: any = { ...basePayload, encrypted: false, encryptionMeta: undefined };
-      if (E2EE_ENABLED) try {
-        const recipientUserIds = getRecipientUserIds();
-        if (__DEV__) console.log('[chat.send.debug] signal recipients', {
-          conversationId: String(convId),
-          recipientUserIds,
-          currentUserId: String(currentUserId),
-        });
-        if (!recipientUserIds.length) {
-          throw new Error('Missing recipient device inventory for signal fanout');
-        }
-        const signalRecipientUserIds = Array.from(
-          new Set([String(currentUserId), ...recipientUserIds.map((id) => String(id))]),
-        );
-        const signalStartedAt = Date.now();
-        const signalEncrypted = await withTimeout(
-          encryptPayloadForRecipients(
-            String(currentUserId),
-            signalRecipientUserIds,
-            basePayload,
-          ),
-          CHAT_SIGNAL_ENCRYPTION_TIMEOUT_MS,
-          'Signal encryption',
-        );
-        if (__DEV__) console.log('[chat.send.debug] signal encryption ready', {
-          conversationId: String(convId),
-          elapsedMs: Date.now() - signalStartedAt,
-          recipientCipherCount: Array.isArray(signalEncrypted.encryptionMeta?.recipients)
-            ? signalEncrypted.encryptionMeta.recipients.length
-            : 0,
-        });
-        payloadToSend = {
-          conversationId: basePayload.conversationId,
-          clientId,
-          kind: basePayload.kind,
-          previewText: basePayload.previewText,
-          encryptionMeta: signalEncrypted.encryptionMeta,
-        };
-      } catch (err) {
-        try {
-          const conversationEncryptStartedAt = Date.now();
-          const encrypted = await withTimeout(
-            encryptConversationPayload(String(convId), basePayload),
-            CHAT_CONVERSATION_ENCRYPTION_TIMEOUT_MS,
-            'Conversation encryption',
-          );
-          if (__DEV__) console.log('[chat.send.debug] conversation encryption ready', {
-            conversationId: String(convId),
-            elapsedMs: Date.now() - conversationEncryptStartedAt,
-          });
-          payloadToSend = {
-            conversationId: basePayload.conversationId,
-            clientId,
-            kind: basePayload.kind,
-            previewText: basePayload.previewText,
-            encrypted: true,
-            ciphertext: encrypted.ciphertext,
-            iv: encrypted.iv,
-            tag: encrypted.tag,
-            encryptionVersion: encrypted.encryptionVersion ?? ENCRYPTION_VERSION,
-            encryptionKeyVersion: encrypted.encryptionKeyVersion,
-            aad: encrypted.aad,
-          };
-        } catch (legacyErr) {
-          console.warn('[useChatMessaging] encryption unavailable/slow; sending plaintext fallback', err, legacyErr);
-          payloadToSend = {
-            ...basePayload,
-            encrypted: false,
-            encryptionMeta: undefined,
-          };
-        }
-      }
+      const payloadToSend: any = { ...basePayload, encrypted: false, encryptionMeta: undefined };
 
       return new Promise<SendOverNetworkResult>(
         (resolve) => {
@@ -933,7 +851,6 @@ export function useChatMessaging({
       currentUserId,
       conversationId,
       storageRoomId,
-      getRecipientUserIds,
     ],
   );
 
@@ -1047,7 +964,22 @@ export function useChatMessaging({
             messageId: msg.serverId,
             type: 'delivered',
           });
-        } catch {}
+        } catch (err: any) {
+          console.warn('[useChatMessaging] delivery receipt emit failed', err?.message);
+        }
+
+        // If the chat room is currently open, immediately mark as read too.
+        if (mountedRef.current) {
+          try {
+            socket.emit('chat.receipt', {
+              conversationId: String(msg.conversationId),
+              messageId: msg.serverId,
+              status: 'read',
+            });
+          } catch (err: any) {
+            console.warn('[useChatMessaging] read receipt emit failed', err?.message);
+          }
+        }
       }
 
       await replaceMessagesRef.current([...messagesRef.current, msg]);
@@ -1263,49 +1195,6 @@ export function useChatMessaging({
         text: patch.text,
         styledText: patch.styledText,
       };
-      if (E2EE_ENABLED && (patch.text != null || patch.styledText)) {
-        try {
-          const recipientUserIds = getRecipientUserIds();
-          if (!recipientUserIds.length) {
-            throw new Error('Missing recipient device inventory for signal fanout');
-          }
-          const encrypted = await encryptPayloadForRecipients(
-            String(currentUserId),
-            recipientUserIds,
-            {
-              conversationId: String(convId),
-              kind: 'text',
-              clientId: String(serverId),
-              text: patch.text,
-              styledText: patch.styledText,
-            },
-          );
-          delete editPayload.text;
-          delete editPayload.styledText;
-          editPayload.encryptionMeta = encrypted.encryptionMeta;
-          editPayload.ciphertext = undefined;
-        } catch (err) {
-          try {
-            const encrypted = await encryptConversationPayload(String(convId), {
-              conversationId: String(convId),
-              kind: 'text',
-              clientId: String(serverId),
-              text: patch.text,
-              styledText: patch.styledText,
-            });
-            delete editPayload.text;
-            delete editPayload.styledText;
-            editPayload.ciphertext = encrypted.ciphertext;
-            editPayload.iv = encrypted.iv;
-            editPayload.tag = encrypted.tag;
-            editPayload.aad = encrypted.aad;
-            editPayload.encryptionVersion = encrypted.encryptionVersion ?? ENCRYPTION_VERSION;
-            editPayload.encryptionKeyVersion = encrypted.encryptionKeyVersion;
-          } catch (legacyErr) {
-            console.warn('[useChatMessaging] edit encryption failed', err, legacyErr);
-          }
-        }
-      }
       socket.emit('chat.edit', editPayload);
     },
     softDeleteMessage: async (

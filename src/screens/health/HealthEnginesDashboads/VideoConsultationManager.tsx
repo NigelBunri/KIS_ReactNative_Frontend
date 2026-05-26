@@ -1,20 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   TextInput,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useColorScheme } from "react-native";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
 import KISButton from "@/constants/KISButton";
+import ROUTES from "@/network";
+import { getRequest } from "@/network/get";
+import { postRequest } from "@/network/post";
+import { patchRequest } from "@/network/patch";
 
-type WaitingPatient = {
+/* ================= TYPES ================= */
+
+type VideoSession = {
   id: string;
-  name: string;
-  joinedAt: number;
+  patient_name?: string;
+  patient?: { name?: string; full_name?: string };
+  status: string;
+  started_at?: string;
+  ended_at?: string;
+  duration_minutes?: number;
+  price?: number;
+  joined_at?: number;
+};
+
+type AnalyticsSummary = {
+  total_sessions: number;
+  total_minutes: number;
+  revenue: number;
 };
 
 export default function VideoConsultationManager() {
@@ -31,33 +51,26 @@ export default function VideoConsultationManager() {
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [waitingRoomEnabled, setWaitingRoomEnabled] = useState(true);
 
-  /* ================= WAITING ROOM ================= */
+  /* ================= REMOTE DATA ================= */
 
-  const [waitingList, setWaitingList] = useState<WaitingPatient[]>([
-    { id: "1", name: "John Doe", joinedAt: Date.now() - 60000 },
-    { id: "2", name: "Mary Smith", joinedAt: Date.now() - 180000 },
-  ]);
+  const [waitingList, setWaitingList] = useState<VideoSession[]>([]);
+  const [activeSession, setActiveSession] = useState<VideoSession | null>(null);
+  const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummary>({
+    total_sessions: 0,
+    total_minutes: 0,
+    revenue: 0,
+  });
 
-  const admitPatient = (patient: WaitingPatient) => {
-    setActiveSession(patient);
-    setWaitingList((prev) => prev.filter((p) => p.id !== patient.id));
-  };
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const removePatient = (id: string) => {
-    setWaitingList((prev) => prev.filter((p) => p.id !== id));
-  };
+  /* ================= SESSION TIMER ================= */
 
-  /* ================= SESSION ================= */
-
-  const [activeSession, setActiveSession] =
-    useState<WaitingPatient | null>(null);
   const [sessionSeconds, setSessionSeconds] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [totalSessions, setTotalSessions] = useState(0);
-  const [totalMinutes, setTotalMinutes] = useState(0);
 
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (activeSession) {
       interval = setInterval(() => {
         setSessionSeconds((prev) => prev + 1);
@@ -66,18 +79,115 @@ export default function VideoConsultationManager() {
     return () => clearInterval(interval);
   }, [activeSession]);
 
-  const endSession = () => {
+  /* ================= FETCH ================= */
+
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const [waitingRes, analyticsRes] = await Promise.all([
+        getRequest(ROUTES.telemedicine.sessions, {
+          params: { status: "waiting" },
+        }),
+        getRequest(ROUTES.telemedicine.sessions, {
+          params: { status: "completed", summary: "true" },
+        }),
+      ]);
+
+      if (waitingRes.success) {
+        const data = waitingRes.data;
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+          ? data.results
+          : [];
+        setWaitingList(list);
+      }
+
+      if (analyticsRes.success) {
+        const data = analyticsRes.data;
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          if ("total_sessions" in data || "total_minutes" in data || "revenue" in data) {
+            setAnalyticsSummary({
+              total_sessions: data.total_sessions ?? 0,
+              total_minutes: data.total_minutes ?? 0,
+              revenue: data.revenue ?? 0,
+            });
+          } else {
+            const results: VideoSession[] = Array.isArray(data.results)
+              ? data.results
+              : Array.isArray(data)
+              ? data
+              : [];
+            const totalSessions = results.length;
+            const totalMinutes = results.reduce(
+              (s: number, r: VideoSession) => s + (r.duration_minutes ?? 0),
+              0
+            );
+            const revenue = results.reduce(
+              (s: number, r: VideoSession) => s + (r.price ?? 0),
+              0
+            );
+            setAnalyticsSummary({ total_sessions: totalSessions, total_minutes: totalMinutes, revenue });
+          }
+        }
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to load video sessions.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /* ================= ACTIONS ================= */
+
+  const admitPatient = useCallback(async (session: VideoSession) => {
+    const res = await postRequest(ROUTES.telemedicine.sessionStart(session.id), {});
+    if (res.success) {
+      setActiveSession(session);
+      setSessionSeconds(0);
+      setWaitingList((prev) => prev.filter((p) => p.id !== session.id));
+    }
+  }, []);
+
+  const removePatient = useCallback(async (id: string) => {
+    const res = await patchRequest(ROUTES.telemedicine.session(id), { status: "cancelled" });
+    if (res.success) {
+      setWaitingList((prev) => prev.filter((p) => p.id !== id));
+    }
+  }, []);
+
+  const endSession = useCallback(async () => {
+    if (!activeSession) return;
     const minutes = Math.ceil(sessionSeconds / 60);
     const minBill = Math.max(minutes, Number(minDuration));
     const cost = minBill * Number(pricePerMinute);
 
-    setTotalRevenue((prev) => prev + cost);
-    setTotalSessions((prev) => prev + 1);
-    setTotalMinutes((prev) => prev + minutes);
+    const res = await postRequest(ROUTES.telemedicine.sessionEnd(activeSession.id), {
+      duration_minutes: minutes,
+      price: cost,
+    });
 
-    setActiveSession(null);
-    setSessionSeconds(0);
-  };
+    if (res.success) {
+      setAnalyticsSummary((prev) => ({
+        total_sessions: prev.total_sessions + 1,
+        total_minutes: prev.total_minutes + minutes,
+        revenue: prev.revenue + cost,
+      }));
+      setActiveSession(null);
+      setSessionSeconds(0);
+    }
+  }, [activeSession, sessionSeconds, minDuration, pricePerMinute]);
 
   const liveCost =
     Math.max(Math.ceil(sessionSeconds / 60), Number(minDuration)) *
@@ -85,8 +195,30 @@ export default function VideoConsultationManager() {
 
   /* ================= UI ================= */
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={palette.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.md }}>
+        <Text style={{ color: palette.text, marginBottom: spacing.md }}>{error}</Text>
+        <KISButton title="Retry" onPress={() => fetchData()} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView
+      style={{ padding: spacing.md }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} />
+      }
+    >
 
       {/* ===== CONFIGURATION ===== */}
       <View style={card(palette, spacing)}>
@@ -140,14 +272,22 @@ export default function VideoConsultationManager() {
             Waiting Room
           </Text>
 
-          {waitingList.map((patient) => {
-            const waitTime = Math.floor(
-              (Date.now() - patient.joinedAt) / 60000
-            );
+          {waitingList.length === 0 && (
+            <Text style={{ color: palette.subtext }}>No patients waiting.</Text>
+          )}
+
+          {waitingList.map((session) => {
+            const joinedAt = session.joined_at ?? Date.now();
+            const waitTime = Math.floor((Date.now() - joinedAt) / 60000);
+            const patientName =
+              session.patient_name ||
+              session.patient?.full_name ||
+              session.patient?.name ||
+              "Unknown Patient";
 
             return (
               <View
-                key={patient.id}
+                key={session.id}
                 style={{
                   padding: spacing.sm,
                   marginVertical: spacing.xs,
@@ -155,20 +295,18 @@ export default function VideoConsultationManager() {
                   backgroundColor: palette.surface,
                 }}
               >
-                <Text style={{ color: palette.text }}>
-                  {patient.name}
-                </Text>
+                <Text style={{ color: palette.text }}>{patientName}</Text>
                 <Text style={{ color: palette.subtext }}>
                   Waiting: {waitTime} mins
                 </Text>
 
                 <KISButton
                   title="Admit"
-                  onPress={() => admitPatient(patient)}
+                  onPress={() => admitPatient(session)}
                 />
                 <KISButton
                   title="Remove"
-                  onPress={() => removePatient(patient.id)}
+                  onPress={() => removePatient(session.id)}
                   variant="outline"
                 />
               </View>
@@ -185,7 +323,11 @@ export default function VideoConsultationManager() {
           </Text>
 
           <Text style={{ color: palette.text }}>
-            Patient: {activeSession.name}
+            Patient:{" "}
+            {activeSession.patient_name ||
+              activeSession.patient?.full_name ||
+              activeSession.patient?.name ||
+              "Unknown"}
           </Text>
 
           <Text style={{ color: palette.text }}>
@@ -208,22 +350,24 @@ export default function VideoConsultationManager() {
         </Text>
 
         <Text style={{ color: palette.text }}>
-          Total Sessions: {totalSessions}
+          Total Sessions: {analyticsSummary.total_sessions}
         </Text>
 
         <Text style={{ color: palette.text }}>
-          Total Minutes: {totalMinutes}
+          Total Minutes: {analyticsSummary.total_minutes}
         </Text>
 
         <Text style={{ color: palette.text }}>
-          Revenue Generated: {totalRevenue} USD
+          Revenue Generated: {analyticsSummary.revenue} USD
         </Text>
 
         <Text style={{ color: palette.text }}>
           Avg Duration:{" "}
-          {totalSessions === 0
+          {analyticsSummary.total_sessions === 0
             ? 0
-            : Math.round(totalMinutes / totalSessions)}{" "}
+            : Math.round(
+                analyticsSummary.total_minutes / analyticsSummary.total_sessions
+              )}{" "}
           mins
         </Text>
       </View>

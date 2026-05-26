@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import type { RootStackParamList } from '@/navigation/types';
 
 type BridgeThread = {
   id: string;
@@ -12,7 +14,9 @@ type BridgeThread = {
   last_activity?: string;
 };
 
-export default function BridgeDashboardScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'BridgeDashboard'>;
+
+export default function BridgeDashboardScreen({ navigation }: Props) {
   const { palette } = useKISTheme();
   const [threads, setThreads] = useState<BridgeThread[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, any> | null>(null);
@@ -46,7 +50,15 @@ export default function BridgeDashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Text style={[styles.title, { color: palette.text }]}>Bridge</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: palette.text }]}>Bridge</Text>
+          <Pressable
+            onPress={() => navigation.navigate('BridgeManagement')}
+            style={[styles.manageBtn, { backgroundColor: palette.primaryStrong }]}
+          >
+            <Text style={styles.manageBtnText}>Manage Bridge</Text>
+          </Pressable>
+        </View>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>
           Automation, job history, and thread sync metrics.
         </Text>
@@ -109,7 +121,10 @@ export default function BridgeDashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '800' },
+  manageBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  manageBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   subtitle: { fontSize: 13 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   statBox: { flex: 1, minWidth: 80, borderRadius: 10, padding: 12, alignItems: 'center', gap: 4 },

@@ -191,7 +191,9 @@ export default function RegisterScreen({ navigation }: any) {
         accessToken: d?.access ?? null,
         refreshToken: d?.refresh ?? null,
       });
-    } catch {}
+    } catch (err: any) {
+      console.warn('[RegisterScreen] failed to persist auth tokens', err?.message);
+    }
   };
 
   // Utility: cryptographically-strong 6-digit code
@@ -259,8 +261,10 @@ export default function RegisterScreen({ navigation }: any) {
       const isActive = user?.is_active ?? user?.status === 'active';
 
       if (isActive) {
-        Alert.alert('Success', 'Account created and activated.');
-        // e.g. navigation.replace('Home');
+        Alert.alert('Success', 'Account created and activated.', [
+          { text: 'OK', onPress: () => navigation.replace('Login') },
+        ]);
+        return;
       }
 
       // Not active yet → generate OTP, ask backend to send SMS via Infobip, then go to verification

@@ -201,10 +201,11 @@ export default function LoginScreen({ navigation }: any) {
           );
         }
         if (res?.data?.two_factor_required) {
-          return Alert.alert(
-            'Two-step verification',
-            'Your account has two-factor authentication enabled. Please enter your OTP code.',
-          );
+          navigation.navigate('TwoFactor', {
+            phone: composedPhone.trim(),
+            tokens: res?.data?.tokens ?? {},
+          });
+          return;
         }
         const msg =
           res?.message ||

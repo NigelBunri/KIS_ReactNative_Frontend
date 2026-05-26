@@ -39,6 +39,7 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -81,7 +82,10 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
         }));
 
       setItems([...communities, ...groups, ...channels]);
-    } catch { /* silently ignored */ }
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(err?.message || 'Unable to load messaging content.');
+    }
   }, [partnerId]);
 
   useEffect(() => {
@@ -130,6 +134,11 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
 
   return (
     <View style={[styles.root, { backgroundColor: palette.surface }]}>
+      {loadError ? (
+        <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: palette.danger ?? '#dc2626', textAlign: 'center' }}>{loadError}</Text>
+        </View>
+      ) : null}
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>
         <Text style={[styles.headerTitle, { color: palette.text }]}>{partnerName}</Text>
         <Text style={[styles.headerSub, { color: palette.subtext }]}>Workspace</Text>

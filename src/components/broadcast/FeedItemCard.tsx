@@ -33,9 +33,11 @@ type Props = {
   item: BroadcastItem;
   onPress: () => void;
   onReact: () => void;
+  isSubscribed?: boolean;
+  onSubscribe?: () => void;
 };
 
-export default function FeedItemCard({ item, onPress, onReact }: Props) {
+export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onSubscribe }: Props) {
   const { palette } = useKISTheme();
   const richTextValue = getFeedRichTextValue(item);
   const plainText = getFeedPlainText(item);
@@ -77,9 +79,23 @@ export default function FeedItemCard({ item, onPress, onReact }: Props) {
       accessibilityLabel="Open broadcast detail"
     >
       <View style={styles.meta}>
-        <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-          {item.title ?? 'Community update'}
-        </Text>
+        <View style={styles.metaHeader}>
+          <Text style={[styles.title, { color: palette.text, flex: 1 }]} numberOfLines={1}>
+            {item.title ?? 'Community update'}
+          </Text>
+          {onSubscribe && !isSubscribed ? (
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); onSubscribe(); }}
+              style={[styles.followBtn, { borderColor: palette.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Follow channel"
+            >
+              <Text style={[styles.followText, { color: palette.primary }]}>
+                Follow
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
         <View style={styles.row}>
           <Text style={[styles.time, { color: palette.subtext }]}>
             {formatDate(item.broadcastedAt)}
@@ -205,6 +221,21 @@ const styles = StyleSheet.create({
   },
   meta: {
     gap: 6,
+  },
+  metaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  followBtn: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  followText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',

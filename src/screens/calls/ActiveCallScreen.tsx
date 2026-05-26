@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -169,6 +170,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         actions.onSetLayout(
           session?.layout === 'speaker' ? 'gallery' : 'speaker',
         );
+        break;
+      case 'screen-share':
+        Alert.alert('Coming Soon', 'Screen sharing will be available in a future update.');
         break;
     }
   }, [actions, session?.layout, revealControls]);

@@ -11,9 +11,18 @@ export function routeNotification(
       conversation_id,
       broadcast_id,
       channel_id,
+      channel_content_id,
       event_id,
       partner_id,
       org_app_id,
+      appointment_id,
+      health_service_session_id,
+      order_id,
+      invoice_id,
+      transaction_id,
+      subscription_id,
+      stream_id,
+      live_id,
     } = data ?? {};
 
     // Conversation / chat message — deep-link into Messages tab.
@@ -31,9 +40,75 @@ export function routeNotification(
       return;
     }
 
+    // Channel content deep-link (specific post/content inside a channel).
+    if (channel_content_id) {
+      navigation.navigate('ChannelContentDetail', { contentId: channel_content_id });
+      return;
+    }
+
     // Channel home.
     if (channel_id) {
       navigation.navigate('ChannelHome', { channelId: channel_id });
+      return;
+    }
+
+    // Live stream notifications.
+    if (stream_id || live_id) {
+      navigation.navigate('LiveWatch', { streamId: stream_id || live_id });
+      return;
+    }
+
+    // Health appointment reminders — navigate to HealthServiceSession when we
+    // have enough context, HealthInstitutionDetail when we only have the
+    // institution, or fall back to Profile.
+    if (appointment_id || health_service_session_id) {
+      const sessionId = health_service_session_id || appointment_id;
+      if (data.institution_id && data.card_id) {
+        navigation.navigate('HealthServiceSession', {
+          institutionId: data.institution_id,
+          institutionType: (data.institution_type as any) || 'clinic',
+          cardId: data.card_id,
+          sessionId,
+          serviceName: data.service_name || 'Appointment',
+          workflowSessionId: data.workflow_session_id,
+          appointmentBookingId: appointment_id,
+        });
+      } else if (data.institution_id) {
+        navigation.navigate('HealthInstitutionDetail', {
+          institutionId: data.institution_id,
+          institutionType: (data.institution_type as any) || 'clinic',
+          institutionName: data.institution_name,
+        });
+      } else {
+        navigation.navigate('MainTabs', { screen: 'Profile' });
+      }
+      return;
+    }
+
+    // Order status notifications.
+    if (order_id) {
+      navigation.navigate('MarketplaceOrderDetail', {
+        orderId: order_id,
+        mode: 'buyer',
+      });
+      return;
+    }
+
+    // Payment / billing notifications — go to invoice list or wallet.
+    if (invoice_id) {
+      navigation.navigate('InvoiceList');
+      return;
+    }
+
+    // Wallet transaction notifications.
+    if (transaction_id) {
+      navigation.navigate('Wallet');
+      return;
+    }
+
+    // Subscription lifecycle notifications.
+    if (subscription_id || type === 'subscription') {
+      navigation.navigate('SubscriptionManagement');
       return;
     }
 
@@ -55,6 +130,13 @@ export function routeNotification(
     // Partner tab.
     if (partner_id || type === 'partner') {
       navigation.navigate('MainTabs', { screen: 'Partners' });
+      return;
+    }
+
+    // Call notifications — calls are handled via socket, navigate to Messages
+    // where call history is visible.
+    if (data.call_id || data.callId) {
+      navigation.navigate('MainTabs', { screen: 'Messages' });
       return;
     }
 

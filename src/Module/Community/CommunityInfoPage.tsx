@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActionSheetIOS,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,8 @@ import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
@@ -121,6 +125,149 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
 
   const role = String(me?.base_role ?? '').toLowerCase();
   const isAdmin = role === 'owner' || role === 'admin' || role === 'moderator';
+
+  const resolveUserId = (member: CommunityMember): string => {
+    const u = member.user;
+    if (typeof u === 'object' && u && u.id) return String(u.id);
+    if (typeof u === 'string' || typeof u === 'number') return String(u);
+    return '';
+  };
+
+  const handleMemberAction = (member: CommunityMember) => {
+    const userId = resolveUserId(member);
+    if (!userId) return;
+    const label = member.display_name || resolveUserName(member.user) || 'Member';
+    const memberRole = String(member.base_role ?? '').toLowerCase();
+    const isOwner = memberRole === 'owner';
+    const isMemberAdmin = memberRole === 'admin' || memberRole === 'owner' || memberRole === 'moderator';
+
+    const options: string[] = [];
+    const actions: (() => void)[] = [];
+
+    if (!isOwner) {
+      options.push('Remove from community');
+      actions.push(() => {
+        Alert.alert(
+          'Remove member',
+          `Remove ${label} from this community?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Remove',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await postRequest(ROUTES.community.ban(communityId), { user_id: userId }, {
+                    errorMessage: 'Failed to remove member',
+                  });
+                  setMembers((prev) => prev.filter((m) => resolveUserId(m) !== userId));
+                } catch (err: any) {
+                  Alert.alert('Error', err?.message || 'Unable to remove member.');
+                }
+              },
+            },
+          ],
+        );
+      });
+
+      if (isMemberAdmin) {
+        options.push('Demote from admin');
+        actions.push(async () => {
+          try {
+            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'member' }, {
+              errorMessage: 'Failed to demote member',
+            });
+            setMembers((prev) =>
+              prev.map((m) =>
+                resolveUserId(m) === userId ? { ...m, base_role: 'member' } : m,
+              ),
+            );
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Unable to demote member.');
+          }
+        });
+      } else {
+        options.push('Promote to admin');
+        actions.push(async () => {
+          try {
+            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'admin' }, {
+              errorMessage: 'Failed to promote member',
+            });
+            setMembers((prev) =>
+              prev.map((m) =>
+                resolveUserId(m) === userId ? { ...m, base_role: 'admin' } : m,
+              ),
+            );
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Unable to promote member.');
+          }
+        });
+      }
+    }
+
+    options.push('Cancel');
+    actions.push(() => {});
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: label,
+          options,
+          destructiveButtonIndex: 0,
+          cancelButtonIndex: options.length - 1,
+        },
+        (index) => {
+          actions[index]?.();
+        },
+      );
+    } else {
+      // Android fallback via Alert
+      const alertButtons = options.slice(0, -1).map((opt, i) => ({
+        text: opt,
+        style: (i === 0 ? 'destructive' : 'default') as 'destructive' | 'default',
+        onPress: () => actions[i]?.(),
+      }));
+      alertButtons.push({ text: 'Cancel', style: 'cancel' as any, onPress: () => {} });
+      Alert.alert(label, 'Choose an action', alertButtons);
+    }
+  };
+
+  const handleLeaveCommunity = () => {
+    Alert.alert(
+      'Leave community',
+      'Are you sure you want to leave this community?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRequest(ROUTES.community.leave(communityId), {
+                errorMessage: 'Failed to leave community',
+              });
+              // Remove self from the members list
+              setMembers((prev) =>
+                prev.filter((m) => resolveUserId(m) !== String(currentUserId ?? '')),
+              );
+            } catch (err: any) {
+              // Some backends use POST for leave
+              try {
+                await postRequest(ROUTES.community.leave(communityId), {}, {
+                  errorMessage: 'Failed to leave community',
+                });
+                setMembers((prev) =>
+                  prev.filter((m) => resolveUserId(m) !== String(currentUserId ?? '')),
+                );
+              } catch (err2: any) {
+                Alert.alert('Error', err2?.message || 'Unable to leave community.');
+              }
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleChangeAvatar = async () => {
     if (!isAdmin || saving) return;
@@ -250,6 +397,10 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
               const label = m.display_name || resolveUserName(m.user) || 'Member';
               const phone = resolveUserPhone(m.user);
               const roleLabel = m.base_role ? String(m.base_role) : '';
+              const memberId = resolveUserId(m);
+              const memberRole = String(m.base_role ?? '').toLowerCase();
+              const isOwnerMember = memberRole === 'owner';
+              const isMe = memberId && memberId === String(currentUserId ?? '');
               return (
                 <View
                   key={`${typeof m.user === 'object' && m.user ? m.user.id : index}`}
@@ -264,11 +415,41 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                       {phone || 'No phone'}{roleLabel ? ` • ${roleLabel}` : ''}
                     </Text>
                   </View>
+                  {isAdmin && !isMe && !isOwnerMember && (
+                    <Pressable
+                      onPress={() => handleMemberAction(m)}
+                      hitSlop={8}
+                      style={styles.memberActionBtn}
+                    >
+                      <KISIcon name="menu" size={18} color={palette.subtext} />
+                    </Pressable>
+                  )}
                 </View>
               );
             })
           )}
         </View>
+
+        {/* Leave community — shown to non-owner members */}
+        {me && role !== 'owner' && (
+          <View style={[styles.section, { paddingTop: 24 }]}>
+            <Pressable
+              onPress={handleLeaveCommunity}
+              style={({ pressed }) => [
+                styles.leaveButton,
+                {
+                  backgroundColor: pressed ? (palette.dangerSoft ?? '#ffeaea') : 'transparent',
+                  borderColor: palette.danger ?? '#d9534f',
+                },
+              ]}
+            >
+              <KISIcon name="arrow-left" size={16} color={palette.danger ?? '#d9534f'} />
+              <Text style={[styles.leaveButtonText, { color: palette.danger ?? '#d9534f' }]}>
+                Leave community
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -313,6 +494,17 @@ const styles = StyleSheet.create({
   memberInfo: { marginLeft: 10, flex: 1 },
   memberName: { fontSize: 14, fontWeight: '600' },
   memberRole: { fontSize: 12 },
+  memberActionBtn: { padding: 6, marginLeft: 4 },
+  leaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  leaveButtonText: { fontSize: 14, fontWeight: '600' },
 });
 
 export default CommunityInfoPage;

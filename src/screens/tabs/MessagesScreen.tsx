@@ -40,6 +40,7 @@ import { decryptFromUser, ensureDeviceId } from '@/security/e2ee';
 import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
 import CallsTab from '@/screens/tabs/MesssagingSubTabs/CallsTab';
+import CommunitiesTab from '@/screens/tabs/CommunitiesTab';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -814,7 +815,9 @@ useEffect(() => {
         convId,
       );
       upsertMessage(convId, mapped).catch(() => {});
-    } catch {}
+    } catch (err: any) {
+      console.warn('[MessagesScreen] failed to map/upsert incoming message', err?.message);
+    }
 
     queueMetaRefresh(convId);
 
@@ -1435,14 +1438,14 @@ const handleSelectAllChats = useCallback(() => {
   }, [activeQuick]);
 
   // ── Animated Top Tab Bar (collapses space) ───────────────────────────────
-  const [activeTopTab, setActiveTopTab] = useState<'Chats' | 'Updates' | 'Calls'>('Chats');
+  const [activeTopTab, setActiveTopTab] = useState<'Chats' | 'Updates' | 'Calls' | 'Communities'>('Chats');
   const [tabSearchOpen, setTabSearchOpen] = useState(false);
   const [tabSearchQuery, setTabSearchQuery] = useState('');
 
   const AnimatedTopBar = (tabProps: any) => {
     const nextTab = tabProps?.state?.routes?.[tabProps.state.index]?.name;
     useEffect(() => {
-      if (nextTab === 'Chats' || nextTab === 'Updates' || nextTab === 'Calls') {
+      if (nextTab === 'Chats' || nextTab === 'Updates' || nextTab === 'Calls' || nextTab === 'Communities') {
         setActiveTopTab(nextTab);
       }
     }, [nextTab]);
@@ -1485,6 +1488,12 @@ const handleSelectAllChats = useCallback(() => {
         { key: 'calls-settings', label: 'Calls settings' },
       ];
     }
+    if (activeTopTab === 'Communities') {
+      return [
+        { key: 'new-community', label: 'New community' },
+        { key: 'discover-communities', label: 'Discover communities' },
+      ];
+    }
     return [
       { key: 'new-chat', label: 'New chat' },
       { key: 'new-group', label: 'New group' },
@@ -1512,6 +1521,12 @@ const handleSelectAllChats = useCallback(() => {
       case 'call-history':
         tabRef.current?.navigate?.('Calls');
         return;
+      case 'new-community':
+        DeviceEventEmitter.emit('community.create');
+        return;
+      case 'discover-communities':
+        DeviceEventEmitter.emit('community.discover');
+        return;
       case 'updates-settings':
       case 'calls-settings':
       case 'settings':
@@ -1526,6 +1541,10 @@ const handleSelectAllChats = useCallback(() => {
     if (activeTopTab === 'Chats') {
       setMenuVisible(false);
       setCameraShareVisible(true);
+      return;
+    }
+    if (activeTopTab === 'Communities') {
+      DeviceEventEmitter.emit('community.discover');
       return;
     }
     setTabSearchOpen(true);
@@ -1591,7 +1610,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   );
 
   useEffect(() => {
-    if (activeTopTab === 'Chats') {
+    if (activeTopTab === 'Chats' || activeTopTab === 'Communities') {
       setTabSearchOpen(false);
       setTabSearchQuery('');
     }
@@ -1826,7 +1845,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {[
                 {
                   key: 'camera-search',
-                  icon: activeTopTab === 'Chats' ? 'camera' : 'search',
+                  icon: activeTopTab === 'Chats' ? 'camera' : activeTopTab === 'Communities' ? 'globe' : 'search',
                   onPress: handleHeaderCameraPress,
                 },
                 { key: 'menu', icon: 'menu', onPress: () => setMenuVisible((v) => !v) },
@@ -1958,6 +1977,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   ? 'Search updates, channels, and messages…'
                   : activeTopTab === 'Calls'
                   ? 'Search calls, contacts, and messages…'
+                  : activeTopTab === 'Communities'
+                  ? 'Search communities…'
                   : 'Search chats, people, groups, and messages…'
               }
               placeholderTextColor={palette.subtext}
@@ -2169,6 +2190,12 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           <Tab.Screen
             name="Calls"
             children={() => <CallsTab searchTerm={query} />}
+          />
+          <Tab.Screen
+            name="Communities"
+            children={() => (
+              <CommunitiesTab onOpenChat={onOpenChat} />
+            )}
           />
         </Tab.Navigator>
 

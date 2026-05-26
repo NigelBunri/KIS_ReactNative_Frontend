@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   ScrollView,
@@ -45,6 +46,15 @@ type Module = {
   order: number;
 };
 
+type QuizChoice = { id: string; text: string };
+type QuizQuestion = {
+  id: string;
+  question: string;
+  question_type?: 'multiple_choice' | 'true_false' | 'short_answer';
+  choices?: QuizChoice[];
+  correct_choice?: string;
+};
+
 type Lesson = {
   id: string;
   course: string;
@@ -64,6 +74,7 @@ type Lesson = {
   is_free?: boolean;
   completed?: boolean;
   last_position_ms?: number;
+  quiz_questions?: QuizQuestion[];
 };
 
 const listFromResponse = (data: any) => {
@@ -105,6 +116,32 @@ export default function BibleLessonsPanel() {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingContent, setLoadingContent] = useState(false);
   const [message, setMessage] = useState('');
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizResult, setQuizResult] = useState<{ score?: number; total?: number; passed?: boolean } | null>(null);
+
+  const submitQuiz = async (lesson: Lesson) => {
+    const questions = lesson.quiz_questions ?? [];
+    if (questions.length === 0) return;
+    setQuizSubmitting(true);
+    setQuizResult(null);
+    const answers = questions.map(q => ({ question_id: q.id, choice_id: quizAnswers[q.id] ?? '' }));
+    const res = await postRequest(
+      `/api/v1/bible/lessons/${lesson.id}/submit/`,
+      { answers },
+      { errorMessage: 'Unable to submit quiz.' },
+    );
+    if (res?.data) {
+      setQuizResult({
+        score: res.data.score ?? res.data.correct ?? null,
+        total: res.data.total ?? questions.length,
+        passed: res.data.passed ?? res.data.pass ?? null,
+      });
+    } else {
+      Alert.alert('Quiz', res?.message || 'Unable to submit. Please try again.');
+    }
+    setQuizSubmitting(false);
+  };
 
   const loadCourses = async () => {
     setLoadingCourses(true);
@@ -421,6 +458,49 @@ export default function BibleLessonsPanel() {
               ) : null}
             </View>
             {message ? <Text style={{ color: palette.primaryStrong, fontWeight: '800' }}>{message}</Text> : null}
+
+            {(selectedLesson.quiz_questions ?? []).length > 0 ? (
+              <View style={{ gap: 12, marginTop: 8 }}>
+                <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Quiz</Text>
+                {(selectedLesson.quiz_questions ?? []).map((q, qi) => (
+                  <View key={q.id} style={{ gap: 6 }}>
+                    <Text style={{ color: palette.text, fontWeight: '700' }}>{qi + 1}. {q.question}</Text>
+                    {(q.choices ?? []).map(choice => {
+                      const selected = quizAnswers[q.id] === choice.id;
+                      return (
+                        <TouchableOpacity
+                          key={choice.id}
+                          onPress={() => setQuizAnswers(prev => ({ ...prev, [q.id]: choice.id }))}
+                          style={{
+                            borderWidth: 2,
+                            borderRadius: 10,
+                            padding: 10,
+                            borderColor: selected ? palette.primary : palette.divider,
+                            backgroundColor: selected ? (palette.primarySoft ?? palette.primary + '15') : 'transparent',
+                          }}
+                        >
+                          <Text style={{ color: selected ? palette.primaryStrong : palette.text }}>{choice.text}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+                {quizResult ? (
+                  <View style={{ padding: 12, borderRadius: 12, backgroundColor: quizResult.passed ? '#16a34a20' : '#dc262620' }}>
+                    <Text style={{ color: quizResult.passed ? '#16a34a' : '#dc2626', fontWeight: '900', fontSize: 15 }}>
+                      {quizResult.passed ? '✓ Passed!' : '✗ Not passed'}
+                      {quizResult.score != null ? `  ${quizResult.score}/${quizResult.total}` : ''}
+                    </Text>
+                  </View>
+                ) : null}
+                <KISButton
+                  title={quizSubmitting ? 'Submitting…' : 'Submit Quiz'}
+                  size="sm"
+                  disabled={quizSubmitting}
+                  onPress={() => submitQuiz(selectedLesson)}
+                />
+              </View>
+            ) : null}
           </BibleSectionCard>
         ) : !loadingContent ? (
           <BibleSectionCard>

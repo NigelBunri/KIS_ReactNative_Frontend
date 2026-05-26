@@ -41,6 +41,20 @@ type PlannerView = 'month' | 'week' | 'day';
 type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 type EventStatus = 'scheduled' | 'completed' | 'missed' | 'cancelled';
 
+type ReadingPlan = {
+  id: string;
+  title: string;
+  description?: string;
+  duration_days?: number;
+  level?: string;
+  category?: string;
+  cover_image?: string | null;
+  is_enrolled?: boolean;
+  enrolled?: boolean;
+  enrollment_id?: string | null;
+  enrollment_status?: string | null;
+};
+
 type PlannerEvent = {
   id: string;
   translation?: string | number | null;
@@ -126,6 +140,12 @@ export default function BiblePlansPanel() {
     'in_app',
   ]);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Bible reading plans state
+  const [plans, setPlans] = useState<ReadingPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [enrollingPlanId, setEnrollingPlanId] = useState<string | null>(null);
+  const [plansMessage, setPlansMessage] = useState('');
 
   const dateRange = useMemo(() => {
     if (view === 'day') {
@@ -430,6 +450,40 @@ export default function BiblePlansPanel() {
     loadEvents();
   };
 
+  const loadPlans = useCallback(async () => {
+    setLoadingPlans(true);
+    const res = await getRequest(ROUTES.bible.plans, {
+      errorMessage: 'Unable to load reading plans.',
+    });
+    const payload = listFromResponse(res?.data);
+    setPlans(payload);
+    setLoadingPlans(false);
+  }, []);
+
+  const enrollInPlan = useCallback(async (plan: ReadingPlan) => {
+    if (plan.is_enrolled || plan.enrolled) return;
+    setEnrollingPlanId(plan.id);
+    setPlansMessage('');
+    const res = await postRequest(
+      ROUTES.bible.planEnrollments,
+      { plan: plan.id },
+      { errorMessage: 'Unable to enroll in plan.' },
+    );
+    if (res?.success || res?.data?.id) {
+      setPlans(prev =>
+        prev.map(p =>
+          p.id === plan.id ? { ...p, is_enrolled: true, enrollment_status: 'active' } : p,
+        ),
+      );
+      setPlansMessage(`Enrolled in "${plan.title}"!`);
+    } else {
+      Alert.alert('Enrollment', res?.message || 'Unable to enroll. Please try again.');
+    }
+    setEnrollingPlanId(null);
+  }, []);
+
+  useEffect(() => { loadPlans(); }, [loadPlans]);
+
   const visibleDays = useMemo(() => {
     if (view === 'day') return [startOfDay(cursor)];
     if (view === 'week') {
@@ -474,6 +528,11 @@ export default function BiblePlansPanel() {
       ),
     [events],
   );
+
+  // Progress stats for the current view range
+  const totalDays = visibleRangeEvents.length;
+  const completedDays = visibleRangeEvents.filter(e => e.status === 'completed').length;
+  const progressRatio = totalDays > 0 ? completedDays / totalDays : 0;
 
   return (
     <View style={styles.stack}>
@@ -1005,6 +1064,84 @@ export default function BiblePlansPanel() {
             {message}
           </Text>
         ) : null}
+      </BibleSectionCard>
+
+      {/* ── Reading Plans ── */}
+      <BibleSectionCard>
+        <View style={styles.headerRow}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>Reading Plans</Text>
+          <KISButton title="Refresh" size="xs" variant="outline" onPress={loadPlans} />
+        </View>
+        {plansMessage ? (
+          <Text style={{ color: palette.primaryStrong, fontWeight: '800', marginBottom: 4 }}>{plansMessage}</Text>
+        ) : null}
+        {loadingPlans ? (
+          <View style={styles.stateBox}>
+            <ActivityIndicator color={palette.primaryStrong} />
+            <Text style={{ color: palette.subtext }}>Loading plans…</Text>
+          </View>
+        ) : plans.length === 0 ? (
+          <View style={styles.stateBox}>
+            <Text style={{ color: palette.subtext }}>No reading plans available.</Text>
+          </View>
+        ) : (
+          <View style={{ gap: 10 }}>
+            {plans.map(plan => {
+              const enrolled = plan.is_enrolled || plan.enrolled;
+              return (
+                <View
+                  key={plan.id}
+                  style={[
+                    styles.eventCard,
+                    { borderColor: enrolled ? palette.primary : palette.divider, backgroundColor: palette.surfaceElevated ?? palette.surface },
+                  ]}
+                >
+                  <View style={styles.referenceRow}>
+                    <Text style={[styles.sectionTitle, { color: palette.text, fontSize: 16, flex: 1 }]}>
+                      {plan.title}
+                    </Text>
+                    {enrolled ? (
+                      <View style={[styles.badge, { backgroundColor: palette.primary + '20' }]}>
+                        <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 12 }}>
+                          {plan.enrollment_status === 'completed' ? 'Completed' : 'Enrolled'}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {plan.description ? (
+                    <Text style={{ color: palette.subtext, fontSize: 13 }}>{plan.description}</Text>
+                  ) : null}
+                  <View style={styles.referenceRow}>
+                    {plan.duration_days ? (
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>{plan.duration_days} days</Text>
+                    ) : null}
+                    {plan.level ? (
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>· {plan.level}</Text>
+                    ) : null}
+                    {plan.category ? (
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>· {plan.category}</Text>
+                    ) : null}
+                  </View>
+                  {!enrolled ? (
+                    <KISButton
+                      title={enrollingPlanId === plan.id ? 'Enrolling…' : 'Start Plan'}
+                      size="sm"
+                      disabled={enrollingPlanId === plan.id}
+                      onPress={() => enrollInPlan(plan)}
+                    />
+                  ) : (
+                    <KISButton
+                      title="Continue"
+                      size="sm"
+                      variant="outline"
+                      onPress={() => setPlansMessage(`Continue reading "${plan.title}"`)}
+                    />
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
       </BibleSectionCard>
     </View>
   );

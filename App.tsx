@@ -41,6 +41,7 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
+import TwoFactorScreen from './src/screens/TwoFactorScreen';
 import { MainTabs } from '@/navigation/AppNavigator';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
@@ -57,6 +58,7 @@ import ContentDashboardScreen from './src/screens/insights/ContentDashboardScree
 import SurveysDashboardScreen from './src/screens/insights/SurveysDashboardScreen';
 import MediaDashboardScreen from './src/screens/insights/MediaDashboardScreen';
 import BridgeDashboardScreen from './src/screens/insights/BridgeDashboardScreen';
+import BridgeManagementScreen from './src/screens/insights/BridgeManagementScreen';
 import TiersDashboardScreen from './src/screens/insights/TiersDashboardScreen';
 import NotificationsDashboardScreen from './src/screens/insights/NotificationsDashboardScreen';
 import OrganizationAppScreen from './src/screens/partners/OrganizationAppScreen';
@@ -64,6 +66,7 @@ import OrganizationAppFormScreen from './src/screens/partners/OrganizationAppFor
 import OrgAppLaunchScreen from './src/screens/partners/OrgAppLaunchScreen';
 import HealthInstitutionDetailScreen from './src/screens/health/HealthInstitutionDetailScreen';
 import HealthInstitutionManagementScreen from './src/screens/health/HealthInstitutionManagementScreen';
+import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
 import InstitutionProfileEditorScreen from './src/screens/health/InstitutionProfileEditorScreen';
 import ProfileLandingEditorScreen from './src/screens/profile/ProfileLandingEditorScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
@@ -116,6 +119,8 @@ import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificati
 import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
+import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
+import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
 import DeviceManagementScreen from '@/screens/DeviceManagementScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
@@ -124,6 +129,14 @@ import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
 import EventsScreen from '@/screens/EventsScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
+import SetupPINScreen from '@/screens/SetupPINScreen';
+import QuickLockScreen from '@/screens/QuickLockScreen';
+import WalletScreen from '@/screens/WalletScreen';
+import SubscriptionManagementScreen from '@/screens/SubscriptionManagementScreen';
+import AIIntegrationScreen from './src/screens/insights/AIIntegrationScreen';
+import MediaAssetManagerScreen from './src/screens/insights/MediaAssetManagerScreen';
+import SurveyManagerScreen from './src/screens/insights/SurveyManagerScreen';
+import { isPINEnabled, shouldLockAsync } from '@/services/QuickLockService';
 
 type AuthCtx = {
   isAuth: boolean;
@@ -163,6 +176,8 @@ function AppContent() {
   const [load, setLoad] = useState(false);
   const [_phone, setPhone] = useState<string | null>(null);
   const [user, setUser] = useState<KISUser | null>(null);
+  const [showQuickLock, setShowQuickLock] = useState(false);
+  const lastActiveAtRef = useRef<number>(Date.now());
   const [locationReady, setLocationReady] = useState(false);
   const locationReadyRef = useRef(false);
   const [locationChecking, setLocationChecking] = useState(true);
@@ -460,6 +475,26 @@ function AppContent() {
     initPushHandlers(navigationRef);
   }, []);
 
+  // Quick Lock: track background → foreground transitions
+  useEffect(() => {
+    if (!isAuth) return;
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const pinEnabled = await isPINEnabled();
+        if (pinEnabled) {
+          const lock = await shouldLockAsync(lastActiveAtRef.current);
+          if (lock) {
+            setShowQuickLock(true);
+          }
+        }
+        lastActiveAtRef.current = Date.now();
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        lastActiveAtRef.current = Date.now();
+      }
+    });
+    return () => subscription.remove();
+  }, [isAuth]);
+
   useEffect(() => {
     if (!isAuth) return;
     let active = true;
@@ -715,6 +750,11 @@ function AppContent() {
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
+                      name="AdminUserManagement"
+                      component={AdminUserManagementScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
                       name="ModerationConsole"
                       component={ModerationConsoleScreen}
                       options={{ presentation: 'modal', title: 'Moderation Console' }}
@@ -757,6 +797,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="BridgeDashboard"
                       component={BridgeDashboardScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="BridgeManagement"
+                      component={BridgeManagementScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
@@ -866,6 +911,11 @@ function AppContent() {
                       component={PasswordChangeScreen}
                     />
                     <RootStack.Screen
+                      name="ComplianceSettings"
+                      component={ComplianceSettingsScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
                       name="DeviceManagement"
                       component={DeviceManagementScreen}
                     />
@@ -889,6 +939,16 @@ function AppContent() {
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
+                      name="Wallet"
+                      component={WalletScreen}
+                      options={{ presentation: 'modal', title: 'Wallet' }}
+                    />
+                    <RootStack.Screen
+                      name="SubscriptionManagement"
+                      component={SubscriptionManagementScreen}
+                      options={{ presentation: 'modal', title: 'Subscription' }}
+                    />
+                    <RootStack.Screen
                       name="ServiceBookingDetails"
                       component={ServiceBookingDetailsPage}
                       options={{ presentation: 'modal' }}
@@ -900,6 +960,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="HealthInstitutionManagement"
                       component={HealthInstitutionManagementScreen}
+                    />
+                    <RootStack.Screen
+                      name="ClinicalCommandCenter"
+                      component={ClinicalCommandCenterScreen}
                     />
                     <RootStack.Screen
                       name="InstitutionProfileEditor"
@@ -938,6 +1002,26 @@ function AppContent() {
                       component={AdminDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
+                    <RootStack.Screen
+                      name="AIIntegration"
+                      component={AIIntegrationScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="MediaAssetManager"
+                      component={MediaAssetManagerScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="SurveyManager"
+                      component={SurveyManagerScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="SetupPIN"
+                      component={SetupPINScreen}
+                      options={{ presentation: 'modal' }}
+                    />
                   </>
                 ) : (
                   <>
@@ -958,6 +1042,11 @@ function AppContent() {
                         />
                       )}
                     </RootStack.Screen>
+                    <RootStack.Screen
+                      name="TwoFactor"
+                      component={TwoFactorScreen}
+                      options={{ headerShown: false }}
+                    />
                   </>
                 )}
               </RootStack.Navigator>
@@ -965,6 +1054,12 @@ function AppContent() {
           </NavigationContainer>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
+          {showQuickLock && isAuth ? (
+            <QuickLockScreen onDismiss={() => {
+              setShowQuickLock(false);
+              lastActiveAtRef.current = Date.now();
+            }} />
+          ) : null}
         </View>
       </SocketProvider>
     </AuthContext.Provider>

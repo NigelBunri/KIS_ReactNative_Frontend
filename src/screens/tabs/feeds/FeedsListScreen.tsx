@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -38,6 +38,48 @@ export default function FeedsListScreen() {
     updateItem,
   } = useBroadcastFeed();
 
+  // Track locally-subscribed channel IDs for optimistic UI.
+  const [subscribedChannels, setSubscribedChannels] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const handleSubscribe = useCallback(
+    async (item: any) => {
+      const channelId: string | undefined =
+        item?.metadata?.channel_id ??
+        item?.metadata?.channel?.id ??
+        item?.channel_id ??
+        item?.channel?.id;
+      if (!channelId) return;
+
+      // Optimistic update — mark subscribed immediately.
+      setSubscribedChannels(prev => {
+        const next = new Set(prev);
+        next.add(channelId);
+        return next;
+      });
+
+      try {
+        const response = await postRequest(
+          ROUTES.broadcasts.channelSubscribe(channelId),
+          {},
+          { errorMessage: 'Unable to subscribe to channel.' },
+        );
+        if (!response?.success) {
+          throw new Error(response?.message ?? 'Subscribe failed');
+        }
+      } catch {
+        // Rollback on failure.
+        setSubscribedChannels(prev => {
+          const next = new Set(prev);
+          next.delete(channelId);
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
   const handleReact = useCallback(
     async (broadcastId: string) => {
       updateItem(broadcastId, item => ({
@@ -71,21 +113,35 @@ export default function FeedsListScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
-      <FeedItemCard
-        item={item}
-        onPress={() =>
-          navigation.navigate('BroadcastDetail', {
-            id: item.id,
-            item,
-            items,
-            index,
-          })
-        }
-        onReact={() => handleReact(item.id)}
-      />
-    ),
-    [handleReact, items, navigation],
+    ({ item, index }: { item: any; index: number }) => {
+      const channelId: string | undefined =
+        item?.metadata?.channel_id ??
+        item?.metadata?.channel?.id ??
+        item?.channel_id ??
+        item?.channel?.id;
+      const isSubscribed =
+        item?.metadata?.channel?.is_subscribed === true ||
+        item?.channel?.is_subscribed === true ||
+        (channelId != null && subscribedChannels.has(channelId));
+
+      return (
+        <FeedItemCard
+          item={item}
+          onPress={() =>
+            navigation.navigate('BroadcastDetail', {
+              id: item.id,
+              item,
+              items,
+              index,
+            })
+          }
+          onReact={() => handleReact(item.id)}
+          isSubscribed={isSubscribed}
+          onSubscribe={channelId ? () => handleSubscribe(item) : undefined}
+        />
+      );
+    },
+    [handleReact, handleSubscribe, items, navigation, subscribedChannels],
   );
 
   const listEmpty = (

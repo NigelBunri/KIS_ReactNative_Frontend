@@ -494,6 +494,17 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     });
   }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
 
+  const handleOpenClinicalCommandCenter = useCallback(() => {
+    if (!resolvedInstitutionId) {
+      Alert.alert('Clinical Command Center', 'Create the institution first.');
+      return;
+    }
+    navigation.navigate('ClinicalCommandCenter', {
+      institutionId: resolvedInstitutionId,
+      institutionName: form.name || resolvedInstitution?.name,
+    });
+  }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
+
   const cycleType = useCallback(() => {
     const index = HEALTH_INSTITUTION_TYPES.findIndex((type) => type === form.type);
     const nextType = HEALTH_INSTITUTION_TYPES[(index + 1) % HEALTH_INSTITUTION_TYPES.length];
@@ -649,6 +660,13 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
                 variant="outline"
                 onPress={resolvedInstitutionId ? handleViewMembers : undefined}
                 disabled={!resolvedInstitutionId || !canOpenMembers}
+              />
+              <View style={{ height: HEALTH_THEME_SPACING.sm }} />
+              <KISButton
+                title={resolvedInstitutionId ? 'Clinical Command Center' : 'Create institution first'}
+                variant="secondary"
+                onPress={resolvedInstitutionId ? handleOpenClinicalCommandCenter : undefined}
+                disabled={!resolvedInstitutionId}
               />
             </View>
           </View>

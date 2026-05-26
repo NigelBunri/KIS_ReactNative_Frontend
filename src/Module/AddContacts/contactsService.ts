@@ -390,7 +390,9 @@ async function setCachedContacts(contacts: KISContact[]): Promise<void> {
         JSON.stringify({ savedAt: Date.now() }),
       ),
     ]);
-  } catch {}
+  } catch (err: any) {
+    console.warn('[contactsService] failed to cache contacts', err?.message);
+  }
 }
 
 export async function saveContactToDevice(payload: {

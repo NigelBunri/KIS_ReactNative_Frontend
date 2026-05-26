@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { isLocalId, localChaptersForBook } from '@/data/bibleLocalData';
 import NetInfo from '@react-native-community/netinfo';
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import {
   ActivityIndicator,
   Alert,
@@ -212,6 +213,13 @@ export default function BibleReaderPanel({
   const verseOffsetsRef = useRef<Record<string, number>>({});
   const pendingScrollVerseRef = useRef<number | null>(null);
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
+
+  // Audio player state
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
+  const audioPlayerRef = useRef<AudioRecorderPlayer | null>(null);
 
   const verses = useMemo(() => reader?.verses ?? [], [reader?.verses]);
   const currentTranslationCode =
@@ -491,6 +499,37 @@ export default function BibleReaderPanel({
     };
     loadChapters();
   }, [selectedBookObj?.id, selectedBookObj?.code]);
+
+  // Sync audio URL when reader chapter changes
+  useEffect(() => {
+    const url = reader?.audio?.audio_file ?? null;
+    if (url !== audioUrl) {
+      // Stop any active playback when chapter changes
+      if (audioPlayerRef.current) {
+        try {
+          audioPlayerRef.current.stopPlayer();
+          audioPlayerRef.current.removePlayBackListener();
+        } catch {}
+      }
+      setIsPlaying(false);
+      setPlaybackPosition(0);
+      setPlaybackDuration(0);
+      setAudioUrl(url);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reader?.audio?.audio_file]);
+
+  // Cleanup audio player on unmount
+  useEffect(() => {
+    return () => {
+      if (audioPlayerRef.current) {
+        try {
+          audioPlayerRef.current.stopPlayer();
+          audioPlayerRef.current.removePlayBackListener();
+        } catch {}
+      }
+    };
+  }, []);
 
   const loadLibraries = useCallback(
     async (color?: string | null) => {
@@ -896,6 +935,90 @@ export default function BibleReaderPanel({
     referenceInput,
     startVerse,
   ]);
+
+  const toggleAudioPlayback = useCallback(async () => {
+    if (!audioUrl) return;
+    if (!audioPlayerRef.current) {
+      audioPlayerRef.current = new AudioRecorderPlayer();
+    }
+    const player = audioPlayerRef.current;
+    if (isPlaying) {
+      try {
+        await player.pausePlayer();
+      } catch {}
+      setIsPlaying(false);
+    } else {
+      try {
+        await player.startPlayer(audioUrl);
+        player.addPlayBackListener((e: any) => {
+          const pos = e.currentPosition ?? 0;
+          const dur = e.duration && e.duration > 0 ? e.duration : 0;
+          setPlaybackPosition(pos);
+          setPlaybackDuration(dur);
+          if (dur > 0 && pos >= dur - 200) {
+            setIsPlaying(false);
+            setPlaybackPosition(0);
+          }
+        });
+        setIsPlaying(true);
+      } catch {}
+    }
+  }, [audioUrl, isPlaying]);
+
+  const formatAudioTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const renderAudioBar = () => {
+    if (!audioUrl) return null;
+    const progress = playbackDuration > 0 ? playbackPosition / playbackDuration : 0;
+    return (
+      <View
+        style={[
+          styles.audioBar,
+          { backgroundColor: palette.surface, borderColor: palette.divider },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={toggleAudioPlayback}
+          style={[styles.audioPlayBtn, { backgroundColor: palette.primarySoft }]}
+        >
+          <KISIcon
+            name={isPlaying ? 'pause' : 'play'}
+            size={20}
+            color={palette.primaryStrong}
+          />
+        </TouchableOpacity>
+        <View style={styles.audioProgressWrap}>
+          <View style={[styles.audioTrack, { backgroundColor: palette.divider }]}>
+            <View
+              style={[
+                styles.audioFill,
+                {
+                  width: `${Math.min(100, Math.round(progress * 100))}%`,
+                  backgroundColor: palette.primaryStrong,
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.audioTimeRow}>
+            <Text style={[styles.audioTimeText, { color: palette.subtext }]}>
+              {formatAudioTime(playbackPosition)}
+            </Text>
+            {playbackDuration > 0 ? (
+              <Text style={[styles.audioTimeText, { color: palette.subtext }]}>
+                {formatAudioTime(playbackDuration)}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Text style={[styles.audioLabel, { color: palette.subtext }]}>Audio</Text>
+      </View>
+    );
+  };
 
   const renderFilterSheet = () => (
     <Modal
@@ -2246,6 +2369,7 @@ export default function BibleReaderPanel({
         ) : null}
       </ScrollView>
 
+      {renderAudioBar()}
       {renderFilterSheet()}
       {renderVerseActionModal()}
     </View>
@@ -2256,6 +2380,27 @@ const styles = StyleSheet.create({
   readerRoot: { flex: 1, minHeight: 0 },
   readerScroll: { flex: 1 },
   readerScrollContent: { gap: 14, paddingVertical: 16, paddingBottom: 40 },
+  audioBar: {
+    borderTopWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  audioPlayBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioProgressWrap: { flex: 1, gap: 4 },
+  audioTrack: { height: 6, borderRadius: 999, overflow: 'hidden' },
+  audioFill: { height: 6, borderRadius: 999 },
+  audioTimeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  audioTimeText: { fontSize: 11 },
+  audioLabel: { fontSize: 11, fontWeight: '900' },
   stack: { gap: 14 },
   title: { fontSize: 18, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },

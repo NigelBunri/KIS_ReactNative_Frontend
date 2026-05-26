@@ -290,6 +290,42 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     !poll &&
     !eventData;
 
+  // Edit indicator
+  const isEdited = !!(message as any).isEdited || !!(message as any).edited_at ||
+    (!!(message as any).is_edited) ||
+    (
+      typeof (message as any).updated_at === 'string' &&
+      typeof (message as any).created_at === 'string' &&
+      (message as any).updated_at !== (message as any).created_at
+    );
+
+  // Voice transcription state (keyed by message id)
+  const messageId = (message as any).id as string;
+  const [transcription, setTranscription] = useState<string | null>(
+    (message as any).transcription ?? (message as any).transcript ?? null,
+  );
+  const [showTranscription, setShowTranscription] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+
+  const handleShowTranscription = async () => {
+    if (transcription) {
+      setShowTranscription(prev => !prev);
+      return;
+    }
+    setTranscribing(true);
+    try {
+      const { getRequest: get } = await import('@/network/get');
+      const res = await get(`/api/v1/messages/${messageId}/transcription/`, { errorMessage: '' });
+      const text: string | undefined = res?.data?.transcription ?? res?.data?.transcript ?? res?.data?.text;
+      if (text) {
+        setTranscription(text);
+        setShowTranscription(true);
+      }
+    } catch { /* silent */ } finally {
+      setTranscribing(false);
+    }
+  };
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
   const responsive = useResponsiveLayout();
@@ -1704,7 +1740,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 ]}
               >
                 {timeLabel}
-                {(message as any).isEdited ? ' • edited' : ''}
+                {isEdited ? ' • edited' : ''}
               </Text>
               {renderPinnedIcon()}
             </View>
@@ -1778,7 +1814,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 ]}
               >
                 {timeLabel}
-                {(message as any).isEdited ? ' • edited' : ''}
+                {isEdited ? ' • edited' : ''}
               </Text>
               {renderPinnedIcon()}
             </View>
@@ -1870,6 +1906,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           </Pressable>
 
+          {/* Transcription button and display */}
+          <Pressable
+            onPress={() => void handleShowTranscription()}
+            disabled={transcribing}
+            style={{ marginTop: 6, opacity: transcribing ? 0.5 : 1, alignSelf: 'flex-start' }}
+          >
+            <Text style={{ fontSize: 11, color: metaColor }}>
+              {transcribing ? 'Transcribing...' : showTranscription ? 'Hide transcript' : 'Show transcript'}
+            </Text>
+          </Pressable>
+          {showTranscription && transcription ? (
+            <View
+              style={{
+                marginTop: 4,
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+                borderRadius: 8,
+                backgroundColor: isMe ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
+              }}
+            >
+              <Text style={{ fontSize: 12, color: textColor, fontStyle: 'italic' }}>{transcription}</Text>
+            </View>
+          ) : null}
+
           {renderReactionsRow()}
           {renderRetry()}
 
@@ -1885,7 +1945,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 ]}
               >
                 {timeLabel}
-                {(message as any).isEdited ? ' • edited' : ''}
+                {isEdited ? ' • edited' : ''}
               </Text>
               {renderPinnedIcon()}
             </View>
@@ -1946,6 +2006,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   {expanded ? t('Show less') : t('Read more')}
                 </Text>
               </Pressable>
+            )}
+            {isEdited && (
+              <Text style={{ fontSize: 10, color: metaColor, marginTop: 2 }}>(edited)</Text>
             )}
           </View>
         )}
@@ -2040,7 +2103,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               ]}
             >
               {timeLabel}
-              {(message as any).isEdited ? ' • edited' : ''}
+              {isEdited ? ' • edited' : ''}
             </Text>
             {renderPinnedIcon()}
           </View>

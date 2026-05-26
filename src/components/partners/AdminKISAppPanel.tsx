@@ -3,7 +3,7 @@
  * Covers: messaging, broadcast, education, market, health, partners,
  * feature flags, notifications, governance, analytics, realtime systems.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -74,6 +74,10 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [secondsAgo, setSecondsAgo] = useState(0);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadSection = useCallback(async (section: KISSection) => {
     setActiveSection(section);
@@ -143,8 +147,33 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
       setError(e?.message || 'Failed to load data.');
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
+      setSecondsAgo(0);
     }
   }, []);
+
+  // Auto-refresh every 30 seconds when a section is active
+  useEffect(() => {
+    if (!activeSection) {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      if (clockIntervalRef.current) clearInterval(clockIntervalRef.current);
+      refreshIntervalRef.current = null;
+      clockIntervalRef.current = null;
+      return;
+    }
+    if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    refreshIntervalRef.current = setInterval(() => {
+      void loadSection(activeSection);
+    }, 30000);
+    if (clockIntervalRef.current) clearInterval(clockIntervalRef.current);
+    clockIntervalRef.current = setInterval(() => {
+      setSecondsAgo(prev => prev + 1);
+    }, 1000);
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      if (clockIntervalRef.current) clearInterval(clockIntervalRef.current);
+    };
+  }, [activeSection, loadSection]);
 
   const toggleFlag = useCallback(async (flag: FeatureFlag) => {
     setActionLoading(flag.key);
@@ -230,6 +259,14 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Send</Text>
             </Pressable>
           )}
+          {activeSection && (
+            <Pressable
+              onPress={() => void loadSection(activeSection)}
+              style={[styles.actionBtn, { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider }]}
+            >
+              <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>Refresh</Text>
+            </Pressable>
+          )}
         </View>
 
         {!activeSection ? (
@@ -253,6 +290,13 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
           </ScrollView>
         ) : (
           <View style={{ flex: 1 }}>
+            {lastUpdated && !loading && (
+              <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider }}>
+                <Text style={{ fontSize: 11, color: palette.subtext }}>
+                  Last updated: {secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`}
+                </Text>
+              </View>
+            )}
             {loading ? (
               <View style={styles.center}>
                 <ActivityIndicator color={palette.primary} />

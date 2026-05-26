@@ -25,6 +25,9 @@ const healthRoutes = {
     referrals: `${API_BASE_URL}/api/v1/core/clinical/referrals/`,
     events: `${API_BASE_URL}/api/v1/core/clinical/events/`,
     commandCenter: `${API_BASE_URL}/api/v1/core/clinical/command-center/`,
+    sessions: `${API_BASE_URL}/api/v1/core/clinical/sessions/`,
+    sessionAdvancePhase: (sessionId: string) =>
+      `${API_BASE_URL}/api/v1/core/clinical/sessions/${encodeURIComponent(sessionId)}/advance_phase/`,
   },
   patients: {
     master: `${API_BASE_URL}/api/v1/patients/master/`,

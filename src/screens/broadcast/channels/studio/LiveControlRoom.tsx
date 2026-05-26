@@ -26,6 +26,7 @@ import {
   Clipboard,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -35,6 +36,7 @@ import KISTextInput from '@/constants/KISTextInput';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { deleteRequest } from '@/network/delete';
 import {
   endLiveStream,
   fetchChannelLiveStreams,
@@ -176,6 +178,193 @@ function CredRow({
   );
 }
 
+// ── Recordings panel (shown when stream status === 'ended') ──────────────────
+
+type Recording = {
+  id: string;
+  title?: string;
+  thumbnail_url?: string;
+  playback_url?: string;
+  duration?: number;
+  created_at?: string;
+};
+
+function RecordingsPanel({
+  streamId,
+  palette,
+}: {
+  streamId: string;
+  palette: any;
+}) {
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const endpoint =
+        (ROUTES.broadcasting?.recordings as string | undefined) ??
+        `${(ROUTES as any).liveStreamings?.recordings ?? ''}/api/v1/broadcasts/recordings/`;
+      const res = await getRequest(
+        `${endpoint}?stream=${streamId}`,
+        { errorMessage: '' },
+      );
+      const list: Recording[] = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? (res as any)
+        : [];
+      setRecordings(list);
+    } finally {
+      setLoading(false);
+    }
+  }, [streamId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleShare = useCallback((recording: Recording) => {
+    const url = recording.playback_url ?? '';
+    if (!url) {
+      Alert.alert('Share', 'Playback URL not available for this recording.');
+      return;
+    }
+    void Share.share({ message: url });
+  }, []);
+
+  const handleDelete = useCallback((recording: Recording) => {
+    Alert.alert(
+      'Delete recording?',
+      `"${recording.title ?? 'This recording'}" will be permanently deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(recording.id);
+            try {
+              const endpoint =
+                (ROUTES.broadcasting?.recordings as string | undefined) ??
+                '/api/v1/broadcasts/recordings/';
+              await deleteRequest(`${endpoint}${recording.id}/`);
+              setRecordings(prev => prev.filter(r => r.id !== recording.id));
+            } catch {
+              Alert.alert('Delete failed', 'Unable to delete recording. Please try again.');
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, []);
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  return (
+    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.background }]}>
+      <View style={recStyles.header}>
+        <KISIcon name="film" size={15} color={palette.primaryStrong} />
+        <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
+        {loading
+          ? <ActivityIndicator size="small" color={palette.primaryStrong} />
+          : <Pressable onPress={load} hitSlop={8}>
+              <KISIcon name="refresh" size={14} color={palette.subtext} />
+            </Pressable>
+        }
+      </View>
+
+      {!loading && recordings.length === 0 && (
+        <Text style={[recStyles.empty, { color: palette.subtext }]}>
+          No recordings found for this stream.
+        </Text>
+      )}
+
+      {recordings.map(rec => (
+        <View key={rec.id} style={[recStyles.row, { borderColor: palette.border }]}>
+          <View style={recStyles.info}>
+            <Text style={[recStyles.recTitle, { color: palette.text }]} numberOfLines={1}>
+              {rec.title ?? 'Recording'}
+            </Text>
+            <Text style={[recStyles.recMeta, { color: palette.subtext }]}>
+              {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : ''}
+              {rec.duration ? `  ·  ${formatDuration(rec.duration)}` : ''}
+            </Text>
+          </View>
+          <View style={recStyles.actions}>
+            <Pressable
+              onPress={() => handleShare(rec)}
+              style={[recStyles.actionBtn, { borderColor: palette.border }]}
+              hitSlop={6}
+            >
+              <KISIcon name="share" size={14} color={palette.primaryStrong} />
+              <Text style={[recStyles.actionText, { color: palette.primaryStrong }]}>Share</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleDelete(rec)}
+              disabled={deletingId === rec.id}
+              style={[recStyles.actionBtn, { borderColor: '#EF444466' }]}
+              hitSlop={6}
+            >
+              {deletingId === rec.id
+                ? <ActivityIndicator size="small" color="#EF4444" />
+                : <KISIcon name="trash" size={14} color="#EF4444" />
+              }
+              <Text style={[recStyles.actionText, { color: '#EF4444' }]}>Delete</Text>
+            </Pressable>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const recStyles = StyleSheet.create({
+  panel: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  title: { flex: 1, fontSize: 13, fontWeight: '900' },
+  empty: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  row: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  info: { flex: 1 },
+  recTitle: { fontSize: 12, fontWeight: '800' },
+  recMeta: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+  actions: { flexDirection: 'row', gap: 6 },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  actionText: { fontSize: 11, fontWeight: '900' },
+});
+
 // ── Broadcaster control panel ─────────────────────────────────────────────────
 
 function BroadcasterPanel({
@@ -290,7 +479,9 @@ function BroadcasterPanel({
     if (!webRTCStreamingAvailable || serviceState !== 'live') return;
     try {
       await liveStreamingService.switchDeviceCamera();
-    } catch {}
+    } catch {
+      Alert.alert('Camera', 'Unable to switch camera. Please try again.');
+    }
   }, [serviceState]);
 
   const isDeviceLive    = serviceState === 'live';
@@ -405,6 +596,11 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
 
   const upcoming = useMemo(
     () => streams.filter(s => s.status !== 'ended' && s.status !== 'cancelled'),
+    [streams],
+  );
+
+  const ended = useMemo(
+    () => streams.filter(s => s.status === 'ended'),
     [streams],
   );
 
@@ -594,6 +790,42 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
             </View>
           );
         })
+      )}
+
+      {/* Ended streams — show with Recordings panel */}
+      {ended.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: palette.subtext, marginTop: 14 }]}>
+            Past streams
+          </Text>
+          {ended.map(stream => (
+            <View
+              key={stream.id}
+              style={[styles.streamCard, { borderColor: palette.border, backgroundColor: palette.background }]}
+            >
+              <View style={styles.cardTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={1}>
+                    {stream.title}
+                  </Text>
+                  <Text style={[styles.cardMeta, { color: palette.subtext }]}>
+                    {stream.started_at
+                      ? new Date(stream.started_at).toLocaleString()
+                      : stream.scheduled_start_at
+                      ? new Date(stream.scheduled_start_at).toLocaleString()
+                      : 'No date'}
+                  </Text>
+                </View>
+                <View style={[styles.statusPill, { backgroundColor: `${statusColor(stream.status, palette)}22` }]}>
+                  <Text style={[styles.statusText, { color: statusColor(stream.status, palette) }]}>
+                    ENDED
+                  </Text>
+                </View>
+              </View>
+              <RecordingsPanel streamId={stream.id} palette={palette} />
+            </View>
+          ))}
+        </>
       )}
     </View>
   );

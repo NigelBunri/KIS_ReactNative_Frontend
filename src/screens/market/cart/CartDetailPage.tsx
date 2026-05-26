@@ -8,8 +8,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,6 +30,17 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
+
+const LAST_ADDRESS_KEY = '@kis:last_shipping_address';
+
+type ShippingAddress = {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+};
 
 type CartDetailRoute = RouteProp<RootStackParamList, 'CartDetail'>;
 type CartDetailNavigation = NativeStackNavigationProp<
@@ -49,11 +62,33 @@ const CartDetailPage = () => {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const pendingOrderIdRef = useRef<string | null>(null);
 
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
+    name: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+  });
+
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  // Load last-used shipping address from storage
+  useEffect(() => {
+    AsyncStorage.getItem(LAST_ADDRESS_KEY).then(raw => {
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw) as ShippingAddress;
+        setShippingAddress(saved);
+      } catch {
+        // ignore corrupt data
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -104,6 +139,18 @@ const CartDetailPage = () => {
     0,
   );
   const cartIsCheckedOut = cart?.status === 'checked_out';
+
+  // Check if any item is a physical product requiring delivery
+  const hasPhysicalProducts = useMemo(
+    () => items.some(item => (item as any).product_type === 'physical'),
+    [items],
+  );
+
+  const shippingFieldsFilled =
+    shippingAddress.name.trim() !== '' &&
+    shippingAddress.address.trim() !== '' &&
+    shippingAddress.city.trim() !== '' &&
+    shippingAddress.country.trim() !== '';
 
   const handleQuantityChange = useCallback(
     (item: ShopCartItem, delta: number) => {
@@ -217,6 +264,21 @@ const CartDetailPage = () => {
 
   const handleCheckout = useCallback(async () => {
     if (!shopId || !items.length || checkingOut || paymentProcessing) return;
+
+    // Validate shipping address for physical products
+    if (hasPhysicalProducts && !shippingFieldsFilled) {
+      Alert.alert(
+        'Delivery address required',
+        'Please fill in at least your name, address, city, and country before proceeding.',
+      );
+      return;
+    }
+
+    // Persist address for next time
+    if (hasPhysicalProducts && shippingFieldsFilled) {
+      void AsyncStorage.setItem(LAST_ADDRESS_KEY, JSON.stringify(shippingAddress));
+    }
+
     setCheckingOut(true);
     try {
       const orderItems = items.map(item => ({
@@ -230,6 +292,7 @@ const CartDetailPage = () => {
       const res = await postRequest(ROUTES.commerce.marketplaceOrders, {
         shop_id: shopId,
         items: orderItems,
+        ...(hasPhysicalProducts ? { delivery_address: shippingAddress } : {}),
         metadata: { source: 'cart' },
       });
       if (res.success || res.data?.id) {
@@ -292,7 +355,7 @@ const CartDetailPage = () => {
     } finally {
       setCheckingOut(false);
     }
-  }, [shopId, items, checkingOut, paymentProcessing, navigation]);
+  }, [shopId, items, checkingOut, paymentProcessing, navigation, hasPhysicalProducts, shippingFieldsFilled, shippingAddress]);
 
   const renderOptionChips = (
     item: ShopCartItem,
@@ -410,6 +473,43 @@ const CartDetailPage = () => {
         </View>
       ) : (
         <ScrollView contentContainerStyle={cartDetailStyles.content}>
+          {/* Delivery address — only for physical products */}
+          {hasPhysicalProducts && !cartIsCheckedOut && (
+            <View style={[cartDetailStyles.addressSection, { borderColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>
+              <Text style={[cartDetailStyles.addressTitle, { color: palette.text }]}>
+                Delivery Address
+              </Text>
+              <Text style={[cartDetailStyles.addressSubtitle, { color: palette.subtext }]}>
+                Required for physical product delivery
+              </Text>
+              {(
+                [
+                  { key: 'name',    label: 'Full name',    placeholder: 'e.g. John Doe' },
+                  { key: 'phone',   label: 'Phone',        placeholder: '+1 555 000 0000' },
+                  { key: 'address', label: 'Street address', placeholder: '123 Main St' },
+                  { key: 'city',    label: 'City',         placeholder: 'New York' },
+                  { key: 'state',   label: 'State / Region', placeholder: 'NY' },
+                  { key: 'country', label: 'Country',      placeholder: 'United States' },
+                ] as Array<{ key: keyof ShippingAddress; label: string; placeholder: string }>
+              ).map(({ key, label, placeholder }) => (
+                <View key={key} style={cartDetailStyles.addressFieldWrapper}>
+                  <Text style={[cartDetailStyles.addressFieldLabel, { color: palette.subtext }]}>
+                    {label}
+                  </Text>
+                  <TextInput
+                    style={[cartDetailStyles.addressFieldInput, { color: palette.text, borderColor: palette.divider }]}
+                    value={shippingAddress[key]}
+                    onChangeText={val =>
+                      setShippingAddress(prev => ({ ...prev, [key]: val }))
+                    }
+                    placeholder={placeholder}
+                    placeholderTextColor={palette.subtext}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+
           {items.map(item => (
             <View
               key={item.id}
@@ -653,6 +753,37 @@ const cartDetailStyles = StyleSheet.create({
     padding: 32,
   },
   emptyText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addressSection: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    gap: 8,
+  },
+  addressTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  addressSubtitle: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  addressFieldWrapper: {
+    marginTop: 6,
+  },
+  addressFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  addressFieldInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  Alert,
   useWindowDimensions,
   DeviceEventEmitter,
 } from 'react-native';
@@ -16,6 +17,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
@@ -40,7 +42,8 @@ type Post = {
   id: string;
   text?: string;
   created_at?: string;
-  author?: { display_name?: string };
+  author?: { id?: string | number; display_name?: string };
+  author_id?: string | number;
   attachments?: any[];
 };
 
@@ -60,6 +63,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const { width } = useWindowDimensions();
   const { currentUserId } = useSocket();
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selected, setSelected] = useState<Community | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -88,6 +92,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
 
   const loadCommunities = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await getRequest(ROUTES.community.list, {
         errorMessage: 'Failed to load communities',
@@ -102,6 +107,8 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         ? res
         : [];
       setCommunities(list as Community[]);
+    } catch (err: any) {
+      setLoadError(err?.message || 'Unable to load communities.');
     } finally {
       setLoading(false);
     }
@@ -212,6 +219,30 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       setPosts((prev) => [res.data as Post, ...prev]);
     }
   }, [selected, composerText]);
+
+  const deletePost = useCallback((post: Post) => {
+    Alert.alert(
+      'Delete post?',
+      'This will permanently delete your post.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRequest(ROUTES.community.postDetail(post.id), {
+                errorMessage: 'Failed to delete post',
+              });
+              setPosts((prev) => prev.filter((p) => p.id !== post.id));
+            } catch (err: any) {
+              Alert.alert('Delete failed', err?.message || 'Unable to delete post.');
+            }
+          },
+        },
+      ],
+    );
+  }, []);
 
   const joinCommunity = useCallback(async (community: Community) => {
     const res = await postRequest(ROUTES.community.join(community.id), {}, {
@@ -344,6 +375,21 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
     return () => sub.remove();
   }, [loadCommunities]);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('community.create', () => {
+      setCreateVisible(true);
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('community.discover', () => {
+      setDiscoverVisible(true);
+      void searchPublicCommunities('');
+    });
+    return () => sub.remove();
+  }, [searchPublicCommunities]);
+
   const header = useMemo(() => {
     if (!selected) {
       return (
@@ -433,14 +479,28 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
               <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}> 
-                    <Text style={{ color: palette.text, fontWeight: '600' }}>
-                      {item.author?.display_name ?? 'Member'}
-                    </Text>
-                    <Text style={{ color: palette.text, marginTop: 6 }}>{item.text ?? ''}</Text>
-                  </View>
-                )}
+                renderItem={({ item }) => {
+                  const authorId = item.author?.id ?? item.author_id;
+                  const isMyPost = authorId != null && String(authorId) === String(currentUserId ?? '');
+                  return (
+                    <Pressable
+                      onLongPress={isMyPost ? () => deletePost(item) : undefined}
+                      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ color: palette.text, fontWeight: '600' }}>
+                          {item.author?.display_name ?? 'Member'}
+                        </Text>
+                        {isMyPost && (
+                          <Pressable onPress={() => deletePost(item)} hitSlop={8}>
+                            <KISIcon name="trash" size={15} color={palette.danger ?? '#d9534f'} />
+                          </Pressable>
+                        )}
+                      </View>
+                      <Text style={{ color: palette.text, marginTop: 6 }}>{item.text ?? ''}</Text>
+                    </Pressable>
+                  );
+                }}
                 contentContainerStyle={{ paddingBottom: 24 }}
               />
             </View>
@@ -508,7 +568,11 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
               </View>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={{ color: palette.subtext }}>No communities yet.</Text>}
+          ListEmptyComponent={
+            <Text style={{ color: loadError ? (palette.danger ?? '#d9534f') : palette.subtext, padding: 8 }}>
+              {loadError ?? 'No communities yet.'}
+            </Text>
+          }
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}

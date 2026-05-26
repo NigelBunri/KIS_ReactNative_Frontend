@@ -79,6 +79,12 @@ import {
   type FamilyAccessibilityPayload,
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
+import {
+  isPINEnabled,
+  getLockTimeout,
+  setLockTimeout,
+  clearPIN,
+} from '@/services/QuickLockService';
 
 import BottomSheet from './profile/sheets/BottomSheet';
 import SheetHeader from './profile/sheets/SheetHeader';
@@ -540,6 +546,8 @@ export default function ProfileScreen() {
   const [verificationStaffConsoleVisible, setVerificationStaffConsoleVisible] = useState(false);
   const [familyAccessibility, setFamilyAccessibility] = useState<FamilyAccessibilityPayload | null>(null);
   const [familyAccessibilitySaving, setFamilyAccessibilitySaving] = useState(false);
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [lockTimeoutMinutes, setLockTimeoutMinutes] = useState(5);
   const userVerificationSummary = useMemo(
     () =>
       normalizeVerificationSummary(c.profile?.user) ||
@@ -568,6 +576,16 @@ export default function ProfileScreen() {
       active = false;
     };
   }, []);
+
+  const refreshPINState = useCallback(async () => {
+    const [enabled, timeout] = await Promise.all([isPINEnabled(), getLockTimeout()]);
+    setPinEnabled(enabled);
+    setLockTimeoutMinutes(timeout);
+  }, []);
+
+  useEffect(() => {
+    void refreshPINState();
+  }, [refreshPINState]);
 
   const applyAgeMode = useCallback(async (ageMode: KISAgeMode) => {
     setFamilyAccessibilitySaving(true);
@@ -2464,6 +2482,12 @@ export default function ProfileScreen() {
                       onPress={() => rootNavigation?.navigate('ModerationConsole')}
                       style={{ marginBottom: 4 }}
                     />
+                    <KISButton
+                      title="User Management"
+                      variant="secondary"
+                      onPress={() => rootNavigation?.navigate('AdminUserManagement')}
+                      style={{ marginBottom: 4 }}
+                    />
                     <RevenueEvidenceAdminPanel />
                     <MonetizationSafetyCard />
                     <ProfitabilityCommandCenterCard />
@@ -2635,7 +2659,10 @@ export default function ProfileScreen() {
                   <Text style={{ color: palette.subtext }}>›</Text>
                 </Pressable>
                 <Pressable
-                  style={billingLinksStyles.link}
+                  style={[
+                    billingLinksStyles.link,
+                    { borderBottomColor: palette.divider },
+                  ]}
                   onPress={() => rootNavigation?.navigate('PromoCode')}
                 >
                   <Text
@@ -2645,6 +2672,37 @@ export default function ProfileScreen() {
                     ]}
                   >
                     Promo Codes
+                  </Text>
+                  <Text style={{ color: palette.subtext }}>›</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    billingLinksStyles.link,
+                    { borderBottomColor: palette.divider },
+                  ]}
+                  onPress={() => rootNavigation?.navigate('Wallet')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    KIS Coins
+                  </Text>
+                  <Text style={{ color: palette.subtext }}>›</Text>
+                </Pressable>
+                <Pressable
+                  style={billingLinksStyles.link}
+                  onPress={() => rootNavigation?.navigate('SubscriptionManagement')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Subscription
                   </Text>
                   <Text style={{ color: palette.subtext }}>›</Text>
                 </Pressable>
@@ -2685,6 +2743,11 @@ export default function ProfileScreen() {
                 Account Security
               </Text>
               {[
+                {
+                  label: 'Privacy & Compliance',
+                  route: 'ComplianceSettings' as const,
+                  danger: false,
+                },
                 {
                   label: 'Change Password',
                   route: 'PasswordChange' as const,
@@ -2731,6 +2794,106 @@ export default function ProfileScreen() {
                   />
                 </Pressable>
               ))}
+
+              {/* Quick Lock PIN row */}
+              <Pressable
+                onPress={() => {
+                  if (!pinEnabled) {
+                    rootNavigation?.navigate('SetupPIN');
+                  } else {
+                    Alert.alert('Quick Lock (PIN)', 'What would you like to do?', [
+                      {
+                        text: 'Change PIN',
+                        onPress: () => rootNavigation?.navigate('SetupPIN'),
+                      },
+                      {
+                        text: 'Disable PIN',
+                        style: 'destructive',
+                        onPress: () => {
+                          Alert.alert('Disable PIN', 'Remove Quick Lock PIN?', [
+                            {
+                              text: 'Remove',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await clearPIN();
+                                void refreshPINState();
+                              },
+                            },
+                            { text: 'Cancel', style: 'cancel' },
+                          ]);
+                        },
+                      },
+                      { text: 'Cancel', style: 'cancel' },
+                    ]);
+                  }
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  backgroundColor: pressed ? palette.surfaceElevated : 'transparent',
+                  borderTopWidth: 0.5,
+                  borderTopColor: palette.divider,
+                })}
+              >
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
+                    Quick Lock (PIN)
+                  </Text>
+                  <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 2 }}>
+                    {pinEnabled ? 'Enabled — tap to change or disable' : 'Set a 6-digit PIN to lock the app'}
+                  </Text>
+                </View>
+                <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              </Pressable>
+
+              {/* Lock Timeout row */}
+              <Pressable
+                onPress={() => {
+                  const options = [
+                    { label: '1 minute', value: 1 },
+                    { label: '5 minutes', value: 5 },
+                    { label: '15 minutes', value: 15 },
+                    { label: '30 minutes', value: 30 },
+                    { label: 'Never', value: 0 },
+                  ];
+                  Alert.alert(
+                    'Lock Timeout',
+                    'Lock the app after being in the background for:',
+                    options.map(opt => ({
+                      text: opt.label + (opt.value === lockTimeoutMinutes ? ' ✓' : ''),
+                      onPress: async () => {
+                        await setLockTimeout(opt.value);
+                        setLockTimeoutMinutes(opt.value);
+                      },
+                    })).concat([{ text: 'Cancel', onPress: () => undefined, style: 'cancel' } as any]),
+                  );
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  backgroundColor: pressed ? palette.surfaceElevated : 'transparent',
+                  borderTopWidth: 0.5,
+                  borderTopColor: palette.divider,
+                })}
+              >
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
+                    Lock Timeout
+                  </Text>
+                  <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 2 }}>
+                    {lockTimeoutMinutes === 0
+                      ? 'Never auto-lock'
+                      : `Auto-lock after ${lockTimeoutMinutes} min${lockTimeoutMinutes === 1 ? '' : 's'} in background`}
+                  </Text>
+                </View>
+                <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              </Pressable>
             </View>
 
             <LogoutSection palette={palette} onLogout={c.logout} loading={c.logoutLoading} />

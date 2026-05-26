@@ -166,7 +166,9 @@ export default function ProfileNotificationsScreen() {
     async (item: InAppNotification) => {
       try {
         await markInAppNotificationAsRead(item.id);
-      } catch {}
+      } catch (err: any) {
+        console.warn('[ProfileNotificationsScreen] mark-as-read failed', err?.message);
+      }
       navigation.navigate('ProfileNotificationDetail', {
         notificationId: item.id,
         notification: item,

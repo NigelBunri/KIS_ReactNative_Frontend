@@ -51,6 +51,7 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
 
   const blocksUrl = ROUTES.partners.organizationAppTabBlocks(partnerId, appId, tabId);
 
@@ -65,7 +66,10 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
           ? res.data
           : [];
       setBlocks(all.filter((b) => b.block_type === activeSubTab));
-    } catch { /* silently ignored */ } finally {
+      setBlockError(null);
+    } catch (err: any) {
+      setBlockError(err?.message || 'Unable to load content.');
+    } finally {
       setLoading(false);
     }
   }, [activeSubTab, blocksUrl]);
@@ -147,11 +151,17 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
           }
           ListEmptyComponent={() => (
             <View style={styles.center}>
-              <Text style={{ fontSize: 36 }}>{SUB_TABS.find((t) => t.key === activeSubTab)?.icon}</Text>
-              <Text style={[styles.empty, { color: palette.subtext }]}>
-                No {SUB_TABS.find((t) => t.key === activeSubTab)?.label.toLowerCase()} yet.{'\n'}
-                Add them via the app manager.
-              </Text>
+              {blockError ? (
+                <Text style={[styles.empty, { color: palette.danger ?? '#dc2626' }]}>{blockError}</Text>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 36 }}>{SUB_TABS.find((t) => t.key === activeSubTab)?.icon}</Text>
+                  <Text style={[styles.empty, { color: palette.subtext }]}>
+                    No {SUB_TABS.find((t) => t.key === activeSubTab)?.label.toLowerCase()} yet.{'\n'}
+                    Add them via the app manager.
+                  </Text>
+                </>
+              )}
             </View>
           )}
           renderItem={renderBlock}

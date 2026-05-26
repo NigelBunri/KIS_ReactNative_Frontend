@@ -62,6 +62,7 @@ const miscRoutes = {
     messages: `${API_BASE_URL}/api/v1/bridge/messages/`,
     message: (id: string) => `${API_BASE_URL}/api/v1/bridge/messages/${id}/`,
     automations: `${API_BASE_URL}/api/v1/bridge/automations/`,
+    automation: (id: string) => `${API_BASE_URL}/api/v1/bridge/automations/${id}/`,
     analytics: `${API_BASE_URL}/api/v1/bridge/analytics/`,
   },
   aiIntegration: {
