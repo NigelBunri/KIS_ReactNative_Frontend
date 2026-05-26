@@ -1,6 +1,6 @@
 // src/screens/tabs/PartnersMessagesPane.tsx
 import React, { useMemo } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import {
@@ -12,7 +12,6 @@ import {
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
-import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
 
 type Props = {
@@ -36,8 +35,8 @@ type Props = {
 export default function PartnersMessagesPane({
   width,
   messagesOffsetAnim,
-  isMessagesExpanded, // kept for future, even if not used directly now
-  toggleMessagesPane,
+  isMessagesExpanded: _isMessagesExpanded,
+  toggleMessagesPane: _toggleMessagesPane,
   closeMessagesPane,
   messagePanHandlers,
   selectedGroupId,
@@ -52,7 +51,6 @@ export default function PartnersMessagesPane({
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const compact = responsive.isWatch || responsive.isCompactPhone;
   const paneWidth = Math.min(width, responsive.isTablet ? Math.max(520, Math.round(width * 0.62)) : width);
 
   const selectedGroup = useMemo(
@@ -122,44 +120,6 @@ export default function PartnersMessagesPane({
       ]}
       {...messagePanHandlers}
     >
-      <View
-        style={[styles.messagesHeader, compact && styles.wrapRow, { borderBottomColor: palette.divider }]}
-      >
-        <Pressable
-          onPress={() =>
-            isMessagesExpanded ? closeMessagesPane() : toggleMessagesPane()
-          }
-          style={({ pressed }) => [
-            styles.toggleButton,
-            !isMessagesExpanded ? styles.messagesPeekToggle : null,
-            { backgroundColor: palette.surface, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <KISIcon
-            name="arrow-left"
-            size={18}
-            color={palette.text}
-            style={
-              isMessagesExpanded
-                ? { transform: [{ rotate: '180deg' }] }
-                : undefined
-            }
-          />
-        </Pressable>
-        <View style={styles.messagesTitleWrap}>
-          <Text style={[styles.messagesTitle, { color: palette.text }]}>
-            {selectedChannel?.name ||
-              selectedGroup?.name ||
-              selectedCommunity?.name ||
-              (selectedFeed
-                ? `${selectedPartner?.name ?? 'Partner'} feed`
-                : 'Messages')}
-          </Text>
-          <Text style={[styles.messagesSubtitle, { color: palette.subtext }]}>
-            Swipe right to close
-          </Text>
-        </View>
-      </View>
       {!hasDestination ? (
         <View style={[styles.messagesBody, { paddingHorizontal: responsive.pageGutter }]}>
           <Text

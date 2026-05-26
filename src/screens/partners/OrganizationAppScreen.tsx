@@ -31,6 +31,10 @@ import type {
   PartnerOrganizationAppTab,
 } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import LocationAttendanceTemplate from '@/components/partners/LocationAttendanceTemplate';
+import PartnerFeedPage from '@/components/partners/PartnerFeedPage';
+import PartnerMessagingView from '@/components/partners/PartnerMessagingView';
+import PartnerBibleScreen from '@/components/partners/PartnerBibleScreen';
+import DashboardTab from '@/components/partners/DashboardTab';
 import BibleScreen from '@/screens/tabs/BibleScreen';
 import MessagesScreen from '@/screens/tabs/MessagesScreen';
 import BroadcastScreen from '@/screens/tabs/BroadcastScreen';
@@ -89,13 +93,29 @@ const TEMPLATE_LABELS: Record<string, string> = {
 
 // Templates that own their own scroll/list layout and must NOT be wrapped in a ScrollView.
 const FULLSCREEN_TEMPLATES = new Set<string>([
-  'messaging', 'workspace', 'broadcast', 'profile', 'partner', 'bible', 'partner_geolocation_attendance',
+  'messaging', 'workspace', 'broadcast', 'profile', 'partner', 'bible', 'dashboard', 'partner_geolocation_attendance',
 ]);
 
 // ─── Embedded KIS-engine tab wrappers ────────────────────────────────────────
 // Each template renders the FULL KIS screen, not a simplified version.
 // The partner's brand colors are applied at the OrganizationAppScreen level
 // (header, tab bar). The embedded screen provides complete feature parity.
+
+function EmbeddedPartnerFeed({
+  partnerId,
+  partnerName,
+}: {
+  partnerId: string;
+  partnerName: string;
+}) {
+  return (
+    <PartnerFeedPage
+      partner={{ id: partnerId, name: partnerName }}
+      onBack={() => {}}
+      hideHeader
+    />
+  );
+}
 
 function EmbeddedMessaging({
   appName,
@@ -145,6 +165,8 @@ export default function OrganizationAppScreen() {
 
   const resolvedLink = useMemo(() => resolveBackendAssetUrl(app.link ?? ''), [app.link]);
   const partnerId = params.partnerId ?? app.partner_id ?? null;
+  const partnerName = params.partnerName ?? app.name;
+  const canManage = params.canManage === true;
   const dataScope = useMemo(() => {
     if (Array.isArray(app.metadata?.dataAccess)) return app.metadata.dataAccess;
     if (app.metadata?.dataAccess) return [app.metadata.dataAccess];
@@ -241,15 +263,18 @@ export default function OrganizationAppScreen() {
       partnerName: app.name,
       label: app.name,
       iconUrl: app.icon || undefined,
-      deepLink: `kis://org-app/${app.id}`,
+      deepLink: `kis://org-app/${partnerId ?? app.partner_id ?? ''}/${app.id}`,
     });
     setShortcutState(result.state);
+    if (result.handled) {
+      // Service already showed its own alert (iOS flow) — just reset state after a moment
+      setTimeout(() => setShortcutState('idle'), 500);
+      return;
+    }
     if (result.state === 'success') {
       Alert.alert(
         'Shortcut created',
-        Platform.OS === 'android'
-          ? `"${app.name}" has been pinned to your home screen.`
-          : `Check the instructions — the link has been copied to your clipboard. Open the Shortcuts app and follow the steps to add "${app.name}" to your Home Screen.`,
+        `"${app.name}" has been pinned to your home screen.`,
         [{ text: 'OK', onPress: () => setShortcutState('idle') }],
       );
     } else if (result.state === 'already_pinned') {
@@ -330,6 +355,13 @@ export default function OrganizationAppScreen() {
     }
 
     if (template === 'bible') {
+      if (partnerId) {
+        return (
+          <View style={{ flex: 1 }}>
+            <PartnerBibleScreen partnerId={partnerId} appId={app.id} tabId={tab.id} />
+          </View>
+        );
+      }
       return (
         <View style={{ flex: 1, minHeight: 600 }}>
           <BibleScreen />
@@ -337,21 +369,32 @@ export default function OrganizationAppScreen() {
       );
     }
 
-    // Full KIS messaging engine — conversation list, filters, floating button,
-    // create groups/channels, all status indicators. Identical to the KIS
-    // Messages tab, rendered inside the partner app's tab frame.
+    // Messaging: scoped to this partner's groups, channels, communities.
     if (template === 'messaging') {
+      if (partnerId) {
+        return <PartnerMessagingView partnerId={partnerId} partnerName={partnerName} />;
+      }
       return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
     }
 
-    // Workspace: full partner workspace — channels, groups, feed, communities.
-    // Uses the KIS messaging engine scoped to partner conversations.
+    // Workspace: same partner-scoped conversation list as messaging.
     if (template === 'workspace') {
+      if (partnerId) {
+        return <PartnerMessagingView partnerId={partnerId} partnerName={partnerName} />;
+      }
       return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
     }
 
-    // Broadcast: full KIS broadcast/feed screen — posts, reactions, comments.
+    // Broadcast: partner-scoped feed — only posts from members of this partner organization,
+    // fully managed by the partner account (create, delete, react, comment).
     if (template === 'broadcast') {
+      if (partnerId) {
+        return (
+          <View style={{ flex: 1 }}>
+            <EmbeddedPartnerFeed partnerId={partnerId} partnerName={partnerName} />
+          </View>
+        );
+      }
       return (
         <View style={{ flex: 1 }}>
           <BroadcastScreen />
@@ -370,7 +413,17 @@ export default function OrganizationAppScreen() {
 
     // Partner: same as workspace — partner channels and conversations.
     if (template === 'partner') {
+      if (partnerId) {
+        return <PartnerMessagingView partnerId={partnerId} partnerName={partnerName} />;
+      }
       return <EmbeddedMessaging appName={app.name} headerGradient={colorTheme.headerGradient} sheenColor={colorTheme.sheenColor} />;
+    }
+
+    // Dashboard: live partner stats and activity summary.
+    if (template === 'dashboard') {
+      if (partnerId) {
+        return <DashboardTab partnerId={partnerId} partnerName={partnerName} />;
+      }
     }
 
     return (
@@ -621,6 +674,23 @@ export default function OrganizationAppScreen() {
           <View style={[styles.promotedBadge, { backgroundColor: brandPrimary }]}>
             <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>⚡ Global</Text>
           </View>
+        ) : null}
+        {canManage && partnerId ? (
+          <Pressable
+            onPress={() => navigation.navigate('OrganizationAppForm', { partnerId, app })}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.5 : 1,
+              paddingHorizontal: 8,
+              paddingVertical: 8,
+              minHeight: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+            })}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Text style={{ fontSize: 18 }}>🎨</Text>
+            <Text style={{ color: brandPrimary, fontSize: 9, fontWeight: '700', marginTop: 1 }}>Colours</Text>
+          </Pressable>
         ) : null}
         <Pressable
           onPress={handleCreateShortcut}

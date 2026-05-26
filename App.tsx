@@ -61,6 +61,7 @@ import TiersDashboardScreen from './src/screens/insights/TiersDashboardScreen';
 import NotificationsDashboardScreen from './src/screens/insights/NotificationsDashboardScreen';
 import OrganizationAppScreen from './src/screens/partners/OrganizationAppScreen';
 import OrganizationAppFormScreen from './src/screens/partners/OrganizationAppFormScreen';
+import OrgAppLaunchScreen from './src/screens/partners/OrgAppLaunchScreen';
 import HealthInstitutionDetailScreen from './src/screens/health/HealthInstitutionDetailScreen';
 import HealthInstitutionManagementScreen from './src/screens/health/HealthInstitutionManagementScreen';
 import InstitutionProfileEditorScreen from './src/screens/health/InstitutionProfileEditorScreen';
@@ -647,6 +648,14 @@ function AppContent() {
           <NavigationContainer
             key={`nav-${language}`}
             theme={scheme === 'dark' ? DarkTheme : DefaultTheme}
+            linking={{
+              prefixes: ['kis://'],
+              config: {
+                screens: {
+                  OrgAppLaunch: 'org-app/:partnerId/:appId',
+                },
+              },
+            }}
           >
             <GlobalProfilePreviewProvider>
               <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -678,6 +687,10 @@ function AppContent() {
                       name="OrganizationApp"
                       component={OrganizationAppScreen}
                       options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="OrgAppLaunch"
+                      component={OrgAppLaunchScreen}
                     />
                     <RootStack.Screen
                       name="OrganizationAppForm"

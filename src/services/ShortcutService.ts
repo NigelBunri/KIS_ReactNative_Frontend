@@ -22,6 +22,8 @@ export type ShortcutResult = {
   state: ShortcutState;
   shortcutId?: string;
   error?: string;
+  // true when the service already showed its own alert — screen should not add a second one
+  handled?: boolean;
 };
 
 async function registerShortcutOnServer(options: ShortcutOptions, pinned: boolean): Promise<string | null> {
@@ -106,7 +108,8 @@ async function createIOSShortcut(options: ShortcutOptions): Promise<ShortcutResu
       'To enable home screen shortcuts, the KIS app needs to be reinstalled once so iOS can register the required link.\n\nSteps:\n\n1. Delete KIS from your iPhone\n\n2. Reinstall it from the App Store (or rebuild from Xcode)\n\n3. Come back here and tap "Pin to Home Screen" again — it will work after that.',
       [{ text: 'OK', style: 'default' }],
     );
-    return { state: 'error', error: 'URL scheme not registered. App reinstall required.' };
+    // handled: true so the screen does not show a second "Could not create shortcut" alert
+    return { state: 'error', error: 'URL scheme not registered. App reinstall required.', handled: true };
   }
 
   // Scheme is registered — proceed with Shortcuts app instructions.
@@ -128,7 +131,9 @@ async function createIOSShortcut(options: ShortcutOptions): Promise<ShortcutResu
     ],
   );
 
-  return { state: 'success' };
+  // handled: true — the detailed instructions alert above is all the user needs; the
+  // screen should not stack a second "Shortcut created" alert on top of it.
+  return { state: 'success', handled: true };
 }
 
 export async function createAppShortcut(options: ShortcutOptions): Promise<ShortcutResult> {

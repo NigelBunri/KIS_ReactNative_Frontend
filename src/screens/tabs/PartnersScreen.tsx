@@ -96,6 +96,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   );
   const {
     partners,
+    partnersLoading,
     selectedPartner,
     selectedPartnerId,
     setSelectedPartnerId,
@@ -116,6 +117,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     communitiesForPartner,
     handlePartnerItemCreated,
     reloadPartners,
+    reloadSelectedPartner,
   } = usePartnersData(isSuperuser);
   const {
     links,
@@ -432,9 +434,13 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const handleLaunchOrganizationApp = useCallback(
     (app: PartnerOrganizationApp) => {
       closeOrgAppsPanel();
-      rootNavigation?.navigate('OrganizationApp', { app });
+      rootNavigation?.navigate('OrganizationApp', {
+        app,
+        partnerName: selectedPartner?.name,
+        canManage: canManageOrganizationApps,
+      });
     },
-    [closeOrgAppsPanel, rootNavigation],
+    [closeOrgAppsPanel, rootNavigation, selectedPartner?.name, canManageOrganizationApps],
   );
 
   const handleOpenOrgProfile = () => {
@@ -503,6 +509,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       <PartnerLayout
         rootPanHandlers={rootPanHandlers}
         partners={partners}
+        partnersLoading={partnersLoading}
         selectedPartnerId={selectedPartnerId}
         setSelectedPartnerId={id => setSelectedPartnerId(id as any)}
         onAddPartnerPress={onAddPartnerPress}
@@ -673,6 +680,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         }}
         isKcanAdmin={isKcanAdmin}
         onOpenAdminDashboard={isKcanAdmin ? adminDashboard.open : undefined}
+        onRefreshPartner={reloadSelectedPartner}
       />
 
       {/* ── KCAN Super-Admin Panels ────────────────────────────────────── */}

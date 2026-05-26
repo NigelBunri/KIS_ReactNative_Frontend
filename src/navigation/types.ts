@@ -44,7 +44,8 @@ export type RootStackParamList = {
   BridgeDashboard: undefined;
   TiersDashboard: undefined;
   NotificationsDashboard: undefined;
-  OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string };
+  OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
+  OrgAppLaunch: { partnerId: string; appId: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
   HealthInstitutionDetail: {
     institutionId: string;

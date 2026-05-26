@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
@@ -43,6 +44,7 @@ const mapPartner = (raw: any): Partner => ({
 
 export const usePartnersData = (isSuperuser = false) => {
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [partnersLoading, setPartnersLoading] = useState(true);
   const [partnerCommunities, setPartnerCommunities] = useState<PartnerCommunity[]>([]);
   const [partnerGroups, setPartnerGroups] = useState<PartnerGroup[]>([]);
   const [partnerChannels, setPartnerChannels] = useState<PartnerChannel[]>([]);
@@ -97,21 +99,26 @@ export const usePartnersData = (isSuperuser = false) => {
   );
 
   const loadPartners = useCallback(async () => {
-    const res = await getRequest(ROUTES.partners.list, {
-      errorMessage: 'Unable to load partners.',
-    });
-    const list = (res?.data?.results ?? res?.data ?? res ?? []) as any[];
-    const mapped = Array.isArray(list)
-      ? list.map((raw) => applyOwnerOverride(mapPartner(raw)))
-      : [];
-    setPartners(mapped);
-    if (mapped.length > 0) {
-      const exists = selectedPartnerId
-        ? mapped.some((p) => p.id === selectedPartnerId)
-        : false;
-      if (!selectedPartnerId || !exists) {
-        setSelectedPartnerId(mapped[0].id);
+    setPartnersLoading(true);
+    try {
+      const res = await getRequest(ROUTES.partners.list, {
+        errorMessage: 'Unable to load partners.',
+      });
+      const list = (res?.data?.results ?? res?.data ?? res ?? []) as any[];
+      const mapped = Array.isArray(list)
+        ? list.map((raw) => applyOwnerOverride(mapPartner(raw)))
+        : [];
+      setPartners(mapped);
+      if (mapped.length > 0) {
+        const exists = selectedPartnerId
+          ? mapped.some((p) => p.id === selectedPartnerId)
+          : false;
+        if (!selectedPartnerId || !exists) {
+          setSelectedPartnerId(mapped[0].id);
+        }
       }
+    } finally {
+      setPartnersLoading(false);
     }
   }, [selectedPartnerId, applyOwnerOverride]);
 
@@ -172,6 +179,19 @@ export const usePartnersData = (isSuperuser = false) => {
     }, [loadPartners]),
   );
 
+  // Reload partner data when groups/channels/communities are created from outside this context
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('partner.data.refresh', () => {
+      loadPartners();
+      if (selectedPartnerId) {
+        loadPartnerGroups(selectedPartnerId);
+        loadPartnerChannels(selectedPartnerId);
+        loadPartnerCommunities(selectedPartnerId);
+      }
+    });
+    return () => sub.remove();
+  }, [selectedPartnerId, loadPartners, loadPartnerGroups, loadPartnerChannels, loadPartnerCommunities]);
+
   useEffect(() => {
     if (!selectedPartnerId) return;
     loadPartnerDetail(selectedPartnerId);
@@ -224,6 +244,8 @@ export const usePartnersData = (isSuperuser = false) => {
           prev.some((c) => c.id === data.id) ? prev : [...prev, data as PartnerCommunity],
         );
       }
+      // Tell the chats list (MessagesScreen) that new conversations exist
+      DeviceEventEmitter.emit('conversation.refresh');
       if (selectedPartnerId) {
         loadPartnerGroups(selectedPartnerId);
         loadPartnerChannels(selectedPartnerId);
@@ -250,6 +272,7 @@ export const usePartnersData = (isSuperuser = false) => {
 
   return {
     partners,
+    partnersLoading,
     partnerCommunities,
     partnerGroups,
     partnerChannels,

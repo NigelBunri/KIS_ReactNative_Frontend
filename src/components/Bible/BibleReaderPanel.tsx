@@ -16,6 +16,7 @@ import {
   Modal,
   PanResponder,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -84,6 +85,8 @@ type Props = {
   loading: boolean;
   onRegisterFilterOpener?: (open: () => void) => void;
   onScroll?: NonNullable<React.ComponentProps<typeof ScrollView>['onScroll']>;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   onLoad: (
     translation?: string,
     book?: string,
@@ -147,6 +150,8 @@ export default function BibleReaderPanel({
   onLoad,
   onRegisterFilterOpener,
   onScroll,
+  onRefresh,
+  refreshing = false,
 }: Props) {
   const { palette, isDark } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -2041,6 +2046,11 @@ export default function BibleReaderPanel({
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          ) : undefined
+        }
       >
         <BibleSectionCard>
           <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>

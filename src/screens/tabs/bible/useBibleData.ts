@@ -440,6 +440,17 @@ export function useBibleData() {
     }
   }, [offlineManifestLoaded, defaultTranslation, defaultBook, loadReader]);
 
+  const reload = useCallback(async () => {
+    await Promise.all([
+      loadTranslations(),
+      loadBooks(),
+      loadDevotionals(),
+      loadMeditations(),
+      loadSpiritualGrowthSummary(),
+    ]);
+    reloadCallbackRef.current?.();
+  }, [loadTranslations, loadBooks, loadDevotionals, loadMeditations, loadSpiritualGrowthSummary]);
+
   return {
     translations: orderedTranslations,
     books,
@@ -453,5 +464,6 @@ export function useBibleData() {
     spiritualGrowthSummary,
     loadReader,
     loadSpiritualGrowthSummary,
+    reload,
   };
 }

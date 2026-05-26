@@ -1,6 +1,6 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, DeviceEventEmitter, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, DeviceEventEmitter, PanResponder, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useResponsiveLayout } from '../../theme/responsive';
@@ -33,7 +33,17 @@ export default function BibleScreen() {
     loadingMeditations,
     spiritualGrowthSummary,
     loadReader,
+    reload: reloadBible,
   } = useBibleData();
+  const [bibleRefreshing, setBibleRefreshing] = React.useState(false);
+  const handleBibleRefresh = React.useCallback(async () => {
+    setBibleRefreshing(true);
+    try {
+      await reloadBible();
+    } finally {
+      setBibleRefreshing(false);
+    }
+  }, [reloadBible]);
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactBible = responsive.isWatch || responsive.isCompactPhone;
@@ -201,6 +211,8 @@ export default function BibleScreen() {
             onLoad={loadReader}
             onRegisterFilterOpener={registerReadFilterOpener}
             onScroll={handleContentScroll}
+            onRefresh={handleBibleRefresh}
+            refreshing={bibleRefreshing}
           />
         );
       case 'daily':
@@ -409,6 +421,12 @@ export default function BibleScreen() {
             showsVerticalScrollIndicator={false}
             onScroll={handleContentScroll}
             scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={bibleRefreshing}
+                onRefresh={handleBibleRefresh}
+              />
+            }
           >
             {renderTab()}
           </Animated.ScrollView>

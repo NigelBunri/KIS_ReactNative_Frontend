@@ -1,6 +1,7 @@
 // src/screens/tabs/PartnersCenterPane.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { PartnerCenterPaneSkeleton } from './PartnersSkeleton';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import {
@@ -44,6 +45,8 @@ type Props = {
   onPartnerHeaderPress: () => void;
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
+  loading?: boolean;
+  onRefresh?: () => Promise<void> | void;
 };
 
 export default function PartnersCenterPane({
@@ -64,7 +67,19 @@ export default function PartnersCenterPane({
   onPartnerHeaderPress,
   isKcanAdmin,
   onOpenAdminDashboard,
+  loading = false,
+  onRefresh,
 }: Props) {
+  const [paneRefreshing, setPaneRefreshing] = React.useState(false);
+  const handleRefresh = React.useCallback(async () => {
+    if (!onRefresh) return;
+    setPaneRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setPaneRefreshing(false);
+    }
+  }, [onRefresh]);
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
@@ -165,6 +180,10 @@ export default function PartnersCenterPane({
     }).start();
   }, [contentAnim, selectedPartner?.id]);
 
+  if (loading && !selectedPartner?.id) {
+    return <PartnerCenterPaneSkeleton />;
+  }
+
   return (
     <Animated.View
       style={[
@@ -192,6 +211,14 @@ export default function PartnersCenterPane({
           { paddingBottom: compact ? 28 : 42 },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={paneRefreshing}
+              onRefresh={handleRefresh}
+            />
+          ) : undefined
+        }
       >
         <PartnerHeaderSection
           partner={selectedPartner}

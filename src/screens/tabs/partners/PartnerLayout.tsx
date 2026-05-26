@@ -15,6 +15,7 @@ import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePa
 type Props = {
   rootPanHandlers: Record<string, any>;
   partners: any[];
+  partnersLoading?: boolean;
   selectedPartnerId: string;
   setSelectedPartnerId: (id: string) => void;
   onAddPartnerPress: () => void;
@@ -79,11 +80,13 @@ type Props = {
   onOpenOrganizationApps: () => void;
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
+  onRefreshPartner?: () => Promise<void> | void;
 };
 
 export default function PartnerLayout({
   rootPanHandlers,
   partners,
+  partnersLoading = false,
   selectedPartnerId,
   setSelectedPartnerId,
   onAddPartnerPress,
@@ -131,6 +134,7 @@ export default function PartnerLayout({
   onOpenOrganizationApps,
   isKcanAdmin,
   onOpenAdminDashboard,
+  onRefreshPartner,
 }: Props) {
   const { palette } = useKISTheme();
   const {
@@ -165,6 +169,7 @@ export default function PartnerLayout({
         selectedPartnerId={selectedPartnerId}
         onSelectPartner={setSelectedPartnerId}
         onAddPartnerPress={onAddPartnerPress}
+        loading={partnersLoading}
       />
 
       <PartnersCenterPane
@@ -185,6 +190,8 @@ export default function PartnerLayout({
         onPartnerHeaderPress={onPartnerHeaderPress}
         isKcanAdmin={isKcanAdmin}
         onOpenAdminDashboard={onOpenAdminDashboard}
+        loading={partnersLoading}
+        onRefresh={onRefreshPartner}
       />
 
       {!isMessagesExpanded ? (

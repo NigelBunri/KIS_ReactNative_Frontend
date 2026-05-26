@@ -393,6 +393,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
       setSelectedGroupMemberIds(new Set());
       setGroupDraft({ name: '', slug: '', description: '', channelId: null });
       onClose();
+      DeviceEventEmitter.emit('conversation.refresh');
+      if (group?.partner) DeviceEventEmitter.emit('partner.data.refresh');
       setTimeout(() => onOpenChat(chat), 150);
     } catch {
       Alert.alert('Error', 'Group was created, but we could not open the conversation.');
@@ -421,6 +423,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
       onClose();
       DeviceEventEmitter.emit('conversation.refresh');
       DeviceEventEmitter.emit('community.refresh');
+      if (community?.partner) DeviceEventEmitter.emit('partner.data.refresh');
       setTimeout(() => onOpenChat(chat), 150);
     } catch {
       Alert.alert('Error', 'Community was created, but we could not open the conversation.');
@@ -430,6 +433,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
   const handleChannelCreated = (channel: any) => {
     const channelId = channel?.id ? String(channel.id) : null;
     if (channelId) setPreferredChannelId(channelId);
+    DeviceEventEmitter.emit('conversation.refresh');
+    if (channel?.partner) DeviceEventEmitter.emit('partner.data.refresh');
     setMode('addGroup');
   };
 

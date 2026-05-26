@@ -171,8 +171,8 @@ const OrganizationAppFormScreen = () => {
       Alert.alert('Name required', 'Provide a name for the app.');
       return;
     }
-    if (!formState.link.trim()) {
-      Alert.alert('Link required', 'Provide a link or module reference.');
+    if (formState.type === 'external' && !formState.link.trim()) {
+      Alert.alert('Link required', 'Provide a URL for the embedded app.');
       return;
     }
     if (!visibleRoles.length) {
@@ -272,7 +272,7 @@ const OrganizationAppFormScreen = () => {
             onChangeText={(value) => setFormState((prev) => ({ ...prev, name: value }))}
           />
           <KISTextInput
-            label="Link / Module"
+            label={formState.type === 'external' ? 'Link / Module (required)' : 'Link / Module (optional)'}
             value={formState.link}
             onChangeText={(value) => setFormState((prev) => ({ ...prev, link: value }))}
           />

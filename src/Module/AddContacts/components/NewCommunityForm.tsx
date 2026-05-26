@@ -140,6 +140,8 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
         description: descriptionValue.trim() || undefined,
         partner: partnerId ?? null,
         avatar_url: avatarUrl || undefined,
+        create_main_conversation: true,
+        create_posts_conversation: true,
       };
 
       const createdCommunity = await postRequest(

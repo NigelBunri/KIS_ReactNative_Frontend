@@ -176,18 +176,53 @@ function Chips({ options, selected, onSelect, palette }: {
 }
 
 // ─── Bible Tab Manager ────────────────────────────────────────────────────────
-// Lightweight Bible content configurator for partner pro tabs with template='bible'.
-// Shows which Bible sections are enabled + featured content pin.
+// Two-pane manager for partner bible tabs:
+//  • "Sections" — toggle which sections are visible + pin a featured scripture
+//  • "Content" — full CRUD for devotionals, meditations, prayer days stored as
+//                tab content blocks so members see partner-specific material
+
+type BibleContentView = 'sections' | 'devotionals' | 'meditations' | 'prayer';
+
+type BibleBlock = {
+  id: string;
+  block_type: string;
+  title?: string;
+  body?: string;
+  payload?: Record<string, any>;
+  created_at?: string;
+};
 
 function BibleTabManager({ tab, appId, partnerId, palette }: {
   tab: PartnerOrganizationAppTab; appId: string; partnerId: string; palette: any;
 }) {
   const cfg = (tab.config ?? {}) as Record<string, any>;
+  const [view, setView] = useState<BibleContentView>('sections');
   const [sections, setSections] = useState<string[]>(
     cfg.bible_sections ?? ['read', 'daily', 'meditations', 'prayer', 'plans', 'lessons'],
   );
   const [featuredRef, setFeaturedRef] = useState<string>(cfg.featured_reference ?? '');
   const [saving, setSaving] = useState(false);
+
+  // Content blocks shared by all content sub-views
+  const blocksUrl = ROUTES.partners.organizationAppTabBlocks(partnerId, appId, tab.id);
+  const [blocks, setBlocks] = useState<BibleBlock[]>([]);
+  const [blocksLoading, setBlocksLoading] = useState(false);
+
+  const loadBlocks = useCallback(async (type: string) => {
+    setBlocksLoading(true);
+    try {
+      const res: any = await getRequest(blocksUrl);
+      const all: BibleBlock[] = Array.isArray(res?.data) ? res.data : res?.data?.results ?? [];
+      setBlocks(all.filter(b => b.block_type === type));
+    } catch { /* silently ignored */ }
+    finally { setBlocksLoading(false); }
+  }, [blocksUrl]);
+
+  useEffect(() => {
+    if (view === 'devotionals') loadBlocks('devotional');
+    else if (view === 'meditations') loadBlocks('meditation');
+    else if (view === 'prayer') loadBlocks('prayer_day');
+  }, [view, loadBlocks]);
 
   const BIBLE_SECTIONS = [
     { key: 'read', label: '📖 Scripture Reader' },
@@ -219,52 +254,281 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
     }
   };
 
+  const NAV_TABS: { key: BibleContentView; label: string }[] = [
+    { key: 'sections', label: '⚙️ Sections' },
+    { key: 'devotionals', label: '🌅 Devotionals' },
+    { key: 'meditations', label: '🧘 Meditations' },
+    { key: 'prayer', label: '🙏 Prayer Days' },
+  ];
+
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 60 }}>
-      <Text style={[styles.sectionTitle, { color: palette.text }]}>Visible sections</Text>
-      <Text style={[styles.small, { color: palette.subtext, marginBottom: 8 }]}>
-        Toggle which sections appear in this Bible tab for your members.
-      </Text>
-      {BIBLE_SECTIONS.map(s => (
-        <Pressable
-          key={s.key}
-          onPress={() => toggleSection(s.key)}
-          style={[
-            styles.toggleRow,
-            {
-              borderColor: sections.includes(s.key) ? palette.primary + '66' : palette.divider,
-              backgroundColor: sections.includes(s.key) ? palette.primary + '0D' : palette.surface,
-            },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{s.label}</Text>
-          <View
-            style={[
-              styles.toggle,
-              {
-                backgroundColor: sections.includes(s.key) ? palette.primary : palette.divider,
-              },
-            ]}
+    <View style={{ flex: 1 }}>
+      {/* Sub-nav */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 6, paddingHorizontal: 14, paddingVertical: 8 }}
+        style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider }}
+      >
+        {NAV_TABS.map(t => (
+          <Pressable
+            key={t.key}
+            onPress={() => setView(t.key)}
+            style={[styles.chip, {
+              backgroundColor: view === t.key ? palette.primary + '22' : 'transparent',
+              borderColor: view === t.key ? palette.primary : palette.divider,
+            }]}
           >
-            <View style={[styles.toggleKnob, { right: sections.includes(s.key) ? 2 : undefined, left: sections.includes(s.key) ? undefined : 2 }]} />
-          </View>
-        </Pressable>
-      ))}
+            <Text style={{ color: view === t.key ? palette.primary : palette.subtext, fontSize: 11, fontWeight: '700' }}>
+              {t.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
-      <Text style={[styles.sectionTitle, { color: palette.text, marginTop: 16 }]}>Featured scripture</Text>
-      <FieldInput
-        label="Pin a scripture reference (optional)"
-        value={featuredRef}
-        onChange={setFeaturedRef}
-        placeholder="e.g. John 3:16 · shown at top of Bible tab"
-        palette={palette}
-      />
+      {/* Sections config */}
+      {view === 'sections' && (
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 60 }}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>Visible sections</Text>
+          <Text style={[styles.small, { color: palette.subtext, marginBottom: 8 }]}>
+            Toggle which sections appear in this Bible tab for your members.
+          </Text>
+          {BIBLE_SECTIONS.map(s => (
+            <Pressable
+              key={s.key}
+              onPress={() => toggleSection(s.key)}
+              style={[
+                styles.toggleRow,
+                {
+                  borderColor: sections.includes(s.key) ? palette.primary + '66' : palette.divider,
+                  backgroundColor: sections.includes(s.key) ? palette.primary + '0D' : palette.surface,
+                },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{s.label}</Text>
+              <View style={[styles.toggle, { backgroundColor: sections.includes(s.key) ? palette.primary : palette.divider }]}>
+                <View style={[styles.toggleKnob, { right: sections.includes(s.key) ? 2 : undefined, left: sections.includes(s.key) ? undefined : 2 }]} />
+              </View>
+            </Pressable>
+          ))}
+          <Text style={[styles.sectionTitle, { color: palette.text, marginTop: 16 }]}>Featured scripture</Text>
+          <FieldInput
+            label="Pin a scripture reference (optional)"
+            value={featuredRef}
+            onChange={setFeaturedRef}
+            placeholder="e.g. John 3:16 · shown at top of Bible tab"
+            palette={palette}
+          />
+          <Pressable onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: palette.primary }]}>
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : (
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Save configuration</Text>
+            )}
+          </Pressable>
+        </ScrollView>
+      )}
 
-      <Pressable onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: palette.primary }]}>
-        {saving ? <ActivityIndicator size="small" color="#fff" /> : (
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Save configuration</Text>
-        )}
+      {/* Devotionals */}
+      {view === 'devotionals' && (
+        <BibleContentEditor
+          blockType="devotional"
+          label="Devotional"
+          icon="🌅"
+          blocksUrl={blocksUrl}
+          blocks={blocks}
+          loading={blocksLoading}
+          onReload={() => loadBlocks('devotional')}
+          setBlocks={setBlocks}
+          palette={palette}
+          formFields={[
+            { key: 'title', label: 'Title *', placeholder: 'e.g. Walking in Faith' },
+            { key: 'body', label: 'Content *', placeholder: 'Write the devotional text...', multiline: true },
+            { key: 'scripture', label: 'Scripture reference', placeholder: 'e.g. Romans 8:28', payloadKey: true },
+            { key: 'date', label: 'Date (YYYY-MM-DD)', placeholder: 'e.g. 2025-06-15', payloadKey: true },
+          ]}
+        />
+      )}
+
+      {/* Meditations */}
+      {view === 'meditations' && (
+        <BibleContentEditor
+          blockType="meditation"
+          label="Meditation"
+          icon="🧘"
+          blocksUrl={blocksUrl}
+          blocks={blocks}
+          loading={blocksLoading}
+          onReload={() => loadBlocks('meditation')}
+          setBlocks={setBlocks}
+          palette={palette}
+          formFields={[
+            { key: 'title', label: 'Title *', placeholder: 'e.g. Resting in His Presence' },
+            { key: 'body', label: 'Reflection text *', placeholder: 'Write the meditation...', multiline: true },
+            { key: 'theme', label: 'Theme / topic', placeholder: 'e.g. Peace, Surrender', payloadKey: true },
+            { key: 'audio_url', label: 'Audio URL (optional)', placeholder: 'https://...', payloadKey: true },
+          ]}
+        />
+      )}
+
+      {/* Prayer days */}
+      {view === 'prayer' && (
+        <BibleContentEditor
+          blockType="prayer_day"
+          label="Prayer Day"
+          icon="🙏"
+          blocksUrl={blocksUrl}
+          blocks={blocks}
+          loading={blocksLoading}
+          onReload={() => loadBlocks('prayer_day')}
+          setBlocks={setBlocks}
+          palette={palette}
+          formFields={[
+            { key: 'title', label: 'Focus / Title *', placeholder: 'e.g. Day 3 — Healing' },
+            { key: 'body', label: 'Prayer text *', placeholder: 'Write the prayer or instructions...', multiline: true },
+            { key: 'date', label: 'Date (YYYY-MM-DD)', placeholder: 'e.g. 2025-06-01', payloadKey: true },
+            { key: 'scripture', label: 'Scripture', placeholder: 'e.g. James 5:16', payloadKey: true },
+          ]}
+        />
+      )}
+    </View>
+  );
+}
+
+// ─── Generic bible content editor ─────────────────────────────────────────────
+// Reusable CRUD panel used by devotionals, meditations, and prayer days.
+
+type ContentFormField = {
+  key: string;
+  label: string;
+  placeholder?: string;
+  multiline?: boolean;
+  payloadKey?: boolean; // if true, stored in block.payload instead of root
+};
+
+function BibleContentEditor({
+  blockType, label, icon, blocksUrl, blocks, loading, onReload, setBlocks, palette, formFields,
+}: {
+  blockType: string; label: string; icon: string; blocksUrl: string;
+  blocks: BibleBlock[]; loading: boolean; onReload: () => void;
+  setBlocks: React.Dispatch<React.SetStateAction<BibleBlock[]>>;
+  palette: any; formFields: ContentFormField[];
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  const setField = (key: string, value: string) =>
+    setFormValues(prev => ({ ...prev, [key]: value }));
+
+  const handleAdd = async () => {
+    const titleField = formFields.find(f => f.key === 'title');
+    const bodyField = formFields.find(f => f.key === 'body');
+    if (titleField && !formValues.title?.trim()) { Alert.alert('Title required'); return; }
+    if (bodyField && !formValues.body?.trim()) { Alert.alert('Content required'); return; }
+
+    setSaving(true);
+    try {
+      const rootFields: Record<string, string> = {};
+      const payloadFields: Record<string, string> = {};
+      formFields.forEach(f => {
+        const val = formValues[f.key]?.trim();
+        if (!val) return;
+        if (f.payloadKey) payloadFields[f.key] = val;
+        else rootFields[f.key] = val;
+      });
+
+      const res: any = await postRequest(blocksUrl, {
+        block_type: blockType,
+        title: rootFields.title,
+        body: rootFields.body,
+        payload: payloadFields,
+      });
+      if (res?.id || res?.data?.id) {
+        setBlocks(prev => [res?.data ?? res, ...prev]);
+        setFormValues({});
+        setShowForm(false);
+      } else {
+        Alert.alert('Error', res?.message || 'Could not save.');
+      }
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = (block: BibleBlock) => {
+    Alert.alert(`Delete ${label}`, 'Remove this entry?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteRequest(`${blocksUrl}${block.id}/`);
+            setBlocks(prev => prev.filter(b => b.id !== block.id));
+          } catch (e: any) { Alert.alert('Error', e?.message || 'Failed.'); }
+        },
+      },
+    ]);
+  };
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60, gap: 10 }}>
+      <Pressable onPress={() => setShowForm(s => !s)} style={[styles.addBtn, { borderColor: palette.primary }]}>
+        <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>
+          {showForm ? '↑ Cancel' : `+ Add ${label}`}
+        </Text>
       </Pressable>
+
+      {showForm && (
+        <View style={[styles.form, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+          <Text style={[styles.formTitle, { color: palette.text }]}>{icon} New {label}</Text>
+          {formFields.map(f => (
+            <FieldInput
+              key={f.key}
+              label={f.label}
+              value={formValues[f.key] ?? ''}
+              onChange={v => setField(f.key, v)}
+              placeholder={f.placeholder}
+              multiline={f.multiline}
+              palette={palette}
+            />
+          ))}
+          <Pressable onPress={handleAdd} disabled={saving} style={[styles.saveBtn, { backgroundColor: palette.primary }]}>
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : (
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Save {label}</Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
+      {loading ? (
+        <ActivityIndicator color={palette.primary} style={{ marginTop: 24 }} />
+      ) : blocks.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={{ fontSize: 36 }}>{icon}</Text>
+          <Text style={[styles.small, { color: palette.subtext, textAlign: 'center', marginTop: 8 }]}>
+            No {label.toLowerCase()}s yet. Add one above.
+          </Text>
+        </View>
+      ) : (
+        blocks.map(block => (
+          <View key={block.id} style={[styles.listRow, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+            <View style={{ flex: 1 }}>
+              {block.title ? (
+                <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={1}>{block.title}</Text>
+              ) : null}
+              {block.body ? (
+                <Text style={[styles.small, { color: palette.subtext }]} numberOfLines={2}>{block.body}</Text>
+              ) : null}
+              {block.payload && Object.keys(block.payload).length > 0 ? (
+                <Text style={[styles.tiny, { color: palette.subtext, marginTop: 2 }]}>
+                  {Object.entries(block.payload).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable onPress={() => handleDelete(block)} style={{ padding: 6 }}>
+              <Text style={{ color: palette.danger ?? '#d9534f', fontSize: 16, fontWeight: '800' }}>×</Text>
+            </Pressable>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }

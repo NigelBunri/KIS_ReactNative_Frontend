@@ -7,12 +7,14 @@ import { useKISTheme } from '../../theme/useTheme';
 import { LEFT_RAIL_WIDTH, Partner } from './partnersTypes';
 import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { PartnerLeftRailSkeleton } from './PartnersSkeleton';
 
 type Props = {
   partners: Partner[];
   selectedPartnerId: string;
   onSelectPartner: (id: string) => void;
   onAddPartnerPress: () => void;
+  loading?: boolean;
 };
 
 export default function PartnersLeftRail({
@@ -20,6 +22,7 @@ export default function PartnersLeftRail({
   selectedPartnerId,
   onSelectPartner,
   onAddPartnerPress,
+  loading = false,
 }: Props) {
   const { palette, isDark, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -41,6 +44,10 @@ export default function PartnersLeftRail({
       useNativeDriver: true,
     }).start();
   }, [entrance]);
+
+  if (loading && partners.length === 0) {
+    return <PartnerLeftRailSkeleton />;
+  }
 
   return (
     <Animated.View

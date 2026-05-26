@@ -15,6 +15,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import styles from '@/components/partners/partnersStyles';
 import KISButton from '@/constants/KISButton';
 import { deleteRequest } from '@/network/delete';
+import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import type { RootStackParamList } from '@/navigation/types';
@@ -107,6 +108,30 @@ export default function PartnerOrganizationAppsPanel({
     );
   }, [canManageApps, onRefresh, partnerId]);
 
+  const handleSetStatus = useCallback(async (app: PartnerOrganizationApp, status: 'published' | 'archived' | 'draft') => {
+    if (!partnerId || !canManageApps) return;
+    const label = status === 'published' ? 'Publish' : status === 'archived' ? 'Archive' : 'Set to draft';
+    Alert.alert(`${label} app`, `${label} "${app.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: label, style: status === 'archived' ? 'destructive' : 'default',
+        onPress: async () => {
+          try {
+            await patchRequest(
+              ROUTES.partners.organizationApp(partnerId, app.id),
+              { status },
+              { errorMessage: 'Unable to update app status.' },
+            );
+            Alert.alert('Updated', `"${app.name}" is now ${status}.`);
+            onRefresh?.();
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Unable to update status.');
+          }
+        },
+      },
+    ]);
+  }, [canManageApps, onRefresh, partnerId]);
+
   const handleCreateApp = () => {
     if (!partnerId) {
       Alert.alert('Partner required', 'Select a partner before creating apps.');
@@ -157,56 +182,62 @@ export default function PartnerOrganizationAppsPanel({
           gap: 6,
         }}
       >
-        <Text style={{ color: palette.text, fontWeight: '700', fontSize: 16 }}>
-          {app.name}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: palette.text, fontWeight: '700', fontSize: 16, flex: 1 }}>
+            {app.name}
+          </Text>
+          {/* Status badge */}
+          <View style={{
+            borderRadius: 10,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            backgroundColor:
+              app.status === 'published' ? '#16a34a22' :
+              app.status === 'archived' ? '#6b728022' : '#d9770622',
+          }}>
+            <Text style={{
+              fontSize: 10,
+              fontWeight: '800',
+              color:
+                app.status === 'published' ? '#16a34a' :
+                app.status === 'archived' ? '#6b7280' : '#d97706',
+            }}>
+              {(app.status ?? 'draft').toUpperCase()}
+            </Text>
+          </View>
+        </View>
         <Text style={{ color: palette.subtext, fontSize: 12 }}>
           {TYPE_LABELS[app.type ?? ''] ?? 'Organization App'}
-        </Text>
-        <Text style={{ color: palette.subtext, fontSize: 11 }}>
-          Status: {app.status || 'draft'} · Scope: {app.is_promoted_global ? 'global promoted' : 'partner launcher'}
+          {app.tabs?.length ? ` · ${app.tabs.length} tab${app.tabs.length !== 1 ? 's' : ''}` : ''}
         </Text>
         {app.description ? (
-          <Text style={{ color: palette.subtext, fontSize: 12 }}>
-            {app.description}
-          </Text>
+          <Text style={{ color: palette.subtext, fontSize: 12 }}>{app.description}</Text>
         ) : null}
         {app.tabs?.length ? (
-          <Text style={{ color: palette.subtext, fontSize: 11 }}>
-            Tabs: {app.tabs.map((tab) => tab.title).join(', ')}
+          <Text style={{ color: palette.subtext, fontSize: 11 }} numberOfLines={2}>
+            {app.tabs.map((tab) => tab.title).join(' · ')}
           </Text>
         ) : null}
-        <Text style={{ color: palette.subtext, fontSize: 11 }}>
-          Visible to:{' '}
-          {(app.visible_to && app.visible_to.length ? app.visible_to : DEFAULT_VISIBILITY).join(', ')}
-        </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-          <KISButton
-            title="Open"
-            size="xs"
-            variant="primary"
-            onPress={() => handleLaunchApp(app)}
-          />
+          <KISButton title="Open" size="xs" variant="primary" onPress={() => handleLaunchApp(app)} />
           {canManageApps ? (
             <>
-              <KISButton
-                title="Edit metadata"
-                size="xs"
-                variant="outline"
-                onPress={() => handleEditApp(app)}
-              />
-              <KISButton
-                title="Delete"
-                size="xs"
-                variant="outline"
-                onPress={() => handleDelete(app)}
-              />
+              <KISButton title="Edit" size="xs" variant="outline" onPress={() => handleEditApp(app)} />
+              {app.status !== 'published' ? (
+                <KISButton title="Publish" size="xs" variant="outline" onPress={() => handleSetStatus(app, 'published')} />
+              ) : (
+                <KISButton title="Unpublish" size="xs" variant="outline" onPress={() => handleSetStatus(app, 'draft')} />
+              )}
+              {app.status !== 'archived' ? (
+                <KISButton title="Archive" size="xs" variant="outline" onPress={() => handleSetStatus(app, 'archived')} />
+              ) : null}
+              <KISButton title="Delete" size="xs" variant="outline" onPress={() => handleDelete(app)} />
             </>
           ) : null}
         </View>
       </View>
     ));
-  }, [apps, error, loading, palette, canManageApps, handleLaunchApp, handleEditApp, handleDelete]);
+  }, [apps, error, loading, palette, canManageApps, handleLaunchApp, handleEditApp, handleDelete, handleSetStatus]);
 
   if (!isOpen) return null;
 

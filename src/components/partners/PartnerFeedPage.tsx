@@ -53,11 +53,12 @@ type FeedItem =
   | { type: 'ad'; id: string };
 
 type Props = {
-  partner: Partner;
+  partner: Pick<Partner, 'id' | 'name'>;
   onBack: () => void;
+  hideHeader?: boolean;
 };
 
-export default function PartnerFeedPage({ partner, onBack }: Props) {
+export default function PartnerFeedPage({ partner, onBack, hideHeader = false }: Props) {
   const { palette } = useKISTheme();
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<PartnerPost[]>([]);
@@ -382,22 +383,24 @@ export default function PartnerFeedPage({ partner, onBack }: Props) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
-      <View
-        style={[
-          styles.header,
-          { borderBottomColor: palette.divider, backgroundColor: palette.card },
-        ]}
-      >
-        <Pressable onPress={onBack} style={styles.headerButton}>
-          <KISIcon name="arrow-left" size={20} color={palette.text} />
-        </Pressable>
-        <Text
-          style={[styles.headerTitle, { color: palette.text }]}
-          numberOfLines={1}
+      {!hideHeader && (
+        <View
+          style={[
+            styles.header,
+            { borderBottomColor: palette.divider, backgroundColor: palette.card },
+          ]}
         >
-          {partner.name} Feed
-        </Text>
-      </View>
+          <Pressable onPress={onBack} style={styles.headerButton}>
+            <KISIcon name="arrow-left" size={20} color={palette.text} />
+          </Pressable>
+          <Text
+            style={[styles.headerTitle, { color: palette.text }]}
+            numberOfLines={1}
+          >
+            {partner.name} Feed
+          </Text>
+        </View>
+      )}
 
       <View style={styles.feedHeader}>
         <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700' }}>
