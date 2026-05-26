@@ -180,6 +180,12 @@ export type RootStackParamList = {
   QuickLock: undefined;
   Wallet: undefined;
   SubscriptionManagement: undefined;
+  PlaylistList: undefined;
+  PlaylistDetail: {
+    playlistId: string;
+    startIndex?: number;
+    autoPlay?: boolean;
+  };
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

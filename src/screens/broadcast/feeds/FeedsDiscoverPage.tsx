@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   DeviceEventEmitter,
@@ -26,6 +26,8 @@ import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
 import type { BroadcastFeedItem } from '@/screens/broadcast/feeds/api/feeds.types';
 import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroadcastPosterId';
 import { KISIcon } from '@/constants/kisIcons';
+import AddToPlaylistSheet from '@/screens/broadcast/playlists/AddToPlaylistSheet';
+import { getPlaylistsState, subscribeToPlaylists } from '@/screens/broadcast/playlists/playlistManager';
 
 type FeedCategory = 'for_you' | 'following' | 'trending' | 'live' | 'channels' | 'community' | 'market' | 'education';
 
@@ -58,6 +60,14 @@ export default function FeedsDiscoverPage({
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FeedCategory>('for_you');
+  const [playlistSheetItem, setPlaylistSheetItem] = useState<BroadcastFeedItem | null>(null);
+  const [playlistCount, setPlaylistCount] = useState(
+    () => getPlaylistsState().playlists.length,
+  );
+
+  useEffect(() => {
+    return subscribeToPlaylists(s => setPlaylistCount(s.playlists.length));
+  }, []);
 
   const {
     items,
@@ -268,6 +278,10 @@ export default function FeedsDiscoverPage({
           },
         },
         {
+          text: 'Add to playlist',
+          onPress: () => setPlaylistSheetItem(item),
+        },
+        {
           text: 'Copy link',
           onPress: () => {
             Clipboard.setString(permalink);
@@ -366,6 +380,7 @@ export default function FeedsDiscoverPage({
       hideItem,
       refreshAll,
       toggleSaved,
+      setPlaylistSheetItem,
     ],
   );
 
@@ -392,6 +407,30 @@ export default function FeedsDiscoverPage({
       }}
       scrollEventThrottle={16}
     >
+      {/* My Playlists quick-access row */}
+      <Pressable
+        onPress={() => navigation.navigate('PlaylistList')}
+        style={({ pressed }) => [
+          styles.playlistsRow,
+          { opacity: pressed ? 0.75 : 1 },
+        ]}
+      >
+        <View style={[styles.playlistsRowLeft, { backgroundColor: palette.primaryStrong + '18', borderColor: palette.primaryStrong + '45' }]}>
+          <KISIcon name="list" size={14} color={palette.primaryStrong} />
+        </View>
+        <Text style={[styles.playlistsRowText, { color: palette.text }]}>
+          My Playlists
+        </Text>
+        {playlistCount > 0 && (
+          <View style={[styles.playlistsBadge, { backgroundColor: palette.primaryStrong }]}>
+            <Text style={[styles.playlistsBadgeText, { color: palette.surface }]}>
+              {playlistCount}
+            </Text>
+          </View>
+        )}
+        <KISIcon name="chevron-right" size={14} color={palette.subtext} />
+      </Pressable>
+
       {/* Category filter tabs */}
       <ScrollView
         horizontal
@@ -562,11 +601,52 @@ export default function FeedsDiscoverPage({
           }}
         />
       </View>
+
+      <AddToPlaylistSheet
+        item={playlistSheetItem}
+        visible={Boolean(playlistSheetItem)}
+        onClose={() => setPlaylistSheetItem(null)}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  playlistsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  playlistsRowLeft: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playlistsRowText: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  playlistsBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  playlistsBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   categoryRow: {
     paddingHorizontal: 12,
     paddingVertical: 10,

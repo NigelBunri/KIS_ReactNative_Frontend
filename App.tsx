@@ -45,6 +45,8 @@ import TwoFactorScreen from './src/screens/TwoFactorScreen';
 import { MainTabs } from '@/navigation/AppNavigator';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
+import PlaylistsScreen from '@/screens/broadcast/playlists/PlaylistsScreen';
+import PlaylistDetailScreen from '@/screens/broadcast/playlists/PlaylistDetailScreen';
 import ChannelHomePage from '@/screens/broadcast/channels/ChannelHomePage';
 import ChannelContentDetailPage from '@/screens/broadcast/channels/ChannelContentDetailPage';
 import LiveWatchPage from '@/screens/broadcast/channels/LiveWatchPage';
@@ -947,6 +949,14 @@ function AppContent() {
                       name="SubscriptionManagement"
                       component={SubscriptionManagementScreen}
                       options={{ presentation: 'modal', title: 'Subscription' }}
+                    />
+                    <RootStack.Screen
+                      name="PlaylistList"
+                      component={PlaylistsScreen}
+                    />
+                    <RootStack.Screen
+                      name="PlaylistDetail"
+                      component={PlaylistDetailScreen}
                     />
                     <RootStack.Screen
                       name="ServiceBookingDetails"

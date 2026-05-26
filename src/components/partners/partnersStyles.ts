@@ -193,10 +193,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   partnerName: {
-    flex: 1,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
-    marginRight: 8,
   },
   partnerTagline: {
     fontSize: 13,

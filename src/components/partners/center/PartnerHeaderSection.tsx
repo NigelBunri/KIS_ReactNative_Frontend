@@ -77,6 +77,7 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 3,
+                flexShrink: 0,
               }}>
                 <KISIcon name="checkmark-circle" size={11} color={isDark ? palette.goldSoft : palette.goldDeep} />
                 <Text style={{ fontSize: 10, fontWeight: '800', color: isDark ? palette.goldSoft : palette.goldDeep }}>

@@ -353,6 +353,14 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/`,
     playlistItemDetail: (playlistId: string, contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/${contentId}/`,
+    // User-created personal playlists (cross-device, server-persisted)
+    userPlaylists: `${API_BASE_URL}/api/v1/broadcasts/user-playlists/`,
+    userPlaylistDetail: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/user-playlists/${id}/`,
+    userPlaylistItems: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/user-playlists/${id}/items/`,
+    userPlaylistItemDetail: (id: string, itemId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/user-playlists/${id}/items/${itemId}/`,
     channelContentDetail: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/`,
     channelContentPublish: (contentId: string) =>
