@@ -1,0 +1,560 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useKISTheme } from '@/theme/useTheme';
+import { useNavigation } from '@react-navigation/native';
+import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
+
+type LoyaltyRule = {
+  id?: string;
+  title?: string;
+  name?: string;
+  description?: string;
+  points_earned?: number;
+  earn_rate?: number;
+  action?: string;
+  trigger?: string;
+};
+
+type LoyaltyActivity = {
+  id?: string;
+  points?: number;
+  action?: string;
+  description?: string;
+  created_at?: string;
+  date?: string;
+  type?: string;
+};
+
+const formatDate = (value?: string) => {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return value;
+  }
+};
+
+const normalizeList = (payload: any): any[] => {
+  const source = payload?.data ?? payload ?? {};
+  const results = source?.results ?? source;
+  return Array.isArray(results) ? results : [];
+};
+
+export default function LoyaltyScreen() {
+  const { palette } = useKISTheme();
+  const navigation = useNavigation();
+
+  const [balance, setBalance] = useState<number>(0);
+  const [rules, setRules] = useState<LoyaltyRule[]>([]);
+  const [history, setHistory] = useState<LoyaltyActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [redeemPoints, setRedeemPoints] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemVisible, setRedeemVisible] = useState(false);
+
+  const fetchAll = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const [balanceRes, rulesRes, historyRes] = await Promise.all([
+        getRequest(ROUTES.billing.loyaltyBalance, {
+          forceNetwork: isRefresh,
+          errorMessage: 'Unable to load loyalty balance.',
+        }),
+        getRequest(ROUTES.billing.loyaltyRules, {
+          forceNetwork: isRefresh,
+          errorMessage: 'Unable to load loyalty rules.',
+        }),
+        getRequest(ROUTES.billing.loyalty, {
+          forceNetwork: isRefresh,
+          errorMessage: 'Unable to load loyalty history.',
+        }),
+      ]);
+
+      if (balanceRes?.success) {
+        const raw = balanceRes.data;
+        const points =
+          raw?.points ?? raw?.balance ?? raw?.point_balance ?? raw?.data?.points ?? 0;
+        setBalance(Number(points) || 0);
+      }
+      if (rulesRes?.success) {
+        setRules(normalizeList(rulesRes.data));
+      }
+      if (historyRes?.success) {
+        setHistory(normalizeList(historyRes.data));
+      }
+      if (!balanceRes?.success && !rulesRes?.success && !historyRes?.success) {
+        setError('Unable to load loyalty data.');
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Unable to load loyalty data.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAll();
+  }, [fetchAll]);
+
+  const handleRefresh = useCallback(() => {
+    void fetchAll(true);
+  }, [fetchAll]);
+
+  const handleRedeem = useCallback(async () => {
+    const points = Number(redeemPoints);
+    if (!points || points <= 0) {
+      Alert.alert('Redeem Points', 'Enter a valid number of points to redeem.');
+      return;
+    }
+    if (points > balance) {
+      Alert.alert('Redeem Points', `You only have ${balance} points available.`);
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const response = await postRequest(
+        ROUTES.billing.loyalty,
+        { action: 'redeem', points },
+        { errorMessage: 'Unable to redeem points.' },
+      );
+      if (response?.success) {
+        Alert.alert('Redeem Points', 'Points redeemed successfully!');
+        setRedeemPoints('');
+        setRedeemVisible(false);
+        void fetchAll(true);
+      } else {
+        Alert.alert(
+          'Redeem Points',
+          response?.message ?? 'Unable to redeem points.',
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Redeem Points', err?.message ?? 'Unable to redeem points.');
+    } finally {
+      setRedeeming(false);
+    }
+  }, [balance, fetchAll, redeemPoints]);
+
+  return (
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[s.header, { borderBottomColor: palette.divider }]}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={s.backBtn}
+          >
+            <Text style={[s.backText, { color: palette.primaryStrong }]}>
+              Back
+            </Text>
+          </Pressable>
+          <Text style={[s.headerTitle, { color: palette.text }]}>
+            Loyalty &amp; Points
+          </Text>
+          <View style={s.backBtn} />
+        </View>
+
+        {loading && !refreshing ? (
+          <View style={s.center}>
+            <ActivityIndicator color={palette.primaryStrong} size="large" />
+          </View>
+        ) : error ? (
+          <View style={s.center}>
+            <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>
+              {error}
+            </Text>
+            <Pressable
+              onPress={() => void fetchAll()}
+              style={[s.retryBtn, { borderColor: palette.primaryStrong }]}
+            >
+              <Text style={[s.retryText, { color: palette.primaryStrong }]}>
+                Retry
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={s.content}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={palette.primaryStrong}
+              />
+            }
+          >
+            {/* Balance Card */}
+            <View
+              style={[
+                s.balanceCard,
+                { backgroundColor: palette.primaryStrong },
+              ]}
+            >
+              <Text style={s.balanceLabel}>Your Points Balance</Text>
+              <Text style={s.balanceValue}>
+                {balance.toLocaleString()}
+              </Text>
+              <Text style={s.balanceSub}>points</Text>
+              {balance > 0 && (
+                <Pressable
+                  style={s.redeemToggleBtn}
+                  onPress={() => setRedeemVisible(prev => !prev)}
+                >
+                  <Text style={s.redeemToggleText}>
+                    {redeemVisible ? 'Cancel' : 'Redeem Points'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Redeem Input */}
+            {redeemVisible && balance > 0 ? (
+              <View
+                style={[
+                  s.redeemCard,
+                  {
+                    backgroundColor: palette.surfaceElevated,
+                    borderColor: palette.divider,
+                  },
+                ]}
+              >
+                <Text style={[s.sectionTitle, { color: palette.text }]}>
+                  Redeem Points
+                </Text>
+                <Text
+                  style={[s.redeemHint, { color: palette.subtext }]}
+                >
+                  Available: {balance.toLocaleString()} pts
+                </Text>
+                <View style={s.redeemRow}>
+                  <TextInput
+                    style={[
+                      s.redeemInput,
+                      {
+                        color: palette.text,
+                        borderColor: palette.divider,
+                        backgroundColor: palette.surface,
+                      },
+                    ]}
+                    placeholder="Points to redeem"
+                    placeholderTextColor={palette.subtext}
+                    keyboardType="numeric"
+                    value={redeemPoints}
+                    onChangeText={setRedeemPoints}
+                    editable={!redeeming}
+                  />
+                  <Pressable
+                    style={[
+                      s.redeemBtn,
+                      {
+                        backgroundColor: redeeming
+                          ? palette.subtext
+                          : palette.primaryStrong,
+                      },
+                    ]}
+                    onPress={handleRedeem}
+                    disabled={redeeming}
+                  >
+                    {redeeming ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={s.redeemBtnText}>Apply</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Earning Rules */}
+            <View>
+              <Text style={[s.sectionTitle, { color: palette.text }]}>
+                How to Earn Points
+              </Text>
+              {rules.length === 0 ? (
+                <Text style={[s.emptyNote, { color: palette.subtext }]}>
+                  No earning rules configured yet.
+                </Text>
+              ) : (
+                rules.map((rule, idx) => (
+                  <View
+                    key={rule.id ?? idx}
+                    style={[
+                      s.ruleCard,
+                      {
+                        backgroundColor: palette.surfaceElevated,
+                        borderColor: palette.divider,
+                      },
+                    ]}
+                  >
+                    <View style={s.ruleRow}>
+                      <View style={s.ruleInfo}>
+                        <Text
+                          style={[s.ruleName, { color: palette.text }]}
+                        >
+                          {rule.title ?? rule.name ?? rule.action ?? `Rule ${idx + 1}`}
+                        </Text>
+                        {rule.description ? (
+                          <Text
+                            style={[s.ruleDesc, { color: palette.subtext }]}
+                            numberOfLines={2}
+                          >
+                            {rule.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View
+                        style={[
+                          s.rulePts,
+                          {
+                            backgroundColor: `${palette.primaryStrong}20`,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            s.rulePtsText,
+                            { color: palette.primaryStrong },
+                          ]}
+                        >
+                          +{rule.points_earned ?? rule.earn_rate ?? '?'}
+                        </Text>
+                        <Text
+                          style={[
+                            s.rulePtsSub,
+                            { color: palette.primaryStrong },
+                          ]}
+                        >
+                          pts
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Activity History */}
+            <View>
+              <Text style={[s.sectionTitle, { color: palette.text }]}>
+                Recent Activity
+              </Text>
+              {history.length === 0 ? (
+                <Text style={[s.emptyNote, { color: palette.subtext }]}>
+                  No activity yet. Start earning points today!
+                </Text>
+              ) : (
+                history.slice(0, 20).map((item, idx) => {
+                  const pts = Number(item.points ?? 0);
+                  const isPositive = pts >= 0;
+                  return (
+                    <View
+                      key={item.id ?? idx}
+                      style={[
+                        s.activityItem,
+                        { borderBottomColor: palette.divider },
+                      ]}
+                    >
+                      <View style={s.activityLeft}>
+                        <Text
+                          style={[s.activityDesc, { color: palette.text }]}
+                          numberOfLines={1}
+                        >
+                          {item.description ??
+                            item.action ??
+                            item.type ??
+                            'Points activity'}
+                        </Text>
+                        <Text
+                          style={[s.activityDate, { color: palette.subtext }]}
+                        >
+                          {formatDate(item.date ?? item.created_at)}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          s.activityPts,
+                          {
+                            color: isPositive ? '#16A34A' : '#DC2626',
+                          },
+                        ]}
+                      >
+                        {isPositive ? '+' : ''}{pts}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  backBtn: { width: 60 },
+  backText: { fontSize: 15, fontWeight: '600' },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { fontSize: 14, fontWeight: '700' },
+  content: { padding: 16, gap: 20, paddingBottom: 40 },
+  balanceCard: {
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  balanceValue: {
+    color: '#fff',
+    fontSize: 56,
+    fontWeight: '900',
+    lineHeight: 64,
+  },
+  balanceSub: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  redeemToggleBtn: {
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  redeemToggleText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  redeemCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+  },
+  redeemHint: { fontSize: 12, marginBottom: 12 },
+  redeemRow: { flexDirection: 'row', gap: 10 },
+  redeemInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  redeemBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+  },
+  redeemBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  emptyNote: { fontSize: 13, fontStyle: 'italic' },
+  ruleCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ruleInfo: { flex: 1, marginRight: 12 },
+  ruleName: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  ruleDesc: { fontSize: 12 },
+  rulePts: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  rulePtsText: { fontSize: 18, fontWeight: '900' },
+  rulePtsSub: { fontSize: 10, fontWeight: '600' },
+  activityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  activityLeft: { flex: 1, marginRight: 12 },
+  activityDesc: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  activityDate: { fontSize: 12 },
+  activityPts: { fontSize: 16, fontWeight: '800' },
+});

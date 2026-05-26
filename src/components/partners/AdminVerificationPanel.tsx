@@ -5,12 +5,13 @@ import {
   Animated,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import type { VerificationCase, VerificationSummary } from '@/screens/tabs/partners/useAdminVerificationPanel';
+import type { VerificationCase, VerificationSummary, SuspiciousSignal } from '@/screens/tabs/partners/useAdminVerificationPanel';
 
 const ACTIONS: { key: 'dismiss' | 'warn' | 'restrict' | 'takedown' | 'ban'; label: string; color: string }[] = [
   { key: 'dismiss', label: 'Dismiss', color: '#888' },
@@ -33,21 +34,24 @@ type Props = {
   panelTranslateX: Animated.Value;
   cases: VerificationCase[];
   summary: VerificationSummary | null;
+  suspiciousSignals?: SuspiciousSignal[];
   loading: boolean;
   actionLoading: string | null;
   error: string | null;
   page: number;
   totalPages: number;
   onTakeAction: (id: string, action: 'dismiss' | 'warn' | 'restrict' | 'takedown' | 'ban', notes?: string) => Promise<boolean>;
+  onApproveBadge?: (userId: string, badgeType: string) => Promise<boolean>;
+  onRejectCase?: (caseId: string, notes?: string) => Promise<boolean>;
   onLoadPage: (p: number) => void;
   onClose: () => void;
 };
 
 export default function AdminVerificationPanel({
   isOpen, panelWidth, panelTranslateX,
-  cases, summary, loading, actionLoading, error,
+  cases, summary, suspiciousSignals = [], loading, actionLoading, error,
   page, totalPages,
-  onTakeAction, onLoadPage, onClose,
+  onTakeAction, onApproveBadge, onRejectCase, onLoadPage, onClose,
 }: Props) {
   const { palette } = useKISTheme();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -145,26 +149,86 @@ export default function AdminVerificationPanel({
                 )}
 
                 {isExpanded && (
-                  <View style={styles.actionsRow}>
-                    {ACTIONS.map(a => (
-                      <Pressable
-                        key={a.key}
-                        onPress={() => handleAction(item, a)}
-                        disabled={actionLoading === item.id}
-                        style={[styles.actionBtn, { borderColor: a.color + '88' }]}
-                      >
-                        {actionLoading === item.id
-                          ? <ActivityIndicator size="small" color={a.color} />
-                          : <Text style={[styles.actionBtnText, { color: a.color }]}>{a.label}</Text>
-                        }
-                      </Pressable>
-                    ))}
-                  </View>
+                  <>
+                    {/* Approve / Reject quick actions */}
+                    <View style={[styles.actionsRow, { marginBottom: 4 }]}>
+                      {onApproveBadge && (
+                        <Pressable
+                          onPress={() => {
+                            Alert.alert(
+                              'Approve & Issue Badge',
+                              'Issue a verified badge to this user?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Issue Badge',
+                                  onPress: () => void onApproveBadge(item.content_id, item.flag_type),
+                                },
+                              ],
+                            );
+                          }}
+                          disabled={actionLoading === item.id}
+                          style={[styles.actionBtn, { borderColor: '#4caf5088', backgroundColor: '#4caf5011' }]}
+                        >
+                          {actionLoading === item.id
+                            ? <ActivityIndicator size="small" color="#4caf50" />
+                            : <Text style={[styles.actionBtnText, { color: '#4caf50' }]}>Approve</Text>
+                          }
+                        </Pressable>
+                      )}
+                      {onRejectCase && (
+                        <Pressable
+                          onPress={() => void onRejectCase(item.id)}
+                          disabled={actionLoading === item.id}
+                          style={[styles.actionBtn, { borderColor: '#e74c3c88', backgroundColor: '#e74c3c11' }]}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#e74c3c' }]}>Reject</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                    {/* Extended moderation actions */}
+                    <View style={styles.actionsRow}>
+                      {ACTIONS.map(a => (
+                        <Pressable
+                          key={a.key}
+                          onPress={() => handleAction(item, a)}
+                          disabled={actionLoading === item.id}
+                          style={[styles.actionBtn, { borderColor: a.color + '88' }]}
+                        >
+                          {actionLoading === item.id
+                            ? <ActivityIndicator size="small" color={a.color} />
+                            : <Text style={[styles.actionBtnText, { color: a.color }]}>{a.label}</Text>
+                          }
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
                 )}
               </View>
             );
           }}
         />
+      )}
+
+      {!loading && suspiciousSignals.length > 0 && (
+        <View style={[styles.signalsSection, { borderTopColor: palette.border }]}>
+          <Text style={[styles.signalsTitle, { color: palette.text }]}>
+            Suspicious Signals ({suspiciousSignals.length})
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.signalsScroll}>
+            {suspiciousSignals.slice(0, 10).map(sig => (
+              <View key={sig.id} style={[styles.signalCard, { backgroundColor: (palette.danger ?? '#e74c3c') + '14', borderColor: (palette.danger ?? '#e74c3c') + '44' }]}>
+                <Text style={[styles.signalType, { color: palette.danger ?? '#e74c3c' }]}>{sig.signal_type}</Text>
+                {sig.detail && (
+                  <Text style={[styles.signalDetail, { color: palette.subtext }]} numberOfLines={2}>{sig.detail}</Text>
+                )}
+                <Text style={[styles.signalDate, { color: palette.subtext }]}>
+                  {new Date(sig.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {totalPages > 1 && (
@@ -225,4 +289,11 @@ const styles = StyleSheet.create({
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderTopWidth: 1 },
   pageBtn: { padding: 8 },
   pageInfo: { fontSize: 13 },
+  signalsSection: { borderTopWidth: 1, paddingVertical: 10 },
+  signalsTitle: { fontSize: 12, fontWeight: '800', paddingHorizontal: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
+  signalsScroll: { paddingLeft: 16 },
+  signalCard: { borderRadius: 10, borderWidth: 1, padding: 10, marginRight: 10, width: 160 },
+  signalType: { fontSize: 11, fontWeight: '800', marginBottom: 4, textTransform: 'uppercase' },
+  signalDetail: { fontSize: 11, lineHeight: 15, marginBottom: 4 },
+  signalDate: { fontSize: 10 },
 });

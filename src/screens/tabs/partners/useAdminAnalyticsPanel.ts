@@ -25,12 +25,15 @@ export type EngagementStats = {
   content_series_30d: { date: string; posts: number; conversations: number }[];
 };
 
+export type AnalyticsPeriod = '7d' | '30d' | '90d';
+
 export const useAdminAnalyticsPanel = (width: number) => {
   const [isOpen, setIsOpen] = useState(false);
   const [revenue, setRevenue] = useState<RevenueStats | null>(null);
   const [engagement, setEngagement] = useState<EngagementStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
 
   const panelWidth = useMemo(() => {
     if (width < 600) return width;
@@ -38,13 +41,15 @@ export const useAdminAnalyticsPanel = (width: number) => {
   }, [width]);
   const panelTranslateX = useRef(new Animated.Value(panelWidth)).current;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { period?: AnalyticsPeriod }) => {
     setLoading(true);
     setError(null);
+    const p = opts?.period ?? period;
+    const params = new URLSearchParams({ period: p });
     try {
       const [rev, eng] = await Promise.allSettled([
-        getRequest((ROUTES as any).analytics?.revenue ?? '', { errorMessage: '' }),
-        getRequest((ROUTES as any).analytics?.engagement ?? '', { errorMessage: '' }),
+        getRequest(`${(ROUTES as any).analytics?.revenue ?? ''}?${params}`, { errorMessage: '' }),
+        getRequest(`${(ROUTES as any).analytics?.engagement ?? ''}?${params}`, { errorMessage: '' }),
       ]);
       if (rev.status === 'fulfilled' && rev.value?.success) setRevenue(rev.value.data);
       if (eng.status === 'fulfilled' && eng.value?.success) setEngagement(eng.value.data);
@@ -56,7 +61,12 @@ export const useAdminAnalyticsPanel = (width: number) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
+
+  const changePeriod = useCallback((p: AnalyticsPeriod) => {
+    setPeriod(p);
+    void load({ period: p });
+  }, [load]);
 
   const open = () => {
     setIsOpen(true);
@@ -73,5 +83,8 @@ export const useAdminAnalyticsPanel = (width: number) => {
     );
   };
 
-  return { panelWidth, panelTranslateX, isOpen, open, close, revenue, engagement, loading, error, refresh: load };
+  return {
+    panelWidth, panelTranslateX, isOpen, open, close,
+    revenue, engagement, loading, error, period, changePeriod, refresh: load,
+  };
 };

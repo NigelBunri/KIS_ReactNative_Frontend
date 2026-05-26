@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
@@ -78,6 +78,13 @@ export const useAdminSystemHealthPanel = (width: number) => {
       setLoading(false);
     }
   }, []);
+
+  // Auto-refresh every 30 seconds while the panel is open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setInterval(() => { void load(); }, 30_000);
+    return () => clearInterval(timer);
+  }, [isOpen, load]);
 
   const open = () => {
     setIsOpen(true);

@@ -745,6 +745,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             engagement={adminAnalytics.engagement}
             loading={adminAnalytics.loading}
             error={adminAnalytics.error}
+            period={adminAnalytics.period}
+            onChangePeriod={adminAnalytics.changePeriod}
             onClose={adminAnalytics.close}
             onRefresh={adminAnalytics.refresh}
           />
@@ -771,12 +773,15 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelTranslateX={adminVerification.panelTranslateX}
             cases={adminVerification.cases}
             summary={adminVerification.summary}
+            suspiciousSignals={adminVerification.suspiciousSignals}
             loading={adminVerification.loading}
             actionLoading={adminVerification.actionLoading}
             error={adminVerification.error}
             page={adminVerification.page}
             totalPages={adminVerification.totalPages}
             onTakeAction={adminVerification.takeAction}
+            onApproveBadge={adminVerification.approveBadge}
+            onRejectCase={adminVerification.rejectCase}
             onLoadPage={(p) => { adminVerification.setPage(p); void adminVerification.load({ p }); }}
             onClose={adminVerification.close}
           />
@@ -802,7 +807,9 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             page={adminAuditTrail.page}
             totalPages={adminAuditTrail.totalPages}
             severityFilter={adminAuditTrail.severityFilter}
+            actionFilter={adminAuditTrail.actionFilter}
             onFilterSeverity={(s) => { adminAuditTrail.setSeverityFilter(s); void adminAuditTrail.load({ severity: s, p: 1 }); }}
+            onFilterAction={(a) => { adminAuditTrail.setActionFilter(a); void adminAuditTrail.load({ action: a, p: 1 }); }}
             onLoadPage={(p) => { adminAuditTrail.setPage(p); void adminAuditTrail.load({ p }); }}
             onClose={adminAuditTrail.close}
           />

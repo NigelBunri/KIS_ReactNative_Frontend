@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
@@ -30,7 +31,9 @@ type Props = {
   page: number;
   totalPages: number;
   severityFilter: string;
+  actionFilter?: string;
   onFilterSeverity: (s: string) => void;
+  onFilterAction?: (a: string) => void;
   onLoadPage: (p: number) => void;
   onClose: () => void;
 };
@@ -38,10 +41,11 @@ type Props = {
 export default function AdminAuditTrailPanel({
   isOpen, panelWidth, panelTranslateX,
   entries, loading, error,
-  page, totalPages, severityFilter,
-  onFilterSeverity, onLoadPage, onClose,
+  page, totalPages, severityFilter, actionFilter = '',
+  onFilterSeverity, onFilterAction, onLoadPage, onClose,
 }: Props) {
   const { palette } = useKISTheme();
+  const [localAction, setLocalAction] = useState(actionFilter);
   if (!isOpen) return null;
 
   return (
@@ -84,6 +88,27 @@ export default function AdminAuditTrailPanel({
           );
         })}
       </View>
+
+      {/* Action type filter input */}
+      {onFilterAction && (
+        <View style={[styles.actionFilterRow, { borderBottomColor: palette.border }]}>
+          <TextInput
+            value={localAction}
+            onChangeText={setLocalAction}
+            onSubmitEditing={() => onFilterAction(localAction)}
+            placeholder="Filter by action type (e.g. USER_BAN)"
+            placeholderTextColor={palette.subtext}
+            style={[styles.actionFilterInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.card ?? palette.surface }]}
+            returnKeyType="search"
+            autoCapitalize="none"
+          />
+          {localAction.length > 0 && (
+            <Pressable onPress={() => { setLocalAction(''); onFilterAction(''); }}>
+              <Text style={{ color: palette.subtext, paddingHorizontal: 8, fontSize: 14 }}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {loading && (
         <View style={styles.centered}>
@@ -156,6 +181,8 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12, marginTop: 2 },
   closeBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   filterRow: { flexDirection: 'row', padding: 12, gap: 6, borderBottomWidth: 1, flexWrap: 'wrap' },
+  actionFilterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, gap: 8 },
+  actionFilterInput: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, fontSize: 12 },
   chip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
   chipText: { fontSize: 12, fontWeight: '600' },
   centered: { padding: 40, alignItems: 'center' },

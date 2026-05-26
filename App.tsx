@@ -83,6 +83,9 @@ import { postRequest } from '@/network/post';
 import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
 import { initPushHandlers } from './src/push/notifications';
+import InAppNotificationToast, {
+  InAppNotificationToastRef,
+} from './src/push/InAppNotificationToast';
 import { getAccessToken } from './src/security/authStorage';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
@@ -111,6 +114,12 @@ import ProfileImpactSnapshotScreen from '@/screens/profile/ProfileImpactSnapshot
 import ProfileNotificationsScreen from '@/screens/profile/ProfileNotificationsScreen';
 import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificationDetailScreen';
 import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
+import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
+import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
+import DeviceManagementScreen from '@/screens/DeviceManagementScreen';
+import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
+import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
+import PromoCodeScreen from '@/screens/market/PromoCodeScreen';
 import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
 import EventsScreen from '@/screens/EventsScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
@@ -147,6 +156,8 @@ function AppContent() {
   const { language } = useLanguage();
   const scheme = useColorScheme();
   const [booting, setBooting] = useState(true);
+
+  const navigationRef = useRef<any>(null);
 
   const [isAuth, setAuth] = useState(false);
   const [load, setLoad] = useState(false);
@@ -446,7 +457,7 @@ function AppContent() {
   }, [isAuth]);
 
   useEffect(() => {
-    initPushHandlers();
+    initPushHandlers(navigationRef);
   }, []);
 
   useEffect(() => {
@@ -646,6 +657,7 @@ function AppContent() {
       <SocketProvider>
         <View key={`app-${language}`} style={{ flex: 1 }}>
           <NavigationContainer
+            ref={navigationRef}
             key={`nav-${language}`}
             theme={scheme === 'dark' ? DarkTheme : DefaultTheme}
             linking={{
@@ -850,6 +862,33 @@ function AppContent() {
                       }}
                     />
                     <RootStack.Screen
+                      name="PasswordChange"
+                      component={PasswordChangeScreen}
+                    />
+                    <RootStack.Screen
+                      name="DeviceManagement"
+                      component={DeviceManagementScreen}
+                    />
+                    <RootStack.Screen
+                      name="AccountDeletion"
+                      component={AccountDeletionScreen}
+                    />
+                    <RootStack.Screen
+                      name="InvoiceList"
+                      component={InvoiceListScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="Loyalty"
+                      component={LoyaltyScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="PromoCode"
+                      component={PromoCodeScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
                       name="ServiceBookingDetails"
                       component={ServiceBookingDetailsPage}
                       options={{ presentation: 'modal' }}
@@ -925,6 +964,7 @@ function AppContent() {
             </GlobalProfilePreviewProvider>
           </NavigationContainer>
           <LanguageSwitcher />
+          <InAppNotificationToast ref={InAppNotificationToastRef} />
         </View>
       </SocketProvider>
     </AuthContext.Provider>

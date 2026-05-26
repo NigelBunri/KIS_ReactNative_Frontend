@@ -9,7 +9,13 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import type { RevenueStats, EngagementStats } from '@/screens/tabs/partners/useAdminAnalyticsPanel';
+import type { RevenueStats, EngagementStats, AnalyticsPeriod } from '@/screens/tabs/partners/useAdminAnalyticsPanel';
+
+const PERIODS: { key: AnalyticsPeriod; label: string }[] = [
+  { key: '7d', label: '7 days' },
+  { key: '30d', label: '30 days' },
+  { key: '90d', label: '90 days' },
+];
 
 type Props = {
   isOpen: boolean;
@@ -19,6 +25,8 @@ type Props = {
   engagement: EngagementStats | null;
   loading: boolean;
   error: string | null;
+  period: AnalyticsPeriod;
+  onChangePeriod: (p: AnalyticsPeriod) => void;
   onClose: () => void;
   onRefresh: () => void;
 };
@@ -26,6 +34,7 @@ type Props = {
 export default function AdminAnalyticsPanel({
   isOpen, panelWidth, panelTranslateX,
   revenue, engagement, loading, error,
+  period, onChangePeriod,
   onClose, onRefresh,
 }: Props) {
   const { palette } = useKISTheme();
@@ -53,6 +62,27 @@ export default function AdminAnalyticsPanel({
             <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
           </Pressable>
         </View>
+      </View>
+
+      {/* Period selector */}
+      <View style={[styles.periodRow, { borderBottomColor: palette.border }]}>
+        {PERIODS.map(p => {
+          const active = period === p.key;
+          return (
+            <Pressable
+              key={p.key}
+              onPress={() => onChangePeriod(p.key)}
+              style={[styles.periodChip, {
+                backgroundColor: active ? palette.primary + '22' : 'transparent',
+                borderColor: active ? palette.primary : palette.border,
+              }]}
+            >
+              <Text style={[styles.periodChipText, { color: active ? palette.primary : palette.subtext }]}>
+                {p.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -159,6 +189,9 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   refreshBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   closeBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  periodRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1 },
+  periodChip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 6 },
+  periodChipText: { fontSize: 12, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   centered: { alignItems: 'center', paddingVertical: 40 },

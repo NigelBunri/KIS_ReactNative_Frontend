@@ -47,7 +47,74 @@ type Props = {
 const SWIPE_THRESHOLD = 40;
 const MAX_PULL_DISTANCE = 80;
 const DOUBLE_TAP_DELAY_MS = 260;
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🙏', '🔥'];
+
+/**
+ * Animated emoji button with spring scale-up on press.
+ * Shows a highlight ring when the current user has already reacted with this emoji.
+ */
+type QuickEmojiButtonProps = {
+  emoji: string;
+  isSelected: boolean;
+  palette: any;
+  onPress: () => void;
+};
+
+const QuickEmojiButton: React.FC<QuickEmojiButtonProps> = ({
+  emoji,
+  isSelected,
+  palette,
+  onPress,
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.spring(scaleAnim, {
+        toValue: 1.35,
+        useNativeDriver: true,
+        speed: 40,
+        bounciness: 14,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 8,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isSelected
+          ? (palette.reactionActiveBg ?? 'rgba(79,70,229,0.12)')
+          : 'transparent',
+        borderWidth: isSelected ? 2 : 0,
+        borderColor: isSelected
+          ? (palette.primary ?? '#4F46E5')
+          : 'transparent',
+      }}
+    >
+      <Animated.Text
+        style={{
+          fontSize: 26,
+          transform: [{ scale: scaleAnim }],
+        }}
+      >
+        {emoji}
+      </Animated.Text>
+    </Pressable>
+  );
+};
 
 export const InteractiveMessageRow: React.FC<Props> = ({
   message,
@@ -335,10 +402,10 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                 marginBottom: 10,
                 flexDirection: 'row',
                 backgroundColor: palette.surface ?? '#fff',
-                borderRadius: 36,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                gap: 4,
+                borderRadius: 40,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                gap: 2,
                 shadowColor: '#000',
                 shadowOpacity: 0.16,
                 shadowRadius: 10,
@@ -346,23 +413,26 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                 elevation: 8,
               }}
             >
-              {QUICK_EMOJIS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => closeSheet(() => onReactMessage?.(message, emoji))}
-                  style={({ pressed }) => ({
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: pressed ? (palette.surfaceSoft ?? '#f0f0f0') : 'transparent',
-                    transform: [{ scale: pressed ? 0.88 : 1 }],
-                  })}
-                >
-                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
-                </Pressable>
-              ))}
+              {QUICK_EMOJIS.map((emoji) => {
+                // Determine whether the current user has already used this emoji on this message
+                const reactions = (message as any).reactions as
+                  | Record<string, string[]>
+                  | undefined;
+                const usersForEmoji = reactions?.[emoji];
+                const isSelected = Array.isArray(usersForEmoji) && currentUserId
+                  ? usersForEmoji.includes(currentUserId)
+                  : false;
+
+                return (
+                  <QuickEmojiButton
+                    key={emoji}
+                    emoji={emoji}
+                    isSelected={isSelected}
+                    palette={palette}
+                    onPress={() => closeSheet(() => onReactMessage?.(message, emoji))}
+                  />
+                );
+              })}
             </View>
 
             {/* ── Actions panel ── */}

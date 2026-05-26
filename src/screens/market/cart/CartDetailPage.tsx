@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
+  AppStateStatus,
   Image,
   Pressable,
   ScrollView,
@@ -25,6 +27,7 @@ import {
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 
 type CartDetailRoute = RouteProp<RootStackParamList, 'CartDetail'>;
 type CartDetailNavigation = NativeStackNavigationProp<
@@ -43,6 +46,8 @@ const CartDetailPage = () => {
   const [shopAwaitingSatisfaction, setShopAwaitingSatisfaction] =
     useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const pendingOrderIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -151,8 +156,67 @@ const CartDetailPage = () => {
     ]);
   }, [navigation, shopId]);
 
+  // Poll / refresh the pending order when the user returns to the app after
+  // completing or cancelling the Flutterwave payment flow.
+  const refreshPendingOrder = useCallback(async () => {
+    const orderId = pendingOrderIdRef.current;
+    if (!orderId) return;
+    try {
+      const res = await getRequest(
+        `${ROUTES.commerce.marketplaceOrders}${orderId}/`,
+        { forceNetwork: true, errorMessage: 'Unable to refresh order status.' },
+      );
+      if (res?.success && res.data) {
+        const status = String(res.data.status ?? res.data.payment_status ?? '').toLowerCase();
+        if (status === 'paid' || status === 'successful' || status === 'completed') {
+          pendingOrderIdRef.current = null;
+          setPaymentProcessing(false);
+          if (shopId) void deleteShopCart(shopId);
+          Alert.alert(
+            'Payment successful!',
+            'Your order has been confirmed.',
+            [
+              {
+                text: 'View order',
+                onPress: () =>
+                  navigation.replace('MarketplaceOrderDetail', {
+                    orderId,
+                    mode: 'buyer',
+                  }),
+              },
+              { text: 'OK', style: 'cancel', onPress: () => navigation.goBack() },
+            ],
+          );
+        } else if (status === 'failed' || status === 'cancelled' || status === 'canceled') {
+          pendingOrderIdRef.current = null;
+          setPaymentProcessing(false);
+          Alert.alert(
+            'Payment incomplete',
+            'Your payment was not completed. You can try again.',
+          );
+        }
+        // otherwise still pending — leave paymentProcessing=true, wait for next active event
+      }
+    } catch {
+      // silently ignore refresh errors
+    }
+  }, [navigation, shopId]);
+
+  useEffect(() => {
+    if (!paymentProcessing) return;
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState === 'active') {
+          void refreshPendingOrder();
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [paymentProcessing, refreshPendingOrder]);
+
   const handleCheckout = useCallback(async () => {
-    if (!shopId || !items.length || checkingOut) return;
+    if (!shopId || !items.length || checkingOut || paymentProcessing) return;
     setCheckingOut(true);
     try {
       const orderItems = items.map(item => ({
@@ -169,34 +233,66 @@ const CartDetailPage = () => {
         metadata: { source: 'cart' },
       });
       if (res.success || res.data?.id) {
-        const orderId = res.data?.id;
-        void deleteShopCart(shopId);
-        Alert.alert(
-          'Order placed!',
-          'Your order has been submitted. Track it in your orders.',
-          [
-            {
-              text: 'View order',
-              onPress: () => {
-                if (orderId) {
-                  navigation.replace('MarketplaceOrderDetail', { orderId, mode: 'buyer' });
-                } else {
-                  navigation.navigate('MarketplaceOrders');
-                }
+        const orderId = res.data?.id ? String(res.data.id) : null;
+        const paymentUrl: string =
+          res.data?.payment_url ??
+          res.data?.paymentUrl ??
+          res.data?.metadata?.payment_url ??
+          '';
+
+        if (paymentUrl) {
+          // Flutterwave / external payment flow
+          pendingOrderIdRef.current = orderId;
+          setPaymentProcessing(true);
+          const opened = await openDirectPaymentUrl(paymentUrl);
+          if (!opened) {
+            pendingOrderIdRef.current = null;
+            setPaymentProcessing(false);
+            Alert.alert(
+              'Payment',
+              'Unable to open the payment page. Please try again.',
+            );
+          }
+          // On return from the browser, AppState 'active' event triggers refreshPendingOrder
+        } else {
+          // No payment URL — order placed directly
+          if (shopId) void deleteShopCart(shopId);
+          Alert.alert(
+            'Order placed!',
+            'Your order has been submitted. Track it in your orders.',
+            [
+              {
+                text: 'View order',
+                onPress: () => {
+                  if (orderId) {
+                    navigation.replace('MarketplaceOrderDetail', {
+                      orderId,
+                      mode: 'buyer',
+                    });
+                  } else {
+                    navigation.navigate('MarketplaceOrders');
+                  }
+                },
               },
-            },
-            { text: 'OK', style: 'cancel', onPress: () => navigation.goBack() },
-          ],
-        );
+              { text: 'OK', style: 'cancel', onPress: () => navigation.goBack() },
+            ],
+          );
+        }
       } else {
-        Alert.alert('Order failed', res.message || 'Unable to place order. Please try again.');
+        Alert.alert(
+          'Order failed',
+          res.message || 'Unable to place order. Please try again.',
+        );
       }
     } catch (e: any) {
-      Alert.alert('Order failed', e?.message || 'Unable to place order. Please try again.');
+      Alert.alert(
+        'Order failed',
+        e?.message || 'Unable to place order. Please try again.',
+      );
     } finally {
       setCheckingOut(false);
     }
-  }, [shopId, items, checkingOut, navigation]);
+  }, [shopId, items, checkingOut, paymentProcessing, navigation]);
 
   const renderOptionChips = (
     item: ShopCartItem,
@@ -436,10 +532,16 @@ const CartDetailPage = () => {
           />
           {items.length > 0 && !cartIsCheckedOut && (
             <KISButton
-              title={checkingOut ? 'Placing order…' : 'Checkout'}
+              title={
+                paymentProcessing
+                  ? 'Payment Processing…'
+                  : checkingOut
+                  ? 'Placing order…'
+                  : 'Proceed to Checkout'
+              }
               size="sm"
               variant="primary"
-              disabled={checkingOut}
+              disabled={checkingOut || paymentProcessing}
               onPress={handleCheckout}
             />
           )}

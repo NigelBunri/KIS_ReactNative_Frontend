@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { routeNotification } from './notificationRouter';
+import { InAppNotificationToastRef } from './InAppNotificationToast';
 
 const registerPushToken = async (payload: {
   pushToken?: string | null;
@@ -24,7 +26,15 @@ const registerPushToken = async (payload: {
   );
 };
 
-export async function initPushHandlers() {
+/** Resolve the raw navigation object from either a plain nav or a React ref. */
+function resolveNav(nav?: any): any {
+  if (!nav) return null;
+  // React.createRef / useRef shape.
+  if (typeof nav === 'object' && 'current' in nav) return nav.current;
+  return nav;
+}
+
+export async function initPushHandlers(navigation?: any) {
   try {
     // Optional dependency: only runs if Firebase app + messaging are installed.
     // Use the modular API to avoid deprecated namespaced calls.
@@ -41,6 +51,8 @@ export async function initPushHandlers() {
     const getAPNSToken = messagingMod?.getAPNSToken;
     const setBackgroundMessageHandler = messagingMod?.setBackgroundMessageHandler;
     const onMessage = messagingMod?.onMessage;
+    const onNotificationOpenedApp = messagingMod?.onNotificationOpenedApp;
+    const getInitialNotification = messagingMod?.getInitialNotification;
 
     if (
       typeof getApps !== 'function' ||
@@ -79,16 +91,59 @@ export async function initPushHandlers() {
       await registerPushToken({ pushToken: fcmToken, apnsToken });
     } catch {}
 
+    // Background message handler — must be registered before the app goes to the
+    // background, so we keep the existing stub (no UI possible in the background).
     if (typeof setBackgroundMessageHandler === 'function') {
       setBackgroundMessageHandler(messaging, async (remoteMessage: any) => {
         if (__DEV__) console.log('[push] background message', remoteMessage?.messageId ?? remoteMessage);
       });
     }
 
+    // Foreground message handler — show an in-app toast banner.
     if (typeof onMessage === 'function') {
       onMessage(messaging, async (remoteMessage: any) => {
         if (__DEV__) console.log('[push] foreground message', remoteMessage?.messageId ?? remoteMessage);
+
+        const title: string =
+          remoteMessage?.notification?.title ??
+          remoteMessage?.data?.title ??
+          '';
+        const body: string =
+          remoteMessage?.notification?.body ??
+          remoteMessage?.data?.body ??
+          '';
+        const data: Record<string, string> = remoteMessage?.data ?? {};
+
+        InAppNotificationToastRef.current?.show({ title, body, data }, resolveNav(navigation));
       });
+    }
+
+    // Tap on notification while the app was in the background (not killed).
+    if (typeof onNotificationOpenedApp === 'function') {
+      onNotificationOpenedApp(messaging, (remoteMessage: any) => {
+        if (__DEV__) console.log('[push] notification opened app', remoteMessage?.messageId ?? remoteMessage);
+        const nav = resolveNav(navigation);
+        if (nav && remoteMessage?.data) {
+          routeNotification(remoteMessage.data, nav);
+        }
+      });
+    }
+
+    // Cold-start: app was killed and user tapped a notification.
+    if (typeof getInitialNotification === 'function') {
+      try {
+        const initialMessage = await getInitialNotification(messaging);
+        if (initialMessage) {
+          if (__DEV__) console.log('[push] initial notification', initialMessage?.messageId ?? initialMessage);
+          // Defer to give the navigator time to mount, then resolve the ref.
+          if (navigation && initialMessage?.data) {
+            setTimeout(() => {
+              const nav = resolveNav(navigation);
+              if (nav) routeNotification(initialMessage.data, nav);
+            }, 300);
+          }
+        }
+      } catch {}
     }
   } catch (err: any) {
     if (__DEV__) console.log('[push] messaging not available:', err?.message);

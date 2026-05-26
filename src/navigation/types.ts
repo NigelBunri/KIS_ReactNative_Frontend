@@ -155,6 +155,12 @@ export type RootStackParamList = {
     shopName?: string;
     returnBroadcastProfileKey?: BroadcastProfileKey;
   };
+  AccountDeletion: undefined;
+  PasswordChange: undefined;
+  DeviceManagement: undefined;
+  InvoiceList: undefined;
+  Loyalty: undefined;
+  PromoCode: undefined;
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

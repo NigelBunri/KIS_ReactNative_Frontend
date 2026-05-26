@@ -14,6 +14,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -2585,6 +2586,70 @@ export default function ProfileScreen() {
 
               <WorkspaceLauncherSection items={workspaceLaunchers} />
 
+              <View
+                style={[
+                  billingLinksStyles.section,
+                  { borderColor: palette.divider },
+                ]}
+              >
+                <Text
+                  style={[
+                    billingLinksStyles.sectionTitle,
+                    { color: palette.text },
+                  ]}
+                >
+                  Billing &amp; Rewards
+                </Text>
+                <Pressable
+                  style={[
+                    billingLinksStyles.link,
+                    { borderBottomColor: palette.divider },
+                  ]}
+                  onPress={() => rootNavigation?.navigate('InvoiceList')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Invoices
+                  </Text>
+                  <Text style={{ color: palette.subtext }}>›</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    billingLinksStyles.link,
+                    { borderBottomColor: palette.divider },
+                  ]}
+                  onPress={() => rootNavigation?.navigate('Loyalty')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Loyalty &amp; Points
+                  </Text>
+                  <Text style={{ color: palette.subtext }}>›</Text>
+                </Pressable>
+                <Pressable
+                  style={billingLinksStyles.link}
+                  onPress={() => rootNavigation?.navigate('PromoCode')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Promo Codes
+                  </Text>
+                  <Text style={{ color: palette.subtext }}>›</Text>
+                </Pressable>
+              </View>
+
               <LanguageSelectorCard
                 currentLabel={currentLanguageLabel}
                 languages={languages}
@@ -2593,6 +2658,79 @@ export default function ProfileScreen() {
                   setLanguage(code).catch(() => undefined);
                 }}
               />
+            </View>
+
+            <View
+              style={{
+                marginHorizontal: 18,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                backgroundColor: palette.surface,
+                overflow: 'hidden',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: palette.subtext,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  paddingHorizontal: 16,
+                  paddingTop: 14,
+                  paddingBottom: 8,
+                }}
+              >
+                Account Security
+              </Text>
+              {[
+                {
+                  label: 'Change Password',
+                  route: 'PasswordChange' as const,
+                  danger: false,
+                },
+                {
+                  label: 'Manage Devices',
+                  route: 'DeviceManagement' as const,
+                  danger: false,
+                },
+                {
+                  label: 'Delete Account',
+                  route: 'AccountDeletion' as const,
+                  danger: true,
+                },
+              ].map((item, index) => (
+                <Pressable
+                  key={item.route}
+                  onPress={() => rootNavigation?.navigate(item.route)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    backgroundColor: pressed ? palette.surfaceElevated : 'transparent',
+                    borderTopWidth: index > 0 ? 0.5 : 0,
+                    borderTopColor: palette.divider,
+                  })}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: item.danger ? palette.danger : palette.text,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                  <KISIcon
+                    name="chevron-right"
+                    size={16}
+                    color={item.danger ? palette.danger : palette.subtext}
+                  />
+                </Pressable>
+              ))}
             </View>
 
             <LogoutSection palette={palette} onLogout={c.logout} loading={c.logoutLoading} />
@@ -2791,3 +2929,32 @@ export default function ProfileScreen() {
     </View>
   );
 }
+
+const billingLinksStyles = StyleSheet.create({
+  section: {
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  link: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  linkText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});
