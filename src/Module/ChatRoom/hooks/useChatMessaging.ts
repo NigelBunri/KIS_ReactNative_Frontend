@@ -472,7 +472,7 @@ export function useChatMessaging({
           socket.emit('chat.receipt', {
             conversationId: String(convId),
             messageId: lastMsg.serverId,
-            status: 'read',
+            type: 'read',
           });
         }
       }
@@ -1021,7 +1021,7 @@ export function useChatMessaging({
             socket.emit('chat.receipt', {
               conversationId: String(msg.conversationId),
               messageId: msg.serverId,
-              status: 'read',
+              type: 'read',
             });
           } catch (err: any) {
             console.warn('[useChatMessaging] read receipt emit failed', err?.message);

@@ -19,11 +19,6 @@ const socialRoutes = {
     list: `${API_BASE_URL}/api/v1/notification-rules/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/notification-rules/${id}/`,
   },
-  messaging: {
-    getMessages: `${API_BASE_URL}/messages/fetch_messages/`,
-    sendMessage: `${API_BASE_URL}/messages/send_message/`,
-    exchangeKeys: `${API_BASE_URL}/messages/exchange_keys/`,
-  },
   community: {
     list: `${API_BASE_URL}/api/v1/communities/`,
     create: `${API_BASE_URL}/api/v1/communities/`,
