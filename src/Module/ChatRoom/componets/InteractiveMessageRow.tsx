@@ -42,6 +42,10 @@ type Props = {
   isSelected?: boolean;
   onStartSelection?: (message: ChatMessage) => void;
   onToggleSelect?: (message: ChatMessage) => void;
+
+  onStarMessage?: (message: ChatMessage) => void;
+  onShowReadReceipts?: (message: ChatMessage) => void;
+  onViewOnce?: (messageId: string) => void;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -137,6 +141,9 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   isSelected = false,
   onStartSelection,
   onToggleSelect,
+  onStarMessage,
+  onShowReadReceipts,
+  onViewOnce,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -314,6 +321,17 @@ export const InteractiveMessageRow: React.FC<Props> = ({
         onPress: () => closeSheet(() => onPinMessage(message)),
       });
     }
+
+    if (onStarMessage) {
+      const alreadyStarred = !!(message as any).isStarred;
+      actions.push({
+        type: 'action',
+        key: 'star',
+        icon: alreadyStarred ? 'star' : 'star-outline',
+        label: alreadyStarred ? 'Unstar' : 'Star',
+        onPress: () => closeSheet(() => onStarMessage(message)),
+      });
+    }
   }
 
   // Select (enters selection mode)
@@ -362,6 +380,9 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             isSelected={isSelected && selectionMode}
             isFirstInGroup={isFirstInGroup}
             isLastInGroup={isLastInGroup}
+            onStar={onStarMessage}
+            onShowReadReceipts={onShowReadReceipts}
+            onViewOnce={onViewOnce}
           />
         </Pressable>
       </Animated.View>

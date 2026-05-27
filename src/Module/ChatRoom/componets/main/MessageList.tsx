@@ -60,6 +60,10 @@ type MessageListProps = {
 
   /** Called when the user scrolls near the top to load older messages. */
   onLoadOlder?: () => void;
+
+  onStarMessage?: (message: ChatMessage) => void;
+  onShowReadReceipts?: (message: ChatMessage) => void;
+  onViewOnce?: (messageId: string) => void;
 };
 
 /**
@@ -136,6 +140,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   startAtBottom = true,
   onVisibleMessageIds,
   onLoadOlder,
+  onStarMessage,
+  onShowReadReceipts,
+  onViewOnce,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -824,6 +831,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onRetryMessage={onRetryMessage}
                 onStartSelection={onStartSelection}
                 onToggleSelect={onToggleSelect}
+                onStarMessage={onStarMessage}
+                onShowReadReceipts={onShowReadReceipts}
+                onViewOnce={onViewOnce}
               />
 
               {renderAttachments(attachments, (item as any).fromMe)}

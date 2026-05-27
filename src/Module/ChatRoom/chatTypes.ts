@@ -109,6 +109,10 @@ export type ChatAttachment = {
   height?: number;
   durationMs?: number;
   thumbUrl?: string;
+
+  /** View-once media: auto-deletes after recipient opens it */
+  viewOnce?: boolean;
+  viewedAt?: string;
 };
 
 /* ============================================================================
@@ -157,6 +161,29 @@ export type EventMessage = {
   startsAt?: string;
   endsAt?: string;
   reminderMinutes?: number;
+};
+
+/* ============================================================================
+ * LOCATION
+ * ============================================================================
+ */
+
+export type LocationMessage = {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  title?: string;
+};
+
+/* ============================================================================
+ * READ RECEIPT (per-user, groups)
+ * ============================================================================
+ */
+
+export type ReadByEntry = {
+  userId: string;
+  displayName?: string;
+  readAt: string;
 };
 
 /* ============================================================================
@@ -279,6 +306,8 @@ export type ChatMessage = {
 
   event?: EventMessage;
 
+  location?: LocationMessage;
+
   replyToId?: string;
 
   isEdited?: boolean;
@@ -293,6 +322,30 @@ export type ChatMessage = {
   isPinned?: boolean;
 
   reactions?: Record<string, string[]>;
+
+  /** Disappearing message — auto-delete after this many seconds from send */
+  disappearAfterSeconds?: number | null;
+
+  /** ISO string — when the message was sent for disappearing countdown start */
+  sentAt?: string;
+
+  /** Scheduled send — ISO datetime to send at */
+  scheduledAt?: string;
+
+  /** Per-user read receipts (group chats) */
+  readBy?: ReadByEntry[];
+
+  /** Link preview fetched by server */
+  linkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    site_name?: string;
+    url?: string;
+  };
+
+  /** Mentioned user IDs (extracted from @mentions in text) */
+  mentionedUserIds?: string[];
 };
 
 /* ============================================================================

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
 import { MessageComposer } from './componets/main/MessageComposer';
-import type { ChatMessage } from './chatTypes';
+import type { ChatMessage, LocationMessage } from './chatTypes';
 import type { Chat } from './messagesUtils';
 import type { Sticker } from './componets/main/FroSticker/StickerEditor';
 import type { AttachmentFilePayload } from './ChatRoomPage';
@@ -57,6 +57,14 @@ type Props = {
   canSend: boolean;
   mentionParticipants?: { id: string; name: string }[];
   onLoadOlder?: () => void;
+
+  // New features
+  onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
+  onSendLocation?: (loc: LocationMessage) => void;
+  onScheduleSend?: (scheduledAt: string) => void;
+  onStarMessage?: (message: ChatMessage) => void;
+  onShowReadReceipts?: (message: ChatMessage) => void;
+  onViewOnce?: (messageId: string) => void;
 };
 
 export default function ChatRoomBody({
@@ -101,6 +109,12 @@ export default function ChatRoomBody({
   canSend,
   mentionParticipants,
   onLoadOlder,
+  onSendGif,
+  onSendLocation,
+  onScheduleSend,
+  onStarMessage,
+  onShowReadReceipts,
+  onViewOnce,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -132,6 +146,9 @@ export default function ChatRoomBody({
         startAtBottom={startAtBottom}
         onVisibleMessageIds={onVisibleMessageIds}
         onLoadOlder={onLoadOlder}
+        onStarMessage={onStarMessage}
+        onShowReadReceipts={onShowReadReceipts}
+        onViewOnce={onViewOnce}
       />
 
       {isChannel && !canPost ? (
@@ -169,6 +186,9 @@ export default function ChatRoomBody({
           onCreatePoll={onCreatePoll}
           onCreateEvent={onCreateEvent}
           mentionParticipants={mentionParticipants}
+          onSendGif={onSendGif}
+          onSendLocation={onSendLocation}
+          onScheduleSend={onScheduleSend}
           bottomInset={insets.bottom}
         />
       )}

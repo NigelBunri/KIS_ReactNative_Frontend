@@ -91,6 +91,14 @@ import { EventDraft } from './componets/main/ForAttachments/EventModal';
 /* -------------------------------------------------------------------------- */
 
 import * as Handlers from './ChatRoomHandlers';
+import type { LocationMessage, ReadByEntry } from './chatTypes';
+import {
+  saveStarredMessage,
+  removeStarredMessage,
+} from './componets/main/StarredMessagesSheet';
+import type { DisappearDuration } from './componets/main/DisappearingTimerSheet';
+import { saveWallpaper, loadWallpaper, WALLPAPER_OPTIONS } from './componets/main/WallpaperPickerSheet';
+import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -268,6 +276,68 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [subRoomsSheetVisible, setSubRoomsSheetVisible] =
     useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // ── New feature state ──────────────────────────────────────────────────────
+  const [starredSheetVisible, setStarredSheetVisible] = useState(false);
+  const [readReceiptsSheetVisible, setReadReceiptsSheetVisible] = useState(false);
+  const [readReceiptsData, setReadReceiptsData] = useState<ReadByEntry[]>([]);
+  const [disappearingSheetVisible, setDisappearingSheetVisible] = useState(false);
+  const [disappearingSeconds, setDisappearingSeconds] = useState<DisappearDuration>(0);
+  const [wallpaperSheetVisible, setWallpaperSheetVisible] = useState(false);
+  const [wallpaperId, setWallpaperId] = useState<string>('default');
+  const [scheduledQueue, setScheduledQueue] = useState<
+    { text: string; scheduledAt: string; timerId: ReturnType<typeof setTimeout> }[]
+  >([]);
+
+  // Load wallpaper on mount
+  useEffect(() => {
+    const chatId = String(conversationId ?? chat?.id ?? '');
+    if (!chatId) return;
+    loadWallpaper(chatId).then(setWallpaperId);
+  }, [conversationId, chat?.id]);
+
+  // Persist + restore scheduled queue so it survives app restarts
+  const SCHED_KEY = `kis.scheduled.${conversationId ?? chat?.id ?? 'unknown'}`;
+  useEffect(() => {
+    if (!conversationId && !chat?.id) return;
+    AsyncStorage.getItem(SCHED_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const saved: { text: string; scheduledAt: string }[] = JSON.parse(raw);
+        const now = Date.now();
+        saved.forEach((item) => {
+          const delay = new Date(item.scheduledAt).getTime() - now;
+          if (delay <= 0) {
+            sendTextMessage(item.text);
+          } else {
+            const timerId = setTimeout(() => sendTextMessage(item.text), delay);
+            setScheduledQueue((prev) => [...prev, { ...item, timerId }]);
+          }
+        });
+        AsyncStorage.removeItem(SCHED_KEY);
+      } catch { /* silent */ }
+    });
+  // Only on mount for this conversation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, chat?.id]);
+
+  useEffect(() => {
+    if (!conversationId && !chat?.id) return;
+    if (scheduledQueue.length === 0) { AsyncStorage.removeItem(SCHED_KEY).catch(() => {}); return; }
+    const toSave = scheduledQueue.map(({ text, scheduledAt }) => ({ text, scheduledAt }));
+    AsyncStorage.setItem(SCHED_KEY, JSON.stringify(toSave)).catch(() => {});
+  }, [scheduledQueue, SCHED_KEY]);
+
+  // Listen for incoming disappearing-message setting changes from the other party
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('chat.disappear.update', (payload: any) => {
+      const convId = String(conversationId ?? chat?.id ?? '');
+      if (!convId || String(payload?.conversationId) !== convId) return;
+      const secs = Number(payload?.seconds ?? 0);
+      setDisappearingSeconds(secs as DisappearDuration);
+    });
+    return () => sub.remove();
+  }, [conversationId, chat?.id]);
 
   const SUBROOMS_CACHE_PREFIX = 'KIS_SUBROOMS_V1:';
 
@@ -1161,6 +1231,123 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       sendRichMessage,
     });
 
+  const handleSendGif = useCallback(
+    async (gif: { url: string; previewUrl: string; width: number; height: number }) => {
+      await ensureConversationId();
+      sendRichMessage({
+        kind: 'text',
+        attachments: [{
+          id: `gif_${Date.now()}`,
+          url: gif.url,
+          originalName: 'gif',
+          mimeType: 'image/gif',
+          size: 0,
+          kind: 'image',
+          width: gif.width,
+          height: gif.height,
+        }],
+      });
+    },
+    [ensureConversationId, sendRichMessage],
+  );
+
+  const handleSendLocation = useCallback(
+    async (loc: LocationMessage) => {
+      await ensureConversationId();
+      sendRichMessage({ kind: 'location', location: loc });
+    },
+    [ensureConversationId, sendRichMessage],
+  );
+
+  const handleScheduleSend = useCallback(
+    (scheduledAt: string) => {
+      const text = draft.trim();
+      if (!text) return;
+      const delay = new Date(scheduledAt).getTime() - Date.now();
+      if (delay <= 0) { handleSend(); return; }
+      const timerId = setTimeout(() => {
+        sendTextMessage(text);
+      }, delay);
+      setScheduledQueue((prev) => [...prev, { text, scheduledAt, timerId }]);
+      setDraft('');
+      Alert.alert(
+        'Message scheduled',
+        `Your message will be sent at ${new Date(scheduledAt).toLocaleString()}`,
+      );
+    },
+    [draft, handleSend, sendTextMessage],
+  );
+
+  const handleStarMessage = useCallback(
+    async (message: ChatMessage) => {
+      if ((message as any).isStarred) {
+        await removeStarredMessage(message.id);
+        replaceMessages(messages.map((m) =>
+          m.id === message.id ? { ...m, isStarred: false } : m,
+        ));
+      } else {
+        await saveStarredMessage(message);
+        replaceMessages(messages.map((m) =>
+          m.id === message.id ? { ...m, isStarred: true } : m,
+        ));
+      }
+    },
+    [messages, replaceMessages],
+  );
+
+  const handleShowReadReceipts = useCallback(
+    (message: ChatMessage) => {
+      const rb: ReadByEntry[] = (message as any).readBy ?? [];
+      setReadReceiptsData(rb);
+      setReadReceiptsSheetVisible(true);
+    },
+    [],
+  );
+
+  const handleSetDisappearing = useCallback(
+    (seconds: DisappearDuration) => {
+      setDisappearingSeconds(seconds);
+      const convId = String(conversationId ?? chat?.id ?? '');
+      if (convId && socket) {
+        (socket as any).emit('chat.disappear.set', { conversationId: convId, seconds });
+      }
+    },
+    [conversationId, chat?.id, socket],
+  );
+
+  const handleSelectWallpaper = useCallback(
+    (id: string) => {
+      const chatId = String(conversationId ?? chat?.id ?? '');
+      setWallpaperId(id);
+      saveWallpaper(chatId, id);
+    },
+    [conversationId, chat?.id],
+  );
+
+  const handleViewOnce = useCallback(
+    (messageId: string) => {
+      const convId = String(conversationId ?? chat?.id ?? '');
+      if (!convId || !socket) return;
+      (socket as any).emit('chat.view_once', { conversationId: convId, messageId });
+    },
+    [conversationId, chat?.id, socket],
+  );
+
+  // Resolve wallpaper background color
+  const wallpaperBgColor = useMemo(() => {
+    const opt = WALLPAPER_OPTIONS.find((o) => o.id === wallpaperId);
+    if (!opt || opt.isDefault || !opt.colors.length) return undefined;
+    return opt.colors[0];
+  }, [wallpaperId]);
+
+  // Last received message for quick replies
+  const lastReceivedMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (!messages[i].fromMe && !messages[i].isDeleted) return messages[i];
+    }
+    return null;
+  }, [messages]);
+
   /* ======================================================================== */
   /*                                   RENDER                                  */
   /* ======================================================================== */
@@ -1335,11 +1522,24 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         />
       )}
       <ImageBackground
-        source={chatBackgroundImage}
+        source={wallpaperBgColor ? undefined : chatBackgroundImage}
         resizeMode="cover"
-        style={[styles.chatWallpaper, { backgroundColor: bg }]}
+        style={[
+          styles.chatWallpaper,
+          { backgroundColor: wallpaperBgColor ?? bg },
+        ]}
         imageStyle={styles.chatWallpaperImage}
       >
+        {/* Quick replies bar above composer */}
+        <QuickRepliesBar
+          lastMessage={lastReceivedMessage}
+          palette={palette}
+          onSelect={(text) => {
+            setDraft(text);
+            handleSend();
+          }}
+        />
+
         <ChatRoomBody
           chat={chat}
           messages={messages}
@@ -1380,9 +1580,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onSendContacts={handleSendContacts}
           onCreatePoll={handleCreatePoll}
           onCreateEvent={handleCreateEvent}
+          onSendGif={handleSendGif}
+          onSendLocation={handleSendLocation}
+          onScheduleSend={handleScheduleSend}
+          onStarMessage={handleStarMessage}
+          onShowReadReceipts={handleShowReadReceipts}
+          onViewOnce={handleViewOnce}
           canSend={canSend}
           onLoadOlder={() => {
-            const oldest = messages[0]; // first = oldest (sorted ascending by createdAt)
+            const oldest = messages[0];
             if (!oldest?.createdAt) return;
             requestHistoryBatch({ before: oldest.createdAt, limit: 50 })
               .then((items: any[]) => {
@@ -1429,6 +1635,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         pinnedMessages={pinnedMessages}
         onJumpToMessage={(messageId) => {
           setPinnedSheetVisible(false);
+          setStarredSheetVisible(false);
           messageLocator?.scrollToMessage(messageId);
           messageLocator?.highlightMessage(messageId);
         }}
@@ -1436,6 +1643,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         onCloseSubRooms={() => setSubRoomsSheetVisible(false)}
         subRooms={subRooms}
         onOpenSubRoom={handleOpenSubRoom}
+        starredSheetVisible={starredSheetVisible}
+        onCloseStarred={() => setStarredSheetVisible(false)}
+        readReceiptsSheetVisible={readReceiptsSheetVisible}
+        onCloseReadReceipts={() => setReadReceiptsSheetVisible(false)}
+        readReceiptsData={readReceiptsData}
+        disappearingSheetVisible={disappearingSheetVisible}
+        onCloseDisappearing={() => setDisappearingSheetVisible(false)}
+        disappearingCurrentValue={disappearingSeconds}
+        onSetDisappearing={handleSetDisappearing}
+        wallpaperSheetVisible={wallpaperSheetVisible}
+        onCloseWallpaper={() => setWallpaperSheetVisible(false)}
+        wallpaperCurrentId={wallpaperId}
+        onSelectWallpaper={handleSelectWallpaper}
       />
     </View>
   );

@@ -13,6 +13,7 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Sticker, STICKER_STORAGE_KEY } from './FroSticker/StickerEditor';
 import { ChatMessage } from '../../chatTypes';
+import type { LocationMessage } from '../../chatTypes';
 import { AVATAR_OPTIONS, AvatarPicker } from '../AvatarPicker';
 import { EmojiPicker } from '../EmojiPicker';
 import { KISIcon } from '@/constants/kisIcons';
@@ -27,6 +28,9 @@ import type { PollDraft } from './ForAttachments/PollModal';
 import type { EventDraft } from './ForAttachments/EventModal';
 import { AttachmentFilePayload } from '../../ChatRoomPage';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { GifPickerSheet } from './GifPickerSheet';
+import { LocationPickerSheet } from './LocationPickerSheet';
+import { ScheduleMessageSheet } from './ScheduleMessageSheet';
 
 /* -------------------------------------------------------------------------- */
 /*                          STICKER PICKER (BOTTOM PANEL)                     */
@@ -136,6 +140,11 @@ type MessageComposerProps = {
   // @mention autocomplete
   mentionParticipants?: { id: string; name: string }[];
 
+  // NEW: GIF / Location / Schedule
+  onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
+  onSendLocation?: (loc: LocationMessage) => void;
+  onScheduleSend?: (scheduledAt: string) => void;
+
   bottomInset?: number;
 };
 
@@ -164,6 +173,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onCreatePoll,
   onCreateEvent,
   mentionParticipants,
+  onSendGif,
+  onSendLocation,
+  onScheduleSend,
   bottomInset = 0,
 }) => {
   /* ----------------------------- VOICE STATE ----------------------------- */
@@ -202,6 +214,15 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const closeCameraModal = () => {
     setCameraVisible(false);
   };
+
+  /* ----------------------------- GIF PICKER ------------------------------- */
+  const [gifPickerVisible, setGifPickerVisible] = useState(false);
+
+  /* ----------------------------- LOCATION PICKER -------------------------- */
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+
+  /* ----------------------------- SCHEDULE SHEET --------------------------- */
+  const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
 
   /* ----------------------------- STICKER STORAGE -------------------------- */
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -711,18 +732,36 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               />
             </Pressable>
 
-            {/* Camera → open full-screen camera modal (ONLY place for images/videos) */}
+            {/* Camera */}
             <Pressable
               style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2, display: isTinyDevice && value.trim().length > 0 ? 'none' : 'flex' }]}
               disabled={!!disabled}
               onPress={openCameraModal}
             >
-              <KISIcon
-                name="camera"
-                size={composerIconGlyph}
-                color={palette.subtext}
-              />
+              <KISIcon name="camera" size={composerIconGlyph} color={palette.subtext} />
             </Pressable>
+
+            {/* GIF picker */}
+            {!!onSendGif && !isTinyDevice && (
+              <Pressable
+                style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
+                disabled={!!disabled}
+                onPress={() => setGifPickerVisible(true)}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '800', color: palette.subtext }}>GIF</Text>
+              </Pressable>
+            )}
+
+            {/* Location */}
+            {!!onSendLocation && !isTinyDevice && (
+              <Pressable
+                style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
+                disabled={!!disabled}
+                onPress={() => setLocationPickerVisible(true)}
+              >
+                <KISIcon name="pin" size={composerIconGlyph} color={palette.subtext} focused />
+              </Pressable>
+            )}
           </>
         )}
 
@@ -730,6 +769,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         {showTextSend ? (
           <Pressable
             onPress={handleTextSend}
+            onLongPress={() => onScheduleSend && setScheduleSheetVisible(true)}
+            delayLongPress={400}
             disabled={!canSend || !!disabled || isSending}
             style={[
               styles.composerActionButton,
@@ -806,6 +847,39 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         onClose={closeCameraModal}
         onCapture={(files) => {
           onSendAttachment?.(files);
+        }}
+      />
+
+      {/* GIF PICKER */}
+      <GifPickerSheet
+        visible={gifPickerVisible}
+        onClose={() => setGifPickerVisible(false)}
+        palette={palette}
+        onSelectGif={(gif) => {
+          onSendGif?.(gif);
+          setGifPickerVisible(false);
+        }}
+      />
+
+      {/* LOCATION PICKER */}
+      <LocationPickerSheet
+        visible={locationPickerVisible}
+        onClose={() => setLocationPickerVisible(false)}
+        palette={palette}
+        onSendLocation={(loc) => {
+          onSendLocation?.(loc);
+          setLocationPickerVisible(false);
+        }}
+      />
+
+      {/* SCHEDULE SHEET */}
+      <ScheduleMessageSheet
+        visible={scheduleSheetVisible}
+        onClose={() => setScheduleSheetVisible(false)}
+        palette={palette}
+        onSchedule={(scheduledAt) => {
+          onScheduleSend?.(scheduledAt);
+          setScheduleSheetVisible(false);
         }}
       />
     </View>

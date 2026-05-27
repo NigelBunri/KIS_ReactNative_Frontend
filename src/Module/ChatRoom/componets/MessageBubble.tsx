@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform } from 'react-native';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
@@ -88,6 +88,11 @@ type MessageBubbleProps = {
   // group bubble context
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
+
+  // star / read-receipts handlers
+  onStar?: (message: ChatMessage) => void;
+  onShowReadReceipts?: (message: ChatMessage) => void;
+  onViewOnce?: (messageId: string) => void;
 };
 
 const formatTimeFromMs = (ms: number) => {
@@ -161,6 +166,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isSelected = false,
   isFirstInGroup = true,
   isLastInGroup = true,
+  onStar,
+  onShowReadReceipts,
+  onViewOnce,
 }) => {
   // ─────────────────────────────────────
   // 🔁 Normalize fields so both shapes work
@@ -328,6 +336,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
+  const [playbackSpeed, setPlaybackSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
+  const SPEED_CYCLE: Array<0.5 | 1 | 1.5 | 2> = [1, 1.5, 2, 0.5];
+
+  // Disappearing messages countdown
+  const disappearAfterSeconds = (message as any).disappearAfterSeconds as number | null | undefined;
+  const sentAt = (message as any).sentAt ?? (message as any).createdAt;
+  const [disappearSecsLeft, setDisappearSecsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!disappearAfterSeconds || !sentAt) { setDisappearSecsLeft(null); return; }
+    const sentMs = new Date(sentAt).getTime();
+    const expiresMs = sentMs + disappearAfterSeconds * 1000;
+    const update = () => {
+      const left = Math.ceil((expiresMs - Date.now()) / 1000);
+      setDisappearSecsLeft(left > 0 ? left : 0);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [disappearAfterSeconds, sentAt]);
+
+  // View-once: track if the user has viewed it
+  const isViewOnce = !!(message as any).attachments?.some((a: any) => a.viewOnce);
+  const [viewOnceViewed, setViewOnceViewed] = useState(
+    !!(message as any).attachments?.some((a: any) => a.viewedAt),
+  );
+
+  const isStarred = !!(message as any).isStarred;
+
   const responsive = useResponsiveLayout();
   const width = responsive.width || Dimensions.get('window').width;
   const bubbleMaxWidth = responsive.isTablet ? '68%' : responsive.isWatch ? '92%' : responsive.isCompactPhone ? '88%' : '80%';
@@ -438,6 +475,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       setProgress(0);
 
       await audioPlayer.startPlayer(voice.uri);
+      try { await (audioPlayer as any).setPlaybackSpeed?.(playbackSpeed); } catch { /* not all versions support it */ }
 
       audioPlayer.addPlayBackListener((e: PlayBackType) => {
         const pos = e.currentPosition ?? 0;
@@ -457,6 +495,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       console.warn('start playback error', err);
       setIsPlaying(false);
       setProgress(0);
+    }
+  };
+
+  const handleCycleSpeed = async () => {
+    const currentIdx = SPEED_CYCLE.indexOf(playbackSpeed);
+    const nextSpeed = SPEED_CYCLE[(currentIdx + 1) % SPEED_CYCLE.length];
+    setPlaybackSpeed(nextSpeed);
+    if (isPlaying) {
+      try { await (audioPlayer as any).setPlaybackSpeed?.(nextSpeed); } catch { /* silent */ }
     }
   };
 
@@ -961,6 +1008,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
    * ──────────────────────────────────────── */
   const renderAttachments = () => {
     if (!hasAttachments) return null;
+
+    // View-once: show "Tap to view" placeholder if not yet viewed
+    if (isViewOnce && !viewOnceViewed && !isMe) {
+      return (
+        <Pressable
+          onPress={() => {
+            setViewOnceViewed(true);
+            onViewOnce?.(messageId);
+          }}
+          style={{
+            marginTop: 6,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            borderRadius: 14,
+            backgroundColor: palette.surfaceSoft ?? 'rgba(0,0,0,0.08)',
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>👁</Text>
+          <View>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>View once</Text>
+            <Text style={{ fontSize: 12, color: palette.subtext }}>Tap to open · disappears after viewing</Text>
+          </View>
+        </Pressable>
+      );
+    }
 
     const maxBubbleWidth = width * (responsive.isWatch ? 0.78 : responsive.isCompactPhone ? 0.74 : responsive.isTablet ? 0.52 : 0.7);
 
@@ -1528,11 +1603,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
    * ──────────────────────────────────────── */
   const renderLocationCard = () => {
     const locationData = (message as any).location as
-      | { lat: number; lng: number; label?: string }
+      | { lat?: number; lng?: number; latitude?: number; longitude?: number; label?: string; address?: string; title?: string }
       | undefined;
     if (!locationData) return null;
 
-    const { lat, lng, label } = locationData;
+    const lat = locationData.lat ?? locationData.latitude ?? 0;
+    const lng = locationData.lng ?? locationData.longitude ?? 0;
+    const label = locationData.label ?? locationData.title ?? locationData.address;
 
     const titleColor = isMe ? outgoingTextColor : palette.text;
     const metaTextColor = isMe ? outgoingMetaColor : palette.subtext;
@@ -1906,16 +1983,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           </Pressable>
 
-          {/* Transcription button and display */}
-          <Pressable
-            onPress={() => void handleShowTranscription()}
-            disabled={transcribing}
-            style={{ marginTop: 6, opacity: transcribing ? 0.5 : 1, alignSelf: 'flex-start' }}
-          >
-            <Text style={{ fontSize: 11, color: metaColor }}>
-              {transcribing ? 'Transcribing...' : showTranscription ? 'Hide transcript' : 'Show transcript'}
-            </Text>
-          </Pressable>
+          {/* Speed control + Transcription */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 12 }}>
+            <Pressable
+              onPress={handleCycleSpeed}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 8,
+                backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : (palette.surfaceSoft ?? '#0000000D'),
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? '#fff' : palette.primary }}>
+                {playbackSpeed}x
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleShowTranscription()}
+              disabled={transcribing}
+              style={{ opacity: transcribing ? 0.5 : 1 }}
+            >
+              <Text style={{ fontSize: 11, color: metaColor }}>
+                {transcribing ? 'Transcribing…' : showTranscription ? 'Hide transcript' : 'Transcript'}
+              </Text>
+            </Pressable>
+          </View>
           {showTranscription && transcription ? (
             <View
               style={{
@@ -2093,13 +2185,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {renderRetry()}
 
         <View style={styles.messageMetaRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {isStarred && (
+              <Text style={{ fontSize: 11 }}>⭐</Text>
+            )}
+            {disappearSecsLeft !== null && disappearSecsLeft > 0 && (
+              <Text style={{ fontSize: 10, color: metaColor }}>
+                ⏱ {disappearSecsLeft < 60
+                  ? `${disappearSecsLeft}s`
+                  : disappearSecsLeft < 3600
+                  ? `${Math.floor(disappearSecsLeft / 60)}m`
+                  : `${Math.floor(disappearSecsLeft / 3600)}h`}
+              </Text>
+            )}
             <Text
               style={[
                 styles.messageTime,
-                {
-                  color: metaColor,
-                },
+                { color: metaColor },
               ]}
             >
               {timeLabel}
@@ -2109,9 +2211,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
 
           {isMe && status && (
-            <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+            <Pressable
+              onPress={() => onShowReadReceipts?.(message as ChatMessage)}
+              style={{ marginLeft: 4, alignSelf: 'center' }}
+              hitSlop={6}
+            >
               {renderStatusIcon(status, statusColor, 13)}
-            </View>
+            </Pressable>
           )}
         </View>
       </View>

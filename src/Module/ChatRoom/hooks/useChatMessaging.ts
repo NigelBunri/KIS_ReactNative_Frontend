@@ -1049,11 +1049,20 @@ export function useChatMessaging({
 
       if (!status) return;
       try {
-        const updated = await bulkUpdateMessages(roomId, (m) =>
-          m.serverId === messageId || m.id === messageId
-            ? { ...m, status }
-            : m,
-        );
+        const incomingReadBy: any[] | undefined = Array.isArray(payload?.readBy) ? payload.readBy : undefined;
+        const updated = await bulkUpdateMessages(roomId, (m) => {
+          if (m.serverId !== messageId && m.id !== messageId) return m;
+          const patch: any = { ...m, status };
+          if (incomingReadBy) {
+            const existing: any[] = (m as any).readBy ?? [];
+            const merged = [...existing];
+            for (const entry of incomingReadBy) {
+              if (!merged.some((e) => e.userId === entry.userId)) merged.push(entry);
+            }
+            patch.readBy = merged;
+          }
+          return patch;
+        });
         replaceMessagesRef.current(updated);
         const changed = updated.find(
           (m) => String(m.serverId ?? m.id ?? '') === String(messageId),
@@ -1163,12 +1172,45 @@ export function useChatMessaging({
 
     socket.on('chat.message_reaction', onReaction);
 
+    // ── Pin / unpin ────────────────────────────────────────────────────────
+    const onPin = (serverMsg: any) => {
+      const activeConv = conversationIdRef.current;
+      if (!activeConv || String(serverMsg.conversationId) !== String(activeConv)) return;
+      const id = serverMsg.messageId ?? serverMsg.id ?? serverMsg._id;
+      if (!id) return;
+      const pinned = serverMsg.pinned !== false; // default true
+      const next = messagesRef.current.map((m) =>
+        m.serverId === id || m.id === id ? { ...m, isPinned: pinned } : m,
+      );
+      replaceMessagesRef.current(next);
+    };
+
+    socket.on('chat.pin', onPin);
+    socket.on('chat.message_pinned', onPin);
+
+    // ── Disappearing-message setting update ───────────────────────────────
+    const onDisappear = (payload: any) => {
+      const activeConv = conversationIdRef.current;
+      if (!activeConv || String(payload.conversationId) !== String(activeConv)) return;
+      DeviceEventEmitter.emit('chat.disappear.update', {
+        conversationId: String(activeConv),
+        seconds: payload.seconds ?? 0,
+      });
+    };
+
+    socket.on('chat.disappear.set', onDisappear);
+    socket.on('chat.disappear.update', onDisappear);
+
     return () => {
       socket.off('chat.message', onIncomingMessage);
       socket.off('chat.message_receipt', onReceipt);
       socket.off('chat.edit', onEdit);
       socket.off('chat.delete', onDelete);
       socket.off('chat.message_reaction', onReaction);
+      socket.off('chat.pin', onPin);
+      socket.off('chat.message_pinned', onPin);
+      socket.off('chat.disappear.set', onDisappear);
+      socket.off('chat.disappear.update', onDisappear);
     };
   }, [socket, storageRoomId, currentUserId]);
 
