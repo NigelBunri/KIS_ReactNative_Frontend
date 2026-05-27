@@ -309,6 +309,21 @@ const refreshConversations = useCallback(async (force?: boolean) => {
   }
 }, [currentUserId]);
 
+const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
+
+// Load cached conversations on mount before the API call completes
+useEffect(() => {
+  AsyncStorage.getItem(CONVERSATIONS_CACHE_KEY).then((raw) => {
+    if (!raw) return;
+    try {
+      const cached = JSON.parse(raw) as Chat[];
+      if (Array.isArray(cached) && cached.length > 0) {
+        setConversations((prev) => (prev.length === 0 ? cached : prev));
+      }
+    } catch { /* silent */ }
+  }).catch(() => {});
+}, []);
+
 useEffect(() => {
   let active = true;
   (async () => {
@@ -319,7 +334,11 @@ useEffect(() => {
       return;
     }
     const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined);
-    if (active) setConversations(convs);
+    if (active) {
+      setConversations(convs);
+      // Persist fresh list for offline use
+      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(convs)).catch(() => {});
+    }
   })().catch(() => {});
   return () => {
     active = false;

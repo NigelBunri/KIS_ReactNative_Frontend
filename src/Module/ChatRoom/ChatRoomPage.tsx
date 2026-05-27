@@ -231,6 +231,9 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     votePoll,
     retryMessage,
     markMessagesRead,
+    requestHistoryBatch,
+    mapServerMessage,
+    replaceMessages,
   } = useChatMessaging({
     chat,
     storageRoomId,
@@ -353,9 +356,30 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       const convId =
         message.conversationId ?? conversationId ?? chat?.id ?? null;
       if (!messageId || !convId) return;
-      sendReaction(messageId, emoji, convId);
+
+      // Toggle: if the current user already reacted with this emoji, remove it
+      const existingReactions = message.reactions ?? {};
+      const reactors: string[] = existingReactions[emoji] ?? [];
+      const alreadyReacted = currentUserId
+        ? reactors.includes(currentUserId)
+        : false;
+
+      if (alreadyReacted) {
+        // Emit a remove-reaction event
+        const resolvedSocket = (socket as any);
+        if (resolvedSocket) {
+          resolvedSocket.emit('chat.react', {
+            conversationId: String(convId),
+            messageId,
+            emoji,
+            remove: true,
+          });
+        }
+      } else {
+        sendReaction(messageId, emoji, convId);
+      }
     },
-    [sendReaction, conversationId, chat?.id],
+    [sendReaction, conversationId, chat?.id, currentUserId, socket],
   );
 
   const handleVotePoll = useCallback(
@@ -1357,6 +1381,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onCreatePoll={handleCreatePoll}
           onCreateEvent={handleCreateEvent}
           canSend={canSend}
+          onLoadOlder={() => {
+            const oldest = messages[0]; // first = oldest (sorted ascending by createdAt)
+            if (!oldest?.createdAt) return;
+            requestHistoryBatch({ before: oldest.createdAt, limit: 50 })
+              .then((items: any[]) => {
+                if (!items.length) return;
+                const mapped = items.map((m: any) => mapServerMessage(m));
+                replaceMessages([...mapped, ...messages]);
+              })
+              .catch(() => {});
+          }}
         />
       </ImageBackground>
 

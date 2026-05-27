@@ -56,6 +56,7 @@ type Props = {
   onCreateEvent: (event: EventDraft) => void;
   canSend: boolean;
   mentionParticipants?: { id: string; name: string }[];
+  onLoadOlder?: () => void;
 };
 
 export default function ChatRoomBody({
@@ -99,6 +100,7 @@ export default function ChatRoomBody({
   onCreateEvent,
   canSend,
   mentionParticipants,
+  onLoadOlder,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -129,6 +131,7 @@ export default function ChatRoomBody({
         autoScrollEnabled={autoScrollEnabled}
         startAtBottom={startAtBottom}
         onVisibleMessageIds={onVisibleMessageIds}
+        onLoadOlder={onLoadOlder}
       />
 
       {isChannel && !canPost ? (

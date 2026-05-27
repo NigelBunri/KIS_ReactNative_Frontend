@@ -1293,5 +1293,8 @@ export function useChatMessaging({
     markMessagesRead,
     socket,
     isSocketConnected: isConnected,
+    requestHistoryBatch,
+    mapServerMessage,
+    replaceMessages,
   };
 }

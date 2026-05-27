@@ -57,6 +57,9 @@ type MessageListProps = {
   autoScrollEnabled?: boolean;
   startAtBottom?: boolean;
   onVisibleMessageIds?: (messageIds: string[]) => void;
+
+  /** Called when the user scrolls near the top to load older messages. */
+  onLoadOlder?: () => void;
 };
 
 /**
@@ -132,6 +135,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   autoScrollEnabled = true,
   startAtBottom = true,
   onVisibleMessageIds,
+  onLoadOlder,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -145,6 +149,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     null,
   );
   const visibleThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadOlderThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressAutoScrollRef = useRef(false);
   const isAtBottomRef = useRef(startAtBottom);
   const prevMessageCountRef = useRef(messages.length);
@@ -178,6 +183,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (visibleThrottleRef.current) clearTimeout(visibleThrottleRef.current);
+      if (loadOlderThrottleRef.current) clearTimeout(loadOlderThrottleRef.current);
     };
   }, []);
 
@@ -250,8 +256,16 @@ export const MessageList: React.FC<MessageListProps> = ({
       } else {
         setShowJumpToLatest(true);
       }
+
+      // Detect scroll near top to load older messages
+      if (onLoadOlder && contentOffset.y < 100 && !loadOlderThrottleRef.current) {
+        loadOlderThrottleRef.current = setTimeout(() => {
+          loadOlderThrottleRef.current = null;
+        }, 2000);
+        onLoadOlder();
+      }
     },
-    [],
+    [onLoadOlder],
   );
 
   const scrollToMessage = useCallback(
@@ -730,14 +744,13 @@ export const MessageList: React.FC<MessageListProps> = ({
         contentContainerStyle={styles.messagesListContent}
         onContentSizeChange={handleContentSizeChange}
         onScroll={handleScroll}
-        scrollEventThrottle={16}
+        scrollEventThrottle={32}
         onViewableItemsChanged={onViewableItemsChangedRef.current}
         viewabilityConfig={viewabilityConfigRef.current}
-        getItemLayout={(_, index) => ({
-          length: 72,
-          offset: 72 * index,
-          index,
-        })}
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         onScrollToIndexFailed={(info) => {
           listRef.current?.scrollToOffset({
             offset: Math.max(0, info.averageItemLength * info.index),
