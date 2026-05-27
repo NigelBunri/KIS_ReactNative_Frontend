@@ -13,12 +13,13 @@ import { Alert, DeviceEventEmitter, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { check, PERMISSIONS, request, RESULTS } from 'react-native-permissions';
+import { check, PERMISSIONS, request, RESULTS, openSettings } from 'react-native-permissions';
 import { useAuth } from './App';
 import ROUTES, { CHAT_WS_URL, CHAT_WS_PATH } from '@/network';
 import { getCache } from '@/network/cache';
 import { getAccessToken } from '@/security/authStorage';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 
 import type {
@@ -130,6 +131,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const activeCallRef = useRef<CallSession | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const persistCallEndRef = useRef<((session: CallSession | null, state: 'ended' | 'missed') => void) | null>(null);
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
@@ -144,14 +146,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let micStatus = await check(mic);
     if (micStatus === RESULTS.DENIED) micStatus = await request(mic);
     if (micStatus !== RESULTS.GRANTED && micStatus !== RESULTS.LIMITED) {
-      Alert.alert('Permission needed', 'Microphone access is required for calls.');
+      Alert.alert(
+        'Permission Required',
+        'Microphone access is needed to make calls. Please enable it in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openSettings() },
+        ],
+      );
       return false;
     }
     if (needsVideo) {
       let camStatus = await check(cam);
       if (camStatus === RESULTS.DENIED) camStatus = await request(cam);
       if (camStatus !== RESULTS.GRANTED && camStatus !== RESULTS.LIMITED) {
-        Alert.alert('Permission needed', 'Camera access is required for video calls.');
+        Alert.alert(
+          'Permission Required',
+          'Camera access is needed for video calls. Please enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => openSettings() },
+          ],
+        );
         return false;
       }
     }
@@ -159,6 +175,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   /* ─── WebRTC helpers ────────────────────────────────────────────────────── */
+
+  const fetchAndApplyIceServers = useCallback(async () => {
+    if (!webRTCAvailable) return;
+    try {
+      // Cap at 3 s — a slow TURN fetch must not noticeably delay call setup.
+      const timeout = new Promise<null>(r => setTimeout(() => r(null), 3000));
+      const fetchPromise = getRequest(ROUTES.calls.iceServers, { errorMessage: '' });
+      const res = await Promise.race([fetchPromise, timeout]);
+      if (!res) return; // timed out — fall back to public STUN
+      const servers = (res as any)?.data?.ice_servers ?? (res as any)?.data;
+      if (Array.isArray(servers) && servers.length > 0) {
+        webRTCService.setIceServers(servers);
+      }
+    } catch {
+      // Non-fatal: falls back to public STUN servers already set in webRTCService
+    }
+  }, []);
 
   const setupWebRTC = useCallback((callType: CallType) => {
     if (!webRTCAvailable) return;
@@ -247,11 +280,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const localUserId = currentUserIdRef.current;
     const invitees = (args.inviteeUserIds ?? []).filter(id => id !== localUserId);
 
-    // Start local media
+    // Fetch TURN credentials then start media (audio session first)
     const needsVideo = hasVideo(callType);
+    await fetchAndApplyIceServers();
+    audioRouteManager.start(needsVideo ? 'video' : 'voice');
     await webRTCService.startLocalStream(needsVideo);
     setupWebRTC(callType);
-    audioRouteManager.start(needsVideo ? 'video' : 'voice');
 
     const localParticipant = makeParticipant({
       userId: localUserId,
@@ -313,7 +347,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     DeviceEventEmitter.emit('calls.refresh');
     return true;
-  }, [requestCallPermissions, setupWebRTC]);
+  }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
 
   /* ─── answerCall ────────────────────────────────────────────────────────── */
 
@@ -326,9 +360,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!granted) return;
 
     const needsVideo = hasVideo(session.callType);
+    // Fetch TURN credentials + configure audio session BEFORE getUserMedia.
+    // iOS AVAudioSession must be in PlayAndRecord mode before mic is acquired.
+    await fetchAndApplyIceServers();
+    audioRouteManager.start(needsVideo ? 'video' : 'voice');
     await webRTCService.startLocalStream(needsVideo);
     setupWebRTC(session.callType);
-    audioRouteManager.start(needsVideo ? 'video' : 'voice');
 
     const localParticipant = makeParticipant({
       userId: session.localUserId,
@@ -359,9 +396,57 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // which crashes the native WebRTC layer, especially on Android.
 
     DeviceEventEmitter.emit('calls.refresh');
-  }, [requestCallPermissions, setupWebRTC]);
+  }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
 
   /* ─── endCall / rejectCall ───────────────────────────────────────────────── */
+
+  const persistCallEnd = useCallback((endedSession: CallSession | null, resolvedState: 'ended' | 'missed') => {
+    if (!endedSession) return;
+    const endedAt = new Date().toISOString();
+    const entry = {
+      id: endedSession.callId,
+      callType: endedSession.callType,
+      participants: endedSession.participants.map(p => ({ userId: p.userId, displayName: p.displayName })),
+      startedAt: endedSession.startedAt ?? new Date().toISOString(),
+      endedAt,
+      durationMs: endedSession.startedAt ? Date.now() - new Date(endedSession.startedAt).getTime() : 0,
+      state: resolvedState,
+      title: endedSession.title,
+      localUserId: endedSession.localUserId,
+    };
+    // Save locally
+    AsyncStorage.getItem('kis.call_history').then(raw => {
+      const history: any[] = raw ? JSON.parse(raw) : [];
+      history.unshift(entry);
+      AsyncStorage.setItem('kis.call_history', JSON.stringify(history.slice(0, 100)));
+    }).catch(() => {});
+    // Save to backend (fire and forget, skip missed calls)
+    if (resolvedState !== 'missed') {
+      postRequest(ROUTES.calls.history, {
+        call_id: entry.id,
+        call_type: entry.callType,
+        duration_ms: entry.durationMs,
+        started_at: entry.startedAt,
+        ended_at: entry.endedAt,
+      }, { errorMessage: '' }).catch(() => {});
+    }
+    // Persist in-call chat if there are messages
+    const chatMessages = endedSession.chatMessages ?? [];
+    if (chatMessages.length > 0) {
+      const key = `kis.incall_chat.${endedSession.callId}`;
+      AsyncStorage.setItem(key, JSON.stringify({
+        callId: endedSession.callId,
+        callType: endedSession.callType,
+        title: endedSession.title,
+        savedAt: new Date().toISOString(),
+        messages: chatMessages,
+      })).catch(() => {});
+    }
+  }, []);
+
+  // Keep persistCallEndRef current so socket handlers (registered once on mount)
+  // can call the stable function without stale-closure issues.
+  useEffect(() => { persistCallEndRef.current = persistCallEnd; }, [persistCallEnd]);
 
   const endCall = useCallback(async (reason = 'ended') => {
     const session = activeCallRef.current;
@@ -378,15 +463,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     webRTCService.closeAll();
     audioRouteManager.stop();
 
+    const resolvedState = reason === 'missed' || reason === 'rejected' || reason === 'busy' ? 'missed' : 'ended';
+    persistCallEnd(session, resolvedState);
+
     setActiveCall(prev => prev ? {
       ...prev,
-      state: reason === 'missed' || reason === 'rejected' || reason === 'busy' ? 'missed' : 'ended',
+      state: resolvedState,
       reason,
       endedAt: new Date().toISOString(),
     } : prev);
 
     DeviceEventEmitter.emit('calls.refresh');
-  }, []);
+  }, [persistCallEnd]);
 
   const rejectCall = useCallback(async (reason = 'rejected') => endCall(reason), [endCall]);
 
@@ -579,7 +667,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 10000,
+        reconnectionDelayMax: 8000,
+        // Low-network resilience: extend connection timeout so slow networks
+        // don't fail the initial handshake. Default is 20 s.
+        timeout: 30000,
       });
 
       socketRef.current = s;
@@ -597,6 +688,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             callId: session.callId,
           });
         }
+        // Check for a pending call notification stored while app was in background/killed.
+        // The socket will receive the call.offer event naturally once connected — just
+        // clear the stale notification so it isn't re-processed on the next connect.
+        AsyncStorage.getItem('kis.pending_call_notification').then(raw => {
+          if (!raw) return;
+          AsyncStorage.removeItem('kis.pending_call_notification');
+        }).catch(() => {});
       });
       s.on('disconnect', (reason) => {
         if (mountedRef.current) setIsConnected(false);
@@ -668,7 +766,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const callId = String(payload?.callId ?? '');
         const fromUserId = payload?.fromUserId ? String(payload.fromUserId) : null;
         if (!conversationId || !callId) return;
-        if (fromUserId && resolvedUserId && fromUserId === resolvedUserId) return;
+
+        // Use live ref — resolvedUserId is captured at connect time and may be stale
+        const myUserId = currentUserIdRef.current ?? resolvedUserId;
+        if (fromUserId && myUserId && fromUserId === myUserId) return;
 
         const existing = activeCallRef.current;
         if (existing && existing.callId !== callId && existing.state !== 'ended' && existing.state !== 'missed') {
@@ -681,7 +782,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const callerParticipant = makeParticipant({
           userId: fromUserId ?? 'caller',
-          displayName: payload?.title ?? 'Caller',
+          displayName: payload?.callerName ?? payload?.title ?? 'Caller',
           role: 'host',
         });
 
@@ -689,10 +790,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           callId,
           conversationId,
           callType,
-          title: String(payload?.title ?? 'Incoming call'),
+          title: String(payload?.title ?? payload?.callerName ?? 'Incoming call'),
           state: 'incoming',
           participants: [callerParticipant],
-          localUserId: resolvedUserId ?? '',
+          localUserId: myUserId ?? '',
           initiatedBy: fromUserId,
           startedAt: payload?.startedAt ?? new Date().toISOString(),
           isMuted: false,
@@ -710,9 +811,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           networkQuality: 4,
           unreadChatCount: 0,
           viewerCount: payload?.viewerCount ?? 0,
+          isRecording: false,
         };
 
-        audioRouteManager.startRingtone();
+        // IncomingCallScreen's useEffect handles ringtone — do NOT start it here
+        // to avoid a double-start that crashes InCallManager on Android.
         setActiveCall(session);
         DeviceEventEmitter.emit('calls.refresh');
       });
@@ -797,11 +900,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!callId) return;
         webRTCService.closePeer(String(payload?.fromUserId ?? ''));
         audioRouteManager.stopRingtone();
+        const resolvedState = reason === 'missed' || reason === 'busy' || reason === 'rejected' ? 'missed' : 'ended';
+        const sessionSnapshot = activeCallRef.current;
+        if (sessionSnapshot && sessionSnapshot.callId === callId) {
+          persistCallEndRef.current?.(sessionSnapshot, resolvedState);
+        }
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           return {
             ...prev,
-            state: reason === 'missed' || reason === 'busy' || reason === 'rejected' ? 'missed' : 'ended',
+            state: resolvedState,
             reason,
             endedAt: payload?.endedAt ?? new Date().toISOString(),
           };

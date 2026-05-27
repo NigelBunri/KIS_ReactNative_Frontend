@@ -36,6 +36,7 @@ import InCallChatSheet from './components/InCallChatSheet';
 import ParticipantsSheet from './components/ParticipantsSheet';
 import CallTimer from './components/CallTimer';
 import NetworkQualityBars from './components/NetworkQualityBars';
+import NetworkQualityBanner from './components/NetworkQualityBanner';
 import { KISIcon } from '@/constants/kisIcons';
 
 const CONTROLS_HIDE_AFTER = 4000;
@@ -172,7 +173,22 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         );
         break;
       case 'screen-share':
-        Alert.alert('Coming Soon', 'Screen sharing will be available in a future update.');
+        if (session?.isScreenSharing) {
+          Alert.alert(
+            'Screen Sharing',
+            'Stop sharing your screen?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Stop', style: 'destructive', onPress: () => actions.onEnd() },
+            ],
+          );
+        } else {
+          Alert.alert(
+            'Share Screen',
+            'Screen sharing requires enabling the screen capture permission. This feature is available on devices with react-native-webrtc >= 106.',
+            [{ text: 'OK' }],
+          );
+        }
         break;
     }
   }, [actions, session?.layout, revealControls]);
@@ -286,6 +302,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
           </View>
         </TouchableWithoutFeedback>
+
+        {/* ── Network Quality Banner ── */}
+        <NetworkQualityBanner quality={session.networkQuality} />
 
         {/* ── TOP HUD ── */}
         <Animated.View
@@ -479,8 +498,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingBottom: 12,
-    backgroundColor: 'linear-gradient(rgba(0,0,0,0.6) 0%, transparent 100%)',
+    paddingBottom: 20,
     zIndex: 10,
   },
   topLeft: { flex: 1, gap: 4 },
@@ -488,13 +506,16 @@ const styles = StyleSheet.create({
   callTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   stateLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
   callTypeChip: {
-    color: 'rgba(255,255,255,0.55)',
+    color: '#C9A227',
     fontSize: 11,
-    fontWeight: '600',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    fontWeight: '700',
+    backgroundColor: 'rgba(201,162,39,0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    letterSpacing: 0.3,
   },
 
   // Voice layout
@@ -506,17 +527,19 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   voiceAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#6366F1',
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    backgroundColor: '#B8860B',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366F1',
+    borderWidth: 3,
+    borderColor: '#C9A227',
+    shadowColor: '#C9A227',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowRadius: 22,
+    elevation: 14,
   },
   voiceInitials: { color: '#fff', fontSize: 44, fontWeight: '800' },
   voiceName: { color: '#fff', fontSize: 26, fontWeight: '700' },
@@ -536,18 +559,18 @@ const styles = StyleSheet.create({
   // Self preview
   selfPreview: {
     position: 'absolute',
-    width: 90,
-    height: 130,
-    borderRadius: 14,
+    width: 92,
+    height: 132,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(201,162,39,0.5)',
     zIndex: 5,
-    shadowColor: '#000',
+    shadowColor: '#C9A227',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
   },
   selfMutedBadge: {
     position: 'absolute',
@@ -566,14 +589,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   endedCard: {
-    backgroundColor: '#111128',
+    backgroundColor: '#0D0D22',
     borderRadius: 28,
     padding: 32,
     alignItems: 'center',
     gap: 12,
-    width: 280,
+    width: 300,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(201,162,39,0.25)',
+    shadowColor: '#C9A227',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   endedIcon: {
     width: 72,
@@ -588,10 +616,12 @@ const styles = StyleSheet.create({
   endedReason: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
   endedCloseBtn: {
     marginTop: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    paddingHorizontal: 32,
+    backgroundColor: 'rgba(201,162,39,0.15)',
+    borderRadius: 18,
+    paddingHorizontal: 36,
     paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.35)',
   },
-  endedCloseTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  endedCloseTxt: { color: '#C9A227', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });
