@@ -31,8 +31,8 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const ROLE_COLOR: Record<string, string> = {
-  host: '#F59E0B',
-  'co-host': '#6366F1',
+  host: '#C9A227',
+  'co-host': '#E8C84D',
   speaker: '#22C55E',
   audience: 'rgba(255,255,255,0.4)',
 };
@@ -57,7 +57,7 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
       <View style={styles.header}>
         <Text style={styles.title}>Participants ({participants.length})</Text>
         <Pressable onPress={onClose} style={styles.closeBtn}>
-          <KISIcon name="x" size={20} color="rgba(255,255,255,0.7)" />
+          <KISIcon name="close" size={20} color="rgba(255,255,255,0.7)" />
         </Pressable>
       </View>
 
@@ -70,7 +70,7 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
           return (
             <View style={styles.row}>
               {/* Avatar */}
-              <View style={[styles.avatar, { backgroundColor: '#6366F1' }]}>
+              <View style={[styles.avatar, { backgroundColor: '#B8860B' }]}>
                 <Text style={styles.avatarText}>
                   {item.displayName.charAt(0).toUpperCase()}
                 </Text>
@@ -132,11 +132,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '65%',
-    backgroundColor: '#111128',
+    backgroundColor: '#0D0D22',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(201,162,39,0.2)',
     zIndex: 50,
   },
   header: {

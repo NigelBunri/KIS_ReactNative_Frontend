@@ -61,7 +61,7 @@ export default function InCallChatSheet({ messages, visible, onClose, onSend, lo
       <View style={styles.header}>
         <Text style={styles.headerTitle}>In-call chat</Text>
         <Pressable onPress={onClose} style={styles.closeBtn}>
-          <KISIcon name="x" size={20} color="rgba(255,255,255,0.7)" />
+          <KISIcon name="close" size={20} color="rgba(255,255,255,0.7)" />
         </Pressable>
       </View>
 
@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '65%',
-    backgroundColor: '#111128',
+    backgroundColor: '#0D0D22',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(201,162,39,0.2)',
     zIndex: 50,
   },
   header: {
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   bubbleMe: {
     alignSelf: 'flex-end',
-    backgroundColor: '#6366F1',
+    backgroundColor: '#B8860B',
     borderBottomRightRadius: 4,
   },
   bubbleThem: {
@@ -191,9 +191,9 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#C9A227',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: { backgroundColor: 'rgba(99,102,241,0.35)' },
+  sendBtnDisabled: { backgroundColor: 'rgba(201,162,39,0.3)' },
 });

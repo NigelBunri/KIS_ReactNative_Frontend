@@ -5,17 +5,18 @@ let RNW: any = null;
 try {
   RNW = require('react-native-webrtc');
 } catch {
-  // Library not installed — calls will show UI but media won't connect.
+  // Library not installed — calls show UI but media won't connect.
 }
 
 export const webRTCAvailable = !!RNW;
 export const RTCView = RNW?.RTCView ?? null;
 
-const ICE_SERVERS = [
+// Public STUN servers only as fallback. TURN servers should be injected at
+// runtime via setIceServers() once fetched from the backend.
+const DEFAULT_ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:stun.nextcloud.com:443' },
 ];
 
 type IceCandidateHandler = (peerId: string, candidate: any) => void;
@@ -35,6 +36,7 @@ class WebRTCService {
   private localStream: any = null;
   private peers = new Map<string, any>(); // peerId → RTCPeerConnection
   private statsIntervals = new Map<string, ReturnType<typeof setInterval>>();
+  private iceServers: any[] = DEFAULT_ICE_SERVERS;
   // Candidates that arrived before setRemoteDescription — flushed once remote SDP is set.
   private iceCandidateQueues = new Map<string, any[]>();
 
@@ -43,6 +45,13 @@ class WebRTCService {
   private onConnectionState: ConnectionStateHandler = () => {};
   private onSpeaking: SpeakingHandler = () => {};
   private onStats: StatsHandler = () => {};
+
+  /** Call this before startCall/answerCall with TURN credentials from your backend. */
+  setIceServers(servers: any[]) {
+    if (Array.isArray(servers) && servers.length > 0) {
+      this.iceServers = servers;
+    }
+  }
 
   setCallbacks(cb: {
     onIceCandidate?: IceCandidateHandler;
@@ -60,6 +69,11 @@ class WebRTCService {
 
   async startLocalStream(video: boolean): Promise<any> {
     if (!webRTCAvailable) return null;
+    // Release any existing stream before acquiring a new one.
+    if (this.localStream) {
+      try { this.localStream.getTracks?.().forEach?.((t: any) => t.stop()); } catch {}
+      this.localStream = null;
+    }
     try {
       const stream = await RNW.mediaDevices.getUserMedia({
         audio: {
@@ -68,7 +82,7 @@ class WebRTCService {
           autoGainControl: true,
         },
         video: video
-          ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+          ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } }
           : false,
       });
       this.localStream = stream;
@@ -100,11 +114,20 @@ class WebRTCService {
 
   private buildPeer(peerId: string): any {
     if (!webRTCAvailable) return null;
-    const pc = new RNW.RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-    this.localStream?.getTracks?.()?.forEach((track: any) => {
-      pc.addTrack(track, this.localStream);
+    const pc = new RNW.RTCPeerConnection({
+      iceServers: this.iceServers,
+      // Prefer relay candidates on flaky networks once direct path fails.
+      // Keep 'all' so we don't force relay on good networks (adds latency).
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
     });
+
+    if (this.localStream) {
+      this.localStream.getTracks?.()?.forEach((track: any) => {
+        pc.addTrack(track, this.localStream);
+      });
+    }
 
     pc.onicecandidate = (e: any) => {
       if (e.candidate) this.onIceCandidate(peerId, e.candidate);
@@ -116,9 +139,24 @@ class WebRTCService {
     };
 
     pc.onconnectionstatechange = () => {
-      this.onConnectionState(peerId, pc.connectionState);
-      if (pc.connectionState === 'failed') {
-        pc.restartIce?.();
+      const state: string = pc.connectionState;
+      this.onConnectionState(peerId, state);
+      if (state === 'failed') {
+        // Attempt ICE restart before giving up.
+        try { pc.restartIce?.(); } catch {}
+      }
+    };
+
+    // Fallback: also watch iceConnectionState for older react-native-webrtc builds
+    pc.oniceconnectionstatechange = () => {
+      const s: string = pc.iceConnectionState;
+      if (s === 'connected' || s === 'completed') {
+        this.onConnectionState(peerId, 'connected');
+      } else if (s === 'failed') {
+        this.onConnectionState(peerId, 'failed');
+        try { pc.restartIce?.(); } catch {}
+      } else if (s === 'disconnected') {
+        this.onConnectionState(peerId, 'disconnected');
       }
     };
 
@@ -134,13 +172,24 @@ class WebRTCService {
   async createOffer(peerId: string): Promise<any | null> {
     if (!webRTCAvailable) return null;
     const pc = this.ensurePeer(peerId);
-    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true } as any);
-    await pc.setLocalDescription(offer);
-    return offer;
+    try {
+      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true } as any);
+      await pc.setLocalDescription(offer);
+      return offer;
+    } catch (err) {
+      console.warn('[WebRTC] createOffer failed:', err);
+      return null;
+    }
   }
 
   async handleOffer(peerId: string, remoteOffer: any): Promise<any | null> {
     if (!webRTCAvailable) return null;
+    // Guard: local stream must exist before building a peer connection.
+    // If it doesn't, the peer won't add any tracks and the caller will get
+    // a one-way call (no audio/video from the answering side).
+    if (!this.localStream) {
+      console.warn('[WebRTC] handleOffer called before localStream is ready — SDP answer may have no tracks');
+    }
     try {
       const pc = this.ensurePeer(peerId);
       await pc.setRemoteDescription(new RNW.RTCSessionDescription(remoteOffer));
@@ -170,7 +219,7 @@ class WebRTCService {
     if (!webRTCAvailable) return;
     const pc = this.peers.get(peerId);
     if (!pc || !pc.remoteDescription) {
-      // Remote description not set yet — queue the candidate so it isn't lost.
+      // Remote description not set yet — queue so the candidate isn't lost.
       const queue = this.iceCandidateQueues.get(peerId) ?? [];
       queue.push(candidate);
       this.iceCandidateQueues.set(peerId, queue);
@@ -213,13 +262,13 @@ class WebRTCService {
           }
         });
         let nq: 1 | 2 | 3 | 4 = 4;
-        if (packetsLost > 20 || rttMs > 400) nq = 1;
-        else if (packetsLost > 10 || rttMs > 200) nq = 2;
-        else if (packetsLost > 3 || rttMs > 100) nq = 3;
+        if (packetsLost > 20 || rttMs > 500) nq = 1;
+        else if (packetsLost > 10 || rttMs > 250) nq = 2;
+        else if (packetsLost > 3 || rttMs > 120) nq = 3;
         this.onStats(peerId, { packetsLost, rttMs, audioLevel, networkQuality: nq });
         this.onSpeaking(peerId, audioLevel > 0.02);
       } catch {}
-    }, 2000);
+    }, 2500);
     this.statsIntervals.set(peerId, interval);
   }
 
@@ -227,7 +276,7 @@ class WebRTCService {
     const interval = this.statsIntervals.get(peerId);
     if (interval) { clearInterval(interval); this.statsIntervals.delete(peerId); }
     const pc = this.peers.get(peerId);
-    if (pc) { pc.close(); this.peers.delete(peerId); }
+    if (pc) { try { pc.close(); } catch {} this.peers.delete(peerId); }
     this.iceCandidateQueues.delete(peerId);
   }
 

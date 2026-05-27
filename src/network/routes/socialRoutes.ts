@@ -97,6 +97,10 @@ const socialRoutes = {
     setMemberRole: (conversationId: string) =>
       `${API_BASE_URL}/api/v1/chats/conversations/${conversationId}/members/role/`,
   },
+  calls: {
+    iceServers: `${API_BASE_URL}/api/v1/calls/ice-servers/`,
+    history: `${API_BASE_URL}/api/v1/calls/history/`,
+  },
   e2ee: {
     conversationKey: (conversationId: string) =>
       `${NEST_API_BASE_URL}/api/v1/e2ee/conversations/${conversationId}/key`,

@@ -117,6 +117,16 @@ export type KISIconName =
   | 'video-off'
   | 'volume-2'
   | 'volume-x'
+  // User management
+  | 'user-minus'
+  // Call control icons (previously unregistered — fixed)
+  | 'raise-hand'
+  | 'flip-camera'
+  | 'smile'
+  | 'message-square'
+  | 'grid'
+  | 'screen-share'
+  | 'broadcast'
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -304,6 +314,15 @@ const ion: IonMap = {
   'video-off': { filled: 'videocam-off', outline: 'videocam-off-outline' },
   'volume-2': { filled: 'volume-high', outline: 'volume-high-outline' },
   'volume-x': { filled: 'volume-mute', outline: 'volume-mute-outline' },
+  // User management
+  'user-minus': { filled: 'person-remove', outline: 'person-remove-outline' },
+  // Aliases used by callTypeIcon()
+  radio: { filled: 'radio', outline: 'radio-outline' },
+  // Call controls (previously fell back to 'home')
+  'flip-camera': { filled: 'camera-reverse', outline: 'camera-reverse-outline' },
+  smile: { filled: 'happy', outline: 'happy-outline' },
+  'message-square': { filled: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
+  grid: { filled: 'grid', outline: 'grid-outline' },
 };
 
 export interface KISIconProps {
@@ -432,6 +451,61 @@ export const KISIcon: React.FC<KISIconProps> = ({
     return (
       <MaterialCommunityIcons
         name="folder-zip-outline"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'phone-off') {
+    return (
+      <MaterialCommunityIcons
+        name="phone-hangup"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'phone-missed') {
+    return (
+      <MaterialCommunityIcons
+        name="phone-missed"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'raise-hand') {
+    return (
+      <MaterialCommunityIcons
+        name="hand-wave"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'screen-share') {
+    return (
+      <MaterialCommunityIcons
+        name="monitor-share"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'broadcast') {
+    return (
+      <MaterialCommunityIcons
+        name="broadcast"
         size={resolvedSize}
         color={iconColor}
         style={style}
