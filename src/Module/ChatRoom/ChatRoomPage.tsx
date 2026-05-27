@@ -314,6 +314,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const initialUnreadJumpRef = useRef<string | null>(null);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lockOverride, setLockOverride] = useState<boolean | null>(null);
   const [muteOverride, setMuteOverride] = useState<boolean | null>(null);
   const [requestStateOverride, setRequestStateOverride] = useState<string | null>(null);
@@ -962,20 +963,24 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   useEffect(() => {
     if (!conversationId) return;
     const isTyping = draft.trim().length > 0;
-    sendTyping(isTyping);
+
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    typingDebounceRef.current = setTimeout(() => {
+      sendTyping(isTyping);
+    }, 500);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    typingTimeoutRef.current = setTimeout(() => {
-      sendTyping(false);
-    }, 2000);
+    if (isTyping) {
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTyping(false);
+      }, 2000);
+    }
 
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, [draft, conversationId, sendTyping]);
 

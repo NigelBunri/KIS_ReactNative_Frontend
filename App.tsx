@@ -92,6 +92,7 @@ import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
 import { getAccessToken } from './src/security/authStorage';
+import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
 import {
@@ -472,6 +473,14 @@ function AppContent() {
   useEffect(() => {
     console.log('isAuth ->', isAuth);
   }, [isAuth]);
+
+  useEffect(() => {
+    if (user?.id) {
+      initE2EE(String(user.id)).catch((err: any) => {
+        console.warn('[E2EE] initE2EE failed:', err?.message);
+      });
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     initPushHandlers(navigationRef);

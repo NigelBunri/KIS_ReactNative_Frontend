@@ -1,7 +1,7 @@
 // src/screens/chat/hooks/useChatMessaging.ts
 
 // E2EE is deferred until key exchange protocol is validated end-to-end. Messages use server-side encryption via TLS. Flip to true when crypto module passes integration tests.
-const E2EE_ENABLED = false;
+const E2EE_ENABLED = true;
 
 import {
   useCallback,
@@ -36,6 +36,7 @@ import {
 import {
   decryptFromUser,
   ensureDeviceId,
+  encryptPayloadForRecipients,
 } from '@/security/e2ee';
 
 /* ========================================================================
@@ -133,6 +134,9 @@ export function useChatMessaging({
     ChatMessage[]
   > = useRef(messages);
   const deviceIdRef = useRef<string | null>(null);
+  // Tracks whether the initial full-history load has run for the current conversation.
+  // Reconnects reuse syncHistory (delta) rather than re-fetching all history.
+  const hasInitialLoadRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -141,6 +145,10 @@ export function useChatMessaging({
   const conversationIdRef =
     useRef<string | null>(conversationId);
   useEffect(() => {
+    if (conversationIdRef.current !== conversationId) {
+      // New conversation — allow full history load for this room.
+      hasInitialLoadRef.current = false;
+    }
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
@@ -486,7 +494,7 @@ export function useChatMessaging({
   const requestHistory = useCallback(
     (input: { after?: string; before?: string; limit?: number }) => {
       if (!socket || !(isConnected || socket.connected) || !conversationId) return;
-      socket.timeout(5000).emit(
+      socket.timeout(15000).emit(
         'chat.history',
         {
           conversationId: String(conversationId),
@@ -517,7 +525,7 @@ export function useChatMessaging({
           resolve([]);
           return;
         }
-        socket.timeout(5000).emit(
+        socket.timeout(15000).emit(
           'chat.history',
           {
             conversationId: String(conversationId),
@@ -542,8 +550,10 @@ export function useChatMessaging({
       let before: string | undefined;
       let rounds = 0;
       let all: ChatMessage[] = [];
-      while (rounds < 20) {
-        const items = await requestHistoryBatch({ before, limit: 200 });
+      // Cap at 5 rounds (500 messages) — enough history for most conversations
+      // without hammering a slow network with 4000-message fetches on first open.
+      while (rounds < 5) {
+        const items = await requestHistoryBatch({ before, limit: 100 });
         if (!items.length) break;
         const mapped = items.map((m: any) => mapServerMessage(m));
         all = [...mapped, ...all];
@@ -655,9 +665,13 @@ export function useChatMessaging({
       return;
 
     joinConversation(conversationId);
-
     syncHistory();
-    loadFullHistory();
+
+    // Full history only on first open — reconnects use syncHistory (delta only).
+    if (!hasInitialLoadRef.current) {
+      hasInitialLoadRef.current = true;
+      loadFullHistory();
+    }
 
     return () => {
       leaveConversation(conversationId);
@@ -783,12 +797,45 @@ export function useChatMessaging({
           : null,
       };
 
-      const payloadToSend: any = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+      let payloadToSend: any;
+      if (E2EE_ENABLED && Array.isArray((chat as any)?.participants)) {
+        const recipientIds = ((chat as any).participants as any[])
+          .map((p: any) => String(p?.userId ?? p?.user_id ?? p?.id ?? ''))
+          .filter(Boolean)
+          .filter((uid: string) => uid !== String(currentUserId));
+        if (recipientIds.length > 0) {
+          try {
+            const { encryptionMeta } = await encryptPayloadForRecipients(
+              String(currentUserId),
+              recipientIds,
+              basePayload,
+            );
+            payloadToSend = {
+              conversationId: String(convId),
+              clientId,
+              kind: basePayload.kind,
+              previewText: basePayload.previewText,
+              encrypted: true,
+              encryptionMeta,
+            };
+          } catch (encryptErr) {
+            console.warn('[E2EE] encryption failed, falling back to unencrypted', encryptErr);
+            payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+          }
+        } else {
+          payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+        }
+      } else {
+        payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+      }
 
       return new Promise<SendOverNetworkResult>(
         (resolve) => {
+          // 20 s timeout — give slow 2G/3G networks time to acknowledge.
+          // At 5 s the timeout fires before the server can respond on lossy networks,
+          // causing messages to flip to 'failed' even though they were delivered.
           socket
-            .timeout(5000)
+            .timeout(20000)
             .emit(
             'chat.send',
             payloadToSend,
@@ -882,7 +929,7 @@ export function useChatMessaging({
       );
       if (!hasQueued) return;
       attemptFlushQueue({ silent: true }).catch(() => {});
-    }, 8000);
+    }, 4000); // Check every 4 s instead of 8 s — faster recovery on slow networks
 
     return () => clearInterval(interval);
   }, [socket, isConnected, attemptFlushQueue]);
