@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity } from 'react-native';
+import Video from 'react-native-video';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
 
@@ -365,6 +366,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const isStarred = !!(message as any).isStarred;
 
+  const [videoFullscreenUri, setVideoFullscreenUri] = useState<string | null>(null);
+
   const responsive = useResponsiveLayout();
   const width = responsive.width || Dimensions.get('window').width;
   const bubbleMaxWidth = responsive.isTablet ? '68%' : responsive.isWatch ? '92%' : responsive.isCompactPhone ? '88%' : '80%';
@@ -624,6 +627,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ([emoji, users]) => !!emoji && Array.isArray(users) && users.length > 0,
       )
     : [];
+
+  const renderMentionText = (raw: string) => {
+    const parts = raw.split(/(@\w+)/g);
+    if (parts.length <= 1) {
+      return <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>{raw}</Text>;
+    }
+    return (
+      <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>
+        {parts.map((part, i) =>
+          /^@\w+$/.test(part) ? (
+            <Text key={i} style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>
+              {part}
+            </Text>
+          ) : (
+            <React.Fragment key={i}>{part}</React.Fragment>
+          ),
+        )}
+      </Text>
+    );
+  };
 
   /* ─────────────────────────────────────────
    * Helper: sender name (group chats)
@@ -1045,7 +1068,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       return kind === 'image' || mime.startsWith('image/');
     });
 
-    const nonImageAtts = attachments.filter((a) => !imageAtts.includes(a));
+    const videoAtts = attachments.filter((a) => {
+      const mime = a.mimeType ?? '';
+      const kind = a.kind;
+      return kind === 'video' || mime.startsWith('video/');
+    });
+
+    const nonImageAtts = attachments.filter(
+      (a) => !imageAtts.includes(a) && !videoAtts.includes(a),
+    );
 
     return (
       <View style={{ marginTop: text ? 8 : 0 }}>
@@ -1082,6 +1113,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     resizeMode="cover"
                   />
                 </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Video thumbnails with play overlay */}
+        {videoAtts.length > 0 && (
+          <View style={{ gap: 6, marginBottom: nonImageAtts.length > 0 ? 8 : 0 }}>
+            {videoAtts.map((att) => {
+              const videoW = Math.min(att.width ?? 220, maxBubbleWidth);
+              const videoH = att.height && att.width ? (videoW * att.height) / att.width : videoW * 0.56;
+              return (
+                <Pressable
+                  key={att.id}
+                  onPress={() => setVideoFullscreenUri(att.url)}
+                  style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}
+                >
+                  <Video
+                    source={{ uri: att.url }}
+                    style={{ width: videoW, height: videoH }}
+                    paused
+                    resizeMode="cover"
+                    muted
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(0,0,0,0.28)',
+                    }}
+                  >
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="play" size={20} color="#111" />
+                    </View>
+                  </View>
+                </Pressable>
               );
             })}
           </View>
@@ -2080,18 +2149,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
         {!!text && (
           <View>
-            <Text
-              style={[
-                styles.messageText,
-                {
-                  color: textColor,
-                  fontSize: bubbleTextSize,
-                },
-              ]}
-            >
-              {displayText}
-              {isLongText && !expanded ? '…' : ''}
-            </Text>
+            {renderMentionText((displayText ?? '') + (isLongText && !expanded ? '…' : ''))}
             {isLongText && (
               <Pressable onPress={() => setExpanded(prev => !prev)} style={{ marginTop: 2 }}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary ?? '#2196F3') }}>
@@ -2224,6 +2282,32 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       {renderReactionPicker()}
       {renderReactionViewerSheet()}
+
+      {/* Fullscreen video player */}
+      {videoFullscreenUri && (
+        <Modal
+          visible
+          transparent={false}
+          animationType="fade"
+          onRequestClose={() => setVideoFullscreenUri(null)}
+          statusBarTranslucent
+        >
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <Video
+              source={{ uri: videoFullscreenUri }}
+              style={{ flex: 1 }}
+              resizeMode="contain"
+              controls
+            />
+            <Pressable
+              onPress={() => setVideoFullscreenUri(null)}
+              style={{ position: 'absolute', top: 44, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };

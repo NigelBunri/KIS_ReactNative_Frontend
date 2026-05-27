@@ -17,7 +17,7 @@ import {
   useChatPersistence,
   type SendOverNetworkFn,
 } from './useChatPersistence';
-import { bulkUpdateMessages } from '../Storage/chatStorage';
+import { bulkUpdateMessages, removeMessage, clearMessages } from '../Storage/chatStorage';
 
 import type {
   ChatMessage,
@@ -1338,5 +1338,13 @@ export function useChatMessaging({
     requestHistoryBatch,
     mapServerMessage,
     replaceMessages,
+    localDeleteMessage: async (messageId: string) => {
+      const updated = await removeMessage(String(storageRoomId), messageId);
+      replaceMessages(updated);
+    },
+    clearAllMessages: async () => {
+      await clearMessages(String(storageRoomId));
+      replaceMessages([]);
+    },
   };
 }

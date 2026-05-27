@@ -165,3 +165,11 @@ export async function bulkUpdateMessages(
   await saveMessages(roomId, next);
   return next;
 }
+
+export async function clearMessages(roomId: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(buildKeyV2(roomId));
+  } catch (e) {
+    console.warn('[chatStorage] clearMessages error', e);
+  }
+}

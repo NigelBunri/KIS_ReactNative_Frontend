@@ -242,6 +242,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     requestHistoryBatch,
     mapServerMessage,
     replaceMessages,
+    localDeleteMessage,
+    clearAllMessages,
   } = useChatMessaging({
     chat,
     storageRoomId,
@@ -607,6 +609,30 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     },
     [softDeleteMessage],
   );
+
+  const handleLocalDeleteMessage = useCallback(
+    async (message: ChatMessage) => {
+      await localDeleteMessage(message.id);
+    },
+    [localDeleteMessage],
+  );
+
+  const handleClearChat = useCallback(() => {
+    Alert.alert(
+      'Clear chat',
+      'This will remove all messages from this conversation on your device only. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllMessages();
+          },
+        },
+      ],
+    );
+  }, [clearAllMessages]);
 
   const handlePinSingleMessage = useCallback(
     (message: ChatMessage) => {
@@ -1498,6 +1524,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             setGroupRoleInput('admin');
             setGroupAction('role');
           }}
+          onClearChat={handleClearChat}
           groupAction={groupAction}
           groupUserIdInput={groupUserIdInput}
           groupRoleInput={groupRoleInput}
@@ -1586,6 +1613,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onStarMessage={handleStarMessage}
           onShowReadReceipts={handleShowReadReceipts}
           onViewOnce={handleViewOnce}
+          onLocalDeleteMessage={handleLocalDeleteMessage}
           canSend={canSend}
           onLoadOlder={() => {
             const oldest = messages[0];

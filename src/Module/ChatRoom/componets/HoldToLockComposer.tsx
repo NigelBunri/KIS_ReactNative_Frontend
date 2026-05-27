@@ -50,6 +50,9 @@ export const HoldToLockComposer: React.FC<Props> = ({
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const [previewProgress, setPreviewProgress] = useState(0);
 
+  // Rolling metering history for waveform — keeps the last WAVEFORM_BARS samples
+  const meteringHistoryRef = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
+
   /* ── refs ──────────────────────────────────────────────────────────────── */
   const voiceModeRef   = useRef<VoiceMode>('idle');
   const lockedRef      = useRef(false);
@@ -172,21 +175,11 @@ export const HoldToLockComposer: React.FC<Props> = ({
     dotLoop.start();
     dotLoopRef.current = dotLoop;
 
-    // Waveform bars — staggered, each independent loop
+    // Waveform bars are driven by live metering data (see addRecordBackListener).
+    // Seed a gentle idle animation until the first metering sample arrives.
     bars.forEach((bar, i) => {
-      // Three distinct animation phases to look alive
-      const hi  = 0.35 + ((i * 0.17) % 0.65);
-      const lo  = 0.08 + ((i * 0.11) % 0.22);
-      const dur = 160 + (i % 5) * 60;
-
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bar, { toValue: hi, duration: dur,      easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(bar, { toValue: lo, duration: dur + 40, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ]),
-      );
-      const t = setTimeout(() => { loop.start(); barLoopsRef.current.push(loop); }, i * 25);
-      barTimeoutsRef.current.push(t);
+      const seedVal = 0.08 + ((i * 0.11) % 0.18);
+      bar.setValue(seedVal);
     });
   }, [micScale, pulse1Scale, pulse1Opacity, pulse2Scale, pulse2Opacity, pulse3Scale, pulse3Opacity, dotOpacity, bars]);
 
@@ -234,6 +227,19 @@ export const HoldToLockComposer: React.FC<Props> = ({
         const ms = e.currentPosition ?? 0;
         recordMsRef.current = ms;
         setRecordSeconds(Math.floor(ms / 1000));
+
+        // Drive waveform bars from live metering (range: -160..0 dBFS typical)
+        const rawDb = e.currentMetering ?? -60;
+        // Normalise: map [-80, 0] to [0.05, 1.0]
+        const normalised = Math.max(0.05, Math.min(1.0, (rawDb + 80) / 80));
+        // Add slight jitter so adjacent bars differ visually
+        const history = meteringHistoryRef.current;
+        history.push(normalised);
+        if (history.length > WAVEFORM_BARS) history.shift();
+        history.forEach((val, idx) => {
+          const jitter = 1 + (((idx * 7) % 5) - 2) * 0.07;
+          bars[idx]?.setValue(Math.max(0.05, Math.min(1.0, val * jitter)));
+        });
       });
     } catch (err) {
       console.warn('[Voice] startRecorder failed', err);

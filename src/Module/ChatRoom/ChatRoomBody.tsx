@@ -65,6 +65,7 @@ type Props = {
   onStarMessage?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
+  onLocalDeleteMessage?: (message: ChatMessage) => void;
 };
 
 export default function ChatRoomBody({
@@ -115,6 +116,7 @@ export default function ChatRoomBody({
   onStarMessage,
   onShowReadReceipts,
   onViewOnce,
+  onLocalDeleteMessage,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -149,6 +151,7 @@ export default function ChatRoomBody({
         onStarMessage={onStarMessage}
         onShowReadReceipts={onShowReadReceipts}
         onViewOnce={onViewOnce}
+        onLocalDeleteMessage={onLocalDeleteMessage}
       />
 
       {isChannel && !canPost ? (

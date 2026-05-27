@@ -15,11 +15,11 @@ import type { LocationMessage } from '../../chatTypes';
 
 async function getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
-    const Geolocation = require('@react-native-community/geolocation').default;
+    const Geolocation = require('react-native-geolocation-service').default;
     Geolocation.getCurrentPosition(
       (pos: any) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       (err: any) => reject(err),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000, forceRequestLocation: true },
     );
   });
 }

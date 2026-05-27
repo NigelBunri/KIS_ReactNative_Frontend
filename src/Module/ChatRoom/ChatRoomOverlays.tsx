@@ -26,6 +26,7 @@ type Props = {
   onOpenAddMember: () => void;
   onOpenRemoveMember: () => void;
   onOpenSetRole: () => void;
+  onClearChat: () => void;
   groupAction: 'add' | 'remove' | 'role' | null;
   groupUserIdInput: string;
   groupRoleInput: string;
@@ -62,6 +63,7 @@ export default function ChatRoomOverlays({
   onOpenAddMember,
   onOpenRemoveMember,
   onOpenSetRole,
+  onClearChat,
   groupAction,
   groupUserIdInput,
   groupRoleInput,
@@ -99,6 +101,7 @@ export default function ChatRoomOverlays({
         onOpenAddMember={onOpenAddMember}
         onOpenRemoveMember={onOpenRemoveMember}
         onOpenSetRole={onOpenSetRole}
+        onClearChat={onClearChat}
       />
       <ChatRoomModals
         palette={palette}

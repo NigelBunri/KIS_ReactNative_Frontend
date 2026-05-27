@@ -20,6 +20,7 @@ type Props = {
   onOpenAddMember: () => void;
   onOpenRemoveMember: () => void;
   onOpenSetRole: () => void;
+  onClearChat: () => void;
 };
 
 export default function ChatRoomMenu({
@@ -39,6 +40,7 @@ export default function ChatRoomMenu({
   onOpenAddMember,
   onOpenRemoveMember,
   onOpenSetRole,
+  onClearChat,
 }: Props) {
   return (
     <View pointerEvents={menuVisible ? 'auto' : 'none'} style={localStyles.menuRoot}>
@@ -182,6 +184,21 @@ export default function ChatRoomMenu({
             >
               <Text style={{ color: palette.text, fontSize: 14 }}>
                 Search messages
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                onCloseMenu();
+                onClearChat();
+              }}
+              style={({ pressed }) => [
+                localStyles.menuItem,
+                { backgroundColor: pressed ? palette.surface : 'transparent' },
+              ]}
+            >
+              <Text style={{ color: '#DC2626', fontSize: 14 }}>
+                Clear chat
               </Text>
             </Pressable>
           </View>

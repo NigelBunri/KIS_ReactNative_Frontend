@@ -46,6 +46,7 @@ type Props = {
   onStarMessage?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
+  onLocalDeleteMessage?: (message: ChatMessage) => void;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -144,6 +145,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onStarMessage,
   onShowReadReceipts,
   onViewOnce,
+  onLocalDeleteMessage,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -346,16 +348,28 @@ export const InteractiveMessageRow: React.FC<Props> = ({
     });
   }
 
-  if (!isDeleted && onDeleteMessage) {
+  if (!isDeleted) {
     actions.push({ type: 'divider', key: 'div2' });
-    actions.push({
-      type: 'action',
-      key: 'delete',
-      icon: 'trash-outline',
-      label: isMe ? 'Delete for everyone' : 'Delete for me',
-      destructive: true,
-      onPress: () => closeSheet(() => onDeleteMessage(message)),
-    });
+    if (onLocalDeleteMessage) {
+      actions.push({
+        type: 'action',
+        key: 'delete_me',
+        icon: 'eye-off-outline',
+        label: 'Delete for me',
+        destructive: true,
+        onPress: () => closeSheet(() => onLocalDeleteMessage(message)),
+      });
+    }
+    if (isMe && onDeleteMessage) {
+      actions.push({
+        type: 'action',
+        key: 'delete_all',
+        icon: 'trash-outline',
+        label: 'Delete for everyone',
+        destructive: true,
+        onPress: () => closeSheet(() => onDeleteMessage(message)),
+      });
+    }
   }
 
   return (

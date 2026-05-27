@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -10,6 +10,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
   DeviceEventEmitter,
 } from 'react-native';
@@ -97,6 +98,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
   const [roleChanging, setRoleChanging] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionInput, setDescriptionInput] = useState<string>(
+    (chat as any).description ?? '',
+  );
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
@@ -361,6 +367,84 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
       Alert.alert('Error', 'Could not change member role.');
     } finally {
       setRoleChanging(null);
+    }
+  };
+
+  const handleLeaveGroup = () => {
+    if (!groupId) return;
+    Alert.alert(
+      'Leave group',
+      'Are you sure you want to leave this group?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await postRequest(ROUTES.groups.leave(groupId), {}, {});
+              onBack?.();
+            } catch {
+              Alert.alert('Error', 'Could not leave the group. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteGroup = () => {
+    if (!groupId) return;
+    Alert.alert(
+      'Delete group',
+      'This will permanently delete the group and all its messages for everyone. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await getAccessToken();
+              const deviceId = await AsyncStorage.getItem('device_id');
+              const headers: Record<string, string> = {
+                Authorization: `Bearer ${token}`,
+              };
+              if (deviceId) headers['X-Device-Id'] = deviceId;
+              const res = await apiService.delete(ROUTES.groups.detail(groupId), headers);
+              if (!res.ok) throw new Error();
+              onBack?.();
+            } catch {
+              Alert.alert('Error', 'Could not delete the group. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSaveDescription = async () => {
+    if (!groupId || !isAdmin) return;
+    setSavingDescription(true);
+    try {
+      const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
+      if (deviceId) headers['X-Device-Id'] = deviceId;
+      const res = await apiService.patch(
+        ROUTES.groups.detail(groupId),
+        { description: descriptionInput },
+        headers,
+      );
+      if (!res.ok) throw new Error();
+      onChatUpdated?.({ ...chat, description: descriptionInput } as any);
+      setEditingDescription(false);
+    } catch {
+      Alert.alert('Error', 'Could not save description. Please try again.');
+    } finally {
+      setSavingDescription(false);
     }
   };
 
@@ -893,6 +977,62 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
         {isGroup && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.sectionTitle, { color: palette.text, marginBottom: 0, flex: 1 }]}>
+                Description
+              </Text>
+              {isAdmin && !editingDescription && (
+                <Pressable onPress={() => setEditingDescription(true)} hitSlop={8}>
+                  <KISIcon name="edit" size={16} color={palette.primary} />
+                </Pressable>
+              )}
+            </View>
+            <View style={[styles.card, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+              {editingDescription ? (
+                <View style={{ gap: 10 }}>
+                  <TextInput
+                    value={descriptionInput}
+                    onChangeText={setDescriptionInput}
+                    multiline
+                    maxLength={500}
+                    placeholder="Add a group description…"
+                    placeholderTextColor={palette.subtext}
+                    style={{
+                      color: palette.text,
+                      fontSize: 14,
+                      minHeight: 72,
+                      textAlignVertical: 'top',
+                    }}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Pressable
+                      onPress={() => { setEditingDescription(false); setDescriptionInput((chat as any).description ?? ''); }}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, borderWidth: 1, borderColor: palette.divider }}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 13 }}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => void handleSaveDescription()}
+                      disabled={savingDescription}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: palette.primary, opacity: savingDescription ? 0.6 : 1 }}
+                    >
+                      <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 13, fontWeight: '600' }}>
+                        {savingDescription ? 'Saving…' : 'Save'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Text style={[styles.detailValue, { color: descriptionInput ? palette.text : palette.subtext }]}>
+                  {descriptionInput || 'No description'}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {isGroup && (
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Invite link
             </Text>
@@ -1019,6 +1159,34 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   </Pressable>
                 );
               })
+            )}
+          </View>
+        )}
+
+        {isGroup && (
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter, paddingBottom: 16 }]}>
+            <Pressable
+              onPress={handleLeaveGroup}
+              style={({ pressed }) => [
+                styles.dangerBtn,
+                { borderColor: '#DC2626', opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <KISIcon name="arrow-left" size={16} color="#DC2626" />
+              <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>Leave group</Text>
+            </Pressable>
+
+            {role === 'owner' && (
+              <Pressable
+                onPress={handleDeleteGroup}
+                style={({ pressed }) => [
+                  styles.dangerBtn,
+                  { borderColor: '#DC2626', backgroundColor: '#DC2626', marginTop: 10, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <KISIcon name="trash" size={16} color="#fff" />
+                <Text style={[styles.dangerBtnText, { color: '#fff' }]}>Delete group</Text>
+              </Pressable>
             )}
           </View>
         )}
@@ -1267,6 +1435,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   inviteLinkBtnText: { fontSize: 13, fontWeight: '600' },
+  dangerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  dangerBtnText: { fontSize: 15, fontWeight: '700' },
 });
 
 export default ChatInfoPage;
