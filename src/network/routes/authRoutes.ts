@@ -33,6 +33,18 @@ const authRoutes = {
     me: `${API_BASE_URL}/api/v1/profiles/me/`,
     view: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/view/`,
     update: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/`,
+    discover: `${API_BASE_URL}/api/v1/profiles/discover/`,
+    openToWork: `${API_BASE_URL}/api/v1/profiles/open-to-work/`,
+    endorseSkill: (profileId: string) => `${API_BASE_URL}/api/v1/profiles/${profileId}/endorse-skill/`,
+  },
+  jobs: {
+    board: `${API_BASE_URL}/api/v1/jobs/`,
+    myApplications: `${API_BASE_URL}/api/v1/my-applications/`,
+  },
+  connections: {
+    list: `${API_BASE_URL}/api/v1/connections/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/connections/${id}/`,
+    peopleYouMayKnow: `${API_BASE_URL}/api/v1/connections/people-you-may-know/`,
   },
   profilePrivacy: {
     list: `${API_BASE_URL}/api/v1/profile-privacy/`,
@@ -88,6 +100,9 @@ const authRoutes = {
   },
   contacts: {
     check: `${API_BASE_URL}/api/v1/users/check-contacts/`,
+  },
+  notifications: {
+    mention: `${API_BASE_URL}/api/v1/notifications/mention/`,
   },
 };
 

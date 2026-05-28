@@ -65,6 +65,7 @@ type MessageListProps = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  mentionMap?: Record<string, string>;
 };
 
 /**
@@ -145,6 +146,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  mentionMap,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -837,6 +839,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onShowReadReceipts={onShowReadReceipts}
                 onViewOnce={onViewOnce}
                 onLocalDeleteMessage={onLocalDeleteMessage}
+                mentionMap={mentionMap}
               />
 
               {renderAttachments(attachments, (item as any).fromMe)}

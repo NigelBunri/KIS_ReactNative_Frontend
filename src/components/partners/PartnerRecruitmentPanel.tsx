@@ -8,6 +8,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
@@ -16,6 +18,7 @@ import { postRequest } from '@/network/post';
 import { PartnerJobPost } from '@/components/partners/partnersTypes';
 import PartnerRecruitmentJobList from '@/components/partners/recruitment/PartnerRecruitmentJobList';
 import PartnerRecruitmentForm from '@/components/partners/recruitment/PartnerRecruitmentForm';
+import type { RootStackParamList } from '@/navigation/types';
 
 type Props = {
   isOpen: boolean;
@@ -38,6 +41,7 @@ export default function PartnerRecruitmentPanel({
   onClose,
 }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [jobs, setJobs] = useState<PartnerJobPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [communities, setCommunities] = useState<Option[]>([]);
@@ -198,6 +202,21 @@ export default function PartnerRecruitmentPanel({
               Define job posts, screening steps, and auto-assign onboarding.
             </Text>
           </View>
+          <Pressable
+            onPress={() => {
+              onClose();
+              navigation.navigate('TalentDiscover', { partnerId: partnerId ?? undefined });
+            }}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.7 : 1,
+              backgroundColor: palette.primary,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 10,
+            })}
+          >
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Find Talent</Text>
+          </Pressable>
         </View>
 
         {loading ? (

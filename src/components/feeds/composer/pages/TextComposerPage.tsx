@@ -1,6 +1,6 @@
 // src/components/feeds/composer/pages/TextComposerPage.tsx
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
@@ -17,6 +17,8 @@ import {
 } from '../richTextUtils';
 import { Swatch } from '../UI/Swatch';
 import { DropButton } from '../UI/DropButton';
+import { getRequest } from '@/network/get';
+import ROUTES from '@/network';
 
 // -----------------------------------------------------
 // Color presets (20 each) — UNIQUE values
@@ -84,6 +86,12 @@ export function TextComposerPage({
   // ✅ font size for the editor input (and preview container text will scale via renderer if you apply fontSize marks)
   const [fontSize, setFontSize] = useState<number>(16);
   const [fontSizeDraft, setFontSizeDraft] = useState<string>('16');
+
+  // @mention picker state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionAnchorPos, setMentionAnchorPos] = useState<number>(0);
+  const [mentionResults, setMentionResults] = useState<Array<{ id: string; display_name: string; avatar_url?: string; headline?: string }>>([]);
+  const [mentionSearching, setMentionSearching] = useState(false);
 
   const activeParagraphIndex = useMemo(
     () => paragraphIndexAt(rich.text, selection.start),
@@ -255,6 +263,23 @@ export function TextComposerPage({
 
         return { ...prev, text: nextText, spans: nextSpans, blocks: nextBlocks };
       });
+
+      // detect @mention trigger
+      const lastAt = nextText.lastIndexOf('@');
+      if (lastAt !== -1) {
+        const afterAt = nextText.slice(lastAt + 1);
+        // only trigger if no space after @
+        if (afterAt.length >= 0 && !/\s/.test(afterAt) && afterAt.length <= 30) {
+          setMentionAnchorPos(lastAt);
+          setMentionQuery(afterAt);
+        } else {
+          setMentionQuery(null);
+          setMentionResults([]);
+        }
+      } else {
+        setMentionQuery(null);
+        setMentionResults([]);
+      }
     },
     [setRich],
   );
@@ -264,6 +289,62 @@ export function TextComposerPage({
     selectionRef.current = sel;
     _setSelection(sel);
   }, []);
+
+  // @mention debounced search
+  useEffect(() => {
+    if (mentionQuery === null) { setMentionResults([]); return; }
+    const t = setTimeout(async () => {
+      if (mentionQuery.trim().length === 0) { setMentionResults([]); return; }
+      setMentionSearching(true);
+      try {
+        const res = await getRequest(`${ROUTES.profiles.discover}?search=${encodeURIComponent(mentionQuery)}&limit=8`, { errorMessage: '' });
+        const items = Array.isArray(res) ? res : (res?.data ?? res?.results ?? []);
+        setMentionResults(items.slice(0, 8));
+      } catch { setMentionResults([]); }
+      finally { setMentionSearching(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [mentionQuery]);
+
+  // @mention insert handler
+  const insertMention = useCallback((user: { id: string; display_name: string }) => {
+    const label = `@${user.display_name}`;
+    setRich((prev) => {
+      const before = prev.text.slice(0, mentionAnchorPos);
+      const afterAt = prev.text.slice(mentionAnchorPos);
+      // find end of @query in afterAt
+      const spaceIdx = afterAt.search(/[\s]/);
+      const queryEnd = spaceIdx === -1 ? afterAt.length : spaceIdx;
+      const after = afterAt.slice(queryEnd);
+      const newText = before + label + ' ' + after;
+
+      // shift existing spans
+      const removed = queryEnd;
+      const added = label.length + 1;
+      let nextSpans = shiftSpans(prev.spans, mentionAnchorPos, removed, added);
+
+      // add mention span
+      nextSpans = [
+        ...nextSpans,
+        {
+          start: mentionAnchorPos,
+          end: mentionAnchorPos + label.length,
+          marks: {},
+          attrs: { mention: user.id },
+        },
+      ];
+
+      const newParas = splitParagraphs(newText);
+      const nextBlocks: Record<number, BlockMeta> = {};
+      for (let i = 0; i < newParas.length; i++) {
+        nextBlocks[i] = prev.blocks[i] ?? { type: 'paragraph', align: prev.defaultAlign };
+      }
+
+      return { ...prev, text: newText, spans: nextSpans, blocks: nextBlocks };
+    });
+    setMentionQuery(null);
+    setMentionResults([]);
+  }, [mentionAnchorPos, setRich]);
 
   // -----------------------------------------------------
   // Preview
@@ -549,6 +630,37 @@ export function TextComposerPage({
 
       {renderDropdownPanel()}
 
+      {/* @mention dropdown — renders above the editor card */}
+      {mentionQuery !== null && (mentionResults.length > 0 || mentionSearching) && (
+        <View style={[mentionStyles.dropdown, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          {mentionSearching && mentionResults.length === 0 && (
+            <ActivityIndicator size="small" color={palette.primary} style={{ padding: 8 }} />
+          )}
+          {mentionResults.map(user => (
+            <Pressable
+              key={user.id}
+              onPress={() => insertMention(user)}
+              style={[mentionStyles.row, { borderBottomColor: palette.divider }]}
+            >
+              <View style={[mentionStyles.avatar, { backgroundColor: palette.primary }]}>
+                <Text style={mentionStyles.avatarText}>
+                  {(user.display_name ?? '?')[0].toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+                  {user.display_name}
+                </Text>
+                {user.headline ? (
+                  <Text style={{ color: palette.subtext, fontSize: 11 }} numberOfLines={1}>{user.headline}</Text>
+                ) : null}
+              </View>
+              <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 12 }}>@</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {/* fixed-size editor (smaller) */}
       <View
         style={[
@@ -665,4 +777,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontWeight: '900',
   },
+});
+
+const mentionStyles = StyleSheet.create({
+  dropdown: {
+    borderRadius: 12, borderWidth: 1, marginHorizontal: 4,
+    marginBottom: 6, maxHeight: 220, overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '900', fontSize: 12 },
 });

@@ -46,6 +46,9 @@ import RichTextRenderer from './RichTextRenderer';
 import FeedComposerSheet from './composer/FeedComposerSheet';
 import { logFeedEvent, type FeedType } from '@/network/personalization';
 import { getAccessToken } from '@/security/authStorage';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 
 const PERSONALIZATION_HISTORY_KEY = '@kis:personalization-history';
 
@@ -82,7 +85,7 @@ export type FeedPost = {
   reactions?: { emoji?: string; count?: number }[];
   has_reacted?: boolean;
   created_at?: string;
-  author?: { display_name?: string; id?: string };
+  author?: { display_name?: string; id?: string; connection_degree?: number | null };
 };
 
 type ComposerContext = { key: string; value: string };
@@ -260,6 +263,7 @@ export default function FeedScreen<T extends FeedPost>({
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const mediaHeaders = useMediaHeaders();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterOptionKey>('all');
@@ -977,9 +981,27 @@ export default function FeedScreen<T extends FeedPost>({
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.authorName} numberOfLines={1}>
-                      {post.author?.display_name ?? 'Member'}
-                    </Text>
+                    <Pressable
+                      onPress={() => post.author?.id && navigation.navigate('ViewProfile', { userId: post.author.id, displayName: post.author.display_name })}
+                      hitSlop={6}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Text style={styles.authorName} numberOfLines={1}>
+                          {post.author?.display_name ?? 'Member'}
+                        </Text>
+                        {post.author?.connection_degree != null && (
+                          <View style={[styles.degreeBadge, {
+                            backgroundColor: post.author.connection_degree === 1 ? '#16A34A20' : post.author.connection_degree === 2 ? '#2563EB20' : '#6B728020',
+                          }]}>
+                            <Text style={[styles.degreeText, {
+                              color: post.author.connection_degree === 1 ? '#16A34A' : post.author.connection_degree === 2 ? '#2563EB' : '#6B7280',
+                            }]}>
+                              {post.author.connection_degree === 1 ? '1st' : post.author.connection_degree === 2 ? '2nd' : '3rd'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
                     <Text style={styles.postTime} numberOfLines={1}>
                       {post.created_at ? new Date(post.created_at).toLocaleString() : 'Just now'}
                     </Text>
@@ -1391,6 +1413,8 @@ const styles = StyleSheet.create({
 
   authorName: { fontSize: 15, fontWeight: '800', color: '#111827' },
   postTime: { fontSize: 12, fontWeight: '600', color: '#9CA3AF', marginTop: 2 },
+  degreeBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 4 },
+  degreeText: { fontSize: 10, fontWeight: '800' },
 
   moreBtnNew: { paddingHorizontal: 8, paddingVertical: 6 },
   moreDots: { fontSize: 18, fontWeight: '800', color: '#9CA3AF' },

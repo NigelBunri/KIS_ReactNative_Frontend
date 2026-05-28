@@ -7,8 +7,28 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+
+/* -------------------------------------------------------------------------- */
+/*                         MENTION NOTIFICATION HELPER                         */
+/* -------------------------------------------------------------------------- */
+
+async function notifyMentions(
+  mentionedUserIds: string[],
+  context: { sender_name: string; preview: string; conversation_id: string; message_id?: string }
+) {
+  if (!mentionedUserIds.length) return;
+  try {
+    await postRequest(
+      ROUTES.notifications.mention,
+      { mentioned_user_ids: mentionedUserIds, context },
+      { errorMessage: '' }
+    );
+  } catch { /* best effort */ }
+}
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Sticker, STICKER_STORAGE_KEY } from './FroSticker/StickerEditor';
@@ -140,6 +160,10 @@ type MessageComposerProps = {
   // @mention autocomplete
   mentionParticipants?: { id: string; name: string }[];
 
+  // mention notification context
+  senderName?: string;
+  conversationIdForMentions?: string;
+
   // NEW: GIF / Location / Schedule
   onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
   onSendLocation?: (loc: LocationMessage) => void;
@@ -173,6 +197,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onCreatePoll,
   onCreateEvent,
   mentionParticipants,
+  senderName = '',
+  conversationIdForMentions = '',
   onSendGif,
   onSendLocation,
   onScheduleSend,
@@ -314,6 +340,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
   /* ----------------------------- @MENTION --------------------------------- */
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const mentionedUserIdsRef = useRef<string[]>([]);
 
   const handleTextChange = (text: string) => {
     onChangeText(text);
@@ -333,10 +360,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         )
       : [];
 
-  const insertMention = (name: string) => {
+  const insertMention = (name: string, userId?: string) => {
     const updated = value.replace(/@\w*$/, `@${name} `);
     onChangeText(updated);
     setMentionQuery(null);
+    if (userId && !mentionedUserIdsRef.current.includes(userId)) {
+      mentionedUserIdsRef.current = [...mentionedUserIdsRef.current, userId];
+    }
   };
 
   const handleTextSend = () => {
@@ -348,10 +378,21 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
     lastSendRef.current = now;
 
+    const mentionIds = [...mentionedUserIdsRef.current];
+    mentionedUserIdsRef.current = [];
+
     setIsSending(true);
     onSend();
     if (sendingTimerRef.current) clearTimeout(sendingTimerRef.current);
     sendingTimerRef.current = setTimeout(() => setIsSending(false), 600);
+
+    if (mentionIds.length > 0) {
+      void notifyMentions(mentionIds, {
+        sender_name: senderName,
+        preview: value.slice(0, 100),
+        conversation_id: conversationIdForMentions,
+      });
+    }
   };
 
   /* ----------------------------- PANEL TOGGLING --------------------------- */
@@ -634,7 +675,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           {mentionSuggestions.slice(0, 6).map((p) => (
             <Pressable
               key={p.id}
-              onPress={() => insertMention(p.name)}
+              onPress={() => insertMention(p.name, p.id)}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',

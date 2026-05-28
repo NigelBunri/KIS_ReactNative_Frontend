@@ -152,6 +152,17 @@ import AIIntegrationScreen from './src/screens/insights/AIIntegrationScreen';
 import MediaAssetManagerScreen from './src/screens/insights/MediaAssetManagerScreen';
 import SurveyManagerScreen from './src/screens/insights/SurveyManagerScreen';
 import { isPINEnabled, shouldLockAsync } from '@/services/QuickLockService';
+import UserProfileScreen from '@/screens/profile/UserProfileScreen';
+import JobsBoardScreen from '@/screens/jobs/JobsBoardScreen';
+import MyApplicationsScreen from '@/screens/jobs/MyApplicationsScreen';
+import ConnectionsScreen from '@/screens/profile/ConnectionsScreen';
+import TalentDiscoverScreen from '@/screens/jobs/TalentDiscoverScreen';
+import TestimonyHubScreen from '@/screens/testimony/TestimonyHubScreen';
+import SeasonsBrowserScreen from '@/screens/testimony/SeasonsBrowserScreen';
+import DeclareSeasonSheet from '@/screens/testimony/DeclareSeasonSheet';
+import DeclareTestimonySheet from '@/screens/testimony/DeclareTestimonySheet';
+import ReachOutSheet from '@/screens/testimony/ReachOutSheet';
+import TestimonyReachInboxScreen from '@/screens/testimony/TestimonyReachInboxScreen';
 
 type AuthCtx = {
   isAuth: boolean;
@@ -1097,6 +1108,37 @@ function AppContent() {
                       component={SetupPINScreen}
                       options={{ presentation: 'modal' }}
                     />
+                    <RootStack.Screen
+                      name="ViewProfile"
+                      component={UserProfileScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="JobsBoard"
+                      component={JobsBoardScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="MyApplications"
+                      component={MyApplicationsScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="Connections"
+                      component={ConnectionsScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="TalentDiscover"
+                      component={TalentDiscoverScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen name="TestimonyHub" component={TestimonyHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SeasonsBrowser" component={SeasonsBrowserScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DeclareSeasonSheet" component={DeclareSeasonSheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="DeclareTestimonySheet" component={DeclareTestimonySheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="ReachOutSheet" component={ReachOutSheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="TestimonyReachInbox" component={TestimonyReachInboxScreen} options={{ headerShown: false }} />
                   </>
                 ) : (
                   <>

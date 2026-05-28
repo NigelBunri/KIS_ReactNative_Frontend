@@ -11,6 +11,7 @@ import socialRoutes from './routes/socialRoutes';
 import adminRoutes from './routes/adminRoutes';
 import personalizationRoutes from './routes/personalizationRoutes';
 import billingRoutes from './routes/billingRoutes';
+import testimonyRoutes from './routes/testimonyRoutes';
 import {
   API_BASE_URL,
   BG_REMOVAL_START_URL,
@@ -38,6 +39,7 @@ const ROUTES: any = {
   ...adminRoutes,
   ...personalizationRoutes,
   billing: billingRoutes,
+  ...testimonyRoutes,
 };
 
 // Keep health analytics endpoints and admin analytics endpoints under one key.

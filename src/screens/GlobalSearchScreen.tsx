@@ -73,6 +73,13 @@ export default function GlobalSearchScreen() {
           navigation.navigate('ProfileNotifications');
           break;
 
+        case 'profile':
+          navigation.navigate('ViewProfile', {
+            userId: id,
+            displayName: String(meta.display_name ?? meta.name ?? result.title ?? ''),
+          });
+          break;
+
         case 'contact':
         case 'user':
           // Open a DM — use conversation ID from metadata if available, else open by user ID

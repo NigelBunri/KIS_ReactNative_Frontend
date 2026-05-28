@@ -15,6 +15,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -1036,6 +1037,27 @@ export default function ProfileScreen() {
   const rootNavigation =
     tabsNavigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
 
+  const [openToWork, setOpenToWork] = useState(false);
+  const [openToWorkLoading, setOpenToWorkLoading] = useState(false);
+
+  useEffect(() => {
+    if (c.profile?.profile?.open_to_work !== undefined) {
+      setOpenToWork(Boolean(c.profile.profile.open_to_work));
+    }
+  }, [c.profile?.profile?.open_to_work]);
+
+  const handleOpenToWorkToggle = useCallback(async (value: boolean) => {
+    setOpenToWork(value);
+    setOpenToWorkLoading(true);
+    try {
+      await postRequest(ROUTES.profiles.openToWork, { open_to_work: value });
+    } catch {
+      setOpenToWork(!value);
+    } finally {
+      setOpenToWorkLoading(false);
+    }
+  }, []);
+
   const openBookingDetails = useCallback(
     (bookingId: string) => {
       if (!bookingId) return;
@@ -1748,6 +1770,33 @@ export default function ProfileScreen() {
         tone: 'primary' as const,
         onPress: () => rootNavigation?.navigate('Events'),
       },
+      {
+        key: 'my-applications',
+        title: 'My Applications',
+        subtitle: 'Track your job applications',
+        icon: 'list' as const,
+        tone: 'info' as const,
+        onPress: () => rootNavigation?.navigate('MyApplications'),
+      },
+      {
+        key: 'my-network',
+        title: 'My Network',
+        subtitle: (() => {
+          const connectionCount = (c.profile?.profile?.connection_count ?? 0) as number;
+          return connectionCount > 0 ? `${connectionCount} connection${connectionCount !== 1 ? 's' : ''}` : 'Manage connections';
+        })(),
+        icon: 'people' as const,
+        tone: 'success' as const,
+        onPress: () => rootNavigation?.navigate('Connections', {}),
+      },
+      {
+        key: 'testimony-network',
+        title: 'Testimony Network',
+        subtitle: 'Your seasons & testimonies',
+        icon: 'heart' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('TestimonyHub'),
+      },
     ],
     [
       c.openCreatePartner,
@@ -2373,6 +2422,38 @@ export default function ProfileScreen() {
                   {c.profile.profile?.bio ||
                     'Add a short bio that explains your work.'}
                 </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 10,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: palette.divider,
+                    marginTop: 8,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: palette.text }}>
+                      Open to Work
+                    </Text>
+                    {openToWork ? (
+                      <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                        <Text style={{ color: '#065F46', fontSize: 11, fontWeight: '700' }}>Active</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {openToWorkLoading ? (
+                    <ActivityIndicator size="small" color={palette.primary} />
+                  ) : (
+                    <Switch
+                      value={openToWork}
+                      onValueChange={handleOpenToWorkToggle}
+                      trackColor={{ true: palette.primary }}
+                      thumbColor={openToWork ? palette.primaryStrong : palette.subtext}
+                    />
+                  )}
+                </View>
                 <View
                   style={[
                     styles.actionRow,

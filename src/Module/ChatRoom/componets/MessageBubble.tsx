@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 import Video from 'react-native-video';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
@@ -94,6 +97,9 @@ type MessageBubbleProps = {
   onStar?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
+
+  mentionMap?: Record<string, string>;
+  senderId?: string;
 };
 
 const formatTimeFromMs = (ms: number) => {
@@ -170,7 +176,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onStar,
   onShowReadReceipts,
   onViewOnce,
+  mentionMap,
+  senderId,
 }) => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // ─────────────────────────────────────
   // 🔁 Normalize fields so both shapes work
   // ─────────────────────────────────────
@@ -637,9 +646,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>
         {parts.map((part, i) =>
           /^@\w+$/.test(part) ? (
-            <Text key={i} style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>
-              {part}
-            </Text>
+            <Pressable
+              key={i}
+              onPress={() => {
+                const uname = part.slice(1).toLowerCase();
+                const uid = mentionMap?.[uname];
+                if (uid) navigation.navigate('ViewProfile', { userId: uid, displayName: part.slice(1) });
+              }}
+            >
+              <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{part}</Text>
+            </Pressable>
           ) : (
             <React.Fragment key={i}>{part}</React.Fragment>
           ),
@@ -653,19 +669,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
    * ──────────────────────────────────────── */
   const renderSenderName = () => {
     if (isMe || !senderName || !isFirstInGroup) return null;
+    const resolvedSenderId = senderId ?? (message as any).senderId;
     return (
-      <Text
-        style={{
-          fontSize: 11,
-          fontWeight: '700',
-          color: palette.senderNameColor ?? palette.primary ?? '#4F46E5',
-          marginBottom: 2,
-          marginLeft: 2,
+      <Pressable
+        onPress={() => {
+          if (resolvedSenderId) navigation.navigate('ViewProfile', { userId: resolvedSenderId, displayName: senderName });
         }}
-        numberOfLines={1}
+        hitSlop={6}
       >
-        {senderName}
-      </Text>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '700',
+            color: palette.senderNameColor ?? palette.primary ?? '#4F46E5',
+            marginBottom: 2,
+            marginLeft: 2,
+          }}
+          numberOfLines={1}
+        >
+          {senderName}
+        </Text>
+      </Pressable>
     );
   };
 

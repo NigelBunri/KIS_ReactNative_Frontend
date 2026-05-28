@@ -47,6 +47,7 @@ type Props = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  mentionMap?: Record<string, string>;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -146,6 +147,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  mentionMap,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -397,6 +399,8 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             onStar={onStarMessage}
             onShowReadReceipts={onShowReadReceipts}
             onViewOnce={onViewOnce}
+            mentionMap={mentionMap}
+            senderId={(message as any).senderId}
           />
         </Pressable>
       </Animated.View>

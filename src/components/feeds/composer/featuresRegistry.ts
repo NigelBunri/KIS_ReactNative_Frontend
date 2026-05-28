@@ -100,7 +100,7 @@ export function getFeaturesForType(type: FeatureContext['type']): FeatureAction[
 
     // ---------------- Insert (ready-to-wire) ----------------
     { id: 'insert.link', label: 'Insert link', icon: 'link', category: 'insert', priority: 30, enabled: hasSelection, run: notYet('Insert link modal') },
-    { id: 'insert.mention', label: 'Mention', icon: 'user', category: 'insert', priority: 29, run: notYet('Mention picker') },
+    { id: 'insert.mention', label: 'Mention', icon: 'user', category: 'insert', priority: 29, run: (ctx) => ctx.toast('Type @name to mention someone') },
     { id: 'insert.hashtag', label: '#Hashtag', icon: 'hash', category: 'insert', priority: 28, run: notYet('Hashtag suggestion') },
     { id: 'insert.emoji', label: 'Emoji', icon: 'emoji', category: 'insert', priority: 27, run: notYet('Emoji picker') },
     { id: 'insert.signature', label: 'Signature', icon: 'pen', category: 'insert', priority: 26, run: notYet('Insert signature snippet') },

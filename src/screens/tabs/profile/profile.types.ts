@@ -19,6 +19,9 @@ export type ProfilePayload = {
     industry?: string | null;
     completion_score?: number;
     branding_prefs?: Record<string, any>;
+    open_to_work?: boolean;
+    connection_count?: number;
+    connection_degree?: number | null;
   };
   sections: {
     experiences?: any[];

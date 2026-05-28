@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
@@ -56,6 +56,8 @@ type Props = {
   onCreateEvent: (event: EventDraft) => void;
   canSend: boolean;
   mentionParticipants?: { id: string; name: string }[];
+  senderName?: string;
+  conversationIdForMentions?: string;
   onLoadOlder?: () => void;
 
   // New features
@@ -109,6 +111,8 @@ export default function ChatRoomBody({
   onCreateEvent,
   canSend,
   mentionParticipants,
+  senderName,
+  conversationIdForMentions,
   onLoadOlder,
   onSendGif,
   onSendLocation,
@@ -119,6 +123,14 @@ export default function ChatRoomBody({
   onLocalDeleteMessage,
 }: Props) {
   const insets = useSafeAreaInsets();
+
+  const mentionMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (mentionParticipants ?? []).forEach(p => {
+      if (p.name) map[p.name.toLowerCase()] = p.id;
+    });
+    return map;
+  }, [mentionParticipants]);
 
   return (
     <KeyboardAvoidingView
@@ -152,6 +164,7 @@ export default function ChatRoomBody({
         onShowReadReceipts={onShowReadReceipts}
         onViewOnce={onViewOnce}
         onLocalDeleteMessage={onLocalDeleteMessage}
+        mentionMap={mentionMap}
       />
 
       {isChannel && !canPost ? (
@@ -189,6 +202,8 @@ export default function ChatRoomBody({
           onCreatePoll={onCreatePoll}
           onCreateEvent={onCreateEvent}
           mentionParticipants={mentionParticipants}
+          senderName={senderName}
+          conversationIdForMentions={conversationIdForMentions}
           onSendGif={onSendGif}
           onSendLocation={onSendLocation}
           onScheduleSend={onScheduleSend}

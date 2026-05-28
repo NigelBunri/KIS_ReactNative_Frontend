@@ -388,6 +388,17 @@ export default function BroadcastScreen() {
             ) : null}
           </View>
         </LinearGradient>
+        <Pressable
+          onPress={() => (navigation as any).navigate('TestimonyHub')}
+          style={[testimonyBannerStyle, { backgroundColor: palette.primaryStrong }]}
+        >
+          <Text style={{ fontSize: 20 }}>🤝</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Real people. Real stories. Real help.</Text>
+          </View>
+          <KISIcon name="arrow-left" size={16} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
+        </Pressable>
         <View
           style={{ paddingHorizontal: responsive.pageGutter }}
           {...tabSwipeResponder.panHandlers}
@@ -466,6 +477,16 @@ export default function BroadcastScreen() {
     </View>
   );
 }
+
+const testimonyBannerStyle: any = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 12,
+  borderRadius: 16,
+  padding: 16,
+  marginHorizontal: 16,
+  marginVertical: 8,
+};
 
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
   StyleSheet.create({

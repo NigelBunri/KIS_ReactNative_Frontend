@@ -196,6 +196,17 @@ export type RootStackParamList = {
   ActivityNotifications: { channelId: string; channelName?: string };
   ChannelMembersScreen: { channelId: string; channelName?: string };
   Membership: { channelId: string; channelName?: string };
+  ViewProfile: { userId: string; displayName?: string };
+  JobsBoard: undefined;
+  MyApplications: undefined;
+  Connections: { userId?: string; tab?: 'mine' | 'requests' | 'discover' };
+  TalentDiscover: { partnerId?: string };
+  TestimonyHub: undefined;
+  SeasonsBrowser: { category?: string };
+  DeclareSeasonSheet: { editId?: string };
+  DeclareTestimonySheet: { editId?: string };
+  ReachOutSheet: { seasonId: string; seasonTitle: string; seasonCategory: string };
+  TestimonyReachInbox: undefined;
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';
