@@ -51,6 +51,9 @@ type ChatHeaderProps = {
   // NEW: context label for feed comment rooms
   contextLabel?: string | null;
   onPressContext?: () => void;
+
+  // E2EE indicator
+  isE2EE?: boolean;
 };
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -87,6 +90,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   statusText,
   contextLabel,
   onPressContext,
+  isE2EE = false,
 }) => {
   const title = chat?.name ?? 'Chat';
   const headerAvatar =
@@ -349,15 +353,24 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 </Text>
               </Pressable>
             ) : null}
-            <Text
-              style={[
-                styles.headerSubtitle,
-                { color: palette.headerSubtext ?? palette.subtext },
-              ]}
-              numberOfLines={1}
-            >
-              {headerStatusText}
-            </Text>
+            {isE2EE ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <KISIcon name="lock" size={10} color={palette.headerSubtext ?? palette.subtext} />
+                <Text
+                  style={[styles.headerSubtitle, { color: palette.headerSubtext ?? palette.subtext }]}
+                  numberOfLines={1}
+                >
+                  End-to-end encrypted
+                </Text>
+              </View>
+            ) : (
+              <Text
+                style={[styles.headerSubtitle, { color: palette.headerSubtext ?? palette.subtext }]}
+                numberOfLines={1}
+              >
+                {headerStatusText}
+              </Text>
+            )}
           </View>
         </Pressable>
 

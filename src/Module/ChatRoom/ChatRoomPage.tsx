@@ -1491,6 +1491,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onOpenSubRooms={() => setSubRoomsSheetVisible(true)}
           isSingleSelection={isSingleSelection}
           onContinueInSubRoom={handleContinueInSubRoom}
+          isE2EE
         />
       )}
 

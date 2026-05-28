@@ -22,7 +22,7 @@ import { setUserData } from '@/network/cache';
 import { postRequest } from '@/network/post/index';
 import ROUTES from '@/network';
 import { useAuth } from '../../App';
-import { ensureDeviceId } from '@/security/e2ee';
+import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { setAuthTokens } from '@/security/authStorage';
 import { KIS_TOKENS } from '@/theme/constants';
 
@@ -226,6 +226,7 @@ export default function LoginScreen({ navigation }: any) {
       const resolvedUser = res?.data?.user ?? null;
       await setUserData(resolvedUser, res.data);
       setUser?.(resolvedUser);
+      void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
       setAuth(true); // App.tsx will switch to MainTabs
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.');
