@@ -28,8 +28,11 @@ import {
   getBroadcastFeedVideoPosterUrl,
 } from '@/components/broadcast/feedVideoPlayback';
 import {
+  addItemToPlaylist,
+  createPlaylist,
   deletePlaylist,
   getPlaylistsState,
+  movePlaylistItem,
   removeItemFromPlaylist,
   renamePlaylist,
   setPlaylistLoopMode,
@@ -39,6 +42,8 @@ import {
   type Playlist,
   type PlaylistItem,
 } from './playlistManager';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type RouteT = RouteProp<RootStackParamList, 'PlaylistDetail'>;
@@ -77,6 +82,9 @@ export default function PlaylistDetailScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const nameInputRef = useRef<TextInput>(null);
+  const [shuffledItems, setShuffledItems] = useState<PlaylistItem[] | null>(null);
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [visibility, setVisibility] = useState<string>((playlist as any)?.visibility || 'public');
 
   useEffect(() => {
     return subscribeToPlaylists(s => {
@@ -211,6 +219,13 @@ export default function PlaylistDetailScreen() {
     [playlistId],
   );
 
+  const handleMoveItem = useCallback(
+    (atIndex: number, direction: 'up' | 'down') => {
+      movePlaylistItem(playlistId, atIndex, direction);
+    },
+    [playlistId],
+  );
+
   const handleRemoveItem = useCallback(
     (itemId: string, atIndex: number) => {
       Alert.alert('Remove from playlist', 'Remove this item from the playlist?', [
@@ -262,8 +277,77 @@ export default function PlaylistDetailScreen() {
     setEditingName(false);
   }, [nameInput, playlistId]);
 
+  const items = isShuffled && shuffledItems ? shuffledItems : (playlist?.items ?? []);
+
+  const handleShuffle = useCallback(() => {
+    if (!playlist) return;
+    if (isShuffled) {
+      setIsShuffled(false);
+      setShuffledItems(null);
+    } else {
+      const arr = [...playlist.items];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      setShuffledItems(arr);
+      setIsShuffled(true);
+      setCurrentIndex(0);
+      setIsPlaying(true);
+    }
+  }, [isShuffled, playlist]);
+
+  const handleSaveToWatchLater = useCallback(async () => {
+    if (!playlist) return;
+    const allPlaylists = getPlaylistsState().playlists;
+    let watchLater = allPlaylists.find(p => p.name === 'Watch Later');
+    if (!watchLater) {
+      watchLater = createPlaylist('Watch Later');
+    }
+    // Add all items from this playlist to Watch Later
+    let added = 0;
+    for (const item of items) {
+      const result = addItemToPlaylist(watchLater.id, item.broadcastItem);
+      if (result === 'added') added++;
+    }
+    Alert.alert('Watch Later', added > 0 ? `Added ${added} item${added === 1 ? '' : 's'} to Watch Later` : 'All items are already in Watch Later');
+  }, [playlist, items]);
+
+  const handleChangeVisibility = useCallback(() => {
+    if (!playlist) return;
+    Alert.alert('Visibility', 'Set playlist visibility', [
+      {
+        text: 'Public',
+        onPress: async () => {
+          setVisibility('public');
+          if ((playlist as any).serverId) {
+            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'public' }, { errorMessage: 'Unable to update visibility.' });
+          }
+        },
+      },
+      {
+        text: 'Unlisted',
+        onPress: async () => {
+          setVisibility('unlisted');
+          if ((playlist as any).serverId) {
+            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'unlisted' }, { errorMessage: 'Unable to update visibility.' });
+          }
+        },
+      },
+      {
+        text: 'Private',
+        onPress: async () => {
+          setVisibility('private');
+          if ((playlist as any).serverId) {
+            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'private' }, { errorMessage: 'Unable to update visibility.' });
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [playlist]);
+
   const loopMode = playlist?.loopMode ?? 'none';
-  const items = playlist?.items ?? [];
 
   if (!playlist) {
     return (
@@ -393,6 +477,17 @@ export default function PlaylistDetailScreen() {
               </Pressable>
 
               <Pressable
+                onPress={handleShuffle}
+                hitSlop={10}
+                style={[
+                  styles.controlBtn,
+                  { backgroundColor: isShuffled ? palette.primaryStrong : palette.surface, borderColor: isShuffled ? palette.primaryStrong : palette.divider },
+                ]}
+              >
+                <KISIcon name="refresh" size={18} color={isShuffled ? palette.surface : palette.text} />
+              </Pressable>
+
+              <Pressable
                 onPress={handleNext}
                 disabled={currentIndex < 0}
                 hitSlop={10}
@@ -465,6 +560,26 @@ export default function PlaylistDetailScreen() {
             <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
               {items.length} {items.length === 1 ? 'Item' : 'Items'}
             </Text>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <Pressable
+                onPress={handleChangeVisibility}
+                style={[styles.visibilityPill, { borderColor: palette.divider, backgroundColor: palette.surface }]}
+              >
+                <KISIcon name="lock" size={12} color={palette.subtext} />
+                <Text style={[styles.visibilityLabel, { color: palette.subtext }]}>
+                  {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
+                </Text>
+              </Pressable>
+              {items.length > 0 && (
+                <Pressable
+                  onPress={handleSaveToWatchLater}
+                  style={[styles.visibilityPill, { borderColor: palette.divider, backgroundColor: palette.surface }]}
+                >
+                  <KISIcon name="bookmark" size={12} color={palette.primaryStrong} />
+                  <Text style={[styles.visibilityLabel, { color: palette.primaryStrong }]}>Watch Later</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
           {items.length === 0 && (
@@ -574,6 +689,26 @@ export default function PlaylistDetailScreen() {
                       {dur ? `  ·  ${formatDuration(dur)}` : ''}
                     </Text>
                   </View>
+                </View>
+
+                {/* Reorder buttons */}
+                <View style={styles.reorderBtns}>
+                  <Pressable
+                    onPress={() => handleMoveItem(idx, 'up')}
+                    disabled={idx === 0}
+                    hitSlop={8}
+                    style={[styles.reorderBtn, { opacity: idx === 0 ? 0.25 : 1 }]}
+                  >
+                    <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↑</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleMoveItem(idx, 'down')}
+                    disabled={idx === items.length - 1}
+                    hitSlop={8}
+                    style={[styles.reorderBtn, { opacity: idx === items.length - 1 ? 0.25 : 1 }]}
+                  >
+                    <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↓</Text>
+                  </Pressable>
                 </View>
 
                 {/* Remove button */}
@@ -821,9 +956,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
   },
+  reorderBtns: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 0,
+    flexShrink: 0,
+  },
+  reorderBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  reorderArrow: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   removeBtn: {
     padding: 4,
     flexShrink: 0,
+  },
+
+  visibilityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  visibilityLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // ─── Not found ────────────────────────────────

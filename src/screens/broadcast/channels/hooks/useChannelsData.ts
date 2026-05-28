@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
+import { patchRequest } from '@/network/patch';
+import { putData as putRequest } from '@/network/put';
 import { emitMainTabBadgeRefresh } from '@/services/mainTabNotificationBadges';
 import {
   CHANNELS_ENDPOINT,
@@ -17,6 +19,8 @@ import {
   channelContentCommentsEndpoint,
   channelAnalyticsEndpoint,
   channelCommentModerateEndpoint,
+  channelCommentReactEndpoint,
+  channelCommentPinEndpoint,
   channelContentReportEndpoint,
   channelBroadcastEndpoint,
   channelContentBroadcastEndpoint,
@@ -27,6 +31,29 @@ import {
   channelContentSaveEndpoint,
   channelContentShareEndpoint,
   channelContentViewEndpoint,
+  watchHistoryEndpoint,
+  channelContentClipEndpoint,
+  channelCommentReportEndpoint,
+  channelContentChaptersEndpoint,
+  channelContentChapterDetailEndpoint,
+  clipShareEndpoint,
+  channelCommentEditEndpoint,
+  channelCommentDeleteEndpoint,
+  channelCommentHeartEndpoint,
+  channelContentSubtitlesEndpoint,
+  channelContentRelatedEndpoint,
+  channelContentEndScreenEndpoint,
+  channelContentCardsEndpoint,
+  channelContentClipDetailEndpoint,
+  channelActivityEndpoint,
+  channelSubscribersEndpoint,
+  liveStreamPollsEndpoint,
+  livePollVoteEndpoint,
+  livePollEndEndpoint,
+  liveStreamQAEndpoint,
+  qaSessionQuestionsEndpoint,
+  qaQuestionUpvoteEndpoint,
+  watchHistorySettingsEndpoint,
 } from '@/screens/broadcast/channels/api/channels.endpoints';
 import type {
   BroadcastChannelContent,
@@ -38,6 +65,7 @@ import type {
   ChannelContentComment,
   ChannelAnalyticsSummary,
   ChannelModerationRecord,
+  ChannelContentChapter,
 } from '@/screens/broadcast/channels/api/channels.types';
 
 type Params = {
@@ -207,13 +235,17 @@ export const normalizeChannelComment = (item: any): ChannelContentComment | null
     user_display: item.user_display || item.userDisplay || 'KIS user',
     body: String(item.body || ''),
     parent: item.parent || null,
+    like_count: Number(item.like_count ?? item.likeCount ?? 0),
+    is_liked: Boolean(item.is_liked ?? item.isLiked),
+    is_pinned: Boolean(item.is_pinned ?? item.isPinned),
+    reply_count: Number(item.reply_count ?? item.replyCount ?? 0),
     created_at: item.created_at || item.createdAt || '',
     updated_at: item.updated_at || item.updatedAt || '',
   };
 };
 
-export const fetchChannelComments = async (contentId: string): Promise<ChannelContentComment[]> => {
-  const response = await getRequest(channelContentCommentsEndpoint(contentId), { errorMessage: 'Unable to load comments.' });
+export const fetchChannelComments = async (contentId: string, sort = 'new'): Promise<ChannelContentComment[]> => {
+  const response = await getRequest(`${channelContentCommentsEndpoint(contentId)}?sort=${sort}`, { errorMessage: 'Unable to load comments.' });
   if (!response?.success) return [];
   const rows = Array.isArray(response.data?.results) ? response.data.results : [];
   return rows.map(normalizeChannelComment).filter(Boolean) as ChannelContentComment[];
@@ -327,6 +359,81 @@ export const removeChannelComment = async (commentId: string) => {
   return response?.success ? response.data : null;
 };
 
+export const reactToChannelComment = async (commentId: string, reaction = 'like') => {
+  const response = await postRequest(channelCommentReactEndpoint(commentId), { reaction }, { errorMessage: 'Unable to like comment.' });
+  return response?.success ? response.data : null;
+};
+
+export const removeChannelCommentReaction = async (commentId: string) => {
+  const response = await deleteRequest(channelCommentReactEndpoint(commentId), { errorMessage: 'Unable to unlike comment.' });
+  return response?.success ? response.data : null;
+};
+
+export const pinChannelComment = async (commentId: string, pin: boolean) => {
+  const response = pin
+    ? await postRequest(channelCommentPinEndpoint(commentId), {}, { errorMessage: 'Unable to pin comment.' })
+    : await deleteRequest(channelCommentPinEndpoint(commentId), { errorMessage: 'Unable to unpin comment.' });
+  return response?.success ? response.data : null;
+};
+
+export const postChannelCommentReply = async (contentId: string, body: string, parentId: string) => {
+  const response = await postRequest(channelContentCommentsEndpoint(contentId), { body, parent: parentId }, { errorMessage: 'Unable to post reply.' });
+  return response?.success ? { comment: normalizeChannelComment(response.data), data: response.data } : null;
+};
+
+export const recordWatchHistory = async (contentId: string, payload: Record<string, any> = {}) => {
+  const response = await postRequest(watchHistoryEndpoint, { content_id: contentId, ...payload }, { errorMessage: 'Unable to record watch history.' });
+  return response?.success ? response.data : null;
+};
+
+export const fetchUserClips = async (contentId: string): Promise<Array<{ id: string; title?: string; start_seconds: number; end_seconds: number; status: string; clip_url?: string; created_at?: string }>> => {
+  const response = await getRequest(channelContentClipEndpoint(contentId), { errorMessage: 'Unable to load clips.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : [];
+};
+
+export const createChannelContentClip = async (contentId: string, payload: { start_seconds: number; end_seconds: number; title?: string }) => {
+  const response = await postRequest(channelContentClipEndpoint(contentId), payload, { errorMessage: 'Unable to create clip.' });
+  return response?.success ? response.data : null;
+};
+
+export const reportChannelComment = async (commentId: string, reason = 'Inappropriate comment') => {
+  const response = await postRequest(channelCommentReportEndpoint(commentId), { reason }, { errorMessage: 'Unable to report comment.' });
+  return response?.success ? response.data : null;
+};
+
+export const fetchChannelContentChapters = async (contentId: string): Promise<ChannelContentChapter[]> => {
+  const response = await getRequest(channelContentChaptersEndpoint(contentId), { errorMessage: 'Unable to load chapters.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : [];
+};
+
+export const createChannelContentChapter = async (contentId: string, payload: { title: string; start_seconds: number; sort_order?: number }) => {
+  const response = await postRequest(channelContentChaptersEndpoint(contentId), payload, { errorMessage: 'Unable to create chapter.' });
+  return response?.success ? response.data : null;
+};
+
+export const deleteChannelContentChapter = async (contentId: string, chapterId: string) => {
+  const response = await deleteRequest(channelContentChapterDetailEndpoint(contentId, chapterId), { errorMessage: 'Unable to delete chapter.' });
+  return response?.success ? response.data : null;
+};
+
+export const shareChannelClip = async (clipId: string, platform = 'app') => {
+  const response = await postRequest(clipShareEndpoint(clipId), { platform }, { errorMessage: 'Unable to share clip.' });
+  return response?.success ? response.data : null;
+};
+
+export const removeFromWatchHistory = async (contentId: string) => {
+  const response = await deleteRequest(`${watchHistoryEndpoint}?content_id=${contentId}`, { errorMessage: 'Unable to remove from history.' });
+  return response?.success;
+};
+
+export const fetchWatchHistory = async (): Promise<Array<{ content_id: string; progress_seconds: number; completed: boolean; last_viewed_at: string }>> => {
+  const response = await getRequest(watchHistoryEndpoint, { errorMessage: 'Unable to load watch history.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : [];
+};
+
 export const normalizeLiveStream = (item: any): BroadcastChannelLiveStream | null => {
   if (!item || typeof item !== 'object' || !item.id) return null;
   return {
@@ -381,6 +488,138 @@ export const endLiveStream = async (streamId: string): Promise<BroadcastChannelL
   return response?.success ? normalizeLiveStream(response.data) : null;
 };
 
+
+// Comment edit/delete
+export const editChannelComment = async (commentId: string, body: string) => {
+  const response = await patchRequest(channelCommentEditEndpoint(commentId), { body }, { errorMessage: 'Unable to edit comment.' });
+  return response?.success ? response.data : null;
+};
+
+export const deleteChannelComment = async (commentId: string) => {
+  const response = await deleteRequest(channelCommentDeleteEndpoint(commentId), { errorMessage: 'Unable to delete comment.' });
+  return response?.success;
+};
+
+// Creator heart
+export const heartChannelComment = async (commentId: string) => {
+  const response = await postRequest(channelCommentHeartEndpoint(commentId), {}, { errorMessage: 'Unable to heart comment.' });
+  return response?.success;
+};
+export const unheartChannelComment = async (commentId: string) => {
+  const response = await deleteRequest(channelCommentHeartEndpoint(commentId), { errorMessage: 'Unable to remove heart.' });
+  return response?.success;
+};
+
+// Subtitles
+export const fetchContentSubtitles = async (contentId: string) => {
+  const response = await getRequest(channelContentSubtitlesEndpoint(contentId), { errorMessage: 'Unable to load subtitles.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+
+// Related content
+export const fetchRelatedContent = async (contentId: string): Promise<BroadcastChannelContent[]> => {
+  const response = await getRequest(channelContentRelatedEndpoint(contentId), { errorMessage: 'Unable to load related content.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+
+// Activity feed
+export const fetchChannelActivity = async (channelId: string) => {
+  const response = await getRequest(channelActivityEndpoint(channelId), { errorMessage: 'Unable to load activity.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+
+// Subscribers
+export const fetchChannelSubscribers = async (channelId: string) => {
+  const response = await getRequest(channelSubscribersEndpoint(channelId), { errorMessage: 'Unable to load subscribers.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+
+// Live polls
+export const fetchLivePolls = async (streamId: string) => {
+  const response = await getRequest(liveStreamPollsEndpoint(streamId), { errorMessage: 'Unable to load polls.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+export const createLivePoll = async (streamId: string, question: string, options: string[]) => {
+  const response = await postRequest(liveStreamPollsEndpoint(streamId), { question, options }, { errorMessage: 'Unable to create poll.' });
+  return response?.success ? response.data : null;
+};
+export const voteLivePoll = async (pollId: string, optionIndex: number) => {
+  const response = await postRequest(livePollVoteEndpoint(pollId), { option_index: optionIndex }, { errorMessage: 'Unable to vote.' });
+  return response?.success;
+};
+export const endLivePoll = async (pollId: string) => {
+  const response = await postRequest(livePollEndEndpoint(pollId), {}, { errorMessage: 'Unable to end poll.' });
+  return response?.success;
+};
+
+// Live Q&A
+export const fetchLiveQA = async (streamId: string) => {
+  const response = await getRequest(liveStreamQAEndpoint(streamId), { errorMessage: 'Unable to load Q&A.' });
+  return response?.success ? response.data : null;
+};
+export const startLiveQA = async (streamId: string) => {
+  const response = await postRequest(liveStreamQAEndpoint(streamId), {}, { errorMessage: 'Unable to start Q&A.' });
+  return response?.success ? response.data : null;
+};
+export const endLiveQA = async (streamId: string) => {
+  const response = await deleteRequest(liveStreamQAEndpoint(streamId), { errorMessage: 'Unable to end Q&A.' });
+  return response?.success;
+};
+export const fetchQAQuestions = async (sessionId: string) => {
+  const response = await getRequest(qaSessionQuestionsEndpoint(sessionId), { errorMessage: 'Unable to load questions.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+export const submitQAQuestion = async (sessionId: string, questionText: string) => {
+  const response = await postRequest(qaSessionQuestionsEndpoint(sessionId), { question_text: questionText }, { errorMessage: 'Unable to submit question.' });
+  return response?.success ? response.data : null;
+};
+export const upvoteQAQuestion = async (questionId: string) => {
+  const response = await postRequest(qaQuestionUpvoteEndpoint(questionId), {}, { errorMessage: 'Unable to upvote.' });
+  return response?.success;
+};
+
+// Watch history settings
+export const fetchWatchHistorySettings = async (): Promise<{ is_paused: boolean }> => {
+  const response = await getRequest(watchHistorySettingsEndpoint, { errorMessage: 'Unable to load history settings.' });
+  return response?.success ? response.data : { is_paused: false };
+};
+export const updateWatchHistorySettings = async (isPaused: boolean) => {
+  const response = await patchRequest(watchHistorySettingsEndpoint, { is_paused: isPaused }, { errorMessage: 'Unable to update history settings.' });
+  return response?.success;
+};
+
+// Delete clip
+export const deleteChannelContentClip = async (contentId: string, clipId: string) => {
+  const response = await deleteRequest(channelContentClipDetailEndpoint(contentId, clipId), { errorMessage: 'Unable to delete clip.' });
+  return response?.success;
+};
+
+// End screen
+export const fetchEndScreen = async (contentId: string) => {
+  const response = await getRequest(channelContentEndScreenEndpoint(contentId), { errorMessage: 'Unable to load end screen.' });
+  return response?.success ? response.data : null;
+};
+export const saveEndScreen = async (contentId: string, config: any[]) => {
+  const response = await putRequest(channelContentEndScreenEndpoint(contentId), { config }, { errorMessage: 'Unable to save end screen.' });
+  return response?.success ? response.data : null;
+};
+
+// Cards
+export const fetchContentCards = async (contentId: string) => {
+  const response = await getRequest(channelContentCardsEndpoint(contentId), { errorMessage: 'Unable to load cards.' });
+  if (!response?.success) return [];
+  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+export const createContentCard = async (contentId: string, payload: { card_type: string; title?: string; start_seconds: number; end_seconds?: number; target_id?: string; url?: string }) => {
+  const response = await postRequest(channelContentCardsEndpoint(contentId), payload, { errorMessage: 'Unable to create card.' });
+  return response?.success ? response.data : null;
+};
 
 export function useChannelsData({ q = '', category = null, mine = false }: Params = {}) {
   const [channels, setChannels] = useState<BroadcastChannelSummary[]>([]);

@@ -515,6 +515,34 @@ export const toggleItemSelectedForLoop = (
   }
 };
 
+export const movePlaylistItem = (
+  playlistId: string,
+  fromIndex: number,
+  direction: 'up' | 'down',
+): void => {
+  const pl = state.playlists.find(p => p.id === playlistId);
+  if (!pl) return;
+  const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+  if (toIndex < 0 || toIndex >= pl.items.length) return;
+  const newItems = [...pl.items];
+  [newItems[fromIndex], newItems[toIndex]] = [newItems[toIndex], newItems[fromIndex]];
+  state = {
+    ...state,
+    playlists: state.playlists.map(p =>
+      p.id === playlistId ? { ...p, items: newItems, updatedAt: new Date().toISOString() } : p,
+    ),
+  };
+  emit();
+  void persistState();
+  if (pl.serverId) {
+    void patchRequest(
+      ROUTES.broadcasts.playlistItems(pl.serverId),
+      { order: newItems.map(it => it.broadcastId) },
+      { errorMessage: 'Unable to save playlist order.' },
+    );
+  }
+};
+
 // ─── Convenience composite ────────────────────────────────────────────────────
 
 export const createPlaylistAndAdd = (

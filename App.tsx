@@ -50,6 +50,13 @@ import PlaylistDetailScreen from '@/screens/broadcast/playlists/PlaylistDetailSc
 import ChannelHomePage from '@/screens/broadcast/channels/ChannelHomePage';
 import ChannelContentDetailPage from '@/screens/broadcast/channels/ChannelContentDetailPage';
 import LiveWatchPage from '@/screens/broadcast/channels/LiveWatchPage';
+import WatchHistoryScreen from '@/screens/broadcast/channels/WatchHistoryScreen';
+import ShortsScreen from '@/screens/broadcast/channels/ShortsScreen';
+import LikedVideosScreen from '@/screens/broadcast/channels/LikedVideosScreen';
+import DownloadsScreen from '@/screens/broadcast/channels/DownloadsScreen';
+import ClipsListScreen from '@/screens/broadcast/channels/ClipsListScreen';
+import ActivityNotificationsScreen from '@/screens/broadcast/channels/ActivityNotificationsScreen';
+import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -87,6 +94,8 @@ import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
+import { MiniPlayerProvider } from '@/contexts/MiniPlayerContext';
+import MiniPlayer from '@/components/common/MiniPlayer';
 import { initPushHandlers } from './src/push/notifications';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
@@ -715,6 +724,7 @@ function AppContent() {
               },
             }}
           >
+            <MiniPlayerProvider>
             <GlobalProfilePreviewProvider>
               <RootStack.Navigator screenOptions={{ headerShown: false }}>
                 {isAuth ? (
@@ -735,6 +745,35 @@ function AppContent() {
                     <RootStack.Screen
                       name="LiveWatch"
                       component={LiveWatchPage}
+                    />
+                    <RootStack.Screen
+                      name="WatchHistory"
+                      component={WatchHistoryScreen}
+                    />
+                    <RootStack.Screen
+                      name="LikedVideosScreen"
+                      component={LikedVideosScreen}
+                    />
+                    <RootStack.Screen
+                      name="DownloadsScreen"
+                      component={DownloadsScreen}
+                    />
+                    <RootStack.Screen
+                      name="ShortsScreen"
+                      component={ShortsScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="ClipsListScreen"
+                      component={ClipsListScreen}
+                    />
+                    <RootStack.Screen
+                      name="ActivityNotifications"
+                      component={ActivityNotificationsScreen}
+                    />
+                    <RootStack.Screen
+                      name="ChannelMembersScreen"
+                      component={ChannelMembersScreen}
                     />
                     <RootStack.Screen
                       name="PartnerInsights"
@@ -1070,6 +1109,8 @@ function AppContent() {
                 )}
               </RootStack.Navigator>
             </GlobalProfilePreviewProvider>
+            <MiniPlayer />
+            </MiniPlayerProvider>
           </NavigationContainer>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />

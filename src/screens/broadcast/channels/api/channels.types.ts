@@ -132,10 +132,25 @@ export type ChannelContentComment = {
   user_display?: string;
   body: string;
   parent?: string | null;
+  like_count?: number;
+  is_liked?: boolean;
+  is_pinned?: boolean;
+  has_creator_heart?: boolean;
+  reply_count?: number;
   created_at?: string;
   updated_at?: string;
 };
 
+
+export type ChannelContentChapter = {
+  id: string;
+  content?: string;
+  title: string;
+  start_seconds: number;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
 
 export type ChannelAnalyticsSummary = {
   subscribers?: number;

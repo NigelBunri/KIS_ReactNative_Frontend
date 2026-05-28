@@ -418,6 +418,32 @@ export default function BroadcastFeedSection({
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
   const shareShotRef = useRef<ViewShot>(null);
 
+  // Not-interested (local hide) — persisted client-side only
+  const HIDDEN_KEY = 'kis.broadcast.hidden.v1';
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const loadHidden = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(HIDDEN_KEY);
+      if (!raw) return;
+      setHiddenIds(new Set(JSON.parse(raw)));
+    } catch { /* ignore */ }
+  }, []);
+  const persistHidden = useCallback(async (next: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { loadHidden(); }, [loadHidden]);
+
+  const handleNotInterested = useCallback((item: BroadcastFeedItem) => {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      next.add(item.id);
+      persistHidden(next);
+      return next;
+    });
+  }, [persistHidden]);
+
   // Saved broadcasts (local) — can later sync server-side
   const SAVED_KEY = 'kis.broadcast.saved.v1';
   const [_savedIds, setSavedIds] = useState<Record<string, boolean>>({});
@@ -549,6 +575,11 @@ export default function BroadcastFeedSection({
   const computedFiltered = useMemo(() => {
     let items = [...broadcasts];
 
+    // Filter locally hidden ("not interested") items
+    if (hiddenIds.size > 0) {
+      items = items.filter(it => !hiddenIds.has(it.id));
+    }
+
     // External legacy filter (kept compatible)
     if (filterSource && filterSource !== 'all') {
       items = items.filter(
@@ -650,6 +681,7 @@ export default function BroadcastFeedSection({
     activeForYouTab,
     broadcasts,
     filterSource,
+    hiddenIds,
     normalizedSearch,
     mediaFilter,
     mainSection,
@@ -1382,6 +1414,11 @@ export default function BroadcastFeedSection({
             key: 'mute',
             label: 'Mute broadcaster',
             onPress: () => handleMute(menuItem),
+          },
+          {
+            key: 'not-interested',
+            label: 'Not interested',
+            onPress: () => handleNotInterested(menuItem),
           },
           {
             key: 'hide',

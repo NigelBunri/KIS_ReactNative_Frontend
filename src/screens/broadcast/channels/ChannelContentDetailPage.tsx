@@ -27,12 +27,14 @@ import type { ComponentProps } from 'react';
 import type { BroadcastChannelContent, BroadcastChannelContentAsset, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import {
   fetchChannelContentDetail,
+  fetchWatchHistory,
   reactToChannelContent,
   recordChannelContentView,
   removeSavedChannelContent,
   saveChannelContent,
   shareChannelContent,
   reportChannelContent,
+  fetchRelatedContent,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
@@ -138,6 +140,10 @@ export default function ChannelContentDetailPage() {
   const [loading, setLoading] = useState(!route.params?.item);
   const [counts, setCounts] = useState<Record<string, number>>((route.params?.item?.engagement_counts || {}) as Record<string, number>);
   const [saved, setSaved] = useState(false);
+  const [resumeSeconds, setResumeSeconds] = useState<number | null>(null);
+  const [relatedContent, setRelatedContent] = useState<BroadcastChannelContent[]>([]);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [autoplayCountdown, setAutoplayCountdown] = useState<number | null>(null);
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
@@ -157,6 +163,23 @@ export default function ChannelContentDetailPage() {
 
   useEffect(() => {
     if (content?.id) void recordChannelContentView(content.id);
+  }, [content?.id]);
+
+  useEffect(() => {
+    if (!content?.id) return;
+    fetchWatchHistory().then(history => {
+      const entry = history.find(e => e.content_id === content.id);
+      if (entry && !entry.completed && entry.progress_seconds > 30) {
+        setResumeSeconds(entry.progress_seconds);
+      }
+    });
+  }, [content?.id]);
+
+  useEffect(() => {
+    if (!content?.id) return;
+    fetchRelatedContent(content.id).then(rows => {
+      setRelatedContent(rows.slice(0, 5));
+    }).catch(() => {});
   }, [content?.id]);
 
   const applyCounts = useCallback((payload: any) => {
@@ -193,6 +216,40 @@ export default function ChannelContentDetailPage() {
     if (completed) applyCounts(await shareChannelContent(content.id, true));
   }, [applyCounts, channel?.display_name, content?.id, content?.title]);
 
+
+  const handleVideoEnd = useCallback(() => {
+    if (relatedContent.length > 0) {
+      setAutoplayCountdown(5);
+    }
+  }, [relatedContent]);
+
+  useEffect(() => {
+    if (autoplayCountdown === null) return;
+    if (autoplayCountdown <= 0) {
+      const next = relatedContent[0];
+      setAutoplayCountdown(null);
+      if (next) {
+        navigation.navigate('ChannelContentDetail', { contentId: next.id, item: next });
+      }
+      return;
+    }
+    const t = setTimeout(() => setAutoplayCountdown(prev => (prev !== null ? prev - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [autoplayCountdown, navigation, relatedContent]);
+
+  const handleSuperThanks = useCallback(() => {
+    Alert.alert(
+      'Super Thanks',
+      'Support this creator with a tip',
+      [
+        { text: '💛 $1', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
+        { text: '🧡 $2', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
+        { text: '❤️ $5', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
+        { text: '💎 $10', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, []);
 
   const handleReport = useCallback(() => {
     if (!content?.id) return;
@@ -239,6 +296,22 @@ export default function ChannelContentDetailPage() {
         <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
           <MediaStage content={content} />
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color="#fff" /></Pressable>
+
+          {/* Autoplay Up Next countdown */}
+          {autoplayCountdown !== null && relatedContent[0] && (
+            <View style={styles.autoplayBanner}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.autoplayLabel}>Up next in {autoplayCountdown}s</Text>
+                <Text style={styles.autoplayTitle} numberOfLines={1}>{relatedContent[0].title || 'Next video'}</Text>
+              </View>
+              <Pressable onPress={() => setAutoplayCountdown(null)} style={{ padding: 6 }}>
+                <KISIcon name="close" size={16} color="#fff" />
+              </Pressable>
+              <View style={styles.autoplayBar}>
+                <View style={[styles.autoplayProgress, { width: `${((5 - autoplayCountdown) / 5) * 100}%` as any }]} />
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={[themed.contentCard, { marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}>
@@ -248,7 +321,17 @@ export default function ChannelContentDetailPage() {
           </View>
           <Text style={[styles.title, { color: palette.text, fontSize: compact ? 19 : 24, lineHeight: compact ? 25 : 31 }]}>{content.title || content.text_plain_preview || 'Untitled content'}</Text>
           {content.content_type !== 'text' && content.content_type !== 'rich_text' && (content.description || content.text_plain) ? (
-            <Text style={[styles.description, { color: palette.subtext }]}>{content.description || content.text_plain}</Text>
+            <Pressable onPress={() => setDescExpanded(prev => !prev)}>
+              <Text
+                style={[styles.description, { color: palette.subtext }]}
+                numberOfLines={descExpanded ? undefined : 3}
+              >
+                {content.description || content.text_plain}
+              </Text>
+              <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 12, marginTop: 4 }}>
+                {descExpanded ? 'Show less' : 'Show more'}
+              </Text>
+            </Pressable>
           ) : null}
 
           {channel ? (
@@ -262,17 +345,68 @@ export default function ChannelContentDetailPage() {
             </Pressable>
           ) : null}
 
+          {resumeSeconds !== null && (
+            <Pressable
+              style={[styles.resumeBanner, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}
+              onPress={() => setResumeSeconds(null)}
+            >
+              <KISIcon name="play" size={14} color={palette.primaryStrong} />
+              <Text style={[styles.resumeText, { color: palette.primaryStrong }]}>
+                Resume from {Math.floor(resumeSeconds / 60)}:{String(Math.floor(resumeSeconds % 60)).padStart(2, '0')}
+              </Text>
+              <KISIcon name="close" size={12} color={palette.primaryStrong} />
+            </Pressable>
+          )}
+
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
             <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />
+            <ActionButton icon="play" label="Shorts" value="Browse" onPress={() => navigation.navigate('ShortsScreen')} />
+            <ActionButton icon="play" label="Clips" value="My clips" onPress={() => navigation.navigate('ClipsListScreen', { contentId: content.id })} />
             <ActionButton icon="report" label="Report" value="Report" onPress={handleReport} />
+            <ActionButton icon="heart" label="Super Thanks" value="Tip" onPress={handleSuperThanks} />
+            <ActionButton icon="dislike" label="Dislike" value="" onPress={() => {}} />
           </View>
         </View>
 
         <ChannelCommentsPanel contentId={content.id} onCountChange={count => setCounts(prev => ({ ...prev, comments: count }))} />
+
+        {relatedContent.length > 0 && (
+          <View style={[styles.assetsBlock, { paddingHorizontal: responsive.pageGutter }]}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Up Next</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {relatedContent.map(related => {
+                const thumbUrl = resolveThumbUrl(related);
+                return (
+                  <Pressable
+                    key={related.id}
+                    onPress={() => navigation.navigate('ChannelContentDetail', { contentId: related.id, item: related })}
+                    style={[styles.relatedCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                  >
+                    <View style={styles.relatedThumb}>
+                      {thumbUrl ? (
+                        <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                      ) : null}
+                      <View style={styles.relatedOverlay} />
+                      <KISIcon name="play" size={16} color="#fff" />
+                    </View>
+                    <View style={styles.relatedBody}>
+                      <Text style={[styles.relatedTitle, { color: palette.text }]} numberOfLines={2}>
+                        {related.title || related.text_plain_preview || 'Untitled'}
+                      </Text>
+                      <Text style={[styles.relatedChannel, { color: palette.subtext }]} numberOfLines={1}>
+                        {related.channel?.display_name || 'KIS Channel'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {content.assets?.length ? (
           <View style={[styles.assetsBlock, { paddingHorizontal: responsive.pageGutter }]}>
@@ -310,6 +444,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   stageWrap: { minHeight: 320 },
+  autoplayBanner: { position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.82)', borderRadius: 10, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 20 },
+  autoplayLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700' },
+  autoplayTitle: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  autoplayBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)', borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
+  autoplayProgress: { height: 3, backgroundColor: '#f59e0b', borderBottomLeftRadius: 10 },
   mediaStage: { height: 340, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   textStage: { minHeight: 340, paddingHorizontal: 24, paddingTop: 70, justifyContent: 'center' },
   richTextStage: { fontSize: 25, lineHeight: 34, fontWeight: '800' },
@@ -332,6 +471,17 @@ const styles = StyleSheet.create({
   channelAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   channelName: { fontSize: 14, fontWeight: '900' },
   channelHandle: { marginTop: 2, fontSize: 11, fontWeight: '700' },
+  resumeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  resumeText: { flex: 1, fontSize: 13, fontWeight: '800' },
   actionGrid: { marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actionButton: { width: '30.5%', minHeight: 76, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center', padding: 8 },
   actionLabel: { marginTop: 5, fontSize: 11, fontWeight: '900' },
@@ -342,6 +492,12 @@ const styles = StyleSheet.create({
   assetTitle: { fontSize: 13, fontWeight: '900' },
   assetMeta: { marginTop: 2, fontSize: 11, fontWeight: '700' },
   retryButton: { marginTop: 14, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  relatedCard: { width: 160, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  relatedThumb: { height: 90, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111' },
+  relatedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
+  relatedBody: { padding: 8 },
+  relatedTitle: { fontSize: 12, fontWeight: '800', lineHeight: 17 },
+  relatedChannel: { marginTop: 3, fontSize: 11, fontWeight: '600' },
 });
 
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => StyleSheet.create({

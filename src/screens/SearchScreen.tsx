@@ -1,18 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import { KISIcon } from '@/constants/kisIcons';
+
+const RECENT_SEARCHES_KEY = 'kis_recent_searches';
+const MAX_RECENT = 8;
 
 type ResultKind = 'user' | 'contact' | 'conversation' | 'content' | 'community' | 'group' | 'channel' | 'channel_content' | 'market_shop' | 'market_product' | 'education_institution' | 'education_course' | 'health_institution' | 'partner' | 'bible_verse' | string;
 
@@ -25,6 +31,28 @@ type SearchResult = {
   route?: string;
   score?: number;
   metadata?: Record<string, any>;
+};
+
+type FilterTab = 'all' | 'videos' | 'channels' | 'education' | 'market' | 'health' | 'bible';
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'videos', label: 'Videos' },
+  { key: 'channels', label: 'Channels' },
+  { key: 'education', label: 'Education' },
+  { key: 'market', label: 'Market' },
+  { key: 'health', label: 'Health' },
+  { key: 'bible', label: 'Bible' },
+];
+
+const FILTER_KINDS: Record<FilterTab, string[]> = {
+  all: [],
+  videos: ['channel_content', 'content'],
+  channels: ['channel'],
+  education: ['education_institution', 'education_course'],
+  market: ['market_shop', 'market_product'],
+  health: ['health_institution'],
+  bible: ['bible_verse'],
 };
 
 const KIND_ICON: Record<string, string> = {
@@ -88,7 +116,41 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCHES_KEY).then(raw => {
+      if (raw) {
+        try { setRecentSearches(JSON.parse(raw)); } catch { /* ignore */ }
+      }
+    });
+  }, []);
+
+  const saveRecentSearch = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setRecentSearches(prev => {
+      const next = [trimmed, ...prev.filter(s => s !== trimmed)].slice(0, MAX_RECENT);
+      AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const removeRecentSearch = useCallback((term: string) => {
+    setRecentSearches(prev => {
+      const next = prev.filter(s => s !== term);
+      AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const clearAllRecent = useCallback(() => {
+    setRecentSearches([]);
+    AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+  }, []);
 
   const search = useCallback(async (q: string) => {
     const term = q.trim();
@@ -111,31 +173,48 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
         ? res.data
         : [];
       setResults(list);
+      if (list.length > 0) void saveRecentSearch(term);
     } catch {
       setError('Search unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saveRecentSearch]);
 
   const onChangeText = useCallback(
     (text: string) => {
       setQuery(text);
+      setActiveFilter('all');
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => search(text), 350);
+      debounceRef.current = setTimeout(() => search(text), 300);
     },
     [search],
   );
 
-  const grouped = React.useMemo(() => {
+  const handleVoiceSearch = useCallback(() => {
+    Alert.alert('Voice Search', 'Speak to search — voice input coming soon.');
+  }, []);
+
+  const handleRecentTap = useCallback((term: string) => {
+    setQuery(term);
+    void search(term);
+  }, [search]);
+
+  const filteredResults = useMemo(() => {
+    if (activeFilter === 'all') return results;
+    const allowed = FILTER_KINDS[activeFilter];
+    return results.filter(r => allowed.includes(r.kind));
+  }, [results, activeFilter]);
+
+  const grouped = useMemo(() => {
     const map: Record<string, SearchResult[]> = {};
-    for (const r of results) {
+    for (const r of filteredResults) {
       const key = r.kind ?? 'other';
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
     return map;
-  }, [results]);
+  }, [filteredResults]);
 
   const sections = useMemo(() => Object.entries(grouped).sort(([a], [b]) => {
     const ai = SECTION_ORDER.indexOf(a);
@@ -148,9 +227,12 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   }, []);
 
   const showShortQueryHint = query.trim().length > 0 && query.trim().length < 2;
+  const showRecentPanel = focused && query.trim().length === 0 && recentSearches.length > 0;
+  const hasResults = results.length > 0;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      {/* Search header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={[styles.inputRow, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
           <KISIcon name="search" size={18} color={palette.subtext} />
@@ -162,11 +244,17 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
             onChangeText={onChangeText}
             autoFocus
             returnKeyType="search"
-            onSubmitEditing={() => search(query)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onSubmitEditing={() => { void search(query); void saveRecentSearch(query); }}
           />
-          {query.length > 0 && (
+          {query.length > 0 ? (
             <Pressable onPress={() => { setQuery(''); setResults([]); }}>
               <KISIcon name="close" size={16} color={palette.subtext} />
+            </Pressable>
+          ) : (
+            <Pressable onPress={handleVoiceSearch} hitSlop={8}>
+              <KISIcon name="mic" size={18} color={palette.subtext} />
             </Pressable>
           )}
         </View>
@@ -176,6 +264,62 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
           </Pressable>
         )}
       </View>
+
+      {/* Filter tabs — only shown when there are results */}
+      {hasResults && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {FILTER_TABS.map(tab => {
+            const active = activeFilter === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveFilter(tab.key)}
+                style={[
+                  styles.filterPill,
+                  {
+                    backgroundColor: active ? palette.primaryStrong : palette.surface,
+                    borderColor: active ? palette.primaryStrong : palette.inputBorder,
+                  },
+                ]}
+              >
+                <Text style={[styles.filterPillText, { color: active ? '#fff' : palette.subtext }]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Recent searches panel */}
+      {showRecentPanel && (
+        <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+          <View style={styles.recentHeader}>
+            <Text style={[styles.sectionHeader, { color: palette.subtext, paddingHorizontal: 0, paddingVertical: 0 }]}>RECENT SEARCHES</Text>
+            <Pressable onPress={clearAllRecent} hitSlop={8}>
+              <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>Clear all</Text>
+            </Pressable>
+          </View>
+          {recentSearches.map(term => (
+            <Pressable
+              key={term}
+              style={[styles.recentRow, { borderBottomColor: palette.divider }]}
+              onPress={() => handleRecentTap(term)}
+            >
+              <KISIcon name="time" size={16} color={palette.subtext} />
+              <Text style={[styles.recentText, { color: palette.text }]} numberOfLines={1}>{term}</Text>
+              <Pressable onPress={() => removeRecentSearch(term)} hitSlop={8}>
+                <KISIcon name="close" size={14} color={palette.subtext} />
+              </Pressable>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {loading && (
         <View style={styles.centered}>
@@ -200,6 +344,13 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
         <View style={styles.centered}>
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No results</Text>
           <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Nothing matched "{query.trim()}" in your safe discovery results.</Text>
+        </View>
+      )}
+
+      {!loading && !error && hasResults && filteredResults.length === 0 && (
+        <View style={styles.centered}>
+          <Text style={[styles.emptyTitle, { color: palette.text }]}>No {FILTER_TABS.find(t => t.key === activeFilter)?.label} results</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Try a different filter or search term.</Text>
         </View>
       )}
 
@@ -263,6 +414,17 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 14, padding: 0 },
   cancelBtn: { paddingHorizontal: 4 },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterPillText: { fontSize: 13, fontWeight: '700' },
+  recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
+  recentText: { flex: 1, fontSize: 14, fontWeight: '600' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 16, fontWeight: '900', textAlign: 'center' },
   emptyCopy: { marginTop: 6, fontSize: 13, lineHeight: 18, textAlign: 'center' },

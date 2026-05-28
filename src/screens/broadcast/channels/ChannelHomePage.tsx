@@ -26,12 +26,13 @@ import {
   fetchChannelContents,
   fetchChannelDetail,
   fetchChannelPlaylists,
+  fetchChannelSubscribers,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
 import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
 import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
 
-type TabId = 'home' | 'videos' | 'shorts' | 'posts' | 'live' | 'playlists' | 'about';
+type TabId = 'home' | 'videos' | 'shorts' | 'posts' | 'live' | 'playlists' | 'members' | 'about';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'home', label: 'Home' },
@@ -40,6 +41,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'posts', label: 'Posts' },
   { id: 'live', label: 'Live' },
   { id: 'playlists', label: 'Playlists' },
+  { id: 'members', label: 'Members' },
   { id: 'about', label: 'About' },
 ];
 
@@ -158,6 +160,7 @@ export default function ChannelHomePage() {
   const [loading, setLoading] = useState(true);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [subscribers, setSubscribers] = useState<any[]>([]);
 
 
   const load = useCallback(async () => {
@@ -168,12 +171,14 @@ export default function ChannelHomePage() {
       const resolved = detail || initialChannel;
       if (resolved) {
         setChannel(resolved);
-        const [contentRows, playlistRows] = await Promise.all([
+        const [contentRows, playlistRows, subRows] = await Promise.all([
           fetchChannelContents(resolved.id, { limit: 36 }),
           fetchChannelPlaylists(resolved.id),
+          fetchChannelSubscribers(resolved.id).catch(() => []),
         ]);
         setContents(contentRows.contents);
         setPlaylists(playlistRows);
+        setSubscribers(subRows);
       }
     } finally {
       setLoading(false);
@@ -272,6 +277,15 @@ export default function ChannelHomePage() {
               <KISIcon name="search" size={14} color={searchVisible ? palette.primaryStrong : palette.text} />
               <Text style={[styles.actionChipText, { color: searchVisible ? palette.primaryStrong : palette.text }]}>Search</Text>
             </Pressable>
+            {(channel as any)?.trailer_content_id ? (
+              <Pressable
+                onPress={() => navigation.navigate('ChannelContentDetail', { contentId: (channel as any).trailer_content_id, channel })}
+                style={[styles.actionChip, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}
+              >
+                <KISIcon name="play" size={14} color={palette.primaryStrong} />
+                <Text style={[styles.actionChipText, { color: palette.primaryStrong }]}>Trailer</Text>
+              </Pressable>
+            ) : null}
           </View>
           {searchVisible && (
             <TextInput
@@ -297,10 +311,39 @@ export default function ChannelHomePage() {
         </ScrollView>
 
         {activeTab === 'about' ? (
-          <View style={[styles.aboutBox, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}> 
+          <View style={[styles.aboutBox, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>About</Text>
             <Text style={[styles.aboutText, { color: palette.subtext }]}>{channel?.description || 'No public channel description yet.'}</Text>
             <Text style={[styles.aboutMetric, { color: palette.text }]}>{compactNumber(channel?.subscriber_count)} subscribers</Text>
+          </View>
+        ) : activeTab === 'members' ? (
+          <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <Text style={[styles.sectionTitle, { color: palette.text, marginBottom: 0 }]}>Members ({compactNumber(channel?.subscriber_count)})</Text>
+              {channel?.id ? (
+                <Pressable
+                  onPress={() => navigation.navigate('ChannelMembersScreen', { channelId: channel.id, channelName: channel.display_name })}
+                  style={[styles.seeAllBtn, { borderColor: palette.border }]}
+                >
+                  <Text style={[styles.seeAllText, { color: palette.primaryStrong }]}>See all</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {subscribers.slice(0, 8).map((sub: any) => {
+                const name = sub.display_name || sub.username || 'KIS';
+                const initials = String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((p: string) => p[0]?.toUpperCase()).join('') || 'KS';
+                return (
+                  <View key={sub.id} style={{ alignItems: 'center', gap: 5 }}>
+                    <View style={[styles.memberAvatar, { backgroundColor: palette.primarySoft }]}>
+                      <Text style={[styles.memberInitials, { color: palette.primaryStrong }]}>{initials}</Text>
+                    </View>
+                    <Text style={[styles.memberName, { color: palette.subtext }]} numberOfLines={1}>{name.split(' ')[0]}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            {subscribers.length === 0 && <Text style={[styles.emptyText, { color: palette.subtext }]}>No subscribers yet.</Text>}
           </View>
         ) : activeTab === 'playlists' ? (
           <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
@@ -402,6 +445,11 @@ const styles = StyleSheet.create({
   actionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   actionChipText: { fontSize: 13, fontWeight: '800' },
   searchInput: { marginTop: 10, borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14 },
+  memberAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  memberInitials: { fontSize: 16, fontWeight: '900' },
+  memberName: { fontSize: 11, fontWeight: '600', maxWidth: 56 },
+  seeAllBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  seeAllText: { fontSize: 12, fontWeight: '800' },
 });
 
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => StyleSheet.create({

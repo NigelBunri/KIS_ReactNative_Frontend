@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
@@ -10,12 +10,35 @@ type Props = {
   onCreate: () => void;
   onToggleBroadcast?: (content: BroadcastChannelContent, nextState: boolean) => void | Promise<void>;
   broadcastingId?: string | null;
+  onUpdateTags?: (contentId: string, tags: string[]) => void;
 };
 
 const statusLabel = (value?: string) => String(value || 'draft').replace(/_/g, ' ').toUpperCase();
 
-export default function ChannelContentManager({ contents, legacyFeeds, onCreate, onToggleBroadcast, broadcastingId }: Props) {
+export default function ChannelContentManager({ contents, legacyFeeds, onCreate, onToggleBroadcast, broadcastingId, onUpdateTags }: Props) {
   const { palette } = useKISTheme();
+  const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
+  const [tagInput, setTagInput] = useState<Record<string, string>>({});
+  const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
+
+  const handleAddTag = useCallback((contentId: string) => {
+    const text = (tagInput[contentId] || '').trim().replace(/,+$/, '');
+    if (!text) return;
+    const newTags = [...(tagsMap[contentId] || [])];
+    text.split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+      if (!newTags.includes(t)) newTags.push(t);
+    });
+    setTagsMap(prev => ({ ...prev, [contentId]: newTags }));
+    setTagInput(prev => ({ ...prev, [contentId]: '' }));
+    onUpdateTags?.(contentId, newTags);
+  }, [tagInput, tagsMap, onUpdateTags]);
+
+  const handleRemoveTag = useCallback((contentId: string, tag: string) => {
+    const newTags = (tagsMap[contentId] || []).filter(t => t !== tag);
+    setTagsMap(prev => ({ ...prev, [contentId]: newTags }));
+    onUpdateTags?.(contentId, newTags);
+  }, [tagsMap, onUpdateTags]);
+
   const rows = useMemo(() => {
     if (contents.length) return contents;
     return legacyFeeds.map(feed => ({
@@ -48,27 +71,64 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
         const isBusy = broadcastingId === item.id;
         const canToggle = Boolean(onToggleBroadcast && contents.length);
         return (
-          <View key={item.id} style={[styles.row, { borderColor: palette.border }]}> 
-            <View style={[styles.typeIcon, { backgroundColor: palette.primarySoft }]}> 
-              <KISIcon name={String(item.content_type).includes('video') ? 'video' : item.content_type === 'audio' ? 'audio' : item.content_type === 'document' ? 'file' : 'edit'} size={16} color={palette.primaryStrong} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.rowTitleLine}>
-                <Text numberOfLines={1} style={[styles.rowTitle, { color: palette.text }]}>{item.title || item.text_plain_preview || 'Untitled channel content'}</Text>
-                {isBroadcast ? <Text style={[styles.liveChip, { color: palette.primaryStrong, borderColor: palette.primary }]}>BROADCAST</Text> : null}
+          <View key={item.id} style={[styles.itemBlock, { borderColor: palette.border }]}>
+            <View style={styles.row}>
+              <View style={[styles.typeIcon, { backgroundColor: palette.primarySoft }]}>
+                <KISIcon name={String(item.content_type).includes('video') ? 'video' : item.content_type === 'audio' ? 'audio' : item.content_type === 'document' ? 'file' : 'edit'} size={16} color={palette.primaryStrong} />
               </View>
-              <Text numberOfLines={1} style={[styles.rowMeta, { color: palette.subtext }]}>{String(item.content_type || 'post').replace(/_/g, ' ')} · {statusLabel(item.status)} · {item.visibility || 'private'}</Text>
-            </View>
-            {canToggle ? (
+              <View style={{ flex: 1 }}>
+                <View style={styles.rowTitleLine}>
+                  <Text numberOfLines={1} style={[styles.rowTitle, { color: palette.text }]}>{item.title || item.text_plain_preview || 'Untitled channel content'}</Text>
+                  {isBroadcast ? <Text style={[styles.liveChip, { color: palette.primaryStrong, borderColor: palette.primary }]}>BROADCAST</Text> : null}
+                </View>
+                <Text numberOfLines={1} style={[styles.rowMeta, { color: palette.subtext }]}>{String(item.content_type || 'post').replace(/_/g, ' ')} · {statusLabel(item.status)} · {item.visibility || 'private'}</Text>
+              </View>
+              {canToggle ? (
+                <Pressable
+                  disabled={isBusy}
+                  onPress={() => onToggleBroadcast?.(item, !isBroadcast)}
+                  style={[styles.broadcastButton, { borderColor: isBroadcast ? palette.error || '#B42318' : palette.primary, opacity: isBusy ? 0.7 : 1 }]}
+                >
+                  {isBusy ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
+                  <Text style={[styles.broadcastText, { color: isBroadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>{isBroadcast ? 'Stop' : 'Broadcast'}</Text>
+                </Pressable>
+              ) : null}
               <Pressable
-                disabled={isBusy}
-                onPress={() => onToggleBroadcast?.(item, !isBroadcast)}
-                style={[styles.broadcastButton, { borderColor: isBroadcast ? palette.error || '#B42318' : palette.primary, opacity: isBusy ? 0.7 : 1 }]}
+                onPress={() => setExpandedTags(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                hitSlop={8}
+                style={{ padding: 4 }}
               >
-                {isBusy ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
-                <Text style={[styles.broadcastText, { color: isBroadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>{isBroadcast ? 'Stop' : 'Broadcast'}</Text>
+                <KISIcon name="chevron-down" size={14} color={palette.subtext} />
               </Pressable>
-            ) : null}
+            </View>
+            {expandedTags[item.id] && (
+              <View style={styles.tagsSection}>
+                <View style={styles.tagsList}>
+                  {(tagsMap[item.id] || []).map(tag => (
+                    <View key={tag} style={[styles.tagPill, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}>
+                      <Text style={[styles.tagText, { color: palette.primaryStrong }]}>{tag}</Text>
+                      <Pressable onPress={() => handleRemoveTag(item.id, tag)} hitSlop={6}>
+                        <KISIcon name="close" size={10} color={palette.primaryStrong} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <TextInput
+                    value={tagInput[item.id] || ''}
+                    placeholder="Add tag…"
+                    placeholderTextColor={palette.subtext}
+                    style={[styles.tagInput, { color: palette.text, borderColor: palette.border }]}
+                    returnKeyType="done"
+                    onSubmitEditing={() => handleAddTag(item.id)}
+                    onChangeText={text => {
+                      setTagInput(prev => ({ ...prev, [item.id]: text }));
+                      if (text.endsWith(',')) {
+                        handleAddTag(item.id);
+                      }
+                    }}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         );
       }) : (
@@ -97,4 +157,10 @@ const styles = StyleSheet.create({
   broadcastButton: { minHeight: 34, minWidth: 76, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   broadcastText: { fontSize: 11, fontWeight: '900' },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 8, padding: 14 },
+  itemBlock: { borderTopWidth: 0 },
+  tagsSection: { paddingBottom: 10, paddingHorizontal: 4 },
+  tagsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  tagPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  tagText: { fontSize: 11, fontWeight: '700' },
+  tagInput: { minWidth: 90, flex: 1, borderBottomWidth: 1, paddingVertical: 4, paddingHorizontal: 6, fontSize: 12, fontWeight: '600' },
 });

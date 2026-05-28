@@ -186,6 +186,13 @@ export type RootStackParamList = {
     startIndex?: number;
     autoPlay?: boolean;
   };
+  WatchHistory: undefined;
+  LikedVideosScreen: undefined;
+  DownloadsScreen: undefined;
+  ShortsScreen: undefined;
+  ClipsListScreen: { contentId: string };
+  ActivityNotifications: { channelId: string; channelName?: string };
+  ChannelMembersScreen: { channelId: string; channelName?: string };
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

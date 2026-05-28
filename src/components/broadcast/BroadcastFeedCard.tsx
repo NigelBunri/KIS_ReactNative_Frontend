@@ -112,6 +112,7 @@ type Props = {
   showComments?: boolean;
   onToggleComments?: () => void;
   onSubscribe?: () => void | Promise<void | boolean>;
+  watchProgress?: number;
 };
 
 const fallbackAvatar = require('@/assets/logo-light.png');
@@ -157,6 +158,7 @@ export default function BroadcastFeedCard({
   onOpenAuthorProfile,
   onToggleComments,
   onSubscribe,
+  watchProgress,
 }: Props) {
   const { palette, tokens } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -505,6 +507,17 @@ export default function BroadcastFeedCard({
                 ))}
               </View>
             </>
+          ) : null}
+
+          {typeof watchProgress === 'number' && watchProgress > 0 ? (
+            <View style={styles.watchProgressTrack} pointerEvents="none">
+              <View
+                style={[
+                  styles.watchProgressBar,
+                  { width: `${Math.min(100, watchProgress * 100)}%`, backgroundColor: palette.primaryStrong },
+                ]}
+              />
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -892,5 +905,18 @@ const makeStyles = (_tokens: any) =>
       paddingHorizontal: 6,
       paddingVertical: 6,
       borderRadius: 12,
+    },
+
+    watchProgressTrack: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+
+    watchProgressBar: {
+      height: 3,
     },
   });

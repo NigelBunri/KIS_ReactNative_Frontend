@@ -11,6 +11,11 @@ export type VideoPlayerState = {
   isBuffering: boolean;
   error: string | null;
   muted: boolean;
+  speed: number;
+  availableQualities: string[];
+  selectedQuality: string | null;
+  captionsEnabled: boolean;
+  availableCaptions: string[];
 };
 
 type UseVideoPlayerConfig = {
@@ -24,7 +29,12 @@ export type VideoPlayerActions = {
   play: () => void;
   pause: () => void;
   seekTo: (seconds: number) => void;
+  seekForward10: () => void;
+  seekBackward10: () => void;
   setMuted: (value: boolean) => void;
+  setSpeed: (value: number) => void;
+  setSelectedQuality: (quality: string | null) => void;
+  setCaptionsEnabled: (enabled: boolean) => void;
 };
 
 export type VideoPlayerHandlers = {
@@ -47,6 +57,11 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
     isBuffering: false,
     error: null,
     muted: initialMuted,
+    speed: 1,
+    availableQualities: [],
+    selectedQuality: null,
+    captionsEnabled: false,
+    availableCaptions: [],
   }), [autoPlay, initialMuted]);
   const [state, setState] = useState<VideoPlayerState>(initialState);
   useEffect(() => {
@@ -64,16 +79,42 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
   const play = useCallback(() => setPlaying(true), [setPlaying]);
   const pause = useCallback(() => setPlaying(false), [setPlaying]);
 
+  const progressRef = useRef(0);
+  const durationRef = useRef(0);
+
   const seekTo = useCallback(
     (seconds: number) => {
       videoRef.current?.seek(seconds);
+      progressRef.current = seconds;
       setState((prev) => ({ ...prev, progress: seconds }));
     },
     [],
   );
 
+  const seekForward10 = useCallback(() => {
+    const target = Math.min(progressRef.current + 10, durationRef.current);
+    seekTo(target);
+  }, [seekTo]);
+
+  const seekBackward10 = useCallback(() => {
+    const target = Math.max(progressRef.current - 10, 0);
+    seekTo(target);
+  }, [seekTo]);
+
   const setMuted = useCallback((value: boolean) => {
     setState((prev) => ({ ...prev, muted: value }));
+  }, []);
+
+  const setSpeed = useCallback((value: number) => {
+    setState((prev) => ({ ...prev, speed: value }));
+  }, []);
+
+  const setSelectedQuality = useCallback((quality: string | null) => {
+    setState((prev) => ({ ...prev, selectedQuality: quality }));
+  }, []);
+
+  const setCaptionsEnabled = useCallback((enabled: boolean) => {
+    setState((prev) => ({ ...prev, captionsEnabled: enabled }));
   }, []);
 
   const onLoad = useCallback((data: OnLoadData) => {
@@ -81,11 +122,20 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
       duration: data.duration,
       naturalSize: data.naturalSize,
     });
+    const videoTracks: string[] = Array.isArray((data as any).videoTracks)
+      ? (data as any).videoTracks.map((t: any) => t.bitrate ? `${Math.round(t.bitrate / 1000)}kbps` : t.title || String(t.height || '')).filter(Boolean)
+      : [];
+    const textTracks: string[] = Array.isArray((data as any).textTracks)
+      ? (data as any).textTracks.map((t: any) => t.title || t.language || '').filter(Boolean)
+      : [];
+    durationRef.current = data.duration ?? 0;
     setState((prev) => ({
       ...prev,
       duration: data.duration ?? prev.duration,
       loading: false,
       error: null,
+      availableQualities: videoTracks,
+      availableCaptions: textTracks,
     }));
   }, []);
 
@@ -94,6 +144,7 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
       currentTime: data.currentTime,
       playableDuration: data.playableDuration,
     });
+    progressRef.current = data.currentTime;
     setState((prev) => ({
       ...prev,
       progress: data.currentTime,
@@ -148,7 +199,7 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
 
   const handlers = useMemo<VideoPlayerHandlers>(() => ({ onLoad, onProgress, onBuffer, onError, onEnd }), [onBuffer, onEnd, onError, onLoad, onProgress]);
 
-  const actions = useMemo<VideoPlayerActions>(() => ({ togglePlay, play, pause, seekTo, setMuted }), [pause, play, seekTo, setMuted, togglePlay]);
+  const actions = useMemo<VideoPlayerActions>(() => ({ togglePlay, play, pause, seekTo, seekForward10, seekBackward10, setMuted, setSpeed, setSelectedQuality, setCaptionsEnabled }), [pause, play, seekTo, seekForward10, seekBackward10, setMuted, setSpeed, setSelectedQuality, setCaptionsEnabled, togglePlay]);
 
   return {
     reset,

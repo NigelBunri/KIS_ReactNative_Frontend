@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   DeviceEventEmitter,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -61,6 +62,10 @@ export default function FeedsDiscoverPage({
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FeedCategory>('for_you');
   const [playlistSheetItem, setPlaylistSheetItem] = useState<BroadcastFeedItem | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterSort, setFilterSort] = useState<'new' | 'top' | 'oldest'>('new');
+  const [filterDatePreset, setFilterDatePreset] = useState<'today' | 'week' | 'month' | 'all'>('all');
+  const [filterDuration, setFilterDuration] = useState<'short' | 'medium' | 'long' | 'any'>('any');
   const [playlistCount, setPlaylistCount] = useState(
     () => getPlaylistsState().playlists.length,
   );
@@ -111,13 +116,43 @@ export default function FeedsDiscoverPage({
     let base = filteredFeed;
     if (context === 'saved') return base.filter(item => Boolean(item.viewer_saved));
 
+    // Date range filter
+    if (filterDatePreset !== 'all') {
+      const now = Date.now();
+      const cutoff =
+        filterDatePreset === 'today'
+          ? new Date().setHours(0, 0, 0, 0)
+          : filterDatePreset === 'week'
+          ? now - 7 * 24 * 60 * 60 * 1000
+          : now - 30 * 24 * 60 * 60 * 1000;
+      base = base.filter(item => {
+        const ts = new Date(item.broadcasted_at ?? item.created_at ?? '').getTime();
+        return ts >= cutoff;
+      });
+    }
+
+    // Duration filter
+    if (filterDuration !== 'any') {
+      base = base.filter(item => {
+        const dur = (item as any).video_duration_seconds as number | undefined;
+        if (filterDuration === 'short') return !dur || dur < 240;
+        if (filterDuration === 'medium') return dur !== undefined && dur >= 240 && dur <= 1200;
+        if (filterDuration === 'long') return dur !== undefined && dur > 1200;
+        return true;
+      });
+    }
+
     switch (category) {
       case 'trending':
         return [...base].sort(
           (a, b) =>
             (b.reaction_count ?? 0) + (b.comment_count ?? 0) * 2 -
             ((a.reaction_count ?? 0) + (a.comment_count ?? 0) * 2),
-        );
+        ).sort(filterSort === 'oldest'
+          ? (a, b) => new Date(a.broadcasted_at ?? a.created_at ?? '').getTime() - new Date(b.broadcasted_at ?? b.created_at ?? '').getTime()
+          : filterSort === 'top'
+          ? (a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0)
+          : () => 0);
       case 'live':
         return base.filter(item => Boolean(item.is_live));
       case 'channels':
@@ -146,9 +181,15 @@ export default function FeedsDiscoverPage({
         return base.filter(item => Boolean(item.source?.is_subscribed || item.source?.is_member));
       case 'for_you':
       default:
+        if (filterSort === 'oldest') {
+          return [...base].sort((a, b) => new Date(a.broadcasted_at ?? a.created_at ?? '').getTime() - new Date(b.broadcasted_at ?? b.created_at ?? '').getTime());
+        }
+        if (filterSort === 'top') {
+          return [...base].sort((a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0));
+        }
         return base;
     }
-  }, [filteredFeed, searchContext, showTrendingOnly, activeCategory]);
+  }, [filteredFeed, searchContext, showTrendingOnly, activeCategory, filterSort, filterDatePreset, filterDuration]);
 
   const liveItems = useMemo(
     () => filteredFeed.filter(item => Boolean(item.is_live)),
@@ -407,29 +448,116 @@ export default function FeedsDiscoverPage({
       }}
       scrollEventThrottle={16}
     >
-      {/* My Playlists quick-access row */}
-      <Pressable
-        onPress={() => navigation.navigate('PlaylistList')}
-        style={({ pressed }) => [
-          styles.playlistsRow,
-          { opacity: pressed ? 0.75 : 1 },
-        ]}
-      >
-        <View style={[styles.playlistsRowLeft, { backgroundColor: palette.primaryStrong + '18', borderColor: palette.primaryStrong + '45' }]}>
+      {/* Quick-access rows */}
+      <View style={styles.quickAccessRow}>
+        <Pressable
+          onPress={() => navigation.navigate('PlaylistList')}
+          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+        >
           <KISIcon name="list" size={14} color={palette.primaryStrong} />
-        </View>
-        <Text style={[styles.playlistsRowText, { color: palette.text }]}>
-          My Playlists
-        </Text>
-        {playlistCount > 0 && (
-          <View style={[styles.playlistsBadge, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={[styles.playlistsBadgeText, { color: palette.surface }]}>
-              {playlistCount}
-            </Text>
+          <Text style={[styles.quickBtnText, { color: palette.text }]}>Playlists</Text>
+          {playlistCount > 0 && (
+            <View style={[styles.playlistsBadge, { backgroundColor: palette.primaryStrong }]}>
+              <Text style={[styles.playlistsBadgeText, { color: palette.surface }]}>{playlistCount}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate('WatchHistory')}
+          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+        >
+          <KISIcon name="play" size={14} color={palette.primaryStrong} />
+          <Text style={[styles.quickBtnText, { color: palette.text }]}>History</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate('ShortsScreen')}
+          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+        >
+          <KISIcon name="play" size={14} color={palette.primaryStrong} />
+          <Text style={[styles.quickBtnText, { color: palette.text }]}>Shorts</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setFilterOpen(true)}
+          style={[styles.quickBtn, { backgroundColor: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primarySoft : palette.surface, borderColor: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.border }]}
+        >
+          <KISIcon name="filter" size={14} color={(filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.subtext} />
+          <Text style={[styles.quickBtnText, { color: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.text }]}>Filter</Text>
+        </Pressable>
+      </View>
+
+      {/* Filter sheet modal */}
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <Pressable style={styles.filterOverlay} onPress={() => setFilterOpen(false)}>
+          <View style={[styles.filterSheet, { backgroundColor: palette.surface }]}>
+            <Text style={[styles.filterTitle, { color: palette.text }]}>Sort & Filter</Text>
+
+            <Text style={[styles.filterLabel, { color: palette.subtext }]}>Sort by</Text>
+            <View style={styles.filterPills}>
+              {(['new', 'top', 'oldest'] as const).map(opt => (
+                <Pressable
+                  key={opt}
+                  onPress={() => setFilterSort(opt)}
+                  style={[styles.filterPill, { backgroundColor: filterSort === opt ? palette.primaryStrong : palette.background, borderColor: filterSort === opt ? palette.primaryStrong : palette.border }]}
+                >
+                  <Text style={[styles.filterPillText, { color: filterSort === opt ? palette.surface : palette.text }]}>
+                    {opt === 'new' ? 'Newest' : opt === 'top' ? 'Top' : 'Oldest'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.filterLabel, { color: palette.subtext, marginTop: 16 }]}>Date range</Text>
+            <View style={styles.filterPills}>
+              {([
+                { id: 'today', label: 'Today' },
+                { id: 'week', label: 'This week' },
+                { id: 'month', label: 'This month' },
+                { id: 'all', label: 'All time' },
+              ] as const).map(opt => (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => setFilterDatePreset(opt.id)}
+                  style={[styles.filterPill, { backgroundColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.background, borderColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.border }]}
+                >
+                  <Text style={[styles.filterPillText, { color: filterDatePreset === opt.id ? palette.surface : palette.text }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.filterLabel, { color: palette.subtext, marginTop: 16 }]}>Duration</Text>
+            <View style={styles.filterPills}>
+              {([
+                { id: 'short', label: 'Short (<4m)' },
+                { id: 'medium', label: 'Medium (4-20m)' },
+                { id: 'long', label: 'Long (>20m)' },
+                { id: 'any', label: 'Any' },
+              ] as const).map(opt => (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => setFilterDuration(opt.id)}
+                  style={[styles.filterPill, { backgroundColor: filterDuration === opt.id ? palette.primaryStrong : palette.background, borderColor: filterDuration === opt.id ? palette.primaryStrong : palette.border }]}
+                >
+                  <Text style={[styles.filterPillText, { color: filterDuration === opt.id ? palette.surface : palette.text }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              onPress={() => setFilterOpen(false)}
+              style={[styles.filterPill, { marginTop: 20, alignSelf: 'center', backgroundColor: palette.text, borderColor: palette.text }]}
+            >
+              <Text style={[styles.filterPillText, { color: palette.surface }]}>Apply</Text>
+            </Pressable>
           </View>
-        )}
-        <KISIcon name="chevron-right" size={14} color={palette.subtext} />
-      </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Category filter tabs */}
       <ScrollView
@@ -494,7 +622,7 @@ export default function FeedsDiscoverPage({
                 Tap to watch
               </Text>
             </View>
-            <KISIcon name="arrow-right" size={14} color={palette.error ?? '#e74c3c'} />
+            <KISIcon name="chevron-right" size={14} color={palette.error ?? '#e74c3c'} />
           </Pressable>
         )}
 
@@ -612,6 +740,66 @@ export default function FeedsDiscoverPage({
 }
 
 const styles = StyleSheet.create({
+  quickAccessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  quickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  quickBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  filterSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 48,
+  },
+  filterTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  filterPills: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   playlistsRow: {
     flexDirection: 'row',
     alignItems: 'center',

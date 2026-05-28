@@ -5,6 +5,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
 import { FEEDS_ENDPOINT } from '@/screens/broadcast/feeds/api/feeds.endpoints';
+import { recordWatchHistory as _recordWatchHistory } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   BroadcastFeedItem,
   BroadcastSourceMeta,
@@ -470,6 +471,13 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     return () => sub.remove();
   }, [refreshAll]);
 
+  const recordWatchHistory = useCallback(
+    async (contentId: string, watchedSeconds?: number) => {
+      await _recordWatchHistory(contentId, watchedSeconds != null ? { watched_seconds: watchedSeconds } : {});
+    },
+    [],
+  );
+
   return {
     items,
     trending,
@@ -484,5 +492,6 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     recordShare,
     hideItem,
     toggleSaved,
+    recordWatchHistory,
   };
 }

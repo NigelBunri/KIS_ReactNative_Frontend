@@ -347,8 +347,15 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/comments/`,
     channelCommentModerate: (commentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/moderate/`,
+    channelCommentReact: (commentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/react/`,
+    channelCommentPin: (commentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/pin/`,
     channelModerationAction: (recordId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-moderation/${recordId}/action/`,
+    watchHistory: `${API_BASE_URL}/api/v1/broadcasts/watch-history/`,
+    channelContentClip: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/clip/`,
     playlistItems: (playlistId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/`,
     playlistItemDetail: (playlistId: string, contentId: string) =>
@@ -559,6 +566,27 @@ const broadcastRoutes = {
         serviceId,
       )}/`,
     upload: `${API_BASE_URL}/api/v1/broadcasts/upload/`,
+    channelContentChapters: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/`,
+    channelContentChapterDetail: (contentId: string, chapterId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/${chapterId}/`,
+    channelCommentReport: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/report/`,
+    clipShare: (clipId: string) => `${API_BASE_URL}/api/v1/broadcasts/clips/${clipId}/share/`,
+    channelCommentEdit: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/edit/`,
+    channelCommentDelete: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/delete/`,
+    channelCommentHeart: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/heart/`,
+    channelContentSubtitles: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/subtitles/`,
+    channelContentRelated: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/related/`,
+    channelContentEndScreen: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/end-screen/`,
+    channelContentCards: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/cards/`,
+    channelContentClipDetail: (contentId: string, clipId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/clips/${clipId}/`,
+    channelActivity: (channelId: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/activity/`,
+    channelSubscribers: (channelId: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/subscribers/`,
+    liveStreamPolls: (streamId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/polls/`,
+    livePollVote: (pollId: string) => `${API_BASE_URL}/api/v1/broadcasts/polls/${pollId}/vote/`,
+    livePollEnd: (pollId: string) => `${API_BASE_URL}/api/v1/broadcasts/polls/${pollId}/end/`,
+    liveStreamQA: (streamId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/qa/`,
+    qaSessionQuestions: (sessionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa/${sessionId}/questions/`,
+    qaQuestionUpvote: (questionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa-questions/${questionId}/upvote/`,
+    watchHistorySettings: `${API_BASE_URL}/api/v1/broadcasts/watch-history/settings/`,
   },
   commerce: {
     carts: `${API_BASE_URL}/api/v1/commerce/carts/`,
