@@ -185,7 +185,7 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
                     styles.optionBtn,
                     {
                       borderColor: isSelected ? palette.primaryStrong : palette.border,
-                      backgroundColor: isSelected ? palette.primarySoft : palette.background,
+                      backgroundColor: isSelected ? palette.primarySoft : palette.bg,
                     },
                   ]}
                 >

@@ -500,7 +500,7 @@ export default function FeedsDiscoverPage({
                 <Pressable
                   key={opt}
                   onPress={() => setFilterSort(opt)}
-                  style={[styles.filterPill, { backgroundColor: filterSort === opt ? palette.primaryStrong : palette.background, borderColor: filterSort === opt ? palette.primaryStrong : palette.border }]}
+                  style={[styles.filterPill, { backgroundColor: filterSort === opt ? palette.primaryStrong : palette.bg, borderColor: filterSort === opt ? palette.primaryStrong : palette.border }]}
                 >
                   <Text style={[styles.filterPillText, { color: filterSort === opt ? palette.surface : palette.text }]}>
                     {opt === 'new' ? 'Newest' : opt === 'top' ? 'Top' : 'Oldest'}
@@ -520,7 +520,7 @@ export default function FeedsDiscoverPage({
                 <Pressable
                   key={opt.id}
                   onPress={() => setFilterDatePreset(opt.id)}
-                  style={[styles.filterPill, { backgroundColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.background, borderColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.border }]}
+                  style={[styles.filterPill, { backgroundColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.bg, borderColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.border }]}
                 >
                   <Text style={[styles.filterPillText, { color: filterDatePreset === opt.id ? palette.surface : palette.text }]}>
                     {opt.label}
@@ -540,7 +540,7 @@ export default function FeedsDiscoverPage({
                 <Pressable
                   key={opt.id}
                   onPress={() => setFilterDuration(opt.id)}
-                  style={[styles.filterPill, { backgroundColor: filterDuration === opt.id ? palette.primaryStrong : palette.background, borderColor: filterDuration === opt.id ? palette.primaryStrong : palette.border }]}
+                  style={[styles.filterPill, { backgroundColor: filterDuration === opt.id ? palette.primaryStrong : palette.bg, borderColor: filterDuration === opt.id ? palette.primaryStrong : palette.border }]}
                 >
                   <Text style={[styles.filterPillText, { color: filterDuration === opt.id ? palette.surface : palette.text }]}>
                     {opt.label}

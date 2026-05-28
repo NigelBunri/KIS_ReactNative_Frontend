@@ -26,6 +26,9 @@ export type LiveChatMessage = {
   text: string;
   sentAt: string;
   isMine?: boolean;
+  is_pinned?: boolean;
+  is_moderator?: boolean;
+  is_member?: boolean;
 };
 
 export type UseLiveStreamResult = {
@@ -127,14 +130,17 @@ export function useLiveStream(
       ? res.data.results
       : Array.isArray(res.data) ? res.data : [];
     const messages: LiveChatMessage[] = rows.map((r: any) => ({
-      id:          String(r.id ?? ''),
-      userId:      String(r.user_id ?? r.userId ?? ''),
-      displayName: String(r.user_display ?? r.displayName ?? 'Viewer'),
-      text:        String(r.text ?? r.body ?? ''),
-      sentAt:      String(r.sent_at ?? r.sentAt ?? r.created_at ?? ''),
-      isMine:      currentUserId
+      id:           String(r.id ?? ''),
+      userId:       String(r.user_id ?? r.userId ?? ''),
+      displayName:  String(r.user_display ?? r.displayName ?? 'Viewer'),
+      text:         String(r.text ?? r.body ?? ''),
+      sentAt:       String(r.sent_at ?? r.sentAt ?? r.created_at ?? ''),
+      isMine:       currentUserId
         ? String(r.user_id ?? r.userId) === String(currentUserId)
         : false,
+      is_pinned:    Boolean(r.is_pinned),
+      is_moderator: Boolean(r.is_moderator),
+      is_member:    Boolean(r.is_member),
     }));
     setChatMessages(messages);
   }, [streamId, currentUserId]);
@@ -184,14 +190,17 @@ export function useLiveStream(
     onChatMessage: (msg) => {
       if (!mountedRef.current) return;
       const message: LiveChatMessage = {
-        id:          msg.id,
-        userId:      msg.userId,
-        displayName: msg.displayName,
-        text:        msg.text,
-        sentAt:      msg.sentAt,
-        isMine:      currentUserId
+        id:           msg.id,
+        userId:       msg.userId,
+        displayName:  msg.displayName,
+        text:         msg.text,
+        sentAt:       msg.sentAt,
+        isMine:       currentUserId
           ? msg.userId === String(currentUserId)
           : false,
+        is_pinned:    (msg as any).is_pinned ?? false,
+        is_moderator: (msg as any).is_moderator ?? false,
+        is_member:    (msg as any).is_member ?? false,
       };
       setChatMessages(prev => {
         if (prev.some(m => m.id === message.id)) return prev;

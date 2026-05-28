@@ -54,6 +54,8 @@ import {
   qaSessionQuestionsEndpoint,
   qaQuestionUpvoteEndpoint,
   watchHistorySettingsEndpoint,
+  userPlaylistsEndpoint,
+  userPlaylistItemsEndpoint,
 } from '@/screens/broadcast/channels/api/channels.endpoints';
 import type {
   BroadcastChannelContent,
@@ -619,6 +621,82 @@ export const fetchContentCards = async (contentId: string) => {
 export const createContentCard = async (contentId: string, payload: { card_type: string; title?: string; start_seconds: number; end_seconds?: number; target_id?: string; url?: string }) => {
   const response = await postRequest(channelContentCardsEndpoint(contentId), payload, { errorMessage: 'Unable to create card.' });
   return response?.success ? response.data : null;
+};
+
+// ── Subscriptions ────────────────────────────────────────────────────────────
+
+export const fetchSubscribedChannels = async (): Promise<BroadcastChannelSummary[]> => {
+  const response = await getRequest(`${CHANNELS_ENDPOINT}?subscribed=1&limit=100`, { errorMessage: 'Unable to load subscriptions.' });
+  if (!response?.success) return [];
+  const rows = Array.isArray(response.data?.results) ? response.data.results : Array.isArray(response.data) ? response.data : [];
+  return rows.map(normalizeChannel).filter(Boolean) as BroadcastChannelSummary[];
+};
+
+export const fetchTrendingChannels = async (limit = 10): Promise<BroadcastChannelSummary[]> => {
+  const response = await getRequest(`${CHANNELS_ENDPOINT}?ordering=-subscriber_count&limit=${limit}`, { errorMessage: 'Unable to load trending channels.' });
+  if (!response?.success) return [];
+  const rows = Array.isArray(response.data?.results) ? response.data.results : Array.isArray(response.data) ? response.data : [];
+  return rows.map(normalizeChannel).filter(Boolean) as BroadcastChannelSummary[];
+};
+
+// ── User Playlists ───────────────────────────────────────────────────────────
+
+export const fetchUserPlaylistsSimple = async (): Promise<Array<{ id: string; name: string; item_count: number; is_system?: boolean; system_key?: string }>> => {
+  const response = await getRequest(userPlaylistsEndpoint, { errorMessage: 'Unable to load playlists.' });
+  if (!response?.success) return [];
+  const rows = Array.isArray(response.data?.results) ? response.data.results : Array.isArray(response.data) ? response.data : [];
+  return rows.map((r: any) => ({
+    id: String(r.id),
+    name: String(r.name || r.title || 'Playlist'),
+    item_count: Number(r.item_count ?? r.items_count ?? 0),
+    is_system: Boolean(r.is_system),
+    system_key: String(r.system_key || ''),
+  }));
+};
+
+export const addContentToUserPlaylist = async (playlistId: string, contentId: string) => {
+  const response = await postRequest(userPlaylistItemsEndpoint(playlistId), { content_id: contentId }, { errorMessage: 'Unable to add to playlist.' });
+  return response?.success ? response.data : null;
+};
+
+export const removeContentFromUserPlaylist = async (playlistId: string, contentId: string) => {
+  const response = await deleteRequest(`${userPlaylistItemsEndpoint(playlistId)}?content_id=${contentId}`, { errorMessage: 'Unable to remove from playlist.' });
+  return response?.success;
+};
+
+export const createUserPlaylist = async (name: string, systemKey?: string) => {
+  const payload: Record<string, any> = { name };
+  if (systemKey) { payload.is_system = true; payload.system_key = systemKey; }
+  const response = await postRequest(userPlaylistsEndpoint, payload, { errorMessage: 'Unable to create playlist.' });
+  return response?.success ? response.data : null;
+};
+
+export const ensureSystemPlaylist = async (systemKey: string, name: string): Promise<string | null> => {
+  const playlists = await fetchUserPlaylistsSimple();
+  const existing = playlists.find(p => p.system_key === systemKey || p.name === name);
+  if (existing) return existing.id;
+  const created = await createUserPlaylist(name, systemKey);
+  return created?.id ? String(created.id) : null;
+};
+
+// ── Continue Watching ────────────────────────────────────────────────────────
+
+export const fetchContinueWatchingItems = async (): Promise<Array<{ content_id: string; progress_seconds: number; completed: boolean; last_viewed_at: string }>> => {
+  const response = await getRequest(`${watchHistoryEndpoint}?incomplete=1&limit=10`, { errorMessage: '' });
+  if (response?.success) {
+    const rows = Array.isArray(response.data?.results) ? response.data.results : Array.isArray(response.data) ? response.data : [];
+    if (rows.length) return rows;
+  }
+  // Fallback: fetch full history and filter locally
+  const all = await fetchWatchHistory();
+  return all.filter(e => !e.completed && e.progress_seconds > 30).slice(0, 10);
+};
+
+// ── Channel Blocking (Don't Recommend) ──────────────────────────────────────
+
+export const blockChannelRecommendation = async (channelId: string) => {
+  const response = await postRequest(`${CHANNELS_ENDPOINT}${channelId}/not-interested/`, {}, { errorMessage: '' });
+  return response?.success ?? false;
 };
 
 export function useChannelsData({ q = '', category = null, mine = false }: Params = {}) {

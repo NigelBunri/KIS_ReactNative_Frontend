@@ -190,6 +190,8 @@ export type RootStackParamList = {
   LikedVideosScreen: undefined;
   DownloadsScreen: undefined;
   ShortsScreen: undefined;
+  SubscriptionsScreen: undefined;
+  LibraryScreen: undefined;
   ClipsListScreen: { contentId: string };
   ActivityNotifications: { channelId: string; channelName?: string };
   ChannelMembersScreen: { channelId: string; channelName?: string };

@@ -32,12 +32,13 @@ import SubscribeBellButton from '@/screens/broadcast/channels/components/Subscri
 import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
 import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
 
-type TabId = 'home' | 'videos' | 'shorts' | 'posts' | 'live' | 'playlists' | 'members' | 'about';
+type TabId = 'home' | 'videos' | 'shorts' | 'clips' | 'posts' | 'live' | 'playlists' | 'members' | 'about';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'home', label: 'Home' },
   { id: 'videos', label: 'Videos' },
   { id: 'shorts', label: 'Shorts' },
+  { id: 'clips', label: 'Clips' },
   { id: 'posts', label: 'Posts' },
   { id: 'live', label: 'Live' },
   { id: 'playlists', label: 'Playlists' },
@@ -221,22 +222,23 @@ export default function ChannelHomePage() {
   }, [contents, searchQuery]);
   const latest = filtered.slice(0, 12);
   const shorts = filtered.filter(item => item.content_type === 'short_video');
+  const clips = filtered.filter(item => item.content_type === 'clip');
   const videos = filtered.filter(item => ['video', 'short_video'].includes(item.content_type));
   const posts = filtered.filter(item => ['text', 'rich_text', 'post', 'image', 'gallery', 'document', 'audio'].includes(item.content_type));
   const live = filtered.filter(item => item.content_type === 'live_stream' || item.status === 'scheduled' || item.status === 'live');
 
-  const tabContents = activeTab === 'videos' ? videos : activeTab === 'shorts' ? shorts : activeTab === 'posts' ? posts : activeTab === 'live' ? live : latest;
+  const tabContents = activeTab === 'videos' ? videos : activeTab === 'shorts' ? shorts : activeTab === 'clips' ? clips : activeTab === 'posts' ? posts : activeTab === 'live' ? live : latest;
 
   if (loading && !channel) {
     return (
-      <SafeAreaView style={[styles.centered, { backgroundColor: palette.background }]}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <View style={[styles.heroWrap, { height: compact ? 144 : 184 }]}>
           <View style={[styles.banner, { height: compact ? 144 : 184 }]}>

@@ -91,7 +91,7 @@ function OBSGuide({
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={[styles.guideCard, { borderColor: palette.border, backgroundColor: palette.background }]}>
+    <View style={[styles.guideCard, { borderColor: palette.border, backgroundColor: palette.bg }]}>
       <Pressable
         onPress={() => setOpen(o => !o)}
         style={styles.guideHeader}
@@ -268,9 +268,9 @@ function RecordingsPanel({
   };
 
   return (
-    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.background }]}>
+    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.bg }]}>
       <View style={recStyles.header}>
-        <KISIcon name="film" size={15} color={palette.primaryStrong} />
+        <KISIcon name="video" size={15} color={palette.primaryStrong} />
         <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
         {loading
           ? <ActivityIndicator size="small" color={palette.primaryStrong} />
@@ -519,7 +519,7 @@ function BroadcasterPanel({
               onPress={handleGoLive}
               style={[styles.goLiveBtn, { backgroundColor: '#C0262D' }]}
             >
-              <KISIcon name="radio" size={16} color="#fff" />
+              <KISIcon name="broadcast" size={16} color="#fff" />
               <Text style={styles.goLiveBtnText}>Go Live from Device</Text>
             </Pressable>
           ) : (
@@ -710,7 +710,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
               key={stream.id}
               style={[
                 styles.streamCard,
-                { borderColor: isActive ? palette.primary : palette.border, backgroundColor: palette.background },
+                { borderColor: isActive ? palette.primary : palette.border, backgroundColor: palette.bg },
                 isActive && { borderWidth: 2 },
               ]}
             >
@@ -758,7 +758,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                   onPress={() => onOpenWatch?.(stream)}
                   style={[styles.actionChip, { borderColor: palette.border }]}
                 >
-                  <KISIcon name="eye" size={13} color={palette.subtext} />
+                  <KISIcon name="people" size={13} color={palette.subtext} />
                   <Text style={[styles.actionChipText, { color: palette.subtext }]}>Preview</Text>
                 </Pressable>
 
@@ -801,7 +801,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
           {ended.map(stream => (
             <View
               key={stream.id}
-              style={[styles.streamCard, { borderColor: palette.border, backgroundColor: palette.background }]}
+              style={[styles.streamCard, { borderColor: palette.border, backgroundColor: palette.bg }]}
             >
               <View style={styles.cardTop}>
                 <View style={{ flex: 1 }}>

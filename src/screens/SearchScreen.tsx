@@ -311,7 +311,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
               style={[styles.recentRow, { borderBottomColor: palette.divider }]}
               onPress={() => handleRecentTap(term)}
             >
-              <KISIcon name="time" size={16} color={palette.subtext} />
+              <KISIcon name="call-history" size={16} color={palette.subtext} />
               <Text style={[styles.recentText, { color: palette.text }]} numberOfLines={1}>{term}</Text>
               <Pressable onPress={() => removeRecentSearch(term)} hitSlop={8}>
                 <KISIcon name="close" size={14} color={palette.subtext} />

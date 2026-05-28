@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { removeChannelContentReaction } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   Animated,
   ActivityIndicator,
@@ -51,13 +52,14 @@ type ShortCardProps = {
   item: ShortsItem;
   isVisible: boolean;
   onLike: (id: string) => void;
+  onDislike: (id: string) => void;
   onShare: (item: ShortsItem) => void;
   onCommentPress: (id: string) => void;
   onSubscribe: (channelId: string) => void;
   subscribedChannels: Set<string>;
 };
 
-function ShortCard({ item, isVisible, onLike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
+function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const liked = Boolean(item.localLiked);
@@ -65,21 +67,44 @@ function ShortCard({ item, isVisible, onLike, onShare, onCommentPress, onSubscri
   const channelId = item.channel?.id;
   const isSubscribed = channelId ? subscribedChannels.has(channelId) : false;
 
+  // Double-tap like detection
+  const lastTapRef = useRef<number>(0);
+  const [showHeart, setShowHeart] = useState(false);
+
+  const handleVideoTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      onLike(item.id);
+      setShowHeart(true);
+      setTimeout(() => setShowHeart(false), 800);
+    }
+    lastTapRef.current = now;
+  }, [item.id, onLike]);
+
   return (
     <View style={[styles.card, { height: SCREEN_HEIGHT }]}>
-      {item.videoUrl ? (
-        <KISVideo
-          sourceUrl={item.videoUrl}
-          poster={item.thumbUrl}
-          autoPlay={isVisible}
-          loop
-          muted={false}
-          containerStyle={StyleSheet.absoluteFillObject}
-          videoStyle={{ borderRadius: 0 }}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
-          <KISIcon name="play" size={48} color={palette.border} />
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={handleVideoTap}>
+        {item.videoUrl ? (
+          <KISVideo
+            sourceUrl={item.videoUrl}
+            poster={item.thumbUrl}
+            autoPlay={isVisible}
+            loop
+            muted={false}
+            containerStyle={StyleSheet.absoluteFillObject}
+            videoStyle={{ borderRadius: 0 }}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
+            <KISIcon name="play" size={48} color={palette.border} />
+          </View>
+        )}
+      </Pressable>
+
+      {/* Double-tap heart flash */}
+      {showHeart && (
+        <View style={styles.doubleTapHeart} pointerEvents="none">
+          <KISIcon name="heart" size={80} color="rgba(239,68,68,0.9)" />
         </View>
       )}
 
@@ -110,6 +135,9 @@ function ShortCard({ item, isVisible, onLike, onShare, onCommentPress, onSubscri
           <Pressable style={styles.actionBtn} onPress={() => onLike(item.id)}>
             <KISIcon name="heart" size={26} color={liked ? '#ef4444' : '#fff'} />
             {likeCount > 0 && <Text style={styles.actionCount}>{likeCount}</Text>}
+          </Pressable>
+          <Pressable style={styles.actionBtn} onPress={() => onDislike(item.id)}>
+            <KISIcon name="warning" size={24} color="#fff" />
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onCommentPress(item.id)}>
             <KISIcon name="comment" size={24} color="#fff" />
@@ -160,6 +188,11 @@ export default function ShortsScreen() {
       setCommentsContentId(null);
     });
   }, [commentsAnim]);
+
+  const handleDislike = useCallback((id: string) => {
+    Vibration.vibrate(15);
+    void removeChannelContentReaction(id);
+  }, []);
 
   const handleLike = useCallback((id: string) => {
     Vibration.vibrate(25);
@@ -247,6 +280,7 @@ export default function ShortsScreen() {
             item={item}
             isVisible={index === visibleIndex}
             onLike={handleLike}
+            onDislike={handleDislike}
             onShare={handleShare}
             onCommentPress={openComments}
             onSubscribe={handleSubscribe}
@@ -327,6 +361,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
   closeBtn: { position: 'absolute', top: 56, left: 16, zIndex: 20 },
   card: { width: '100%', overflow: 'hidden' },
+  doubleTapHeart: { position: 'absolute', top: '35%', left: '50%', marginLeft: -40, zIndex: 30 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
   infoRow: {
     position: 'absolute',

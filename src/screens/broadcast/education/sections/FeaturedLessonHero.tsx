@@ -56,7 +56,7 @@ export default function FeaturedLessonHero({
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <KISIcon name="radio" size={14} color={palette.primaryStrong} />
+            <KISIcon name="broadcast" size={14} color={palette.primaryStrong} />
             <Text style={{ color: palette.subtext, fontWeight: '900', fontSize: 12 }}>{badgeLeft}</Text>
           </View>
 

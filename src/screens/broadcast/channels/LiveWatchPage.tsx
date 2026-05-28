@@ -39,6 +39,8 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { useLiveStream } from './hooks/useLiveStream';
 import LiveChatPanel from './components/LiveChatPanel';
+import LivePollsPanel from './LivePollsPanel';
+import LiveQAPanel from './LiveQAPanel';
 import SubscribeBellButton from './components/SubscribeBellButton';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,7 +137,7 @@ function ScheduledOverlay({
         ) : null}
         <Text style={styles.scheduledTitle}>{title}</Text>
         <View style={styles.countdownBox}>
-          <KISIcon name="clock" size={16} color="#fff" />
+          <KISIcon name="call-history" size={16} color="#fff" />
           <Text style={styles.countdownLabel}>Starting in</Text>
           <Text style={styles.countdownTime}>{countdown || '--:--'}</Text>
         </View>
@@ -155,7 +157,7 @@ function EndedOverlay({
 }) {
   return (
     <View style={[styles.endedOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-      <KISIcon name="film" size={40} color="#fff" />
+      <KISIcon name="video" size={40} color="#fff" />
       <Text style={styles.endedTitle}>{title}</Text>
       <Text style={styles.endedSub}>This stream has ended</Text>
       <Pressable
@@ -184,6 +186,10 @@ export default function LiveWatchPage() {
   const { stream, loading, viewerCount, chatMessages, sendChatMessage } =
     useLiveStream(streamId);
 
+  const pinnedMessage = chatMessages.find(m => m.is_pinned) ?? null;
+  const slowModeSecs: number = (stream?.metadata?.slow_mode_seconds as number) ?? 0;
+  const membersOnly: boolean = Boolean(stream?.metadata?.members_only);
+
   const countdown = useCountdown(stream?.scheduled_start_at);
 
   const thumb = useMemo(
@@ -192,11 +198,12 @@ export default function LiveWatchPage() {
   );
 
   // ── Player state ────────────────────────────────────────────────────────────
-  const [paused,      setPaused]      = useState(false);
-  const [buffering,   setBuffering]   = useState(false);
-  const [videoError,  setVideoError]  = useState<string | null>(null);
-  const [showReplay,  setShowReplay]  = useState(false);
-  const [chatOpen,    setChatOpen]    = useState(true);
+  const [paused,        setPaused]        = useState(false);
+  const [buffering,     setBuffering]     = useState(false);
+  const [videoError,    setVideoError]    = useState<string | null>(null);
+  const [showReplay,    setShowReplay]    = useState(false);
+  const [chatOpen,      setChatOpen]      = useState(true);
+  const [activePanel,   setActivePanel]   = useState<'chat' | 'polls' | 'qa'>('chat');
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -313,7 +320,7 @@ export default function LiveWatchPage() {
         {/* Video error */}
         {videoError && (
           <View style={styles.bufferWrap} pointerEvents="none">
-            <KISIcon name="wifi-off" size={32} color="#fff" />
+            <KISIcon name="warning" size={32} color="#fff" />
             <Text style={styles.errorText}>{videoError}</Text>
           </View>
         )}
@@ -330,7 +337,7 @@ export default function LiveWatchPage() {
         {/* Failed / cancelled */}
         {isFailed && (
           <View style={styles.bufferWrap} pointerEvents="none">
-            <KISIcon name="alert-circle" size={36} color="#EF4444" />
+            <KISIcon name="warning" size={36} color="#EF4444" />
             <Text style={styles.errorText}>Stream unavailable</Text>
           </View>
         )}
@@ -381,10 +388,26 @@ export default function LiveWatchPage() {
           {/* Viewer count */}
           {(isLive || isEnded) && (
             <View style={styles.viewerPill}>
-              <KISIcon name="eye" size={12} color="#fff" />
+              <KISIcon name="people" size={12} color="#fff" />
               <Text style={styles.viewerText}>
                 {viewerCount.toLocaleString()}
               </Text>
+            </View>
+          )}
+
+          {/* Slow mode badge */}
+          {isLive && slowModeSecs > 0 && (
+            <View style={styles.slowModePill}>
+              <KISIcon name="call-history" size={11} color="#fbbf24" />
+              <Text style={styles.slowModeText}>Slow {slowModeSecs}s</Text>
+            </View>
+          )}
+
+          {/* Members-only badge */}
+          {isLive && membersOnly && (
+            <View style={styles.membersOnlyPill}>
+              <KISIcon name="people" size={11} color="#a78bfa" />
+              <Text style={styles.membersOnlyText}>Members</Text>
             </View>
           )}
         </View>
@@ -443,7 +466,7 @@ export default function LiveWatchPage() {
                 />
               ) : (
                 <View style={[styles.channelAvatar, { backgroundColor: palette.primary }]}>
-                  <KISIcon name="tv" size={14} color="#fff" />
+                  <KISIcon name="broadcast" size={14} color="#fff" />
                 </View>
               )}
               <Text style={styles.channelName} numberOfLines={1}>
@@ -484,16 +507,88 @@ export default function LiveWatchPage() {
         )}
       </View>
 
-      {/* ── Live chat panel ── */}
+      {/* ── Pinned message banner ── */}
+      {pinnedMessage && (
+        <View
+          style={[
+            styles.pinnedBanner,
+            { bottom: insets.bottom + (chatOpen ? 280 : 110) },
+          ]}
+          pointerEvents="none"
+        >
+          <KISIcon name="pin" size={13} color="#fbbf24" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pinnedLabel}>Pinned message</Text>
+            <Text style={styles.pinnedText} numberOfLines={2}>{pinnedMessage.text}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Bottom panel (chat / polls / Q&A tabs) ── */}
       {(isLive || isEnded) && (
-        <LiveChatPanel
-          messages={chatMessages}
-          onSend={sendChatMessage}
-          palette={palette}
-          disabled={!isLive}
-          collapsed={!chatOpen}
-          onToggleCollapse={() => setChatOpen(o => !o)}
-        />
+        <View style={styles.bottomPanelWrap}>
+          {/* Tab selector */}
+          <View style={styles.panelTabRow}>
+            {([
+              { key: 'chat',  label: 'Chat',  icon: 'comment'  },
+              { key: 'polls', label: 'Polls', icon: 'list'     },
+              { key: 'qa',    label: 'Q&A',   icon: 'audio'    },
+            ] as const).map(tab => (
+              <Pressable
+                key={tab.key}
+                onPress={() => { setActivePanel(tab.key); setChatOpen(true); }}
+                style={[
+                  styles.panelTab,
+                  activePanel === tab.key && styles.panelTabActive,
+                ]}
+              >
+                <KISIcon
+                  name={tab.icon}
+                  size={13}
+                  color={activePanel === tab.key ? palette.primaryStrong : 'rgba(255,255,255,0.6)'}
+                />
+                <Text
+                  style={[
+                    styles.panelTabLabel,
+                    { color: activePanel === tab.key ? palette.primaryStrong : 'rgba(255,255,255,0.6)' },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Active panel content */}
+          {activePanel === 'chat' && (
+            <LiveChatPanel
+              messages={chatMessages}
+              onSend={sendChatMessage}
+              palette={palette}
+              disabled={!isLive}
+              collapsed={!chatOpen}
+              onToggleCollapse={() => setChatOpen(o => !o)}
+            />
+          )}
+          {activePanel === 'polls' && streamId ? (
+            <View style={[styles.sidePanelWrap, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
+              <LivePollsPanel
+                streamId={streamId}
+                isManager={false}
+                palette={palette}
+              />
+            </View>
+          ) : null}
+          {activePanel === 'qa' && streamId ? (
+            <View style={[styles.sidePanelWrap, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
+              <LiveQAPanel
+                streamId={streamId}
+                isManager={false}
+                palette={palette}
+              />
+            </View>
+          ) : null}
+        </View>
       )}
     </View>
   );
@@ -742,4 +837,84 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   replayBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+
+  slowModePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(251,191,36,0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.4)',
+  },
+  slowModeText: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
+
+  membersOnlyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(167,139,250,0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.4)',
+  },
+  membersOnlyText: { color: '#a78bfa', fontSize: 10, fontWeight: '800' },
+
+  pinnedBanner: {
+    position: 'absolute',
+    left: 10,
+    right: 240,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#fbbf24',
+  },
+  pinnedLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '900', marginBottom: 2 },
+  pinnedText: { color: '#fff', fontSize: 12, fontWeight: '600', lineHeight: 17 },
+
+  // bottom panel tabs
+  bottomPanelWrap: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 230,
+  },
+  panelTabRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 0,
+    overflow: 'hidden',
+  },
+  panelTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+  },
+  panelTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#c9a84c',
+  },
+  panelTabLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  sidePanelWrap: {
+    borderBottomLeftRadius: 10,
+    overflow: 'hidden',
+    maxHeight: 340,
+  },
 });

@@ -54,6 +54,8 @@ import WatchHistoryScreen from '@/screens/broadcast/channels/WatchHistoryScreen'
 import ShortsScreen from '@/screens/broadcast/channels/ShortsScreen';
 import LikedVideosScreen from '@/screens/broadcast/channels/LikedVideosScreen';
 import DownloadsScreen from '@/screens/broadcast/channels/DownloadsScreen';
+import SubscriptionsScreen from '@/screens/broadcast/channels/SubscriptionsScreen';
+import LibraryScreen from '@/screens/broadcast/channels/LibraryScreen';
 import ClipsListScreen from '@/screens/broadcast/channels/ClipsListScreen';
 import ActivityNotificationsScreen from '@/screens/broadcast/channels/ActivityNotificationsScreen';
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
@@ -757,6 +759,15 @@ function AppContent() {
                     <RootStack.Screen
                       name="DownloadsScreen"
                       component={DownloadsScreen}
+                    />
+                    <RootStack.Screen
+                      name="SubscriptionsScreen"
+                      component={SubscriptionsScreen}
+                    />
+                    <RootStack.Screen
+                      name="LibraryScreen"
+                      component={LibraryScreen}
+                      options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ShortsScreen"

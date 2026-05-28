@@ -112,7 +112,7 @@ export default function StreamHealthBar({ stats, viewerCount, startedAt, palette
 
       {/* Viewer count */}
       <View style={styles.statCell}>
-        <KISIcon name="eye" size={12} color={palette.primaryStrong} />
+        <KISIcon name="people" size={12} color={palette.primaryStrong} />
         <Text style={[styles.statText, { color: palette.text }]}>
           {viewerCount.toLocaleString()}
         </Text>
@@ -121,7 +121,7 @@ export default function StreamHealthBar({ stats, viewerCount, startedAt, palette
       {/* Duration */}
       {startedAt && (
         <View style={styles.statCell}>
-          <KISIcon name="clock" size={12} color={palette.subtext} />
+          <KISIcon name="call-history" size={12} color={palette.subtext} />
           <Text style={[styles.statText, { color: palette.subtext }]}>{duration}</Text>
         </View>
       )}

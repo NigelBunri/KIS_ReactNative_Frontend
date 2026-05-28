@@ -10,9 +10,13 @@ import {
   ActivityIndicator,
   Animated,
   DeviceEventEmitter,
+  FlatList,
+  Image,
   Modal,
   PanResponder,
   Pressable,
+  RefreshControl,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -40,6 +44,13 @@ import { logFeedEvent } from '@/network/personalization';
 
 import BroadcastFeedCard, { type BroadcastFeedItem } from './BroadcastFeedCard';
 export type { BroadcastFeedItem } from './BroadcastFeedCard';
+import {
+  fetchContinueWatchingItems,
+  fetchTrendingChannels,
+  blockChannelRecommendation,
+} from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { resolveBackendAssetUrl } from '@/network';
+import type { BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import BroadcastAuthorProfileSheet from '@/components/broadcast/BroadcastAuthorProfileSheet';
 import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils';
 import useAuthorProfilePreview from '@/components/broadcast/useAuthorProfilePreview';
@@ -418,6 +429,66 @@ export default function BroadcastFeedSection({
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
   const shareShotRef = useRef<ViewShot>(null);
 
+  // Continue Watching rail
+  const [continueItems, setContinueItems] = useState<Array<{ content_id: string; progress_seconds: number; duration_seconds?: number; completed: boolean; last_viewed_at: string }>>([]);
+  useEffect(() => {
+    fetchContinueWatchingItems().then(rows => setContinueItems(rows)).catch(() => {});
+  }, []);
+
+  // Map<content_id, watchProgress 0-1> for card progress bars
+  const watchProgressMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of continueItems) {
+      if (entry.completed) {
+        map.set(entry.content_id, 1);
+      } else if (entry.duration_seconds && entry.duration_seconds > 0) {
+        map.set(entry.content_id, entry.progress_seconds / entry.duration_seconds);
+      } else if (entry.progress_seconds > 0) {
+        // Estimate: treat progress_seconds / 600s (10 min) as a rough indicator
+        map.set(entry.content_id, Math.min(0.95, entry.progress_seconds / 600));
+      }
+    }
+    return map;
+  }, [continueItems]);
+
+  // Trending channels rail
+  const [trendingChannels, setTrendingChannels] = useState<BroadcastChannelSummary[]>([]);
+  useEffect(() => {
+    fetchTrendingChannels(8).then(rows => setTrendingChannels(rows)).catch(() => {});
+  }, []);
+
+  // Blocked channels (don't recommend)
+  const BLOCKED_CHANNELS_KEY = 'kis.broadcast.blocked_channels.v1';
+  const [blockedChannelIds, setBlockedChannelIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    AsyncStorage.getItem(BLOCKED_CHANNELS_KEY).then(raw => {
+      if (raw) { try { setBlockedChannelIds(new Set(JSON.parse(raw))); } catch { /**/ } }
+    });
+  }, []);
+
+  const handleDontRecommendChannel = useCallback((channelId: string, channelName?: string) => {
+    Alert.alert(
+      'Don\'t recommend this channel',
+      `You won't see content from "${channelName || 'this channel'}" in your feed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'destructive',
+          onPress: () => {
+            setBlockedChannelIds(prev => {
+              const next = new Set(prev);
+              next.add(channelId);
+              AsyncStorage.setItem(BLOCKED_CHANNELS_KEY, JSON.stringify([...next]));
+              return next;
+            });
+            void blockChannelRecommendation(channelId);
+          },
+        },
+      ],
+    );
+  }, []);
+
   // Not-interested (local hide) — persisted client-side only
   const HIDDEN_KEY = 'kis.broadcast.hidden.v1';
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -580,6 +651,14 @@ export default function BroadcastFeedSection({
       items = items.filter(it => !hiddenIds.has(it.id));
     }
 
+    // Filter blocked channels ("don't recommend this channel")
+    if (blockedChannelIds.size > 0) {
+      items = items.filter(it => {
+        const channelId = it.source?.id ? String(it.source.id) : '';
+        return !channelId || !blockedChannelIds.has(channelId);
+      });
+    }
+
     // External legacy filter (kept compatible)
     if (filterSource && filterSource !== 'all') {
       items = items.filter(
@@ -679,6 +758,7 @@ export default function BroadcastFeedSection({
     return items;
   }, [
     activeForYouTab,
+    blockedChannelIds,
     broadcasts,
     filterSource,
     hiddenIds,
@@ -1266,60 +1346,136 @@ export default function BroadcastFeedSection({
    * Render
    * ───────────────────────── */
 
-  const renderFeedBody = () => (
-    <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90, gap: responsive.cardGap }}>
-      {loadingBroadcasts ? (
-        <View style={{ marginTop: 12, gap: 10 }}>
-          <Skeleton height={140} radius={16} />
-          <Skeleton height={140} radius={16} />
+  const renderFeedBody = (headerContent?: React.ReactNode) => (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={loadingBroadcasts}
+          onRefresh={loadBroadcasts}
+          tintColor={palette.primaryStrong}
+        />
+      }
+    >
+      {headerContent}
+      {/* Continue Watching Rail */}
+      {continueItems.length > 0 && (
+        <View style={{ marginTop: 12, marginBottom: 4 }}>
+          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15, paddingHorizontal: responsive.pageGutter, marginBottom: 8 }}>Continue Watching</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: responsive.pageGutter, gap: 10 }}>
+            {continueItems.map(entry => {
+              const progress = watchProgressMap.get(entry.content_id) ?? 0;
+              const progressPct = `${Math.round(Math.min(100, progress * 100))}%` as any;
+              const m = Math.floor(entry.progress_seconds / 60);
+              const s = String(Math.floor(entry.progress_seconds % 60)).padStart(2, '0');
+              return (
+                <Pressable
+                  key={entry.content_id}
+                  onPress={() => (navigation as any).navigate('ChannelContentDetail', { contentId: entry.content_id })}
+                  style={{ width: 148, borderRadius: 10, overflow: 'hidden', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider }}
+                >
+                  <View style={{ height: 84, backgroundColor: palette.bar }}>
+                    {(entry as any).thumbnail_url ? (
+                      <Image source={{ uri: (entry as any).thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : null}
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)' }}>
+                      <View style={{ height: 3, backgroundColor: palette.primaryStrong, width: progressPct }} />
+                    </View>
+                  </View>
+                  <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '700', padding: 6 }} numberOfLines={1}>
+                    {`${m}:${s}`} watched
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
-      ) : broadcasts.length === 0 ? (
-        <Text style={{ color: palette.subtext }}>No broadcasts yet.</Text>
-      ) : computedFiltered.length === 0 ? (
-        <Text style={{ color: palette.subtext }}>
-          No broadcasts match this filter.
-        </Text>
-      ) : (
-        computedFiltered.map(item => (
-          <BroadcastFeedCard
-            key={item.id}
-            item={{
-              ...item,
-              comment_count: commentCounts[item.id] ?? item.comment_count ?? 0,
-            }}
-            onLike={() => handleLike(item)}
-            onShare={() => handleShare(item)}
-            onOpenSource={() => handleOpenSource(item)}
-            onVideoPress={() =>
-              hasVideoAttachment(item) && openVideoModal(item)
-            }
-            onOpenMarket={() => setMainSection('market')}
-            onMenuPress={() => openActionMenu(item)}
-            onSave={() => toggleSaved(item)}
-            onJoinLesson={() => handleJoinLesson(item)}
-            commentConversationId={broadcastConversationIds[item.id] ?? null}
-            fetchConversationId={() => fetchBroadcastConversationId(item.id)}
-            onConversationResolved={id =>
-              setBroadcastConversationId(item.id, id)
-            }
-            onMessageCountChange={count =>
-              handleCommentCountChange(item.id, count)
-            }
-            contextLabel={item.source?.name ?? item.title ?? 'Broadcast'}
-            showComments={activeBroadcastCommentId === item.id}
-            onToggleComments={() => toggleBroadcastComments(item.id)}
-            onSubscribe={() => handleSubscribeToBroadcaster(item)}
-            onOpenAuthorProfile={
-              isUserBroadcastSource(item)
-                ? () => {
-                    void openAuthorProfile(item);
-                  }
-                : undefined
-            }
-          />
-        ))
       )}
-    </View>
+
+      {/* Trending Channels Rail */}
+      {trendingChannels.length > 0 && (
+        <View style={{ marginTop: 16, marginBottom: 4 }}>
+          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15, paddingHorizontal: responsive.pageGutter, marginBottom: 8 }}>Trending Channels</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: responsive.pageGutter, gap: 10 }}>
+            {trendingChannels.map(ch => {
+              const avatarUrl = ch.avatar_url ? resolveBackendAssetUrl(ch.avatar_url) : '';
+              const initials = String(ch.display_name || 'KC').slice(0, 2).toUpperCase();
+              return (
+                <Pressable
+                  key={ch.id}
+                  onPress={() => (navigation as any).navigate('ChannelHome', { channelId: ch.id, channel: ch })}
+                  style={{ alignItems: 'center', gap: 5, width: 70 }}
+                >
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                  ) : (
+                    <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 16 }}>{initials}</Text>
+                    </View>
+                  )}
+                  <Text style={{ color: palette.text, fontWeight: '700', fontSize: 11, textAlign: 'center' }} numberOfLines={1}>{ch.display_name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90, gap: responsive.cardGap, marginTop: 12 }}>
+        {loadingBroadcasts ? (
+          <View style={{ marginTop: 12, gap: 10 }}>
+            <Skeleton height={140} radius={16} />
+            <Skeleton height={140} radius={16} />
+          </View>
+        ) : broadcasts.length === 0 ? (
+          <Text style={{ color: palette.subtext }}>No broadcasts yet.</Text>
+        ) : computedFiltered.length === 0 ? (
+          <Text style={{ color: palette.subtext }}>
+            No broadcasts match this filter.
+          </Text>
+        ) : (
+          computedFiltered.map(item => (
+            <BroadcastFeedCard
+              key={item.id}
+              item={{
+                ...item,
+                comment_count: commentCounts[item.id] ?? item.comment_count ?? 0,
+              }}
+              watchProgress={watchProgressMap.get(item.id)}
+              onLike={() => handleLike(item)}
+              onShare={() => handleShare(item)}
+              onOpenSource={() => handleOpenSource(item)}
+              onVideoPress={() =>
+                hasVideoAttachment(item) && openVideoModal(item)
+              }
+              onOpenMarket={() => setMainSection('market')}
+              onMenuPress={() => openActionMenu(item)}
+              onSave={() => toggleSaved(item)}
+              onJoinLesson={() => handleJoinLesson(item)}
+              commentConversationId={broadcastConversationIds[item.id] ?? null}
+              fetchConversationId={() => fetchBroadcastConversationId(item.id)}
+              onConversationResolved={id =>
+                setBroadcastConversationId(item.id, id)
+              }
+              onMessageCountChange={count =>
+                handleCommentCountChange(item.id, count)
+              }
+              contextLabel={item.source?.name ?? item.title ?? 'Broadcast'}
+              showComments={activeBroadcastCommentId === item.id}
+              onToggleComments={() => toggleBroadcastComments(item.id)}
+              onSubscribe={() => handleSubscribeToBroadcaster(item)}
+              onOpenAuthorProfile={
+                isUserBroadcastSource(item)
+                  ? () => {
+                      void openAuthorProfile(item);
+                    }
+                  : undefined
+              }
+            />
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 
   const renderMarketBody = () => (
@@ -1332,65 +1488,66 @@ export default function BroadcastFeedSection({
     </View>
   );
 
-  const renderLessonsBody = () => (
-    <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: compact ? 72 : 90, gap: responsive.cardGap }}>
-      <View
-        style={[
-          styles.lessonHero,
-          { borderColor: palette.divider, backgroundColor: palette.surface },
-        ]}
-      >
-        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>
-          Lessons
-        </Text>
-        <Text style={{ color: palette.subtext, marginTop: 4 }}>
-          Live classrooms, replays, and guided learning — all inside broadcasts.
-        </Text>
+  const renderLessonsBody = () => {
+    const lessonHero = (
+      <View style={{ paddingHorizontal: responsive.pageGutter, paddingBottom: responsive.cardGap }}>
         <View
-          style={{
-            flexDirection: 'row',
-            gap: 10,
-            marginTop: 10,
-            flexWrap: 'wrap',
-          }}
+          style={[
+            styles.lessonHero,
+            { borderColor: palette.divider, backgroundColor: palette.surface },
+          ]}
         >
-          <Pressable
-            onPress={() => setSourceChip('lessons')}
-            style={[
-              styles.heroBtn,
-              {
-                backgroundColor: palette.primarySoft,
-                borderColor: palette.primary,
-              },
-            ]}
-          >
-            <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
-              Explore lessons
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setMainSection('market');
-              DeviceEventEmitter.emit('market.studio.tab', 'lessons');
+          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>
+            Lessons
+          </Text>
+          <Text style={{ color: palette.subtext, marginTop: 4 }}>
+            Live classrooms, replays, and guided learning — all inside broadcasts.
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 10,
+              flexWrap: 'wrap',
             }}
-            style={[
-              styles.heroBtn,
-              {
-                backgroundColor: palette.surface,
-                borderColor: palette.divider,
-              },
-            ]}
           >
-            <Text style={{ color: palette.text, fontWeight: '900' }}>
-              Create lesson
-            </Text>
-          </Pressable>
+            <Pressable
+              onPress={() => setSourceChip('lessons')}
+              style={[
+                styles.heroBtn,
+                {
+                  backgroundColor: palette.primarySoft,
+                  borderColor: palette.primary,
+                },
+              ]}
+            >
+              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
+                Explore lessons
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMainSection('market');
+                DeviceEventEmitter.emit('market.studio.tab', 'lessons');
+              }}
+              style={[
+                styles.heroBtn,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.divider,
+                },
+              ]}
+            >
+              <Text style={{ color: palette.text, fontWeight: '900' }}>
+                Create lesson
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
-
-      {renderFeedBody()}
-    </View>
-  );
+    );
+    return renderFeedBody(lessonHero);
+  };
 
   const broadcastMenuActions: FeedPostAction[] = menuItem
     ? (() => {
@@ -1419,6 +1576,14 @@ export default function BroadcastFeedSection({
             key: 'not-interested',
             label: 'Not interested',
             onPress: () => handleNotInterested(menuItem),
+          },
+          {
+            key: 'dont-recommend-channel',
+            label: 'Don\'t recommend this channel',
+            onPress: () => {
+              const channelId = menuItem.source?.id ? String(menuItem.source.id) : '';
+              if (channelId) handleDontRecommendChannel(channelId, menuItem.source?.name);
+            },
           },
           {
             key: 'hide',

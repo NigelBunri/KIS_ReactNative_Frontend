@@ -156,7 +156,7 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
             </View>
             <Pressable
               onPress={() => handleUpvote(q.id)}
-              style={[styles.upvoteBtn, { backgroundColor: q.user_upvoted ? palette.primarySoft : palette.background, borderColor: q.user_upvoted ? palette.primaryStrong : palette.border }]}
+              style={[styles.upvoteBtn, { backgroundColor: q.user_upvoted ? palette.primarySoft : palette.bg, borderColor: q.user_upvoted ? palette.primaryStrong : palette.border }]}
             >
               <KISIcon name="arrow-right" size={14} color={q.user_upvoted ? palette.primaryStrong : palette.subtext} style={{ transform: [{ rotate: '-90deg' }] }} />
               <Text style={[styles.upvoteCount, { color: q.user_upvoted ? palette.primaryStrong : palette.subtext }]}>
@@ -167,7 +167,7 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
         ))}
       </ScrollView>
 
-      <View style={[styles.inputRow, { borderTopColor: palette.border, backgroundColor: palette.background }]}>
+      <View style={[styles.inputRow, { borderTopColor: palette.border, backgroundColor: palette.bg }]}>
         <TextInput
           value={questionText}
           onChangeText={setQuestionText}
