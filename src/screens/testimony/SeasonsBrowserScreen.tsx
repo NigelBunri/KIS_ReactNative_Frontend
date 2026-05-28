@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -118,9 +119,13 @@ export default function SeasonsBrowserScreen() {
       return (
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <View style={styles.cardRow}>
-            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            {item?.user?.avatar_url ? (
+              <Image source={{ uri: item.user.avatar_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={[styles.name, { color: palette.text }]}>{firstName}</Text>
               <View style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.border }]}>

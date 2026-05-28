@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -189,11 +191,18 @@ export default function UserProfileScreen() {
 
           {/* Avatar + name block */}
           <View style={styles.identityBlock}>
-            <View style={[styles.avatarCircle, { backgroundColor: palette.primary, borderColor: palette.bg }]}>
-              <Text style={[styles.avatarInitials, { color: palette.bg }]}>
-                {getInitials(profile?.display_name ?? displayName)}
-              </Text>
-            </View>
+            {profile?.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={[styles.avatarCircle, { borderColor: palette.bg }]}
+              />
+            ) : (
+              <View style={[styles.avatarCircle, { backgroundColor: palette.primary, borderColor: palette.bg }]}>
+                <Text style={[styles.avatarInitials, { color: palette.bg }]}>
+                  {getInitials(profile?.display_name ?? displayName)}
+                </Text>
+              </View>
+            )}
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
               <Text style={[styles.displayName, { color: palette.text }]}>
@@ -238,7 +247,13 @@ export default function UserProfileScreen() {
             {renderConnectButton()}
             <Pressable
               style={[styles.actionBtn, styles.actionBtnSecondary, { borderColor: palette.border }]}
-              onPress={() => Alert.alert('Coming soon')}
+              onPress={() => {
+                DeviceEventEmitter.emit('chat.open', {
+                  userId: userId,
+                  name: profile?.display_name ?? displayName ?? '',
+                  kind: 'dm',
+                });
+              }}
             >
               <Text style={[styles.actionBtnText, { color: palette.text }]}>Message</Text>
             </Pressable>

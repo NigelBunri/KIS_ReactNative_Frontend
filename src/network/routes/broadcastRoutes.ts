@@ -607,6 +607,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/membership-tiers/`,
     channelMembership: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/membership/`,
+    tipCreator: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcast-items/${contentId}/tip/`,
   },
   commerce: {
     carts: `${API_BASE_URL}/api/v1/commerce/carts/`,

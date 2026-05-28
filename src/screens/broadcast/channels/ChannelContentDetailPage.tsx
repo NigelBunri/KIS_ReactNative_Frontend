@@ -534,6 +534,9 @@ export default function ChannelContentDetailPage() {
   const [clipStart, setClipStart] = useState('0');
   const [clipEnd, setClipEnd] = useState('30');
   const [clipping, setClipping] = useState(false);
+  const [tipModal, setTipModal] = useState(false);
+  const [tipping, setTipping] = useState(false);
+  const [selectedTipAmount, setSelectedTipAmount] = useState<number | null>(null);
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
@@ -627,18 +630,34 @@ export default function ChannelContentDetailPage() {
     return () => clearTimeout(t);
   }, [autoplayCountdown, navigation, relatedContent]);
 
+  const processTip = useCallback(async (amountCents: number, provider: 'flutterwave' | 'stripe') => {
+    const contentId = content?.id ?? route.params.contentId;
+    if (!contentId) return;
+    setTipping(true);
+    try {
+      const res = await postRequest(
+        ROUTES.broadcasts.tipCreator(contentId),
+        { amount_cents: amountCents, currency: 'USD', payment_provider: provider },
+        { errorMessage: 'Could not process tip.' },
+      );
+      setTipModal(false);
+      setSelectedTipAmount(null);
+      if (res?.payment_required) {
+        const url = res.payment_url || res.checkout_url;
+        if (url) {
+          await Linking.openURL(url);
+        }
+      }
+    } catch {
+      Alert.alert('Error', 'Could not process tip. Please try again.');
+    } finally {
+      setTipping(false);
+    }
+  }, [content?.id, route.params.contentId]);
+
   const handleSuperThanks = useCallback(() => {
-    Alert.alert(
-      'Super Thanks',
-      'Support this creator with a tip',
-      [
-        { text: '💛 $1', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
-        { text: '🧡 $2', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
-        { text: '❤️ $5', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
-        { text: '💎 $10', onPress: () => Alert.alert('Super Thanks', 'Thank you for your support! Payment coming soon.') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+    setSelectedTipAmount(null);
+    setTipModal(true);
   }, []);
 
   const handleReport = useCallback(() => {
@@ -928,6 +947,65 @@ export default function ChannelContentDetailPage() {
               ))}
             </ScrollView>
           )}
+        </View>
+      </Modal>
+
+      {/* Super Thanks / Tip Modal */}
+      <Modal visible={tipModal} transparent animationType="slide" onRequestClose={() => { setTipModal(false); setSelectedTipAmount(null); }}>
+        <Pressable style={styles.modalBackdrop} onPress={() => { setTipModal(false); setSelectedTipAmount(null); }} />
+        <View style={[styles.modalSheet, { backgroundColor: palette.surface }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
+            <Text style={[styles.modalTitle, { color: palette.text }]}>Support this creator</Text>
+            <Pressable onPress={() => { setTipModal(false); setSelectedTipAmount(null); }} hitSlop={12}>
+              <KISIcon name="close" size={20} color={palette.subtext} />
+            </Pressable>
+          </View>
+          <View style={{ padding: 16, gap: 14 }}>
+            <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 13 }}>Choose an amount</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {[{ label: '💛 $1', cents: 100 }, { label: '🧡 $2', cents: 200 }, { label: '❤️ $5', cents: 500 }, { label: '💎 $10', cents: 1000 }].map(opt => (
+                <Pressable
+                  key={opt.cents}
+                  onPress={() => setSelectedTipAmount(opt.cents)}
+                  style={[
+                    { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, alignItems: 'center' },
+                    {
+                      backgroundColor: selectedTipAmount === opt.cents ? palette.primarySoft : palette.bg,
+                      borderColor: selectedTipAmount === opt.cents ? palette.primaryStrong : palette.border,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontWeight: '800', fontSize: 13, color: selectedTipAmount === opt.cents ? palette.primaryStrong : palette.text }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {selectedTipAmount !== null && (
+              <View style={{ gap: 10 }}>
+                <Pressable
+                  onPress={() => !tipping && processTip(selectedTipAmount, 'flutterwave')}
+                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : '#f5a623' }]}
+                  disabled={tipping}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Flutterwave'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => !tipping && processTip(selectedTipAmount, 'stripe')}
+                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : palette.primaryStrong }]}
+                  disabled={tipping}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Stripe (card)'}</Text>
+                </Pressable>
+              </View>
+            )}
+            <Pressable
+              onPress={() => { setTipModal(false); setSelectedTipAmount(null); }}
+              style={[styles.modalBtn, { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }]}
+            >
+              <Text style={{ color: palette.subtext, fontWeight: '700' }}>Cancel</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
 

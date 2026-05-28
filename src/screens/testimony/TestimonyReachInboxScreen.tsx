@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  DeviceEventEmitter,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -135,9 +137,13 @@ export default function TestimonyReachInboxScreen() {
     return (
       <View key={item.id} style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
         <View style={styles.cardRow}>
-          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          {item?.from_user?.avatar_url ? (
+            <Image source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={[styles.name, { color: palette.text }]}>{fromName}</Text>
             {item?.testimony?.title ? (
@@ -184,7 +190,11 @@ export default function TestimonyReachInboxScreen() {
               <Text style={{ color: '#2E7D32', fontWeight: '700', fontSize: 13 }}>✓ Accepted</Text>
             </View>
             <Pressable
-              onPress={() => Alert.alert('Coming soon', 'Messaging will be available soon.')}
+              onPress={() => DeviceEventEmitter.emit('chat.open', {
+                userId: item.from_user.id,
+                name: item.from_user.display_name ?? '',
+                kind: 'dm',
+              })}
               style={[styles.messageBtn, { borderColor: palette.primary }]}
             >
               <Text style={[styles.messageBtnText, { color: palette.primary }]}>Message</Text>
@@ -213,9 +223,13 @@ export default function TestimonyReachInboxScreen() {
     return (
       <View key={item.id} style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
         <View style={styles.cardRow}>
-          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          {item?.to_user?.avatar_url ? (
+            <Image source={{ uri: item.to_user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={[styles.name, { color: palette.text }]}>{toName}</Text>
             {item?.season?.title ? (

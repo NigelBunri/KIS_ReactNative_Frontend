@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -191,10 +190,6 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
     [search],
   );
 
-  const handleVoiceSearch = useCallback(() => {
-    Alert.alert('Voice Search', 'Speak to search — voice input coming soon.');
-  }, []);
-
   const handleRecentTap = useCallback((term: string) => {
     setQuery(term);
     void search(term);
@@ -252,11 +247,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
             <Pressable onPress={() => { setQuery(''); setResults([]); }}>
               <KISIcon name="close" size={16} color={palette.subtext} />
             </Pressable>
-          ) : (
-            <Pressable onPress={handleVoiceSearch} hitSlop={8}>
-              <KISIcon name="mic" size={18} color={palette.subtext} />
-            </Pressable>
-          )}
+          ) : null}
         </View>
         {onClose && (
           <Pressable onPress={onClose} style={styles.cancelBtn}>

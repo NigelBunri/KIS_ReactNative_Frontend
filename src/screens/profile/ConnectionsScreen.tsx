@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -193,9 +195,13 @@ export default function ConnectionsScreen() {
     const isLoading = actionLoadingId === item.id;
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
+        {user?.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {user?.headline ? (
@@ -207,7 +213,14 @@ export default function ConnectionsScreen() {
         <View style={styles.actionRow}>
           <Pressable
             style={[styles.smallBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-            onPress={() => Alert.alert('Message', 'Coming soon')}
+            onPress={() => {
+              const otherUser = getOtherUser(item);
+              DeviceEventEmitter.emit('chat.open', {
+                userId: otherUser?.id ?? '',
+                name: otherUser?.display_name ?? '',
+                kind: 'dm',
+              });
+            }}
           >
             <Text style={[styles.smallBtnText, { color: palette.text }]}>Message</Text>
           </Pressable>
@@ -234,9 +247,13 @@ export default function ConnectionsScreen() {
     const isLoading = actionLoadingId === item.id;
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
+        {user?.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {user?.headline ? (
@@ -276,9 +293,13 @@ export default function ConnectionsScreen() {
     const isPending = pendingConnections.has(item.id);
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
+        {item.avatar_url ? (
+          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {item.headline ? (
