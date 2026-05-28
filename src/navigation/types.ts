@@ -173,6 +173,8 @@ export type RootStackParamList = {
   ComplianceSettings: undefined;
   AdminUserManagement: undefined;
   DeviceManagement: undefined;
+  QRScanLogin: undefined;
+  ParentRecovery: undefined;
   InvoiceList: undefined;
   Loyalty: undefined;
   PromoCode: undefined;

@@ -137,6 +137,8 @@ import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
 import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
 import DeviceManagementScreen from '@/screens/DeviceManagementScreen';
+import QRScanLoginScreen from '@/screens/QRScanLoginScreen';
+import ParentRecoveryScreen from '@/screens/ParentRecoveryScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import PromoCodeScreen from '@/screens/market/PromoCodeScreen';
@@ -996,6 +998,15 @@ function AppContent() {
                     <RootStack.Screen
                       name="DeviceManagement"
                       component={DeviceManagementScreen}
+                    />
+                    <RootStack.Screen
+                      name="QRScanLogin"
+                      component={QRScanLoginScreen}
+                      options={{ presentation: 'fullScreenModal', headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="ParentRecovery"
+                      component={ParentRecoveryScreen}
                     />
                     <RootStack.Screen
                       name="AccountDeletion"

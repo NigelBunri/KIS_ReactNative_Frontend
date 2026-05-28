@@ -93,6 +93,13 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
     link: {
       textDecorationLine: 'underline',
     },
+    secondaryDeviceBtn: {
+      borderWidth: 1.5,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });
 
 export default function LoginScreen({ navigation }: any) {
@@ -355,6 +362,24 @@ export default function LoginScreen({ navigation }: any) {
       >
         {loading ? <ActivityIndicator /> : null}
       </KISButton>
+
+      <Pressable
+        onPress={() => navigation.navigate('QRScanLogin')}
+        style={[styles.secondaryDeviceBtn, { borderColor: palette.primary }]}
+      >
+        <KISText preset="helper" color={palette.primary} style={{ fontWeight: '700', textAlign: 'center' }}>
+          Log in as a secondary device (scan QR)
+        </KISText>
+      </Pressable>
+
+      <Pressable onPress={() => navigation.navigate('ParentRecovery')}>
+        <KISText preset="helper" color={palette.subtext} style={[styles.centerText, { textAlign: 'center' }]}>
+          Lost your primary device?{' '}
+          <KISText preset="helper" color={palette.primary} style={styles.link}>
+            Recover account
+          </KISText>
+        </KISText>
+      </Pressable>
 
       <View style={styles.bottomCallout}>
         <KISText preset="helper" color={palette.subtext} style={styles.centerText}>
