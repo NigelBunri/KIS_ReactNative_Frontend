@@ -77,16 +77,20 @@ type SpeedOption = typeof SPEED_OPTIONS[number];
 type Chapter = { id: string; title: string; start_seconds: number };
 type Subtitle = { id: string; language: string; url: string; label?: string };
 
+type VideoTrack = { bitrate?: number; width?: number; height?: number; trackId: string };
+
 function VideoPlayerControls({
   content,
   videoUrl,
   stageHeight,
   palette,
+  relatedContent,
 }: {
   content: BroadcastChannelContent;
   videoUrl: string;
   stageHeight: number;
   palette: any;
+  relatedContent?: { id: string; title: string; thumbnail_url?: string; channel?: { name: string } }[];
 }) {
   const videoRef = useRef<any>(null);
   const [paused, setPaused]           = useState(false);
@@ -103,6 +107,11 @@ function VideoPlayerControls({
   const controlsAnim = useRef(new Animated.Value(1)).current;
   const hideTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVis, setControlsVis] = useState(true);
+  const [videoTracks, setVideoTracks] = useState<VideoTrack[]>([]);
+  const [selectedQuality, setSelectedQuality] = useState<string>('auto');
+  const [qualityModal, setQualityModal] = useState(false);
+  const [showEndScreen, setShowEndScreen] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     fetchChannelContentChapters(content.id)
@@ -115,6 +124,16 @@ function VideoPlayerControls({
       })
       .catch(() => {});
   }, [content.id]);
+
+  useEffect(() => {
+    if (!showEndScreen) return;
+    if (countdown <= 0) {
+      setShowEndScreen(false);
+      return;
+    }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showEndScreen, countdown]);
 
   const showControls = useCallback(() => {
     setControlsVis(true);
@@ -160,8 +179,27 @@ function VideoPlayerControls({
         onLoad={({ duration: d }) => { setDuration(d); setBuffering(false); }}
         onProgress={({ currentTime: t }) => { if (!seeking) setCurrentTime(t); }}
         onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-        onEnd={() => setPaused(true)}
+        onEnd={() => {
+          setPaused(true);
+          if (chapters.length > 0) return;
+          setShowEndScreen(true);
+          setCountdown(5);
+        }}
         textTracks={activeSubtrack as any}
+        onVideoTracks={(data: any) => {
+          const tracks: VideoTrack[] = (data?.videoTracks ?? []).map((t: any) => ({
+            trackId: String(t.trackId ?? t.index ?? ''),
+            width: t.width,
+            height: t.height,
+            bitrate: t.bitrate,
+          }));
+          setVideoTracks(tracks);
+        }}
+        selectedVideoTrack={
+          selectedQuality === 'auto'
+            ? ({ type: 'auto' } as any)
+            : ({ type: 'trackId', value: selectedQuality } as any)
+        }
       />
 
       {buffering && (
@@ -240,6 +278,11 @@ function VideoPlayerControls({
           <Pressable onPress={() => setSpeedModal(true)} style={vstyles.speedBtn} hitSlop={8}>
             <Text style={vstyles.speedText}>{speed === 1 ? '1×' : `${speed}×`}</Text>
           </Pressable>
+
+          {/* Quality */}
+          <Pressable onPress={() => setQualityModal(true)} style={vstyles.speedBtn} hitSlop={8}>
+            <KISIcon name="video" size={16} color="#fff" />
+          </Pressable>
         </View>
       </Animated.View>
 
@@ -263,11 +306,77 @@ function VideoPlayerControls({
           </View>
         </Pressable>
       </Modal>
+
+      {/* Quality modal */}
+      {qualityModal && (
+        <Pressable style={vstyles.modalBackdrop} onPress={() => setQualityModal(false)}>
+          <View style={[vstyles.speedModal, { backgroundColor: palette.card }]}>
+            <Text style={{ color: palette.text, fontWeight: '900', marginBottom: 8 }}>Quality</Text>
+            {[{ label: 'Auto', trackId: 'auto' }, ...videoTracks.map(t => ({
+              label: t.height ? `${t.height}p` : `Track ${t.trackId}`,
+              trackId: t.trackId,
+            }))].map(opt => (
+              <Pressable
+                key={opt.trackId}
+                onPress={() => { setSelectedQuality(opt.trackId); setQualityModal(false); }}
+                style={vstyles.speedOption}
+              >
+                <Text style={{
+                  color: selectedQuality === opt.trackId ? palette.primaryStrong : palette.text,
+                  fontWeight: selectedQuality === opt.trackId ? '900' : '600',
+                }}>
+                  {opt.label}{selectedQuality === opt.trackId ? ' ✓' : ''}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      )}
+
+      {/* End screen overlay */}
+      {showEndScreen && (
+        <View style={[vstyles.endScreen, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, marginBottom: 16 }}>
+            Up Next in {countdown}s
+          </Text>
+          {(relatedContent ?? [])[0] ? (
+            <View style={{ alignItems: 'center', gap: 12 }}>
+              {(relatedContent![0].thumbnail_url) ? (
+                <Image
+                  source={{ uri: relatedContent![0].thumbnail_url }}
+                  style={{ width: 200, height: 112, borderRadius: 10 }}
+                  resizeMode="cover"
+                />
+              ) : null}
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, textAlign: 'center' }} numberOfLines={2}>
+                {relatedContent![0].title}
+              </Text>
+              <Text style={{ color: '#ccc', fontSize: 12 }}>{relatedContent![0].channel?.name}</Text>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+            <Pressable
+              onPress={() => setShowEndScreen(false)}
+              style={{ borderWidth: 1, borderColor: '#fff', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Cancel</Text>
+            </Pressable>
+            {(relatedContent ?? [])[0] ? (
+              <Pressable
+                onPress={() => { setShowEndScreen(false); /* TODO: navigate to related */ }}
+                style={{ backgroundColor: palette.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '900' }}>Watch Now</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      )}
     </Pressable>
   );
 }
 
-function MediaStage({ content }: { content: BroadcastChannelContent }) {
+function MediaStage({ content, relatedContent }: { content: BroadcastChannelContent; relatedContent?: { id: string; title: string; thumbnail_url?: string; channel?: { name: string } }[] }) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
@@ -334,6 +443,7 @@ function MediaStage({ content }: { content: BroadcastChannelContent }) {
           videoUrl={videoUrl}
           stageHeight={stageHeight}
           palette={palette}
+          relatedContent={relatedContent}
         />
       );
     }
@@ -391,6 +501,13 @@ const vstyles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
   },
   speedOptionText: { fontSize: 14, fontWeight: '700' },
+  speedModal: {
+    width: 220, borderRadius: 14, overflow: 'hidden', paddingVertical: 12, paddingHorizontal: 16,
+  },
+  endScreen: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', padding: 24,
+  },
 });
 
 export default function ChannelContentDetailPage() {
@@ -646,7 +763,7 @@ export default function ChannelContentDetailPage() {
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
-          <MediaStage content={content} />
+          <MediaStage content={content} relatedContent={relatedContent as any} />
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color="#fff" /></Pressable>
 
           {/* Autoplay Up Next countdown */}

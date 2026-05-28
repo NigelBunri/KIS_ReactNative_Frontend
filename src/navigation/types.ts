@@ -195,6 +195,7 @@ export type RootStackParamList = {
   ClipsListScreen: { contentId: string };
   ActivityNotifications: { channelId: string; channelName?: string };
   ChannelMembersScreen: { channelId: string; channelName?: string };
+  Membership: { channelId: string; channelName?: string };
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

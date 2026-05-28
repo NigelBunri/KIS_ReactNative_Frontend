@@ -13,6 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import { getRequest } from '@/network/get';
+import ROUTES from '@/network';
 
 type DownloadItem = {
   name: string;
@@ -39,11 +41,12 @@ export default function DownloadsScreen() {
   const navigation = useNavigation();
   const [items, setItems] = useState<DownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const dir = `${RNFS.DocumentDirectoryPath}/kis-education-downloads`;
+      const dir = `${RNFS.DocumentDirectoryPath}/kis-downloads`;
       const exists = await RNFS.exists(dir);
       if (!exists) { setItems([]); return; }
       const files = await RNFS.readDir(dir);
@@ -62,6 +65,36 @@ export default function DownloadsScreen() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const downloadContent = useCallback(async (contentId: string, title: string) => {
+    try {
+      const res = await getRequest(ROUTES.broadcasts.channelContentDownload(contentId), { errorMessage: 'Download failed.' });
+      const downloadUrl = res?.data?.download_url || res?.download_url;
+      const filename = res?.data?.filename || res?.filename || `${title}.mp4`;
+      if (!downloadUrl) { Alert.alert('Error', 'No download URL available.'); return; }
+
+      const dir = `${RNFS.DocumentDirectoryPath}/kis-downloads`;
+      await RNFS.mkdir(dir).catch(() => {});
+      const destPath = `${dir}/${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+      setDownloading(prev => ({ ...prev, [contentId]: 0 }));
+      const download = RNFS.downloadFile({
+        fromUrl: downloadUrl,
+        toFile: destPath,
+        progress: (p) => {
+          const pct = Math.round((p.bytesWritten / p.contentLength) * 100);
+          setDownloading(prev => ({ ...prev, [contentId]: pct }));
+        },
+      });
+      await download.promise;
+      setDownloading(prev => { const next = { ...prev }; delete next[contentId]; return next; });
+      Alert.alert('Downloaded', `"${title}" saved to your downloads.`);
+      load();
+    } catch (e: any) {
+      setDownloading(prev => { const next = { ...prev }; delete next[contentId]; return next; });
+      Alert.alert('Download failed', e?.message || 'Please try again.');
+    }
+  }, [load]);
 
   const handleDelete = useCallback((item: DownloadItem) => {
     Alert.alert('Delete download', `Delete "${item.name}"?`, [
@@ -95,36 +128,30 @@ export default function DownloadsScreen() {
         <View style={styles.centered}>
           <KISIcon name="download" size={40} color={palette.border} />
           <Text style={[styles.emptyText, { color: palette.subtext }]}>No downloads yet</Text>
-          <Text style={[styles.emptyHint, { color: palette.subtext }]}>Education content you download will appear here</Text>
+          <Text style={[styles.emptyHint, { color: palette.subtext }]}>Tap Download on any video to save it here</Text>
         </View>
       ) : (
-        <>
-          <FlatList
-            data={items}
-            keyExtractor={item => item.path}
-            contentContainerStyle={{ paddingBottom: 80 }}
-            renderItem={({ item }) => (
-              <View style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
-                <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft ?? '#3d2b00' }]}>
-                  <KISIcon name="file" size={18} color={palette.primaryStrong} />
-                </View>
-                <View style={styles.info}>
-                  <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[styles.meta, { color: palette.subtext }]}>
-                    {formatSize(item.size)} · {timeAgo(item.mtime)}
-                  </Text>
-                </View>
-                <Pressable onPress={() => handleDelete(item)} hitSlop={12}>
-                  <KISIcon name="trash" size={18} color="#ef4444" />
-                </Pressable>
+        <FlatList
+          data={items}
+          keyExtractor={item => item.path}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          renderItem={({ item }) => (
+            <View style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
+              <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft ?? '#3d2b00' }]}>
+                <KISIcon name="file" size={18} color={palette.primaryStrong} />
               </View>
-            )}
-          />
-          <View style={[styles.comingSoon, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
-            <KISIcon name="play" size={14} color={palette.primaryStrong} />
-            <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700', marginLeft: 6 }}>Video download coming soon</Text>
-          </View>
-        </>
+              <View style={styles.info}>
+                <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.meta, { color: palette.subtext }]}>
+                  {formatSize(item.size)} · {timeAgo(item.mtime)}
+                </Text>
+              </View>
+              <Pressable onPress={() => handleDelete(item)} hitSlop={12}>
+                <KISIcon name="close" size={18} color="#ef4444" />
+              </Pressable>
+            </View>
+          )}
+        />
       )}
     </SafeAreaView>
   );

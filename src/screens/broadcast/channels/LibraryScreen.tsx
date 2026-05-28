@@ -15,6 +15,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
+import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
 import type { RootStackParamList } from '@/navigation/types';
 import {
   fetchContinueWatchingItems,
@@ -94,6 +96,7 @@ export default function LibraryScreen() {
   const [continueItems, setContinueItems] = useState<ContinueItem[]>([]);
   const [continueLoading, setContinueLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [trending, setTrending] = useState<any[]>([]);
 
   const loadContinue = useCallback(async () => {
     try {
@@ -123,6 +126,12 @@ export default function LibraryScreen() {
 
   useEffect(() => { void loadContinue(); }, [loadContinue]);
 
+  useEffect(() => {
+    getRequest(`${ROUTES.broadcasts.broadcastsTrending}?limit=10`, { errorMessage: '' })
+      .then(res => setTrending(Array.isArray(res?.results) ? res.results : []))
+      .catch(() => {});
+  }, []);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     void loadContinue();
@@ -141,6 +150,34 @@ export default function LibraryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
         }
       >
+        {/* Trending */}
+        {trending.length > 0 && (
+          <View style={{ marginBottom: 16, marginTop: 16 }}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15, paddingHorizontal: 16, marginBottom: 8 }}>
+              Trending
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+              {trending.map(item => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => navigation.navigate('ChannelContentDetail', { contentId: item.id })}
+                  style={{ width: 160 }}
+                >
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={{ width: 160, height: 90, borderRadius: 10, marginBottom: 6 }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ width: 160, height: 90, borderRadius: 10, backgroundColor: palette.card, marginBottom: 6, alignItems: 'center', justifyContent: 'center' }}>
+                      <KISIcon name="video" size={24} color={palette.border} />
+                    </View>
+                  )}
+                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: 12 }} numberOfLines={2}>{item.title}</Text>
+                  <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 11 }} numberOfLines={1}>{item.channel?.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Continue Watching */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>

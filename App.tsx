@@ -59,6 +59,7 @@ import LibraryScreen from '@/screens/broadcast/channels/LibraryScreen';
 import ClipsListScreen from '@/screens/broadcast/channels/ClipsListScreen';
 import ActivityNotificationsScreen from '@/screens/broadcast/channels/ActivityNotificationsScreen';
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
+import MembershipScreen from '@/screens/broadcast/channels/MembershipScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -785,6 +786,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="ChannelMembersScreen"
                       component={ChannelMembersScreen}
+                    />
+                    <RootStack.Screen
+                      name="Membership"
+                      component={MembershipScreen}
+                      options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="PartnerInsights"

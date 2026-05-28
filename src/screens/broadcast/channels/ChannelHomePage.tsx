@@ -262,6 +262,24 @@ export default function ChannelHomePage() {
               <Text style={[styles.metrics, { color: palette.text }]}>{compactNumber(channel?.subscriber_count)} subscribers · {compactNumber(channel?.content_count || contents.length)} posts</Text>
             </View>
             <SubscribeBellButton channelId={channel?.id} initialSubscribed={Boolean(channel?.is_subscribed)} />
+            {channel?.id ? (
+              <Pressable
+                onPress={() => navigation.navigate('Membership', { channelId: channel.id, channelName: channel.display_name })}
+                style={{
+                  borderWidth: 1.5,
+                  borderColor: palette.primaryStrong,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <KISIcon name="people" size={14} color={palette.primaryStrong} />
+                <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 13 }}>Join</Text>
+              </Pressable>
+            ) : null}
           </View>
           <Text numberOfLines={3} style={[styles.channelDescription, { color: palette.subtext }]}>{channel?.description || 'Original broadcasts, live sessions, posts, files, and updates from this KIS channel.'}</Text>
           <View style={styles.channelActions}>

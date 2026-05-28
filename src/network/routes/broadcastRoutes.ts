@@ -360,6 +360,9 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/`,
     playlistItemDetail: (playlistId: string, contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/${contentId}/`,
+    // Live stream viewer presence (REST fallback for when socket is unavailable)
+    liveStreamViewerPing: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/viewer-ping/`,
     // User-created personal playlists (cross-device, server-persisted)
     userPlaylists: `${API_BASE_URL}/api/v1/broadcasts/user-playlists/`,
     userPlaylistDetail: (id: string) =>
@@ -587,6 +590,23 @@ const broadcastRoutes = {
     qaSessionQuestions: (sessionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa/${sessionId}/questions/`,
     qaQuestionUpvote: (questionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa-questions/${questionId}/upvote/`,
     watchHistorySettings: `${API_BASE_URL}/api/v1/broadcasts/watch-history/settings/`,
+
+    // Trending
+    broadcastsTrending: `${API_BASE_URL}/api/v1/broadcasts/trending/`,
+
+    // Content download
+    channelContentDownload: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/download/`,
+
+    // Live archive (DVR webhook / manual trigger)
+    liveStreamArchive: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/archive/`,
+
+    // Channel membership tiers + user membership
+    channelMembershipTiers: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/membership-tiers/`,
+    channelMembership: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/membership/`,
   },
   commerce: {
     carts: `${API_BASE_URL}/api/v1/commerce/carts/`,

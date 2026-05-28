@@ -9,6 +9,7 @@
 //  • Provides sendChatMessage, switchCameraSource, refresh.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { getRequest }  from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -216,6 +217,37 @@ export function useLiveStream(
       void fetchStream();
     },
   });
+
+  // ── Emit viewer presence events for real-time viewer count ─────────────────
+  // Join the stream room on the socket so NestJS can count active viewers.
+  // Also POST a REST ping every 25s as fallback for non-socket contexts.
+
+  useEffect(() => {
+    if (!streamId || stream?.status !== 'live') return;
+
+    // Signal join to any socket provider listening
+    DeviceEventEmitter.emit('channel.live.join', { streamId });
+
+    // REST ping fallback every 25 s keeps viewer count accurate when socket unavailable
+    const pingId = setInterval(() => {
+      if (!mountedRef.current) return;
+      void postRequest(
+        ROUTES.broadcasts.liveStreamViewerPing(streamId),
+        {},
+        { errorMessage: '' },
+      ).then((res: any) => {
+        if (res?.success && mountedRef.current) {
+          const count = res?.data?.viewer_count;
+          if (typeof count === 'number') setViewerCount(count);
+        }
+      });
+    }, 25_000);
+
+    return () => {
+      clearInterval(pingId);
+      DeviceEventEmitter.emit('channel.live.leave', { streamId });
+    };
+  }, [streamId, stream?.status]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 

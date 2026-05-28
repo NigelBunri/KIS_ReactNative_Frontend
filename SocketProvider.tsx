@@ -625,6 +625,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     mountedRef.current = true;
 
+    let joinLiveSub: { remove: () => void } | null = null;
+    let leaveLiveSub: { remove: () => void } | null = null;
+
     const connect = async () => {
       let token = await getAccessToken();
       const cached = await getCache('AUTH_CACHE', 'USER_KEY');
@@ -757,6 +760,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       s.on('channel.chat.message',      onChannelChatMessage);
       s.on('channel.content.published', onChannelContentPublished);
       s.on('channel.subscribed',        onChannelSubscribed);
+
+      // Forward outbound live events from components to the socket server
+      joinLiveSub = DeviceEventEmitter.addListener('channel.live.join', (p: any) => {
+        if (s.connected) s.emit('channel.live.join', p);
+      });
+      leaveLiveSub = DeviceEventEmitter.addListener('channel.live.leave', (p: any) => {
+        if (s.connected) s.emit('channel.live.leave', p);
+      });
 
       /* ── CALL EVENTS ── */
 
@@ -1051,6 +1062,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       mountedRef.current = false;
       webRTCService.closeAll();
       audioRouteManager.stop();
+      joinLiveSub?.remove();
+      leaveLiveSub?.remove();
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
