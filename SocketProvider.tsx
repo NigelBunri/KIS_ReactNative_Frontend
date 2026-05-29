@@ -251,6 +251,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           };
         });
       },
+      onIceRestartNeeded: (peerId, offer) => {
+        const session = activeCallRef.current;
+        if (!session || !socketRef.current) return;
+        socketRef.current.emit('call.sdp.offer', {
+          callId: session.callId,
+          conversationId: session.conversationId,
+          targetUserId: peerId,
+          sdp: offer,
+          iceRestart: true,
+        });
+      },
     });
   }, []);
 

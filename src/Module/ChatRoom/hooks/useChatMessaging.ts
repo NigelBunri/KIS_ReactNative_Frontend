@@ -90,6 +90,51 @@ export function useChatMessaging({
   const flushInFlightRef = useRef(false);
   const historyLoadRef = useRef(false);
 
+  /* -----------------------------------------------------------------------
+   * OFFLINE QUEUES — receipts and reactions are fire-and-forget socket
+   * emits. Under poor network, the socket may be temporarily disconnected.
+   * Queue them and flush as soon as the socket reconnects.
+   * --------------------------------------------------------------------- */
+  type PendingReceipt = { conversationId: string; messageId: string; type: string };
+  type PendingReaction = { conversationId: string; messageId: string; emoji: string; remove?: boolean };
+
+  const pendingReceiptsRef = useRef<PendingReceipt[]>([]);
+  const pendingReactionsRef = useRef<PendingReaction[]>([]);
+
+  const emitReceiptRef = useRef<(convId: string, msgId: string, type: string) => void>(
+    () => {},
+  );
+  const emitReactionRef = useRef<(convId: string, msgId: string, emoji: string, remove?: boolean) => void>(
+    () => {},
+  );
+
+  // Keep the emit helpers up-to-date as socket/isConnected change
+  useEffect(() => {
+    emitReceiptRef.current = (convId: string, msgId: string, type: string) => {
+      if (!convId || !msgId) return;
+      if (socket && (isConnected || socket.connected)) {
+        socket.emit('chat.receipt', { conversationId: convId, messageId: msgId, type });
+      } else {
+        const key = `${convId}:${msgId}:${type}`;
+        const already = pendingReceiptsRef.current.some(
+          r => r.conversationId === convId && r.messageId === msgId && r.type === type,
+        );
+        if (!already) pendingReceiptsRef.current.push({ conversationId: convId, messageId: msgId, type });
+      }
+    };
+    emitReactionRef.current = (convId: string, msgId: string, emoji: string, remove?: boolean) => {
+      if (!convId || !msgId || !emoji) return;
+      if (socket && (isConnected || socket.connected)) {
+        socket.emit('chat.react', { conversationId: convId, messageId: msgId, emoji, ...(remove ? { remove: true } : {}) });
+      } else {
+        const already = pendingReactionsRef.current.some(
+          r => r.conversationId === convId && r.messageId === msgId && r.emoji === emoji && !!r.remove === !!remove,
+        );
+        if (!already) pendingReactionsRef.current.push({ conversationId: convId, messageId: msgId, emoji, remove });
+      }
+    };
+  }, [socket, isConnected]);
+
   const sendOverNetwork: SendOverNetworkFn =
   useCallback(async (message) => {
     const impl = sendOverNetworkImplRef.current;
@@ -469,11 +514,7 @@ export function useChatMessaging({
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
         if (lastMsg?.serverId && lastMsg.senderId !== currentUserId) {
-          socket.emit('chat.receipt', {
-            conversationId: String(convId),
-            messageId: lastMsg.serverId,
-            type: 'read',
-          });
+          emitReceiptRef.current(String(convId), lastMsg.serverId, 'read');
         }
       }
     },
@@ -631,11 +672,7 @@ export function useChatMessaging({
 
       for (const msg of unread) {
         if (!msg.serverId) continue;
-        socket.emit('chat.receipt', {
-          conversationId,
-          messageId: msg.serverId,
-          type: 'read',
-        });
+        emitReceiptRef.current(conversationId, msg.serverId, 'read');
       }
 
       const updated = await bulkUpdateMessages(roomId, (m) => {
@@ -917,6 +954,18 @@ export function useChatMessaging({
     if (__DEV__) console.log('[useChatMessaging] socket connected → flush queue');
     attemptFlushQueue({ silent: true });
     syncHistory();
+
+    // Flush queued receipts
+    const receipts = pendingReceiptsRef.current.splice(0);
+    for (const r of receipts) {
+      try { socket.emit('chat.receipt', r); } catch {}
+    }
+
+    // Flush queued reactions
+    const reactions = pendingReactionsRef.current.splice(0);
+    for (const r of reactions) {
+      try { socket.emit('chat.react', r); } catch {}
+    }
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
 
   useEffect(() => {
@@ -1005,24 +1054,12 @@ export function useChatMessaging({
       const msg = mapServerMessageRef.current(serverMsg);
 
       if (!msg.fromMe && msg.serverId) {
-        try {
-          socket.emit('chat.receipt', {
-            conversationId: String(msg.conversationId),
-            messageId: msg.serverId,
-            type: 'delivered',
-          });
-        } catch (err: any) {
-          console.warn('[useChatMessaging] delivery receipt emit failed', err?.message);
-        }
+        emitReceiptRef.current(String(msg.conversationId), msg.serverId, 'delivered');
 
         // If the chat room is currently open, immediately mark as read too.
         if (mountedRef.current) {
           try {
-            socket.emit('chat.receipt', {
-              conversationId: String(msg.conversationId),
-              messageId: msg.serverId,
-              type: 'read',
-            });
+            emitReceiptRef.current(String(msg.conversationId), msg.serverId, 'read');
           } catch (err: any) {
             console.warn('[useChatMessaging] read receipt emit failed', err?.message);
           }
@@ -1309,17 +1346,13 @@ export function useChatMessaging({
     retryMessage: async (messageId: string) => {
       await retryMessage(messageId);
     },
-    sendReaction: (messageId: string, emoji: string, convId?: string | null) => {
+    sendReaction: (messageId: string, emoji: string, convId?: string | null, remove?: boolean) => {
       const resolvedConvId =
         convId ??
         conversationIdRef.current ??
         String(storageRoomId);
-      if (!socket || !resolvedConvId || !messageId) return;
-      socket.emit('chat.react', {
-        conversationId: String(resolvedConvId),
-        messageId,
-        emoji,
-      });
+      if (!resolvedConvId || !messageId) return;
+      emitReactionRef.current(String(resolvedConvId), messageId, emoji, remove);
     },
     votePoll: (messageId: string, optionId: string) => {
       const resolvedConvId =

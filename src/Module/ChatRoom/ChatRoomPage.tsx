@@ -437,21 +437,12 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         : false;
 
       if (alreadyReacted) {
-        // Emit a remove-reaction event
-        const resolvedSocket = (socket as any);
-        if (resolvedSocket) {
-          resolvedSocket.emit('chat.react', {
-            conversationId: String(convId),
-            messageId,
-            emoji,
-            remove: true,
-          });
-        }
+        sendReaction(messageId, emoji, convId, true);
       } else {
         sendReaction(messageId, emoji, convId);
       }
     },
-    [sendReaction, conversationId, chat?.id, currentUserId, socket],
+    [sendReaction, conversationId, chat?.id, currentUserId],
   );
 
   const handleVotePoll = useCallback(

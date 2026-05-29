@@ -1,6 +1,7 @@
 import React from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Feather from 'react-native-vector-icons/Feather';
 import { useKISTheme } from '@/theme/useTheme';
 import { ICON_SIZES, getIconColor, IconTone } from '@/theme/foundations/icons';
 
@@ -460,8 +461,8 @@ export const KISIcon: React.FC<KISIconProps> = ({
 
   if (name === 'phone-off') {
     return (
-      <MaterialCommunityIcons
-        name="phone-hangup"
+      <Feather
+        name="phone-off"
         size={resolvedSize}
         color={iconColor}
         style={style}
@@ -471,7 +472,7 @@ export const KISIcon: React.FC<KISIconProps> = ({
 
   if (name === 'phone-missed') {
     return (
-      <MaterialCommunityIcons
+      <Feather
         name="phone-missed"
         size={resolvedSize}
         color={iconColor}

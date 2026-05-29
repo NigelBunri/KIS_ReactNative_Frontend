@@ -24,6 +24,7 @@ type TrackHandler = (peerId: string, stream: any) => void;
 type ConnectionStateHandler = (peerId: string, state: string) => void;
 type SpeakingHandler = (peerId: string, speaking: boolean) => void;
 type StatsHandler = (peerId: string, stats: PeerStats) => void;
+type IceRestartHandler = (peerId: string, offer: any) => void;
 
 export type PeerStats = {
   packetsLost: number;
@@ -45,6 +46,9 @@ class WebRTCService {
   private onConnectionState: ConnectionStateHandler = () => {};
   private onSpeaking: SpeakingHandler = () => {};
   private onStats: StatsHandler = () => {};
+  private onIceRestartNeeded: IceRestartHandler = () => {};
+  // Debounce ICE restart per peer to avoid rapid repeated renegotiation
+  private iceRestartDebounce = new Map<string, ReturnType<typeof setTimeout>>();
 
   /** Call this before startCall/answerCall with TURN credentials from your backend. */
   setIceServers(servers: any[]) {
@@ -59,12 +63,14 @@ class WebRTCService {
     onConnectionState?: ConnectionStateHandler;
     onSpeaking?: SpeakingHandler;
     onStats?: StatsHandler;
+    onIceRestartNeeded?: IceRestartHandler;
   }) {
     if (cb.onIceCandidate) this.onIceCandidate = cb.onIceCandidate;
     if (cb.onRemoteTrack) this.onRemoteTrack = cb.onRemoteTrack;
     if (cb.onConnectionState) this.onConnectionState = cb.onConnectionState;
     if (cb.onSpeaking) this.onSpeaking = cb.onSpeaking;
     if (cb.onStats) this.onStats = cb.onStats;
+    if (cb.onIceRestartNeeded) this.onIceRestartNeeded = cb.onIceRestartNeeded;
   }
 
   async startLocalStream(video: boolean): Promise<any> {
@@ -141,9 +147,8 @@ class WebRTCService {
     pc.onconnectionstatechange = () => {
       const state: string = pc.connectionState;
       this.onConnectionState(peerId, state);
-      if (state === 'failed') {
-        // Attempt ICE restart before giving up.
-        try { pc.restartIce?.(); } catch {}
+      if (state === 'failed' || state === 'disconnected') {
+        this.scheduleIceRestart(peerId, pc);
       }
     };
 
@@ -154,15 +159,35 @@ class WebRTCService {
         this.onConnectionState(peerId, 'connected');
       } else if (s === 'failed') {
         this.onConnectionState(peerId, 'failed');
-        try { pc.restartIce?.(); } catch {}
+        this.scheduleIceRestart(peerId, pc);
       } else if (s === 'disconnected') {
         this.onConnectionState(peerId, 'disconnected');
+        this.scheduleIceRestart(peerId, pc);
       }
     };
 
     this.peers.set(peerId, pc);
     this.startStats(peerId, pc);
     return pc;
+  }
+
+  private scheduleIceRestart(peerId: string, pc: any) {
+    // Debounce: wait 2 s in case the state flaps back to connected on its own
+    const existing = this.iceRestartDebounce.get(peerId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(async () => {
+      this.iceRestartDebounce.delete(peerId);
+      if (!pc || pc.connectionState === 'connected' || pc.connectionState === 'closed') return;
+      try {
+        pc.restartIce?.();
+        const offer = await pc.createOffer({ iceRestart: true } as any);
+        await pc.setLocalDescription(offer);
+        this.onIceRestartNeeded(peerId, offer);
+      } catch (err) {
+        console.warn('[WebRTC] ICE restart renegotiation failed:', err);
+      }
+    }, 2000);
+    this.iceRestartDebounce.set(peerId, timer);
   }
 
   private ensurePeer(peerId: string): any {
@@ -275,6 +300,8 @@ class WebRTCService {
   closePeer(peerId: string) {
     const interval = this.statsIntervals.get(peerId);
     if (interval) { clearInterval(interval); this.statsIntervals.delete(peerId); }
+    const timer = this.iceRestartDebounce.get(peerId);
+    if (timer) { clearTimeout(timer); this.iceRestartDebounce.delete(peerId); }
     const pc = this.peers.get(peerId);
     if (pc) { try { pc.close(); } catch {} this.peers.delete(peerId); }
     this.iceCandidateQueues.delete(peerId);
@@ -283,6 +310,8 @@ class WebRTCService {
   closeAll() {
     this.statsIntervals.forEach(i => clearInterval(i));
     this.statsIntervals.clear();
+    this.iceRestartDebounce.forEach(t => clearTimeout(t));
+    this.iceRestartDebounce.clear();
     this.peers.forEach(pc => { try { pc.close(); } catch {} });
     this.peers.clear();
     this.iceCandidateQueues.clear();
