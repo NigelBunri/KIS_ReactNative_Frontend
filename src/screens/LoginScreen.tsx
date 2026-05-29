@@ -1,6 +1,7 @@
 // src/screens/LoginScreen.tsx
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
   View,
   StyleSheet,
@@ -35,12 +36,15 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       gap: tokens.spacing.lg,
     },
     backBtn: {
-      marginBottom: tokens.spacing.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
       alignSelf: 'flex-start',
+      marginBottom: tokens.spacing.sm,
+      gap: 2,
     },
     backTxt: {
-      fontSize: tokens.typography.title,
-      fontWeight: tokens.typography.weight.bold,
+      fontSize: tokens.typography.body,
+      fontWeight: tokens.typography.weight.semibold,
     },
     header: {
       fontSize: tokens.typography.h2,
@@ -355,9 +359,8 @@ export default function LoginScreen({ navigation }: any) {
         keyboardShouldPersistTaps="handled"
       >
       <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
-        <KISText preset="label" style={[styles.backTxt, { color: palette.text }]}>
-          {Platform.OS === 'ios' ? '‹' : '←'} Back
-        </KISText>
+        <Ionicons name="chevron-back" size={22} color={palette.text} />
+        <KISText preset="label" style={[styles.backTxt, { color: palette.text }]}>Back</KISText>
       </Pressable>
 
       <KISText preset="h2" color={palette.text} style={styles.header}>

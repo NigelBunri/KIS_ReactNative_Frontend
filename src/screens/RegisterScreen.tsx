@@ -20,6 +20,7 @@ import { postRequest } from '@/network/post/index';
 import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { ensureDeviceId } from '@/security/e2ee';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useKISTheme } from '@/theme/useTheme';
 import KISText from '@/components/common/KISText';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -38,10 +39,6 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: tokens.spacing.sm,
-    },
-    backIcon: {
-      fontSize: tokens.typography.h3,
-      lineHeight: tokens.typography.h3,
     },
     backText: {
       fontSize: tokens.typography.body,
@@ -251,7 +248,7 @@ export default function RegisterScreen({ navigation }: any) {
             accessibilityLabel="Go back"
             style={styles.backBtn}
           >
-            <KISText preset="h3" color={palette.text} style={styles.backIcon}>←</KISText>
+            <Ionicons name="chevron-back" size={22} color={palette.text} />
             <KISText preset="body" color={palette.text} style={styles.backText}>Back</KISText>
           </Pressable>
         </View>

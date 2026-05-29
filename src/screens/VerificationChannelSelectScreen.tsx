@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -45,10 +46,6 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: tokens.spacing.sm,
-    },
-    backIcon: {
-      fontSize: tokens.typography.h3,
-      lineHeight: tokens.typography.h3,
     },
     container: {
       padding: tokens.spacing['2xl'],
@@ -204,7 +201,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
           accessibilityLabel="Go back"
           style={styles.backBtn}
         >
-          <KISText preset="h3" color={palette.text} style={styles.backIcon}>←</KISText>
+          <Ionicons name="chevron-back" size={22} color={palette.text} />
           <KISText preset="body" color={palette.text}>Back</KISText>
         </Pressable>
       </View>
