@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -59,6 +59,7 @@ function timeAgo(iso: string) {
 export default function TestimonyHubScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const { setAuth, setPhone, callingCode } = useAuth();
   const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
   const currentUserId = useMemo(() => {
@@ -254,7 +255,7 @@ export default function TestimonyHubScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.stickyBar, { backgroundColor: palette.bg, borderTopColor: palette.divider }]}>
+      <View style={[styles.stickyBar, { backgroundColor: palette.bg, borderTopColor: palette.divider, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <Pressable
           onPress={() => navigation.navigate('TestimonyReachInbox')}
           style={[styles.inboxBtn, { backgroundColor: palette.primaryStrong }]}
@@ -299,7 +300,7 @@ function makeStyles(palette: any) {
     chipScroll: { gap: 8, paddingRight: 16 },
     chip: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
     chipText: { fontSize: 13, fontWeight: '600' },
-    stickyBar: { borderTopWidth: 1, padding: 16 },
+    stickyBar: { borderTopWidth: 1, paddingTop: 16, paddingHorizontal: 16 },
     inboxBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14 },
     inboxBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
     badge: { backgroundColor: '#E53935', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },

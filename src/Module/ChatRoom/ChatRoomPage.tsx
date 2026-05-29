@@ -1080,6 +1080,43 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     return `${count} ${noun}`;
   }, [showMessageCount, statusText, messages, messageCountLabel]);
 
+  // Typing users with resolved name + avatar for the in-room indicator
+  const typingUserObjects = useMemo(() => {
+    const convId = conversationId ?? String(storageRoomId);
+    if (!convId) return [];
+    const typingMap = typingByConversation?.[convId] ?? {};
+    const otherIds = Object.keys(typingMap).filter(u => u !== currentUserId);
+    if (otherIds.length === 0) return [];
+
+    const participants = chat?.participants ?? [];
+    return otherIds.map(uid => {
+      // Try to resolve name and avatar from participants list
+      let name = `User ${uid.slice(-4)}`;
+      let avatarUrl: string | null = null;
+      if (Array.isArray(participants)) {
+        for (const p of participants as any[]) {
+          const pId = String(p?.id ?? p?.user?.id ?? p ?? '');
+          if (pId !== uid) continue;
+          name =
+            p?.display_name ??
+            p?.user?.display_name ??
+            p?.user?.username ??
+            name;
+          avatarUrl =
+            p?.user?.profile?.avatar_url ??
+            p?.user?.profile?.avatarUrl ??
+            p?.user?.avatar_url ??
+            p?.user?.avatarUrl ??
+            p?.avatar_url ??
+            p?.avatarUrl ??
+            null;
+          break;
+        }
+      }
+      return { id: uid, name: String(name), avatarUrl: avatarUrl ?? undefined };
+    });
+  }, [typingByConversation, conversationId, storageRoomId, currentUserId, chat?.participants]);
+
   useEffect(() => {
     if (!conversationId) return;
     const isTyping = draft.trim().length > 0;
@@ -1617,6 +1654,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onShowReadReceipts={handleShowReadReceipts}
           onViewOnce={handleViewOnce}
           onLocalDeleteMessage={handleLocalDeleteMessage}
+          typingUsers={typingUserObjects}
           canSend={canSend}
           onLoadOlder={() => {
             const oldest = messages[0];

@@ -349,7 +349,7 @@ export default function KISTextInput({
       </View>
 
       {!!errorText ? (
-        <Text style={[errorStyle, { marginTop: 6 }]}>{errorText}</Text>
+        <Text style={[errorStyle, { marginTop: -16 }]}>{errorText}</Text>
       ) : null}
     </View>
   );

@@ -11,6 +11,7 @@ import type { AttachmentFilePayload } from './ChatRoomPage';
 import type { SimpleContact } from './componets/main/ForAttachments/ContactsModal';
 import type { PollDraft } from './componets/main/ForAttachments/PollModal';
 import type { EventDraft } from './componets/main/ForAttachments/EventModal';
+import TypingIndicator, { type TypingUser } from './componets/main/TypingIndicator';
 
 type Props = {
   chat: Chat | null;
@@ -68,6 +69,7 @@ type Props = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  typingUsers?: TypingUser[];
 };
 
 export default function ChatRoomBody({
@@ -121,6 +123,7 @@ export default function ChatRoomBody({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  typingUsers = [],
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -135,8 +138,8 @@ export default function ChatRoomBody({
   return (
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
-      behavior="padding"
-      keyboardVerticalOffset={insets.top}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <MessageList
         messages={messages}
@@ -166,6 +169,8 @@ export default function ChatRoomBody({
         onLocalDeleteMessage={onLocalDeleteMessage}
         mentionMap={mentionMap}
       />
+
+      <TypingIndicator typingUsers={typingUsers} palette={palette} />
 
       {isChannel && !canPost ? (
         <View

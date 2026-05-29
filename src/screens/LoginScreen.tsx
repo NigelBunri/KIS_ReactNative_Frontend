@@ -1,5 +1,5 @@
 // src/screens/LoginScreen.tsx
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -117,6 +117,11 @@ export default function LoginScreen({ navigation }: any) {
   const [forgotCode, setForgotCode] = useState('');
   const [forgotPassword, setForgotPassword] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
+
+  useEffect(() => {
+    return navigation.addListener('focus', () => setQrLoading(false));
+  }, [navigation]);
 
   const onChangePhoneNumber = useCallback((value: string) => {
     const digits = String(value || '').replace(/[^\d]/g, '').slice(0, 14);
@@ -364,12 +369,20 @@ export default function LoginScreen({ navigation }: any) {
       </KISButton>
 
       <Pressable
-        onPress={() => navigation.navigate('QRScanLogin')}
-        style={[styles.secondaryDeviceBtn, { borderColor: palette.primary }]}
+        onPress={() => {
+          setQrLoading(true);
+          navigation.navigate('QRScanLogin');
+        }}
+        disabled={qrLoading}
+        style={[styles.secondaryDeviceBtn, { borderColor: palette.primary, opacity: qrLoading ? 0.6 : 1 }]}
       >
-        <KISText preset="helper" color={palette.primary} style={{ fontWeight: '700', textAlign: 'center' }}>
-          Log in as a secondary device (scan QR)
-        </KISText>
+        {qrLoading ? (
+          <ActivityIndicator color={palette.primary} size="small" />
+        ) : (
+          <KISText preset="helper" color={palette.primary} style={{ fontWeight: '700', textAlign: 'center' }}>
+            Log in as a secondary device (scan QR)
+          </KISText>
+        )}
       </Pressable>
 
       <Pressable onPress={() => navigation.navigate('ParentRecovery')}>

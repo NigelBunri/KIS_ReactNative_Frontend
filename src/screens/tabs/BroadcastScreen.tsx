@@ -340,50 +340,59 @@ export default function BroadcastScreen() {
             </View>
             {showFilterPanel ? (
               <View style={[styles.headerSection, styles.filterPanel, { padding: compactBroadcast ? 6 : 8 }]}>
-                {FILTER_OPTIONS[activeMainTab].map(option => (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => handleFilterSelect(option.key)}
-                    style={[
-                      styles.filterOption,
-                      {
-                        minWidth: compactBroadcast ? 96 : 120,
-                        paddingHorizontal: compactBroadcast ? 10 : 14,
-                        paddingVertical: compactBroadcast ? 8 : 10,
-                        borderColor:
-                          option.key === currentFilter
-                            ? palette.primary
-                            : palette.divider,
-                        backgroundColor:
-                          option.key === currentFilter
-                            ? palette.primaryStrong
-                            : palette.surface,
-                      },
-                    ]}
-                  >
-                    <Text
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {FILTER_OPTIONS[activeMainTab].map(option => (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => handleFilterSelect(option.key)}
                       style={[
-                        styles.filterOptionLabel,
+                        styles.filterOption,
                         {
-                          color:
+                          minWidth: compactBroadcast ? 96 : 120,
+                          paddingHorizontal: compactBroadcast ? 10 : 14,
+                          paddingVertical: compactBroadcast ? 8 : 10,
+                          marginRight: 0,
+                          marginBottom: 0,
+                          borderColor:
                             option.key === currentFilter
-                              ? palette.onPrimary
-                              : palette.text,
+                              ? palette.primary
+                              : palette.divider,
+                          backgroundColor:
+                            option.key === currentFilter
+                              ? palette.primaryStrong
+                              : palette.surface,
                         },
                       ]}
                     >
-                      {option.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.filterOptionDescription,
-                        { color: option.key === currentFilter ? palette.onPrimary : palette.subtext },
-                      ]}
-                    >
-                      {compactBroadcast ? '' : option.description}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={[
+                          styles.filterOptionLabel,
+                          {
+                            color:
+                              option.key === currentFilter
+                                ? palette.onPrimary
+                                : palette.text,
+                          },
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.filterOptionDescription,
+                          { color: option.key === currentFilter ? palette.onPrimary : palette.subtext },
+                        ]}
+                      >
+                        {compactBroadcast ? '' : option.description}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
               </View>
             ) : null}
           </View>
@@ -394,10 +403,10 @@ export default function BroadcastScreen() {
         >
           <Text style={{ fontSize: 20 }}>🤝</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Real people. Real stories. Real help.</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
+            <Text style={{ color: palette.onPrimaryMuted ?? palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
           </View>
-          <KISIcon name="arrow-left" size={16} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
+          <KISIcon name="arrow-left" size={16} color={palette.onPrimary} style={{ transform: [{ rotate: '180deg' }] }} />
         </Pressable>
         <View
           style={{ paddingHorizontal: responsive.pageGutter }}
@@ -573,8 +582,6 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderColor: palette.goldBorder,
       padding: 10,
       backgroundColor: palette.surface,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
       shadowColor: palette.shadow ?? '#000',
       shadowOpacity: 0.09,
       shadowRadius: 20,

@@ -376,9 +376,17 @@ export const HoldToLockComposer: React.FC<Props> = ({
       onStartShouldSetPanResponder: () =>
         !disabled && voiceModeRef.current === 'idle',
 
+      // On Android the touch can be stolen by parent scroll/keyboard views.
+      // Capture ensures we claim it first.
+      onStartShouldSetPanResponderCapture: () =>
+        !disabled && voiceModeRef.current === 'idle',
+
       // Only grab move events while in hold mode — locked mode buttons must
       // receive their own touches without interference.
       onMoveShouldSetPanResponder: () =>
+        voiceModeRef.current === 'recordingHold',
+
+      onMoveShouldSetPanResponderCapture: () =>
         voiceModeRef.current === 'recordingHold',
 
       onPanResponderGrant: () => {

@@ -22,6 +22,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -727,6 +728,11 @@ function AppContent() {
     <AuthContext.Provider key={`auth-${language}`} value={ctx}>
       <SocketProvider>
         <View key={`app-${language}`} style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#09070D' : '#FFFFFF' }}>
+          <StatusBar
+            translucent={false}
+            backgroundColor={scheme === 'dark' ? '#09070D' : '#FFFFFF'}
+            barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+          />
           <NavigationContainer
             ref={navigationRef}
             key={`nav-${language}`}
@@ -1177,6 +1183,15 @@ function AppContent() {
                       name="TwoFactor"
                       component={TwoFactorScreen}
                       options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="QRScanLogin"
+                      component={QRScanLoginScreen}
+                      options={{ presentation: 'fullScreenModal', headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="ParentRecovery"
+                      component={ParentRecoveryScreen}
                     />
                   </>
                 )}
