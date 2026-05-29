@@ -43,6 +43,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import TermsAndConditionsScreen from './src/screens/TermsAndConditionsScreen';
 import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
+import VerificationChannelSelectScreen from './src/screens/VerificationChannelSelectScreen';
 import TwoFactorScreen from './src/screens/TwoFactorScreen';
 import { MainTabs } from '@/navigation/AppNavigator';
 import type { RootStackParamList } from '@/navigation/types';
@@ -204,6 +205,7 @@ function AppContent() {
 
   const [isAuth, setAuth] = useState(false);
   const [load, setLoad] = useState(false);
+  const [pendingVerificationPhone, setPendingVerificationPhone] = useState<string | null>(null);
   const [_phone, setPhone] = useState<string | null>(null);
   const [user, setUser] = useState<KISUser | null>(null);
   const [showQuickLock, setShowQuickLock] = useState(false);
@@ -401,6 +403,20 @@ function AppContent() {
         console.log('active from backend:', active);
 
         if (active) {
+          // Anti-bypass: tokens exist but phone was never verified (edge case from old data)
+          const phoneVerified = Boolean(
+            (u as any)?.verification?.phone?.verified,
+          );
+          if (!phoneVerified) {
+            const pendingPhone =
+              (u as any)?.phone ||
+              (u as any)?.phone_number ||
+              '';
+            setPendingVerificationPhone(pendingPhone);
+            setUser(null);
+            setAuth(false);
+            return;
+          }
           setUser(u);
           setAuth(true);
         } else if (Number(res?.status) === 429) {
@@ -500,6 +516,24 @@ function AppContent() {
   useEffect(() => {
     console.log('isAuth ->', isAuth);
   }, [isAuth]);
+
+  // After boot, route unverified accounts (has tokens but phone_verified=false) to verification.
+  // Retries until the navigator is ready (onReady fires async after first render).
+  useEffect(() => {
+    if (!booting && pendingVerificationPhone) {
+      const tryNavigate = () => {
+        if (navigationRef.current?.isReady?.()) {
+          navigationRef.current.navigate('VerificationChannelSelect' as any, {
+            phone: pendingVerificationPhone,
+            purpose: 'register',
+          });
+        } else {
+          setTimeout(tryNavigate, 50);
+        }
+      };
+      tryNavigate();
+    }
+  }, [booting, pendingVerificationPhone]);
 
   useEffect(() => {
     if (user?.id) {
@@ -1190,6 +1224,11 @@ function AppContent() {
                         />
                       )}
                     </RootStack.Screen>
+                    <RootStack.Screen
+                      name="VerificationChannelSelect"
+                      component={VerificationChannelSelectScreen}
+                      options={{ headerShown: false }}
+                    />
                     <RootStack.Screen
                       name="TwoFactor"
                       component={TwoFactorScreen}

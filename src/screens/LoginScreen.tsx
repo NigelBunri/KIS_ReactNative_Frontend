@@ -26,9 +26,6 @@ import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { setAuthTokens } from '@/security/authStorage';
 import { KIS_TOKENS } from '@/theme/constants';
 
-const DEFAULT_COUNTRY_ISO = 'CM';
-const DEFAULT_COUNTRY_CODE = '+237';
-
 const makeStyles = (tokens: typeof KIS_TOKENS) =>
   StyleSheet.create({
     root: {
@@ -105,7 +102,7 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
 export default function LoginScreen({ navigation }: any) {
   const { palette, tokens } = useKISTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
-  const { setAuth, setPhone, setUser, countryISO, callingCode, locationReady } = useAuth();
+  const { setAuth, setPhone, setUser } = useAuth();
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -128,41 +125,21 @@ export default function LoginScreen({ navigation }: any) {
     setPhoneNumber(digits);
   }, []);
 
-  const activeCountryCode = useMemo(() => {
-    const digits = String(callingCode || DEFAULT_COUNTRY_CODE).replace(/[^\d]/g, '').slice(0, 4);
-    return digits ? `+${digits}` : DEFAULT_COUNTRY_CODE;
-  }, [callingCode]);
-
-  const activeCountryISO = useMemo(
-    () => String(countryISO || DEFAULT_COUNTRY_ISO).trim().toUpperCase() || DEFAULT_COUNTRY_ISO,
-    [countryISO],
+  const phoneValid = useMemo(
+    () => String(phoneNumber || '').replace(/[^\d]/g, '').length >= 6,
+    [phoneNumber],
   );
 
-  const phoneValid = useMemo(() => {
-    const normalizedCode = String(activeCountryCode || '').replace(/[^\d]/g, '');
-    const normalizedPhone = String(phoneNumber || '').replace(/[^\d]/g, '');
-    if (!normalizedCode || !normalizedPhone) return false;
-    return normalizedPhone.length >= 6;
-  }, [activeCountryCode, phoneNumber]);
-
-  const composedPhone = useMemo(() => {
-    const normalizedCode = String(activeCountryCode || '').replace(/[^\d]/g, '');
-    const normalizedPhone = String(phoneNumber || '').replace(/[^\d]/g, '');
-    if (!normalizedPhone) return '';
-    return `${normalizedCode ? `+${normalizedCode}` : ''}${normalizedPhone}`;
-  }, [activeCountryCode, phoneNumber]);
-
-  const canSubmit = !!locationReady && phoneValid && password.length > 0 && !loading;
+  const canSubmit = phoneValid && password.length > 0 && !loading;
 
   const persistAuth = async (data: any) => {
     const access = data?.access || data?.access_token;
     const refresh = data?.refresh || data?.refresh_token;
     await setAuthTokens({ accessToken: access ?? null, refreshToken: refresh ?? null });
 
-    // Save what the user typed (national or +E.164); optional
-    if (remember && composedPhone) {
-      await AsyncStorage.setItem('user_phone', composedPhone.trim());
-      setPhone?.(composedPhone.trim());
+    if (remember && phoneNumber) {
+      await AsyncStorage.setItem('user_phone', phoneNumber.trim());
+      setPhone?.(phoneNumber.trim());
     } else {
       await AsyncStorage.removeItem('user_phone');
       setPhone?.(null);
@@ -174,16 +151,11 @@ export default function LoginScreen({ navigation }: any) {
       if (!canSubmit) return;
       setLoading(true);
 
-      // Country code is derived from live device location.
       const deviceId = await ensureDeviceId();
-      const normalizedCode = String(activeCountryCode || '').replace(/[^\d]/g, '');
-      const normalizedPhone = String(phoneNumber || '').replace(/[^\d]/g, '');
+      const normalizedPhone = phoneNumber.replace(/[^\d]/g, '');
       const payload = {
-        phone: composedPhone.trim(),
-        phone_country_code: normalizedCode ? `+${normalizedCode}` : '',
         phone_number: normalizedPhone,
         password,
-        country: activeCountryISO,
         device_id: deviceId,
         device_platform: Platform.OS,
       };
@@ -214,9 +186,14 @@ export default function LoginScreen({ navigation }: any) {
             'This account has been disabled. Please contact support.',
           );
         }
+        if (errorCode === 'phone_not_verified') {
+          const phone = res.data?.phone || res.data?.data?.phone || '';
+          navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' });
+          return;
+        }
         if (res?.data?.two_factor_required) {
           navigation.navigate('TwoFactor', {
-            phone: composedPhone.trim(),
+            phone: normalizedPhone,
             tokens: res?.data?.tokens ?? {},
           });
           return;
@@ -239,7 +216,7 @@ export default function LoginScreen({ navigation }: any) {
       await setUserData(resolvedUser, res.data);
       setUser?.(resolvedUser);
       void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
-      setAuth(true); // App.tsx will switch to MainTabs
+      setAuth(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.');
     } finally {
@@ -323,12 +300,6 @@ export default function LoginScreen({ navigation }: any) {
       </KISText>
 
       <KISTextInput
-        label="Country code (auto from location)"
-        value={`${activeCountryISO} ${activeCountryCode}`}
-        editable={false}
-      />
-
-      <KISTextInput
         label="Phone number"
         placeholder="e.g. 676139881"
         autoCapitalize="none"
@@ -337,6 +308,9 @@ export default function LoginScreen({ navigation }: any) {
         onChangeText={onChangePhoneNumber}
         errorText={phoneNumber.length > 0 && !phoneValid ? 'Enter a valid phone number.' : undefined}
       />
+      <KISText preset="helper" color={palette.subtext}>
+        Enter your phone number without the country code
+      </KISText>
 
       <KISTextInput
         label="Password"
@@ -417,15 +391,15 @@ export default function LoginScreen({ navigation }: any) {
               Reset password
             </KISText>
             <KISTextInput
-              label={`Phone (${activeCountryISO})`}
-              placeholder={`e.g. 676139881 or ${activeCountryCode}676139881`}
+              label="Phone number"
+              placeholder="e.g. 237676139881 or +237676139881"
               autoCapitalize="none"
               keyboardType="phone-pad"
               value={forgotPhone}
               onChangeText={setForgotPhone}
               errorText={
                 forgotPhone.length > 0 && !forgotPhoneValid
-                  ? `Enter a valid number or ${activeCountryCode}…`
+                  ? 'Enter a valid phone number (with country code)'
                   : undefined
               }
             />

@@ -8,6 +8,7 @@ const authRoutes = {
     checkLogin: `${API_BASE_URL}/api/v1/users/me/`,
     otp: `${API_BASE_URL}/api/v1/auth/otp/initiate/`,
     sendDeviceCode: `${API_BASE_URL}/api/v1/auth/otp/verify/`,
+    otpChannels: `${API_BASE_URL}/api/v1/auth/otp/channels/`,
     status: `${API_BASE_URL}/api/v1/auth/otp/status/`,
     forgotPassword: `${API_BASE_URL}/api/v1/auth/password/forgot/`,
     resetPassword: `${API_BASE_URL}/api/v1/auth/password/reset/`,

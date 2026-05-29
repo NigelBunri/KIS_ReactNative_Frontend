@@ -390,6 +390,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isActivelyTypingRef = useRef(false);
   const [lockOverride, setLockOverride] = useState<boolean | null>(null);
   const [muteOverride, setMuteOverride] = useState<boolean | null>(null);
   const [requestStateOverride, setRequestStateOverride] = useState<string | null>(null);
@@ -1141,20 +1142,32 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   useEffect(() => {
     if (!conversationId) return;
-    const isTyping = draft.trim().length > 0;
+    const nowTyping = draft.trim().length > 0;
 
     if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
-    typingDebounceRef.current = setTimeout(() => {
-      sendTyping(isTyping);
-    }, 500);
 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    if (isTyping) {
+    if (nowTyping) {
+      // Send start signal immediately on the FIRST keystroke of a typing session.
+      // Subsequent keystrokes just reset the stop timer — no need to re-send.
+      if (!isActivelyTypingRef.current) {
+        isActivelyTypingRef.current = true;
+        sendTyping(true);
+      }
+      // Reset auto-stop: clears any pending stop timer and sets a fresh one.
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
+        isActivelyTypingRef.current = false;
         sendTyping(false);
-      }, 2000);
+      }, 4000);
+    } else {
+      // Draft was cleared (sent or deleted) — stop immediately after a short delay.
+      typingDebounceRef.current = setTimeout(() => {
+        if (isActivelyTypingRef.current) {
+          isActivelyTypingRef.current = false;
+          sendTyping(false);
+        }
+        if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+      }, 300);
     }
 
     return () => {

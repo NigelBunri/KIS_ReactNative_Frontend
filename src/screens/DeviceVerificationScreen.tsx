@@ -3,7 +3,9 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -19,10 +21,16 @@ import { useKISTheme } from '@/theme/useTheme';
 import KISText from '@/components/common/KISText';
 import { KIS_TOKENS } from '@/theme/constants';
 import { useAuth } from '../../App';
+import { setAuthTokens } from '@/security/authStorage';
+import { setUserData } from '@/network/cache';
+import { initE2EE } from '@/security/e2ee';
 
 type RouteParams = {
-  phone?: string | null;   // <-- we expect phone passed from Register
+  phone?: string | null;
   purpose?: 'register' | 'login';
+  channel?: 'sms' | 'email' | 'whatsapp';
+  whatsapp_code?: string | null;
+  whatsapp_link?: string | null;
 };
 
 const makeStyles = (tokens: typeof KIS_TOKENS) =>
@@ -48,22 +56,60 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
       fontSize: tokens.typography.input,
     },
+    whatsappCodeBox: {
+      borderWidth: 2,
+      borderRadius: tokens.radius.lg,
+      padding: tokens.spacing.lg,
+      alignItems: 'center',
+      gap: tokens.spacing.sm,
+    },
+    whatsappCode: {
+      fontSize: tokens.typography.h2,
+      fontWeight: '900',
+      letterSpacing: 4,
+      textAlign: 'center',
+    },
     spacer: { height: tokens.spacing.sm },
   });
 
-export default function DeviceVerificationScreen({ setLoad }: any) {
+export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
   const route = useRoute<any>();
-  const { setAuth } = useAuth();
+  const { setAuth, setUser } = useAuth();
   const params: RouteParams = route?.params || {};
 
   const { palette, tokens } = useKISTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
-  const [phone, setPhone] = useState<string>(params.phone || '');
+  const [phone] = useState<string>(params.phone || '');
   const [purpose] = useState<'register' | 'login'>(params.purpose || 'register');
+  const [channel] = useState<string>(params.channel || 'sms');
+  const [whatsappCode] = useState<string>(params.whatsapp_code || '');
+  const [whatsappLink] = useState<string>(params.whatsapp_link || '');
   const [code, setCode] = useState('');
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingResend, setLoadingResend] = useState(false);
+
+  const isWhatsApp = channel === 'whatsapp';
+
+  const channelLabel = channel === 'email'
+    ? 'email'
+    : channel === 'whatsapp'
+    ? 'WhatsApp'
+    : 'phone';
+
+  const openWhatsApp = async () => {
+    if (!whatsappLink) return;
+    try {
+      const canOpen = await Linking.canOpenURL(whatsappLink);
+      if (canOpen) {
+        await Linking.openURL(whatsappLink);
+      } else {
+        Alert.alert('WhatsApp not found', 'Please install WhatsApp and try again.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open WhatsApp.');
+    }
+  };
 
   const onVerify = async () => {
     try {
@@ -76,23 +122,35 @@ export default function DeviceVerificationScreen({ setLoad }: any) {
       setLoadingVerify(true);
 
       const res = await postRequest(
-        ROUTES.auth.sendDeviceCode, // '/api/v1/auth/otp/verify/'
+        ROUTES.auth.sendDeviceCode,
         { phone: phone.trim(), purpose, code: code.trim() },
         {
           cacheKey: 'DEVICE_CODE_VERIFY',
           cacheType: 'AUTH_CACHE',
           errorMessage: 'Verification failed.',
-        }
+        },
       );
 
       if (!res?.success) {
-        const msg = res?.message || 'Invalid or expired code.';
+        const msg = res?.message || res?.data?.detail || 'Invalid or expired code.';
         return Alert.alert('Verification failed', msg);
       }
 
-      Alert.alert('Verified', 'Your account is now activated.');
-      setAuth?.(true);
+      // OtpVerifyView now returns tokens — store them and transition to app
+      const access = res.data?.access || res.data?.access_token;
+      const refresh = res.data?.refresh || res.data?.refresh_token;
+      if (access) {
+        await setAuthTokens({ accessToken: access, refreshToken: refresh ?? null });
+      }
+      const resolvedUser = res.data?.user ?? null;
+      if (resolvedUser) {
+        await setUserData(resolvedUser, res.data);
+        setUser?.(resolvedUser);
+        void initE2EE(String(resolvedUser.id ?? '')).catch(() => {});
+      }
+
       setLoad?.(true);
+      setAuth?.(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error.');
     } finally {
@@ -100,21 +158,20 @@ export default function DeviceVerificationScreen({ setLoad }: any) {
     }
   };
 
-  // Optional: resend (only if user asks)
   const onResend = async () => {
     try {
       if (!phone.trim()) return Alert.alert('Missing phone', 'Enter your phone.');
       setLoadingResend(true);
       const r = await postRequest(
-        ROUTES.auth.otp, // '/api/v1/auth/otp/initiate/'
-        { phone: phone.trim(), purpose, channel: 'sms' },
-        { errorMessage: 'Failed to resend code.' }
+        ROUTES.auth.otp,
+        { phone: phone.trim(), purpose, channel },
+        { errorMessage: 'Failed to resend code.' },
       );
       if (!r?.success) {
-        const msg = r?.message || 'Please wait and try again.';
+        const msg = r?.message || r?.data?.detail || 'Please wait and try again.';
         return Alert.alert('Resend failed', msg);
       }
-      Alert.alert('Code sent', `We sent a new code to ${phone}.`);
+      Alert.alert('Code sent', `We sent a new code to your ${channelLabel}.`);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error.');
     } finally {
@@ -130,30 +187,33 @@ export default function DeviceVerificationScreen({ setLoad }: any) {
             <KISText preset="h1" style={{ textAlign: 'center', color: palette.text }}>
               Verify your account
             </KISText>
-            <KISText preset="body" color={palette.subtext}>
-              We sent a 6-digit code to your phone.
+            <KISText preset="body" color={palette.subtext} style={{ textAlign: 'center' }}>
+              {isWhatsApp
+                ? 'Send the code below to our WhatsApp number'
+                : `We sent a 6-digit code to your ${channelLabel}`}
             </KISText>
           </View>
 
-          <View style={styles.field}>
-            <KISText preset="label" color={palette.subtext}>
-              Phone (read-only)
-            </KISText>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              editable={false}
-              style={[
-                styles.input,
-                {
-                  borderColor: palette.inputBorder,
-                  backgroundColor: palette.surface,
-                  color: palette.text,
-                  opacity: 0.8,
-                },
-              ]}
+          {isWhatsApp && whatsappCode ? (
+            <View style={[styles.whatsappCodeBox, { borderColor: palette.primary, backgroundColor: palette.surface }]}>
+              <KISText preset="helper" color={palette.subtext}>Your verification code</KISText>
+              <KISText preset="h2" color={palette.primary} style={styles.whatsappCode}>
+                {whatsappCode}
+              </KISText>
+              <KISText preset="helper" color={palette.subtext} style={{ textAlign: 'center' }}>
+                Open WhatsApp and send this code to us, then enter it below once received
+              </KISText>
+            </View>
+          ) : null}
+
+          {isWhatsApp && whatsappLink ? (
+            <KISButton
+              title="Open WhatsApp"
+              onPress={openWhatsApp}
+              variant="primary"
+              size="md"
             />
-          </View>
+          ) : null}
 
           <View style={styles.field}>
             <KISText preset="label" color={palette.subtext}>
@@ -191,7 +251,7 @@ export default function DeviceVerificationScreen({ setLoad }: any) {
           <View style={styles.spacer} />
 
           <KISButton
-            title={loadingResend ? undefined : 'Resend Code'}
+            title={loadingResend ? undefined : `Resend Code${isWhatsApp ? ' via WhatsApp' : ''}`}
             onPress={onResend}
             disabled={loadingResend}
             variant="secondary"
@@ -199,6 +259,18 @@ export default function DeviceVerificationScreen({ setLoad }: any) {
           >
             {loadingResend ? <ActivityIndicator /> : null}
           </KISButton>
+
+          <Pressable
+            onPress={() => {
+              if (navigation?.canGoBack?.()) navigation?.goBack();
+            }}
+            hitSlop={8}
+            style={{ alignItems: 'center', paddingVertical: 8 }}
+          >
+            <KISText preset="helper" color={palette.subtext}>
+              Try a different method
+            </KISText>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

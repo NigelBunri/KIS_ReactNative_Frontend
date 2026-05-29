@@ -18,11 +18,9 @@ import { postRequest } from '@/network/post/index';
 import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { ensureDeviceId } from '@/security/e2ee';
-import { setAuthTokens } from '@/security/authStorage';
 import { useKISTheme } from '@/theme/useTheme';
 import KISText from '@/components/common/KISText';
 import { KIS_TOKENS } from '@/theme/constants';
-import { useAuth } from '../../App';
 
 const createStyles = (tokens: typeof KIS_TOKENS) =>
   StyleSheet.create({
@@ -60,10 +58,6 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
     field: {
       gap: tokens.spacing.sm,
     },
-    label: {
-      fontSize: tokens.typography.body,
-      fontWeight: tokens.typography.weight.semibold,
-    },
     input: {
       borderWidth: 2,
       borderRadius: tokens.radius.lg,
@@ -79,20 +73,24 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
     prefixBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: tokens.spacing.xs,
       borderWidth: 2,
       borderRadius: tokens.radius.lg,
       paddingHorizontal: tokens.spacing.md,
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
-      minWidth: 128,
+      minWidth: 88,
+    },
+    prefixPlus: {
+      fontSize: tokens.typography.body,
+      fontWeight: tokens.typography.weight.semibold,
+      marginRight: 2,
+    },
+    prefixInput: {
+      fontSize: tokens.typography.body,
+      minWidth: 48,
+      padding: 0,
     },
     phoneInput: {
       flex: 1,
-    },
-    readonly: {
-      paddingVertical: Platform.select({ ios: 12, android: 10 }),
-      borderWidth: 2,
-      borderRadius: tokens.radius.lg,
     },
     passwordReqTitle: {
       fontSize: tokens.typography.helper,
@@ -104,11 +102,6 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
     },
     passwordReqItem: {
       fontSize: tokens.typography.helper,
-    },
-    privacy: {
-      textAlign: 'center',
-      fontSize: tokens.typography.helper,
-      marginTop: tokens.spacing.lg,
     },
     termsRow: {
       flexDirection: 'row',
@@ -137,11 +130,6 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
 
 export default function RegisterScreen({ navigation }: any) {
   const { palette, tokens, tone } = useKISTheme();
-  const {
-    countryISO: detectedCountryISO,
-    callingCode: detectedCallingCode,
-    locationReady,
-  } = useAuth();
   const styles = useMemo(() => createStyles(tokens), [tokens]);
   const inputStyle = useMemo(
     () => ({
@@ -149,56 +137,43 @@ export default function RegisterScreen({ navigation }: any) {
       backgroundColor: palette.inputBg,
       color: palette.text,
     }),
-    [palette]
+    [palette],
   );
 
-  // form fields
   const [displayName, setDisplayName] = useState('');
-  const [regPhone, setRegPhone] = useState(''); // national digits only (no +code)
+  const [regPhone, setRegPhone] = useState('');
+  // User manually enters country calling code digits (without +), e.g. "237"
+  const [callingCodeDigits, setCallingCodeDigits] = useState('237');
   const [regPassword, setRegPassword] = useState('');
   const [regPassword2, setRegPassword2] = useState('');
-
-  // ui
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
 
   const onChangeRegPhone = useCallback((value: string) => {
-    const digits = String(value || '').replace(/[^\d]/g, '').slice(0, 14);
-    setRegPhone(digits);
+    setRegPhone(String(value || '').replace(/[^\d]/g, '').slice(0, 14));
   }, []);
 
-  const countryISO = useMemo(
-    () => String(detectedCountryISO || 'CM').trim().toUpperCase() || 'CM',
-    [detectedCountryISO],
+  const onChangeCallingCode = useCallback((value: string) => {
+    // Keep only digits, max 4 (country codes are 1-4 digits)
+    setCallingCodeDigits(String(value || '').replace(/[^\d]/g, '').slice(0, 4));
+  }, []);
+
+  const callingCode = useMemo(
+    () => (callingCodeDigits ? `+${callingCodeDigits}` : ''),
+    [callingCodeDigits],
   );
 
-  const callingCode = useMemo(() => {
-    const digits = String(detectedCallingCode || '+237').replace(/[^\d]/g, '').slice(0, 4);
-    return digits ? `+${digits}` : '+237';
-  }, [detectedCallingCode]);
+  const passwordValid = (pwd: string) =>
+    pwd.length >= 10 &&
+    /[A-Z]/.test(pwd) &&
+    /[a-z]/.test(pwd) &&
+    /[0-9]/.test(pwd);
 
-  // validators
-  const passwordValid = (pwd: string) => {
-    return (
-      pwd.length >= 10 &&
-      /[A-Z]/.test(pwd) &&   // contains uppercase
-      /[a-z]/.test(pwd) &&   // contains lowercase
-      /[0-9]/.test(pwd)      // contains number
-    );
-  };
-
-  const phoneValid = useMemo(() => {
-    const cleaned = regPhone.trim().replace(/[^\d]/g, '');
-    return cleaned.length >= 6;
-  }, [regPhone]);
-  const countryCodeValid = useMemo(
-    () => callingCode.replace(/[^\d]/g, '').length > 0,
-    [callingCode]
-  );
+  const phoneValid = regPhone.trim().replace(/[^\d]/g, '').length >= 6;
+  const countryCodeValid = callingCodeDigits.length >= 1;
   const passwordsMatch = regPassword.length > 0 && regPassword === regPassword2;
 
   const registerReady =
-    !!locationReady &&
     countryCodeValid &&
     phoneValid &&
     passwordValid(regPassword) &&
@@ -206,57 +181,22 @@ export default function RegisterScreen({ navigation }: any) {
     termsAgreed &&
     !loading;
 
-  const persistTokensIfAny = async (payload: any) => {
-    try {
-      const d = payload?.data || payload || {};
-      await setAuthTokens({
-        accessToken: d?.access ?? null,
-        refreshToken: d?.refresh ?? null,
-      });
-    } catch (err: any) {
-      console.warn('[RegisterScreen] failed to persist auth tokens', err?.message);
-    }
-  };
-
-  // Utility: cryptographically-strong 6-digit code
-  const generateOtp = (len: number = 6) => {
-    const digits = '0123456789';
-    let code = '';
-    if (globalThis.crypto?.getRandomValues) {
-      const arr = new Uint32Array(len);
-      globalThis.crypto.getRandomValues(arr);
-      for (let i = 0; i < len; i++) code += digits[arr[i] % 10];
-    } else {
-      for (let i = 0; i < len; i++) code += digits[Math.floor(Math.random() * 10)];
-    }
-    if (/^0+$/.test(code)) return generateOtp(len);
-    return code;
-  };
-
   const onRegister = async () => {
     try {
-      if (!locationReady) {
-        Alert.alert('Location required', 'Enable device location to continue.');
-        return;
-      }
       setLoading(true);
-
-      const normalizedPhoneNumber = regPhone.replace(/[^\d]/g, '');
-      const normalizedCountryDigits = callingCode.replace(/[^\d]/g, '');
-      const normalizedCountryCode = normalizedCountryDigits ? `+${normalizedCountryDigits}` : '';
-      if (!normalizedCountryCode) {
+      const normalizedPhone = regPhone.replace(/[^\d]/g, '');
+      if (!callingCode) {
         return Alert.alert('Registration failed', 'Country code is required.');
       }
-      const phoneE164 = `${normalizedCountryCode}${normalizedPhoneNumber}`;
+      const phoneE164 = `${callingCode}${normalizedPhone}`;
 
       const deviceId = await ensureDeviceId();
       const payload: Record<string, any> = {
         phone: phoneE164,
-        phone_country_code: normalizedCountryCode,
-        phone_number: normalizedPhoneNumber,
+        phone_country_code: callingCode,
+        phone_number: normalizedPhone,
         password: regPassword,
         password2: regPassword2,
-        country: countryISO,
         device_id: deviceId,
         device_platform: Platform.OS,
       };
@@ -277,45 +217,8 @@ export default function RegisterScreen({ navigation }: any) {
         return Alert.alert('Registration failed', msg);
       }
 
-      await persistTokensIfAny(res);
-
-      const user = res.data?.user || res.data || {};
-      const isActive = user?.is_active ?? user?.status === 'active';
-
-      if (isActive) {
-        Alert.alert('Success', 'Account created and activated.', [
-          { text: 'OK', onPress: () => navigation.replace('Login') },
-        ]);
-        return;
-      }
-
-      // Not active yet → generate OTP, ask backend to send SMS via Infobip, then go to verification
-      const code = generateOtp(6);
-
-      const otpInitRes = await postRequest(
-        ROUTES.auth.otp,
-        {
-          phone: phoneE164,
-          code,
-          channel: 'sms',
-          purpose: 'register',
-        },
-        { errorMessage: 'Unable to send verification code.' }
-      );
-
-      if (!otpInitRes?.success) {
-        const msg =
-          otpInitRes?.message ||
-          otpInitRes?.data?.message ||
-          otpInitRes?.data?.detail ||
-          'We could not send your verification code. Please try again.';
-        return Alert.alert('SMS failed', msg);
-      }
-
-      Alert.alert('Almost done', 'We sent you a verification code via SMS.');
-      navigation.navigate('DeviceVerification', {
-        phone: phoneE164,
-      });
+      // Account created — now verify. No tokens yet.
+      navigation.navigate('VerificationChannelSelect', { phone: phoneE164 });
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected issue occurred.');
     } finally {
@@ -324,11 +227,8 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleBack = () => {
-    if (navigation?.canGoBack?.()) {
-      navigation.goBack();
-    } else {
-      navigation.replace?.('Welcome');
-    }
+    if (navigation?.canGoBack?.()) navigation.goBack();
+    else navigation.replace?.('Welcome');
   };
 
   return (
@@ -349,12 +249,8 @@ export default function RegisterScreen({ navigation }: any) {
             accessibilityLabel="Go back"
             style={styles.backBtn}
           >
-            <KISText preset="h3" color={palette.text} style={styles.backIcon}>
-              ←
-            </KISText>
-            <KISText preset="body" color={palette.text} style={styles.backText}>
-              Back
-            </KISText>
+            <KISText preset="h3" color={palette.text} style={styles.backIcon}>←</KISText>
+            <KISText preset="body" color={palette.text} style={styles.backText}>Back</KISText>
           </Pressable>
         </View>
 
@@ -363,18 +259,14 @@ export default function RegisterScreen({ navigation }: any) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerBlock}>
-            <KISText preset="h1" color={palette.text}>
-              Create account
-            </KISText>
+            <KISText preset="h1" color={palette.text}>Create account</KISText>
             <KISText preset="body" color={palette.subtext}>
-              Phone required; country auto-detected
+              Enter your country code and phone number
             </KISText>
           </View>
 
           <View style={styles.field}>
-            <KISText preset="label" color={palette.subtext}>
-              Display Name (optional)
-            </KISText>
+            <KISText preset="label" color={palette.subtext}>Display Name (optional)</KISText>
             <TextInput
               value={displayName}
               onChangeText={setDisplayName}
@@ -386,32 +278,33 @@ export default function RegisterScreen({ navigation }: any) {
           </View>
 
           <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>
-              Phone
-            </KISText>
+            <KISText preset="label" color={palette.text}>Phone</KISText>
             <View style={styles.phoneRow}>
+              {/* Country code input — digits only, user types e.g. 237 */}
               <View
                 style={[
                   styles.prefixBox,
                   {
-                    borderColor: palette.inputBorder,
+                    borderColor: countryCodeValid ? palette.inputBorder : palette.danger,
                     backgroundColor: palette.surface,
                   },
                 ]}
-                accessible
-                accessibilityLabel={`Country ${countryISO}, code ${callingCode}`}
               >
-                <KISText preset="title" color={palette.text}>
-                  {countryISO}
-                </KISText>
-                <KISText preset="title" color={palette.text}>
-                  {callingCode}
-                </KISText>
+                <KISText preset="body" color={palette.subtext} style={styles.prefixPlus}>+</KISText>
+                <TextInput
+                  value={callingCodeDigits}
+                  onChangeText={onChangeCallingCode}
+                  keyboardType="number-pad"
+                  placeholder="237"
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.prefixInput, { color: palette.text }]}
+                  maxLength={4}
+                  accessibilityLabel="Country calling code"
+                />
               </View>
               <TextInput
                 value={regPhone}
                 onChangeText={onChangeRegPhone}
-                autoCapitalize="none"
                 keyboardType="phone-pad"
                 placeholder="6xx xxx xxx"
                 placeholderTextColor={palette.subtext}
@@ -424,12 +317,13 @@ export default function RegisterScreen({ navigation }: any) {
                 textContentType="telephoneNumber"
               />
             </View>
+            <KISText preset="helper" color={palette.subtext}>
+              Enter your country code (e.g. 237 for Cameroon) then your phone number
+            </KISText>
           </View>
 
           <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>
-              Password
-            </KISText>
+            <KISText preset="label" color={palette.text}>Password</KISText>
             <TextInput
               value={regPassword}
               onChangeText={setRegPassword}
@@ -443,63 +337,39 @@ export default function RegisterScreen({ navigation }: any) {
               ]}
               textContentType="newPassword"
             />
-
-            {/* Password Requirements */}
             <View style={styles.passwordReqList}>
               <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
                 Password must include:
               </KISText>
-              <KISText
-                preset="helper"
-                style={[
-                  styles.passwordReqItem,
-                  {
-                    color: regPassword.length === 0 ? palette.subtext : regPassword.length >= 10 ? palette.success : palette.danger,
-                  },
-                ]}
-              >
-                • At least 10 characters
-              </KISText>
-              <KISText
-                preset="helper"
-                style={[
-                  styles.passwordReqItem,
-                  {
-                    color: regPassword.length === 0 ? palette.subtext : /[A-Z]/.test(regPassword) ? palette.success : palette.danger,
-                  },
-                ]}
-              >
-                • One uppercase letter (A-Z)
-              </KISText>
-              <KISText
-                preset="helper"
-                style={[
-                  styles.passwordReqItem,
-                  {
-                    color: regPassword.length === 0 ? palette.subtext : /[a-z]/.test(regPassword) ? palette.success : palette.danger,
-                  },
-                ]}
-              >
-                • One lowercase letter (a-z)
-              </KISText>
-              <KISText
-                preset="helper"
-                style={[
-                  styles.passwordReqItem,
-                  {
-                    color: regPassword.length === 0 ? palette.subtext : /[0-9]/.test(regPassword) ? palette.success : palette.danger,
-                  },
-                ]}
-              >
-                • One number (0-9)
-              </KISText>
+              {[
+                { label: '• At least 10 characters', ok: regPassword.length >= 10 },
+                { label: '• One uppercase letter (A-Z)', ok: /[A-Z]/.test(regPassword) },
+                { label: '• One lowercase letter (a-z)', ok: /[a-z]/.test(regPassword) },
+                { label: '• One number (0-9)', ok: /[0-9]/.test(regPassword) },
+              ].map(({ label, ok }) => (
+                <KISText
+                  key={label}
+                  preset="helper"
+                  style={[
+                    styles.passwordReqItem,
+                    {
+                      color:
+                        regPassword.length === 0
+                          ? palette.subtext
+                          : ok
+                          ? palette.success
+                          : palette.danger,
+                    },
+                  ]}
+                >
+                  {label}
+                </KISText>
+              ))}
             </View>
           </View>
 
           <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>
-              Confirm Password
-            </KISText>
+            <KISText preset="label" color={palette.text}>Confirm Password</KISText>
             <TextInput
               value={regPassword2}
               onChangeText={setRegPassword2}
@@ -515,27 +385,6 @@ export default function RegisterScreen({ navigation }: any) {
             />
           </View>
 
-          {/* Country is auto-detected from device location */}
-          <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>
-              Country
-            </KISText>
-            <View
-              style={[
-                styles.input,
-                styles.readonly,
-                {
-                  borderColor: palette.inputBorder,
-                  backgroundColor: palette.surfaceElevated,
-                },
-              ]}
-            >
-              <KISText preset="title" color={palette.text}>
-                {countryISO}
-              </KISText>
-            </View>
-          </View>
-
           <KISButton
             title={loading ? undefined : 'Create Account'}
             onPress={onRegister}
@@ -546,7 +395,6 @@ export default function RegisterScreen({ navigation }: any) {
             {loading ? <ActivityIndicator /> : null}
           </KISButton>
 
-          {/* Terms agreement checkbox */}
           <Pressable
             onPress={() => setTermsAgreed(v => !v)}
             style={styles.termsRow}

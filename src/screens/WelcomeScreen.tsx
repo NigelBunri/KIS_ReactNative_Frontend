@@ -18,6 +18,8 @@ import { useKISTheme } from '../theme/useTheme';
 import KISButton from '../constants/KISButton';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import KISText from '@/components/common/KISText';
 
 // theme-aware hero illustrations (light/dark)
@@ -36,6 +38,8 @@ const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let welcomeAuthCheckBlockedUntil = 0;
 
 Ionicons.loadFont?.();
+Feather.loadFont?.();
+MaterialCommunityIcons.loadFont?.();
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();

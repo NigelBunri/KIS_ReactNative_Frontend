@@ -13,7 +13,16 @@ export type RootStackParamList = {
     tokens?: { access?: string; refresh?: string };
   };
   DeviceVerification:
-    | { phone?: string | null; email?: string | null }
+    | {
+        phone?: string | null;
+        email?: string | null;
+        channel?: 'sms' | 'email' | 'whatsapp';
+        whatsapp_code?: string | null;
+        whatsapp_link?: string | null;
+      }
+    | undefined;
+  VerificationChannelSelect:
+    | { phone?: string | null; purpose?: 'register' | 'login' }
     | undefined;
   MainTabs: undefined;
   BroadcastDetail: {
