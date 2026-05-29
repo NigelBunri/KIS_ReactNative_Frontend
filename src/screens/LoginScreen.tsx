@@ -188,16 +188,17 @@ export default function LoginScreen({ navigation }: any) {
         }
         const isVerifyRequired =
           errorCode === 'phone_not_verified' ||
-          (res?.message || '').toLowerCase().includes('verif') ||
-          ((res?.data?.detail as string) || '').toLowerCase().includes('verif');
+          String(res?.message ?? '').toLowerCase().includes('verif') ||
+          String(res?.data?.detail ?? '').toLowerCase().includes('verif');
 
         if (isVerifyRequired) {
           // Use server-returned phone (E.164) or fall back to what the user typed
-          const phone =
+          const phone = String(
             res?.data?.phone ||
             res?.data?.data?.phone ||
             normalizedPhone ||
-            '';
+            '',
+          );
           try {
             navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' });
           } catch {

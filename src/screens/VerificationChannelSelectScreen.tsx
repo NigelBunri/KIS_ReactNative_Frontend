@@ -103,7 +103,7 @@ const CHANNEL_META: Record<string, { emoji: string; label: string; description: 
   whatsapp: {
     emoji: '🟢',
     label: 'WhatsApp',
-    description: 'Open WhatsApp and send us the verification code',
+    description: 'We will send a 6-digit code to your WhatsApp number',
   },
 };
 
@@ -112,7 +112,7 @@ const CHANNEL_ORDER = ['sms', 'email', 'whatsapp'];
 export default function VerificationChannelSelectScreen({ navigation }: any) {
   const route = useRoute<any>();
   const params: RouteParams = route?.params || {};
-  const phone = params.phone || '';
+  const phone = String(params.phone || '');
   const purpose = params.purpose || 'register';
 
   const { palette, tokens, tone } = useKISTheme();
@@ -175,8 +175,6 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
       navigation.navigate('DeviceVerification', {
         phone: phone.trim(),
         channel,
-        whatsapp_code: res.data?.whatsapp_code ?? null,
-        whatsapp_link: res.data?.whatsapp_link ?? null,
       });
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error.');

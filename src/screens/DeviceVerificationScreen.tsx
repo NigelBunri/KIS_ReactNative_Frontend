@@ -3,7 +3,6 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -29,8 +28,6 @@ type RouteParams = {
   phone?: string | null;
   purpose?: 'register' | 'login';
   channel?: 'sms' | 'email' | 'whatsapp';
-  whatsapp_code?: string | null;
-  whatsapp_link?: string | null;
 };
 
 const makeStyles = (tokens: typeof KIS_TOKENS) =>
@@ -56,19 +53,6 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
       fontSize: tokens.typography.input,
     },
-    whatsappCodeBox: {
-      borderWidth: 2,
-      borderRadius: tokens.radius.lg,
-      padding: tokens.spacing.lg,
-      alignItems: 'center',
-      gap: tokens.spacing.sm,
-    },
-    whatsappCode: {
-      fontSize: tokens.typography.h2,
-      fontWeight: '900',
-      letterSpacing: 4,
-      textAlign: 'center',
-    },
     spacer: { height: tokens.spacing.sm },
   });
 
@@ -80,11 +64,9 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
   const { palette, tokens } = useKISTheme();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
-  const [phone] = useState<string>(params.phone || '');
+  const [phone] = useState<string>(String(params.phone || ''));
   const [purpose] = useState<'register' | 'login'>(params.purpose || 'register');
   const [channel] = useState<string>(params.channel || 'sms');
-  const [whatsappCode] = useState<string>(params.whatsapp_code || '');
-  const [whatsappLink] = useState<string>(params.whatsapp_link || '');
   const [code, setCode] = useState('');
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingResend, setLoadingResend] = useState(false);
@@ -96,20 +78,6 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
     : channel === 'whatsapp'
     ? 'WhatsApp'
     : 'phone';
-
-  const openWhatsApp = async () => {
-    if (!whatsappLink) return;
-    try {
-      const canOpen = await Linking.canOpenURL(whatsappLink);
-      if (canOpen) {
-        await Linking.openURL(whatsappLink);
-      } else {
-        Alert.alert('WhatsApp not found', 'Please install WhatsApp and try again.');
-      }
-    } catch {
-      Alert.alert('Error', 'Could not open WhatsApp.');
-    }
-  };
 
   const onVerify = async () => {
     try {
@@ -189,31 +157,15 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
             </KISText>
             <KISText preset="body" color={palette.subtext} style={{ textAlign: 'center' }}>
               {isWhatsApp
-                ? 'Send the code below to our WhatsApp number'
+                ? 'We sent a 6-digit code to your WhatsApp number'
                 : `We sent a 6-digit code to your ${channelLabel}`}
             </KISText>
-          </View>
-
-          {isWhatsApp && whatsappCode ? (
-            <View style={[styles.whatsappCodeBox, { borderColor: palette.primary, backgroundColor: palette.surface }]}>
-              <KISText preset="helper" color={palette.subtext}>Your verification code</KISText>
-              <KISText preset="h2" color={palette.primary} style={styles.whatsappCode}>
-                {whatsappCode}
-              </KISText>
+            {isWhatsApp && (
               <KISText preset="helper" color={palette.subtext} style={{ textAlign: 'center' }}>
-                Open WhatsApp and send this code to us, then enter it below once received
+                Open WhatsApp, find the message from KIS, then come back and enter the code below
               </KISText>
-            </View>
-          ) : null}
-
-          {isWhatsApp && whatsappLink ? (
-            <KISButton
-              title="Open WhatsApp"
-              onPress={openWhatsApp}
-              variant="primary"
-              size="md"
-            />
-          ) : null}
+            )}
+          </View>
 
           <View style={styles.field}>
             <KISText preset="label" color={palette.subtext}>
