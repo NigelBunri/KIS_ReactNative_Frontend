@@ -236,9 +236,12 @@ export default function WelcomeScreen() {
               Welcome to KIS
             </KISText>
 
+            <KISText preset="h1" color={palette.text} style={styles.title}>
+              Kingdom Impact Social
+            </KISText>
+
             <KISText preset="body" color={palette.subtext} style={styles.subtitle}>
-              A space for believers to connect, grow, learn, and support one another.
-              Built for today’s world — rooted in faith, guided by purpose, and strengthened in community.
+              A Kingdom of God–centered digital ecosystem designed to restore trust, purpose, righteous stewardship, family safety, discipleship, and transformative human development within the digital world according to God’s original design for humanity.
             </KISText>
 
             <View style={styles.statsRow}>
@@ -320,6 +323,15 @@ export default function WelcomeScreen() {
               KIS | 2026 ·{' '}
               <KISText preset="helper" color="#FF8A33" style={styles.link} onPress={openExternal}>
                 Privacy
+              </KISText>
+              {' · '}
+              <KISText
+                preset="helper"
+                color="#FF8A33"
+                style={styles.link}
+                onPress={() => navigation.navigate('TermsAndConditions')}
+              >
+                Terms
               </KISText>
             </KISText>
           </View>

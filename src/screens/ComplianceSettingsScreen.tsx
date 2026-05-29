@@ -387,7 +387,7 @@ export default function ComplianceSettingsScreen() {
               styles.row,
               pressed && { backgroundColor: palette.surfaceElevated },
             ]}
-            onPress={() => openURL('https://kisapp.com/terms', 'Terms of Service')}
+            onPress={() => navigation.navigate('TermsAndConditions')}
           >
             <View style={styles.rowContent}>
               <Text style={[styles.rowTitle, { color: palette.text }]}>Terms of Service</Text>

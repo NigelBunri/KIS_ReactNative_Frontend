@@ -110,6 +110,26 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       fontSize: tokens.typography.helper,
       marginTop: tokens.spacing.lg,
     },
+    termsRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: tokens.spacing.sm,
+      marginTop: tokens.spacing.lg,
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 4,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 1,
+      flexShrink: 0,
+    },
+    termsText: {
+      flex: 1,
+      lineHeight: 20,
+    },
     spacer: {
       height: tokens.spacing['3xl'],
     },
@@ -140,6 +160,7 @@ export default function RegisterScreen({ navigation }: any) {
 
   // ui
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const onChangeRegPhone = useCallback((value: string) => {
     const digits = String(value || '').replace(/[^\d]/g, '').slice(0, 14);
@@ -182,6 +203,7 @@ export default function RegisterScreen({ navigation }: any) {
     phoneValid &&
     passwordValid(regPassword) &&
     passwordsMatch &&
+    termsAgreed &&
     !loading;
 
   const persistTokensIfAny = async (payload: any) => {
@@ -524,9 +546,48 @@ export default function RegisterScreen({ navigation }: any) {
             {loading ? <ActivityIndicator /> : null}
           </KISButton>
 
-          <KISText preset="helper" color={palette.subtext} style={styles.privacy}>
-            By creating an account, you agree to our Terms and Privacy Policy.
-          </KISText>
+          {/* Terms agreement checkbox */}
+          <Pressable
+            onPress={() => setTermsAgreed(v => !v)}
+            style={styles.termsRow}
+            hitSlop={8}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  borderColor: termsAgreed ? palette.primary : palette.inputBorder,
+                  backgroundColor: termsAgreed ? palette.primary : 'transparent',
+                },
+              ]}
+            >
+              {termsAgreed && (
+                <KISText preset="helper" style={{ color: '#fff', fontWeight: '900', lineHeight: 14 }}>
+                  ✓
+                </KISText>
+              )}
+            </View>
+            <KISText preset="helper" color={palette.subtext} style={styles.termsText}>
+              I have read and agree to the{' '}
+              <KISText
+                preset="helper"
+                color={palette.primary}
+                style={{ fontWeight: '600' }}
+                onPress={() => navigation.navigate('TermsAndConditions')}
+              >
+                Terms & Conditions
+              </KISText>
+              {' '}and{' '}
+              <KISText
+                preset="helper"
+                color={palette.primary}
+                style={{ fontWeight: '600' }}
+                onPress={() => navigation.navigate('TermsAndConditions')}
+              >
+                Privacy Policy
+              </KISText>
+            </KISText>
+          </Pressable>
 
           <View style={styles.spacer} />
         </ScrollView>
