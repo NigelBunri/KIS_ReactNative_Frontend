@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -377,6 +377,45 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [videoFullscreenUri, setVideoFullscreenUri] = useState<string | null>(null);
 
+  // Per-attachment download state (non-image files)
+  const [downloadState, setDownloadState] = useState<Record<string, {
+    progress: number; // 0..1
+    status: 'idle' | 'downloading' | 'done' | 'failed';
+    localPath?: string;
+  }>>({});
+
+  const downloadFile = async (attId: string, url: string, filename: string) => {
+    if (!url) return;
+    setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'downloading' } }));
+    try {
+      let RNBlobUtil: any = null;
+      try { RNBlobUtil = require('react-native-blob-util').default; } catch {}
+
+      if (RNBlobUtil) {
+        const dirs = RNBlobUtil.fs.dirs;
+        const destPath = `${dirs.DownloadDir ?? dirs.DocumentDir}/${filename}`;
+        const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: filename } })
+          .fetch('GET', url);
+        task.progress((received: number, total: number) => {
+          if (total > 0) {
+            setDownloadState(prev => ({ ...prev, [attId]: { progress: received / total, status: 'downloading' } }));
+          }
+        });
+        await task;
+        setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
+        RNBlobUtil.android?.actionViewIntent?.(destPath, 'application/octet-stream').catch(() => {
+          Linking.openURL(url).catch(() => {});
+        });
+      } else {
+        // Fallback: open in browser
+        Linking.openURL(url).catch(() => {});
+        setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done' } }));
+      }
+    } catch {
+      setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
+    }
+  };
+
   const responsive = useResponsiveLayout();
   const width = responsive.width || Dimensions.get('window').width;
   const bubbleMaxWidth = responsive.isTablet ? '68%' : responsive.isWatch ? '92%' : responsive.isCompactPhone ? '88%' : '80%';
@@ -630,6 +669,55 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       ? palette.readStatus ?? palette.primary ?? '#34B7F1'
       : metaColor;
   const showRetry = status === 'failed';
+
+  // Upload progress overlay data (synthetic in-flight bubbles only)
+  const uploadStatus = (message as any)._uploadStatus as
+    | 'verifying' | 'verification_failed' | 'failed'
+    | undefined;
+  const uploadProgress = typeof (message as any)._uploadProgress === 'number'
+    ? (message as any)._uploadProgress as number
+    : undefined;
+
+  const renderUploadOverlay = () => {
+    if (!uploadStatus || !isMe) return null;
+    const pct = uploadProgress != null ? Math.round(uploadProgress * 100) : null;
+    const isVerifFailed = uploadStatus === 'verification_failed';
+    const isFailed = uploadStatus === 'failed' || isVerifFailed;
+    return (
+      <View
+        style={{
+          marginTop: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 8,
+          backgroundColor: isFailed ? 'rgba(220,38,38,0.15)' : 'rgba(0,0,0,0.12)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        {!isFailed && (
+          <ActivityIndicator size="small" color={palette.primary ?? '#C9A227'} />
+        )}
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: isFailed ? '#DC2626' : (isMe ? outgoingTextColor : (palette.subtext ?? '#888')),
+            flexShrink: 1,
+          }}
+        >
+          {isVerifFailed
+            ? 'Verification failed'
+            : isFailed
+            ? 'Upload failed'
+            : pct != null && pct > 0
+            ? `Uploading ${pct}%`
+            : 'Verifying…'}
+        </Text>
+      </View>
+    );
+  };
 
   const reactionEntries = reactions
     ? Object.entries(reactions).filter(
@@ -1186,10 +1274,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {nonImageAtts.map((att) => {
               const iconName = getAttachmentIconName(att);
               const fileSizeLabel = formatFileSize(att.size);
+              const dl = downloadState[att.id] ?? { status: 'idle', progress: 0 };
+              const isDownloading = dl.status === 'downloading';
+              const dlPct = Math.round(dl.progress * 100);
 
               return (
-                <View
+                <Pressable
                   key={att.id}
+                  onPress={() => {
+                    if (dl.status === 'downloading') return;
+                    downloadFile(att.id, att.downloadUrl ?? att.url, att.originalName);
+                  }}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -1199,8 +1294,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     backgroundColor: isMe
                       ? palette.attachmentBgOutgoing ?? '#00000022'
                       : palette.attachmentBgIncoming ?? '#00000011',
+                    overflow: 'hidden',
                   }}
                 >
+                  {/* Download progress bar background */}
+                  {isDownloading && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${dlPct}%`,
+                        backgroundColor: (palette.primary ?? '#C9A227') + '33',
+                      }}
+                    />
+                  )}
                   <View
                     style={{
                       width: responsive.isWatch ? 28 : 32,
@@ -1214,13 +1323,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         : palette.attachmentIconBgIncoming ?? '#00000022',
                     }}
                   >
-                    <KISIcon
-                      name={iconName}
-                      size={responsive.isWatch ? 15 : 18}
-                      color={
-                        isMe ? palette.onPrimary ?? '#fff' : palette.primary
-                      }
-                    />
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color={isMe ? palette.onPrimary ?? '#fff' : palette.primary} />
+                    ) : (
+                      <KISIcon
+                        name={iconName}
+                        size={responsive.isWatch ? 15 : 18}
+                        color={isMe ? palette.onPrimary ?? '#fff' : palette.primary}
+                      />
+                    )}
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -1246,11 +1357,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         marginTop: 2,
                       }}
                     >
-                      {att.mimeType ?? 'file'}
-                      {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
+                      {isDownloading
+                        ? `Downloading ${dlPct}%`
+                        : dl.status === 'done'
+                        ? 'Downloaded'
+                        : dl.status === 'failed'
+                        ? 'Download failed — tap to retry'
+                        : `${att.mimeType ?? 'file'}${fileSizeLabel ? ` • ${fileSizeLabel}` : ''} • Tap to download`}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -2115,6 +2231,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           ) : null}
 
+          {renderUploadOverlay()}
           {renderReactionsRow()}
           {renderRetry()}
 
@@ -2263,6 +2380,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Attachments (images, files, etc.) */}
         {renderAttachments()}
 
+        {renderUploadOverlay()}
         {renderReactionsRow()}
         {renderRetry()}
 

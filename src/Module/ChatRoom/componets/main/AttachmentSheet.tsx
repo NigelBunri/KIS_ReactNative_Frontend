@@ -21,7 +21,7 @@ import {
   AttachmentPreviewPage,
   PreviewKind,
 } from './ForAttachments/AttachmentPreviewPage';
-import type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
+import type { AttachmentFilePayload, FilesType, UploadStatus } from '../../ChatRoomPage';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
 export type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
 
@@ -34,7 +34,7 @@ type AttachmentSheetProps = {
     files: AttachmentFilePayload,
     callbacks?: {
       onProgress?: (uri: string, progress: number) => void;
-      onStatus?: (uri: string, status: 'uploading' | 'done' | 'failed') => void;
+      onStatus?: (uri: string, status: UploadStatus) => void;
     },
   ) => Promise<boolean> | boolean;
 
@@ -100,7 +100,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     caption: string,
     callbacks?: {
       onProgress?: (uri: string, progress: number) => void;
-      onStatus?: (uri: string, status: 'uploading' | 'done' | 'failed') => void;
+      onStatus?: (uri: string, status: UploadStatus) => void;
     },
   ): Promise<boolean> => {
     if (!previewKind || !previewItems.length) {

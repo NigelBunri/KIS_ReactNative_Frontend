@@ -7,8 +7,29 @@ try {
   InCallManager = require('react-native-incall-manager').default;
 } catch {}
 
+// Fallback audio player for ringtone/ringback when InCallManager is unavailable.
+let _arPlayer: any = null;
+const getARPlayer = () => {
+  if (!_arPlayer) {
+    try {
+      const { default: AudioRecorderPlayer } = require('react-native-audio-recorder-player');
+      _arPlayer = new AudioRecorderPlayer();
+    } catch {}
+  }
+  return _arPlayer;
+};
+
+// System ringtone URIs — Android supports content:// for the default ringtone.
+// iOS falls back to vibration only without a bundled audio file.
+const SYSTEM_RINGTONE_URI = Platform.select({
+  android: 'content://settings/system/ringtone',
+  default: undefined,
+});
+
 class AudioRouteManager {
   private _speakerOn = false;
+  private _ringtoneActive = false;
+  private _ringbackActive = false;
 
   start(media: 'voice' | 'video') {
     this._speakerOn = media === 'video';
@@ -52,21 +73,68 @@ class AudioRouteManager {
     return this._speakerOn;
   }
 
+  private _playRingtoneLoop(activeFlag: '_ringtoneActive' | '_ringbackActive') {
+    if (!SYSTEM_RINGTONE_URI) return;
+    const player = getARPlayer();
+    if (!player) return;
+    // Play once, then repeat via progress listener detecting end-of-track
+    const play = () => {
+      if (!this[activeFlag]) return;
+      player.startPlayer(SYSTEM_RINGTONE_URI).catch(() => { this[activeFlag] = false; });
+    };
+    // Use playback progress to detect completion (position ~= duration)
+    player.addPlayBackListener?.((e: any) => {
+      if (!this[activeFlag]) { player.removePlayBackListener?.(); return; }
+      const dur = e?.duration ?? e?.durationMs ?? 0;
+      const pos = e?.currentPosition ?? e?.currentPositionMs ?? 0;
+      if (dur > 0 && pos >= dur - 300) play();
+    });
+    play();
+  }
+
   startRingtone() {
-    try { InCallManager?.startRingtone?.('_DEFAULT_'); } catch {}
+    if (InCallManager) {
+      try { InCallManager.startRingtone('_DEFAULT_'); } catch {}
+      return;
+    }
+    this._ringtoneActive = true;
+    this._playRingtoneLoop('_ringtoneActive');
   }
 
   stopRingtone() {
-    try { InCallManager?.stopRingtone?.(); } catch {}
+    this._ringtoneActive = false;
+    if (InCallManager) {
+      try { InCallManager.stopRingtone(); } catch {}
+      return;
+    }
+    try {
+      const p = getARPlayer();
+      p?.removePlayBackListener?.();
+      p?.stopPlayer?.();
+    } catch {}
   }
 
   // Ringback tone: played on the caller's side while waiting for the remote to answer
   startRingback() {
-    try { InCallManager?.startRingback?.('_DEFAULT_'); } catch {}
+    if (InCallManager) {
+      try { InCallManager.startRingback('_DEFAULT_'); } catch {}
+      return;
+    }
+    this._ringbackActive = true;
+    this._playRingtoneLoop('_ringbackActive');
   }
 
   stopRingback() {
-    try { InCallManager?.stopRingback?.(); } catch {}
+    this._ringbackActive = false;
+    if (InCallManager) {
+      try { InCallManager.stopRingback(); } catch {}
+      return;
+    }
+    try {
+      const p = getARPlayer();
+      p?.removePlayBackListener?.();
+      p?.stopPlayer?.();
+    } catch {}
   }
 }
 

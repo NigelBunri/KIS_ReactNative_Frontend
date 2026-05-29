@@ -7,6 +7,19 @@ import {
   normalizeUploadContext,
   type MediaSafetyPayload,
 } from '@/services/mediaSafety';
+import { FEATURE_FLAGS } from '@/constants/featureFlags';
+
+export class VerificationFailedError extends Error {
+  readonly _verificationFailed = true as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'VerificationFailedError';
+  }
+}
+
+export function isVerificationFailedError(err: unknown): err is VerificationFailedError {
+  return err instanceof VerificationFailedError || (err as any)?._verificationFailed === true;
+}
 export type AttachmentKind =
   | 'image'
   | 'video'
@@ -47,7 +60,7 @@ export async function uploadFileToBackend(opts: {
   deviceId?: string;
   baseUrl?: string; // e.g. https://your-api.com
   onProgress?: (progress: number) => void;
-  onStatus?: (status: 'uploading' | 'done' | 'failed') => void;
+  onStatus?: (status: 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed') => void;
   conversationId?: string;
   clientId?: string;
   metadata?: Record<string, string | number>;
@@ -74,7 +87,7 @@ export async function uploadFileToBackend(opts: {
   const uploadContext = normalizeUploadContext(opts.context || 'chat');
   form.append('context', uploadContext);
 
-  onStatus?.('uploading');
+  onStatus?.('verifying');
   onProgress?.(0);
 
   const params = new URLSearchParams();
@@ -157,18 +170,29 @@ export async function uploadFileToBackend(opts: {
   }
 
   onProgress?.(1);
-  onStatus?.('done');
   const attachment = json?.attachment ?? json;
   const safety = attachment.safety as MediaSafetyPayload | undefined;
-  if (isMediaSafetyBlocked(safety)) {
-    throw new Error(getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.');
+
+  if (FEATURE_FLAGS.MEDIA_VERIFICATION_ENABLED) {
+    const notConfigured = safety?.status === 'not_configured';
+    if (isMediaSafetyBlocked(safety) || notConfigured) {
+      const msg = notConfigured
+        ? 'Verification failed: AI safety keys are not configured on the server.'
+        : (getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.');
+      onStatus?.('verification_failed');
+      throw new VerificationFailedError(msg);
+    }
+    if (
+      ['chat', 'dm', 'group', 'partner', 'status'].includes(uploadContext) &&
+      isMediaSafetyPendingReview(safety)
+    ) {
+      const msg = getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.';
+      onStatus?.('verification_failed');
+      throw new VerificationFailedError(msg);
+    }
   }
-  if (
-    ['chat', 'dm', 'group', 'partner', 'status'].includes(uploadContext) &&
-    isMediaSafetyPendingReview(safety)
-  ) {
-    throw new Error(getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.');
-  }
+
+  onStatus?.('done');
   const durationSeconds =
     typeof attachment.duration_seconds === 'number'
       ? attachment.duration_seconds

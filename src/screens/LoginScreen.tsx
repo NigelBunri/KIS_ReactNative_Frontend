@@ -186,9 +186,34 @@ export default function LoginScreen({ navigation }: any) {
             'This account has been disabled. Please contact support.',
           );
         }
-        if (errorCode === 'phone_not_verified') {
-          const phone = res.data?.phone || res.data?.data?.phone || '';
-          navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' });
+        const isVerifyRequired =
+          errorCode === 'phone_not_verified' ||
+          (res?.message || '').toLowerCase().includes('verif') ||
+          ((res?.data?.detail as string) || '').toLowerCase().includes('verif');
+
+        if (isVerifyRequired) {
+          // Use server-returned phone (E.164) or fall back to what the user typed
+          const phone =
+            res?.data?.phone ||
+            res?.data?.data?.phone ||
+            normalizedPhone ||
+            '';
+          try {
+            navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' });
+          } catch {
+            Alert.alert(
+              'Phone verification required',
+              'Your account needs to be verified before you can log in.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Verify Now',
+                  onPress: () =>
+                    navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' }),
+                },
+              ],
+            );
+          }
           return;
         }
         if (res?.data?.two_factor_required) {

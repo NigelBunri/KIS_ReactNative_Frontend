@@ -3,6 +3,7 @@
 import { Alert, DeviceEventEmitter } from 'react-native';
 import {
   uploadFileToBackend,
+  isVerificationFailedError,
   AttachmentMeta,
 } from './uploadFileToBackend';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
@@ -179,6 +180,7 @@ export const handleSendVoice = async ({
   currentUserId,
   ensureConversationId,
   sendRichMessage,
+  onUploadStatus,
 }: {
   uri: string;
   durationMs: number;
@@ -187,8 +189,13 @@ export const handleSendVoice = async ({
   currentUserId: string;
   ensureConversationId: EnsureConversationId;
   sendRichMessage: SendRichMessage;
+  onUploadStatus?: (status: 'verifying' | 'done' | 'failed' | 'verification_failed') => void;
 }) => {
-  if (!chat || !authToken) return;
+  if (!chat) return;
+  if (!authToken) {
+    Alert.alert('Not signed in', 'You need to be signed in to send voice messages.');
+    return;
+  }
 
   const convId = await ensureConversationId('Voice message');
   if (!convId) return;
@@ -204,12 +211,22 @@ export const handleSendVoice = async ({
       },
       authToken,
       conversationId: String(convId),
+      onStatus: (s) => {
+        if (s === 'verifying' || s === 'done' || s === 'failed' || s === 'verification_failed') {
+          onUploadStatus?.(s);
+        }
+      },
     });
   } catch (error) {
-    showMediaSafetyError(error);
+    // verification_failed: onUploadStatus already called via onStatus callback before throw
+    if (!isVerificationFailedError(error)) {
+      onUploadStatus?.('failed');
+      showMediaSafetyError(error);
+    }
     return;
   }
 
+  onUploadStatus?.('done');
   await sendRichMessage({
     kind: 'voice',
     fromMe: true,
@@ -324,10 +341,11 @@ export const handleSendAttachment = async ({
           },
         });
       } catch (error) {
-        if (file?.uri) {
+        // verification_failed: onStatus already called inside uploadFileToBackend before throw
+        if (file?.uri && !isVerificationFailedError(error)) {
           input?.onStatus?.(file.uri, 'failed');
+          showMediaSafetyError(error);
         }
-        showMediaSafetyError(error);
         return null;
       }
     }),

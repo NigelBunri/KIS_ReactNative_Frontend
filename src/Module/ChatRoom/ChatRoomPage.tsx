@@ -112,11 +112,18 @@ export type FilesType = {
   durationMs?: number | null;
 };
 
+export type UploadStatus = 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed';
+
+type UploadBubble = ChatMessage & {
+  _uploadProgress: number;
+  _uploadStatus: 'verifying' | 'verification_failed' | 'failed';
+};
+
 export type AttachmentFilePayload = {
   files?: FilesType[];
   caption?: string;
   onProgress?: (uri: string, progress: number) => void;
-  onStatus?: (uri: string, status: 'uploading' | 'done' | 'failed') => void;
+  onStatus?: (uri: string, status: UploadStatus) => void;
 };
 
 const normalizeSubRoom = (row: any, parentRoomId: string): SubRoom | null => {
@@ -290,6 +297,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [scheduledQueue, setScheduledQueue] = useState<
     { text: string; scheduledAt: string; timerId: ReturnType<typeof setTimeout> }[]
   >([]);
+
+  const [uploadBubbles, setUploadBubbles] = useState<Record<string, UploadBubble>>({});
+
+  const messagesWithUploads = useMemo(
+    () => [...messages, ...Object.values(uploadBubbles)] as ChatMessage[],
+    [messages, uploadBubbles],
+  );
 
   // Load wallpaper on mount
   useEffect(() => {
@@ -1258,15 +1272,43 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     setGroupUserIdInput('');
   };
 
-  const handleSendVoice = (p: { uri: string; durationMs: number }) =>
-    Handlers.handleSendVoice({
+  const handleSendVoice = useCallback((p: { uri: string; durationMs: number }) => {
+    const bubbleId = `__upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const bubble: UploadBubble = {
+      id: bubbleId,
+      clientId: bubbleId,
+      roomId: String(storageRoomId),
+      senderId: currentUserId,
+      fromMe: true,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+      kind: 'voice',
+      voice: { uri: p.uri, durationMs: p.durationMs },
+      _uploadProgress: 0,
+      _uploadStatus: 'verifying',
+    };
+    setUploadBubbles(prev => ({ ...prev, [bubbleId]: bubble }));
+
+    void Handlers.handleSendVoice({
       ...p,
       chat,
       authToken,
       currentUserId,
       ensureConversationId,
       sendRichMessage,
+      onUploadStatus: (s) => {
+        if (s === 'done') {
+          setUploadBubbles(prev => { const { [bubbleId]: _, ...rest } = prev; return rest; });
+        } else if (s === 'verification_failed' || s === 'failed') {
+          setUploadBubbles(prev => {
+            const b = prev[bubbleId];
+            if (!b) return prev;
+            return { ...prev, [bubbleId]: { ...b, status: 'failed', _uploadStatus: s } };
+          });
+        }
+      },
     });
+  }, [chat, authToken, currentUserId, storageRoomId, ensureConversationId, sendRichMessage]);
 
   const handleSendSticker = (sticker: Sticker) =>
     Handlers.handleSendSticker({
@@ -1278,15 +1320,89 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       sendRichMessage,
     });
 
-  const handleSendAttachment = (input: AttachmentFilePayload) =>
-    Handlers.handleSendAttachment({
-      input,
+  const handleSendAttachment = useCallback((input: AttachmentFilePayload) => {
+    const bubbleId = `__upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const localAttachments = (input.files ?? []).map((f, i) => ({
+      id: `local_${i}`,
+      url: f.uri,
+      originalName: f.name,
+      mimeType: f.type ?? 'application/octet-stream',
+      size: f.size ?? 0,
+    }));
+    const bubble: UploadBubble = {
+      id: bubbleId,
+      clientId: bubbleId,
+      roomId: String(storageRoomId),
+      senderId: currentUserId,
+      fromMe: true,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+      kind: 'text',
+      text: input.caption || undefined,
+      attachments: localAttachments as any,
+      _uploadProgress: 0,
+      _uploadStatus: 'verifying',
+    };
+    setUploadBubbles(prev => ({ ...prev, [bubbleId]: bubble }));
+
+    // Per-file progress tracking
+    const fileProgressMap: Record<string, number> = {};
+    const fileStatusMap: Record<string, UploadStatus> = {};
+    const uris = (input.files ?? []).map(f => f.uri);
+
+    const syncBubble = () => {
+      const progresses = uris.map(u => fileProgressMap[u] ?? 0);
+      const avgProgress = progresses.length ? progresses.reduce((a, b) => a + b, 0) / progresses.length : 0;
+      const anyVerifFailed = uris.some(u => fileStatusMap[u] === 'verification_failed');
+      const anyFailed = uris.some(u => fileStatusMap[u] === 'failed');
+      const allDone = uris.every(u => fileStatusMap[u] === 'done');
+
+      if (allDone) {
+        setUploadBubbles(prev => { const { [bubbleId]: _, ...rest } = prev; return rest; });
+      } else if (anyVerifFailed || anyFailed) {
+        setUploadBubbles(prev => {
+          const b = prev[bubbleId];
+          if (!b) return prev;
+          return { ...prev, [bubbleId]: { ...b, status: 'failed', _uploadProgress: avgProgress, _uploadStatus: anyVerifFailed ? 'verification_failed' : 'failed' } };
+        });
+      } else {
+        setUploadBubbles(prev => {
+          const b = prev[bubbleId];
+          if (!b) return prev;
+          return { ...prev, [bubbleId]: { ...b, _uploadProgress: avgProgress } };
+        });
+      }
+    };
+
+    const wrappedInput: AttachmentFilePayload = {
+      ...input,
+      onProgress: (uri, progress) => {
+        fileProgressMap[uri] = progress;
+        input.onProgress?.(uri, progress);
+        syncBubble();
+      },
+      onStatus: (uri, status) => {
+        fileStatusMap[uri] = status;
+        input.onStatus?.(uri, status);
+        syncBubble();
+      },
+    };
+
+    void Handlers.handleSendAttachment({
+      input: wrappedInput,
       chat,
       authToken,
       currentUserId,
       ensureConversationId,
       sendRichMessage,
+    }).catch(() => {
+      setUploadBubbles(prev => {
+        const b = prev[bubbleId];
+        if (!b) return prev;
+        return { ...prev, [bubbleId]: { ...b, status: 'failed', _uploadStatus: 'failed' } };
+      });
     });
+  }, [chat, authToken, currentUserId, storageRoomId, ensureConversationId, sendRichMessage]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat.sendPendingAttachment', (payload: any) => {
@@ -1642,7 +1758,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
         <ChatRoomBody
           chat={chat}
-          messages={messages}
+          messages={messagesWithUploads}
           palette={palette}
           isChannel={isChannel}
           canPost={canPost}

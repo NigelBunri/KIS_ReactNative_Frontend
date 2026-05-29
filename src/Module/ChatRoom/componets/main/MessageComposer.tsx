@@ -47,7 +47,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import type { SimpleContact } from './ForAttachments/ContactsModal';
 import type { PollDraft } from './ForAttachments/PollModal';
 import type { EventDraft } from './ForAttachments/EventModal';
-import { AttachmentFilePayload } from '../../ChatRoomPage';
+import { AttachmentFilePayload, UploadStatus } from '../../ChatRoomPage';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { searchTenor, TenorGif } from './GifPickerSheet';
 import { LocationPickerSheet } from './LocationPickerSheet';
@@ -923,7 +923,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           const res = await onSendAttachment?.({
             ...files,
             onProgress: callbacks?.onProgress,
-            onStatus: callbacks?.onStatus,
+            onStatus: callbacks?.onStatus as ((uri: string, status: UploadStatus) => void) | undefined,
           });
           return res !== false;
         }}

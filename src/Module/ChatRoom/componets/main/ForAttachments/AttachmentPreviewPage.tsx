@@ -20,6 +20,7 @@ import {
   KISPalette,
 } from '@/theme/constants';
 import type { FilesType } from '../AttachmentSheet';
+import type { UploadStatus } from '../../../ChatRoomPage';
 import { useResponsiveLayout } from '@/theme/responsive';
 
 export type PreviewKind = 'file' | 'audio';
@@ -34,7 +35,7 @@ type AttachmentPreviewPageProps = {
     caption: string,
     callbacks?: {
       onProgress?: (uri: string, progress: number) => void;
-      onStatus?: (uri: string, status: 'uploading' | 'done' | 'failed') => void;
+      onStatus?: (uri: string, status: UploadStatus) => void;
     },
   ) => Promise<boolean> | boolean;
 };
@@ -103,7 +104,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
   const [localItems, setLocalItems] = useState<FilesType[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [uploadStatus, setUploadStatus] = useState<Record<string, 'uploading' | 'done' | 'failed'>>({});
+  const [uploadStatus, setUploadStatus] = useState<Record<string, UploadStatus>>({});
 
   // AUDIO PLAYER STATE
   const audioPlayerRef = useRef(new AudioRecorderPlayer());
@@ -174,7 +175,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
       }));
     };
 
-    const onStatus = (uri: string, status: 'uploading' | 'done' | 'failed') => {
+    const onStatus = (uri: string, status: UploadStatus) => {
       setUploadStatus((prev) => ({
         ...prev,
         [uri]: status,
@@ -436,12 +437,12 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                             marginTop: 4,
                             fontSize: KIS_TOKENS.typography.tiny,
                             color:
-                              status === 'failed'
+                              (status === 'failed' || status === 'verification_failed')
                                 ? palette.error ?? palette.primary
                                 : palette.subtext,
                           }}
                         >
-                          {status === 'failed' ? 'Upload failed' : 'Uploading...'}
+                          {status === 'verification_failed' ? 'Verification failed' : status === 'failed' ? 'Upload failed' : status === 'verifying' ? 'Verifying…' : 'Uploading...'}
                         </Text>
                       )}
                       <View
@@ -569,7 +570,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                               : palette.subtext,
                         }}
                       >
-                        {status === 'failed' ? 'Upload failed' : 'Uploading...'}
+                        {status === 'verification_failed' ? 'Verification failed' : status === 'failed' ? 'Upload failed' : status === 'verifying' ? 'Verifying…' : 'Uploading...'}
                       </Text>
                     )}
                     {status && (
