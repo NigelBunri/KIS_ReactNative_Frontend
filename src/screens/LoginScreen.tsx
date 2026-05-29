@@ -1,5 +1,6 @@
 // src/screens/LoginScreen.tsx
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import {
   View,
   StyleSheet,
@@ -97,6 +98,23 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    phoneRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: tokens.spacing.sm,
+    },
+    prefixBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderRadius: tokens.radius.md,
+      paddingHorizontal: tokens.spacing.md,
+      paddingVertical: Platform.select({ ios: 13, android: 11 }),
+      gap: tokens.spacing.xs,
+    },
+    phoneInput: {
+      flex: 1,
+    },
   });
 
 export default function LoginScreen({ navigation }: any) {
@@ -105,6 +123,9 @@ export default function LoginScreen({ navigation }: any) {
   const { setAuth, setPhone, setUser } = useAuth();
 
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode, setCountryCode] = useState<CountryCode>('CM');
+  const [dialCode, setDialCode] = useState('+237');
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -120,9 +141,24 @@ export default function LoginScreen({ navigation }: any) {
     return navigation.addListener('focus', () => setQrLoading(false));
   }, [navigation]);
 
+  useEffect(() => {
+    AsyncStorage.multiGet(['user_dial_code', 'user_country_code']).then(pairs => {
+      const stored = Object.fromEntries(pairs.map(([k, v]) => [k, v]));
+      if (stored.user_dial_code) setDialCode(stored.user_dial_code);
+      if (stored.user_country_code) setCountryCode(stored.user_country_code as CountryCode);
+    }).catch(() => {});
+  }, []);
+
   const onChangePhoneNumber = useCallback((value: string) => {
     const digits = String(value || '').replace(/[^\d]/g, '').slice(0, 14);
     setPhoneNumber(digits);
+  }, []);
+
+  const onCountrySelect = useCallback((country: Country) => {
+    const code = country.callingCode?.[0];
+    if (code) setDialCode(`+${code}`);
+    setCountryCode(country.cca2 as CountryCode);
+    setCountryPickerVisible(false);
   }, []);
 
   const phoneValid = useMemo(
@@ -153,8 +189,11 @@ export default function LoginScreen({ navigation }: any) {
 
       const deviceId = await ensureDeviceId();
       const normalizedPhone = phoneNumber.replace(/[^\d]/g, '');
+      const phoneE164 = `${dialCode}${normalizedPhone}`;
       const payload = {
+        phone: phoneE164,
         phone_number: normalizedPhone,
+        phone_country_code: dialCode,
         password,
         device_id: deviceId,
         device_platform: Platform.OS,
@@ -325,18 +364,40 @@ export default function LoginScreen({ navigation }: any) {
         Log In
       </KISText>
 
-      <KISTextInput
-        label="Phone number"
-        placeholder="e.g. 676139881"
-        autoCapitalize="none"
-        keyboardType="phone-pad"
-        value={phoneNumber}
-        onChangeText={onChangePhoneNumber}
-        errorText={phoneNumber.length > 0 && !phoneValid ? 'Enter a valid phone number.' : undefined}
-      />
-      <KISText preset="helper" color={palette.subtext}>
-        Enter your phone number without the country code
-      </KISText>
+      <KISText preset="label" color={palette.subtext} style={{ marginBottom: 4 }}>Phone number</KISText>
+      <View style={styles.phoneRow}>
+        <Pressable
+          onPress={() => setCountryPickerVisible(true)}
+          style={[styles.prefixBox, { borderColor: palette.inputBorder, backgroundColor: palette.surface }]}
+          accessibilityLabel="Select country code"
+          accessibilityRole="button"
+        >
+          <KISText preset="body" color={palette.text} style={{ fontWeight: '600' }}>{dialCode}</KISText>
+          <KISText preset="helper" color={palette.subtext}>▾</KISText>
+        </Pressable>
+        {countryPickerVisible && (
+          <CountryPicker
+            visible={countryPickerVisible}
+            countryCode={countryCode}
+            withFilter
+            withCallingCode
+            withFlag
+            withEmoji
+            withCountryNameButton={false}
+            onSelect={onCountrySelect}
+            onClose={() => setCountryPickerVisible(false)}
+          />
+        )}
+        <KISTextInput
+          placeholder="e.g. 676139881"
+          autoCapitalize="none"
+          keyboardType="phone-pad"
+          value={phoneNumber}
+          onChangeText={onChangePhoneNumber}
+          errorText={phoneNumber.length > 0 && !phoneValid ? 'Enter a valid phone number.' : undefined}
+          containerStyle={styles.phoneInput}
+        />
+      </View>
 
       <KISTextInput
         label="Password"

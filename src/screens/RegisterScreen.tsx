@@ -1,5 +1,7 @@
 // src/screens/RegisterScreen.tsx
 import React, { useCallback, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -77,17 +79,12 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       borderRadius: tokens.radius.lg,
       paddingHorizontal: tokens.spacing.md,
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
-      minWidth: 88,
+      minWidth: 80,
+      gap: tokens.spacing.xs,
     },
     prefixPlus: {
       fontSize: tokens.typography.body,
       fontWeight: tokens.typography.weight.semibold,
-      marginRight: 2,
-    },
-    prefixInput: {
-      fontSize: tokens.typography.body,
-      minWidth: 48,
-      padding: 0,
     },
     phoneInput: {
       flex: 1,
@@ -142,8 +139,9 @@ export default function RegisterScreen({ navigation }: any) {
 
   const [displayName, setDisplayName] = useState('');
   const [regPhone, setRegPhone] = useState('');
-  // User manually enters country calling code digits (without +), e.g. "237"
-  const [callingCodeDigits, setCallingCodeDigits] = useState('237');
+  const [countryCode, setCountryCode] = useState<CountryCode>('CM');
+  const [callingCode, setCallingCode] = useState('+237');
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [regPassword, setRegPassword] = useState('');
   const [regPassword2, setRegPassword2] = useState('');
   const [loading, setLoading] = useState(false);
@@ -153,15 +151,12 @@ export default function RegisterScreen({ navigation }: any) {
     setRegPhone(String(value || '').replace(/[^\d]/g, '').slice(0, 14));
   }, []);
 
-  const onChangeCallingCode = useCallback((value: string) => {
-    // Keep only digits, max 4 (country codes are 1-4 digits)
-    setCallingCodeDigits(String(value || '').replace(/[^\d]/g, '').slice(0, 4));
+  const onCountrySelect = useCallback((country: Country) => {
+    const code = country.callingCode?.[0];
+    if (code) setCallingCode(`+${code}`);
+    setCountryCode(country.cca2 as CountryCode);
+    setCountryPickerVisible(false);
   }, []);
-
-  const callingCode = useMemo(
-    () => (callingCodeDigits ? `+${callingCodeDigits}` : ''),
-    [callingCodeDigits],
-  );
 
   const passwordValid = (pwd: string) =>
     pwd.length >= 10 &&
@@ -170,7 +165,7 @@ export default function RegisterScreen({ navigation }: any) {
     /[0-9]/.test(pwd);
 
   const phoneValid = regPhone.trim().replace(/[^\d]/g, '').length >= 6;
-  const countryCodeValid = callingCodeDigits.length >= 1;
+  const countryCodeValid = callingCode.replace(/[^\d]/g, '').length >= 1;
   const passwordsMatch = regPassword.length > 0 && regPassword === regPassword2;
 
   const registerReady =
@@ -195,6 +190,7 @@ export default function RegisterScreen({ navigation }: any) {
         phone: phoneE164,
         phone_country_code: callingCode,
         phone_number: normalizedPhone,
+        country: countryCode,
         password: regPassword,
         password2: regPassword2,
         device_id: deviceId,
@@ -216,6 +212,12 @@ export default function RegisterScreen({ navigation }: any) {
           'Please review your details and try again.';
         return Alert.alert('Registration failed', msg);
       }
+
+      // Persist country selection so login screen can pre-populate it
+      await AsyncStorage.multiSet([
+        ['user_dial_code', callingCode],
+        ['user_country_code', countryCode],
+      ]);
 
       // Account created — now verify. No tokens yet.
       navigation.navigate('VerificationChannelSelect', { phone: phoneE164 });
@@ -280,28 +282,34 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.field}>
             <KISText preset="label" color={palette.text}>Phone</KISText>
             <View style={styles.phoneRow}>
-              {/* Country code input — digits only, user types e.g. 237 */}
-              <View
+              {/* Country picker button */}
+              <Pressable
+                onPress={() => setCountryPickerVisible(true)}
                 style={[
                   styles.prefixBox,
-                  {
-                    borderColor: countryCodeValid ? palette.inputBorder : palette.danger,
-                    backgroundColor: palette.surface,
-                  },
+                  { borderColor: palette.inputBorder, backgroundColor: palette.surface },
                 ]}
+                accessibilityLabel="Select country code"
+                accessibilityRole="button"
               >
-                <KISText preset="body" color={palette.subtext} style={styles.prefixPlus}>+</KISText>
-                <TextInput
-                  value={callingCodeDigits}
-                  onChangeText={onChangeCallingCode}
-                  keyboardType="number-pad"
-                  placeholder="237"
-                  placeholderTextColor={palette.subtext}
-                  style={[styles.prefixInput, { color: palette.text }]}
-                  maxLength={4}
-                  accessibilityLabel="Country calling code"
+                <KISText preset="body" color={palette.text} style={styles.prefixPlus}>
+                  {callingCode}
+                </KISText>
+                <KISText preset="helper" color={palette.subtext}>▾</KISText>
+              </Pressable>
+              {countryPickerVisible && (
+                <CountryPicker
+                  visible={countryPickerVisible}
+                  countryCode={countryCode}
+                  withFilter
+                  withCallingCode
+                  withFlag
+                  withEmoji
+                  withCountryNameButton={false}
+                  onSelect={onCountrySelect}
+                  onClose={() => setCountryPickerVisible(false)}
                 />
-              </View>
+              )}
               <TextInput
                 value={regPhone}
                 onChangeText={onChangeRegPhone}
@@ -318,7 +326,7 @@ export default function RegisterScreen({ navigation }: any) {
               />
             </View>
             <KISText preset="helper" color={palette.subtext}>
-              Enter your country code (e.g. 237 for Cameroon) then your phone number
+              Tap the country code to change it
             </KISText>
           </View>
 
