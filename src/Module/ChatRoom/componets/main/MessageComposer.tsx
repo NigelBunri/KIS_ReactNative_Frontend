@@ -6,6 +6,7 @@ import {
   Text,
   Image,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -48,7 +49,7 @@ import type { PollDraft } from './ForAttachments/PollModal';
 import type { EventDraft } from './ForAttachments/EventModal';
 import { AttachmentFilePayload } from '../../ChatRoomPage';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { GifPickerSheet } from './GifPickerSheet';
+import { searchTenor, TenorGif } from './GifPickerSheet';
 import { LocationPickerSheet } from './LocationPickerSheet';
 import { ScheduleMessageSheet } from './ScheduleMessageSheet';
 
@@ -241,9 +242,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     setCameraVisible(false);
   };
 
-  /* ----------------------------- GIF PICKER ------------------------------- */
-  const [gifPickerVisible, setGifPickerVisible] = useState(false);
-
   /* ----------------------------- LOCATION PICKER -------------------------- */
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
 
@@ -304,7 +302,31 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   /* ----------------------------- PANEL STATE ------------------------------ */
   const [keyboardMode, setKeyboardMode] = useState(true);
   const [panelTab, setPanelTab] =
-    useState<'custom' | 'emoji' | 'stickers'>('emoji');
+    useState<'custom' | 'emoji' | 'stickers' | 'gif'>('emoji');
+
+  /* ----------------------------- INLINE GIF STATE ------------------------- */
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifResults, setGifResults] = useState<TenorGif[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const gifSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchGifs = useCallback(async (q: string) => {
+    setGifLoading(true);
+    try {
+      const results = await searchTenor(q);
+      setGifResults(results);
+    } catch {
+      setGifResults([]);
+    } finally {
+      setGifLoading(false);
+    }
+  }, []);
+
+  const handleGifQueryChange = (text: string) => {
+    setGifQuery(text);
+    if (gifSearchTimerRef.current) clearTimeout(gifSearchTimerRef.current);
+    gifSearchTimerRef.current = setTimeout(() => fetchGifs(text), 400);
+  };
 
   const textInputRef = useRef<TextInput | null>(null);
 
@@ -418,7 +440,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     if (panelTab === 'stickers') {
       loadStickers();
     }
-  }, [panelTab, loadStickers]);
+    if (panelTab === 'gif' && gifResults.length === 0) {
+      fetchGifs('');
+    }
+  }, [panelTab, loadStickers, gifResults.length, fetchGifs]);
 
   const renderPanelContent = () => {
     switch (panelTab) {
@@ -455,6 +480,58 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           />
         );
 
+      case 'gif':
+        return (
+          <View style={{ padding: 10 }}>
+            {/* GIF search bar */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.composerInputBg ?? palette.surface, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 }}>
+              <TextInput
+                value={gifQuery}
+                onChangeText={handleGifQueryChange}
+                placeholder="Search GIFs…"
+                placeholderTextColor={palette.subtext}
+                style={{ flex: 1, color: palette.text, fontSize: 14 }}
+                returnKeyType="search"
+                onSubmitEditing={() => fetchGifs(gifQuery)}
+              />
+              {gifQuery.length > 0 && (
+                <Pressable onPress={() => { setGifQuery(''); fetchGifs(''); }} hitSlop={8}>
+                  <Text style={{ color: palette.subtext, fontSize: 16 }}>✕</Text>
+                </Pressable>
+              )}
+            </View>
+            {gifLoading ? (
+              <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} />
+            ) : (
+              <FlatList
+                data={gifResults}
+                keyExtractor={(g) => g.id}
+                numColumns={2}
+                style={{ maxHeight: 220 }}
+                contentContainerStyle={{ gap: 6 }}
+                columnWrapperStyle={{ gap: 6 }}
+                renderItem={({ item }) => {
+                  const aspectRatio = item.width > 0 && item.height > 0 ? item.width / item.height : 1;
+                  return (
+                    <Pressable
+                      style={{ flex: 1, aspectRatio, borderRadius: 8, overflow: 'hidden', backgroundColor: palette.surface }}
+                      onPress={() => {
+                        onSendGif?.({ url: item.url, previewUrl: item.previewUrl, width: item.width, height: item.height });
+                        setKeyboardMode(true);
+                        textInputRef.current?.focus();
+                      }}
+                    >
+                      <Image source={{ uri: item.previewUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    </Pressable>
+                  );
+                }}
+                ListEmptyComponent={<Text style={{ color: palette.subtext, fontSize: 13, textAlign: 'center', marginTop: 16 }}>No GIFs found</Text>}
+              />
+            )}
+            <Text style={{ color: palette.subtext, fontSize: 10, textAlign: 'center', marginTop: 6 }}>Powered by Tenor</Text>
+          </View>
+        );
+
       default:
         return (
           <AvatarPicker
@@ -472,6 +549,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       { id: 'custom', label: 'Custom' },
       { id: 'emoji', label: 'Emoji' },
       { id: 'stickers', label: 'Stickers' },
+      { id: 'gif', label: 'GIF' },
     ] as const;
 
     return (
@@ -782,27 +860,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               <KISIcon name="camera" size={composerIconGlyph} color={palette.subtext} />
             </Pressable>
 
-            {/* GIF picker */}
-            {!!onSendGif && !isTinyDevice && (
-              <Pressable
-                style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
-                disabled={!!disabled}
-                onPress={() => setGifPickerVisible(true)}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '800', color: palette.subtext }}>GIF</Text>
-              </Pressable>
-            )}
-
-            {/* Location */}
-            {!!onSendLocation && !isTinyDevice && (
-              <Pressable
-                style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
-                disabled={!!disabled}
-                onPress={() => setLocationPickerVisible(true)}
-              >
-                <KISIcon name="pin" size={composerIconGlyph} color={palette.subtext} focused />
-              </Pressable>
-            )}
           </>
         )}
 
@@ -879,6 +936,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         onCreateEvent={(event) => {
           onCreateEvent?.(event);
         }}
+        onShareLocation={onSendLocation ? () => setLocationPickerVisible(true) : undefined}
       />
 
       {/* CAMERA FULL-SCREEN MODAL (ONLY source for images/videos) */}
@@ -888,17 +946,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         onClose={closeCameraModal}
         onCapture={(files) => {
           onSendAttachment?.(files);
-        }}
-      />
-
-      {/* GIF PICKER */}
-      <GifPickerSheet
-        visible={gifPickerVisible}
-        onClose={() => setGifPickerVisible(false)}
-        palette={palette}
-        onSelectGif={(gif) => {
-          onSendGif?.(gif);
-          setGifPickerVisible(false);
         }}
       />
 

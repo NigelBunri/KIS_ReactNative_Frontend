@@ -726,11 +726,14 @@ function AppContent() {
   return (
     <AuthContext.Provider key={`auth-${language}`} value={ctx}>
       <SocketProvider>
-        <View key={`app-${language}`} style={{ flex: 1 }}>
+        <View key={`app-${language}`} style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#09070D' : '#FFFFFF' }}>
           <NavigationContainer
             ref={navigationRef}
             key={`nav-${language}`}
-            theme={scheme === 'dark' ? DarkTheme : DefaultTheme}
+            theme={scheme === 'dark'
+              ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } }
+              : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
+            }
             linking={{
               prefixes: ['kis://'],
               config: {

@@ -41,6 +41,7 @@ type AttachmentSheetProps = {
   onSendContacts?: (contacts: SimpleContact[]) => void;
   onCreatePoll?: (poll: PollDraft) => void;
   onCreateEvent?: (event: EventDraft) => void;
+  onShareLocation?: () => void;
 };
 
 export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
@@ -51,6 +52,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   onSendContacts,
   onCreatePoll,
   onCreateEvent,
+  onShareLocation,
 }) => {
   const cardRadius = kisRadius.xl ?? 20;
   const pickInProgressRef = useRef(false);
@@ -298,6 +300,11 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     setEventVisible(true);
   };
 
+  const handleShareLocationPress = () => {
+    onClose();
+    onShareLocation?.();
+  };
+
   const attachments = [
     {
       key: 'files',
@@ -339,6 +346,14 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       icon: 'calendar' as const,
       color: palette.warning,
       onPress: handleCreateEventPress,
+    },
+    {
+      key: 'location',
+      label: 'Share location',
+      description: 'Send your current pin',
+      icon: 'pin' as const,
+      color: palette.error ?? '#EF4444',
+      onPress: handleShareLocationPress,
     },
   ];
 
@@ -412,8 +427,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
                 marginBottom: KIS_TOKENS.spacing.lg,
               }}
             >
-              Attach files, audio, contacts, polls or events to this
-              conversation.
+              Attach files, audio, contacts, polls, events or share your location.
             </Text>
 
             {/* Options grid */}

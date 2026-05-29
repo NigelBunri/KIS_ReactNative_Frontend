@@ -1351,11 +1351,11 @@ const handleSelectAllChats = useCallback(() => {
       const nextState = toValue ? 'hide' : 'show';
       animatingRef.current = nextState;
       animationRef.current?.stop();
-      animationRef.current = Animated.timing(hideProgress, {
+      animationRef.current = Animated.spring(hideProgress, {
         toValue,
-        duration: 220,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: false, // we still animate layout margins
+        tension: 120,
+        friction: 18,
+        useNativeDriver: false, // layout margins cannot use native driver
       });
       animationRef.current.start(() => {
         animatingRef.current = null;

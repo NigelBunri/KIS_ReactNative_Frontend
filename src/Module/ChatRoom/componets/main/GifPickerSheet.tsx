@@ -18,7 +18,7 @@ import { KISIcon } from '@/constants/kisIcons';
 const TENOR_API_KEY = (process.env as any).TENOR_API_KEY ?? 'LIVDSRZULELA';
 const TENOR_BASE = 'https://tenor.googleapis.com/v2';
 
-type TenorGif = {
+export type TenorGif = {
   id: string;
   title: string;
   url: string;
@@ -27,7 +27,7 @@ type TenorGif = {
   height: number;
 };
 
-async function searchTenor(query: string, limit = 24): Promise<TenorGif[]> {
+export async function searchTenor(query: string, limit = 24): Promise<TenorGif[]> {
   const endpoint = query.trim()
     ? `${TENOR_BASE}/search?q=${encodeURIComponent(query)}&key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`
     : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`;
