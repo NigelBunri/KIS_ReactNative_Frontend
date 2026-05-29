@@ -259,7 +259,7 @@ export default function TestimonyReachInboxScreen() {
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>Reach-out Inbox</Text>
+        <Text style={[styles.headerTitle, { color: palette.onPrimary }]}>Reach-out Inbox</Text>
       </View>
 
       <View style={[styles.tabs, { borderBottomColor: palette.divider }]}>

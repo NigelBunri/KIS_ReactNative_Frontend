@@ -86,11 +86,13 @@ function stringToColor(str: string) {
 }
 
 function buildLabel(users: TypingUser[]): string {
-  if (users.length === 1) return `${users[0].name} is typing`;
-  if (users.length === 2) return `${users[0].name} and ${users[1].name} are typing`;
-  if (users.length === 3)
-    return `${users[0].name}, ${users[1].name} and ${users[2].name} are typing`;
-  return `${users[0].name}, ${users[1].name} and ${users.length - 2} others are typing`;
+  const safe = users.filter(u => u?.name);
+  if (safe.length === 0) return '';
+  if (safe.length === 1) return `${safe[0].name} is typing`;
+  if (safe.length === 2) return `${safe[0].name} and ${safe[1].name} are typing`;
+  if (safe.length === 3)
+    return `${safe[0].name}, ${safe[1].name} and ${safe[2].name} are typing`;
+  return `${safe[0].name}, ${safe[1].name} and ${safe.length - 2} others are typing`;
 }
 
 export default function TypingIndicator({ typingUsers, palette }: Props) {

@@ -166,6 +166,7 @@ const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
 
 const mountedRef = useRef(true);
+const conversationMetaRef = useRef<Record<string, ConversationMetaEntry>>({});
 const metaRefreshQueue = useRef(new Set<string>());
 const metaRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 const metaPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,6 +188,11 @@ useEffect(() => {
     } catch { /* silent */ }
   }).catch(() => {});
 }, []);
+
+// Keep ref in sync so callbacks can read current meta without stale closures
+useEffect(() => {
+  conversationMetaRef.current = conversationMeta;
+}, [conversationMeta]);
 
 // Debounced persistence of unreadCount whenever conversationMeta changes
 useEffect(() => {
@@ -303,7 +309,18 @@ const handleStartQuickCall = useCallback(
 
 const refreshConversations = useCallback(async (force?: boolean) => {
   const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined, !!force);
-  setConversations(convs);
+  // Override server unread counts with local zero-reads — prevents stale server counts
+  // from showing after the user has already read those messages in a prior session.
+  const meta = conversationMetaRef.current;
+  const merged = convs.map(c => {
+    const cId = String((c as any).conversationId ?? c.id ?? '');
+    const localUnread = meta[cId]?.unreadCount;
+    if (typeof localUnread === 'number' && localUnread === 0 && (c.unreadCount ?? 0) > 0) {
+      return { ...c, unreadCount: 0 };
+    }
+    return c;
+  });
+  setConversations(merged);
   if (force) {
     await loadCommunitiesRef.current();
   }
@@ -335,9 +352,19 @@ useEffect(() => {
     }
     const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined);
     if (active) {
-      setConversations(convs);
+      // Apply local zero-read overrides so server's stale unread counts don't re-appear
+      const meta = conversationMetaRef.current;
+      const merged = convs.map(c => {
+        const cId = String((c as any).conversationId ?? c.id ?? '');
+        const localUnread = meta[cId]?.unreadCount;
+        if (typeof localUnread === 'number' && localUnread === 0 && (c.unreadCount ?? 0) > 0) {
+          return { ...c, unreadCount: 0 };
+        }
+        return c;
+      });
+      setConversations(merged);
       // Persist fresh list for offline use
-      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(convs)).catch(() => {});
+      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(merged)).catch(() => {});
     }
   })().catch(() => {});
   return () => {
@@ -1101,12 +1128,15 @@ const handleOpenChat = useCallback((chat: Chat) => {
       ...prev,
       [convId]: { ...prev[convId], unreadCount: 0 },
     }));
-    setConversations(prev =>
-      prev.map(c => {
+    setConversations(prev => {
+      const updated = prev.map(c => {
         const cId = String((c as any).conversationId ?? c.id ?? '');
         return cId === convId ? { ...c, unreadCount: 0 } : c;
-      })
-    );
+      });
+      // Persist immediately so the cache has unreadCount:0 on next reload
+      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
   }
   onOpenChat(chat);
 }, [onOpenChat]);

@@ -47,6 +47,8 @@ type SocketContextValue = {
   isConnected: boolean;
   currentUserId?: string | null;
   typingByConversation?: Record<string, Record<string, number>>;
+  /** userId → display name, populated from typing events when the backend includes senderName */
+  typingDisplayNames?: Record<string, string>;
   presenceByUser?: Record<string, { isOnline: boolean; at: number }>;
   activeCall?: CallSession | null;
   startCall?: (args: StartCallArgs) => Promise<boolean>;
@@ -73,6 +75,7 @@ const SocketContext = createContext<SocketContextValue>({
   isConnected: false,
   currentUserId: null,
   typingByConversation: {},
+  typingDisplayNames: {},
   presenceByUser: {},
   activeCall: null,
 });
@@ -123,6 +126,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [typingByConversation, setTypingByConversation] = useState<Record<string, Record<string, number>>>({});
+  const [typingDisplayNames, setTypingDisplayNames] = useState<Record<string, string>>({});
   const [presenceByUser, setPresenceByUser] = useState<Record<string, { isOnline: boolean; at: number }>>({});
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
 
@@ -712,7 +716,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const convId = payload?.conversationId;
         const userId = payload?.userId;
         const isTyping = payload?.isTyping;
+        const senderName: string | undefined = payload?.senderName ?? payload?.display_name ?? payload?.name;
         if (!convId || !userId) return;
+        // Cache the display name whenever the server provides it
+        if (senderName && senderName !== userId) {
+          setTypingDisplayNames(prev =>
+            prev[userId] === senderName ? prev : { ...prev, [userId]: senderName },
+          );
+        }
         setTypingByConversation(prev => {
           const next = { ...prev };
           const conv = { ...(next[convId] ?? {}) };
@@ -1105,6 +1116,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isConnected,
     currentUserId,
     typingByConversation,
+    typingDisplayNames,
     presenceByUser,
     activeCall,
     startCall,
@@ -1112,7 +1124,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     rejectCall,
     endCall,
     dismissCallUi,
-  }), [socket, isConnected, currentUserId, typingByConversation, presenceByUser, activeCall, startCall, answerCall, rejectCall, endCall, dismissCallUi]);
+  }), [socket, isConnected, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, endCall, dismissCallUi]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 

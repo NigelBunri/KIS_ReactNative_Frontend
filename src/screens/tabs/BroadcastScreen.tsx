@@ -404,7 +404,7 @@ export default function BroadcastScreen() {
           <Text style={{ fontSize: 20 }}>🤝</Text>
           <View style={{ flex: 1 }}>
             <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
-            <Text style={{ color: palette.onPrimaryMuted ?? palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
           </View>
           <KISIcon name="arrow-left" size={16} color={palette.onPrimary} style={{ transform: [{ rotate: '180deg' }] }} />
         </Pressable>

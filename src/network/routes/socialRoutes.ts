@@ -91,6 +91,8 @@ const socialRoutes = {
     threads: `${API_BASE_URL}/api/v1/chats/threads/`,
     setMemberRole: (conversationId: string) =>
       `${API_BASE_URL}/api/v1/chats/conversations/${conversationId}/members/role/`,
+    markRead: (conversationId: string) =>
+      `${API_BASE_URL}/api/v1/chats/conversations/${conversationId}/mark-read/`,
   },
   calls: {
     iceServers: `${API_BASE_URL}/api/v1/calls/ice-servers/`,

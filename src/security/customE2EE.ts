@@ -175,8 +175,25 @@ export async function decryptConversationPayload(
 export async function preloadConversationKey(conversationId: string) {
   try {
     await loadConversationKey(conversationId);
-  } catch (error) {
-    console.warn('[customE2EE] preload failed', error);
+  } catch (error: any) {
+    // Auth errors (session expired / 401) are transient — the token refresh may still be
+    // in-flight when the chat room mounts. Retry once after a short delay.
+    const isAuthError =
+      error?.message?.toLowerCase().includes('session') ||
+      error?.message?.toLowerCase().includes('expired') ||
+      error?.message?.toLowerCase().includes('unauthorized') ||
+      error?.status === 401;
+    if (isAuthError) {
+      setTimeout(async () => {
+        try {
+          await loadConversationKey(conversationId);
+        } catch {
+          // Silently ignore — key will be fetched lazily on first decrypt
+        }
+      }, 3000);
+    } else {
+      console.warn('[customE2EE] preload failed', error);
+    }
   }
 }
 

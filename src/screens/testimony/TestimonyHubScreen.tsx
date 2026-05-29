@@ -302,7 +302,7 @@ function makeStyles(palette: any) {
     chipText: { fontSize: 13, fontWeight: '600' },
     stickyBar: { borderTopWidth: 1, paddingTop: 16, paddingHorizontal: 16 },
     inboxBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14 },
-    inboxBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    inboxBtnText: { color: palette.onPrimary, fontWeight: '700', fontSize: 15 },
     badge: { backgroundColor: '#E53935', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
     badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   });

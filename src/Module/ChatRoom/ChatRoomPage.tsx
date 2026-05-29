@@ -197,7 +197,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const { authToken, currentUserId: authCurrentUserId, currentUserName } =
     useChatAuth(chat);
-  const { typingByConversation, presenceByUser, socket, startCall, currentUserId: socketCurrentUserId } = useSocket();
+  const { typingByConversation, typingDisplayNames, presenceByUser, socket, startCall, currentUserId: socketCurrentUserId } = useSocket();
   const currentUserId = authCurrentUserId || String(socketCurrentUserId ?? '');
 
   /* ------------------------------------------------------------------------ */
@@ -862,6 +862,16 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     setAutoScrollEnabled(true);
   }, [conversationId]);
 
+  // HTTP mark-read — guarantees Django persists the read state even if socket receipts are lost.
+  // Fires once per conversation open; deduplicated by ref so re-renders don't repeat the call.
+  const markedReadRef = useRef<string | null>(null);
+  useEffect(() => {
+    const convId = conversationId ?? chat?.id;
+    if (!convId || markedReadRef.current === String(convId)) return;
+    markedReadRef.current = String(convId);
+    postRequest(ROUTES.chat.markRead(String(convId)), {}).catch(() => {});
+  }, [conversationId, chat?.id]);
+
   useEffect(() => {
     initialUnreadJumpRef.current = null;
   }, [conversationId]);
@@ -1090,18 +1100,24 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
     const participants = chat?.participants ?? [];
     return otherIds.map(uid => {
-      // Try to resolve name and avatar from participants list
-      let name = `User ${uid.slice(-4)}`;
+      let name: string | null = null;
       let avatarUrl: string | null = null;
-      if (Array.isArray(participants)) {
+
+      // 1. Name from typing event itself (backend sends senderName since the fix)
+      const fromTypingEvent = typingDisplayNames?.[uid];
+      if (fromTypingEvent && fromTypingEvent !== uid) name = fromTypingEvent;
+
+      // 2. Structured participant objects (for name + avatar)
+      if (!name && Array.isArray(participants)) {
         for (const p of participants as any[]) {
-          const pId = String(p?.id ?? p?.user?.id ?? p ?? '');
+          if (typeof p === 'string') continue;
+          const pId = String(p?.id ?? p?.user?.id ?? '');
           if (pId !== uid) continue;
           name =
             p?.display_name ??
             p?.user?.display_name ??
             p?.user?.username ??
-            name;
+            null;
           avatarUrl =
             p?.user?.profile?.avatar_url ??
             p?.user?.profile?.avatarUrl ??
@@ -1113,9 +1129,24 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           break;
         }
       }
-      return { id: uid, name: String(name), avatarUrl: avatarUrl ?? undefined };
+
+      // 3. mentionParticipants — only if name differs from the id (not a UUID mapped to itself)
+      if (!name) {
+        const fromMention = mentionParticipants.find(m => m.id === uid);
+        if (fromMention?.name && fromMention.name !== uid) name = fromMention.name;
+      }
+
+      // 4. Message sender name from live/recent messages
+      if (!name) {
+        const msg = messages.find(
+          m => m.senderId === uid && m.senderName,
+        );
+        if (msg?.senderName) name = msg.senderName;
+      }
+
+      return { id: uid, name: name ?? `User ${uid.slice(-4)}`, avatarUrl: avatarUrl ?? undefined };
     });
-  }, [typingByConversation, conversationId, storageRoomId, currentUserId, chat?.participants]);
+  }, [typingByConversation, typingDisplayNames, conversationId, storageRoomId, currentUserId, chat?.participants, mentionParticipants, messages]);
 
   useEffect(() => {
     if (!conversationId) return;
