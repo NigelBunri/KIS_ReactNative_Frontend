@@ -282,13 +282,8 @@ export default function WelcomeScreen() {
 
             <View style={styles.featureGrid}>
               {highlightFeatures.map((item) => (
-                <LinearGradient
-                  key={item.title}
-                  colors={
-                    tone === 'dark'
-                      ? ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']
-                      : ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.2)']
-                  }
+                <View
+                 key={item.title}
                   style={[
                     styles.featureCard,
                     { borderColor: tone === 'dark' ? 'rgba(255,255,255,0.2)' : palette.border },
@@ -305,7 +300,7 @@ export default function WelcomeScreen() {
                   <KISText preset="label" color={palette.subtext} style={styles.featureSubtitle}>
                     {item.subtitle}
                   </KISText>
-                </LinearGradient>
+                </View>
               ))}
             </View>
 
@@ -431,13 +426,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   featureCard: {
-    padding: 16,
+    padding: 18,
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 2,
+    alignItems: 'center',
   },
-  featureTitle: { fontSize: 16, fontWeight: '700' },
-  featureSubtitle: { fontSize: 13, lineHeight: 18 },
+  featureTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 10 },
+  featureSubtitle: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 4 },
   buttons: { width: '100%', marginTop: 18 },
   legal: { textAlign: 'center', marginTop: 20, fontSize: 12 },
   link: { fontWeight: '700' },

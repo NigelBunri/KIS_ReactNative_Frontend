@@ -136,6 +136,9 @@ export default function LoginScreen({ navigation }: any) {
   const [forgotVisible, setForgotVisible] = useState(false);
   const [forgotStep, setForgotStep] = useState<'request' | 'reset'>('request');
   const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotDialCode, setForgotDialCode] = useState('+237');
+  const [forgotCountryCode, setForgotCountryCode] = useState<CountryCode>('CM');
+  const [forgotCountryPickerVisible, setForgotCountryPickerVisible] = useState(false);
   const [forgotCode, setForgotCode] = useState('');
   const [forgotPassword, setForgotPassword] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -148,8 +151,14 @@ export default function LoginScreen({ navigation }: any) {
   useEffect(() => {
     AsyncStorage.multiGet(['user_dial_code', 'user_country_code']).then(pairs => {
       const stored = Object.fromEntries(pairs.map(([k, v]) => [k, v]));
-      if (stored.user_dial_code) setDialCode(stored.user_dial_code);
-      if (stored.user_country_code) setCountryCode(stored.user_country_code as CountryCode);
+      if (stored.user_dial_code) {
+        setDialCode(stored.user_dial_code);
+        setForgotDialCode(stored.user_dial_code);
+      }
+      if (stored.user_country_code) {
+        setCountryCode(stored.user_country_code as CountryCode);
+        setForgotCountryCode(stored.user_country_code as CountryCode);
+      }
     }).catch(() => {});
   }, []);
 
@@ -235,11 +244,11 @@ export default function LoginScreen({ navigation }: any) {
           String(res?.data?.detail ?? '').toLowerCase().includes('verif');
 
         if (isVerifyRequired) {
-          // Use server-returned phone (E.164) or fall back to what the user typed
+          // Prefer server-returned E.164; fall back to locally composed E.164 (dialCode + digits)
           const phone = String(
             res?.data?.phone ||
             res?.data?.data?.phone ||
-            normalizedPhone ||
+            (normalizedPhone ? `${dialCode}${normalizedPhone}` : '') ||
             '',
           );
           try {
@@ -293,19 +302,25 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
-  const forgotPhoneValid = useMemo(() => {
-    if (!forgotPhone) return false;
-    if (forgotPhone.startsWith('+')) {
-      return forgotPhone.replace(/[^\d]/g, '').length >= 8;
-    }
-    return /^\d{6,14}$/.test(forgotPhone);
-  }, [forgotPhone]);
+  const forgotPhoneDigits = useMemo(
+    () => String(forgotPhone || '').replace(/[^\d]/g, ''),
+    [forgotPhone],
+  );
+  const forgotPhoneValid = forgotPhoneDigits.length >= 6;
+  const forgotPhoneE164 = forgotPhoneValid ? `${forgotDialCode}${forgotPhoneDigits}` : '';
+
+  const onForgotCountrySelect = useCallback((country: Country) => {
+    const code = country.callingCode?.[0];
+    if (code) setForgotDialCode(`+${code}`);
+    setForgotCountryCode(country.cca2 as CountryCode);
+    setForgotCountryPickerVisible(false);
+  }, []);
 
   const requestResetCode = async () => {
     try {
       if (!forgotPhoneValid || forgotLoading) return;
       setForgotLoading(true);
-      const payload = { phone: forgotPhone.trim(), channel: 'sms' };
+      const payload = { phone: forgotPhoneE164, channel: 'sms' };
       const res = await postRequest(ROUTES.auth.forgotPassword, payload, {
         errorMessage: 'Unable to send reset code.',
       });
@@ -326,7 +341,7 @@ export default function LoginScreen({ navigation }: any) {
       if (!forgotPhoneValid || !forgotCode || !forgotPassword || forgotLoading) return;
       setForgotLoading(true);
       const payload = {
-        phone: forgotPhone.trim(),
+        phone: forgotPhoneE164,
         code: forgotCode.trim(),
         new_password: forgotPassword,
       };
@@ -340,6 +355,7 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert('Success', 'Password reset. Please log in.');
       setForgotVisible(false);
       setForgotStep('request');
+      setForgotPhone('');
       setForgotCode('');
       setForgotPassword('');
     } catch (e: any) {
@@ -426,7 +442,7 @@ export default function LoginScreen({ navigation }: any) {
 
       <KISButton
         title={loading ? undefined : 'Log In'}
-        onPress={() => onLogin().catch((e: any) => Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.'))}
+        onPress={onLogin}
         disabled={!canSubmit}
       >
         {loading ? <ActivityIndicator /> : null}
@@ -480,19 +496,40 @@ export default function LoginScreen({ navigation }: any) {
             <KISText preset="h3" color={palette.text} style={styles.modalTitle}>
               Reset password
             </KISText>
-            <KISTextInput
-              label="Phone number"
-              placeholder="e.g. 237676139881 or +237676139881"
-              autoCapitalize="none"
-              keyboardType="phone-pad"
-              value={forgotPhone}
-              onChangeText={setForgotPhone}
-              errorText={
-                forgotPhone.length > 0 && !forgotPhoneValid
-                  ? 'Enter a valid phone number (with country code)'
-                  : undefined
-              }
-            />
+            <KISText preset="label" color={palette.subtext} style={{ marginBottom: 6 }}>Phone number</KISText>
+            <View style={styles.phoneRow}>
+              <Pressable
+                onPress={() => setForgotCountryPickerVisible(true)}
+                style={[styles.prefixBox, { borderColor: palette.inputBorder, backgroundColor: palette.surface }]}
+                accessibilityLabel="Select country code"
+                accessibilityRole="button"
+              >
+                <KISText preset="body" color={palette.text} style={{ fontWeight: '600' }}>{forgotDialCode}</KISText>
+                <KISText preset="helper" color={palette.subtext}>▾</KISText>
+              </Pressable>
+              {forgotCountryPickerVisible && (
+                <CountryPicker
+                  visible={forgotCountryPickerVisible}
+                  countryCode={forgotCountryCode}
+                  withFilter
+                  withCallingCode
+                  withFlag
+                  withEmoji
+                  withCountryNameButton={false}
+                  onSelect={onForgotCountrySelect}
+                  onClose={() => setForgotCountryPickerVisible(false)}
+                />
+              )}
+              <KISTextInput
+                placeholder="e.g. 676139881"
+                autoCapitalize="none"
+                keyboardType="phone-pad"
+                value={forgotPhone}
+                onChangeText={text => setForgotPhone(text.replace(/[^\d]/g, '').slice(0, 14))}
+                errorText={forgotPhone.length > 0 && !forgotPhoneValid ? 'Enter a valid phone number.' : undefined}
+                containerStyle={styles.phoneInput}
+              />
+            </View>
             {forgotStep === 'reset' ? (
               <>
                 <KISTextInput
@@ -519,7 +556,13 @@ export default function LoginScreen({ navigation }: any) {
               >
                 {forgotLoading ? <ActivityIndicator /> : null}
               </KISButton>
-              <Pressable onPress={() => setForgotVisible(false)}>
+              <Pressable onPress={() => {
+                setForgotVisible(false);
+                setForgotStep('request');
+                setForgotPhone('');
+                setForgotCode('');
+                setForgotPassword('');
+              }}>
                 <KISText preset="helper" color={palette.subtext}>
                   Cancel
                 </KISText>

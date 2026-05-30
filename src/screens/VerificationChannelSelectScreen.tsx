@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -23,7 +24,7 @@ import { KIS_TOKENS } from '@/theme/constants';
 
 type RouteParams = {
   phone?: string | null;
-  purpose?: 'register' | 'login';
+  purpose?: 'register' | 'login' | 'reset';
 };
 
 type Channels = {
@@ -157,9 +158,10 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
     }
     try {
       setInitiating(channel);
+      const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
       const res = await postRequest(
         ROUTES.auth.otp,
-        { phone: phone.trim(), channel, purpose },
+        { phone: phone.trim(), channel, purpose, device_id: deviceId },
         { errorMessage: 'Failed to start verification.' },
       );
 
@@ -172,6 +174,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
       navigation.navigate('DeviceVerification', {
         phone: phone.trim(),
         channel,
+        purpose,
       });
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error.');

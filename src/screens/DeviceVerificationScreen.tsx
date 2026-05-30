@@ -1,5 +1,5 @@
 // src/screens/DeviceVerificationScreen.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import KISButton from '@/constants/KISButton';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -26,7 +27,7 @@ import { initE2EE } from '@/security/e2ee';
 
 type RouteParams = {
   phone?: string | null;
-  purpose?: 'register' | 'login';
+  purpose?: 'register' | 'login' | 'reset';
   channel?: 'sms' | 'email' | 'whatsapp';
 };
 
@@ -52,8 +53,14 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       paddingHorizontal: 14,
       paddingVertical: Platform.select({ ios: 12, android: 10 }),
       fontSize: tokens.typography.input,
+      textAlign: 'center',
+      letterSpacing: 8,
     },
     spacer: { height: tokens.spacing.sm },
+    cooldownText: {
+      textAlign: 'center',
+      marginTop: tokens.spacing.xs,
+    },
   });
 
 export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
@@ -65,33 +72,59 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   const [phone] = useState<string>(String(params.phone || ''));
-  const [purpose] = useState<'register' | 'login'>(params.purpose || 'register');
+  const [purpose] = useState<'register' | 'login' | 'reset'>(params.purpose || 'register');
   const [channel] = useState<string>(params.channel || 'sms');
   const [code, setCode] = useState('');
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingResend, setLoadingResend] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isWhatsApp = channel === 'whatsapp';
+  const channelLabel = channel === 'email' ? 'email' : channel === 'whatsapp' ? 'WhatsApp' : 'phone';
 
-  const channelLabel = channel === 'email'
-    ? 'email'
-    : channel === 'whatsapp'
-    ? 'WhatsApp'
-    : 'phone';
+  const startCooldown = useCallback((seconds: number) => {
+    setCooldownSeconds(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldownSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
 
-  const onVerify = async () => {
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
+
+  const getDeviceId = useCallback(async () => {
+    return (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+  }, []);
+
+  const getCountry = useCallback(async () => {
+    return (await AsyncStorage.getItem('user_country_code')) || 'CM';
+  }, []);
+
+  const onVerify = useCallback(async () => {
     try {
-      if (!phone.trim()) {
-        return Alert.alert('Missing phone', 'We need your phone number to verify.');
-      }
-      if (!code.trim()) {
-        return Alert.alert('Missing code', 'Please enter the verification code.');
-      }
+      if (!phone.trim()) return Alert.alert('Missing phone', 'We need your phone number to verify.');
+      if (!code.trim()) return Alert.alert('Missing code', 'Please enter the verification code.');
       setLoadingVerify(true);
+
+      const [deviceId, country] = await Promise.all([getDeviceId(), getCountry()]);
 
       const res = await postRequest(
         ROUTES.auth.sendDeviceCode,
-        { phone: phone.trim(), purpose, code: code.trim() },
+        {
+          phone: phone.trim(),
+          purpose,
+          code: code.trim(),
+          device_id: deviceId,
+          device_platform: Platform.OS,
+          country,
+        },
         {
           cacheKey: 'DEVICE_CODE_VERIFY',
           cacheType: 'AUTH_CACHE',
@@ -101,10 +134,22 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
 
       if (!res?.success) {
         const msg = res?.message || res?.data?.detail || 'Invalid or expired code.';
-        return Alert.alert('Verification failed', msg);
+        if (res?.data?.message === 'too many attempts') {
+          Alert.alert('Too many attempts', 'This code is locked. Please request a new one.');
+          setCode('');
+        } else if (res?.data?.debug) {
+          // Temporary diagnostic — remove after fixing
+          const d = res.data.debug;
+          Alert.alert(
+            'Debug: user not found',
+            `Phone raw: ${d.phone_raw}\nNormalized: ${d.phone_normalized}\nVariants: ${d.phone_variants_searched?.join(', ')}\nNational: ${d.national_variants_searched?.join(', ')}\nTotal users in DB: ${d.total_users_in_db}\nRecent users:\n${JSON.stringify(d.recent_users_phones, null, 2)}`,
+          );
+        } else {
+          Alert.alert('Verification failed', msg);
+        }
+        return;
       }
 
-      // OtpVerifyView now returns tokens — store them and transition to app
       const access = res.data?.access || res.data?.access_token;
       const refresh = res.data?.refresh || res.data?.refresh_token;
       if (access) {
@@ -124,21 +169,38 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
     } finally {
       setLoadingVerify(false);
     }
-  };
+  }, [phone, purpose, code, getDeviceId, getCountry, setAuth, setUser, setLoad]);
+
+  // Auto-submit when exactly 6 digits are entered
+  useEffect(() => {
+    if (code.length === 6 && !loadingVerify) {
+      onVerify();
+    }
+  }, [code]); // intentionally omit onVerify to avoid re-triggering on its identity change
 
   const onResend = async () => {
     try {
       if (!phone.trim()) return Alert.alert('Missing phone', 'Enter your phone.');
+      if (cooldownSeconds > 0) return;
       setLoadingResend(true);
+
+      const [deviceId, country] = await Promise.all([getDeviceId(), getCountry()]);
       const r = await postRequest(
         ROUTES.auth.otp,
-        { phone: phone.trim(), purpose, channel },
+        { phone: phone.trim(), purpose, channel, device_id: deviceId, device_platform: Platform.OS, country },
         { errorMessage: 'Failed to resend code.' },
       );
+
       if (!r?.success) {
+        const retryAfter = r?.data?.retry_after;
+        if (retryAfter) startCooldown(Number(retryAfter));
         const msg = r?.message || r?.data?.detail || 'Please wait and try again.';
-        return Alert.alert('Resend failed', msg);
+        Alert.alert('Resend failed', msg);
+        return;
       }
+
+      const cooldown = r?.data?.cooldown ?? 60;
+      startCooldown(cooldown);
       Alert.alert('Code sent', `We sent a new code to your ${channelLabel}.`);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error.');
@@ -173,27 +235,29 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
             </KISText>
             <TextInput
               value={code}
-              onChangeText={setCode}
+              onChangeText={text => setCode(text.replace(/[^\d]/g, '').slice(0, 6))}
               autoCapitalize="none"
               keyboardType="number-pad"
-              placeholder="Enter 6-digit code"
+              placeholder="• • • • • •"
               placeholderTextColor={palette.subtext}
               style={[
                 styles.input,
                 {
-                  borderColor: palette.inputBorder,
+                  borderColor: code.length === 6 ? palette.primary : palette.inputBorder,
                   backgroundColor: palette.surface,
                   color: palette.text,
                 },
               ]}
               maxLength={6}
+              autoFocus
+              textContentType="oneTimeCode"
             />
           </View>
 
           <KISButton
             title={loadingVerify ? undefined : 'Verify & Activate'}
             onPress={onVerify}
-            disabled={loadingVerify || !code.trim()}
+            disabled={loadingVerify || code.trim().length < 6}
             variant="primary"
             size="md"
           >
@@ -203,9 +267,15 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
           <View style={styles.spacer} />
 
           <KISButton
-            title={loadingResend ? undefined : `Resend Code${isWhatsApp ? ' via WhatsApp' : ''}`}
+            title={
+              loadingResend
+                ? undefined
+                : cooldownSeconds > 0
+                ? `Resend in ${cooldownSeconds}s`
+                : `Resend Code${isWhatsApp ? ' via WhatsApp' : ''}`
+            }
             onPress={onResend}
-            disabled={loadingResend}
+            disabled={loadingResend || cooldownSeconds > 0}
             variant="secondary"
             size="md"
           >

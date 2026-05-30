@@ -174,12 +174,16 @@ export default function RegisterScreen({ navigation }: any) {
     !loading;
 
   const onRegister = async () => {
+    const normalizedPhone = regPhone.replace(/[^\d]/g, '');
+    if (!callingCode) {
+      Alert.alert('Registration failed', 'Country code is required.');
+      return;
+    }
+    if (!normalizedPhone || !passwordValid(regPassword) || regPassword !== regPassword2 || !termsAgreed) {
+      return;
+    }
     try {
       setLoading(true);
-      const normalizedPhone = regPhone.replace(/[^\d]/g, '');
-      if (!callingCode) {
-        return Alert.alert('Registration failed', 'Country code is required.');
-      }
       const phoneE164 = `${callingCode}${normalizedPhone}`;
 
       const deviceId = await ensureDeviceId();
@@ -390,16 +394,6 @@ export default function RegisterScreen({ navigation }: any) {
             />
           </View>
 
-          <KISButton
-            title={loading ? undefined : 'Create Account'}
-            onPress={onRegister}
-            disabled={!registerReady}
-            variant="primary"
-            size="md"
-          >
-            {loading ? <ActivityIndicator /> : null}
-          </KISButton>
-
           <Pressable
             onPress={() => setTermsAgreed(v => !v)}
             style={styles.termsRow}
@@ -441,6 +435,16 @@ export default function RegisterScreen({ navigation }: any) {
               </KISText>
             </KISText>
           </Pressable>
+
+          <KISButton
+            title={loading ? undefined : 'Create Account'}
+            onPress={onRegister}
+            disabled={!registerReady}
+            variant="primary"
+            size="md"
+          >
+            {loading ? <ActivityIndicator /> : null}
+          </KISButton>
 
           <View style={styles.spacer} />
         </ScrollView>
