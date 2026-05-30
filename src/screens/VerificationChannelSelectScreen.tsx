@@ -167,7 +167,24 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
 
       if (!res?.success) {
         const msg = res?.message || res?.data?.detail || 'Could not send verification code.';
-        Alert.alert('Verification failed', msg);
+        // Let user proceed to code entry anyway — the override code or a previously
+        // delivered code may still be usable even if the initiation call failed.
+        Alert.alert(
+          'Sending failed',
+          `${msg}\n\nIf you already have a code (or are using the test code), tap "Enter code anyway" to continue.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Enter code anyway',
+              onPress: () =>
+                navigation.navigate('DeviceVerification', {
+                  phone: phone.trim(),
+                  channel,
+                  purpose,
+                }),
+            },
+          ],
+        );
         return;
       }
 
@@ -177,7 +194,23 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
         purpose,
       });
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Unexpected error.');
+      const msg = e?.message ?? 'Unexpected error.';
+      Alert.alert(
+        'Error',
+        `${msg}\n\nTap "Enter code anyway" if you have a code.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Enter code anyway',
+            onPress: () =>
+              navigation.navigate('DeviceVerification', {
+                phone: phone.trim(),
+                channel,
+                purpose,
+              }),
+          },
+        ],
+      );
     } finally {
       setInitiating(null);
     }
