@@ -5,11 +5,32 @@ import { localizeNode, localizeProps, subscribeToLanguageChange, translateString
 
 let installed = false;
 
-const isTextLike = (type: any) => {
-  if (type === Text) return true;
-  const name = String(type?.displayName || type?.name || '');
-  return name === 'Text' || name === 'KISText';
+// ── isTextLike cache ─────────────────────────────────────────────────────────
+// `isTextLike` is called for every JSX element (jsx/jsxs). A plain Map keyed
+// by type reference avoids repeated String() coercion and string comparisons on
+// each call. WeakMap would be ideal but component functions can be primitives
+// (string tags like 'View') so we use a regular Map with a cap to prevent leaks.
+const textLikeCache = new Map<any, boolean>();
+const TEXT_LIKE_CACHE_MAX = 2000;
+
+const isTextLike = (type: any): boolean => {
+  const cached = textLikeCache.get(type);
+  if (cached !== undefined) return cached;
+  let result = false;
+  if (type === Text) {
+    result = true;
+  } else {
+    const name = String(type?.displayName || type?.name || '');
+    result = name === 'Text' || name === 'KISText' || name === 'Animated.Text';
+  }
+  if (textLikeCache.size < TEXT_LIKE_CACHE_MAX) textLikeCache.set(type, result);
+  return result;
 };
+
+// Clear both caches when language changes so stale translations aren't served.
+subscribeToLanguageChange(() => {
+  textLikeCache.clear();
+});
 
 export const installLocalizationRuntime = () => {
   if (installed) return;
@@ -26,22 +47,30 @@ export const installLocalizationRuntime = () => {
     if (typeof jsxRuntime?.jsx === 'function') {
       const orig = jsxRuntime.jsx;
       jsxRuntime.jsx = (type: any, props: any, key?: any) => {
+        if (!isTextLike(type)) {
+          const next = localizeProps(props);
+          return orig(type, next, key);
+        }
         const next = localizeProps(props);
-        if (isTextLike(type) && next) {
+        if (next) {
           return orig(type, { ...next, children: localizeNode(next.children) }, key);
         }
-        return orig(type, next, key);
+        return orig(type, props, key);
       };
     }
 
     if (typeof jsxRuntime?.jsxs === 'function') {
       const orig = jsxRuntime.jsxs;
       jsxRuntime.jsxs = (type: any, props: any, key?: any) => {
+        if (!isTextLike(type)) {
+          const next = localizeProps(props);
+          return orig(type, next, key);
+        }
         const next = localizeProps(props);
-        if (isTextLike(type) && next) {
+        if (next) {
           return orig(type, { ...next, children: localizeNode(next.children) }, key);
         }
-        return orig(type, next, key);
+        return orig(type, props, key);
       };
     }
   } catch {}
@@ -60,8 +89,12 @@ export const installLocalizationRuntime = () => {
         source?: any,
         self?: any,
       ) => {
+        if (!isTextLike(type)) {
+          const next = localizeProps(props);
+          return orig(type, next, key, isStatic, source, self);
+        }
         const next = localizeProps(props);
-        if (isTextLike(type) && next) {
+        if (next) {
           return orig(
             type,
             { ...next, children: localizeNode(next.children) },
@@ -71,7 +104,7 @@ export const installLocalizationRuntime = () => {
             self,
           );
         }
-        return orig(type, next, key, isStatic, source, self);
+        return orig(type, props, key, isStatic, source, self);
       };
     }
   } catch {}
@@ -96,9 +129,4 @@ export const installLocalizationRuntime = () => {
       })),
       options,
     )) as typeof Alert.alert;
-
-  subscribeToLanguageChange(() => {
-    // Keeps this module subscribed so the patched closures always read the
-    // latest activeLanguage on the next render pass.
-  });
 };

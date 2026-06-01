@@ -54,19 +54,45 @@ const LanguageContext = createContext<LanguageContextValue>({
   languages: LANGUAGE_OPTIONS,
 });
 
-const hasLetters = (value: string) => /[A-Za-zÀ-ÿ]/.test(value);
+// ── Translation result cache ─────────────────────────────────────────────────
+// Caches translateString(value, undefined, lang) results per language.
+// Cleared on every language change so stale translations never persist.
+// Bounded to 5000 entries to prevent memory growth in large apps.
+const TRANSLATE_CACHE_MAX = 5000;
+const translateCacheByLang = new Map<LanguageCode, Map<string, string>>();
 
-const isProbablyTranslatable = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  if (!hasLetters(trimmed)) return false;
-  if (/^(https?:\/\/|\.\/|\.\.\/|@\/|#|[A-Za-z]:\\)/.test(trimmed)) return false;
-  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.\/-]+$/.test(trimmed)) return false;
-  if (/^[A-Z0-9_]+$/.test(trimmed) && !trimmed.includes(' ')) return false;
+const getTranslateCache = (lang: LanguageCode): Map<string, string> => {
+  let c = translateCacheByLang.get(lang);
+  if (!c) { c = new Map(); translateCacheByLang.set(lang, c); }
+  return c;
+};
+
+// ── isProbablyTranslatable — cheap checks first ──────────────────────────────
+// Order: fastest rejections first to skip regex on the majority of values.
+const isProbablyTranslatable = (value: string): boolean => {
+  const len = value.length;
+  if (len < 2 || len > 400) return false;
+  // Must contain at least one ASCII letter (cheap charCode check)
+  let hasLetter = false;
+  for (let i = 0; i < len; i++) {
+    const c = value.charCodeAt(i);
+    if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) { hasLetter = true; break; }
+  }
+  if (!hasLetter) return false;
+  // Reject obvious non-text patterns (URLs, paths, ALL_CAPS identifiers)
+  const ch0 = value[0];
+  if (ch0 === '/' || ch0 === '.' || ch0 === '@' || ch0 === '#') return false;
+  if (value.startsWith('http')) return false;
+  // ALL_CAPS_IDENTIFIER with no spaces → likely a constant, not UI text
+  if (!/\s/.test(value) && value === value.toUpperCase() && /^[A-Z0-9_]+$/.test(value)) return false;
+  // File-path-like (contains slash between word chars, no spaces)
+  if (!/\s/.test(value) && /^[A-Za-z0-9_.-]+\//.test(value)) return false;
   return true;
 };
 
 const notifyListeners = () => {
+  // Clear translation cache so the new language is used immediately.
+  translateCacheByLang.clear();
   listeners.forEach((listener) => listener());
 };
 
@@ -98,8 +124,18 @@ export const translateString = (
   value: string,
   params?: Record<string, string | number>,
   language: LanguageCode = activeLanguage,
-) => {
+): string => {
   if (!isProbablyTranslatable(value)) return value;
+  // params-free path uses the per-language result cache.
+  if (!params) {
+    const cache = getTranslateCache(language);
+    const hit = cache.get(value);
+    if (hit !== undefined) return hit;
+    const fallback = resources.en?.[value] ?? value;
+    const result = resources[language]?.[value] ?? fallback;
+    if (cache.size < TRANSLATE_CACHE_MAX) cache.set(value, result);
+    return result;
+  }
   const fallback = resources.en?.[value] ?? value;
   const translated = resources[language]?.[value] ?? fallback;
   return interpolate(translated, params);
@@ -113,17 +149,26 @@ export const localizeNode = (value: any): any => {
 
 export const localizeProps = <T extends Record<string, any> | null | undefined>(props: T): T => {
   if (!props || props.disableLocalization) return props;
+  // Fast-path: if none of the props keys are in the translatable set, return as-is
+  // without allocating a new object. This is the common case for most components.
+  const keys = Object.keys(props);
+  let hasTranslatableKey = false;
+  for (let i = 0; i < keys.length; i++) {
+    if (PROP_NAMES_TO_TRANSLATE.has(keys[i])) { hasTranslatableKey = true; break; }
+  }
+  if (!hasTranslatableKey) return props;
   let changed = false;
   const nextProps: Record<string, any> = { ...props };
-  Object.keys(nextProps).forEach((key) => {
-    if (!PROP_NAMES_TO_TRANSLATE.has(key)) return;
-    if (typeof nextProps[key] !== 'string') return;
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (!PROP_NAMES_TO_TRANSLATE.has(key)) continue;
+    if (typeof nextProps[key] !== 'string') continue;
     const translated = translateString(nextProps[key]);
     if (translated !== nextProps[key]) {
       nextProps[key] = translated;
       changed = true;
     }
-  });
+  }
   return (changed ? nextProps : props) as T;
 };
 

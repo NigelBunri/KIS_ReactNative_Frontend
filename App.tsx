@@ -573,10 +573,13 @@ function AppContent() {
 
     const registerPushToken = async () => {
       try {
-        const token = await AsyncStorage.getItem('push_token');
-        const fallbackToken = await AsyncStorage.getItem('fcm_token');
-        const apnsToken = await AsyncStorage.getItem('apns_token');
-        const deviceId = await AsyncStorage.getItem('device_id');
+        // Read all four tokens concurrently instead of sequentially.
+        const [token, fallbackToken, apnsToken, deviceId] = await Promise.all([
+          AsyncStorage.getItem('push_token'),
+          AsyncStorage.getItem('fcm_token'),
+          AsyncStorage.getItem('apns_token'),
+          AsyncStorage.getItem('device_id'),
+        ]);
         const finalToken = token || fallbackToken;
 
         if (!active) return;

@@ -190,18 +190,28 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         category: channelForm.category.trim(),
         is_public: true,
       });
-      if (!created?.id) {
-        setChannelError('Unable to create this channel. Try another handle.');
-        return;
-      }
       setSelectedChannelId(created.id);
       setLastCreatedHandle(created.handle || created.display_name || 'channel');
       setChannelForm(EMPTY_FORM);
-      // Keep form open so the user can immediately create another channel.
-      // Tab stays on the current view — no auto-jump.
       await refresh();
     } catch (err: any) {
-      setChannelError(err?.message || 'Unable to create this channel.');
+      const raw = String(err?.message || '');
+      const isHandleTaken =
+        raw.toLowerCase().includes('handle') ||
+        raw.toLowerCase().includes('already') ||
+        raw.toLowerCase().includes('unique') ||
+        raw.toLowerCase().includes('exists');
+      const isThrottle =
+        raw.toLowerCase().includes('throttl') ||
+        raw.toLowerCase().includes('too many') ||
+        raw.toLowerCase().includes('requests');
+      if (isHandleTaken) {
+        setChannelError('That handle is already taken. Try a different one.');
+      } else if (isThrottle) {
+        setChannelError(`Too many requests. Wait a moment and try again.${raw.includes('Try again') ? ' ' + raw.split('Try again')[1] : ''}`);
+      } else {
+        setChannelError(raw || 'Unable to create this channel.');
+      }
     } finally {
       setCreatingChannel(false);
     }

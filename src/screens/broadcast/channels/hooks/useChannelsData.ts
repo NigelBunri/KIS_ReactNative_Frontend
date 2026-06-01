@@ -188,10 +188,15 @@ export const fetchChannelDetail = async (handleOrId: string): Promise<BroadcastC
   return normalizeChannel(response.data) as BroadcastChannelDetail | null;
 };
 
-export const createBroadcastChannel = async (payload: Record<string, any>): Promise<BroadcastChannelDetail | null> => {
+export const createBroadcastChannel = async (payload: Record<string, any>): Promise<BroadcastChannelDetail> => {
   const response = await postRequest(CHANNELS_ENDPOINT, payload, { errorMessage: 'Unable to create channel.' });
-  if (!response?.success) return null;
-  return normalizeChannel(response.data) as BroadcastChannelDetail | null;
+  if (!response?.success) {
+    // Surface the real server message (e.g. "handle already taken", throttle message)
+    // instead of losing it so callers can show the right error to the user.
+    const msg = response?.message || response?.data?.detail || response?.data?.handle?.[0] || 'Unable to create channel.';
+    throw new Error(msg);
+  }
+  return normalizeChannel(response.data) as BroadcastChannelDetail;
 };
 
 export const fetchChannelContents = async (

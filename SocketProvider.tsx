@@ -1140,55 +1140,58 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    const flushRoom = async (roomId: string) => {
+      const messages = await loadMessages(roomId);
+      const pending = messages.filter(
+        m => m.status === 'pending' || m.status === 'failed',
+      );
+      if (pending.length === 0) { await unmarkRoomHasPending(roomId); return; }
+      await Promise.all(pending.map(msg =>
+        new Promise<void>((resolve) => {
+          socket.timeout(20000).emit(
+            'chat.send',
+            {
+              conversationId: msg.conversationId ?? roomId,
+              kind: msg.kind ?? 'text',
+              clientId: msg.clientId,
+              text: msg.text,
+              replyToId: msg.replyToId ?? null,
+              attachments: msg.attachments?.length ? msg.attachments : undefined,
+              styledText: msg.styledText ?? null,
+              voice: msg.voice ?? null,
+              sticker: msg.sticker ?? null,
+              contacts: msg.contacts,
+              poll: msg.poll,
+              event: msg.event,
+              encrypted: false,
+            },
+            async (err: any, ack: any) => {
+              if (!err && ack?.ok && ack?.serverId) {
+                await bulkUpdateMessages(roomId, m =>
+                  m.clientId === msg.clientId
+                    ? { ...m, status: 'sent' as any, serverId: ack.serverId, isLocalOnly: false }
+                    : m,
+                );
+              }
+              resolve();
+            },
+          );
+        }),
+      ));
+      const remaining = await loadMessages(roomId);
+      if (!remaining.some(m => m.status === 'pending' || m.status === 'failed')) {
+        await unmarkRoomHasPending(roomId);
+      }
+    };
+
     const flush = async () => {
       try {
         const rooms = await getAllRoomsWithPendingMessages();
-        for (const roomId of rooms) {
-          const messages = await loadMessages(roomId);
-          const pending = messages.filter(
-            m => m.status === 'pending' || m.status === 'failed',
-          );
-          if (pending.length === 0) {
-            await unmarkRoomHasPending(roomId);
-            continue;
-          }
-          for (const msg of pending) {
-            await new Promise<void>((resolve) => {
-              socket.timeout(20000).emit(
-                'chat.send',
-                {
-                  conversationId: msg.conversationId ?? roomId,
-                  kind: msg.kind ?? 'text',
-                  clientId: msg.clientId,
-                  text: msg.text,
-                  replyToId: msg.replyToId ?? null,
-                  attachments: msg.attachments?.length ? msg.attachments : undefined,
-                  styledText: msg.styledText ?? null,
-                  voice: msg.voice ?? null,
-                  sticker: msg.sticker ?? null,
-                  contacts: msg.contacts,
-                  poll: msg.poll,
-                  event: msg.event,
-                  encrypted: false,
-                },
-                async (err: any, ack: any) => {
-                  if (!err && ack?.ok && ack?.serverId) {
-                    await bulkUpdateMessages(roomId, m =>
-                      m.clientId === msg.clientId
-                        ? { ...m, status: 'sent' as any, serverId: ack.serverId, isLocalOnly: false }
-                        : m,
-                    );
-                  }
-                  resolve();
-                },
-              );
-            });
-          }
-          const remaining = await loadMessages(roomId);
-          const stillPending = remaining.some(
-            m => m.status === 'pending' || m.status === 'failed',
-          );
-          if (!stillPending) await unmarkRoomHasPending(roomId);
+        // Process rooms in parallel batches of 5 — avoids blocking the socket
+        // event loop with a long sequential chain on accounts with many rooms.
+        const BATCH = 5;
+        for (let i = 0; i < rooms.length; i += BATCH) {
+          await Promise.all(rooms.slice(i, i + BATCH).map(flushRoom));
         }
       } catch (err) {
         if (__DEV__) console.warn('[SocketProvider] global flush error', err);

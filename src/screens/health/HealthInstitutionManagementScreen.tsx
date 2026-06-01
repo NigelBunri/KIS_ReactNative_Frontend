@@ -328,11 +328,17 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
 
       const result = await fetchHealthProfileState();
       setHasHealthProfile(result.exists);
-      const list = Array.isArray(result.profile?.institutions)
+      const serverList: any[] = Array.isArray(result.profile?.institutions)
         ? result.profile.institutions
         : [];
-      setInstitutions(list);
-      const match = list.find((inst: any) => inst.id === initialParams.id);
+      // Merge: keep any locally-created institutions the server hasn't returned
+      // yet (e.g. due to propagation delay or a throttled refresh).
+      setInstitutions((prev) => {
+        const serverIds = new Set(serverList.map((i: any) => i.id));
+        const localOnly = prev.filter((i: any) => i.id && !serverIds.has(i.id));
+        return [...serverList, ...localOnly];
+      });
+      const match = serverList.find((inst: any) => inst.id === initialParams.id);
       if (match) {
         setForm((prev) => ({
           ...prev,
@@ -418,6 +424,8 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
         ? await updateHealthInstitutions(nextInstitutions)
         : await createHealthProfile(nextInstitutions);
       if (!res?.success) throw new Error(res?.message || 'Unable to update institution.');
+      // Apply the optimistic state immediately so the list updates without
+      // waiting for the server round-trip (which may be slow or throttled).
       setInstitutions(nextInstitutions);
       setForm((prev) => ({
         ...prev,
@@ -440,7 +448,9 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
           employees: Math.max(count, 1),
         });
       }
-      await loadInstitutions();
+      // Background refresh — silently merge server state but never wipe the
+      // newly created entry if the server response is throttled/stale.
+      loadInstitutions().catch(() => {});
     } catch (error: any) {
       Alert.alert('Manage institution', error?.message || 'Unable to update institution.');
     } finally {

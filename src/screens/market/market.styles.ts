@@ -201,8 +201,9 @@ export const marketStyles = StyleSheet.create({
     flex: 1,
     borderTopLeftRadius: 28,
     borderBottomLeftRadius: 28,
-    paddingBottom: 24,
-    overflow: 'hidden',
+    // overflow: 'hidden' removed — it clips the ScrollView's touch recognizer
+    // on Android, preventing scroll gestures from registering inside the drawer.
+    // Border radius still works for visual rounded corners without clipping.
   },
   drawerHeader: {
     flexDirection: 'row',

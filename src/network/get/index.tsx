@@ -10,11 +10,24 @@ import { recordRedactedPerformanceEvent, computeRetryDelayMs } from '@/services/
 
 export type GetResponse<T = any> = ApiResult<T>;
 
+// Cache device_id in memory after the first AsyncStorage read so every
+// subsequent GET request doesn't pay the async storage lookup cost.
+let _cachedDeviceId: string | null | undefined = undefined; // undefined = not yet loaded
+const getCachedDeviceId = async (): Promise<string | null> => {
+  if (_cachedDeviceId !== undefined) return _cachedDeviceId;
+  _cachedDeviceId = await AsyncStorage.getItem('device_id');
+  return _cachedDeviceId;
+};
+
 const inflightGetRequests = new Map<string, Promise<GetResponse>>();
 const blockedUntilByUrl = new Map<string, number>();
 const blockedUntilByPath = new Map<string, number>();
 const recentSuccessByUrl = new Map<string, { at: number; payload: any }>();
 const GET_429_COOLDOWN_MS = 15000;
+// Never block longer than 5 minutes regardless of what the server says.
+// A Django throttle of "Expected available in 68092 seconds" (~19 hours) would
+// otherwise lock the endpoint for the entire app session.
+const GET_429_MAX_COOLDOWN_MS = 5 * 60 * 1000;
 const GET_HOT_SUCCESS_TTL_MS = 10000;
 
 /* ── Retry helpers ────────────────────────────────────────────────────────── */
@@ -111,10 +124,21 @@ const resolve429CooldownMs = (payload: any): number => {
   if (secMatch) {
     const seconds = Number(secMatch[1]);
     if (Number.isFinite(seconds) && seconds > 0) {
-      return Math.max(GET_429_COOLDOWN_MS, seconds * 1000);
+      // Cap at GET_429_MAX_COOLDOWN_MS so a server-side throttle of 68000+ seconds
+      // doesn't block the endpoint for the whole app session.
+      return Math.min(GET_429_MAX_COOLDOWN_MS, Math.max(GET_429_COOLDOWN_MS, seconds * 1000));
     }
   }
   return GET_429_COOLDOWN_MS;
+};
+
+const describe429Wait = (blockedUntilMs: number): string => {
+  const remainMs = blockedUntilMs - Date.now();
+  if (remainMs <= 0) return '';
+  const remainSec = Math.ceil(remainMs / 1000);
+  if (remainSec < 60) return ` Try again in ${remainSec}s.`;
+  const mins = Math.ceil(remainSec / 60);
+  return ` Try again in ${mins} min.`;
 };
 
 export const getRequest = async (
@@ -134,7 +158,7 @@ export const getRequest = async (
   const execute = async (): Promise<GetResponse> => {
   try {
     const token = await getAccessToken();
-    const deviceId = await AsyncStorage.getItem('device_id');
+    const deviceId = await getCachedDeviceId();
     const baseHeaders: HeadersInit = {};
     if (token) baseHeaders.Authorization = `Bearer ${token}`;
     if (deviceId) baseHeaders['X-Device-Id'] = deviceId;
@@ -169,14 +193,14 @@ export const getRequest = async (
         return {
           success: false,
           status: 429,
-          message: 'Too many requests. Retrying shortly.',
+          message: `Too many requests.${describe429Wait(blockedUntilUrl)}`,
         };
       }
       if (now < blockedUntilPath) {
         return {
           success: false,
           status: 429,
-          message: 'Too many requests on this endpoint. Retrying shortly.',
+          message: `Too many requests.${describe429Wait(blockedUntilPath)}`,
         };
       }
     }

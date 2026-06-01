@@ -512,7 +512,7 @@ export function MainTabs() {
     });
   }, [chatSlide, subRoomSlide]);
 
-  const openInfo = (payload: { chat: Chat | null; currentUserId: string | null }) => {
+  const openInfo = useCallback((payload: { chat: Chat | null; currentUserId: string | null }) => {
     if (!payload.chat) return;
     setActiveInfo({ chat: payload.chat, currentUserId: payload.currentUserId });
     setInfoVisible(true);
@@ -521,7 +521,7 @@ export function MainTabs() {
       duration: 240,
       useNativeDriver: true,
     }).start();
-  };
+  }, [infoSlide]);
 
   const closeInfo = () => {
     RNAnimated.timing(infoSlide, {
@@ -620,6 +620,19 @@ export function MainTabs() {
     outputRange: [width, 0],
   });
 
+  // Stable screen components — defined with useCallback so their identity only
+  // changes when the callbacks they depend on change.  Inline arrow functions
+  // passed as `children` to Tabs.Screen recreate on every MainTabs render
+  // (e.g. badge count updates), causing React Navigation to remount the screen.
+  const MessagesTabScreen = useCallback(
+    () => <MessagesScreen onOpenChat={openChat} onOpenInfo={openInfo} />,
+    [openChat, openInfo],
+  );
+  const PartnersTabScreen = useCallback(
+    () => <PartnersScreen setHidNav={setHidNav} onOpenInfo={openInfo} />,
+    [openInfo, setHidNav],
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {isOffline && (
@@ -637,33 +650,26 @@ export function MainTabs() {
         }}
         tabBar={(p) => <AnimatedKISTabBar {...p} hidNav={hidNav} badgeCounts={badgeCounts} />}
       >
-        <Tabs.Screen name="Messages" options={{ title: 'Messages' }}>
-          {() => <MessagesScreen onOpenChat={openChat} onOpenInfo={openInfo} />}
-        </Tabs.Screen>
+        <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} />
 
         <Tabs.Screen
           name="Bible"
           component={BibleScreen}
-          options={{ title: 'Bible' }}
+          options={{ title: translateString('Bible') }}
         />
 
         <Tabs.Screen
           name="Broadcast"
           component={BroadcastScreen}
-          options={{ title: 'Broadcast' }}
+          options={{ title: translateString('Broadcast') }}
         />
 
-        <Tabs.Screen
-          name="Partners"
-          options={{ title: 'Partners' }}
-        >
-          {() => <PartnersScreen setHidNav={setHidNav} onOpenInfo={openInfo} />}
-        </Tabs.Screen>
+        <Tabs.Screen name="Partners" options={{ title: translateString('Partners') }} component={PartnersTabScreen} />
 
         <Tabs.Screen
           name="Profile"
           component={ProfileScreen}
-          options={{ title: 'Profile' }}
+          options={{ title: translateString('Profile') }}
         />
       </Tabs.Navigator>
 

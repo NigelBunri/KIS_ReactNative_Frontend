@@ -716,6 +716,7 @@ useEffect(() => {
   loadContacts();
 }, []);
 
+const prevConvIdsRef = useRef<Set<string>>(new Set());
 useEffect(() => {
   const convIds = Array.from(
     new Set(
@@ -724,16 +725,23 @@ useEffect(() => {
         .filter(Boolean),
     ),
   );
+  const convIdSet = new Set(convIds);
 
-  convIds.forEach((id) => queueMetaRefresh(id));
+  // Only refresh metadata for conversations that are NEW to the list.
+  // Refreshing all conversations on every list change causes a thundering-herd
+  // of storage reads when conversations re-order after a new message arrives.
+  for (const id of convIdSet) {
+    if (!prevConvIdsRef.current.has(id)) {
+      queueMetaRefresh(id);
+    }
+  }
+  prevConvIdsRef.current = convIdSet;
 
   setConversationMeta((prev) => {
     const next = { ...prev };
-    const keep = new Set(convIds);
+    const keep = convIdSet;
     Object.keys(next).forEach((key) => {
-      if (!keep.has(key)) {
-        delete next[key];
-      }
+      if (!keep.has(key)) delete next[key];
     });
     return next;
   });
