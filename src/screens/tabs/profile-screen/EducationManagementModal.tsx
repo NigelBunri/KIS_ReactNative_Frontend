@@ -1852,16 +1852,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     }
     setInstitutionSubmitting(true);
     try {
-      // Attempt logo upload, but if it fails (throttled, network error) proceed
-      // without the logo so the institution itself is still created.  The user
-      // can add or change the logo later from the institution settings.
       let logoUrl = institutionForm.logoUrl.trim();
       if (institutionForm.logoAsset) {
         setLogoUploading(true);
         try {
           logoUrl = await uploadInstitutionLogo(institutionForm.logoAsset);
         } catch (uploadErr: any) {
-          console.warn('[EducationModal] Logo upload failed, continuing without logo:', uploadErr?.message);
+          throw new Error(uploadErr?.message || 'Unable to upload institution logo.');
         } finally {
           setLogoUploading(false);
         }

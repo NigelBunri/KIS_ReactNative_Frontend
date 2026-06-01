@@ -8,10 +8,12 @@ import {
   Image,
   StyleSheet,
   Alert,
+  Platform,
   ScrollView,
   TextInput,
   Linking,
 } from 'react-native';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 import {
   launchCamera,
@@ -30,6 +32,28 @@ import {
 
 import type { FilesType } from './AttachmentSheet';
 import { MediaEditModal } from './FroCamer/MediaEditModal';
+
+const getCameraPermission = () =>
+  Platform.select({
+    android: PERMISSIONS.ANDROID.CAMERA,
+    ios: PERMISSIONS.IOS.CAMERA,
+    default: undefined,
+  });
+
+const ensureCameraPermission = async () => {
+  const cameraPermission = getCameraPermission();
+  if (!cameraPermission) return true;
+
+  const currentStatus = await check(cameraPermission);
+  if (currentStatus === RESULTS.GRANTED || currentStatus === RESULTS.LIMITED) {
+    return true;
+  }
+
+  const nextStatus =
+    currentStatus === RESULTS.DENIED ? await request(cameraPermission) : currentStatus;
+
+  return nextStatus === RESULTS.GRANTED || nextStatus === RESULTS.LIMITED;
+};
 
 type CameraCaptureModalProps = {
   visible: boolean;
@@ -74,6 +98,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       isOpeningCameraRef.current = true;
       setIsOpeningCamera(true);
       try {
+        const hasCameraPermission = await ensureCameraPermission();
+        if (!hasCameraPermission) {
+          Alert.alert(
+            'Camera permission needed',
+            'Allow camera access in your device settings to take photos or videos in KIS.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open settings', onPress: () => void Linking.openSettings() },
+            ],
+          );
+          return;
+        }
+
         const options: CameraOptions = {
           mediaType,
           cameraType,
