@@ -70,6 +70,10 @@ type Props = {
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
   typingUsers?: TypingUser[];
+  // Height of the header above this component so KeyboardAvoidingView can
+  // calculate the correct offset. Defaults to 0; ChatRoomPage should pass
+  // its measured header height.
+  keyboardOffset?: number;
 };
 
 export default function ChatRoomBody({
@@ -124,6 +128,7 @@ export default function ChatRoomBody({
   onViewOnce,
   onLocalDeleteMessage,
   typingUsers = [],
+  keyboardOffset = 0,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -138,8 +143,8 @@ export default function ChatRoomBody({
   return (
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : 0}
     >
       <MessageList
         messages={messages}

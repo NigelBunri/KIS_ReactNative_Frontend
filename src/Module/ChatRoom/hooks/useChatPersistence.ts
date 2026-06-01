@@ -30,6 +30,8 @@ import {
 import {
   loadMessages,
   saveMessages,
+  markRoomHasPending,
+  unmarkRoomHasPending,
 } from '../Storage/chatStorage';
 
 /* ============================================================================
@@ -444,6 +446,7 @@ export function useChatPersistence(
       ];
 
       await persist(optimistic);
+      markRoomHasPending(roomId).catch(() => {});
 
       if (!sendOverNetwork) return;
 
@@ -631,6 +634,11 @@ export function useChatPersistence(
           });
           await persist(reconciled);
         }
+        // Unmark room if no messages remain pending/failed after flush
+        const hasPending = messagesRef.current.some(
+          m => m.status === STATUS_QUEUED || m.status === STATUS_FAILED,
+        );
+        if (!hasPending) unmarkRoomHasPending(roomIdRef.current).catch(() => {});
       } finally {
         flushInFlightRef.current = false;
       }

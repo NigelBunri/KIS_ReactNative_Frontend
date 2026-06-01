@@ -11,6 +11,37 @@ import { ChatMessage } from '../chatTypes';
 const STORAGE_KEY_PREFIX_V2 = 'KIS_CHAT_MESSAGES_BY_ROOM_V2:';
 const LEGACY_STORAGE_KEY_PREFIX_V1 = 'KIS_CHAT_MESSAGES_BY_ROOM_V1:';
 
+// Tracks which roomIds have unsent (pending/failed) messages so a global
+// flush service can retry them even after the ChatRoom component unmounts.
+const PENDING_ROOMS_KEY = 'KIS_PENDING_ROOMS_V1';
+
+export async function markRoomHasPending(roomId: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
+    const rooms: string[] = raw ? JSON.parse(raw) : [];
+    if (!rooms.includes(roomId)) {
+      await AsyncStorage.setItem(PENDING_ROOMS_KEY, JSON.stringify([...rooms, roomId]));
+    }
+  } catch {}
+}
+
+export async function unmarkRoomHasPending(roomId: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
+    if (!raw) return;
+    const rooms: string[] = JSON.parse(raw);
+    const next = rooms.filter(r => r !== roomId);
+    await AsyncStorage.setItem(PENDING_ROOMS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+export async function getAllRoomsWithPendingMessages(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
 const buildKeyV2 = (roomId: string) => `${STORAGE_KEY_PREFIX_V2}${roomId}`;
 const buildLegacyKeyV1 = (roomId: string) =>
   `${LEGACY_STORAGE_KEY_PREFIX_V1}${roomId}`;

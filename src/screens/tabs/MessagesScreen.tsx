@@ -1347,7 +1347,7 @@ const handleSelectAllChats = useCallback(() => {
 
   const translateHeaderY = hideProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -(headerH * 2) || 0],
+    outputRange: [0, -(headerH || 0)],
     extrapolate: 'clamp',
   });
   const headerNegMargin = hideProgress.interpolate({

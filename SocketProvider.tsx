@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert, DeviceEventEmitter, Platform } from 'react-native';
+import { Alert, AppState, DeviceEventEmitter, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,6 +21,12 @@ import { getAccessToken } from '@/security/authStorage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import {
+  loadMessages,
+  bulkUpdateMessages,
+  getAllRoomsWithPendingMessages,
+  unmarkRoomHasPending,
+} from '@/Module/ChatRoom/Storage/chatStorage';
 
 import type {
   CallSession,
@@ -1119,6 +1125,88 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     return () => unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ─── Global message queue flush ─────────────────────────────────────────
+   * Retries pending/failed messages from ALL rooms whenever the socket
+   * connects or the app comes back to the foreground — ensuring queued
+   * messages are delivered even if the ChatRoom component is not mounted.
+   * ─────────────────────────────────────────────────────────────────────── */
+
+  const globalFlushRef = useRef<(() => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    if (!socket || !isConnected || !currentUserId) {
+      globalFlushRef.current = null;
+      return;
+    }
+
+    const flush = async () => {
+      try {
+        const rooms = await getAllRoomsWithPendingMessages();
+        for (const roomId of rooms) {
+          const messages = await loadMessages(roomId);
+          const pending = messages.filter(
+            m => m.status === 'pending' || m.status === 'failed',
+          );
+          if (pending.length === 0) {
+            await unmarkRoomHasPending(roomId);
+            continue;
+          }
+          for (const msg of pending) {
+            await new Promise<void>((resolve) => {
+              socket.timeout(20000).emit(
+                'chat.send',
+                {
+                  conversationId: msg.conversationId ?? roomId,
+                  kind: msg.kind ?? 'text',
+                  clientId: msg.clientId,
+                  text: msg.text,
+                  replyToId: msg.replyToId ?? null,
+                  attachments: msg.attachments?.length ? msg.attachments : undefined,
+                  styledText: msg.styledText ?? null,
+                  voice: msg.voice ?? null,
+                  sticker: msg.sticker ?? null,
+                  contacts: msg.contacts,
+                  poll: msg.poll,
+                  event: msg.event,
+                  encrypted: false,
+                },
+                async (err: any, ack: any) => {
+                  if (!err && ack?.ok && ack?.serverId) {
+                    await bulkUpdateMessages(roomId, m =>
+                      m.clientId === msg.clientId
+                        ? { ...m, status: 'sent' as any, serverId: ack.serverId, isLocalOnly: false }
+                        : m,
+                    );
+                  }
+                  resolve();
+                },
+              );
+            });
+          }
+          const remaining = await loadMessages(roomId);
+          const stillPending = remaining.some(
+            m => m.status === 'pending' || m.status === 'failed',
+          );
+          if (!stillPending) await unmarkRoomHasPending(roomId);
+        }
+      } catch (err) {
+        if (__DEV__) console.warn('[SocketProvider] global flush error', err);
+      }
+    };
+
+    globalFlushRef.current = flush;
+    flush(); // Run immediately on connect
+  }, [socket, isConnected, currentUserId]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        globalFlushRef.current?.().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   /* ─── Context value ─────────────────────────────────────────────────────── */
 

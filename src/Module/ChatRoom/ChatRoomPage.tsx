@@ -271,6 +271,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [chatHeaderH, setChatHeaderH] = useState(56);
   const noop = () => {};
 
   const [openStickerEditor, setOpenStickerEditor] = useState(false);
@@ -1644,6 +1645,12 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       ]}
     >
       {!hideHeader && (
+        <View
+          onLayout={(e) => {
+            const h = e?.nativeEvent?.layout?.height;
+            if (h && h > 0) setChatHeaderH(h);
+          }}
+        >
         <ChatHeader
           chat={chat}
           onBack={selectionMode ? exitSelectionMode : onBack}
@@ -1681,6 +1688,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onContinueInSubRoom={handleContinueInSubRoom}
           isE2EE
         />
+        </View>
       )}
 
       {!selectionMode && (
@@ -1760,6 +1768,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           chat={chat}
           messages={messagesWithUploads}
           palette={palette}
+          keyboardOffset={chatHeaderH}
           isChannel={isChannel}
           canPost={canPost}
           draft={draft}
