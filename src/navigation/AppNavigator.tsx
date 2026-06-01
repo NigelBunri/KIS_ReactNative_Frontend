@@ -53,6 +53,7 @@ import {
   MAIN_TAB_BADGES_REALTIME_EVENT,
   MainTabBadgeCounts,
 } from '@/services/mainTabNotificationBadges';
+import { translateString } from '@/languages';
 
 type RouteKey = 'Partners' | 'Bible' | 'Messages' | 'Broadcast' | 'Profile';
 
@@ -151,7 +152,7 @@ function AnimatedKISTabBar({
       >
         {state.routes.map((route, index) => {
           const focused = state.index === index;
-          const label = descriptors[route.key].options.title ?? route.name;
+          const label = translateString(descriptors[route.key].options.title ?? route.name);
           const badgeCount = badgeCounts[route.name as RouteKey] ?? 0;
 
           const onPress = () => {

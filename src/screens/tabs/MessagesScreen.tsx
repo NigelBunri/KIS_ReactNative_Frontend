@@ -2197,6 +2197,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
         >
           <Tab.Screen
             name="Chats"
+            options={{ tabBarLabel: translateString('Chats') }}
             children={() => (
               <ChatsTab
                 filters={customFilters}
@@ -2235,16 +2236,19 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           />
           <Tab.Screen
             name="Updates"
+            options={{ tabBarLabel: translateString('Updates') }}
             children={() => (
               <UpdatesTab searchTerm={query} onOpenChat={onOpenChat} />
             )}
           />
           <Tab.Screen
             name="Calls"
+            options={{ tabBarLabel: translateString('Calls') }}
             children={() => <CallsTab searchTerm={query} />}
           />
           <Tab.Screen
             name="Communities"
+            options={{ tabBarLabel: translateString('Communities') }}
             children={() => (
               <CommunitiesTab onOpenChat={onOpenChat} />
             )}

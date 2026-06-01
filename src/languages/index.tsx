@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getLocales } from 'react-native-localize';
 
 import { LANGUAGE_REGISTRY, type LanguageEntry } from './registry';
@@ -10,6 +10,10 @@ type TranslationDictionary = Record<string, string>;
 
 type LanguageContextValue = {
   language: LanguageCode;
+  // Monotonically-increasing counter. Increments on every language change.
+  // Use this as a React `key` on a content wrapper to force all children to
+  // remount (and therefore re-translate) when the user switches language.
+  languageVersion: number;
   setLanguage: (language: LanguageCode) => Promise<void>;
   ready: boolean;
   languages: Array<{ code: string; label: string; nativeName: string; flagEmoji: string }>;
@@ -44,6 +48,7 @@ let activeLanguage: LanguageCode = 'en';
 
 const LanguageContext = createContext<LanguageContextValue>({
   language: 'en',
+  languageVersion: 0,
   setLanguage: async () => undefined,
   ready: false,
   languages: LANGUAGE_OPTIONS,
@@ -124,6 +129,7 @@ export const localizeProps = <T extends Record<string, any> | null | undefined>(
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>(activeLanguage);
+  const [languageVersion, setLanguageVersion] = useState(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -154,6 +160,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLanguage = async (nextLanguage: LanguageCode) => {
     activeLanguage = nextLanguage;
     setLanguageState(nextLanguage);
+    setLanguageVersion((v) => v + 1);
     notifyListeners();
     await AsyncStorage.setItem(STORAGE_KEY, nextLanguage);
   };
@@ -161,14 +168,42 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       language,
+      languageVersion,
       setLanguage,
       ready,
       languages: LANGUAGE_OPTIONS,
     }),
-    [language, ready],
+    [language, languageVersion, ready],
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+/**
+ * Wrap any content subtree with this to make it remount (and therefore
+ * re-translate) when the user switches language. Prefer to place this at the
+ * root of a screen or tab so the remount is scoped — rather than keying the
+ * NavigationContainer which would also reset navigation state.
+ *
+ * Usage:
+ *   <LanguageResetBoundary>
+ *     <MyScreenContent />
+ *   </LanguageResetBoundary>
+ */
+export function LanguageResetBoundary({ children, style }: { children: React.ReactNode; style?: any }) {
+  const { languageVersion } = useLanguage();
+  // The key on this View changes on every language switch, causing React to
+  // unmount + remount all children. Fresh renders go through the patched
+  // jsx-runtime and pick up the new language translations.
+  return (
+    <React.Fragment>
+      {React.createElement(
+        require('react-native').View,
+        { key: languageVersion, style: style ?? { flex: 1 } },
+        children,
+      )}
+    </React.Fragment>
+  );
 }
 
 export const useLanguage = () => useContext(LanguageContext);

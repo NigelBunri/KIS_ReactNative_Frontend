@@ -32,7 +32,9 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
       >
         Partner workspace
       </Text>
-      <View style={styles.partnerHeaderRow}>
+
+      {/* Avatar row: initials box left, settings button right */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <LinearGradient
           colors={isDark ? ['#5A372D', '#8A5A12', '#D9A875'] : [palette.primarySoft, palette.surface, palette.primarySoft]}
           style={[
@@ -58,41 +60,7 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             </Text>
           )}
         </LinearGradient>
-        <View style={styles.partnerHeaderIdentity}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text
-              style={[styles.partnerName, { color: titleColor, flexShrink: 1 }]}
-              numberOfLines={1}
-            >
-              {partner?.name}
-            </Text>
-            {partner?.verification_summary?.verified && (
-              <View style={{
-                backgroundColor: isDark ? 'rgba(217,168,117,0.22)' : '#FFF8EC',
-                borderRadius: 10,
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderWidth: 1,
-                borderColor: isDark ? palette.goldSoft : palette.goldDeep,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 3,
-                flexShrink: 0,
-              }}>
-                <KISIcon name="checkmark-circle" size={11} color={isDark ? palette.goldSoft : palette.goldDeep} />
-                <Text style={{ fontSize: 10, fontWeight: '800', color: isDark ? palette.goldSoft : palette.goldDeep }}>
-                  Verified
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text
-            style={[styles.partnerTagline, { color: mutedColor }]}
-            numberOfLines={2}
-          >
-            {partner?.tagline}
-          </Text>
-        </View>
+
         <Pressable
           onPress={onPress}
           accessibilityRole="button"
@@ -125,22 +93,31 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             style={StyleSheet.absoluteFillObject}
           />
           <View pointerEvents="none" style={localStyles.goldSheen} />
-          <Text
-            style={{
-              color: palette.ivory ?? '#fff',
-              fontSize: 12,
-              fontWeight: '800',
-            }}
-          >
+          <Text style={{ color: palette.ivory ?? '#fff', fontSize: 12, fontWeight: '800' }}>
             Settings
           </Text>
-          <KISIcon
-            name="settings"
-            size={14}
-            color={palette.ivory ?? '#fff'}
-          />
+          <KISIcon name="settings" size={14} color={palette.ivory ?? '#fff'} />
         </Pressable>
       </View>
+
+      {/* Partner name: full-width own line, no badge interruption */}
+      <Text
+        style={[styles.partnerName, { color: titleColor, marginBottom: 4 }]}
+        numberOfLines={2}
+      >
+        {partner?.name}
+      </Text>
+
+      {/* Tagline below name */}
+      {!!partner?.tagline && (
+        <Text
+          style={[styles.partnerTagline, { color: mutedColor, marginBottom: 12 }]}
+          numberOfLines={2}
+        >
+          {partner?.tagline}
+        </Text>
+      )}
+
       <View style={[styles.partnerHeaderMetaRow, { marginBottom: 16 }]}>
         <View
           style={[

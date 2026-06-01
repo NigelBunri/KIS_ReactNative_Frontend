@@ -197,7 +197,7 @@ const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
 
 function AppContent() {
-  const { language } = useLanguage();
+  const { language, languageVersion } = useLanguage();
   const scheme = useColorScheme();
   const [booting, setBooting] = useState(true);
 
@@ -653,7 +653,7 @@ function AppContent() {
       : countryList;
 
     return (
-      <View key={`location-${language}`} style={{ flex: 1 }}>
+      <View key={`location-${languageVersion}`} style={{ flex: 1 }}>
         <View style={locationStyles.root}>
           <Text style={locationStyles.title}>Location Required</Text>
           <Text style={locationStyles.message}>
@@ -760,9 +760,9 @@ function AppContent() {
   }
 
   return (
-    <AuthContext.Provider key={`auth-${language}`} value={ctx}>
+    <AuthContext.Provider value={ctx}>
       <SocketProvider>
-        <View key={`app-${language}`} style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#09070D' : '#FFFFFF' }}>
+        <View style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#09070D' : '#FFFFFF' }}>
           <StatusBar
             translucent={false}
             backgroundColor={scheme === 'dark' ? '#09070D' : '#FFFFFF'}
@@ -770,7 +770,7 @@ function AppContent() {
           />
           <NavigationContainer
             ref={navigationRef}
-            key={`nav-${language}`}
+            key={`nav-${languageVersion}`}
             theme={scheme === 'dark'
               ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } }
               : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
