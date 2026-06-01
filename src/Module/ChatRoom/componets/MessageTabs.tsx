@@ -1,5 +1,5 @@
 // src/screens/tabs/MessageTabs.tsx
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Image,
+  Animated,
+  StyleSheet,
 } from 'react-native';
 
 import { useKISTheme } from '@/theme/useTheme';
@@ -64,6 +66,7 @@ type ChatsTabProps = {
 
   selectedChat?: Chat[];
   setSelectedChat?: (chats: Chat[]) => void;
+  loading?: boolean;
 };
 
 export function ChatsTab({
@@ -87,6 +90,7 @@ export function ChatsTab({
   onOpenChat,
   selectedChat = [],
   setSelectedChat,
+  loading = false,
 }: ChatsTabProps) {
   const { palette } = useKISTheme();
 
@@ -195,6 +199,10 @@ export function ChatsTab({
   /* ------------------------------------------------------------
    * RENDER
    * ------------------------------------------------------------ */
+  if (loading && conversations.length === 0) {
+    return <ChatListSkeleton palette={palette} />;
+  }
+
   return (
     <FlatList
       contentContainerStyle={{ padding: 16 }}
@@ -540,3 +548,78 @@ export function ChatsTab({
     />
   );
 }
+
+const SKELETON_COUNT = 8;
+
+function SkeletonRow({ shimmer, palette }: { shimmer: Animated.Value; palette: any }) {
+  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
+  const bg = palette.inputBorder ?? '#e0e0e0';
+  return (
+    <Animated.View style={[skeletonStyles.row, { opacity, backgroundColor: palette.card }]}>
+      <View style={[skeletonStyles.avatar, { backgroundColor: bg }]} />
+      <View style={skeletonStyles.lines}>
+        <View style={[skeletonStyles.lineWide, { backgroundColor: bg }]} />
+        <View style={[skeletonStyles.lineNarrow, { backgroundColor: bg }]} />
+      </View>
+      <View style={[skeletonStyles.timestamp, { backgroundColor: bg }]} />
+    </Animated.View>
+  );
+}
+
+function ChatListSkeleton({ palette }: { palette: any }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+        <SkeletonRow key={i} shimmer={shimmer} palette={palette} />
+      ))}
+    </View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  lines: {
+    flex: 1,
+    gap: 8,
+  },
+  lineWide: {
+    height: 14,
+    borderRadius: 7,
+    width: '70%',
+  },
+  lineNarrow: {
+    height: 12,
+    borderRadius: 6,
+    width: '45%',
+  },
+  timestamp: {
+    width: 36,
+    height: 10,
+    borderRadius: 5,
+  },
+});

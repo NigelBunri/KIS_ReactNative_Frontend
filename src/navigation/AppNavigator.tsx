@@ -44,6 +44,7 @@ import { getRequest } from '@/network/get';
 import {
   startInAppNotificationRuntime,
 } from '@/services/inAppNotificationService';
+import { startBackgroundPrefetch } from '@/services/backgroundPrefetch';
 import NetInfo from '@react-native-community/netinfo';
 import {
   bindMainTabBadgeSourceEvents,
@@ -299,6 +300,7 @@ export function MainTabs() {
   const [badgeCounts, setBadgeCounts] = useState<MainTabBadgeCounts>(() => emptyMainTabBadgeCounts());
 
   useEffect(() => {
+    startBackgroundPrefetch(currentUserId);
     startInAppNotificationRuntime();
     let alive = true;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;

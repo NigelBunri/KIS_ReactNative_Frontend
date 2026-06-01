@@ -154,6 +154,7 @@ export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, header
 const [selectCount, setSelectCount] = useState<number | null>(null);
 
 const [conversations, setConversations] = useState<Chat[]>([]);
+const [conversationsLoading, setConversationsLoading] = useState(true);
 const [contactNameByPhone, setContactNameByPhone] = useState<Record<string, string>>({});
 const [conversationMeta, setConversationMeta] = useState<Record<string, ConversationMetaEntry>>({});
 const [communityByConversationId, setCommunityByConversationId] = useState<Record<string, { id: string; name: string }>>({});
@@ -363,6 +364,7 @@ useEffect(() => {
         return c;
       });
       setConversations(merged);
+      setConversationsLoading(false);
       // Persist fresh list for offline use
       AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(merged)).catch(() => {});
     }
@@ -2227,6 +2229,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 selectedChat={selectedChat}
                 setSelectedChat={setSelectedChat}
                 conversations={conversations}
+                loading={conversationsLoading}
               />
             )}
           />
