@@ -881,13 +881,20 @@ useEffect(() => {
       const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
       const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : null;
       const currentDeviceId = deviceIdRef.current;
+      const isOwnCurrentDeviceMessage =
+        String(payload?.senderId ?? payload?.sender_id ?? payload?.sender?.id ?? '') === String(currentUserId) &&
+        !!currentDeviceId &&
+        String(senderDeviceId) === String(currentDeviceId);
       const recipientCipher = recipients
-        ? recipients.find(
-            (r: any) =>
-              String(r.userId) === String(currentUserId) ||
-              String(r.deviceId) === String(currentDeviceId),
-          )
+        ? currentDeviceId
+          ? recipients.find(
+              (r: any) =>
+                String(r.userId) === String(currentUserId) &&
+                String(r.deviceId) === String(currentDeviceId),
+            )
+          : recipients.find((r: any) => String(r.userId) === String(currentUserId))
         : null;
+      if (isOwnCurrentDeviceMessage && !recipientCipher) return;
       const ciphertext = recipientCipher?.ciphertext ?? payload?.ciphertext;
       const type = recipientCipher?.type ?? encMeta?.type ?? 1;
       if (senderDeviceId && ciphertext) {

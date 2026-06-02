@@ -25,8 +25,6 @@ import type {
   MessageKind,
   MessageStatus,
 } from '../chatTypes';
-import { participantsToIds } from '../messagesUtils';
-
 import { useSocket } from '../../../../SocketProvider';
 import {
   ENCRYPTION_VERSION,
@@ -89,6 +87,8 @@ export function useChatMessaging({
   const historySyncRef = useRef<number>(0);
   const flushInFlightRef = useRef(false);
   const historyLoadRef = useRef(false);
+  const decryptInFlightRef = useRef<Set<string>>(new Set());
+  const decryptFailedAtRef = useRef<Map<string, number>>(new Map());
 
   /* -----------------------------------------------------------------------
    * OFFLINE QUEUES — receipts and reactions are fire-and-forget socket
@@ -115,7 +115,6 @@ export function useChatMessaging({
       if (socket && (isConnected || socket.connected)) {
         socket.emit('chat.receipt', { conversationId: convId, messageId: msgId, type });
       } else {
-        const key = `${convId}:${msgId}:${type}`;
         const already = pendingReceiptsRef.current.some(
           r => r.conversationId === convId && r.messageId === msgId && r.type === type,
         );
@@ -261,15 +260,35 @@ export function useChatMessaging({
       const encMeta = mapped.encryptionMeta;
       if (!encMeta && !mapped.ciphertext) return;
 
+      const decryptKey = [
+        mapped.serverId ?? mapped.id ?? mapped.clientId ?? 'unknown',
+        encMeta?.e2ee ?? mapped.encryptionVersion ?? 'encrypted',
+        mapped.ciphertext ? String(mapped.ciphertext).slice(0, 48) : '',
+      ].join(':');
+      const failedAt = decryptFailedAtRef.current.get(decryptKey) ?? 0;
+      if (decryptInFlightRef.current.has(decryptKey) || Date.now() - failedAt < 30_000) {
+        return;
+      }
+      decryptInFlightRef.current.add(decryptKey);
+
       try {
         if (encMeta?.e2ee === 'signal') {
           const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
           const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : [];
-          const recipientCipher = recipients.find(
-            (item: any) =>
-              String(item?.userId) === String(currentUserId) &&
-              (!deviceIdRef.current || String(item?.deviceId) === String(deviceIdRef.current)),
-          ) ?? recipients.find((item: any) => String(item?.userId) === String(currentUserId));
+          const currentDeviceId = deviceIdRef.current;
+          const isOwnCurrentDeviceMessage =
+            String(mapped.senderId) === String(currentUserId) &&
+            !!currentDeviceId &&
+            String(senderDeviceId) === String(currentDeviceId);
+          const recipientCipher = currentDeviceId
+            ? recipients.find(
+                (item: any) =>
+                  String(item?.userId) === String(currentUserId) &&
+                  String(item?.deviceId) === String(currentDeviceId),
+              )
+            : recipients.find((item: any) => String(item?.userId) === String(currentUserId));
+
+          if (isOwnCurrentDeviceMessage && !recipientCipher) return;
 
           const ciphertext = recipientCipher?.ciphertext ?? mapped.ciphertext;
           const type = recipientCipher?.type ?? encMeta?.type ?? 1;
@@ -332,8 +351,12 @@ export function useChatMessaging({
             kind: parsed?.kind ?? mapped.kind,
           });
         }
+        decryptFailedAtRef.current.delete(decryptKey);
       } catch (error) {
+        decryptFailedAtRef.current.set(decryptKey, Date.now());
         console.warn('[useChatMessaging] decrypt failed', error);
+      } finally {
+        decryptInFlightRef.current.delete(decryptKey);
       }
     },
     [currentUserId, patchDecryptedMessage],
@@ -868,6 +891,23 @@ export function useChatMessaging({
 
       return new Promise<SendOverNetworkResult>(
         (resolve) => {
+          const logAckDebug = (label: string, details: Record<string, any>) => {
+            if (!__DEV__) return;
+            console.log(`[chat.send.ack] ${label}`, {
+              conversationId: payloadToSend?.conversationId,
+              clientId,
+              encrypted: payloadToSend?.encrypted === true,
+              kind: payloadToSend?.kind,
+              hasText: typeof payloadToSend?.text === 'string' && payloadToSend.text.length > 0,
+              hasPreviewText: typeof payloadToSend?.previewText === 'string' && payloadToSend.previewText.length > 0,
+              attachmentCount: Array.isArray(payloadToSend?.attachments) ? payloadToSend.attachments.length : 0,
+              recipientCount: Array.isArray(payloadToSend?.encryptionMeta?.recipients)
+                ? payloadToSend.encryptionMeta.recipients.length
+                : 0,
+              ...details,
+            });
+          };
+
           // 20 s timeout — give slow 2G/3G networks time to acknowledge.
           // At 5 s the timeout fires before the server can respond on lossy networks,
           // causing messages to flip to 'failed' even though they were delivered.
@@ -880,11 +920,14 @@ export function useChatMessaging({
                 err: any,
                 ack?: any,
               ) => {
+                logAckDebug('received', { ack, err });
+
                 if (err) {
-                  if (__DEV__) console.warn('[chat.send.debug] socket ack timeout/error', {
+                  console.warn('[chat.send.debug] socket ack timeout/error', {
                     conversationId: payloadToSend?.conversationId,
                     clientId,
                     err,
+                    ack,
                   });
                   return resolve({ ok: false });
                 }
@@ -892,10 +935,13 @@ export function useChatMessaging({
                 const success = ack?.ok === true;
 
                 if (!success) {
-                  if (__DEV__) console.warn('[chat.send.debug] ACK failed', {
+                  console.warn('[chat.send.debug] ACK failed', {
                     conversationId: payloadToSend?.conversationId,
                     clientId,
                     ack,
+                    ackJson: (() => {
+                      try { return JSON.stringify(ack); } catch { return null; }
+                    })(),
                   });
                   return resolve({ ok: false });
                 }

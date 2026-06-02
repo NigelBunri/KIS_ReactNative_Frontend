@@ -5,11 +5,13 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
@@ -84,13 +86,12 @@ export default function DeviceManagementScreen() {
   const [renameValue, setRenameValue] = useState('');
 
   // Transfer parent state
-  const [transferTarget, setTransferTarget] = useState<string | null>(null);
   const [transferring, setTransferring] = useState(false);
 
   const currentDevice = useMemo(() => devices.find(d => d.is_current), [devices]);
   const isParent = currentDevice?.is_parent ?? false;
 
-  const styles = useMemo(() => createStyles(palette), [palette]);
+  const styles = useMemo(() => createStyles(), []);
 
   const loadDevices = useCallback(async () => {
     setError(null);
@@ -150,6 +151,17 @@ export default function DeviceManagementScreen() {
     }, 1000);
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, [qrData, loadQR]);
+
+  const copyQRToken = useCallback(() => {
+    if (!qrData?.qr_payload) return;
+    Clipboard.setString(qrData.qr_payload);
+    Alert.alert('Copied', 'One-time device link token copied.');
+  }, [qrData]);
+
+  const shareQRToken = useCallback(() => {
+    if (!qrData?.qr_payload) return;
+    void Share.share({ message: qrData.qr_payload });
+  }, [qrData]);
 
   /* ---------- Actions ---------- */
   const handleRevoke = useCallback((device: Device) => {
@@ -234,7 +246,6 @@ export default function DeviceManagementScreen() {
               Alert.alert('Failed', err?.message ?? 'Unable to transfer primary role.');
             } finally {
               setTransferring(false);
-              setTransferTarget(null);
             }
           },
         },
@@ -325,7 +336,7 @@ export default function DeviceManagementScreen() {
           {isParent && !item.is_current && !item.is_parent && (
             <Pressable
               style={styles.iconBtn}
-              onPress={() => { setTransferTarget(item.id); handleTransferParent(item); }}
+              onPress={() => { handleTransferParent(item); }}
               disabled={transferring}
             >
               <KISIcon name="arrow-left" size={16} color={palette.primary} style={{ transform: [{ rotate: '180deg' }] }} />
@@ -412,6 +423,14 @@ export default function DeviceManagementScreen() {
                         <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
                       </Pressable>
                     </View>
+                    <View style={styles.tokenActionRow}>
+                      <Pressable onPress={copyQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                        <Text style={[styles.tokenActionText, { color: palette.primary }]}>Copy token</Text>
+                      </Pressable>
+                      <Pressable onPress={shareQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                        <Text style={[styles.tokenActionText, { color: palette.primary }]}>Share token</Text>
+                      </Pressable>
+                    </View>
                   </>
                 ) : (
                   <View style={styles.qrPlaceholder}>
@@ -476,7 +495,7 @@ export default function DeviceManagementScreen() {
   );
 }
 
-const createStyles = (palette: any) =>
+const createStyles = () =>
   StyleSheet.create({
     root: { flex: 1 },
     header: {
@@ -525,6 +544,9 @@ const createStyles = (palette: any) =>
     countdownText: { fontSize: 13, fontWeight: '700' },
     refreshQRBtn: { marginLeft: 8, paddingVertical: 2, paddingHorizontal: 8 },
     refreshQRText: { fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+    tokenActionRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 10 },
+    tokenActionBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+    tokenActionText: { fontSize: 13, fontWeight: '800' },
 
     /* Revoke all */
     revokeAllBtn: {

@@ -238,6 +238,23 @@ export default function LoginScreen({ navigation }: any) {
             'This account has been disabled. Please contact support.',
           );
         }
+        if (
+          errorCode === 'secondary_device_qr_required' ||
+          res?.data?.secondary_device_required ||
+          res?.data?.qr_login_required
+        ) {
+          return Alert.alert(
+            'Use secondary device login',
+            'This account is already active on another device. Open Profile -> Manage Devices on the primary device, then link this device with the QR code.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Scan QR',
+                onPress: () => navigation.navigate('QRScanLogin'),
+              },
+            ],
+          );
+        }
         const isVerifyRequired =
           errorCode === 'phone_not_verified' ||
           String(res?.message ?? '').toLowerCase().includes('verif') ||

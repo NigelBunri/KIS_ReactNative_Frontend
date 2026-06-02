@@ -434,6 +434,12 @@ export const encryptPayloadForRecipients = async (
   for (const uid of uniqueIds) {
     const sessions = await ensureSessionsForUser(uid);
     for (const session of sessions) {
+      // The sender's active device already has the plaintext locally. Encrypting
+      // a copy back to the same device can make the socket echo decrypt against
+      // the wrong self-session and produce Bad MAC warnings.
+      if (String(uid) === String(senderUserId) && String(session.device_id) === String(senderDeviceId)) {
+        continue;
+      }
       const cipher = new libsignal.SessionCipher(signalStore, session.address);
       const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
       const body = encrypted.body;
