@@ -32,10 +32,10 @@ const GET_HOT_SUCCESS_TTL_MS = 10000;
 
 /* ── Retry helpers ────────────────────────────────────────────────────────── */
 
-const MAX_GET_RETRIES = 2; // up to 3 total attempts
-const AUTO_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes offline TTL
+const MAX_GET_RETRIES = 3; // up to 4 total attempts on poor networks
+const AUTO_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes automatic fallback TTL
 const AUTO_CACHE_PREFIX = 'KIS_GET_AUTO_V1:';
-const AUTO_CACHE_MAX_BYTES = 400_000; // skip caching very large payloads
+const AUTO_CACHE_MAX_BYTES = 1_000_000; // skip caching very large payloads
 
 const isTransientError = (err: any): boolean => {
   const name = String(err?.name ?? '');
@@ -82,7 +82,7 @@ const fetchGetWithRetry = async (
   let lastError: any;
   for (let attempt = 0; attempt <= MAX_GET_RETRIES; attempt++) {
     if (attempt > 0) {
-      await new Promise(r => setTimeout(r, computeRetryDelayMs(attempt - 1, 600, 8000)));
+      await new Promise(r => setTimeout(r, computeRetryDelayMs(attempt - 1, 900, 12000)));
     }
     try {
       const response = await apiService.get(finalUrl, headers);

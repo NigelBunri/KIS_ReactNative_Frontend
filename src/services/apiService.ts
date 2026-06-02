@@ -46,7 +46,7 @@ const assertSecureRequestUrl = (url: string): void => {
   }
 };
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 45_000;
 
 const safeFetch = (url: string, init: RequestInit) => {
   assertSecureRequestUrl(url);
