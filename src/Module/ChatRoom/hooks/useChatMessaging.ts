@@ -51,6 +51,53 @@ type UseChatMessagingParams = {
   conversationId: string | null;
 };
 
+const serializeErrorForDiagnostics = (error: any) => {
+  if (!error) return null;
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: (error as any).code,
+      status: (error as any).status,
+      response: (error as any).response?.data ?? (error as any).response,
+    };
+  }
+  if (typeof error === 'object') {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return {
+        name: error?.name,
+        message: error?.message ?? String(error),
+        code: error?.code,
+        stack: error?.stack,
+      };
+    }
+  }
+  return { message: String(error) };
+};
+
+const reactNativeDiagnostics = (
+  stage: string,
+  error: any,
+  context: Record<string, any> = {},
+) => ({
+  source: 'reactnative:useChatMessaging',
+  at: new Date().toISOString(),
+  stage,
+  ...context,
+  error: serializeErrorForDiagnostics(error),
+});
+
+const safeStringify = (value: any) => {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+};
+
 /* ========================================================================
  * HOOK
  * ===================================================================== */
@@ -879,7 +926,14 @@ export function useChatMessaging({
               encryptionMeta,
             };
           } catch (encryptErr) {
-            console.warn('[E2EE] encryption failed, falling back to unencrypted', encryptErr);
+            console.warn('[E2EE] encryption failed, falling back to unencrypted', {
+              reactNativeDiagnostics: reactNativeDiagnostics('send.encrypt_payload', encryptErr, {
+                conversationId: String(convId),
+                clientId,
+                senderUserId: currentUserId,
+                recipientIds,
+              }),
+            });
             payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
           }
         } else {
@@ -928,6 +982,13 @@ export function useChatMessaging({
                     clientId,
                     err,
                     ack,
+                    serverDiagnostics: ack?.diagnostics,
+                    reactNativeDiagnostics: reactNativeDiagnostics('send.socket_ack', err, {
+                      conversationId: payloadToSend?.conversationId,
+                      clientId,
+                    }),
+                    errJson: safeStringify(err),
+                    ackJson: safeStringify(ack),
                   });
                   return resolve({ ok: false });
                 }
@@ -939,9 +1000,13 @@ export function useChatMessaging({
                     conversationId: payloadToSend?.conversationId,
                     clientId,
                     ack,
-                    ackJson: (() => {
-                      try { return JSON.stringify(ack); } catch { return null; }
-                    })(),
+                    serverDiagnostics: ack?.diagnostics,
+                    reactNativeDiagnostics: reactNativeDiagnostics('send.nack', ack?.error ?? ack, {
+                      conversationId: payloadToSend?.conversationId,
+                      clientId,
+                      ackCode: ack?.code,
+                    }),
+                    ackJson: safeStringify(ack),
                   });
                   return resolve({ ok: false });
                 }

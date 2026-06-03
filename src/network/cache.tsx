@@ -34,6 +34,11 @@ const getCacheFilePath = (type: string, key: string) =>
 
 const stripTrailingSlash = (path: string) => path.replace(/\/+$/, '');
 
+const isMissingFileError = (error: unknown) => {
+  const message = String((error as any)?.message ?? error ?? '').toLowerCase();
+  return message.includes('enoent') || message.includes('no such file or directory');
+};
+
 const ensureDirectoryExists = async (dirPath: string) => {
   const normalizedPath = stripTrailingSlash(dirPath);
   const exists = await RNFS.exists(normalizedPath);
@@ -286,6 +291,7 @@ export const clearCacheByKey = async (type: string, key: string) => {
       await RNFS.unlink(file);
     }
   } catch (error) {
+    if (isMissingFileError(error)) return;
     console.warn(`[cache] clearCacheByKey failed for ${type}/${key}:`, error);
   }
 };

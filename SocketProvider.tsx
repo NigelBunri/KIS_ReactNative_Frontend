@@ -35,9 +35,8 @@ import type {
   CallLayout,
   InCallMessage,
   ActiveReaction,
-  NetworkQuality,
 } from '@/services/calls/callTypes';
-import { isGroupCall, hasVideo, REACTION_EMOJIS } from '@/services/calls/callTypes';
+import { isGroupCall, hasVideo } from '@/services/calls/callTypes';
 import { webRTCService, webRTCAvailable } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 
@@ -99,9 +98,26 @@ function resolveCallType(args: StartCallArgs): CallType {
   return args.media === 'video' ? 'video' : 'voice';
 }
 
+function looksLikeTechnicalId(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)) return true;
+  if (/^(call|client|dev|msg|rxn)_[a-z0-9_-]+$/i.test(trimmed)) return true;
+  if (/^[0-9a-f]{24,}$/i.test(trimmed)) return true;
+  if (/^[a-z0-9]+(?:[-_.][a-z0-9]+){2,}$/i.test(trimmed) && /\d/.test(trimmed)) return true;
+  return false;
+}
+
+function safeDisplayName(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return fallback;
+  const text = String(value).trim();
+  if (!text || looksLikeTechnicalId(text)) return fallback;
+  return text;
+}
+
 function makeParticipant(overrides: Partial<CallParticipant> & { userId: string }): CallParticipant {
+  const displayName = safeDisplayName(overrides.displayName, overrides.isLocal ? 'You' : 'Participant');
   return {
-    displayName: overrides.userId,
     isLocal: false,
     isMuted: false,
     isVideoOff: false,
@@ -114,6 +130,7 @@ function makeParticipant(overrides: Partial<CallParticipant> & { userId: string 
     stream: null,
     avatarUrl: null,
     ...overrides,
+    displayName,
   };
 }
 
@@ -203,7 +220,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const setupWebRTC = useCallback((callType: CallType) => {
+  const setupWebRTC = useCallback((_callType: CallType) => {
     if (!webRTCAvailable) return;
     webRTCService.setCallbacks({
       onIceCandidate: (peerId, candidate) => {
@@ -322,7 +339,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       callId,
       conversationId: args.conversationId,
       callType,
-      title: args.title,
+      title: safeDisplayName(args.title, 'Call'),
       state: 'dialing',
       participants: [localParticipant],
       localUserId,
@@ -353,7 +370,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       conversationId: args.conversationId,
       callType,
       media: needsVideo ? 'video' : 'voice',
-      title: args.title,
+      title: safeDisplayName(args.title, 'Call'),
       inviteeUserIds: invitees,
       createdBy: localUserId,
       startedAt: session.startedAt,
@@ -821,7 +838,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const callerParticipant = makeParticipant({
           userId: fromUserId ?? 'caller',
-          displayName: payload?.callerName ?? payload?.title ?? 'Caller',
+          displayName: safeDisplayName(payload?.callerName ?? payload?.title, 'Caller'),
           role: 'host',
         });
 
@@ -829,7 +846,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           callId,
           conversationId,
           callType,
-          title: String(payload?.title ?? payload?.callerName ?? 'Incoming call'),
+          title: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
           state: 'incoming',
           participants: [callerParticipant],
           localUserId: myUserId ?? '',
@@ -879,7 +896,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (exists) return prev;
             return {
               ...prev,
-              participants: [...prev.participants, makeParticipant({ userId: responderId, displayName: payload?.displayName ?? responderId, role: 'audience' })],
+              participants: [...prev.participants, makeParticipant({ userId: responderId, displayName: safeDisplayName(payload?.displayName, 'Participant'), role: 'audience' })],
             };
           });
         }
@@ -968,7 +985,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ...prev,
             participants: [...prev.participants, makeParticipant({
               userId,
-              displayName: payload?.displayName ?? userId,
+              displayName: safeDisplayName(payload?.displayName, 'Participant'),
               role: payload?.role ?? 'audience',
             })],
           };
@@ -1018,7 +1035,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const reaction: ActiveReaction = {
           id: makeReactionId(),
           userId,
-          displayName: payload?.displayName ?? userId,
+          displayName: safeDisplayName(payload?.displayName, 'Participant'),
           emoji,
           xNorm: Math.random() * 0.8 + 0.1,
           startedAt: Date.now(),
@@ -1041,7 +1058,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const msg: InCallMessage = {
           id: `msg_${payload?.id ?? Date.now()}`,
           userId: String(payload?.userId ?? ''),
-          displayName: payload?.displayName ?? 'Participant',
+          displayName: safeDisplayName(payload?.displayName, 'Participant'),
           text: String(payload?.text ?? ''),
           sentAt: payload?.sentAt ?? new Date().toISOString(),
         };
@@ -1103,7 +1120,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsConnected(false);
       setActiveCall(null);
     };
-  }, [isAuth]);
+  }, [isAuth, startWebRTCOffer]);
 
   /* ─── NetInfo-driven reconnect ───────────────────────────────────────────── */
   // When the device regains network, immediately prompt the socket to reconnect
