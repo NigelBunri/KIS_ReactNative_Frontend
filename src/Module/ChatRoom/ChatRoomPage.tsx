@@ -116,7 +116,8 @@ export type UploadStatus = 'verifying' | 'uploading' | 'done' | 'failed' | 'veri
 
 type UploadBubble = ChatMessage & {
   _uploadProgress: number;
-  _uploadStatus: 'verifying' | 'verification_failed' | 'failed';
+  _uploadStatus: 'verifying' | 'uploading' | 'verification_failed' | 'failed';
+  _uploadInput?: AttachmentFilePayload;
 };
 
 export type AttachmentFilePayload = {
@@ -124,6 +125,7 @@ export type AttachmentFilePayload = {
   caption?: string;
   onProgress?: (uri: string, progress: number) => void;
   onStatus?: (uri: string, status: UploadStatus) => void;
+  onUploadedReady?: () => void;
 };
 
 const normalizeSubRoom = (row: any, parentRoomId: string): SubRoom | null => {
@@ -301,10 +303,95 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const [uploadBubbles, setUploadBubbles] = useState<Record<string, UploadBubble>>({});
 
-  const messagesWithUploads = useMemo(
-    () => [...messages, ...Object.values(uploadBubbles)] as ChatMessage[],
-    [messages, uploadBubbles],
-  );
+  const messagesWithUploads = useMemo(() => {
+    const uploadLocalKeys = new Set<string>();
+    const uploadFileSignatures = new Set<string>();
+    const isMediaAttachment = (attachment: any) => {
+      const kind = String(attachment?.kind ?? '').trim().toLowerCase();
+      const mime = String(attachment?.mimeType ?? attachment?.mime ?? attachment?.type ?? '').trim().toLowerCase();
+      const nameOrUri = String(
+        attachment?.originalName ??
+          attachment?.name ??
+          attachment?.localUri ??
+          attachment?.uri ??
+          attachment?.url ??
+          '',
+      ).toLowerCase();
+      return (
+        kind === 'image' ||
+        kind === 'video' ||
+        mime.startsWith('image/') ||
+        mime.startsWith('video/') ||
+        /\.(jpe?g|png|webp|heic|heif|gif|mp4|mov|m4v)(\?|#|$)/i.test(nameOrUri)
+      );
+    };
+    const activeMediaUploadBubbles = Object.values(uploadBubbles).filter((bubble: any) => {
+      const attachments = Array.isArray(bubble?.attachments) ? bubble.attachments : [];
+      return attachments.some(isMediaAttachment);
+    });
+
+    const getMessageTimeMs = (value: any) => {
+      const raw = value?.createdAt ?? value?.created_at ?? value?.timestamp ?? value?.sentAt;
+      if (typeof raw === 'number') return raw;
+      if (raw instanceof Date) return raw.getTime();
+      if (typeof raw === 'string') {
+        const parsed = Date.parse(raw);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return 0;
+    };
+
+    const hasMediaAttachment = (attachments: any[]) =>
+      attachments.some(isMediaAttachment);
+
+    const collectUploadKeys = (attachment: any) => {
+      if (!attachment || typeof attachment !== 'object') return;
+      const localKey = attachment.localUploadKey;
+      const localUri = attachment.localUri ?? attachment.uri ?? attachment.url;
+      if (typeof localKey === 'string' && localKey) uploadLocalKeys.add(localKey);
+      if (typeof localUri === 'string' && localUri) uploadLocalKeys.add(localUri);
+      const name = String(attachment.originalName ?? attachment.name ?? '').trim().toLowerCase();
+      const mime = String(attachment.mimeType ?? attachment.mime ?? attachment.type ?? '').trim().toLowerCase();
+      if (name || mime) uploadFileSignatures.add(`${name}:${mime}`);
+    };
+
+    Object.values(uploadBubbles).forEach((bubble: any) => {
+      (Array.isArray(bubble?.attachments) ? bubble.attachments : []).forEach(collectUploadKeys);
+    });
+
+    const visibleMessages = messages.filter((message: any) => {
+      const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
+      if (attachments.length === 0) return true;
+
+      if (activeMediaUploadBubbles.length > 0 && hasMediaAttachment(attachments)) {
+        const messageTime = getMessageTimeMs(message);
+        const sender = String(message?.senderId ?? '');
+        const fromMe = Boolean(message?.fromMe);
+        const hasMatchingUploadBubble = activeMediaUploadBubbles.some((bubble: any) => {
+          const bubbleTime = getMessageTimeMs(bubble);
+          const sameSender =
+            (sender && sender === String(bubble?.senderId ?? '')) ||
+            (fromMe && Boolean(bubble?.fromMe));
+          if (!sameSender) return false;
+          if (!messageTime || !bubbleTime) return true;
+          return messageTime >= bubbleTime - 60_000 && messageTime <= bubbleTime + 10 * 60_000;
+        });
+        if (hasMatchingUploadBubble) return false;
+      }
+
+      return !attachments.some((attachment: any) => {
+        const localKey = attachment?.localUploadKey;
+        const localUri = attachment?.localUri ?? attachment?.uri ?? attachment?.url;
+        if (typeof localKey === 'string' && uploadLocalKeys.has(localKey)) return true;
+        if (typeof localUri === 'string' && uploadLocalKeys.has(localUri)) return true;
+        const name = String(attachment?.originalName ?? attachment?.name ?? '').trim().toLowerCase();
+        const mime = String(attachment?.mimeType ?? attachment?.mime ?? attachment?.type ?? '').trim().toLowerCase();
+        return Boolean(name || mime) && uploadFileSignatures.has(`${name}:${mime}`);
+      });
+    });
+
+    return [...visibleMessages, ...Object.values(uploadBubbles)] as ChatMessage[];
+  }, [messages, uploadBubbles]);
 
   // Load wallpaper on mount
   useEffect(() => {
@@ -1299,7 +1386,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       sendRichMessage,
       onUploadStatus: (s) => {
         if (s === 'done') {
-          setUploadBubbles(prev => { const { [bubbleId]: _, ...rest } = prev; return rest; });
+          setUploadBubbles(prev => {
+            const next = { ...prev };
+            delete next[bubbleId];
+            return next;
+          });
         } else if (s === 'verification_failed' || s === 'failed') {
           setUploadBubbles(prev => {
             const b = prev[bubbleId];
@@ -1323,13 +1414,26 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const handleSendAttachment = useCallback((input: AttachmentFilePayload) => {
     const bubbleId = `__upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const localAttachments = (input.files ?? []).map((f, i) => ({
-      id: `local_${i}`,
-      url: f.uri,
-      originalName: f.name,
-      mimeType: f.type ?? 'application/octet-stream',
-      size: f.size ?? 0,
-    }));
+    const localAttachments = (input.files ?? []).map((f, i) => {
+      const fileType = String(f.type ?? '').toLowerCase();
+      const fileName = String(f.name ?? f.uri ?? '').toLowerCase();
+      const kind =
+        fileType.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|gif)(\?|#|$)/i.test(fileName)
+          ? 'image'
+          : fileType.startsWith('video/') || /\.(mp4|mov|m4v)(\?|#|$)/i.test(fileName)
+          ? 'video'
+          : undefined;
+      return {
+        id: `local_${i}`,
+        url: f.uri,
+        originalName: f.name,
+        mimeType: f.type ?? (kind === 'image' ? 'image/*' : kind === 'video' ? 'video/*' : 'application/octet-stream'),
+        kind,
+        size: f.size ?? 0,
+        localUri: f.uri,
+        localUploadKey: `${f.uri}:${f.name}:${f.type ?? ''}`,
+      };
+    });
     const bubble: UploadBubble = {
       id: bubbleId,
       clientId: bubbleId,
@@ -1343,6 +1447,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       attachments: localAttachments as any,
       _uploadProgress: 0,
       _uploadStatus: 'verifying',
+      _uploadInput: {
+        files: input.files,
+        caption: input.caption,
+      },
     };
     setUploadBubbles(prev => ({ ...prev, [bubbleId]: bubble }));
 
@@ -1356,10 +1464,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       const avgProgress = progresses.length ? progresses.reduce((a, b) => a + b, 0) / progresses.length : 0;
       const anyVerifFailed = uris.some(u => fileStatusMap[u] === 'verification_failed');
       const anyFailed = uris.some(u => fileStatusMap[u] === 'failed');
-      const allDone = uris.every(u => fileStatusMap[u] === 'done');
+      const allDone = uris.length > 0 && uris.every(u => fileStatusMap[u] === 'done');
+      const anyUploading = uris.some(u => fileStatusMap[u] === 'uploading');
 
       if (allDone) {
-        setUploadBubbles(prev => { const { [bubbleId]: _, ...rest } = prev; return rest; });
+        setUploadBubbles(prev => {
+          const b = prev[bubbleId];
+          if (!b) return prev;
+          return { ...prev, [bubbleId]: { ...b, _uploadProgress: 1, _uploadStatus: 'uploading' } };
+        });
       } else if (anyVerifFailed || anyFailed) {
         setUploadBubbles(prev => {
           const b = prev[bubbleId];
@@ -1370,7 +1483,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         setUploadBubbles(prev => {
           const b = prev[bubbleId];
           if (!b) return prev;
-          return { ...prev, [bubbleId]: { ...b, _uploadProgress: avgProgress } };
+          return { ...prev, [bubbleId]: { ...b, _uploadProgress: avgProgress, _uploadStatus: anyUploading ? 'uploading' : b._uploadStatus } };
         });
       }
     };
@@ -1387,6 +1500,14 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         input.onStatus?.(uri, status);
         syncBubble();
       },
+      onUploadedReady: () => {
+        input.onUploadedReady?.();
+        setUploadBubbles(prev => {
+          const next = { ...prev };
+          delete next[bubbleId];
+          return next;
+        });
+      },
     };
 
     void Handlers.handleSendAttachment({
@@ -1396,6 +1517,14 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       currentUserId,
       ensureConversationId,
       sendRichMessage,
+    }).then((ok) => {
+      if (ok === false) {
+        setUploadBubbles(prev => {
+          const b = prev[bubbleId];
+          if (!b) return prev;
+          return { ...prev, [bubbleId]: { ...b, status: 'failed', _uploadStatus: 'failed' } };
+        });
+      }
     }).catch(() => {
       setUploadBubbles(prev => {
         const b = prev[bubbleId];
@@ -1571,11 +1700,54 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const chatBackgroundImage = isDark ? DARK_CHAT_BACKGROUND : LIGHT_CHAT_BACKGROUND;
   const handleRetryMessage = useCallback(
     (message: ChatMessage) => {
+      const uploadInput = (message as any)._uploadInput as AttachmentFilePayload | undefined;
+      const fallbackFiles = Array.isArray((message as any).attachments)
+        ? ((message as any).attachments as any[])
+            .map((attachment): FilesType | null => {
+              const uri = attachment?.localUri ?? attachment?.uri ?? attachment?.url;
+              if (typeof uri !== 'string' || !uri) return null;
+              return {
+                uri,
+                name: String(attachment?.originalName ?? attachment?.name ?? 'upload'),
+                type: attachment?.mimeType ?? attachment?.mime ?? attachment?.type ?? null,
+                size: typeof attachment?.size === 'number' ? attachment.size : null,
+                durationMs: typeof attachment?.durationMs === 'number' ? attachment.durationMs : null,
+              };
+            })
+            .filter(Boolean) as FilesType[]
+        : [];
+      const retryInput =
+        uploadInput?.files?.length
+          ? uploadInput
+          : fallbackFiles.length
+          ? { files: fallbackFiles, caption: (message as any).text }
+          : null;
+
+      if (retryInput?.files?.length) {
+        const failedBubbleId = String((message as any).id ?? '');
+        if (__DEV__) {
+          console.log('[chat.upload.retry] retrying failed upload bubble', {
+            failedBubbleId,
+            fileCount: retryInput.files.length,
+            hasStoredInput: Boolean(uploadInput?.files?.length),
+          });
+        }
+        if (failedBubbleId) {
+          setUploadBubbles(prev => {
+            const next = { ...prev };
+            delete next[failedBubbleId];
+            return next;
+          });
+        }
+        handleSendAttachment(retryInput);
+        return;
+      }
+
       const messageId = message.serverId ?? message.id;
       if (!messageId) return;
       void retryMessage(String(messageId));
     },
-    [retryMessage],
+    [handleSendAttachment, retryMessage],
   );
   const handleOpenInfo = useCallback(() => {
     if (!chat) return;

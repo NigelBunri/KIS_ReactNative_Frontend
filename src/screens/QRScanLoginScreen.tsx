@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera } from 'react-native-image-picker';
 import { useKISTheme } from '@/theme/useTheme';
@@ -19,7 +19,8 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
-import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { ensureDeviceId, initE2EE, rotateDeviceId } from '@/security/e2ee';
+import { prefetchNow, resetPrefetchFlag, startBackgroundPrefetch } from '@/services/backgroundPrefetch';
 import { useAuth } from '../../App';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -45,38 +46,89 @@ export default function QRScanLoginScreen() {
   const [token, setToken] = useState('');
   const [step, setStep] = useState<'scan' | 'manual'>('scan');
 
+  const extractQRToken = (value: string) => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      const candidate = parsed?.qr_payload ?? parsed?.token ?? parsed?.data?.qr_payload ?? parsed?.data?.token;
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    } catch {
+      // Plain token paste is the expected path.
+    }
+    const tokenMatch =
+      trimmed.match(/(?:qr_payload|token)=([^\s&]+)/i) ||
+      trimmed.match(/(?:qr_payload|token)["']?\s*[:=]\s*["']([^"'\s]+)/i);
+    if (tokenMatch?.[1]) return decodeURIComponent(tokenMatch[1]).trim();
+    return trimmed;
+  };
+
   const handleToken = useCallback(async (rawToken: string) => {
-    const trimmed = rawToken.trim();
+    const trimmed = extractQRToken(rawToken);
     if (!trimmed) return;
     setLoading(true);
     try {
-      const deviceId = await ensureDeviceId();
-      const res = await postRequest(
-        ROUTES.auth.deviceQRLogin,
-        {
-          token: trimmed,
-          device_id: deviceId,
-          device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (secondary)`,
-          platform: Platform.OS,
-        },
-        { errorMessage: 'QR login failed.' },
-      );
+      const loginWithDevice = async (deviceId: string) =>
+        postRequest(
+          ROUTES.auth.deviceQRLogin,
+          {
+            token: trimmed,
+            device_id: deviceId,
+            device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (secondary)`,
+            platform: Platform.OS,
+          },
+          { errorMessage: 'QR login failed.' },
+        );
+
+      let deviceId = await ensureDeviceId();
+      let res = await loginWithDevice(deviceId);
+      const firstDetail = String(res?.data?.detail ?? res?.message ?? '').toLowerCase();
+
+      if (!res?.success && firstDetail.includes('primary device cannot consume')) {
+        deviceId = await rotateDeviceId();
+        res = await loginWithDevice(deviceId);
+      }
 
       if (!res?.success) {
-        Alert.alert(
-          'Login failed',
-          res?.message || res?.data?.detail || 'QR code is invalid or has expired. Ask the primary device to show a fresh code.',
-        );
+        const detail =
+          res?.data?.detail ||
+          res?.data?.message ||
+          res?.message ||
+          'QR code is invalid or has expired. Ask the primary device to show a fresh code.';
+        Alert.alert('Login failed', String(detail));
         return;
       }
 
-      const t = res.data?.tokens ?? res.data ?? {};
-      await setAuthTokens({ accessToken: t.access ?? t.access_token, refreshToken: t.refresh ?? t.refresh_token });
-      const resolvedUser = res?.data?.user ?? null;
-      await setUserData(resolvedUser, res.data);
+      const payload = res.data ?? {};
+      const t = payload?.tokens ?? payload;
+      const access = t.access ?? t.access_token;
+      const refresh = t.refresh ?? t.refresh_token;
+      if (!access) {
+        Alert.alert('Login failed', 'The server linked the device but did not return an access token. Please refresh the QR and try again.');
+        return;
+      }
+      await setAuthTokens({ accessToken: access, refreshToken: refresh ?? null });
+      const resolvedUser = payload?.user ?? null;
+      const resolvedUserId = String(resolvedUser?.id ?? '');
+      await setUserData(resolvedUser, payload);
       setUser?.(resolvedUser);
-      void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+      if (resolvedUserId) {
+        await initE2EE(resolvedUserId).catch((err: any) => {
+          if (__DEV__) console.warn('[QRScanLogin] E2EE init failed:', err?.message ?? err);
+        });
+        resetPrefetchFlag();
+        startBackgroundPrefetch(resolvedUserId);
+        void prefetchNow(resolvedUserId).catch((err: any) => {
+          if (__DEV__) console.warn('[QRScanLogin] initial prefetch failed:', err?.message ?? err);
+        });
+      }
       setAuth(true);
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' as never, params: { screen: 'Messages' } as never }],
+        }),
+      );
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error. Please try again.');
     } finally {
@@ -107,7 +159,14 @@ export default function QRScanLoginScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => {
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.navigate('Login');
+          }}
+          style={styles.backBtn}
+          hitSlop={12}
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Secondary Device Login</Text>

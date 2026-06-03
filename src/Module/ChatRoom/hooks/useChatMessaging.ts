@@ -35,6 +35,7 @@ import {
   decryptFromUser,
   ensureDeviceId,
   encryptPayloadForRecipients,
+  isSignalMessageCounterError,
 } from '@/security/e2ee';
 
 /* ========================================================================
@@ -96,6 +97,70 @@ const safeStringify = (value: any) => {
   } catch {
     return null;
   }
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeUuid = (value: unknown): string | null => {
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    return (
+      normalizeUuid(objectValue.id) ??
+      normalizeUuid(objectValue.userId) ??
+      normalizeUuid(objectValue.user_id) ??
+      normalizeUuid(objectValue.uuid)
+    );
+  }
+  const text = String(value ?? '').trim();
+  return UUID_RE.test(text) ? text : null;
+};
+
+const resolveParticipantUserIdForE2EE = (participant: any): string | null => {
+  if (typeof participant === 'string') return normalizeUuid(participant);
+  if (!participant || typeof participant !== 'object') return null;
+
+  const user = participant.user;
+  if (user && typeof user === 'object') {
+    const nested =
+      normalizeUuid(user.id) ??
+      normalizeUuid(user.userId) ??
+      normalizeUuid(user.user_id) ??
+      normalizeUuid(user.uuid);
+    if (nested) return nested;
+  }
+
+  return (
+    normalizeUuid(participant.userId) ??
+    normalizeUuid(participant.user_id) ??
+    normalizeUuid(participant.user_uuid) ??
+    normalizeUuid(participant.member_user_id) ??
+    normalizeUuid(participant.account_id) ??
+    null
+  );
+};
+
+const resolveE2EERecipientIds = (chat: any, currentUserId: string): string[] => {
+  const recipients = new Set<string>();
+  const directCandidates = [
+    chat?.peer_user_id,
+    chat?.peerUserId,
+    chat?.contactUserId,
+    chat?.contact_user_id,
+    chat?.requestRecipientId,
+    chat?.request_initiator_id,
+    chat?.requestInitiatorId,
+  ];
+  for (const candidate of directCandidates) {
+    const userId = normalizeUuid(candidate);
+    if (userId && userId !== String(currentUserId)) recipients.add(userId);
+  }
+
+  const participants = Array.isArray(chat?.participants) ? chat.participants : [];
+  for (const participant of participants) {
+    const userId = resolveParticipantUserIdForE2EE(participant);
+    if (userId && userId !== String(currentUserId)) recipients.add(userId);
+  }
+  return Array.from(recipients);
 };
 
 /* ========================================================================
@@ -401,7 +466,16 @@ export function useChatMessaging({
         decryptFailedAtRef.current.delete(decryptKey);
       } catch (error) {
         decryptFailedAtRef.current.set(decryptKey, Date.now());
-        console.warn('[useChatMessaging] decrypt failed', error);
+        if (isSignalMessageCounterError(error)) {
+          console.warn('[useChatMessaging] duplicate or stale Signal message skipped', {
+            messageId: mapped.serverId ?? mapped.id ?? mapped.clientId,
+            senderId: mapped.senderId,
+            senderDeviceId: encMeta?.senderDeviceId ?? encMeta?.deviceId,
+            error: serializeErrorForDiagnostics(error),
+          });
+        } else {
+          console.warn('[useChatMessaging] decrypt failed', error);
+        }
       } finally {
         decryptInFlightRef.current.delete(decryptKey);
       }
@@ -905,11 +979,8 @@ export function useChatMessaging({
       };
 
       let payloadToSend: any;
-      if (E2EE_ENABLED && Array.isArray((chat as any)?.participants)) {
-        const recipientIds = ((chat as any).participants as any[])
-          .map((p: any) => String(p?.userId ?? p?.user_id ?? p?.id ?? ''))
-          .filter(Boolean)
-          .filter((uid: string) => uid !== String(currentUserId));
+      if (E2EE_ENABLED && chat) {
+        const recipientIds = resolveE2EERecipientIds(chat as any, String(currentUserId));
         if (recipientIds.length > 0) {
           try {
             const { encryptionMeta } = await encryptPayloadForRecipients(
@@ -917,16 +988,25 @@ export function useChatMessaging({
               recipientIds,
               basePayload,
             );
+            const encryptedRecipientCount = Array.isArray(encryptionMeta?.recipients)
+              ? encryptionMeta.recipients.length
+              : 0;
+            if (encryptedRecipientCount < recipientIds.length) {
+              throw new Error(`E2EE recipient envelope missing: ${encryptedRecipientCount}/${recipientIds.length}`);
+            }
             payloadToSend = {
               conversationId: String(convId),
               clientId,
-              kind: basePayload.kind,
-              previewText: basePayload.previewText,
+              // The real kind lives inside the encrypted payload. Keep the
+              // server-visible shell generic so rich encrypted messages do not
+              // have to expose styledText/voice/etc. outside E2EE.
+              kind: 'text',
+              previewText: 'Encrypted message',
               encrypted: true,
               encryptionMeta,
             };
           } catch (encryptErr) {
-            console.warn('[E2EE] encryption failed, falling back to unencrypted', {
+            console.warn('[E2EE] encryption failed; message remains queued locally', {
               reactNativeDiagnostics: reactNativeDiagnostics('send.encrypt_payload', encryptErr, {
                 conversationId: String(convId),
                 clientId,
@@ -934,10 +1014,15 @@ export function useChatMessaging({
                 recipientIds,
               }),
             });
-            payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+            return { ok: false };
           }
         } else {
-          payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+          console.warn('[E2EE] no valid recipient user ids; message remains queued locally', {
+            conversationId: String(convId),
+            clientId,
+            participantCount: Array.isArray((chat as any)?.participants) ? (chat as any).participants.length : 0,
+          });
+          return { ok: false };
         }
       } else {
         payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };

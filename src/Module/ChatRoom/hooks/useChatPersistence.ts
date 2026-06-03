@@ -156,16 +156,151 @@ const getIdentityKey = (msg: ChatMessage): string => {
  * ============================================================================
  */
 
+
+const isSyntheticUploadMessage = (msg: ChatMessage): boolean => {
+  const row = msg as any;
+  const id = String(row.id ?? row.clientId ?? '');
+  return id.startsWith('__upload_') || Boolean(row._uploadStatus || row._uploadProgress !== undefined);
+};
+
+const attachmentKeys = (attachment: any): string[] => {
+  if (!attachment || typeof attachment !== 'object') return [];
+  const keys = new Set<string>();
+  const add = (prefix: string, value: unknown) => {
+    if (typeof value !== 'string') return;
+    const clean = value.trim();
+    if (clean) keys.add(`${prefix}:${clean}`);
+  };
+
+  add('asset', attachment.mediaAssetId ?? attachment.assetId ?? attachment.mediaAssetRef);
+  add('remote', attachment.displayUrl ?? attachment.url ?? attachment.downloadUrl ?? attachment.publicUrl);
+  add('local', attachment.localUploadKey);
+  add('local', attachment.localUri ?? attachment.uri);
+
+  const name = String(attachment.originalName ?? attachment.name ?? '').trim().toLowerCase();
+  const mime = String(attachment.mimeType ?? attachment.mime ?? attachment.type ?? '').trim().toLowerCase();
+  const size = typeof attachment.size === 'number' && Number.isFinite(attachment.size)
+    ? String(attachment.size)
+    : '';
+  if ((name || mime) && size) {
+    keys.add(`file:${name}:${mime}:${size}`);
+  }
+
+  return Array.from(keys);
+};
+
+const dedupeMessageAttachments = (msg: ChatMessage): ChatMessage => {
+  const row = msg as any;
+  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
+  if (attachments.length < 2) return msg;
+
+  const isLocalUrl = (attachment: any) => /^(file|ph|assets-library|content):/i.test(String(attachment?.displayUrl ?? attachment?.url ?? attachment?.uri ?? ''));
+  const isMedia = (attachment: any) => {
+    const mime = String(attachment?.mimeType ?? attachment?.mime ?? attachment?.type ?? '').toLowerCase();
+    const kind = String(attachment?.kind ?? '').toLowerCase();
+    return kind === 'image' || kind === 'video' || mime.startsWith('image/') || mime.startsWith('video/');
+  };
+  const hasRemoteMedia = attachments.some((attachment: any) => isMedia(attachment) && !isLocalUrl(attachment));
+
+  const seen = new Set<string>();
+  const nextAttachments: any[] = [];
+  for (const attachment of attachments) {
+    if (hasRemoteMedia && isMedia(attachment) && isLocalUrl(attachment)) continue;
+    const keys = attachmentKeys(attachment);
+    const duplicate = keys.length > 0 && keys.some((key) => seen.has(key));
+    if (duplicate) continue;
+    keys.forEach((key) => seen.add(key));
+    nextAttachments.push(attachment);
+  }
+
+  return nextAttachments.length === attachments.length
+    ? msg
+    : ({ ...msg, attachments: nextAttachments } as ChatMessage);
+};
+
+const messageTimestampMs = (msg: ChatMessage): number => {
+  if (typeof msg.createdAt === 'number') return msg.createdAt;
+  if (typeof msg.createdAt !== 'string') return 0;
+  const parsed = Date.parse(msg.createdAt);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const messageAttachmentKeys = (msg: ChatMessage): string[] => {
+  const attachments = Array.isArray((msg as any).attachments) ? (msg as any).attachments : [];
+  const keys = new Set<string>();
+  attachments.forEach((attachment: any) => {
+    attachmentKeys(attachment).forEach((key) => keys.add(key));
+  });
+  return Array.from(keys);
+};
+
+const isUnsettledLocalMediaMessage = (msg: ChatMessage): boolean => {
+  const status = String((msg as any).status ?? '').toLowerCase();
+  return status === 'failed' || status === 'pending' || status === 'sending' || status === 'local_only';
+};
+
+const hasRemoteAttachment = (msg: ChatMessage): boolean => {
+  const attachments = Array.isArray((msg as any).attachments) ? (msg as any).attachments : [];
+  return attachments.some((attachment: any) => {
+    const url = String(attachment?.displayUrl ?? attachment?.url ?? attachment?.downloadUrl ?? attachment?.publicUrl ?? '');
+    return /^https?:\/\//i.test(url);
+  });
+};
+
+const duplicateMessageScore = (msg: ChatMessage): number => {
+  const status = String((msg as any).status ?? '').toLowerCase();
+  const statusScore = status === 'read' || status === 'delivered' || status === 'sent'
+    ? 100
+    : status === 'pending' || status === 'sending'
+      ? 40
+      : status === 'failed' || status === 'local_only'
+        ? 10
+        : 20;
+  return statusScore + (hasRemoteAttachment(msg) ? 20 : 0) + (isSyntheticUploadMessage(msg) ? -100 : 0);
+};
+
+const cleanupHistoricalUploadDuplicates = (list: ChatMessage[]): ChatMessage[] => {
+  const normalized = list
+    .map(dedupeMessageAttachments)
+    .filter((msg) => !isSyntheticUploadMessage(msg));
+
+  const kept: ChatMessage[] = [];
+
+  normalized.forEach((msg) => {
+    const keys = messageAttachmentKeys(msg);
+    if (!keys.length) {
+      kept.push(msg);
+      return;
+    }
+
+    const duplicateIndex = kept.findIndex((candidate) => {
+      const candidateKeys = messageAttachmentKeys(candidate);
+      if (!candidateKeys.some((key) => keys.includes(key))) return false;
+      return isUnsettledLocalMediaMessage(candidate) || isUnsettledLocalMediaMessage(msg);
+    });
+
+    if (duplicateIndex < 0) {
+      kept.push(msg);
+      return;
+    }
+
+    const existing = kept[duplicateIndex];
+    const existingScore = duplicateMessageScore(existing);
+    const nextScore = duplicateMessageScore(msg);
+    if (
+      nextScore > existingScore ||
+      (nextScore === existingScore && messageTimestampMs(msg) >= messageTimestampMs(existing))
+    ) {
+      kept[duplicateIndex] = msg;
+    }
+  });
+
+  return kept;
+};
+
 function sortMessages(
   list: ChatMessage[],
 ): ChatMessage[] {
-  const getTimestampMs = (msg: ChatMessage): number => {
-    if (typeof msg.createdAt === 'number') return msg.createdAt;
-    if (typeof msg.createdAt !== 'string') return 0;
-    const parsed = Date.parse(msg.createdAt);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
-
   return [...list].sort((a, b) => {
     const aSeq = typeof a.seq === 'number' ? a.seq : undefined;
     const bSeq = typeof b.seq === 'number' ? b.seq : undefined;
@@ -174,8 +309,8 @@ function sortMessages(
       return aSeq - bSeq;
     }
 
-    const aTs = getTimestampMs(a);
-    const bTs = getTimestampMs(b);
+    const aTs = messageTimestampMs(a);
+    const bTs = messageTimestampMs(b);
     if (aTs !== bTs) {
       return aTs - bTs;
     }
@@ -219,6 +354,19 @@ function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage 
   if (!n.event && p.event) merged.event = p.event;
   if (!(n.contacts?.length) && p.contacts?.length) merged.contacts = p.contacts;
   if (!n.styledText && p.styledText) merged.styledText = p.styledText;
+
+  const incomingEncrypted = Boolean(n.encryptionMeta ?? n.ciphertext ?? n.encrypted);
+  if (p.fromMe && incomingEncrypted && n.text === 'Encrypted message') {
+    if (p.text && p.text !== 'Encrypted message') merged.text = p.text;
+    if (p.styledText) merged.styledText = p.styledText;
+    if (p.voice) merged.voice = p.voice;
+    if (p.sticker) merged.sticker = p.sticker;
+    if (p.poll) merged.poll = p.poll;
+    if (p.event) merged.event = p.event;
+    if (p.contacts?.length) merged.contacts = p.contacts;
+    if (p.attachments?.length) merged.attachments = p.attachments;
+  }
+
   return merged as ChatMessage;
 }
 
@@ -294,7 +442,7 @@ function mergeMessages(
     }
   }
 
-  return sortMessages(Array.from(map.values()));
+  return cleanupHistoricalUploadDuplicates(sortMessages(Array.from(map.values())));
 }
 
 /* ============================================================================
@@ -367,7 +515,7 @@ export function useChatPersistence(
         const normalized = Array.from(byIdentity.values()).map((m) =>
           normalizeSender(m, currentUserId),
         );
-        const sorted = sortMessages(normalized);
+        const sorted = cleanupHistoricalUploadDuplicates(sortMessages(normalized));
         setMessages(sorted);
         if (currentUserId) {
           await saveMessages(roomId, sorted);
@@ -391,7 +539,7 @@ export function useChatPersistence(
 
   const persist = useCallback(
     async (next: ChatMessage[]) => {
-      const sorted = sortMessages(next);
+      const sorted = cleanupHistoricalUploadDuplicates(sortMessages(next));
       // Update the ref synchronously before the async state update so that any
       // concurrent async operation (e.g. decrypt → patchDecryptedMessage) that
       // reads messagesRef.current immediately after persist() will see the

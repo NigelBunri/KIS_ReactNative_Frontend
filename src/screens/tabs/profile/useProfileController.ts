@@ -311,9 +311,15 @@ const extractRequestErrorMessage = (result: any, fallback: string) => {
 
 const normalizePlanList = (payload: any): any[] => {
   const source = payload?.data ?? payload ?? {};
-  const results = source?.results ?? source;
+  const results =
+    source?.plans ??
+    source?.tiers ??
+    source?.results ??
+    source?.data?.plans ??
+    source?.data?.results ??
+    source;
   if (!Array.isArray(results)) return [];
-  return results.map(entry => entry?.data ?? entry);
+  return results.map(entry => entry?.data ?? entry).filter(Boolean);
 };
 
 export const useProfileController = (opts: {
@@ -627,7 +633,14 @@ export const useProfileController = (opts: {
 
   const loadTierCatalog = useCallback(async () => {
     try {
-      const response = await getRequest(ROUTES.tiers.plans, {
+      const tierPlansRoute = ROUTES.tiers?.plans ?? ROUTES.billing?.tierPlans;
+      if (!tierPlansRoute) {
+        console.warn(
+          'Unable to load upgrade tiers: tier plans route is not configured.',
+        );
+        return;
+      }
+      const response = await getRequest(tierPlansRoute, {
         errorMessage: 'Unable to load upgrade tiers.',
         forceNetwork: true,
       });

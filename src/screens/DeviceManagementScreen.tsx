@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Pressable,
   RefreshControl,
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -25,10 +26,14 @@ import ROUTES from '@/network';
 
 type Device = {
   id: string;
+  device_id?: string;
+  name?: string;
   device_name?: string;
   nickname?: string;
   platform?: string;
   last_seen?: string;
+  last_seen_at?: string;
+  current?: boolean;
   is_current?: boolean;
   is_parent?: boolean;
   linked_via_qr?: boolean;
@@ -97,13 +102,24 @@ export default function DeviceManagementScreen() {
     setError(null);
     try {
       const res = await getRequest(ROUTES.auth.listDevices, { errorMessage: 'Unable to load devices.', forceNetwork: true });
-      const list: Device[] = Array.isArray(res?.data)
+      const rawList: Device[] = Array.isArray(res?.data?.devices)
+        ? res.data.devices
+        : Array.isArray(res?.devices)
+        ? res.devices
+        : Array.isArray(res?.data)
         ? res.data
         : Array.isArray(res?.data?.results)
         ? res.data.results
         : Array.isArray(res)
         ? res
         : [];
+      const list = rawList.map(device => ({
+        ...device,
+        id: String(device.device_id ?? device.id),
+        device_name: device.device_name ?? device.name,
+        is_current: Boolean(device.is_current ?? device.current),
+        last_seen: device.last_seen ?? device.last_seen_at,
+      }));
       setDevices(list);
     } catch (err: any) {
       setError(err?.message || 'Unable to load devices.');
@@ -115,17 +131,43 @@ export default function DeviceManagementScreen() {
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadDevices();
+    }, [loadDevices]),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadDevices();
+    });
+    return () => subscription.remove();
+  }, [loadDevices]);
+
+  useEffect(() => {
+    if (!isParent) return;
+    const timer = setInterval(() => {
+      void loadDevices();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [isParent, loadDevices]);
+
   /* ---------- QR generation (parent only) ---------- */
   const loadQR = useCallback(async () => {
     setQRLoading(true);
     try {
-      const res = await getRequest(ROUTES.auth.deviceQRGenerate, { errorMessage: 'Unable to generate QR code.' });
-      const data = (res as unknown) as QRData;
+      const res = await getRequest(ROUTES.auth.deviceQRGenerate, { errorMessage: 'Unable to generate QR code.', forceNetwork: true });
+      const data = (res?.data ?? res) as QRData;
       if (data?.qr_payload) {
         setQRData(data);
         setCountdown(secondsUntil(data.expires_at));
+      } else {
+        setQRData(null);
       }
-    } catch { /* silent */ } finally {
+    } catch (err: any) {
+      setQRData(null);
+      setError(err?.message || 'Unable to generate QR code.');
+    } finally {
       setQRLoading(false);
     }
   }, []);
@@ -165,7 +207,7 @@ export default function DeviceManagementScreen() {
 
   /* ---------- Actions ---------- */
   const handleRevoke = useCallback((device: Device) => {
-    const label = device.nickname || device.device_name || device.platform || 'this device';
+    const label = device.nickname || device.device_name || device.name || device.platform || 'this device';
     Alert.alert('Remove device', `Remove "${label}" from your account?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -223,7 +265,7 @@ export default function DeviceManagementScreen() {
   }, [renameValue, loadDevices]);
 
   const handleTransferParent = useCallback((targetDevice: Device) => {
-    const label = targetDevice.nickname || targetDevice.device_name || 'the selected device';
+    const label = targetDevice.nickname || targetDevice.device_name || targetDevice.name || 'the selected device';
     Alert.alert(
       'Transfer primary role',
       `Make "${label}" the new primary device?\n\nThis device will become a secondary device. A confirmation email will be sent.`,
@@ -255,7 +297,7 @@ export default function DeviceManagementScreen() {
 
   /* ---------- Render ---------- */
   const renderDevice = ({ item }: { item: Device }) => {
-    const label = item.nickname || item.device_name || item.platform || 'Unknown device';
+    const label = item.nickname || item.device_name || item.name || item.platform || 'Unknown device';
     const isRevoking = revokingId === item.id;
     const isRenaming = renamingId === item.id;
 
@@ -326,7 +368,7 @@ export default function DeviceManagementScreen() {
           {!isRenaming && (
             <Pressable
               style={styles.iconBtn}
-              onPress={() => { setRenamingId(item.id); setRenameValue(item.nickname || item.device_name || ''); }}
+              onPress={() => { setRenamingId(item.id); setRenameValue(item.nickname || item.device_name || item.name || ''); }}
             >
               <KISIcon name="edit" size={16} color={palette.subtext} />
             </Pressable>

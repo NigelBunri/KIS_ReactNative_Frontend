@@ -68,6 +68,22 @@ type MessagesScreenProps = {
 
 type LocalQuick = QuickChip;
 
+
+const isEncryptedPreviewPlaceholder = (value: unknown): boolean => {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'encrypted message';
+};
+
+const resolveConversationPreview = (
+  candidate: unknown,
+  previous?: string,
+  fallback = '',
+): string => {
+  const text = typeof candidate === 'string' ? candidate.trim() : '';
+  if (text && !isEncryptedPreviewPlaceholder(text)) return text;
+  if (previous && !isEncryptedPreviewPlaceholder(previous)) return previous;
+  return fallback && !isEncryptedPreviewPlaceholder(fallback) ? fallback : '';
+};
+
 const getMessagePreviewText = (message: any): string => {
   if (!message) return '';
 
@@ -159,12 +175,17 @@ const [contactNameByPhone, setContactNameByPhone] = useState<Record<string, stri
 const [conversationMeta, setConversationMeta] = useState<Record<string, ConversationMetaEntry>>({});
 const [communityByConversationId, setCommunityByConversationId] = useState<Record<string, { id: string; name: string }>>({});
 const [communityGroupConversationIds, setCommunityGroupConversationIds] = useState<Set<string>>(new Set());
+const { socket, isConnected, typingByConversation, currentUserId, presenceByUser, startCall } = useSocket();
 const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
 const avatarAnim = useRef(new Animated.Value(0)).current;
 const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
+const userScopedCacheKey = useCallback(
+  (baseKey: string) => `${baseKey}:${currentUserId ?? 'anon'}`,
+  [currentUserId],
+);
 
 const mountedRef = useRef(true);
 const conversationMetaRef = useRef<Record<string, ConversationMetaEntry>>({});
@@ -174,7 +195,7 @@ const metaPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 // On mount: restore persisted unread counts into conversationMeta
 useEffect(() => {
-  AsyncStorage.getItem('KIS_CONV_META_V1').then((raw) => {
+  AsyncStorage.getItem(userScopedCacheKey('KIS_CONV_META_V1')).then((raw) => {
     if (!raw) return;
     try {
       const saved: Record<string, number> = JSON.parse(raw);
@@ -188,12 +209,12 @@ useEffect(() => {
       });
     } catch { /* silent */ }
   }).catch(() => {});
-}, []);
+}, [userScopedCacheKey]);
 
 // Keep ref in sync so callbacks can read current meta without stale closures
 useEffect(() => {
   conversationMetaRef.current = conversationMeta;
-}, [conversationMeta]);
+}, [conversationMeta, userScopedCacheKey]);
 
 // Debounced persistence of unreadCount whenever conversationMeta changes
 useEffect(() => {
@@ -207,14 +228,14 @@ useEffect(() => {
         toSave[convId] = entry.unreadCount;
       }
     }
-    AsyncStorage.setItem('KIS_CONV_META_V1', JSON.stringify(toSave)).catch(() => {});
+    AsyncStorage.setItem(userScopedCacheKey('KIS_CONV_META_V1'), JSON.stringify(toSave)).catch(() => {});
   }, 1500);
   return () => {
     if (metaPersistTimer.current) {
       clearTimeout(metaPersistTimer.current);
     }
   };
-}, [conversationMeta]);
+}, [conversationMeta, userScopedCacheKey]);
 
 useEffect(() => {
   return () => {
@@ -224,7 +245,7 @@ useEffect(() => {
       metaRefreshTimer.current = null;
     }
   };
-}, []);
+}, [userScopedCacheKey]);
 
 const refreshConversationMeta = useCallback(
   async (convId: string) => {
@@ -280,7 +301,6 @@ const queueMetaRefresh = useCallback(
 
 const deviceIdRef = useRef<string>('');
 const joinedRoomsRef = useRef<Set<string>>(new Set());
-const { socket, isConnected, typingByConversation, currentUserId, presenceByUser, startCall } = useSocket();
 
 const handleStartQuickCall = useCallback(
   async (chat: Chat | undefined | null, media: 'voice' | 'video') => {
@@ -331,7 +351,7 @@ const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
 
 // Load cached conversations on mount before the API call completes
 useEffect(() => {
-  AsyncStorage.getItem(CONVERSATIONS_CACHE_KEY).then((raw) => {
+  AsyncStorage.getItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY)).then((raw) => {
     if (!raw) return;
     try {
       const cached = JSON.parse(raw) as Chat[];
@@ -340,7 +360,7 @@ useEffect(() => {
       }
     } catch { /* silent */ }
   }).catch(() => {});
-}, []);
+}, [userScopedCacheKey]);
 
 useEffect(() => {
   let active = true;
@@ -366,13 +386,13 @@ useEffect(() => {
       setConversations(merged);
       setConversationsLoading(false);
       // Persist fresh list for offline use
-      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(merged)).catch(() => {});
+      AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(merged)).catch(() => {});
     }
   })().catch(() => {});
   return () => {
     active = false;
   };
-}, [currentUserId, query]);
+}, [currentUserId, query, userScopedCacheKey]);
 
 const chatConversationKey = useCallback((chat: Chat | any) => {
   return String(chat?.conversationId ?? chat?.id ?? '');
@@ -772,16 +792,22 @@ useEffect(() => {
       payload?.user_id;
     const senderId = rawSenderId != null ? String(rawSenderId) : '';
     const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
-    const previewText =
+    const rawPreviewText =
       payload?.text ??
       payload?.previewText ??
       payload?.preview_text ??
       getMessagePreviewText(payload) ??
-      (hasEncrypted ? 'Encrypted message' : '');
+      '';
+    const listPreviewText = resolveConversationPreview(rawPreviewText, conversationMeta[convId]?.lastMessage, hasEncrypted ? '' : getMessagePreviewText(payload));
 
     setConversationMeta((prev) => {
       const prevUnread = prev[convId]?.unreadCount ?? 0;
       const increment = isFromMe ? 0 : 1;
+      const previewText = resolveConversationPreview(
+        rawPreviewText,
+        prev[convId]?.lastMessage,
+        hasEncrypted ? '' : getMessagePreviewText(payload),
+      );
       return {
         ...prev,
         [convId]: {
@@ -805,8 +831,8 @@ useEffect(() => {
           if (String(existingId ?? '') !== convId) return item;
           return {
             ...item,
-            last_message_preview: previewText,
-            lastMessage: previewText,
+            last_message_preview: listPreviewText,
+            lastMessage: listPreviewText,
             last_message_at: lastAt,
             lastAt,
             updated_at: lastAt,
@@ -838,8 +864,8 @@ useEffect(() => {
           kind: 'direct',
           title: fallbackName,
           name: fallbackName,
-          last_message_preview: previewText,
-          lastMessage: previewText,
+          last_message_preview: listPreviewText,
+          lastMessage: listPreviewText,
           last_message_at: lastAt,
           lastAt,
           created_at: lastAt,
@@ -1004,19 +1030,19 @@ useEffect(() => {
 
     // Apply preview/timestamp immediately from the payload so the list updates
     // before the network refresh completes — avoids a blank/stale row.
-    const preview = payload?.preview ?? payload?.previewText ?? payload?.preview_text;
+    const rawPreview = payload?.preview ?? payload?.previewText ?? payload?.preview_text;
     const lastAt = payload?.lastMessageAt ?? payload?.last_message_at ?? new Date().toISOString();
     const senderId = payload?.senderId ? String(payload.senderId) : '';
     const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
 
-    if (preview !== undefined) {
+    if (rawPreview !== undefined) {
       setConversationMeta((prev) => {
         const prevUnread = prev[convId]?.unreadCount ?? 0;
         return {
           ...prev,
           [convId]: {
             ...prev[convId],
-            lastMessage: preview,
+            lastMessage: resolveConversationPreview(rawPreview, prev[convId]?.lastMessage),
             lastAt,
             unreadCount: isFromMe ? prevUnread : prevUnread + 1,
             lastMessageFromMe: isFromMe,
@@ -1030,8 +1056,8 @@ useEffect(() => {
           if (id !== convId) return item;
           return {
             ...item,
-            last_message_preview: preview,
-            lastMessage: preview,
+            last_message_preview: resolveConversationPreview(rawPreview, conversationMeta[convId]?.lastMessage),
+            lastMessage: resolveConversationPreview(rawPreview, conversationMeta[convId]?.lastMessage),
             last_message_at: lastAt,
             lastAt,
             updated_at: lastAt,
@@ -1151,12 +1177,12 @@ const handleOpenChat = useCallback((chat: Chat) => {
         return cId === convId ? { ...c, unreadCount: 0 } : c;
       });
       // Persist immediately so the cache has unreadCount:0 on next reload
-      AsyncStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(updated)).catch(() => {});
       return updated;
     });
   }
   onOpenChat(chat);
-}, [onOpenChat]);
+}, [onOpenChat, userScopedCacheKey]);
 
 const updateSelectedConversations = useCallback(
   (updater: (chat: Chat) => Chat | null) => {

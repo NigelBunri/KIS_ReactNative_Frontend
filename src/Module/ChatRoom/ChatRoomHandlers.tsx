@@ -1,6 +1,7 @@
 // src/screens/chat/ChatRoomHandlers.ts
 
 import { Alert, DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   uploadFileToBackend,
   isVerificationFailedError,
@@ -197,6 +198,8 @@ export const handleSendVoice = async ({
     return;
   }
 
+  const deviceId = await AsyncStorage.getItem('device_id');
+
   const convId = await ensureConversationId('Voice message');
   if (!convId) return;
 
@@ -210,6 +213,7 @@ export const handleSendVoice = async ({
         type: 'audio/m4a',
       },
       authToken,
+      deviceId: deviceId || undefined,
       conversationId: String(convId),
       onStatus: (s) => {
         if (s === 'verifying' || s === 'done' || s === 'failed' || s === 'verification_failed') {
@@ -319,6 +323,8 @@ export const handleSendAttachment = async ({
   const caption = (input?.caption ?? '').trim();
   const files = input.files ?? [];
 
+  const deviceId = await AsyncStorage.getItem('device_id');
+
   const convId = await ensureConversationId(caption || 'File');
   if (!convId) return;
 
@@ -328,6 +334,7 @@ export const handleSendAttachment = async ({
         return await uploadFileToBackend({
           file,
           authToken,
+          deviceId: deviceId || undefined,
           conversationId: String(convId),
           onProgress: (progress) => {
             if (file?.uri) {
@@ -365,6 +372,8 @@ export const handleSendAttachment = async ({
     text: caption || undefined,
     attachments,
   });
+
+  input.onUploadedReady?.();
   return true;
 };
 

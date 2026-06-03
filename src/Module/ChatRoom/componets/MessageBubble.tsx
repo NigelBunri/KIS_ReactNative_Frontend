@@ -68,6 +68,9 @@ type AttachmentMeta = {
   downloadUrl?: string;
   displayUrl?: string;
   publicUrl?: string;
+  assetId?: string;
+  mediaAssetId?: string;
+  mediaAssetRef?: string;
 };
 
 type MessageBubbleProps = {
@@ -242,7 +245,57 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // ---------------------------------------------------------------------------
   const rawAttachments = ((message as any).attachments ?? []) as any[];
 
-  const attachments: AttachmentMeta[] = rawAttachments
+  const isLocalAttachmentUrl = (url: string) =>
+    /^(file|ph|assets-library|content):/i.test(url);
+
+  const dedupeAttachments = (items: AttachmentMeta[]): AttachmentMeta[] => {
+    const byKey = new Map<string, AttachmentMeta>();
+    const orderedKeys: string[] = [];
+
+    const keyFor = (att: AttachmentMeta) => {
+      const assetKey = att.mediaAssetId ?? att.assetId ?? att.mediaAssetRef;
+      if (assetKey) return `asset:${assetKey}`;
+      const url = String(att.displayUrl ?? att.url ?? att.downloadUrl ?? att.publicUrl ?? '').trim();
+      if (url && !isLocalAttachmentUrl(url)) return `remote:${url}`;
+      const name = (att.originalName || '').trim().toLowerCase();
+      const mime = (att.mimeType || '').trim().toLowerCase();
+      const size = typeof att.size === 'number' ? att.size : '';
+      if (name || mime || size) return `file:${name}:${mime}:${size}`;
+      return `id:${att.id}`;
+    };
+
+    for (const att of items) {
+      const key = keyFor(att);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, att);
+        orderedKeys.push(key);
+        continue;
+      }
+      const existingIsLocal = isLocalAttachmentUrl(existing.url);
+      const nextIsLocal = isLocalAttachmentUrl(att.url);
+      if (existingIsLocal && !nextIsLocal) {
+        byKey.set(key, att);
+      }
+    }
+
+    const deduped = orderedKeys.map((key) => byKey.get(key)).filter(Boolean) as AttachmentMeta[];
+    const hasRemoteMedia = deduped.some((att) => {
+      const mime = att.mimeType ?? '';
+      const kind = att.kind;
+      return !isLocalAttachmentUrl(att.url) && (kind === 'image' || kind === 'video' || mime.startsWith('image/') || mime.startsWith('video/'));
+    });
+    if (!hasRemoteMedia) return deduped;
+
+    return deduped.filter((att) => {
+      const mime = att.mimeType ?? '';
+      const kind = att.kind;
+      const isMedia = kind === 'image' || kind === 'video' || mime.startsWith('image/') || mime.startsWith('video/');
+      return !(isMedia && isLocalAttachmentUrl(att.url));
+    });
+  };
+
+  const attachments: AttachmentMeta[] = dedupeAttachments(rawAttachments
     .filter((att) => att && typeof att === 'object')
     .map((att, index): AttachmentMeta => {
       const id =
@@ -276,6 +329,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ? att.mimeType
           : typeof att.mimetype === 'string'
           ? att.mimetype
+          : typeof att.mime === 'string'
+          ? att.mime
+          : typeof att.contentType === 'string'
+          ? att.contentType
           : undefined;
 
       const kind: AttachmentKind | undefined =
@@ -292,9 +349,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         height: typeof att.height === 'number' ? att.height : undefined,
         durationMs:
           typeof att.durationMs === 'number' ? att.durationMs : undefined,
+        downloadUrl: typeof att.downloadUrl === 'string' ? att.downloadUrl : undefined,
+        displayUrl: typeof att.displayUrl === 'string' ? att.displayUrl : undefined,
+        publicUrl: typeof att.publicUrl === 'string' ? att.publicUrl : undefined,
+        assetId: typeof att.assetId === 'string' ? att.assetId : undefined,
+        mediaAssetId: typeof att.mediaAssetId === 'string' ? att.mediaAssetId : undefined,
+        mediaAssetRef: typeof att.mediaAssetRef === 'string' ? att.mediaAssetRef : undefined,
       };
     })
-    .filter((att) => !!att.url); // require a URL to show something
+    .filter((att) => !!att.url)); // require a URL to show something
 
   const hasAttachments = attachments.length > 0;
 
@@ -663,28 +726,42 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const textColor = isMe ? outgoingTextColor : palette.text;
   const metaColor = isMe ? outgoingMetaColor : palette.subtext;
+  const chatBgColor = String(palette.chatBg ?? palette.bg ?? '');
+  const chatLooksLight = readableTextForBg(chatBgColor) === '#111111';
+  const deletedBubbleColor =
+    palette.deletedBubbleBg ?? (chatLooksLight ? '#F1E7DA' : '#2A2434');
+  const deletedTextColor =
+    palette.deletedTextColor ?? (chatLooksLight ? '#765D47' : '#CFC6DA');
+  const deletedMetaColor =
+    palette.deletedMetaColor ?? (chatLooksLight ? '#8B735D' : '#AFA5BC');
 
   const statusColor =
     status === 'read'
       ? palette.readStatus ?? palette.primary ?? '#34B7F1'
       : metaColor;
-  const showRetry = status === 'failed';
 
   // Upload progress overlay data (synthetic in-flight bubbles only)
   const uploadStatus = (message as any)._uploadStatus as
-    | 'verifying' | 'verification_failed' | 'failed'
+    | 'verifying' | 'uploading' | 'verification_failed' | 'failed'
     | undefined;
   const uploadProgress = typeof (message as any)._uploadProgress === 'number'
     ? (message as any)._uploadProgress as number
     : undefined;
+  const hasUploadState = Boolean(uploadStatus || uploadProgress !== undefined);
+  const isUploadFailed = uploadStatus === 'failed' || uploadStatus === 'verification_failed';
+  const showRetry = (status === 'failed' && !hasUploadState) || isUploadFailed;
 
   const renderUploadOverlay = () => {
-    if (!uploadStatus || !isMe) return null;
+    if (!uploadStatus || !isMe || hasAttachments) return null;
     const pct = uploadProgress != null ? Math.round(uploadProgress * 100) : null;
     const isVerifFailed = uploadStatus === 'verification_failed';
     const isFailed = uploadStatus === 'failed' || isVerifFailed;
     return (
-      <View
+      <Pressable
+        disabled={!isFailed || !onRetry}
+        hitSlop={8}
+        onStartShouldSetResponder={() => isFailed}
+        onPress={() => onRetry?.(message as ChatMessage)}
         style={{
           marginTop: 6,
           paddingHorizontal: 10,
@@ -710,12 +787,70 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {isVerifFailed
             ? 'Verification failed'
             : isFailed
-            ? 'Upload failed'
+            ? 'Upload failed - tap to retry'
             : pct != null && pct > 0
             ? `Uploading ${pct}%`
             : 'Verifying…'}
         </Text>
-      </View>
+      </Pressable>
+    );
+  };
+
+  const renderInlineUploadOverlay = () => {
+    if (!uploadStatus || !isMe) return null;
+    const pct = uploadProgress != null ? Math.round(uploadProgress * 100) : null;
+    const isVerifFailed = uploadStatus === 'verification_failed';
+    const isFailed = uploadStatus === 'failed' || isVerifFailed;
+    return (
+      <Pressable
+        disabled={!isFailed || !onRetry}
+        hitSlop={8}
+        onStartShouldSetResponder={() => isFailed}
+        onPress={() => onRetry?.(message as ChatMessage)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isFailed ? 'rgba(127,29,29,0.42)' : 'rgba(0,0,0,0.35)',
+          padding: 12,
+        }}
+      >
+        {!isFailed && <ActivityIndicator size="small" color="#FFFFFF" />}
+        <Text
+          style={{
+            marginTop: isFailed ? 0 : 8,
+            fontSize: 12,
+            fontWeight: '700',
+            color: '#FFFFFF',
+            textAlign: 'center',
+          }}
+        >
+          {isVerifFailed
+            ? 'Verification failed'
+            : isFailed
+            ? 'Upload failed'
+            : pct != null && pct > 0
+            ? `Uploading ${pct}%`
+            : 'Verifying...'}
+        </Text>
+        {isFailed && onRetry && (
+          <Text
+            style={{
+              marginTop: 8,
+              fontSize: 12,
+              fontWeight: '700',
+              color: '#FFFFFF',
+              textDecorationLine: 'underline',
+            }}
+          >
+            Tap to retry
+          </Text>
+        )}
+      </Pressable>
     );
   };
 
@@ -1223,7 +1358,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     source={{ uri: att.url }}
                     style={{ width: imgWidth, height: imgHeight }}
                     resizeMode="cover"
+                    blurRadius={uploadStatus ? 4 : 0}
                   />
+                  {renderInlineUploadOverlay()}
                 </View>
               );
             })}
@@ -1919,7 +2056,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           style={[
             styles.messageBubble,
             {
-              backgroundColor: palette.deletedBubbleBg ?? '#333',
+              backgroundColor: deletedBubbleColor,
             },
             pinnedStyle || undefined,
             selectedStyle || undefined,
@@ -1930,7 +2067,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             style={[
               styles.messageText,
               {
-                color: palette.deletedTextColor ?? metaColor,
+                color: deletedTextColor,
                 fontStyle: 'italic',
               },
             ]}
@@ -1947,7 +2084,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 style={[
                   styles.messageTime,
                   {
-                    color: metaColor,
+                    color: isDeleted ? deletedMetaColor : metaColor,
                   },
                 ]}
               >

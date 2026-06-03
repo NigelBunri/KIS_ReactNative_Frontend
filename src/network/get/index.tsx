@@ -10,13 +10,10 @@ import { recordRedactedPerformanceEvent, computeRetryDelayMs } from '@/services/
 
 export type GetResponse<T = any> = ApiResult<T>;
 
-// Cache device_id in memory after the first AsyncStorage read so every
-// subsequent GET request doesn't pay the async storage lookup cost.
-let _cachedDeviceId: string | null | undefined = undefined; // undefined = not yet loaded
 const getCachedDeviceId = async (): Promise<string | null> => {
-  if (_cachedDeviceId !== undefined) return _cachedDeviceId;
-  _cachedDeviceId = await AsyncStorage.getItem('device_id');
-  return _cachedDeviceId;
+  // Device id can rotate during QR secondary-device login. Read the current
+  // value for each GET so device-bound headers never use a stale primary id.
+  return AsyncStorage.getItem('device_id');
 };
 
 const inflightGetRequests = new Map<string, Promise<GetResponse>>();

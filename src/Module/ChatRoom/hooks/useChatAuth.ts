@@ -15,7 +15,9 @@ export function useChatAuth(chat: ChatType | undefined) {
     const bootstrapAuth = async () => {
       try {
         const storedToken = await getAccessToken();
+        let secureTokenLoaded = false;
         if (storedToken) {
+          secureTokenLoaded = true;
           setAuthToken(storedToken);
         }
 
@@ -30,7 +32,7 @@ export function useChatAuth(chat: ChatType | undefined) {
           const firstName = user?.first_name ?? user?.firstName;
           const lastName = user?.last_name ?? user?.lastName;
 
-          if (token) setAuthToken(token);
+          if (token && !secureTokenLoaded) setAuthToken(token);
           if (userId) setCurrentUserId(String(userId));
           if (firstName || lastName) {
             setCurrentUserName(

@@ -15,6 +15,17 @@ const E2EE_READY_KEY = 'kis.e2ee.ready.v2';
 type SignalStoreCache = Record<string, any>;
 
 let storeCache: SignalStoreCache | null = null;
+const decryptPlaintextCache = new Map<string, string>();
+const decryptInFlight = new Map<string, Promise<string>>();
+const MAX_DECRYPT_CACHE_SIZE = 500;
+
+const rememberDecryptedPlaintext = (key: string, value: string) => {
+  decryptPlaintextCache.set(key, value);
+  if (decryptPlaintextCache.size > MAX_DECRYPT_CACHE_SIZE) {
+    const oldest = decryptPlaintextCache.keys().next().value;
+    if (oldest) decryptPlaintextCache.delete(oldest);
+  }
+};
 
 const loadStore = async (): Promise<SignalStoreCache> => {
   if (storeCache) return storeCache;
@@ -197,12 +208,23 @@ class SignalProtocolStore {
 
 const signalStore = new SignalProtocolStore();
 
+const createDeviceId = () => `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 export const ensureDeviceId = async (): Promise<string> => {
   let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
-    deviceId = `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    deviceId = createDeviceId();
     await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
   }
+  return deviceId;
+};
+
+export const rotateDeviceId = async (): Promise<string> => {
+  const deviceId = createDeviceId();
+  storeCache = null;
+  await EncryptedStorage.removeItem(STORE_KEY);
+  await AsyncStorage.removeItem(E2EE_READY_KEY);
+  await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
   return deviceId;
 };
 
@@ -217,10 +239,11 @@ export const initE2EE = async (userId?: string | null) => {
   if (!globalThis.crypto || !(globalThis.crypto as any).subtle) {
     throw new Error('Missing WebCrypto: install react-native-quick-crypto and restart the app.');
   }
-  const ready = await AsyncStorage.getItem(E2EE_READY_KEY);
-  if (ready === 'true') return;
 
   const deviceId = await ensureDeviceId();
+  const readyKey = `${E2EE_READY_KEY}:${userId}:${deviceId}`;
+  const ready = await AsyncStorage.getItem(readyKey);
+  if (ready === 'true') return;
 
   let identityKey = await signalStore.getIdentityKeyPair();
   let registrationId = await signalStore.getLocalRegistrationId();
@@ -282,10 +305,12 @@ export const initE2EE = async (userId?: string | null) => {
   });
 
   if (!res?.success) {
+    await AsyncStorage.removeItem(readyKey);
     await AsyncStorage.removeItem(E2EE_READY_KEY);
     throw new Error(res?.message || res?.data?.detail || 'E2EE key registration failed.');
   }
 
+  await AsyncStorage.setItem(readyKey, 'true');
   await AsyncStorage.setItem(E2EE_READY_KEY, 'true');
 };
 
@@ -463,6 +488,17 @@ export const encryptPayloadForRecipients = async (
   };
 };
 
+export const isSignalMessageCounterError = (error: unknown): boolean => {
+  const name = String((error as any)?.name ?? '');
+  const message = String((error as any)?.message ?? '');
+  return (
+    name.includes('MessageCounterError') ||
+    message.includes('Message key not found') ||
+    message.includes('counter was repeated') ||
+    message.includes('key was not filled')
+  );
+};
+
 export const decryptFromUser = async (
   senderUserId: string,
   senderDeviceId: string,
@@ -470,15 +506,39 @@ export const decryptFromUser = async (
   metaType: number,
 ) => {
   const address = getAddress(senderUserId, senderDeviceId);
-  const cipher = new libsignal.SessionCipher(signalStore, address);
-  const bytes = fromB64(ciphertext);
+  const cacheKey = `${getSessionId(address)}:${metaType}:${ciphertext}`;
+  const cached = decryptPlaintextCache.get(cacheKey);
+  if (cached !== undefined) return cached;
 
-  let plaintext;
-  if (metaType === 3) {
-    plaintext = await cipher.decryptPreKeyWhisperMessage(bytes, 'binary');
-  } else {
-    plaintext = await cipher.decryptWhisperMessage(bytes, 'binary');
+  const pending = decryptInFlight.get(cacheKey);
+  if (pending) return pending;
+
+  const decryptPromise = (async () => {
+    const cipher = new libsignal.SessionCipher(signalStore, address);
+    const bytes = fromB64(ciphertext);
+
+    let plaintext;
+    if (metaType === 3) {
+      plaintext = await cipher.decryptPreKeyWhisperMessage(bytes, 'binary');
+    } else {
+      plaintext = await cipher.decryptWhisperMessage(bytes, 'binary');
+    }
+
+    const decoded = Buffer.from(new Uint8Array(plaintext)).toString('utf8');
+    rememberDecryptedPlaintext(cacheKey, decoded);
+    return decoded;
+  })();
+
+  decryptInFlight.set(cacheKey, decryptPromise);
+  try {
+    return await decryptPromise;
+  } catch (error) {
+    const recovered = decryptPlaintextCache.get(cacheKey);
+    if (recovered !== undefined && isSignalMessageCounterError(error)) {
+      return recovered;
+    }
+    throw error;
+  } finally {
+    decryptInFlight.delete(cacheKey);
   }
-
-  return Buffer.from(new Uint8Array(plaintext)).toString('utf8');
 };

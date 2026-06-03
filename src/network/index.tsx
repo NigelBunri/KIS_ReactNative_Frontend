@@ -48,6 +48,17 @@ ROUTES.analytics = {
   ...((adminRoutes as any).analytics || {}),
 };
 
+ROUTES.tiers = {
+  plans: billingRoutes.tierPlans,
+  plan: billingRoutes.tierPlan,
+  subscriptions: billingRoutes.tierSubscriptions,
+  subscription: billingRoutes.tierSubscription,
+  entitlements: billingRoutes.tierEntitlements,
+  usage: billingRoutes.tierUsage,
+  campaigns: billingRoutes.tierCampaigns,
+  campaign: billingRoutes.tierCampaign,
+};
+
 export default ROUTES;
 
 export type MediaHeaders = Record<string, string>;

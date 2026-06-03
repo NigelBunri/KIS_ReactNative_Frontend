@@ -68,6 +68,10 @@ function schedulePrefetch(_reason: 'startup' | 'resume', delayMs: number, ignore
   }, delayMs);
 }
 
+export async function prefetchNow(currentUserId?: string | null): Promise<void> {
+  await runPrefetch(currentUserId, true);
+}
+
 async function runPrefetch(currentUserId?: string | null, ignoreInterval = false): Promise<void> {
   const now = Date.now();
   if (prefetchInFlight) return;
@@ -112,7 +116,7 @@ async function prefetchMessages(currentUserId?: string | null): Promise<void> {
   const rawList = Array.isArray(res?.data?.results) ? res.data.results : [];
   if (!rawList.length) return;
   const normalized = rawList.map((item: any) => normalizeConversation(item, currentUserId ?? undefined));
-  await AsyncStorage.setItem('kis.conversations_cache', JSON.stringify(normalized));
+  await AsyncStorage.setItem(`kis.conversations_cache:${currentUserId ? String(currentUserId).trim() : 'anon'}`, JSON.stringify(normalized));
   await setCache(
     CONVERSATION_CACHE_TYPE,
     `${CONVERSATION_CACHE_KEY}:${currentUserId ? String(currentUserId).trim() : 'anon'}`,
