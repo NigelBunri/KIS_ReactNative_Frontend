@@ -50,6 +50,7 @@ import IncomingCallScreen from '@/screens/calls/IncomingCallScreen';
 type SocketContextValue = {
   socket: Socket | null;
   isConnected: boolean;
+  isNetworkOnline: boolean;
   currentUserId?: string | null;
   typingByConversation?: Record<string, Record<string, number>>;
   /** userId → display name, populated from typing events when the backend includes senderName */
@@ -78,6 +79,7 @@ type StartCallArgs = {
 const SocketContext = createContext<SocketContextValue>({
   socket: null,
   isConnected: false,
+  isNetworkOnline: true,
   currentUserId: null,
   typingByConversation: {},
   typingDisplayNames: {},
@@ -147,11 +149,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isNetworkOnline, setIsNetworkOnline] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [typingByConversation, setTypingByConversation] = useState<Record<string, Record<string, number>>>({});
   const [typingDisplayNames, setTypingDisplayNames] = useState<Record<string, string>>({});
   const [presenceByUser, setPresenceByUser] = useState<Record<string, { isOnline: boolean; at: number }>>({});
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+  const [socketIdentityVersion, setSocketIdentityVersion] = useState(0);
 
   const socketRef = useRef<Socket | null>(null);
   const mountedRef = useRef(true);
@@ -159,9 +163,34 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const activeCallRef = useRef<CallSession | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
   const persistCallEndRef = useRef<((session: CallSession | null, state: 'ended' | 'missed') => void) | null>(null);
+  const lastSocketRecoveryKickRef = useRef(0);
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+
+  const requestSocketRecovery = useCallback((reason: string) => {
+    if (!mountedRef.current || !isAuth) return;
+    const now = Date.now();
+    if (now - lastSocketRecoveryKickRef.current < 5000) return;
+    lastSocketRecoveryKickRef.current = now;
+    if (__DEV__) console.log('[SocketProvider] socket recovery requested', reason);
+    setSocketIdentityVersion((v) => v + 1);
+  }, [isAuth]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('auth.device.changed', () => {
+      const existing = socketRef.current;
+      if (existing) {
+        existing.removeAllListeners();
+        existing.disconnect();
+        socketRef.current = null;
+      }
+      setSocket(null);
+      setIsConnected(false);
+      requestSocketRecovery('auth.device.changed');
+    });
+    return () => sub.remove();
+  }, []);
 
   /* ─── Permissions ───────────────────────────────────────────────────────── */
 
@@ -667,6 +696,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let leaveLiveSub: { remove: () => void } | null = null;
 
     const connect = async () => {
+      const netState = await NetInfo.fetch().catch(() => null);
+      const online = !!(netState?.isConnected && netState.isInternetReachable !== false);
+      setIsNetworkOnline(online);
+      if (!online) {
+        setIsConnected(false);
+        return;
+      }
+
       let token = await getAccessToken();
       const cached = await getCache('AUTH_CACHE', 'USER_KEY');
       if (!token) token = cached?.access || cached?.access_token || null;
@@ -709,9 +746,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 8000,
-        // Low-network resilience: extend connection timeout so slow networks
-        // don't fail the initial handshake. Default is 20 s.
-        timeout: 30000,
+        // Fail fast when there is no route. Slow real networks still reconnect
+        // via backoff and queued messages flush when NetInfo reports recovery.
+        timeout: 8000,
       });
 
       socketRef.current = s;
@@ -743,6 +780,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
       s.on('connect_error', (err: any) => {
         console.warn('[WS] connect_error', err?.message);
+        if (!mountedRef.current) return;
+        setIsConnected(false);
       });
 
       /* ── Typing ── */
@@ -1120,7 +1159,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsConnected(false);
       setActiveCall(null);
     };
-  }, [isAuth, startWebRTCOffer]);
+  }, [isAuth, startWebRTCOffer, socketIdentityVersion]);
 
   /* ─── NetInfo-driven reconnect ───────────────────────────────────────────── */
   // When the device regains network, immediately prompt the socket to reconnect
@@ -1131,17 +1170,52 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let wasOnline = true;
     const unsubscribe = NetInfo.addEventListener((state) => {
       const online = !!(state.isConnected && state.isInternetReachable !== false);
-      if (online && !wasOnline) {
-        // Network just came back — kick the socket reconnect immediately
+      setIsNetworkOnline(online);
+      if (!online) {
+        setIsConnected(false);
         const s = socketRef2.current;
-        if (s && !s.connected) {
-          s.connect();
+        if (s) {
+          s.removeAllListeners();
+          s.disconnect();
+          socketRef2.current = null;
+          setSocket(null);
         }
+      }
+      if (online && !wasOnline) {
+        // Network just came back. Recreate the socket instead of trusting a
+        // stale Manager instance; this avoids needing an app restart.
+        requestSocketRecovery('netinfo.online');
       }
       wasOnline = online;
     });
     return () => unsubscribe();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [requestSocketRecovery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAuth) return;
+    let cancelled = false;
+    const check = async (reason: string) => {
+      const state = await NetInfo.fetch().catch(() => null);
+      if (cancelled) return;
+      const online = !!(state?.isConnected && state.isInternetReachable !== false);
+      setIsNetworkOnline(online);
+      if (!online) return;
+      const s = socketRef.current;
+      if (!s || !s.connected) requestSocketRecovery(reason);
+    };
+    void check('watchdog.initial');
+    const interval = setInterval(() => {
+      void check('watchdog.interval');
+    }, 7000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void check('watchdog.app_active');
+    });
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, [isAuth, requestSocketRecovery]);
 
   /* ─── Global message queue flush ─────────────────────────────────────────
    * Retries pending/failed messages from ALL rooms whenever the socket
@@ -1233,6 +1307,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const value = useMemo<SocketContextValue>(() => ({
     socket,
     isConnected,
+    isNetworkOnline,
     currentUserId,
     typingByConversation,
     typingDisplayNames,
@@ -1243,7 +1318,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     rejectCall,
     endCall,
     dismissCallUi,
-  }), [socket, isConnected, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, endCall, dismissCallUi]);
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, endCall, dismissCallUi]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 

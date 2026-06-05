@@ -1,10 +1,11 @@
 // src/screens/broadcast/education/components/EducationContentCard.tsx
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import {
   EducationContentType,
   EducationContentItem,
@@ -130,10 +131,11 @@ export default function EducationContentCard({
       }}
     >
       {item.coverUrl ? (
-        <Image
-          source={{ uri: item.coverUrl }}
-          style={{ width: thumbWidth, height: thumbHeight, borderRadius: 18 }}
-          resizeMode="cover"
+        <PermanentRemoteImage
+          uri={item.coverUrl}
+          domain="Education"
+          stableKey={`education_content_${item.id}_${item.coverUrl}`}
+          containerStyle={{ width: thumbWidth, height: thumbHeight, borderRadius: 18 }}
         />
       ) : (
         <View

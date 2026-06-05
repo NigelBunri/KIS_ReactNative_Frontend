@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 const fallbackCover = require('@/assets/logo-light.png');
 
@@ -70,10 +71,6 @@ export default function MarketProductCard({
   const responsive = useResponsiveLayout();
   const tiny = responsive.isWatch || responsive.isCompactPhone;
 
-  const imgSource = useMemo(() => {
-    if (coverUrl) return { uri: coverUrl };
-    return fallbackCover;
-  }, [coverUrl]);
 
   const displayPrice = salePrice ?? price;
   const originalPrice = salePrice != null ? (compareAtPrice ?? price) : null;
@@ -110,7 +107,16 @@ export default function MarketProductCard({
       }}
     >
       <View style={{ height: compact || tiny ? 110 : 140 }}>
-        <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        {coverUrl ? (
+          <PermanentRemoteImage
+            uri={coverUrl}
+            domain="Market"
+            stableKey={`market_title_${title}_${coverUrl}`}
+            containerStyle={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <Image source={fallbackCover} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        )}
 
         {discountPct !== null && (
           <View

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -48,6 +47,7 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
 import EngineModal from './HealthEnginesDashboads/EngineModal';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type EngineData = {
   id: string;

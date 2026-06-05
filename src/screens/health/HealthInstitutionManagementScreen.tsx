@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   View,
@@ -39,6 +38,7 @@ import {
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { nanoid } from 'nanoid/non-secure';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionManagement'>;
 

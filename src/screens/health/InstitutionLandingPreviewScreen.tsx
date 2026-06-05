@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -33,6 +32,7 @@ import TestimonialsSection from '@/components/sections/TestimonialsSection';
 import ProgramsSection from '@/components/sections/ProgramsSection';
 import CTASection from '@/components/sections/CTASection';
 import ContactSection from '@/components/sections/ContactSection';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InstitutionLandingPreview'>;
 

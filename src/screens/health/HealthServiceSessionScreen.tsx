@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
@@ -111,6 +110,7 @@ import {
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
 import { RootStackParamList } from '@/navigation/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthServiceSession'>;
 

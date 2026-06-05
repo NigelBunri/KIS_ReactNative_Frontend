@@ -5,7 +5,6 @@ import {
   Easing,
   Modal,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import type { CallSession } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { KISIcon } from '@/constants/kisIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Each call type has its own royal accent colour
 const ACCENT: Record<string, string> = {

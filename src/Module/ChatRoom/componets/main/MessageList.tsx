@@ -17,8 +17,6 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import Pdf from 'react-native-pdf';
-
 import { chatRoomStyles as styles } from '@/Module/ChatRoom/chatRoomStyles';
 import { ChatMessage } from '../../chatTypes';
 import { InteractiveMessageRow } from '../InteractiveMessageRow';
@@ -65,60 +63,12 @@ type MessageListProps = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
 };
 
-/**
- * Old backend attachment wrapper:
- * {
- *   attachment: { id, url, name, mime, size }
- * }
- */
-type LegacyAttachmentWrapper = {
-  attachment: {
-    id?: string | number;
-    url?: string;
-    uri?: string;
-    mimeType?: string;
-    contentType?: string;
-    mime?: string;
-    name?: string;
-    filename?: string;
-    sizeBytes?: number;
-    size?: number;
-  };
-  id?: string | number;
-};
 
-/**
- * New flat AttachmentMeta we send/receive when using uploadFileToBackend.
- */
-type FlatAttachmentMeta = {
-  id?: string | number;
-  url?: string;
-  uri?: string;
-  displayUrl?: string;
-  downloadUrl?: string;
-  publicUrl?: string;
-  mimeType?: string;
-  mimetype?: string;
-  contentType?: string;
-  mime?: string;
-  name?: string;
-  originalName?: string;
-  filename?: string;
-  sizeBytes?: number;
-  size?: number;
-};
 
-type NormalizedAttachment = {
-  key: string;
-  uri: string;
-  mime?: string;
-  name?: string;
-  filename?: string;
-  size?: number;
-};
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
@@ -146,6 +96,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  onUpdateMessage,
   mentionMap,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -372,378 +323,12 @@ export const MessageList: React.FC<MessageListProps> = ({
     );
   }
 
-  /* ----------------------------- Helpers ---------------------------------- */
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes || bytes <= 0) return '';
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    const mb = kb / 1024;
-    if (mb < 1024) return `${mb.toFixed(1)} MB`;
-    const gb = mb / 1024;
-    return `${gb.toFixed(1)} GB`;
-  };
-
-  const getExtension = (nameOrUrl: string | undefined) => {
-    if (!nameOrUrl) return '';
-    const last = nameOrUrl.split('.').pop();
-    if (!last) return '';
-    return last.split('?')[0].split('#')[0].toLowerCase();
-  };
-
-  const getDisplayName = (raw?: string) => {
-    if (!raw) return 'File';
-    try {
-      const decoded = decodeURIComponent(raw);
-      return decoded.replace(/_/g, ' ');
-    } catch {
-      return raw.replace(/_/g, ' ');
-    }
-  };
-
-  const getShortUrl = (url?: string) => {
-    if (!url) return '';
-    try {
-      const u = new URL(url);
-      const last = u.pathname.split('/').pop();
-      return `${u.host}${last ? ` / ${decodeURIComponent(last)}` : ''}`;
-    } catch {
-      const parts = url.split('/');
-      return parts.slice(-2).join('/');
-    }
-  };
-
-  const normalizeAttachments = (
-    attachmentsRaw: unknown,
-  ): NormalizedAttachment[] => {
-    if (!Array.isArray(attachmentsRaw)) return [];
-
-    const list = attachmentsRaw as any[];
-
-    return list
-      .map((raw, index): NormalizedAttachment | null => {
-        if (!raw || typeof raw !== 'object') return null;
-
-        let att: any;
-
-        // Legacy shape: { attachment: {...} }
-        if ('attachment' in raw && raw.attachment) {
-          att = (raw as LegacyAttachmentWrapper).attachment;
-        } else {
-          // New flat metadata shape (AttachmentMeta[] from uploadFileToBackend)
-          att = raw as FlatAttachmentMeta;
-        }
-
-        const uri =
-          att.displayUrl ||
-          att.url ||
-          att.downloadUrl ||
-          att.publicUrl ||
-          att.uri ||
-          (typeof att.path === 'string' ? att.path : '');
-
-        if (!uri) return null;
-
-        const mime =
-          att.mimeType ||
-          att.mimetype ||
-          att.contentType ||
-          att.mime ||
-          undefined;
-
-        const name =
-          att.name ||
-          att.originalName ||
-          att.filename ||
-          (uri ? uri.split('/').pop() : '');
-
-        const size =
-          typeof att.sizeBytes === 'number'
-            ? att.sizeBytes
-            : typeof att.size === 'number'
-            ? att.size
-            : undefined;
-
-        const key = String(att.id ?? uri ?? index);
-
-        return { key, uri, mime, name, filename: att.filename, size };
-      })
-      .filter(Boolean) as NormalizedAttachment[];
-  };
-
   /**
    * Renders a richer attachment strip for a message:
    * - Images: thumbnail.
    * - PDFs: first-page preview with react-native-pdf.
    * - Other docs: mini preview card (extension badge, filename, mime, size, url hint).
    */
-  const renderAttachments = (
-    attachmentsRaw: unknown,
-    fromMe: boolean | undefined,
-  ) => {
-    const attachments = normalizeAttachments(attachmentsRaw);
-    if (!attachments.length) return null;
-
-    const isOutgoing = !!fromMe;
-
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          marginTop: 4,
-          marginBottom: 6,
-          justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
-        }}
-      >
-        {attachments.map((att, _index) => {
-          const key = att.key;
-          const uri = att.uri;
-          const mime = att.mime;
-          const ext = getExtension(att.name || att.filename || uri);
-
-          const isImage =
-            mime?.startsWith('image/') ||
-            (uri &&
-              (uri.toLowerCase().endsWith('.png') ||
-                uri.toLowerCase().endsWith('.jpg') ||
-                uri.toLowerCase().endsWith('.jpeg') ||
-                uri.toLowerCase().endsWith('.gif') ||
-                uri.toLowerCase().endsWith('.webp')));
-
-          const isPdf =
-            mime === 'application/pdf' ||
-            ext === 'pdf' ||
-            (uri && uri.toLowerCase().endsWith('.pdf'));
-
-          const sizeLabel = formatFileSize(att.size);
-          const displayName = getDisplayName(
-            att.name || att.filename || (uri ? uri.split('/').pop() : ''),
-          );
-          const shortUrl = getShortUrl(uri);
-
-          // IMAGE THUMBNAIL PREVIEW (images will only reach here from camera or backend)
-          if (isImage && uri) {
-            return (
-              <Pressable
-                key={key}
-                style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  marginHorizontal: 4,
-                  marginVertical: 4,
-                  backgroundColor: palette.surface ?? palette.card,
-                }}
-                onPress={() => {
-                  Linking.openURL(uri).catch((err) =>
-                    console.warn('open attachment error', err),
-                  );
-                }}
-              >
-                <Image
-                  source={{ uri }}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-              </Pressable>
-            );
-          }
-
-          // PDF FIRST-PAGE PREVIEW
-          if (isPdf && uri) {
-            return (
-              <Pressable
-                key={key}
-                style={{
-                  width: 220,
-                  height: 260,
-                  borderRadius: 18,
-                  overflow: 'hidden',
-                  marginHorizontal: 4,
-                  marginVertical: 4,
-                  backgroundColor: palette.surface ?? palette.card,
-                }}
-                onPress={() => {
-                  Linking.openURL(uri).catch((err) =>
-                    console.warn('open pdf error', err),
-                  );
-                }}
-              >
-                {/* First page as preview */}
-                <View style={{ flex: 1 }}>
-                  <Pdf
-                    source={{ uri, cache: true }}
-                    page={1}
-                    singlePage
-                    style={{ flex: 1 }}
-                  />
-                </View>
-
-                {/* Overlay footer with filename + meta */}
-                <View
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    backgroundColor: '#00000088',
-                  }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    ellipsizeMode="middle"
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '600',
-                      color: '#ffffff',
-                    }}
-                  >
-                    {displayName}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                    style={{
-                      fontSize: 11,
-                      color: '#f5f5f5',
-                      marginTop: 2,
-                    }}
-                  >
-                    PDF {sizeLabel ? `• ${sizeLabel}` : ''}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          }
-
-          // DOCUMENT / OTHER FILE MINI PREVIEW CARD
-          return (
-            <Pressable
-              key={key}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                maxWidth: 340,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                marginHorizontal: 4,
-                marginVertical: 4,
-                borderRadius: 16,
-                backgroundColor: isOutgoing
-                  ? palette.outgoingBubble ?? palette.primary
-                  : palette.incomingBubble ??
-                    palette.surface ??
-                    palette.card,
-              }}
-              onPress={() => {
-                if (uri) {
-                  Linking.openURL(uri).catch((err) =>
-                    console.warn('open attachment error', err),
-                  );
-                }
-              }}
-            >
-              {/* Extension badge on the left */}
-              <View
-                style={{
-                  width: 46,
-                  height: 56,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10,
-                  backgroundColor: isOutgoing
-                    ? palette.onPrimary
-                      ? `${palette.onPrimary}22`
-                      : '#ffffff22'
-                    : palette.primary
-                    ? `${palette.primary}22`
-                    : '#00000011',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: '700',
-                    textTransform: 'uppercase',
-                    color: isOutgoing
-                      ? palette.onPrimary ?? '#fff'
-                      : palette.primary ?? '#4F46E5',
-                  }}
-                >
-                  {ext || 'FILE'}
-                </Text>
-              </View>
-
-              {/* Right side: file "preview" info */}
-              <View style={{ flex: 1 }}>
-                {/* File name */}
-                <Text
-                  numberOfLines={2}
-                  ellipsizeMode="tail"
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '600',
-                    color: isOutgoing
-                      ? palette.onPrimary ?? '#fff'
-                      : palette.text,
-                  }}
-                >
-                  {displayName}
-                </Text>
-
-                {/* Mime + size */}
-                <Text
-                  style={{
-                    fontSize: 11,
-                    marginTop: 4,
-                    color: isOutgoing
-                      ? palette.onPrimaryMuted ?? '#e0e0e0'
-                      : palette.subtext,
-                  }}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {(mime || 'Document') +
-                    (sizeLabel ? ` • ${sizeLabel}` : '')}
-                </Text>
-
-                {/* Short URL / location hint */}
-                {!!shortUrl && (
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      marginTop: 4,
-                      color: isOutgoing
-                        ? palette.onPrimaryMuted ?? '#e0e0e0'
-                        : palette.subtext,
-                    }}
-                    numberOfLines={1}
-                    ellipsizeMode="middle"
-                  >
-                    {shortUrl}
-                  </Text>
-                )}
-
-                {/* Tap hint */}
-                <Text
-                  style={{
-                    fontSize: 10,
-                    marginTop: 4,
-                    color: isOutgoing
-                      ? palette.onPrimaryMuted ?? '#e0e0e0'
-                      : palette.subtext,
-                  }}
-                >
-                  Tap to open
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    );
-  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -839,10 +424,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onShowReadReceipts={onShowReadReceipts}
                 onViewOnce={onViewOnce}
                 onLocalDeleteMessage={onLocalDeleteMessage}
+                onUpdateMessage={onUpdateMessage}
                 mentionMap={mentionMap}
               />
-
-              {renderAttachments(attachments, (item as any).fromMe)}
             </View>
           );
         }}

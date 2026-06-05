@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Animated,
-  FlatList,
   Image,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import MarketProductCard from '@/screens/broadcast/market/components/MarketProductCard';
@@ -179,7 +179,7 @@ type Props = {
 export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeAllProducts, onSeeAllShops }: Props) {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { home, loadingHome, subscribeProduct, joinShop, reloadAll } = useMarketData({
+  const { home, loadingHome, homeCacheMeta, subscribeProduct, joinShop, reloadAll } = useMarketData({
     ownerId,
     q: searchTerm,
   });
@@ -227,6 +227,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={{ gap: 20 }}>
+        <OfflineDataBadge meta={homeCacheMeta} style={{ marginHorizontal: 12, marginTop: 12 }} />
 
         {/* Hero Banner */}
         <Pressable onPress={reloadAll} style={{ marginHorizontal: 12 }}>

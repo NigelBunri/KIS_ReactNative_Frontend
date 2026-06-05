@@ -99,6 +99,7 @@ import {
 import type { DisappearDuration } from './componets/main/DisappearingTimerSheet';
 import { saveWallpaper, loadWallpaper, WALLPAPER_OPTIONS } from './componets/main/WallpaperPickerSheet';
 import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
+import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -110,6 +111,7 @@ export type FilesType = {
   type: string | null;
   size?: number | null;
   durationMs?: number | null;
+  originalUri?: string | null;
 };
 
 export type UploadStatus = 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed';
@@ -206,7 +208,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const { authToken, currentUserId: authCurrentUserId, currentUserName } =
     useChatAuth(chat);
-  const { typingByConversation, typingDisplayNames, presenceByUser, socket, startCall, currentUserId: socketCurrentUserId } = useSocket();
+  const { typingByConversation, typingDisplayNames, presenceByUser, socket, isNetworkOnline, startCall, currentUserId: socketCurrentUserId } = useSocket();
   const currentUserId = authCurrentUserId || String(socketCurrentUserId ?? '');
 
   /* ------------------------------------------------------------------------ */
@@ -704,6 +706,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     [softDeleteMessage],
   );
 
+  const handleUpdateMessage = useCallback(
+    (updatedMessage: ChatMessage) => {
+      replaceMessages(messages.map((message) => {
+        const sameId =
+          message.id === updatedMessage.id ||
+          message.clientId === updatedMessage.clientId ||
+          (message.serverId && message.serverId === updatedMessage.serverId);
+        return sameId ? { ...message, ...updatedMessage } : message;
+      }));
+    },
+    [messages, replaceMessages],
+  );
+
   const handleLocalDeleteMessage = useCallback(
     async (message: ChatMessage) => {
       await localDeleteMessage(message.id);
@@ -1077,7 +1092,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         id: String(item?.id ?? item?._id ?? item?.serverId ?? item?.messageId ?? ''),
         serverId: item?.serverId ?? item?.id ?? item?._id,
         clientId: item?.clientId,
-        text: item?.text ?? item?.previewText ?? item?.styledText?.text ?? '',
+        text:
+          normalizeChatDisplayText(item?.text) ||
+          normalizeChatDisplayText(item?.previewText) ||
+          normalizeChatDisplayText(item?.styledText?.text),
         createdAt: item?.createdAt ?? item?.created_at ?? null,
       })).filter((item: any) => item.id);
 
@@ -1442,9 +1460,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       fromMe: true,
       createdAt: new Date().toISOString(),
       status: 'sending',
-      kind: 'text',
-      text: input.caption || undefined,
+      kind: input.caption ? 'text' : 'attachment',
+      text: normalizeChatSendText(input.caption),
       attachments: localAttachments as any,
+      media: { attachments: localAttachments as any },
       _uploadProgress: 0,
       _uploadStatus: 'verifying',
       _uploadInput: {
@@ -1578,9 +1597,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleSendGif = useCallback(
     async (gif: { url: string; previewUrl: string; width: number; height: number }) => {
       await ensureConversationId();
-      sendRichMessage({
-        kind: 'text',
-        attachments: [{
+      const attachments = [{
           id: `gif_${Date.now()}`,
           url: gif.url,
           originalName: 'gif',
@@ -1589,7 +1606,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           kind: 'image',
           width: gif.width,
           height: gif.height,
-        }],
+        }];
+      sendRichMessage({
+        kind: 'attachment',
+        attachments,
+        media: { attachments },
       });
     },
     [ensureConversationId, sendRichMessage],
@@ -1859,6 +1880,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           isSingleSelection={isSingleSelection}
           onContinueInSubRoom={handleContinueInSubRoom}
           isE2EE
+          isConnecting={!isNetworkOnline || !socket?.connected}
         />
         </View>
       )}
@@ -1986,6 +2008,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onShowReadReceipts={handleShowReadReceipts}
           onViewOnce={handleViewOnce}
           onLocalDeleteMessage={handleLocalDeleteMessage}
+          onUpdateMessage={handleUpdateMessage}
           typingUsers={typingUserObjects}
           canSend={canSend}
           onLoadOlder={() => {

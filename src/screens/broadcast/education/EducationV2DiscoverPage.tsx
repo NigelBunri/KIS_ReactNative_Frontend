@@ -25,6 +25,7 @@ import EducationEnrollmentSheet from '@/screens/broadcast/education/components/E
 import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
 import useEducationOfflineStore from '@/screens/broadcast/education/hooks/useEducationOfflineStore';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 import { getDirectPaymentInfo, openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 import type {
   EducationContentItem,
@@ -163,7 +164,7 @@ export default function EducationV2DiscoverPage({
   onAvailable,
 }: Props) {
   const { palette } = useKISTheme();
-  const { data, loading, error, refresh, setSearch, filters, updateFilter } =
+  const { data, loading, error, refresh, setSearch, filters, updateFilter, cacheMeta } =
     useEducationDiscovery({
       initialSearch: searchTerm,
       onUnavailable,
@@ -1353,6 +1354,7 @@ export default function EducationV2DiscoverPage({
           />
         }
       >
+        <OfflineDataBadge meta={cacheMeta} />
         {expandedList ? (
           renderExpandedList()
         ) : (

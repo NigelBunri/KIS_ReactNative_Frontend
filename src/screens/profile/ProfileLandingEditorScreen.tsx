@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   DeviceEventEmitter,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -41,6 +40,7 @@ import {
 } from '@/components/section-builder/types';
 import { resolveBackgroundColor } from '@/components/section-builder/backgroundOptions';
 import type { InstitutionProfileEditorDraft } from '@/features/health-dashboard/models';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type LandingTargetKind = 'market' | 'education' | 'partner';
 

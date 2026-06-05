@@ -234,7 +234,7 @@ export const resetE2EEStore = async () => {
   await AsyncStorage.removeItem(E2EE_READY_KEY);
 };
 
-export const initE2EE = async (userId?: string | null) => {
+export const initE2EE = async (userId?: string | null, options?: { force?: boolean }) => {
   if (!userId) return;
   if (!globalThis.crypto || !(globalThis.crypto as any).subtle) {
     throw new Error('Missing WebCrypto: install react-native-quick-crypto and restart the app.');
@@ -243,7 +243,7 @@ export const initE2EE = async (userId?: string | null) => {
   const deviceId = await ensureDeviceId();
   const readyKey = `${E2EE_READY_KEY}:${userId}:${deviceId}`;
   const ready = await AsyncStorage.getItem(readyKey);
-  if (ready === 'true') return;
+  if (ready === 'true' && !options?.force) return;
 
   let identityKey = await signalStore.getIdentityKeyPair();
   let registrationId = await signalStore.getLocalRegistrationId();
@@ -312,6 +312,15 @@ export const initE2EE = async (userId?: string | null) => {
 
   await AsyncStorage.setItem(readyKey, 'true');
   await AsyncStorage.setItem(E2EE_READY_KEY, 'true');
+};
+
+export const repairLocalE2EEBundle = async (userId?: string | null) => {
+  if (!userId) return;
+  const deviceId = await ensureDeviceId();
+  const readyKey = `${E2EE_READY_KEY}:${userId}:${deviceId}`;
+  await AsyncStorage.removeItem(readyKey);
+  await AsyncStorage.removeItem(E2EE_READY_KEY);
+  await initE2EE(userId, { force: true });
 };
 
 const getAddress = (userId: string, deviceId: string) =>
@@ -449,34 +458,44 @@ export const encryptPayloadForRecipients = async (
 ) => {
   const plaintext = JSON.stringify(payload);
   const senderDeviceId = await ensureDeviceId();
+  await initE2EE(senderUserId);
   const uniqueIds = Array.from(new Set([senderUserId, ...recipientUserIds]))
     .filter((uid) => isUuid(uid));
   if (!uniqueIds.length) {
     throw new Error('Missing valid E2EE recipient user ids');
   }
-  const recipients: Array<{ userId: string; deviceId: string; type: number; ciphertext: string }> = [];
 
-  for (const uid of uniqueIds) {
-    const sessions = await ensureSessionsForUser(uid);
-    for (const session of sessions) {
-      // The sender's active device already has the plaintext locally. Encrypting
-      // a copy back to the same device can make the socket echo decrypt against
-      // the wrong self-session and produce Bad MAC warnings.
-      if (String(uid) === String(senderUserId) && String(session.device_id) === String(senderDeviceId)) {
-        continue;
+  const encryptOnce = async () => {
+    const recipients: Array<{ userId: string; deviceId: string; type: number; ciphertext: string }> = [];
+    for (const uid of uniqueIds) {
+      let sessions;
+      try {
+        sessions = await ensureSessionsForUser(uid);
+      } catch (error) {
+        if (uid === senderUserId && String((error as any)?.message ?? '').includes('Missing E2EE bundle')) {
+          await repairLocalE2EEBundle(senderUserId);
+          sessions = await ensureSessionsForUser(uid);
+        } else {
+          throw error;
+        }
       }
-      const cipher = new libsignal.SessionCipher(signalStore, session.address);
-      const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
-      const body = encrypted.body;
-      const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
-      recipients.push({
-        userId: uid,
-        deviceId: session.device_id,
-        type: encrypted.type,
-        ciphertext: fromByteArray(bodyBytes),
-      });
+      for (const session of sessions) {
+        const cipher = new libsignal.SessionCipher(signalStore, session.address);
+        const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
+        const body = encrypted.body;
+        const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
+        recipients.push({
+          userId: uid,
+          deviceId: session.device_id,
+          type: encrypted.type,
+          ciphertext: fromByteArray(bodyBytes),
+        });
+      }
     }
-  }
+    return recipients;
+  };
+
+  const recipients = await encryptOnce();
 
   return {
     encryptionMeta: {

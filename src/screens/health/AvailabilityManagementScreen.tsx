@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   PanResponder,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -38,6 +37,7 @@ import {
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { HEALTH_DASHBOARD_DEFAULT_SERVICES } from '@/features/health-dashboard/defaults';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   HEALTH_DASHBOARD_INSTITUTION_TYPES,
   type ServiceDefinition,

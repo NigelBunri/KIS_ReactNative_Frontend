@@ -8,6 +8,7 @@ import {
   AttachmentMeta,
 } from './uploadFileToBackend';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { copyUriToChatMedia, fileUriForPath } from './chatMediaStorage';
 import { postRequest } from '@/network/post';
 
 import type { ChatMessage } from './chatTypes';
@@ -43,7 +44,7 @@ const showMediaSafetyError = (error: unknown) => {
     error instanceof Error && error.message
       ? error.message
       : 'This media cannot be sent until it passes KIS family-safety checks.';
-  Alert.alert('Media safety check', message);
+  Alert.alert(isVerificationFailedError(error) ? 'Media safety check' : 'Upload failed', message);
 };
 
 /* =========================================================
@@ -263,7 +264,7 @@ export const handleSendSticker = async ({
   ensureConversationId: EnsureConversationId;
   sendRichMessage: SendRichMessage;
 }) => {
-  if (!chat || !authToken) return;
+  if (!chat) return false;
 
   const convId = await ensureConversationId('Sticker');
   if (!convId) return;
@@ -318,10 +319,24 @@ export const handleSendAttachment = async ({
   ensureConversationId: EnsureConversationId;
   sendRichMessage: SendRichMessage;
 }) => {
-  if (!chat || !authToken) return;
+  if (!chat) return false;
 
   const caption = (input?.caption ?? '').trim();
   const files = input.files ?? [];
+  const stagedFiles = await Promise.all(files.map(async (file: FilesType) => {
+    if (!file?.uri?.startsWith('file://')) return file;
+    try {
+      const targetPath = await copyUriToChatMedia(
+        file.uri,
+        'uploads',
+        file.name,
+        `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      );
+      return targetPath ? { ...file, originalUri: file.uri, uri: fileUriForPath(targetPath) } : file;
+    } catch {
+      return file;
+    }
+  }));
 
   const deviceId = await AsyncStorage.getItem('device_id');
 
@@ -329,28 +344,32 @@ export const handleSendAttachment = async ({
   if (!convId) return;
 
   const uploaded = await Promise.all(
-    files.map(async (file: FilesType) => {
+    stagedFiles.map(async (file: FilesType) => {
       try {
         return await uploadFileToBackend({
           file,
           authToken,
           deviceId: deviceId || undefined,
+          baseUrl: NEST_API_BASE_URL,
           conversationId: String(convId),
           onProgress: (progress) => {
-            if (file?.uri) {
-              input?.onProgress?.(file.uri, progress);
+            const progressUri = (file as any)?.originalUri ?? file?.uri;
+            if (progressUri) {
+              input?.onProgress?.(progressUri, progress);
             }
           },
           onStatus: (status) => {
-            if (file?.uri) {
-              input?.onStatus?.(file.uri, status);
+            const progressUri = (file as any)?.originalUri ?? file?.uri;
+            if (progressUri) {
+              input?.onStatus?.(progressUri, status);
             }
           },
         });
       } catch (error) {
         // verification_failed: onStatus already called inside uploadFileToBackend before throw
-        if (file?.uri && !isVerificationFailedError(error)) {
-          input?.onStatus?.(file.uri, 'failed');
+        const progressUri = (file as any)?.originalUri ?? file?.uri;
+        if (progressUri && !isVerificationFailedError(error)) {
+          input?.onStatus?.(progressUri, 'failed');
           showMediaSafetyError(error);
         }
         return null;
@@ -365,12 +384,13 @@ export const handleSendAttachment = async ({
   if (!attachments.length && !caption) return false;
 
   await sendRichMessage({
-    kind: 'text',
+    kind: caption ? 'text' : 'attachment',
     fromMe: true,
     senderId: currentUserId,
     conversationId: convId,
     text: caption || undefined,
     attachments,
+    media: { attachments },
   });
 
   input.onUploadedReady?.();

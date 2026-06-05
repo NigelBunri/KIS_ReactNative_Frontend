@@ -10,7 +10,6 @@ import {
   Alert,
   Image,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -55,6 +54,7 @@ import {
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
 import HealthRevenuePreviewCard from '@/components/profitability/HealthRevenuePreviewCard';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<
   RootStackParamList,

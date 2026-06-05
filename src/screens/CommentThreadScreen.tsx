@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { View, Pressable, StyleSheet, SafeAreaView, Text } from 'react-native';
+import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { postRequest } from '@/network/post';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type CommentThreadRouteParams = {
   CommentThreadScreen: {

@@ -48,7 +48,8 @@ export type MessageKind =
   | 'contacts'
   | 'poll'
   | 'event'
-  | 'location';
+  | 'location'
+  | 'attachment';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -113,6 +114,11 @@ export type ChatAttachment = {
   /** View-once media: auto-deletes after recipient opens it */
   viewOnce?: boolean;
   viewedAt?: string;
+};
+
+export type ChatMediaPayload = {
+  attachments?: ChatAttachment[];
+  [key: string]: any;
 };
 
 /* ============================================================================
@@ -299,6 +305,9 @@ export type ChatMessage = {
   };
 
   attachments?: ChatAttachment[];
+
+  /** Encrypted media/file metadata. `attachments` is only the UI projection. */
+  media?: ChatMediaPayload;
 
   contacts?: ContactAttachment[];
 

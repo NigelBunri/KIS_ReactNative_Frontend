@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -7,6 +8,7 @@ import Video from 'react-native-video';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
 
+import Pdf from 'react-native-pdf';
 import AudioRecorderPlayer, {
   PlayBackType,
 } from 'react-native-audio-recorder-player';
@@ -16,6 +18,9 @@ import { ChatMessage } from '../chatTypes';
 import { EmojiPicker } from './EmojiPicker';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { useLanguage, useTranslation } from '@/languages';
+import { getAccessToken } from '@/security/authStorage';
+import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFileScheme } from '../chatMediaStorage';
+import { normalizeChatDisplayText } from '../safeChatText';
 
 // Use a shared player instance for all bubbles
 const audioPlayer = new AudioRecorderPlayer();
@@ -39,6 +44,7 @@ type ServerMessageLike = {
   createdAt: string | number | Date;
   roomId?: string;
   senderId?: string;
+  onUpdateMessage?: (message: ChatMessage) => void;
   fromMe: boolean;
   kind?: string;
   status?: ChatMessage['status'] | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'pending' | 'local_only';
@@ -71,6 +77,65 @@ type AttachmentMeta = {
   assetId?: string;
   mediaAssetId?: string;
   mediaAssetRef?: string;
+  localUri?: string;
+  localPath?: string;
+};
+
+/**
+ * Old backend attachment wrapper:
+ * {
+ *   attachment: { id, url, name, mime, size }
+ * }
+ */
+type LegacyAttachmentWrapper = {
+  attachment: {
+    id?: string | number;
+    url?: string;
+    uri?: string;
+    mimeType?: string;
+    contentType?: string;
+    mime?: string;
+    name?: string;
+    filename?: string;
+    sizeBytes?: number;
+    size?: number;
+  };
+  id?: string | number;
+};
+
+
+/**
+ * New flat AttachmentMeta we send/receive when using uploadFileToBackend.
+ */
+type FlatAttachmentMeta = {
+  id?: string | number;
+  url?: string;
+  uri?: string;
+  displayUrl?: string;
+  downloadUrl?: string;
+  publicUrl?: string;
+  mimeType?: string;
+  mimetype?: string;
+  contentType?: string;
+  mime?: string;
+  name?: string;
+  originalName?: string;
+  filename?: string;
+  sizeBytes?: number;
+  size?: number;
+  localUri?: string;
+  localPath?: string;
+};
+
+type NormalizedAttachment = {
+  key: string;
+  uri: string;
+  mime?: string;
+  name?: string;
+  filename?: string;
+  size?: number;
+  localUri?: string;
+  localPath?: string;
 };
 
 type MessageBubbleProps = {
@@ -103,6 +168,7 @@ type MessageBubbleProps = {
 
   mentionMap?: Record<string, string>;
   senderId?: string;
+  onUpdateMessage?: (message: ChatMessage) => void;
 };
 
 const formatTimeFromMs = (ms: number) => {
@@ -181,6 +247,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onViewOnce,
   mentionMap,
   senderId,
+  onUpdateMessage,
 }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // ─────────────────────────────────────
@@ -203,11 +270,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     | string
     | undefined;
 
-  // text can be undefined or empty string from the server
-  const text: string =
-    typeof (message as any).text === 'string'
-      ? ((message as any).text as string)
-      : '';
+  // text can be undefined or empty string from the server. Final display
+  // text is derived after attachments so encrypted media-only placeholders can
+  // be suppressed without hiding real captions.
+  const rawText: string = normalizeChatDisplayText((message as any).text);
 
   const voice = (message as any).voice;
   const styled = (message as any).styledText;
@@ -355,11 +421,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         assetId: typeof att.assetId === 'string' ? att.assetId : undefined,
         mediaAssetId: typeof att.mediaAssetId === 'string' ? att.mediaAssetId : undefined,
         mediaAssetRef: typeof att.mediaAssetRef === 'string' ? att.mediaAssetRef : undefined,
+        localUri: typeof att.localUri === 'string' ? att.localUri : undefined,
+        localPath: typeof att.localPath === 'string' ? att.localPath : undefined,
       };
     })
     .filter((att) => !!att.url)); // require a URL to show something
 
   const hasAttachments = attachments.length > 0;
+  const isEncryptedPlaceholderText = rawText.trim().toLowerCase() === 'encrypted message';
+  const hasEncryptedPayload = !!(
+    (message as any).encryptionMeta ||
+    (message as any).ciphertext ||
+    (message as any).encrypted
+  );
+  const text = hasAttachments && hasEncryptedPayload && isEncryptedPlaceholderText
+    ? ''
+    : rawText;
 
   const isVoiceOnly =
     !!voice &&
@@ -440,12 +517,86 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [videoFullscreenUri, setVideoFullscreenUri] = useState<string | null>(null);
 
+  const [mediaHeaders, setMediaHeaders] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      getAccessToken().catch(() => null),
+      AsyncStorage.getItem('device_id').catch(() => null),
+    ]).then(([token, deviceId]) => {
+      if (cancelled) return;
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (deviceId) headers['X-Device-Id'] = deviceId;
+      setMediaHeaders(headers);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   // Per-attachment download state (non-image files)
   const [downloadState, setDownloadState] = useState<Record<string, {
     progress: number; // 0..1
     status: 'idle' | 'downloading' | 'done' | 'failed';
     localPath?: string;
   }>>({});
+
+  const persistDownloadedAttachmentPath = useCallback((attId: string, localPath: string) => {
+    if (!attId || !localPath || !onUpdateMessage) return;
+    const localUri = fileUriForPath(localPath);
+    const matches = (att: any, index: number) => {
+      const values = [
+        att?.id,
+        att?.key,
+        att?.assetId,
+        att?.mediaAssetId,
+        att?.mediaAssetRef,
+        att?.url,
+        att?.displayUrl,
+        att?.downloadUrl,
+        att?.publicUrl,
+        att?.localUri,
+        att?.localPath,
+        index,
+      ].map((value) => String(value ?? ''));
+      return values.includes(String(attId));
+    };
+    const withLocalPath = (list: any[] | undefined) =>
+      Array.isArray(list)
+        ? list.map((att: any, index: number) =>
+            matches(att, index) ? { ...att, localPath, localUri } : att,
+          )
+        : list;
+
+    const nextAttachments = withLocalPath((message as any).attachments) ?? [];
+    const currentMedia = (message as any).media && typeof (message as any).media === 'object'
+      ? (message as any).media
+      : undefined;
+    const nextMedia = currentMedia
+      ? { ...currentMedia, attachments: withLocalPath(currentMedia.attachments) }
+      : undefined;
+    const currentVoice = (message as any).voice && typeof (message as any).voice === 'object'
+      ? (message as any).voice
+      : undefined;
+    const voiceIds = currentVoice
+      ? [
+          (message as any).serverId,
+          (message as any).id,
+          currentVoice.id,
+          currentVoice.uri,
+          currentVoice.url,
+        ].map((value) => String(value ?? ''))
+      : [];
+    const nextVoice = currentVoice && voiceIds.includes(String(attId))
+      ? { ...currentVoice, localPath, localUri, uri: localUri }
+      : currentVoice;
+    onUpdateMessage({
+      ...(message as any),
+      attachments: nextAttachments,
+      ...(nextMedia ? { media: nextMedia } : {}),
+      ...(nextVoice ? { voice: nextVoice } : {}),
+    } as ChatMessage);
+  }, [message, onUpdateMessage]);
 
   const downloadFile = async (attId: string, url: string, filename: string) => {
     if (!url) return;
@@ -455,28 +606,126 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       try { RNBlobUtil = require('react-native-blob-util').default; } catch {}
 
       if (RNBlobUtil) {
-        const dirs = RNBlobUtil.fs.dirs;
-        const destPath = `${dirs.DownloadDir ?? dirs.DocumentDir}/${filename}`;
-        const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: filename } })
-          .fetch('GET', url);
+        const safeName = sanitizeChatMediaFileName(filename || `kis_file_${Date.now()}`);
+        const destPath = await buildChatMediaPath('downloads', safeName, attId);
+        const alreadyExists = await RNBlobUtil.fs.exists(destPath).catch(() => false);
+        if (alreadyExists) {
+          setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
+          persistDownloadedAttachmentPath(attId, destPath);
+          return;
+        }
+        const token = await getAccessToken();
+        const deviceId = await AsyncStorage.getItem('device_id');
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (deviceId) headers['X-Device-Id'] = deviceId;
+        const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: safeName, path: destPath } })
+          .fetch('GET', url, headers);
         task.progress((received: number, total: number) => {
           if (total > 0) {
-            setDownloadState(prev => ({ ...prev, [attId]: { progress: received / total, status: 'downloading' } }));
+            setDownloadState(prev => ({ ...prev, [attId]: { progress: Math.max(0, Math.min(1, received / total)), status: 'downloading' } }));
           }
         });
-        await task;
+        const response = await task;
+        const statusCode = Number(response?.info?.()?.status ?? 200);
+        if (statusCode >= 400) {
+          throw new Error(`Download failed with status ${statusCode}`);
+        }
         setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
+        persistDownloadedAttachmentPath(attId, destPath);
         RNBlobUtil.android?.actionViewIntent?.(destPath, 'application/octet-stream').catch(() => {
-          Linking.openURL(url).catch(() => {});
+          /* Protected media URLs need auth headers; do not open them in Safari. */
         });
       } else {
-        // Fallback: open in browser
-        Linking.openURL(url).catch(() => {});
-        setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done' } }));
+        setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
       }
     } catch {
       setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
     }
+  };
+
+  const renderDownloadControl = (
+    attId: string,
+    url: string,
+    filename: string,
+    variant: 'overlay' | 'inline' = 'inline',
+  ) => {
+    if (isMe || !url) return null;
+    const state = downloadState[attId] ?? { status: 'idle', progress: 0 };
+    const pct = Math.max(0, Math.min(100, Math.round((state.progress ?? 0) * 100)));
+    const isDownloading = state.status === 'downloading';
+    const isDone = state.status === 'done';
+    if (isDone) return null;
+    const isFailed = state.status === 'failed';
+    const label = isDownloading
+      ? `Downloading ${pct}%`
+      : isDone
+      ? 'Downloaded'
+      : isFailed
+      ? 'Retry download'
+      : 'Download';
+    const isOverlay = variant === 'overlay';
+    return (
+      <Pressable
+        disabled={isDownloading || isDone}
+        onPress={() => downloadFile(attId, url, filename)}
+        style={{
+          ...(isOverlay
+            ? {
+                position: 'absolute' as const,
+                right: 8,
+                bottom: 8,
+                minWidth: 124,
+                maxWidth: '92%' as const,
+              }
+            : { alignSelf: 'flex-start' as const, marginTop: 6 }),
+          minHeight: 34,
+          minWidth: isOverlay ? 124 : 132,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: isOverlay ? 'rgba(0,0,0,0.62)' : (palette.surfaceSoft ?? 'rgba(0,0,0,0.08)'),
+          borderWidth: isFailed ? 1 : 0,
+          borderColor: palette.error ?? '#DC2626',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          overflow: 'hidden',
+        }}
+      >
+        {isDownloading && (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${pct}%`,
+              backgroundColor: isOverlay ? 'rgba(255,255,255,0.24)' : `${palette.primary ?? '#C9A227'}33`,
+            }}
+          />
+        )}
+        {isDownloading ? (
+          <ActivityIndicator size="small" color={isOverlay ? '#FFFFFF' : palette.primary} />
+        ) : (
+          <KISIcon
+            name={isDone ? 'check' : 'download'}
+            size={14}
+            color={isOverlay ? '#FFFFFF' : isFailed ? (palette.error ?? '#DC2626') : (palette.primary ?? '#C9A227')}
+          />
+        )}
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: isDownloading ? 12 : 11,
+            fontWeight: '800',
+            color: isOverlay ? '#FFFFFF' : isFailed ? (palette.error ?? '#DC2626') : (palette.text ?? '#111'),
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    );
   };
 
   const responsive = useResponsiveLayout();
@@ -751,6 +1000,529 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUploadFailed = uploadStatus === 'failed' || uploadStatus === 'verification_failed';
   const showRetry = (status === 'failed' && !hasUploadState) || isUploadFailed;
 
+  const normalizeAttachments = (
+      attachmentsRaw: unknown,
+    ): NormalizedAttachment[] => {
+      if (!Array.isArray(attachmentsRaw)) return [];
+  
+      const list = attachmentsRaw as any[];
+  
+      return list
+        .map((raw, index): NormalizedAttachment | null => {
+          if (!raw || typeof raw !== 'object') return null;
+  
+          let att: any;
+  
+          // Legacy shape: { attachment: {...} }
+          if ('attachment' in raw && raw.attachment) {
+            att = (raw as LegacyAttachmentWrapper).attachment;
+          } else {
+            // New flat metadata shape (AttachmentMeta[] from uploadFileToBackend)
+            att = raw as FlatAttachmentMeta;
+          }
+  
+          const uri =
+            att.displayUrl ||
+            att.url ||
+            att.downloadUrl ||
+            att.publicUrl ||
+            att.localUri ||
+            (att.localPath ? `file://${att.localPath}` : '') ||
+            att.uri ||
+            (typeof att.path === 'string' ? att.path : '');
+  
+          if (!uri) return null;
+  
+          const mime =
+            att.mimeType ||
+            att.mimetype ||
+            att.contentType ||
+            att.mime ||
+            undefined;
+  
+          const name =
+            att.name ||
+            att.originalName ||
+            att.filename ||
+            (uri ? uri.split('/').pop() : '');
+  
+          const size =
+            typeof att.sizeBytes === 'number'
+              ? att.sizeBytes
+              : typeof att.size === 'number'
+              ? att.size
+              : undefined;
+  
+          const key = String(att.id ?? uri ?? index);
+  
+          return { key, uri, mime, name, filename: att.filename, size, localUri: att.localUri, localPath: att.localPath };
+        })
+        .filter(Boolean) as NormalizedAttachment[];
+    };
+
+    /* ----------------------------- Helpers ---------------------------------- */
+    
+    const formatFileSize = (bytes?: number) => {
+      if (!bytes || bytes <= 0) return '';
+      const kb = bytes / 1024;
+      if (kb < 1024) return `${kb.toFixed(1)} KB`;
+      const mb = kb / 1024;
+      if (mb < 1024) return `${mb.toFixed(1)} MB`;
+      const gb = mb / 1024;
+      return `${gb.toFixed(1)} GB`;
+    };
+  
+    const getExtension = (nameOrUrl: string | undefined) => {
+      if (!nameOrUrl) return '';
+      const last = nameOrUrl.split('.').pop();
+      if (!last) return '';
+      return last.split('?')[0].split('#')[0].toLowerCase();
+    };
+  
+    const getDisplayName = (raw?: string) => {
+      if (!raw) return 'File';
+      try {
+        const decoded = decodeURIComponent(raw);
+        return decoded.replace(/_/g, ' ');
+      } catch {
+        return raw.replace(/_/g, ' ');
+      }
+    };
+  
+    const getShortUrl = (url?: string) => {
+      if (!url) return '';
+      try {
+        const u = new URL(url);
+        const last = u.pathname.split('/').pop();
+        return `${u.host}${last ? ` / ${decodeURIComponent(last)}` : ''}`;
+      } catch {
+        const parts = url.split('/');
+        return parts.slice(-2).join('/');
+      }
+    };
+
+  const renderAttachments = (
+    attachmentsRaw: unknown,
+    fromMe: boolean | undefined,
+  ) => {
+    const attachments = normalizeAttachments(attachmentsRaw);
+    if (!attachments.length) return null;
+
+    const isOutgoing = !!fromMe;
+    const bubbleWidthRatio = responsive.isTablet ? 0.68 : responsive.isWatch ? 0.92 : responsive.isCompactPhone ? 0.88 : 0.8;
+    const gridGap = 6;
+    const gridOuterWidth = Math.max(220, Math.floor(width * bubbleWidthRatio) - (bubblePaddingX * 2));
+    const gridItemWidth = attachments.length > 1
+      ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
+      : Math.min(220, gridOuterWidth);
+    const gridItemHight = attachments.length > 1
+      ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
+      : Math.min(220, gridOuterWidth);
+    const gridItemWidth2 = attachments.length > 1
+      ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2.11))
+      : "100%";
+    const pdfTileHeight = Math.max(170, Math.floor(gridItemWidth * 1.25));
+    const videoTileHeight = Math.max(96, Math.floor(gridItemWidth * 0.68));
+
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          width: gridOuterWidth,
+          maxWidth: '100%',
+          marginTop: 4,
+          marginBottom: 6,
+          justifyContent: 'space-between',
+          alignSelf: isOutgoing ? 'flex-end' : 'flex-start',
+        }}
+      >
+        {attachments.map((att, _index) => {
+          const key = att.key;
+          const uri = att.uri;
+          const mime = att.mime;
+          const ext = getExtension(att.name || att.filename || uri);
+          const downloadKey = String(key);
+          const savedLocalPath = (att as any).localPath;
+          const savedLocalUri = (att as any).localUri;
+          const localUriPath = typeof savedLocalUri === 'string' && savedLocalUri.startsWith('file://')
+            ? stripFileScheme(savedLocalUri)
+            : undefined;
+          const downloadedPath = downloadState[downloadKey]?.localPath ?? savedLocalPath ?? localUriPath;
+          const downloadedUri = downloadedPath ? fileUriForPath(downloadedPath) : (savedLocalUri || '');
+          const canOpenRemote = isOutgoing || isLocalAttachmentUrl(uri);
+          const canOpenDownloaded = !!downloadedUri;
+          const openableUri = downloadedUri || (canOpenRemote ? uri : '');
+
+          const isImage =
+            mime?.startsWith('image/') ||
+            (uri &&
+              (uri.toLowerCase().endsWith('.png') ||
+                uri.toLowerCase().endsWith('.jpg') ||
+                uri.toLowerCase().endsWith('.jpeg') ||
+                uri.toLowerCase().endsWith('.gif') ||
+                uri.toLowerCase().endsWith('.webp')));
+
+          const isPdf =
+            mime === 'application/pdf' ||
+            ext === 'pdf' ||
+            (uri && uri.toLowerCase().endsWith('.pdf'));
+
+          const isVideo =
+            mime?.startsWith('video/') ||
+            ['mp4', 'mov', 'm4v', 'webm'].includes(ext);
+
+          const isAudio =
+            mime?.startsWith('audio/') ||
+            ['mp3', 'm4a', 'wav', 'ogg'].includes(ext);
+
+          const shouldBlurUntilDownloaded = !isOutgoing && !isLocalAttachmentUrl(uri) && !canOpenDownloaded;
+          const sizeLabel = formatFileSize(att.size);
+          const displayName = getDisplayName(
+            att.name || att.filename || (uri ? uri.split('/').pop() : ''),
+          );
+          const shortUrl = getShortUrl(uri);
+
+          // IMAGE THUMBNAIL PREVIEW (images will only reach here from camera or backend)
+          if (isImage && uri) {
+            return (
+              <Pressable
+                key={key}
+                style={{
+                  width: gridItemWidth2,
+                  height: gridItemHight,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  marginHorizontal: 0,
+                  marginVertical: gridGap / 2,
+                  backgroundColor: palette.surface ?? palette.card,
+                }}
+                onPress={() => {
+                  if (!openableUri) {
+                    void downloadFile(downloadKey, uri, displayName);
+                    return;
+                  }
+                  Linking.openURL(openableUri).catch((err) =>
+                    console.warn('open attachment error', err),
+                  );
+                }}
+              >
+                <Image
+                  source={{ uri: openableUri || uri, headers: mediaHeaders }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                  blurRadius={shouldBlurUntilDownloaded ? 9 : 0}
+                />
+                {shouldBlurUntilDownloaded && (
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.22)',
+                    }}
+                  />
+                )}
+                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {renderInlineUploadOverlay()}
+              </Pressable>
+            );
+          }
+
+          // PDF FIRST-PAGE PREVIEW
+          if (isPdf && uri) {
+            return (
+              <Pressable
+                key={key}
+                style={{
+                  width: gridItemWidth,
+                  height: pdfTileHeight,
+                  borderRadius: 18,
+                  overflow: 'hidden',
+                  marginHorizontal: 0,
+                  marginVertical: gridGap / 2,
+                  backgroundColor: palette.surface ?? palette.card,
+                }}
+                onPress={() => {
+                  if (!openableUri) {
+                    void downloadFile(downloadKey, uri, displayName);
+                    return;
+                  }
+                  Linking.openURL(openableUri).catch((err) =>
+                    console.warn('open pdf error', err),
+                  );
+                }}
+              >
+                {/* First page as preview */}
+                <View style={{ flex: 1 }}>
+                  <Pdf
+                    source={{ uri: openableUri || uri, cache: true, headers: mediaHeaders }}
+                    page={1}
+                    singlePage
+                    style={{ flex: 1, opacity: shouldBlurUntilDownloaded ? 0.45 : 1 }}
+                  />
+                </View>
+
+                {/* Overlay footer with filename + meta */}
+                <View
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 8,
+                    backgroundColor: '#00000088',
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}
+                  >
+                    {displayName}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{
+                      fontSize: 11,
+                      color: '#f5f5f5',
+                      marginTop: 2,
+                    }}
+                  >
+                    PDF {sizeLabel ? `• ${sizeLabel}` : ''}
+                  </Text>
+                </View>
+                {shouldBlurUntilDownloaded && (
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.24)',
+                    }}
+                  />
+                )}
+                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {renderInlineUploadOverlay()}
+              </Pressable>
+            );
+          }
+
+
+          if (isVideo && uri) {
+            return (
+              <Pressable
+                key={key}
+                style={{
+                  width: gridItemWidth,
+                  height: videoTileHeight,
+                  borderRadius: 18,
+                  overflow: 'hidden',
+                  marginHorizontal: 0,
+                  marginVertical: gridGap / 2,
+                  backgroundColor: '#111827',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => {
+                  if (!downloadedUri) {
+                    void downloadFile(downloadKey, uri, displayName);
+                    return;
+                  }
+                  setVideoFullscreenUri(downloadedUri);
+                }}
+              >
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    backgroundColor: shouldBlurUntilDownloaded ? 'rgba(0,0,0,0.58)' : 'rgba(0,0,0,0.28)',
+                  }}
+                />
+                <Ionicons name={downloadedUri ? 'play-circle' : 'videocam'} size={42} color="#fff" />
+                <Text style={{ marginTop: 8, color: '#fff', fontWeight: '700', fontSize: 12 }} numberOfLines={1}>
+                  {downloadedUri ? 'Play video' : displayName}
+                </Text>
+                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {renderInlineUploadOverlay()}
+              </Pressable>
+            );
+          }
+
+          if (isAudio && uri) {
+            return (
+              <Pressable
+                key={key}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  width: attachments.length > 1 ? gridItemWidth : Math.min(300, gridOuterWidth),
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  marginHorizontal: 0,
+                  marginVertical: gridGap / 2,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  backgroundColor: isOutgoing ? palette.outgoingBubble ?? palette.primary : palette.incomingBubble ?? palette.surface ?? palette.card,
+                }}
+                onPress={() => {
+                  if (!openableUri) {
+                    void downloadFile(downloadKey, uri, displayName);
+                    return;
+                  }
+                  Linking.openURL(openableUri).catch((err) => console.warn('open audio error', err));
+                }}
+              >
+                <KISIcon name="mic" size={22} color={isOutgoing ? palette.onPrimary ?? '#fff' : palette.primary ?? '#4F46E5'} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? palette.onPrimary ?? '#fff' : palette.text }}>
+                    {displayName}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 3, color: isOutgoing ? palette.onPrimaryMuted ?? '#e0e0e0' : palette.subtext }}>
+                    Audio {sizeLabel ? `• ${sizeLabel}` : ''}
+                  </Text>
+                  {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'inline')}
+                </View>
+                {renderInlineUploadOverlay()}
+              </Pressable>
+            );
+          }
+
+          // DOCUMENT / OTHER FILE MINI PREVIEW CARD
+          return (
+            <Pressable
+              key={key}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                width: attachments.length > 1 ? gridItemWidth : Math.min(340, gridOuterWidth),
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginHorizontal: 0,
+                marginVertical: gridGap / 2,
+                borderRadius: 16,
+                overflow: 'hidden',
+                backgroundColor: isOutgoing
+                  ? palette.outgoingBubble ?? palette.primary
+                  : palette.incomingBubble ??
+                    palette.surface ??
+                    palette.card,
+              }}
+              onPress={() => {
+                if (!openableUri) {
+                  void downloadFile(downloadKey, uri, displayName);
+                  return;
+                }
+                if (openableUri) {
+                  Linking.openURL(openableUri).catch((err) =>
+                    console.warn('open attachment error', err),
+                  );
+                }
+              }}
+            >
+              {/* Extension badge on the left */}
+              <View
+                style={{
+                  width: 46,
+                  height: 56,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                  backgroundColor: isOutgoing
+                    ? palette.onPrimary
+                      ? `${palette.onPrimary}22`
+                      : '#ffffff22'
+                    : palette.primary
+                    ? `${palette.primary}22`
+                    : '#00000011',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    color: isOutgoing
+                      ? palette.onPrimary ?? '#fff'
+                      : palette.primary ?? '#4F46E5',
+                  }}
+                >
+                  {ext || 'FILE'}
+                </Text>
+              </View>
+
+              {/* Right side: file "preview" info */}
+              <View style={{ flex: 1 }}>
+                {/* File name */}
+                <Text
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '600',
+                    color: isOutgoing
+                      ? palette.onPrimary ?? '#fff'
+                      : palette.text,
+                  }}
+                >
+                  {displayName}
+                </Text>
+
+                {/* Mime + size */}
+                <Text
+                  style={{
+                    fontSize: 11,
+                    marginTop: 4,
+                    color: isOutgoing
+                      ? palette.onPrimaryMuted ?? '#e0e0e0'
+                      : palette.subtext,
+                  }}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {(mime || 'Document') +
+                    (sizeLabel ? ` • ${sizeLabel}` : '')}
+                </Text>
+
+                {/* Short URL / location hint */}
+                {!!shortUrl && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      marginTop: 4,
+                      color: isOutgoing
+                        ? palette.onPrimaryMuted ?? '#e0e0e0'
+                        : palette.subtext,
+                    }}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
+                    {shortUrl}
+                  </Text>
+                )}
+
+                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'inline')}
+              </View>
+              {renderInlineUploadOverlay()}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderUploadOverlay = () => {
     if (!uploadStatus || !isMe || hasAttachments) return null;
     const pct = uploadProgress != null ? Math.round(uploadProgress * 100) : null;
@@ -903,7 +1675,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <Text
           style={{
             fontSize: 11,
-            fontWeight: '700',
+            fontWeight: '800',
             color: palette.senderNameColor ?? palette.primary ?? '#4F46E5',
             marginBottom: 2,
             marginLeft: 2,
@@ -1276,241 +2048,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
    * Helper: attachments renderer (defensive)
    * (for images, files, etc.)
    * ──────────────────────────────────────── */
-  const renderAttachments = () => {
-    if (!hasAttachments) return null;
 
-    // View-once: show "Tap to view" placeholder if not yet viewed
-    if (isViewOnce && !viewOnceViewed && !isMe) {
-      return (
-        <Pressable
-          onPress={() => {
-            setViewOnceViewed(true);
-            onViewOnce?.(messageId);
-          }}
-          style={{
-            marginTop: 6,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderRadius: 14,
-            backgroundColor: palette.surfaceSoft ?? 'rgba(0,0,0,0.08)',
-          }}
-        >
-          <Text style={{ fontSize: 22 }}>👁</Text>
-          <View>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>View once</Text>
-            <Text style={{ fontSize: 12, color: palette.subtext }}>Tap to open · disappears after viewing</Text>
-          </View>
-        </Pressable>
-      );
-    }
 
-    const maxBubbleWidth = width * (responsive.isWatch ? 0.78 : responsive.isCompactPhone ? 0.74 : responsive.isTablet ? 0.52 : 0.7);
 
-    const imageAtts = attachments.filter((a) => {
-      const mime = a.mimeType ?? '';
-      const kind = a.kind;
-      return kind === 'image' || mime.startsWith('image/');
-    });
 
-    const videoAtts = attachments.filter((a) => {
-      const mime = a.mimeType ?? '';
-      const kind = a.kind;
-      return kind === 'video' || mime.startsWith('video/');
-    });
 
-    const nonImageAtts = attachments.filter(
-      (a) => !imageAtts.includes(a) && !videoAtts.includes(a),
-    );
 
-    return (
-      <View style={{ marginTop: text ? 8 : 0 }}>
-        {/* Images grid (from camera or backend) */}
-        {imageAtts.length > 0 && (
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              marginBottom: nonImageAtts.length > 0 ? 8 : 0,
-            }}
-          >
-            {imageAtts.map((att) => {
-              const imgWidth = Math.min(att.width ?? 180, maxBubbleWidth);
-              const imgHeight =
-                att.height && att.width
-                  ? (imgWidth * att.height) / att.width
-                  : imgWidth;
 
-              return (
-                <View
-                  key={att.id}
-                  style={{
-                    marginRight: 6,
-                    marginBottom: 6,
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    backgroundColor: '#00000011',
-                  }}
-                >
-                  <Image
-                    source={{ uri: att.url }}
-                    style={{ width: imgWidth, height: imgHeight }}
-                    resizeMode="cover"
-                    blurRadius={uploadStatus ? 4 : 0}
-                  />
-                  {renderInlineUploadOverlay()}
-                </View>
-              );
-            })}
-          </View>
-        )}
 
-        {/* Video thumbnails with play overlay */}
-        {videoAtts.length > 0 && (
-          <View style={{ gap: 6, marginBottom: nonImageAtts.length > 0 ? 8 : 0 }}>
-            {videoAtts.map((att) => {
-              const videoW = Math.min(att.width ?? 220, maxBubbleWidth);
-              const videoH = att.height && att.width ? (videoW * att.height) / att.width : videoW * 0.56;
-              return (
-                <Pressable
-                  key={att.id}
-                  onPress={() => setVideoFullscreenUri(att.url)}
-                  style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}
-                >
-                  <Video
-                    source={{ uri: att.url }}
-                    style={{ width: videoW, height: videoH }}
-                    paused
-                    resizeMode="cover"
-                    muted
-                  />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(0,0,0,0.28)',
-                    }}
-                  >
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="play" size={20} color="#111" />
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
 
-        {/* Non-image file chips */}
-        {nonImageAtts.length > 0 && (
-          <View style={{ gap: 6 }}>
-            {nonImageAtts.map((att) => {
-              const iconName = getAttachmentIconName(att);
-              const fileSizeLabel = formatFileSize(att.size);
-              const dl = downloadState[att.id] ?? { status: 'idle', progress: 0 };
-              const isDownloading = dl.status === 'downloading';
-              const dlPct = Math.round(dl.progress * 100);
 
-              return (
-                <Pressable
-                  key={att.id}
-                  onPress={() => {
-                    if (dl.status === 'downloading') return;
-                    downloadFile(att.id, att.downloadUrl ?? att.url, att.originalName);
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 8,
-                    paddingHorizontal: 10,
-                    borderRadius: 10,
-                    backgroundColor: isMe
-                      ? palette.attachmentBgOutgoing ?? '#00000022'
-                      : palette.attachmentBgIncoming ?? '#00000011',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Download progress bar background */}
-                  {isDownloading && (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: `${dlPct}%`,
-                        backgroundColor: (palette.primary ?? '#C9A227') + '33',
-                      }}
-                    />
-                  )}
-                  <View
-                    style={{
-                      width: responsive.isWatch ? 28 : 32,
-                      height: responsive.isWatch ? 28 : 32,
-                      borderRadius: responsive.isWatch ? 7 : 8,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 10,
-                      backgroundColor: isMe
-                        ? palette.attachmentIconBgOutgoing ?? '#ffffff22'
-                        : palette.attachmentIconBgIncoming ?? '#00000022',
-                    }}
-                  >
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color={isMe ? palette.onPrimary ?? '#fff' : palette.primary} />
-                    ) : (
-                      <KISIcon
-                        name={iconName}
-                        size={responsive.isWatch ? 15 : 18}
-                        color={isMe ? palette.onPrimary ?? '#fff' : palette.primary}
-                      />
-                    )}
-                  </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={{
-                        fontSize: 13,
-                        fontWeight: '600',
-                        color: isMe
-                          ? palette.attachmentTitleOutgoing ?? '#fff'
-                          : palette.attachmentTitleIncoming ?? palette.text,
-                      }}
-                    >
-                      {att.originalName}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: isMe
-                          ? palette.attachmentMetaOutgoing ?? metaColor
-                          : palette.attachmentMetaIncoming ?? metaColor,
-                        marginTop: 2,
-                      }}
-                    >
-                      {isDownloading
-                        ? `Downloading ${dlPct}%`
-                        : dl.status === 'done'
-                        ? 'Downloaded'
-                        : dl.status === 'failed'
-                        ? 'Download failed — tap to retry'
-                        : `${att.mimeType ?? 'file'}${fileSizeLabel ? ` • ${fileSizeLabel}` : ''} • Tap to download`}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </View>
-    );
-  };
+
+
+
+
+
+
+
+
+
 
   /* ─────────────────────────────────────────
    * Helper: contacts card
@@ -1916,7 +2473,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             onPress={() => {
               const url = buildGoogleCalendarUrl();
               if (url) {
-                Linking.openURL(url).catch(() => {});
+                /* Protected media URLs need auth headers; do not open them in Safari. */
               }
             }}
             style={{
@@ -2329,6 +2886,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           </Pressable>
 
+          {!(voice as any).localPath && !(voice as any).localUri && renderDownloadControl(
+            String((message as any).serverId ?? messageId ?? voice.uri ?? 'voice'),
+            String((voice as any).url ?? voice.uri ?? ''),
+            String((voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
+            'inline',
+          )}
+
           {/* Speed control + Transcription */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 12 }}>
             <Pressable
@@ -2515,7 +3079,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {renderLocationCard()}
 
         {/* Attachments (images, files, etc.) */}
-        {renderAttachments()}
+        {renderAttachments(attachments, (message as any).fromMe)}
 
         {renderUploadOverlay()}
         {renderReactionsRow()}

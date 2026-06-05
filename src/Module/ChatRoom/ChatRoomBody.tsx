@@ -69,6 +69,7 @@ type Props = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  onUpdateMessage?: (message: ChatMessage) => void;
   typingUsers?: TypingUser[];
   // Height of the header above this component so KeyboardAvoidingView can
   // calculate the correct offset. Defaults to 0; ChatRoomPage should pass
@@ -127,6 +128,7 @@ export default function ChatRoomBody({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  onUpdateMessage,
   typingUsers = [],
   keyboardOffset = 0,
 }: Props) {
@@ -172,6 +174,7 @@ export default function ChatRoomBody({
         onShowReadReceipts={onShowReadReceipts}
         onViewOnce={onViewOnce}
         onLocalDeleteMessage={onLocalDeleteMessage}
+        onUpdateMessage={onUpdateMessage}
         mentionMap={mentionMap}
       />
 

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 const fallbackCover = require('@/assets/logo-light.png');
 
@@ -34,10 +35,6 @@ export default function MarketShopCard({
 }: Props) {
   const { palette } = useKISTheme();
 
-  const imgSource = useMemo(() => {
-    if (coverUrl) return { uri: coverUrl };
-    return fallbackCover;
-  }, [coverUrl]);
 
   const badgesToShow = trustBadges?.slice(0, 3) ?? [];
 
@@ -53,7 +50,16 @@ export default function MarketShopCard({
       }}
     >
       <View style={{ height: 90 }}>
-        <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        {coverUrl ? (
+          <PermanentRemoteImage
+            uri={coverUrl}
+            domain="Market"
+            stableKey={`market_name_${name}_${coverUrl}`}
+            containerStyle={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <Image source={fallbackCover} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        )}
         <View
           style={{
             position: 'absolute',

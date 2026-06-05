@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   Text,
   View,
@@ -21,6 +20,7 @@ import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createDefaultAvailability,
   formatDateKey,

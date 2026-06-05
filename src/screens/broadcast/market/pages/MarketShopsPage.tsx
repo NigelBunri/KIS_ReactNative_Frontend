@@ -6,6 +6,7 @@ import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 import { MarketShop } from '@/screens/broadcast/market/api/market.types';
 
 type PickedImage = { uri: string; name: string; type: string };
@@ -33,7 +34,7 @@ const normalizeEmployeeSlots = (value: string) => {
 
 export default function MarketShopsPage({ ownerId = null, canUseMarket = false, onUpgrade }: Props) {
   const { palette } = useKISTheme();
-  const { myShops, loadingMine, createShop, updateShop, deleteShop, reloadAll } = useMarketData({
+  const { myShops, loadingMine, mineCacheMeta, createShop, updateShop, deleteShop, reloadAll } = useMarketData({
     ownerId,
     q: '',
   });
@@ -146,6 +147,7 @@ export default function MarketShopsPage({ ownerId = null, canUseMarket = false, 
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <OfflineDataBadge meta={mineCacheMeta} style={{ marginHorizontal: 12, marginTop: 12 }} />
       <View style={{ paddingHorizontal: 12, gap: 12, paddingTop: 12 }}>
         <View style={{ borderWidth: 2, borderColor: palette.divider, backgroundColor: palette.card, borderRadius: 22, padding: 12, gap: 10 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

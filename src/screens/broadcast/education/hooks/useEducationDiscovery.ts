@@ -4,6 +4,13 @@ import { EducationDiscoveryPayload } from '@/screens/broadcast/education/api/edu
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { FEATURE_FLAGS } from '@/constants/featureFlags';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 
 export type FilterPayload = {
   type?: string;
@@ -69,6 +76,7 @@ export default function useEducationDiscovery({
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<EducationDiscoveryPayload | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [cacheMeta, setCacheMeta] = useState<OfflineCacheMeta | null>(null);
   const mounted = useRef(true);
 
   const buildParams = useCallback(() => {
@@ -88,13 +96,22 @@ export default function useEducationDiscovery({
 
   const load = useCallback(async () => {
     if (!FEATURE_FLAGS.EDUCATION_V2) return;
+    const params = buildParams();
+    const cacheKey = offlineStructuredCacheKey('education-discovery', JSON.stringify(params));
     setLoading(true);
     setError(null);
+    const cached = await readOfflineStructuredCache<EducationDiscoveryPayload>(cacheKey);
+    if (mounted.current && cached?.data) {
+      setData(cached.data);
+      setCacheMeta(cached.meta);
+      setUnavailable(false);
+      setLoading(false);
+    }
     try {
-      const response = await getRequest(ROUTES.education.discovery, { params: buildParams() });
+      const response = await getRequest(ROUTES.education.discovery, { params });
       if (response?.success === false) {
         if (response?.status === 404) {
-          if (mounted.current) {
+          if (mounted.current && !cached?.data) {
             setUnavailable(true);
           }
           onUnavailable?.();
@@ -102,15 +119,19 @@ export default function useEducationDiscovery({
         }
         throw new Error(response?.message ?? 'Unable to load education discovery.');
       }
-      const payload = response?.data ?? response ?? {};
+      const payload = normalizePayload(response?.data ?? response ?? {});
       if (mounted.current) {
-        setData(normalizePayload(payload));
+        setData(payload);
+        setCacheMeta(freshOfflineMeta);
         setUnavailable(false);
       }
+      await writeOfflineStructuredCache(cacheKey, payload);
       onAvailable?.();
     } catch (err: any) {
-      if (mounted.current) {
+      if (mounted.current && !cached?.data) {
         setError(err?.message || 'Unable to load education discovery.');
+      } else if (mounted.current && cached?.data) {
+        setCacheMeta(cached.meta);
       }
     } finally {
       if (mounted.current) {
@@ -150,6 +171,7 @@ export default function useEducationDiscovery({
     sortOptions: data?.filters?.sortOptions ?? EDUCATION_SORT_OPTIONS,
     availableFilters,
     unavailable,
+    cacheMeta,
     refresh,
   };
 }

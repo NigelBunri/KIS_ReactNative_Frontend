@@ -26,6 +26,7 @@ import {
   ChatMessage,
   MessageStatus,
 } from '../chatTypes';
+import { normalizeChatSendText } from '../safeChatText';
 
 import {
   loadMessages,
@@ -54,6 +55,7 @@ export type SendOverNetworkAck = {
  */
 export type SendOverNetworkNack = {
   ok: false;
+  queued?: boolean;
 };
 
 /**
@@ -350,13 +352,18 @@ function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage 
   if (!n.sticker && p.sticker) merged.sticker = p.sticker;
   if (!n.voice && p.voice) merged.voice = p.voice;
   if (!(n.attachments?.length) && p.attachments?.length) merged.attachments = p.attachments;
+  if (!n.media && p.media) merged.media = p.media;
   if (!n.poll && p.poll) merged.poll = p.poll;
   if (!n.event && p.event) merged.event = p.event;
   if (!(n.contacts?.length) && p.contacts?.length) merged.contacts = p.contacts;
   if (!n.styledText && p.styledText) merged.styledText = p.styledText;
 
   const incomingEncrypted = Boolean(n.encryptionMeta ?? n.ciphertext ?? n.encrypted);
-  if (p.fromMe && incomingEncrypted && n.text === 'Encrypted message') {
+  const incomingPlaceholder =
+    typeof n.text !== 'string' ||
+    n.text.trim() === '' ||
+    n.text.trim().toLowerCase() === 'encrypted message';
+  if (incomingEncrypted && incomingPlaceholder) {
     if (p.text && p.text !== 'Encrypted message') merged.text = p.text;
     if (p.styledText) merged.styledText = p.styledText;
     if (p.voice) merged.voice = p.voice;
@@ -365,6 +372,7 @@ function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage 
     if (p.event) merged.event = p.event;
     if (p.contacts?.length) merged.contacts = p.contacts;
     if (p.attachments?.length) merged.attachments = p.attachments;
+    if (p.media) merged.media = p.media;
   }
 
   return merged as ChatMessage;
@@ -558,7 +566,7 @@ export function useChatPersistence(
   const sendRichMessage = useCallback(
     async (payload: Partial<ChatMessage>) => {
       const hasContent = Boolean(
-        payload.text?.trim() ||
+        normalizeChatSendText(payload.text) ||
           payload.voice ||
           payload.styledText ||
           payload.sticker ||
@@ -571,6 +579,8 @@ export function useChatPersistence(
       if (!hasContent) return;
 
       const clientId = payload.clientId ?? createClientId();
+
+      const safePayloadText = normalizeChatSendText(payload.text);
 
       const draft: ChatMessage = {
         // IMPORTANT: id is REQUIRED in your ChatMessage type
@@ -586,6 +596,7 @@ export function useChatPersistence(
         createdAt: nowIso(),
         status: STATUS_QUEUED,
         ...payload,
+        text: safePayloadText,
       };
 
       const optimistic = [
@@ -610,10 +621,11 @@ export function useChatPersistence(
       );
 
       if (!result.ok) {
-        // Re-read current state — an echo-back may have already updated it.
+        // Offline/socket-unavailable sends remain queued locally. Only a real
+        // online NACK/ACK failure should show the user a retry failure state.
         const afterFail = messagesRef.current.map((m) =>
           m.clientId === clientId && m.status !== STATUS_SENT && m.status !== 'delivered' && m.status !== 'read'
-            ? { ...m, status: STATUS_FAILED, isLocalOnly: true }
+            ? { ...m, status: result.queued ? STATUS_QUEUED : STATUS_FAILED, isLocalOnly: true }
             : m,
         );
         await persist(afterFail);
@@ -651,10 +663,11 @@ export function useChatPersistence(
       text: string,
       extra?: Partial<ChatMessage>,
     ) => {
-      if (!text.trim()) return;
+      const safeText = normalizeChatSendText(text);
+      if (!safeText) return;
 
       await sendRichMessage({
-        text: text.trim(),
+        text: safeText,
         kind: extra?.kind ?? 'text',
         ...extra,
       });
@@ -773,7 +786,7 @@ export function useChatPersistence(
             if (m.status === STATUS_SENT || m.status === 'delivered' || m.status === 'read') return m;
             return {
               ...m,
-              status: result.ok ? STATUS_SENT : silent ? m.status : STATUS_FAILED,
+              status: result.ok ? STATUS_SENT : result.queued ? STATUS_QUEUED : silent ? m.status : STATUS_FAILED,
               serverId: result.ok ? (m.serverId ?? result.serverId) : m.serverId,
               seq: result.ok && typeof result.seq === 'number' ? result.seq : m.seq,
               createdAt: result.ok && result.createdAt ? result.createdAt : m.createdAt,

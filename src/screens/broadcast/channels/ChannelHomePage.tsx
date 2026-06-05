@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   Share,
@@ -31,6 +30,15 @@ import {
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
 import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
 import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 
 type TabId = 'home' | 'videos' | 'shorts' | 'clips' | 'posts' | 'live' | 'playlists' | 'members' | 'about';
 
@@ -87,7 +95,16 @@ const contentLabel = (type?: string) => {
 function ChannelAvatar({ channel, size }: { channel?: BroadcastChannelSummary | null; size: number }) {
   const { palette } = useKISTheme();
   const url = channel?.avatar_url ? resolveBackendAssetUrl(channel.avatar_url) : '';
-  if (url) return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  if (url) {
+    return (
+      <PermanentRemoteImage
+        uri={url}
+        domain="Broadcast"
+        stableKey={`channel_avatar_${channel?.id ?? channel?.handle ?? url}_${url}`}
+        containerStyle={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
   return (
     <View style={[styles.avatarFallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.primarySoft, borderColor: palette.surface }]}>
       <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: Math.max(16, size * 0.28) }}>{initialsFor(channel)}</Text>
@@ -115,7 +132,16 @@ function ContentTile({ content, mode = 'grid', onPress }: { content: BroadcastCh
   return (
     <Pressable onPress={onPress} style={[mode === 'wide' ? styles.wideTile : styles.contentTile, { backgroundColor: palette.surface, borderColor: palette.border, marginBottom: compact ? 10 : 12 }]}>
       <View style={[mode === 'wide' ? styles.wideMedia : styles.tileMedia, { height: mode === 'wide' ? (compact ? 150 : 196) : (compact ? 106 : 126) }]}>
-        {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
+        {imageUrl ? (
+          <PermanentRemoteImage
+            uri={imageUrl}
+            domain="Broadcast"
+            stableKey={`channel_content_${content.id}_${imageUrl}`}
+            containerStyle={StyleSheet.absoluteFillObject}
+          />
+        ) : (
+          <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+        )}
         <View style={styles.mediaScrim} />
         <View style={styles.mediaBadge}>
           <KISIcon name={content.content_type === 'audio' ? 'audio' : content.content_type === 'document' ? 'file' : 'play'} size={13} color="#fff" />
@@ -162,29 +188,49 @@ export default function ChannelHomePage() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [channelCacheMeta, setChannelCacheMeta] = useState<OfflineCacheMeta | null>(null);
 
+
+  const applyChannelSnapshot = useCallback((snapshot: any, meta: OfflineCacheMeta | null) => {
+    if (!snapshot) return;
+    if (snapshot.channel) setChannel(snapshot.channel);
+    setContents(Array.isArray(snapshot.contents) ? snapshot.contents : []);
+    setPlaylists(Array.isArray(snapshot.playlists) ? snapshot.playlists : []);
+    setSubscribers(Array.isArray(snapshot.subscribers) ? snapshot.subscribers : []);
+    setChannelCacheMeta(meta);
+  }, []);
 
   const load = useCallback(async () => {
     if (!channelKey) return;
+    const cacheKey = offlineStructuredCacheKey('broadcast-channel', channelKey);
     setLoading(true);
+    const cached = await readOfflineStructuredCache<any>(cacheKey);
+    if (cached?.data) {
+      applyChannelSnapshot(cached.data, cached.meta);
+      setLoading(false);
+    }
     try {
       const detail = await fetchChannelDetail(channelKey);
       const resolved = detail || initialChannel;
       if (resolved) {
-        setChannel(resolved);
         const [contentRows, playlistRows, subRows] = await Promise.all([
           fetchChannelContents(resolved.id, { limit: 36 }),
           fetchChannelPlaylists(resolved.id),
           fetchChannelSubscribers(resolved.id).catch(() => []),
         ]);
-        setContents(contentRows.contents);
-        setPlaylists(playlistRows);
-        setSubscribers(subRows);
+        const snapshot = {
+          channel: resolved,
+          contents: contentRows.contents,
+          playlists: playlistRows,
+          subscribers: subRows,
+        };
+        applyChannelSnapshot(snapshot, freshOfflineMeta);
+        await writeOfflineStructuredCache(cacheKey, snapshot);
       }
     } finally {
       setLoading(false);
     }
-  }, [channelKey, initialChannel]);
+  }, [applyChannelSnapshot, channelKey, initialChannel]);
 
   useEffect(() => {
     void load();
@@ -240,9 +286,19 @@ export default function ChannelHomePage() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
+        <OfflineDataBadge meta={channelCacheMeta} style={{ marginHorizontal: responsive.pageGutter, marginTop: 12 }} />
         <View style={[styles.heroWrap, { height: compact ? 144 : 184 }]}>
           <View style={[styles.banner, { height: compact ? 144 : 184 }]}>
-            {bannerUrl ? <Image source={{ uri: bannerUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
+            {bannerUrl ? (
+              <PermanentRemoteImage
+                uri={bannerUrl}
+                domain="Broadcast"
+                stableKey={`channel_banner_${channel?.id ?? channel?.handle ?? bannerUrl}_${bannerUrl}`}
+                containerStyle={StyleSheet.absoluteFillObject}
+              />
+            ) : (
+              <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+            )}
             <View style={styles.heroShade} />
           </View>
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}>
@@ -382,7 +438,18 @@ export default function ChannelHomePage() {
           <>
             {activeTab === 'home' && featured ? (
               <Pressable onPress={() => openContent(featured)} style={[styles.featuredHero, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter }]}> 
-                <View style={[styles.featuredMedia, { height: compact ? 150 : 190 }]}>{assetUrlFor(featured) ? <Image source={{ uri: assetUrlFor(featured) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}</View>
+                <View style={[styles.featuredMedia, { height: compact ? 150 : 190 }]}>
+                  {assetUrlFor(featured) ? (
+                    <PermanentRemoteImage
+                      uri={assetUrlFor(featured)}
+                      domain="Broadcast"
+                      stableKey={`channel_featured_${featured.id}_${assetUrlFor(featured)}`}
+                      containerStyle={StyleSheet.absoluteFillObject}
+                    />
+                  ) : (
+                    <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+                  )}
+                </View>
                 <View style={styles.featuredCopy}>
                   <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>Featured</Text>
                   <Text numberOfLines={2} style={[styles.featuredTitle, { color: palette.text }]}>{featured.title || featured.text_plain_preview || 'Channel feature'}</Text>

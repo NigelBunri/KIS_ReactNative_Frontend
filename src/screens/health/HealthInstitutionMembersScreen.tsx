@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -31,6 +30,7 @@ import {
 } from '@/theme/health';
 import type { HealthInstitutionMember } from './types';
 import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionMembers'>;
 

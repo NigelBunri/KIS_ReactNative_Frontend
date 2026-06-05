@@ -1,5 +1,6 @@
 // src/screens/chat/uploadFileToBackend.ts
 import { API_BASE_URL } from '@/network';
+import { stripFileScheme } from './chatMediaStorage';
 import {
   getMediaSafetyMessage,
   isMediaSafetyBlocked,
@@ -9,12 +10,33 @@ import {
 } from '@/services/mediaSafety';
 import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import { refreshAccessToken } from '@/security/tokenRefresh';
+import { getAccessToken } from '@/security/authStorage';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_MAX_UPLOAD_BYTES = 2_147_483_647;
+const uploadEnv = process.env as typeof process.env & {
+  CHAT_UPLOAD_MAX_BYTES?: string;
+  UPLOAD_MAX_BYTES?: string;
+};
+const MAX_UPLOAD_BYTES = Number(
+  uploadEnv.CHAT_UPLOAD_MAX_BYTES ?? uploadEnv.UPLOAD_MAX_BYTES,
+) || DEFAULT_MAX_UPLOAD_BYTES;
 const IMAGE_UPLOAD_MAX_DIMENSION = 1600;
 const IMAGE_UPLOAD_QUALITY = 82;
+
+const formatUploadBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+};
 
 export class VerificationFailedError extends Error {
   readonly _verificationFailed = true as const;
@@ -45,6 +67,46 @@ const isCompressibleImage = (file: { name?: string; type?: string | null }) => {
 const withJpegExtension = (name: string) => {
   const clean = name || `image_${Date.now()}`;
   return clean.replace(/\.[^.]+$/, '') + '.jpg';
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  json: 'application/json',
+  zip: 'application/zip',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+};
+
+const inferUploadMime = (name?: string, type?: string | null) => {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized && normalized !== 'application/octet-stream' && normalized !== 'audio/*') {
+    return normalized;
+  }
+  const ext = String(name || '')
+    .toLowerCase()
+    .split('?')[0]
+    .split('#')[0]
+    .match(/\.([a-z0-9]+)$/)?.[1];
+  return (ext && MIME_BY_EXTENSION[ext]) || normalized || 'application/octet-stream';
 };
 
 const prepareUploadFile = async (file: {
@@ -113,12 +175,13 @@ export type AttachmentMeta = {
   durationSeconds?: number;
   videoCategory?: string;
   localUri?: string;
+  localPath?: string;
   localUploadKey?: string;
 };
 
 export async function uploadFileToBackend(opts: {
   file: { uri: string; name: string; type: string | null; size?: number | null; durationMs?: number | null };
-  authToken: string;
+  authToken?: string | null;
   deviceId?: string;
   baseUrl?: string; // e.g. https://your-api.com
   onProgress?: (progress: number) => void;
@@ -140,6 +203,13 @@ export async function uploadFileToBackend(opts: {
   } = opts;
   const baseUrl = providedBaseUrl ?? API_BASE_URL;
   const resolvedDeviceId = opts.deviceId || (await AsyncStorage.getItem('device_id')) || undefined;
+  const fileSize = typeof file.size === 'number' ? file.size : 0;
+  if (fileSize > MAX_UPLOAD_BYTES) {
+    onStatus?.('failed');
+    throw new Error(
+      `This file is ${formatUploadBytes(fileSize)}, but the current upload limit is ${formatUploadBytes(MAX_UPLOAD_BYTES)}.`,
+    );
+  }
   const originalFile = file;
   const uploadFile = await prepareUploadFile(file);
 
@@ -147,7 +217,7 @@ export async function uploadFileToBackend(opts: {
   form.append('file', {
     uri: uploadFile.uri,
     name: uploadFile.name || 'file',
-    type: uploadFile.type || 'application/octet-stream',
+    type: inferUploadMime(uploadFile.name, uploadFile.type),
   } as any);
   const uploadContext = normalizeUploadContext(opts.context || 'chat');
   form.append('context', uploadContext);
@@ -179,6 +249,13 @@ export async function uploadFileToBackend(opts: {
   const url = params.toString()
     ? `${baseUrl}/uploads/file?${params.toString()}`
     : `${baseUrl}/uploads/file`;
+  const uploadBackendName = /kis-nest-backend|:4000/.test(baseUrl) ? 'Nest' : 'Django';
+
+  const isAuthUploadError = (err: any) => {
+    const status = Number(err?.status ?? 0);
+    const message = String(err?.message ?? '').toLowerCase();
+    return status === 401 || status === 403 || message.includes('token') || message.includes('unauthorized');
+  };
 
   const uploadOnce = (token: string) =>
     new Promise<any>((resolve, reject) => {
@@ -212,13 +289,13 @@ export async function uploadFileToBackend(opts: {
         } catch {
           // Keep the generic message; do not expose raw backend/storage responses.
         }
-        reject(Object.assign(new Error(safeMessage), { status: xhr.status }));
+        reject(Object.assign(new Error(safeMessage), { status: xhr.status, responseText: xhr.responseText }));
       };
 
       xhr.onerror = () => {
         const diagnostic = { status: xhr.status, readyState: xhr.readyState, responseURL: xhr.responseURL, uploadedUri: uploadFile.uri, originalUri: originalFile.uri };
         if (__DEV__) console.warn('[uploadFileToBackend] xhr network error', diagnostic);
-        reject(Object.assign(new Error('Upload failed after upload reached the server. Please retry; if it repeats, check the Django Render logs for /uploads/file.'), { status: xhr.status, diagnostic }));
+        reject(Object.assign(new Error(`Upload failed after upload reached the server. Please retry; if it repeats, check the ${uploadBackendName} Render logs for /uploads/file.`), { status: xhr.status, diagnostic }));
       };
 
       xhr.ontimeout = () => {
@@ -237,11 +314,17 @@ export async function uploadFileToBackend(opts: {
       xhr.send(form as any);
     });
 
+  const firstToken = (await getAccessToken().catch(() => null)) || authToken || null;
+  if (!firstToken) {
+    onStatus?.('failed');
+    throw new Error('Authentication token missing. Please reconnect and try again.');
+  }
+
   let json: any;
   try {
-    json = await uploadOnce(authToken);
+    json = await uploadOnce(firstToken);
   } catch (err) {
-    if ((err as any)?.status !== 401) {
+    if (!isAuthUploadError(err)) {
       onStatus?.('failed');
       throw err;
     }
@@ -310,7 +393,7 @@ export async function uploadFileToBackend(opts: {
     mediaAssetId: attachment.mediaAssetId,
     mediaAssetRef: attachment.mediaAssetRef,
     originalName: originalFile.name ?? attachment.originalName ?? attachment.name ?? uploadFile.name,
-    mimeType: attachment.mimeType ?? attachment.mime ?? uploadFile.type ?? originalFile.type ?? 'application/octet-stream',
+    mimeType: attachment.mimeType ?? attachment.mime ?? inferUploadMime(uploadFile.name, uploadFile.type ?? originalFile.type),
     size: attachment.size ?? uploadFile.size ?? originalFile.size ?? 0,
     kind,
     private: attachment.private,
@@ -328,6 +411,7 @@ export async function uploadFileToBackend(opts: {
       attachment.video_category ??
       (kind === 'short_video' ? 'shorts' : kind === 'video' || kind === 'long_video' ? 'videos' : undefined),
     localUri: originalFile.uri,
+    localPath: originalFile.uri?.startsWith('file://') ? stripFileScheme(originalFile.uri) : undefined,
     localUploadKey: `${originalFile.uri}:${originalFile.name}:${originalFile.type ?? ''}`,
   } as AttachmentMeta;
 }

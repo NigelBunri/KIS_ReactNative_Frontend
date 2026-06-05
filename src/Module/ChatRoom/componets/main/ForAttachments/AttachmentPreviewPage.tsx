@@ -106,6 +106,21 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadStatus, setUploadStatus] = useState<Record<string, UploadStatus>>({});
 
+  const getUploadLabel = (status: UploadStatus | undefined, progress: number) => {
+    const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+    if (status === 'verification_failed') return 'Verification failed';
+    if (status === 'failed') return 'Upload failed';
+    if (status === 'verifying') return pct > 0 ? `Verifying ${pct}%` : 'Verifying...';
+    if (status === 'uploading') return `Uploading ${pct}%`;
+    return pct > 0 ? `Uploading ${pct}%` : 'Waiting...';
+  };
+
+  const averageUploadProgress = () => {
+    if (!localItems.length) return 0;
+    const total = localItems.reduce((sum, item) => sum + (uploadProgress[item.uri] ?? 0), 0);
+    return total / localItems.length;
+  };
+
   // AUDIO PLAYER STATE
   const audioPlayerRef = useRef(new AudioRecorderPlayer());
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -442,7 +457,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                                 : palette.subtext,
                           }}
                         >
-                          {status === 'verification_failed' ? 'Verification failed' : status === 'failed' ? 'Upload failed' : status === 'verifying' ? 'Verifying…' : 'Uploading...'}
+                          {getUploadLabel(status, uploadPct)}
                         </Text>
                       )}
                       <View
@@ -570,7 +585,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                               : palette.subtext,
                         }}
                       >
-                        {status === 'verification_failed' ? 'Verification failed' : status === 'failed' ? 'Upload failed' : status === 'verifying' ? 'Verifying…' : 'Uploading...'}
+                        {getUploadLabel(status, uploadPct)}
                       </Text>
                     )}
                     {status && (
@@ -703,7 +718,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                       color: palette.onPrimary,
                     }}
                   >
-                    Uploading...
+                    {`Uploading ${Math.max(1, Math.min(100, Math.round(averageUploadProgress() * 100)))}%`}
                   </Text>
                 </View>
               ) : (

@@ -138,6 +138,7 @@ import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
+import CacheManagementScreen from '@/screens/CacheManagementScreen';
 import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
 import DeviceManagementScreen from '@/screens/DeviceManagementScreen';
 import QRScanLoginScreen from '@/screens/QRScanLoginScreen';
@@ -354,6 +355,8 @@ function AppContent() {
     try {
       const token = await getAccessToken();
       const storedPhone = await AsyncStorage.getItem('user_phone');
+      const netState = await NetInfo.fetch().catch(() => null);
+      const online = !!(netState?.isConnected && netState.isInternetReachable !== false);
 
       console.log('checking login (token, phone):', token, storedPhone);
 
@@ -362,6 +365,12 @@ function AppContent() {
       if (!token) {
         setUser(null);
         setAuth(false);
+        return;
+      }
+
+      if (!online) {
+        console.log('[checkAuth] offline with token — keeping cached session.');
+        setAuth(true);
         return;
       }
 
@@ -436,13 +445,14 @@ function AppContent() {
         }
       } catch (networkErr: any) {
         console.log('[checkAuth] network error:', networkErr?.message);
-        setUser(null);
+        // If a token exists, a transient network error must not log the user out.
         setAuth(true);
       }
     } catch (e: any) {
       console.log('[checkAuth] outer error:', e?.message);
+      const token = await getAccessToken().catch(() => null);
       setUser(null);
-      setAuth(false);
+      setAuth(!!token);
     }
   }, []);
 
@@ -1040,6 +1050,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="ComplianceSettings"
                       component={ComplianceSettingsScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="CacheManagement"
+                      component={CacheManagementScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen

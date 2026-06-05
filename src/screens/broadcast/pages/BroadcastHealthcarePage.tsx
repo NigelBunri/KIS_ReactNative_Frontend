@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -20,6 +19,15 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import { resolveBookingEnginesFromKeys } from '@/features/health-dashboard/bookingEngines';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 import { fetchHealthProfileState } from '@/services/healthProfileService';
 import {
   fetchInstitutionLandingPage,
@@ -257,6 +265,7 @@ export default function BroadcastHealthcarePage({
   >({});
   const [joiningInstitutionId, setJoiningInstitutionId] = useState('');
   const [showPractitionerDashboard, setShowPractitionerDashboard] = useState(false);
+  const [healthcareCacheMeta, setHealthcareCacheMeta] = useState<OfflineCacheMeta | null>(null);
 
   useEffect(() => {
     const nextFilter = String(searchContext || '')
@@ -267,8 +276,21 @@ export default function BroadcastHealthcarePage({
     }
   }, [searchContext]);
 
+  const applyHealthcareSnapshot = useCallback((snapshot: any, meta: OfflineCacheMeta | null) => {
+    setItems(Array.isArray(snapshot?.items) ? snapshot.items : []);
+    setInstitutionMeta(snapshot?.institutionMeta && typeof snapshot.institutionMeta === 'object' ? snapshot.institutionMeta : {});
+    setInstitutionDetails(snapshot?.institutionDetails && typeof snapshot.institutionDetails === 'object' ? snapshot.institutionDetails : {});
+    setHealthcareCacheMeta(meta);
+  }, []);
+
   const loadHealthcareBroadcasts = useCallback(async () => {
+    const cacheKey = offlineStructuredCacheKey('healthcare-broadcasts');
     setLoading(true);
+    const cached = await readOfflineStructuredCache<any>(cacheKey);
+    if (cached?.data) {
+      applyHealthcareSnapshot(cached.data, cached.meta);
+      setLoading(false);
+    }
     try {
       const [res, profileStateResult] = await Promise.allSettled([
         getRequest(ROUTES.broadcasts.list, {
@@ -294,7 +316,6 @@ export default function BroadcastHealthcarePage({
         ).toLowerCase();
         return type === 'healthcare';
       });
-      setItems(healthcareRows);
 
       const profileState =
         profileStateResult.status === 'fulfilled'
@@ -430,7 +451,6 @@ export default function BroadcastHealthcarePage({
             resolveBackendAssetUrl(rawLogo) || rawLogo || current.logoUrl,
         };
       });
-      setInstitutionMeta(mergedMeta);
 
       const detailResponses = await Promise.allSettled(
         institutionIds.map(institutionId =>
@@ -468,16 +488,26 @@ export default function BroadcastHealthcarePage({
           viewerCanManage: !!(viewer?.can_manage || viewer?.canManage),
         };
       });
-      setInstitutionDetails(nextDetails);
+      const snapshot = {
+        items: healthcareRows,
+        institutionMeta: mergedMeta,
+        institutionDetails: nextDetails,
+      };
+      applyHealthcareSnapshot(snapshot, freshOfflineMeta);
+      await writeOfflineStructuredCache(cacheKey, snapshot);
     } catch (error: any) {
-      Alert.alert(
-        'Healthcare broadcasts',
-        error?.message || 'Unable to load healthcare broadcasts.',
-      );
+      if (!cached?.data) {
+        Alert.alert(
+          'Healthcare broadcasts',
+          error?.message || 'Unable to load healthcare broadcasts.',
+        );
+      } else {
+        setHealthcareCacheMeta(cached.meta);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyHealthcareSnapshot]);
 
   useEffect(() => {
     loadHealthcareBroadcasts().catch(() => undefined);
@@ -626,7 +656,7 @@ export default function BroadcastHealthcarePage({
     });
   }, [filtered, timeFilter]);
 
-  if (loading) {
+  if (loading && !items.length) {
     return (
       <View
         style={{ marginTop: 10, paddingHorizontal: 12, alignItems: 'center' }}
@@ -648,6 +678,7 @@ export default function BroadcastHealthcarePage({
         gap: 12,
       }}
     >
+      <OfflineDataBadge meta={healthcareCacheMeta} />
       {/* Solo Practitioner Entry Card */}
       <Pressable
         onPress={() => setShowPractitionerDashboard(true)}
@@ -786,10 +817,11 @@ export default function BroadcastHealthcarePage({
               }}
             >
               {logoUrl ? (
-                <Image
-                  source={{ uri: logoUrl }}
-                  resizeMode="cover"
-                  style={{ width: '100%', height: '100%' }}
+                <PermanentRemoteImage
+                  uri={logoUrl}
+                  domain="Institutions"
+                  stableKey={`healthcare_institution_${card.institution_id ?? item.id}_${logoUrl}`}
+                  containerStyle={{ width: '100%', height: '100%' }}
                 />
               ) : (
                 <KISIcon name="heart" size={28} color={palette.primary} />

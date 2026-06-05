@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type LoyaltyRule = {
   id?: string;

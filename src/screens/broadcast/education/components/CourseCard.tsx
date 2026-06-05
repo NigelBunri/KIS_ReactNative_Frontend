@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 type Props = {
   title: string;
@@ -26,11 +27,6 @@ export default function CourseCard({
   const responsive = useResponsiveLayout();
   const isTiny = responsive.isWatch || responsive.isCompactPhone;
 
-  const imgSource = useMemo(() => {
-    if (coverUrl) return { uri: coverUrl };
-    return fallbackCover;
-  }, [coverUrl]);
-
   return (
     <Pressable
       onPress={onPress}
@@ -44,7 +40,16 @@ export default function CourseCard({
       }}
     >
       <View style={{ height: isTiny ? 92 : responsive.isTablet ? 144 : 120 }}>
-        <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        {coverUrl ? (
+          <PermanentRemoteImage
+            uri={coverUrl}
+            domain="Education"
+            stableKey={`course_${title}_${coverUrl}`}
+            containerStyle={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <Image source={fallbackCover} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        )}
       </View>
 
       <View style={{ padding: isTiny ? 10 : 12, gap: 6 }}>

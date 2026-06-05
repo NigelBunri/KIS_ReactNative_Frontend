@@ -32,6 +32,7 @@ import {
 } from '../messagesUtils';
 import { normalizeConversation } from '../normalizeConversation';
 import { MessageStatus } from '../chatTypes';
+import { resolveChatPreviewText } from '../safeChatText';
 
 
 type ChatsTabProps = {
@@ -232,9 +233,11 @@ export function ChatsTab({
           metaAt &&
           (!Number.isNaN(metaTs) &&
             (Number.isNaN(itemTs) || metaTs >= itemTs));
+        const cleanPreview = (value?: string, source?: any) =>
+          resolveChatPreviewText(source ?? value, undefined, value);
         const displayLastMessage = useMeta
-          ? meta?.lastMessage ?? ''
-          : item.lastMessage ?? '';
+          ? cleanPreview(meta?.lastMessage) || cleanPreview(item.lastMessage, item)
+          : cleanPreview(item.lastMessage, item) || cleanPreview(meta?.lastMessage);
         const displayLastAt = useMeta ? metaAt : itemAt;
         const useMetaUnread =
           useMeta &&

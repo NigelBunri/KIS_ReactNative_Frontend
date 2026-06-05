@@ -22,6 +22,13 @@ import {
   normalizeHome,
   normalizeList,
 } from '@/screens/broadcast/market/api/market.types';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 
 type Params = {
   ownerId?: string | null;
@@ -40,6 +47,8 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
   const [myProducts, setMyProducts] = useState<MarketProduct[]>([]);
   const [loadingHome, setLoadingHome] = useState(false);
   const [loadingMine, setLoadingMine] = useState(false);
+  const [homeCacheMeta, setHomeCacheMeta] = useState<OfflineCacheMeta | null>(null);
+  const [mineCacheMeta, setMineCacheMeta] = useState<OfflineCacheMeta | null>(null);
 
   const mountedRef = useRef(true);
 
@@ -50,14 +59,32 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
 
   const loadHome = useCallback(
     async (_forceNetwork = false) => {
+      const cacheKey = offlineStructuredCacheKey('market-home', feedQuery);
       setLoadingHome(true);
-      const res = await getRequest(feedQuery, {
-        errorMessage: 'Unable to load market.',
-      });
-      const payload = normalizeHome(res?.data ?? res);
-      if (!mountedRef.current) return;
-      setHome(payload);
-      setLoadingHome(false);
+      const cached = await readOfflineStructuredCache<MarketHomePayload>(cacheKey);
+      if (mountedRef.current && cached?.data) {
+        setHome(cached.data);
+        setHomeCacheMeta(cached.meta);
+        setLoadingHome(false);
+      }
+      try {
+        const res = await getRequest(feedQuery, {
+          errorMessage: 'Unable to load market.',
+        });
+        const payload = normalizeHome(res?.data ?? res);
+        if (!mountedRef.current) return;
+        setHome(payload);
+        setHomeCacheMeta(freshOfflineMeta);
+        await writeOfflineStructuredCache(cacheKey, payload);
+      } catch (error: any) {
+        if (mountedRef.current && cached?.data) {
+          setHomeCacheMeta(cached.meta);
+        } else {
+          console.warn('Unable to load market:', error?.message ?? error);
+        }
+      } finally {
+        if (mountedRef.current) setLoadingHome(false);
+      }
     },
     [feedQuery],
   );
@@ -79,7 +106,15 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
   }, []);
 
   const loadMine = useCallback(async () => {
+    const cacheKey = offlineStructuredCacheKey('market-mine', ownerId || 'all');
     setLoadingMine(true);
+    const cached = await readOfflineStructuredCache<{ shops: MarketShop[]; products: MarketProduct[] }>(cacheKey);
+    if (mountedRef.current && cached?.data) {
+      setMyShops(Array.isArray(cached.data.shops) ? cached.data.shops : []);
+      setMyProducts(Array.isArray(cached.data.products) ? cached.data.products : []);
+      setMineCacheMeta(cached.meta);
+      setLoadingMine(false);
+    }
     try {
       const ownerParams = ownerId ? { owner: ownerId } : undefined;
       let shops = await fetchShops(ownerParams);
@@ -93,14 +128,20 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
       if (!mountedRef.current) return;
       setMyShops(shops);
       setMyProducts(products);
+      setMineCacheMeta(freshOfflineMeta);
+      await writeOfflineStructuredCache(cacheKey, { shops, products });
     } catch (error: any) {
       console.warn(
         'Unable to load market owner data:',
         error?.message ?? error,
       );
       if (!mountedRef.current) return;
-      setMyShops([]);
-      setMyProducts([]);
+      if (cached?.data) {
+        setMineCacheMeta(cached.meta);
+      } else {
+        setMyShops([]);
+        setMyProducts([]);
+      }
     } finally {
       if (!mountedRef.current) return;
       setLoadingMine(false);
@@ -269,6 +310,8 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
     myProducts,
     loadingHome,
     loadingMine,
+    homeCacheMeta,
+    mineCacheMeta,
     reloadAll,
 
     joinShop,

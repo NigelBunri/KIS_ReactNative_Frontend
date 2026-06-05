@@ -181,6 +181,7 @@ export type RootStackParamList = {
   AccountDeletion: undefined;
   PasswordChange: undefined;
   ComplianceSettings: undefined;
+  CacheManagement: undefined;
   AdminUserManagement: undefined;
   DeviceManagement: undefined;
   QRScanLogin: undefined;

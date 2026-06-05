@@ -10,7 +10,6 @@ import {
   Animated,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
@@ -26,6 +25,7 @@ import ROUTES from '@/network';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Specialty =
   | 'general_practice'

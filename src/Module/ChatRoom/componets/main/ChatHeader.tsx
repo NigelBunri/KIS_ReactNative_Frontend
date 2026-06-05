@@ -1,7 +1,7 @@
 // src/screens/chat/components/ChatHeader.tsx
 
 import React from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable, Image, ActivityIndicator } from 'react-native';
 
 import type { Chat } from '../../messagesUtils';
 import { directConversationAvatar } from '../../messagesUtils';
@@ -54,6 +54,7 @@ type ChatHeaderProps = {
 
   // E2EE indicator
   isE2EE?: boolean;
+  isConnecting?: boolean;
 };
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -91,6 +92,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   contextLabel,
   onPressContext,
   isE2EE = false,
+  isConnecting = false,
 }) => {
   const title = chat?.name ?? 'Chat';
   const headerAvatar =
@@ -354,13 +356,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               </Pressable>
             ) : null}
             {isE2EE ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <KISIcon name="lock" size={10} color={palette.headerSubtext ?? palette.subtext} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {isConnecting ? (
+                  <ActivityIndicator size="small" color={palette.headerSubtext ?? palette.subtext} />
+                ) : (
+                  <KISIcon name="lock" size={10} color={palette.headerSubtext ?? palette.subtext} />
+                )}
                 <Text
                   style={[styles.headerSubtitle, { color: palette.headerSubtext ?? palette.subtext }]}
                   numberOfLines={1}
                 >
-                  End-to-end encrypted
+                  {isConnecting ? 'Connecting...' : 'End-to-end encrypted'}
                 </Text>
               </View>
             ) : (

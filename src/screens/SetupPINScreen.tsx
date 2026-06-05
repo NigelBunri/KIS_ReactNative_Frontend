@@ -4,7 +4,6 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -13,6 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '@/navigation/types';
 import { setPIN } from '@/services/QuickLockService';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PIN_LENGTH = 6;
 

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   DeviceEventEmitter,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,15 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'ViewProfile'>;
 type RoutePropType = RouteProp<RootStackParamList, 'ViewProfile'>;
@@ -37,6 +45,7 @@ export default function UserProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [profileCacheMeta, setProfileCacheMeta] = useState<OfflineCacheMeta | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
   const [connecting, setConnecting] = useState(false);
   const [endorsingSkillId, setEndorsingSkillId] = useState<string | null>(null);
@@ -45,8 +54,27 @@ export default function UserProfileScreen() {
 
   const styles = makeStyles(palette);
 
+  const applyProfileData = useCallback((data: any, meta: OfflineCacheMeta | null) => {
+    setProfile(data);
+    setProfileCacheMeta(meta);
+    const connStatus = data?.connection_status ?? data?.connectionStatus;
+    if (connStatus === 'accepted' || connStatus === 'connected') {
+      setConnectionStatus('connected');
+    } else if (connStatus === 'pending') {
+      setConnectionStatus('pending');
+    } else {
+      setConnectionStatus('none');
+    }
+  }, []);
+
   const loadProfile = useCallback(async () => {
+    const cacheKey = offlineStructuredCacheKey('profile', userId);
     setLoading(true);
+    const cached = await readOfflineStructuredCache<any>(cacheKey);
+    if (cached?.data) {
+      applyProfileData(cached.data, cached.meta);
+      setLoading(false);
+    }
     try {
       const res = await getRequest(ROUTES.profiles.view(userId), {
         errorMessage: 'Unable to load profile.',
@@ -54,20 +82,19 @@ export default function UserProfileScreen() {
       });
       if (res?.success || res?.data) {
         const data = res?.data ?? res;
-        setProfile(data);
-        const connStatus = data?.connection_status ?? data?.connectionStatus;
-        if (connStatus === 'accepted' || connStatus === 'connected') {
-          setConnectionStatus('connected');
-        } else if (connStatus === 'pending') {
-          setConnectionStatus('pending');
-        }
+        applyProfileData(data, freshOfflineMeta);
+        await writeOfflineStructuredCache(cacheKey, data);
       }
     } catch {
-      Alert.alert('Error', 'Failed to load profile.');
+      if (!cached?.data) {
+        Alert.alert('Error', 'Failed to load profile.');
+      } else {
+        setProfileCacheMeta(cached.meta);
+      }
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [applyProfileData, userId]);
 
   useEffect(() => {
     loadProfile();
@@ -186,15 +213,18 @@ export default function UserProfileScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          <OfflineDataBadge meta={profileCacheMeta} />
           {/* Cover area */}
           <View style={[styles.coverArea, { backgroundColor: palette.surface }]} />
 
           {/* Avatar + name block */}
           <View style={styles.identityBlock}>
             {profile?.avatar_url ? (
-              <Image
-                source={{ uri: profile.avatar_url }}
-                style={[styles.avatarCircle, { borderColor: palette.bg }]}
+              <PermanentRemoteImage
+                uri={profile.avatar_url}
+                domain="Profile"
+                stableKey={`profile_avatar_${userId}_${profile.avatar_url}`}
+                containerStyle={[styles.avatarCircle, { borderColor: palette.bg }]}
               />
             ) : (
               <View style={[styles.avatarCircle, { backgroundColor: palette.primary, borderColor: palette.bg }]}>

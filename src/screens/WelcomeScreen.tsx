@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 import { useKISTheme } from '../theme/useTheme';
 import KISButton from '../constants/KISButton';
@@ -131,6 +132,12 @@ export default function WelcomeScreen() {
       if (storedPhone) setPhone?.(storedPhone);
 
       if (!token) return; // not logged in locally
+      const netState = await NetInfo.fetch().catch(() => null);
+      const online = !!(netState?.isConnected && netState.isInternetReachable !== false);
+      if (!online) {
+        setAuth?.(true);
+        return;
+      }
 
       const qs = storedPhone ? `?phone=${encodeURIComponent(storedPhone)}` : '';
       const res = await getRequest(`${ROUTES.auth.checkLogin}${qs}`, {
@@ -144,7 +151,13 @@ export default function WelcomeScreen() {
           setAuth?.(true);
           return;
         }
-        setAuth?.(false);
+        // Only explicit auth failures should log out. Network/cache failures
+        // with a local token should keep the user inside the app.
+        if (Number(res?.status) === 401 || Number(res?.status) === 403) {
+          setAuth?.(false);
+        } else {
+          setAuth?.(true);
+        }
         return;
       }
 
@@ -157,8 +170,9 @@ export default function WelcomeScreen() {
         setAuth?.(false);
       }
     } catch {
-      // swallow — stay on Welcome if anything fails
-      setAuth?.(false);
+      // Offline/network failure with a local token should not log out the user.
+      const token = await getAccessToken().catch(() => null);
+      if (token) setAuth?.(true);
     } finally {
       loginCheckInFlightRef.current = false;
     }

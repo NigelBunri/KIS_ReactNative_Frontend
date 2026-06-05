@@ -13,6 +13,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 import {
   MarketProduct,
   MarketShop,
@@ -67,6 +68,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     deleteProduct,
     broadcastProduct,
     unpublishProduct,
+    mineCacheMeta,
   } = useMarketData({ ownerId, q: '' });
 
   const [activeShopId, setActiveShopId] = useState<string | null>(null);
@@ -315,6 +317,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <OfflineDataBadge meta={mineCacheMeta} style={{ marginHorizontal: 12, marginTop: 12 }} />
       <View style={{ paddingHorizontal: 12, gap: 12, paddingTop: 12 }}>
         <View
           style={{

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   Text,
   TouchableOpacity,
   View,
@@ -36,6 +35,7 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionDetail'>;
 

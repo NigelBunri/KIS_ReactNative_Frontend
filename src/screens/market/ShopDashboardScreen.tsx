@@ -5,7 +5,6 @@ import {
   DeviceEventEmitter,
   Image,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -44,6 +43,7 @@ import { resolveShopImageUri } from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
 import { collectProductImageUris } from '@/utils/productImages';
 import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type PickedImage = { uri: string; name: string; type: string };
 const toUploadFile = (picked: PickedImage) => ({

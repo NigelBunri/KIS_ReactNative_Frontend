@@ -6,7 +6,6 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   getHealthThemeBorders,
   getHealthThemeColors,

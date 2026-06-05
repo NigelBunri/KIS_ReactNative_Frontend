@@ -4,7 +4,6 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Invoice = {
   id: string;

@@ -1,6 +1,7 @@
 // src/screens/chat/chatMapping.ts
 
 import type { ChatMessage } from '../chatTypes';
+import { normalizeChatDisplayText } from '../safeChatText';
 
 // Helper to map backend payload -> ChatMessage
 export const mapBackendToChatMessage = (
@@ -43,7 +44,9 @@ export const mapBackendToChatMessage = (
   const rawText = payload.text ?? payload.previewText ?? payload.preview_text ?? '';
   const ciphertext = payload.ciphertext ?? undefined;
   const hasEncryptedMeta = !!(payload.encryptionMeta ?? payload.encryption_meta);
-  const text = rawText || (ciphertext || hasEncryptedMeta ? 'Encrypted message' : '');
+  const text = (ciphertext || hasEncryptedMeta) && String(rawText).trim().toLowerCase() === 'encrypted message'
+    ? ''
+    : normalizeChatDisplayText(rawText);
 
   const styledText = payload.styledText ?? payload.styled_text ?? undefined;
 
@@ -105,6 +108,15 @@ export const mapBackendToChatMessage = (
         }
       : undefined;
 
+  const rawMedia = payload.media && typeof payload.media === 'object' ? payload.media : undefined;
+  const rawAttachments = Array.isArray(rawMedia?.attachments)
+    ? rawMedia.attachments
+    : Array.isArray(payload.attachments)
+    ? payload.attachments
+    : [];
+  const attachments = mapAttachments(rawAttachments);
+  const media = rawMedia ? { ...rawMedia, attachments } : attachments.length ? { attachments } : undefined;
+
   return {
     id: String(payload.id ?? payload._id ?? payload.clientId ?? ''),
     clientId: payload.clientId ?? undefined,
@@ -127,9 +139,8 @@ export const mapBackendToChatMessage = (
     encryptionVersion: payload.encryptionVersion ?? undefined,
     encryptionKeyVersion: payload.encryptionKeyVersion ?? undefined,
     replyToId: payload.replyToId,
-    attachments: payload.attachments
-      ? mapAttachments(payload.attachments)
-      : [],
+    attachments,
+    media,
     styledText,
     contacts,
     poll,

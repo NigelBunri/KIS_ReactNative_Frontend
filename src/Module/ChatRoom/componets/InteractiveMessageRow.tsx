@@ -47,6 +47,7 @@ type Props = {
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
   onLocalDeleteMessage?: (message: ChatMessage) => void;
+  onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
 };
 
@@ -147,6 +148,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onShowReadReceipts,
   onViewOnce,
   onLocalDeleteMessage,
+  onUpdateMessage,
   mentionMap,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -401,6 +403,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             onViewOnce={onViewOnce}
             mentionMap={mentionMap}
             senderId={(message as any).senderId}
+            onUpdateMessage={onUpdateMessage}
           />
         </Pressable>
       </Animated.View>

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 type Props = {
   title: string;
@@ -24,11 +25,6 @@ export default function FeaturedLessonHero({
 }: Props) {
   const { palette } = useKISTheme();
 
-  const imgSource = useMemo(() => {
-    if (coverUrl) return { uri: coverUrl };
-    return fallbackCover;
-  }, [coverUrl]);
-
   return (
     <View
       style={{
@@ -40,7 +36,16 @@ export default function FeaturedLessonHero({
       }}
     >
       <View style={{ height: 140 }}>
-        <Image source={imgSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        {coverUrl ? (
+          <PermanentRemoteImage
+            uri={coverUrl}
+            domain="Education"
+            stableKey={`featured_${title}_${coverUrl}`}
+            containerStyle={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <Image source={fallbackCover} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        )}
       </View>
 
       <View style={{ padding: 12, gap: 8 }}>

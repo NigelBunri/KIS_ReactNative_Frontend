@@ -11,7 +11,6 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,8 @@ import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { API_BASE_URL } from '@/network/config';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 const INSTITUTIONS_ENDPOINT = `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`;
 const INSTITUTION_DASHBOARD_ENDPOINT = (id: string) => `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/dashboard/`;
@@ -533,7 +534,12 @@ function InstitutionDashboard({
         }}
       >
         {logoUri ? (
-          <Image source={{ uri: logoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <PermanentRemoteImage
+            uri={logoUri}
+            domain="Institutions"
+            stableKey={`institution_${institution.id}_${logoUri}`}
+            containerStyle={{ width: '100%', height: '100%' }}
+          />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <KISIcon name="school-outline" size={48} color={palette.primaryStrong} />
@@ -1192,7 +1198,12 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
               >
                 <View style={{ height: 100, backgroundColor: palette.primarySoft }}>
                   {logoUri ? (
-                    <Image source={{ uri: logoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <PermanentRemoteImage
+                      uri={logoUri}
+                      domain="Institutions"
+                      stableKey={`institution_${inst.id}_${logoUri}`}
+                      containerStyle={{ width: '100%', height: '100%' }}
+                    />
                   ) : (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                       <KISIcon name="school-outline" size={36} color={palette.primaryStrong} />

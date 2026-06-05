@@ -2,6 +2,8 @@
 
 // E2EE is deferred until key exchange protocol is validated end-to-end. Messages use server-side encryption via TLS. Flip to true when crypto module passes integration tests.
 const E2EE_ENABLED = true;
+const STALE_SIGNAL_DECRYPTS_KEY = 'kis.chat.stale_signal_decrypts.v1';
+const DEBUG_STALE_DECRYPTS = false;
 
 import {
   useCallback,
@@ -10,7 +12,8 @@ import {
 } from 'react';
 import type { MutableRefObject } from 'react';
 import { AppState, DeviceEventEmitter } from 'react-native';
-import { onNetworkRecovery } from '@/services/networkMonitor';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 
 import {
   SendOverNetworkResult,
@@ -25,6 +28,7 @@ import type {
   MessageKind,
   MessageStatus,
 } from '../chatTypes';
+import { normalizeChatDisplayText, normalizeChatSendText } from '../safeChatText';
 import { useSocket } from '../../../../SocketProvider';
 import {
   ENCRYPTION_VERSION,
@@ -36,6 +40,7 @@ import {
   ensureDeviceId,
   encryptPayloadForRecipients,
   isSignalMessageCounterError,
+  repairLocalE2EEBundle,
 } from '@/security/e2ee';
 
 /* ========================================================================
@@ -97,6 +102,12 @@ const safeStringify = (value: any) => {
   } catch {
     return null;
   }
+};
+
+const isBadMacDecryptError = (error: any): boolean => {
+  const name = String(error?.name ?? '').toLowerCase();
+  const message = String(error?.message ?? error ?? '').toLowerCase();
+  return name.includes('badmac') || message.includes('bad mac');
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -201,6 +212,27 @@ export function useChatMessaging({
   const historyLoadRef = useRef(false);
   const decryptInFlightRef = useRef<Set<string>>(new Set());
   const decryptFailedAtRef = useRef<Map<string, number>>(new Map());
+  const decryptSkippedRef = useRef<Set<string>>(new Set());
+  const staleSignalDecryptsRef = useRef<Set<string>>(new Set());
+  const staleSignalDecryptsLoadedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(STALE_SIGNAL_DECRYPTS_KEY)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        try {
+          const values = JSON.parse(raw);
+          if (Array.isArray(values)) {
+            staleSignalDecryptsRef.current = new Set(values.filter((value) => typeof value === 'string'));
+          }
+        } catch {}
+      })
+      .finally(() => {
+        if (!cancelled) staleSignalDecryptsLoadedRef.current = true;
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   /* -----------------------------------------------------------------------
    * OFFLINE QUEUES — receipts and reactions are fire-and-forget socket
@@ -363,22 +395,50 @@ export function useChatMessaging({
           : message,
       );
       replaceMessages(next);
+      const updated = next.find((message) => message.serverId === messageId || message.id === messageId);
+      const convId = updated?.conversationId ?? conversationIdRef.current;
+      if (convId) {
+        DeviceEventEmitter.emit('message.decrypted', { conversationId: String(convId), messageId });
+        DeviceEventEmitter.emit('conversation.refresh');
+      }
     },
     [replaceMessages],
   );
+
+  const rememberStaleSignalDecrypt = useCallback((key: string) => {
+    if (!key || staleSignalDecryptsRef.current.has(key)) return;
+    staleSignalDecryptsRef.current.add(key);
+    const values = Array.from(staleSignalDecryptsRef.current).slice(-1000);
+    staleSignalDecryptsRef.current = new Set(values);
+    AsyncStorage.setItem(STALE_SIGNAL_DECRYPTS_KEY, JSON.stringify(values)).catch(() => {});
+  }, []);
 
   const decryptChatMessage = useCallback(
     async (mapped: ChatMessage) => {
       const encMeta = mapped.encryptionMeta;
       if (!encMeta && !mapped.ciphertext) return;
 
+      const messageId = String(mapped.serverId ?? mapped.id ?? mapped.clientId ?? '');
+      const existingReadable = messageId
+        ? messagesRef.current.find((m) => {
+            const sameMessage = m.serverId === messageId || m.id === messageId || m.clientId === messageId;
+            const text = typeof m.text === 'string' ? m.text.trim() : '';
+            return sameMessage && text.length > 0 && text.toLowerCase() !== 'encrypted message';
+          })
+        : null;
+      if (existingReadable) return;
+
       const decryptKey = [
-        mapped.serverId ?? mapped.id ?? mapped.clientId ?? 'unknown',
+        messageId || 'unknown',
         encMeta?.e2ee ?? mapped.encryptionVersion ?? 'encrypted',
         mapped.ciphertext ? String(mapped.ciphertext).slice(0, 48) : '',
       ].join(':');
       const failedAt = decryptFailedAtRef.current.get(decryptKey) ?? 0;
-      if (decryptInFlightRef.current.has(decryptKey) || Date.now() - failedAt < 30_000) {
+      if (
+        decryptSkippedRef.current.has(decryptKey) ||
+        decryptInFlightRef.current.has(decryptKey) ||
+        Date.now() - failedAt < 5_000
+      ) {
         return;
       }
       decryptInFlightRef.current.add(decryptKey);
@@ -387,7 +447,11 @@ export function useChatMessaging({
         if (encMeta?.e2ee === 'signal') {
           const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
           const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : [];
-          const currentDeviceId = deviceIdRef.current;
+          let currentDeviceId = deviceIdRef.current;
+          if (!currentDeviceId) {
+            currentDeviceId = await ensureDeviceId();
+            deviceIdRef.current = currentDeviceId;
+          }
           const isOwnCurrentDeviceMessage =
             String(mapped.senderId) === String(currentUserId) &&
             !!currentDeviceId &&
@@ -400,11 +464,40 @@ export function useChatMessaging({
               )
             : recipients.find((item: any) => String(item?.userId) === String(currentUserId));
 
+          // Multi-device Signal payloads are per-device. If the server returned
+          // recipient envelopes, this device must only decrypt its own envelope.
+          // Falling back to another ciphertext consumes/reads the wrong session
+          // counter and causes MessageCounterError on history replay.
+          if (recipients.length > 0 && !recipientCipher) return;
           if (isOwnCurrentDeviceMessage && !recipientCipher) return;
 
           const ciphertext = recipientCipher?.ciphertext ?? mapped.ciphertext;
           const type = recipientCipher?.type ?? encMeta?.type ?? 1;
           if (!mapped.senderId || !senderDeviceId || !ciphertext) return;
+
+          const signalStaleKey = [
+            currentDeviceId,
+            messageId || mapped.serverId || mapped.id || mapped.clientId || 'unknown',
+            mapped.senderId,
+            senderDeviceId,
+            String(ciphertext).slice(0, 64),
+          ].join(':');
+          if (!staleSignalDecryptsLoadedRef.current) {
+            try {
+              const raw = await AsyncStorage.getItem(STALE_SIGNAL_DECRYPTS_KEY);
+              if (raw) {
+                const values = JSON.parse(raw);
+                if (Array.isArray(values)) {
+                  staleSignalDecryptsRef.current = new Set(values.filter((value) => typeof value === 'string'));
+                }
+              }
+            } catch {
+              // Non-fatal: a corrupt skip cache just means we attempt decrypt once.
+            } finally {
+              staleSignalDecryptsLoadedRef.current = true;
+            }
+          }
+          if (staleSignalDecryptsRef.current.has(signalStaleKey)) return;
 
           const plaintext = await decryptFromUser(
             String(mapped.senderId),
@@ -416,10 +509,20 @@ export function useChatMessaging({
           try {
             parsed = JSON.parse(plaintext);
           } catch {}
+          if (typeof signalStaleKey === 'string') {
+            staleSignalDecryptsRef.current.delete(signalStaleKey);
+          }
+          const parsedMedia = parsed?.media && typeof parsed.media === 'object'
+            ? parsed.media
+            : (Array.isArray(parsed?.attachments) ? { attachments: parsed.attachments } : undefined);
+          const nextMedia = parsedMedia ?? (mapped as any).media;
           patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
-            text: parsed?.text ?? plaintext,
+            text: parsed ? normalizeChatSendText(parsed?.text) : normalizeChatDisplayText(plaintext),
             styledText: parsed?.styledText ?? mapped.styledText,
-            attachments: parsed?.attachments ?? mapped.attachments,
+            attachments: Array.isArray(nextMedia?.attachments)
+              ? nextMedia.attachments
+              : parsed?.attachments ?? mapped.attachments,
+            media: nextMedia,
             contacts: parsed?.contacts ?? mapped.contacts,
             poll: parsed?.poll ?? mapped.poll,
             event: parsed?.event ?? mapped.event,
@@ -450,10 +553,17 @@ export function useChatMessaging({
           try {
             parsed = JSON.parse(plaintext);
           } catch {}
+          const parsedMedia = parsed?.media && typeof parsed.media === 'object'
+            ? parsed.media
+            : (Array.isArray(parsed?.attachments) ? { attachments: parsed.attachments } : undefined);
+          const nextMedia = parsedMedia ?? (mapped as any).media;
           patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
-            text: parsed?.text ?? plaintext,
+            text: parsed ? normalizeChatSendText(parsed?.text) : normalizeChatDisplayText(plaintext),
             styledText: parsed?.styledText ?? mapped.styledText,
-            attachments: parsed?.attachments ?? mapped.attachments,
+            attachments: Array.isArray(nextMedia?.attachments)
+              ? nextMedia.attachments
+              : parsed?.attachments ?? mapped.attachments,
+            media: nextMedia,
             contacts: parsed?.contacts ?? mapped.contacts,
             poll: parsed?.poll ?? mapped.poll,
             event: parsed?.event ?? mapped.event,
@@ -467,12 +577,43 @@ export function useChatMessaging({
       } catch (error) {
         decryptFailedAtRef.current.set(decryptKey, Date.now());
         if (isSignalMessageCounterError(error)) {
-          console.warn('[useChatMessaging] duplicate or stale Signal message skipped', {
-            messageId: mapped.serverId ?? mapped.id ?? mapped.clientId,
-            senderId: mapped.senderId,
-            senderDeviceId: encMeta?.senderDeviceId ?? encMeta?.deviceId,
-            error: serializeErrorForDiagnostics(error),
-          });
+          const messageId = String(mapped.serverId ?? mapped.id ?? mapped.clientId ?? '');
+          const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
+          const currentDeviceId = deviceIdRef.current ?? '';
+          const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : [];
+          const recipientCipher = currentDeviceId
+            ? recipients.find(
+                (item: any) =>
+                  String(item?.userId) === String(currentUserId) &&
+                  String(item?.deviceId) === String(currentDeviceId),
+              )
+            : null;
+          const staleKey = [
+            currentDeviceId,
+            messageId || 'unknown',
+            mapped.senderId,
+            senderDeviceId,
+            String(recipientCipher?.ciphertext ?? mapped.ciphertext ?? '').slice(0, 64),
+          ].join(':');
+          rememberStaleSignalDecrypt(staleKey);
+          const existing = messageId
+            ? messagesRef.current.find((m) => m.serverId === messageId || m.id === messageId || m.clientId === messageId)
+            : null;
+          if (existing?.text && existing.text !== 'Encrypted message') {
+            return;
+          }
+          decryptSkippedRef.current.add(decryptKey);
+          return;
+        } else if (isBadMacDecryptError(error)) {
+          decryptSkippedRef.current.add(decryptKey);
+          if (__DEV__ && DEBUG_STALE_DECRYPTS) {
+            console.warn('[useChatMessaging] stale encrypted message skipped', {
+              messageId: mapped.serverId ?? mapped.id ?? mapped.clientId,
+              senderId: mapped.senderId,
+              error: serializeErrorForDiagnostics(error),
+            });
+          }
+          return;
         } else {
           console.warn('[useChatMessaging] decrypt failed', error);
         }
@@ -480,7 +621,7 @@ export function useChatMessaging({
         decryptInFlightRef.current.delete(decryptKey);
       }
     },
-    [currentUserId, patchDecryptedMessage],
+    [currentUserId, patchDecryptedMessage, rememberStaleSignalDecrypt],
   );
 
   // Stable refs so the socket listener effect doesn't re-subscribe on every render
@@ -494,7 +635,13 @@ export function useChatMessaging({
           const a = raw?.attachment ?? raw ?? {};
           return {
             id: a.id ?? a.key,
-            url: a.url ?? a.uri,
+            url: a.url ?? a.displayUrl ?? a.downloadUrl ?? a.publicUrl ?? a.uri,
+            publicUrl: a.publicUrl,
+            downloadUrl: a.downloadUrl,
+            displayUrl: a.displayUrl,
+            assetId: a.assetId,
+            mediaAssetId: a.mediaAssetId,
+            mediaAssetRef: a.mediaAssetRef,
             originalName: a.originalName ?? a.name ?? a.filename,
             mimeType: a.mimeType ?? a.mime ?? a.contentType,
             size: a.size ?? a.sizeBytes,
@@ -502,7 +649,13 @@ export function useChatMessaging({
             width: a.width,
             height: a.height,
             durationMs: a.durationMs,
+            durationSeconds: a.durationSeconds,
             thumbUrl: a.thumbUrl,
+            private: a.private,
+            scanStatus: a.scanStatus,
+          localUri: a.localUri,
+          localPath: a.localPath,
+            quarantined: a.quarantined,
           };
         });
 
@@ -582,13 +735,21 @@ export function useChatMessaging({
             }
           : undefined;
 
+      const rawMedia = serverMsg.media && typeof serverMsg.media === 'object' ? serverMsg.media : undefined;
+      const rawAttachments = Array.isArray(rawMedia?.attachments)
+        ? rawMedia.attachments
+        : Array.isArray(serverMsg.attachments)
+        ? serverMsg.attachments
+        : [];
+      const attachments = mapAttachments(rawAttachments);
+      const media = rawMedia ? { ...rawMedia, attachments } : attachments.length ? { attachments } : undefined;
+
       const rawCiphertext = serverMsg.ciphertext ?? undefined;
       const hasEncryptedMeta = !!(serverMsg.encryptionMeta ?? serverMsg.encryption_meta);
-      const text =
-        serverMsg.text ??
-        serverMsg.previewText ??
-        serverMsg.preview_text ??
-        (rawCiphertext || hasEncryptedMeta ? 'Encrypted message' : '');
+      const rawText = serverMsg.text ?? serverMsg.previewText ?? serverMsg.preview_text ?? '';
+      const text = hasEncryptedMeta || rawCiphertext
+        ? (String(rawText).trim().toLowerCase() === 'encrypted message' ? '' : normalizeChatDisplayText(rawText))
+        : normalizeChatDisplayText(rawText);
 
       return {
         id: serverMsg.id ?? serverMsg._id,
@@ -604,9 +765,8 @@ export function useChatMessaging({
           serverMsg.createdAt ??
           serverMsg.created_at ??
           new Date().toISOString(),
-        attachments: serverMsg.attachments
-          ? mapAttachments(serverMsg.attachments)
-          : [],
+        attachments,
+        media,
         replyToId: serverMsg.replyToId ?? null,
         status: (
           serverMsg.status === 'read' ? 'read' :
@@ -889,10 +1049,11 @@ export function useChatMessaging({
         participantCount: Array.isArray(chat?.participants) ? chat.participants.length : 0,
       });
 
-      // Socket not ready → keep message queued locally
-      if (!socket || !(isConnected || socket.connected) || !chat) {
-        if (__DEV__) console.log('[sendOverNetworkImpl] socket not ready → queue');
-        return { ok: false };
+      const online = await isOnline();
+      // Offline/socket not ready → keep message queued locally without showing retry failure.
+      if (!online || !socket || !(isConnected || socket.connected) || !chat) {
+        if (__DEV__) console.log('[sendOverNetworkImpl] socket offline/not ready → queue');
+        return { ok: false, queued: true };
       }
 
       const convId =
@@ -911,6 +1072,12 @@ export function useChatMessaging({
         attachments.map((a) => ({
           id: a.id,
           url: a.url,
+          publicUrl: a.publicUrl,
+          downloadUrl: a.downloadUrl,
+          displayUrl: a.displayUrl,
+          assetId: a.assetId,
+          mediaAssetId: a.mediaAssetId,
+          mediaAssetRef: a.mediaAssetRef,
           originalName: a.originalName ?? a.name,
           mimeType: a.mimeType ?? a.mime,
           size: a.size,
@@ -918,7 +1085,13 @@ export function useChatMessaging({
           width: a.width,
           height: a.height,
           durationMs: a.durationMs,
+          durationSeconds: a.durationSeconds,
           thumbUrl: a.thumbUrl,
+          private: a.private,
+          scanStatus: a.scanStatus,
+          localUri: a.localUri,
+          localPath: a.localPath,
+          quarantined: a.quarantined,
         }));
 
       const normalizeContacts = (list: any[] | undefined) =>
@@ -954,17 +1127,31 @@ export function useChatMessaging({
         };
       };
 
+      const rawTextPayload = message.text ?? message.styledText?.text;
+      const textPayload = normalizeChatSendText(rawTextPayload);
+      const mediaAttachments = Array.isArray((message as any).media?.attachments)
+        ? (message as any).media.attachments
+        : Array.isArray(message.attachments)
+        ? message.attachments
+        : [];
+      const normalizedMediaAttachments = mediaAttachments.length
+        ? normalizeAttachments(mediaAttachments)
+        : undefined;
+      const mediaPayload = normalizedMediaAttachments?.length
+        ? { ...((message as any).media ?? {}), attachments: normalizedMediaAttachments }
+        : undefined;
+
       const basePayload: any = {
         conversationId: String(convId),
         kind: (message.kind as MessageKind) ?? 'text',
         clientId,
-        text: message.text ?? message.styledText?.text ?? undefined,
+        text: textPayload,
         previewText:
-          typeof (message.text ?? message.styledText?.text) === 'string'
-            ? String(message.text ?? message.styledText?.text).slice(0, 200)
+          typeof textPayload === 'string'
+            ? textPayload.slice(0, 200)
             : undefined,
         replyToId: message.replyToId ?? null,
-        attachments: message.attachments ? normalizeAttachments(message.attachments) : undefined,
+        media: mediaPayload,
         contacts: normalizeContacts(message.contacts),
         poll: normalizePoll(message.poll),
         event: message.event ?? undefined,
@@ -1006,15 +1193,51 @@ export function useChatMessaging({
               encryptionMeta,
             };
           } catch (encryptErr) {
-            console.warn('[E2EE] encryption failed; message remains queued locally', {
-              reactNativeDiagnostics: reactNativeDiagnostics('send.encrypt_payload', encryptErr, {
-                conversationId: String(convId),
-                clientId,
-                senderUserId: currentUserId,
-                recipientIds,
-              }),
-            });
-            return { ok: false };
+            if (String((encryptErr as any)?.message ?? '').includes('Missing E2EE bundle')) {
+              try {
+                await repairLocalE2EEBundle(String(currentUserId));
+                const { encryptionMeta } = await encryptPayloadForRecipients(
+                  String(currentUserId),
+                  recipientIds,
+                  basePayload,
+                );
+                const encryptedRecipientCount = Array.isArray(encryptionMeta?.recipients)
+                  ? encryptionMeta.recipients.length
+                  : 0;
+                if (encryptedRecipientCount >= recipientIds.length) {
+                  payloadToSend = {
+                    conversationId: String(convId),
+                    clientId,
+                    kind: 'text',
+                    previewText: 'Encrypted message',
+                    encrypted: true,
+                    encryptionMeta,
+                  };
+                } else {
+                  throw new Error(`E2EE recipient envelope missing after repair: ${encryptedRecipientCount}/${recipientIds.length}`);
+                }
+              } catch (repairErr) {
+                console.warn('[E2EE] encryption failed; message remains queued locally', {
+                  reactNativeDiagnostics: reactNativeDiagnostics('send.encrypt_payload', repairErr, {
+                    conversationId: String(convId),
+                    clientId,
+                    senderUserId: currentUserId,
+                    recipientIds,
+                  }),
+                });
+                return { ok: false };
+              }
+            } else {
+              console.warn('[E2EE] encryption failed; message remains queued locally', {
+                reactNativeDiagnostics: reactNativeDiagnostics('send.encrypt_payload', encryptErr, {
+                  conversationId: String(convId),
+                  clientId,
+                  senderUserId: currentUserId,
+                  recipientIds,
+                }),
+              });
+              return { ok: false };
+            }
           }
         } else {
           console.warn('[E2EE] no valid recipient user ids; message remains queued locally', {
@@ -1039,7 +1262,9 @@ export function useChatMessaging({
               kind: payloadToSend?.kind,
               hasText: typeof payloadToSend?.text === 'string' && payloadToSend.text.length > 0,
               hasPreviewText: typeof payloadToSend?.previewText === 'string' && payloadToSend.previewText.length > 0,
-              attachmentCount: Array.isArray(payloadToSend?.attachments) ? payloadToSend.attachments.length : 0,
+              attachmentCount: Array.isArray(payloadToSend?.media?.attachments)
+                ? payloadToSend.media.attachments.length
+                : Array.isArray(payloadToSend?.attachments) ? payloadToSend.attachments.length : 0,
               recipientCount: Array.isArray(payloadToSend?.encryptionMeta?.recipients)
                 ? payloadToSend.encryptionMeta.recipients.length
                 : 0,

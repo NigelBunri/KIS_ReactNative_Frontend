@@ -30,7 +30,9 @@ async function _doRefresh(): Promise<string | null> {
     });
 
     if (!response.ok) {
-      await clearAuthTokens();
+      if (response.status === 400 || response.status === 401 || response.status === 403) {
+        await clearAuthTokens();
+      }
       return null;
     }
 
@@ -49,7 +51,6 @@ async function _doRefresh(): Promise<string | null> {
 
     return newAccess;
   } catch {
-    await clearAuthTokens();
     return null;
   }
 }

@@ -1,5 +1,6 @@
 import { KIS_TOKENS } from '@/theme/constants';
 import { StyleSheet } from 'react-native';
+import { resolveChatPreviewText } from './safeChatText';
 
 /* ----------------------------- Types & Storage ----------------------------- */
 
@@ -305,7 +306,14 @@ export function normalizeChatFromServer(raw: any): Chat {
   chat.title = raw?.title ?? undefined;
   chat.avatarUrl = raw?.avatar_url ?? raw?.avatarUrl ?? undefined;
 
-  chat.lastMessage = raw?.lastMessage ?? raw?.last_message ?? raw?.last_message_preview ?? undefined;
+  chat.lastMessage = resolveChatPreviewText({
+    ...raw,
+    text: raw?.lastMessageText ?? raw?.last_message_text ?? raw?.text,
+    previewText: raw?.lastMessage ?? raw?.last_message ?? raw?.last_message_preview,
+    attachments: raw?.attachments,
+    media: raw?.media,
+    kind: raw?.last_message_kind ?? raw?.lastMessageKind ?? raw?.kind,
+  });
   chat.lastAt = raw?.lastAt ?? raw?.last_at ?? undefined;
   chat.unreadCount = typeof raw?.unreadCount === 'number' ? raw.unreadCount : raw?.unread_count ?? 0;
   chat.hasMention = raw?.hasMention ?? raw?.has_mention ?? false;

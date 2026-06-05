@@ -4,6 +4,11 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
+import {
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+} from '@/storage/offlineStructuredCache';
 
 const IN_APP_NOTIFICATIONS_KEY = 'kis_in_app_notifications_v1';
 const AVAILABILITY_REMINDERS_KEY = 'kis_availability_reminders_v1';
@@ -114,11 +119,19 @@ const toBackendNotification = (raw: any): InAppNotification | null => {
 };
 
 const fetchBackendNotifications = async (): Promise<InAppNotification[]> => {
-  const res = await getRequest(ROUTES.notifications.notifications, { forceNetwork: true });
-  if (!res?.success) return [];
-  const payload = res?.data?.results ?? res?.data ?? [];
-  const list = Array.isArray(payload) ? payload : [];
-  return list.map(toBackendNotification).filter(Boolean) as InAppNotification[];
+  const cacheKey = offlineStructuredCacheKey('notifications', 'backend');
+  const cached = await readOfflineStructuredCache<InAppNotification[]>(cacheKey);
+  try {
+    const res = await getRequest(ROUTES.notifications.notifications, { forceNetwork: true });
+    if (!res?.success) return cached?.data ?? [];
+    const payload = res?.data?.results ?? res?.data ?? [];
+    const list = Array.isArray(payload) ? payload : [];
+    const normalized = list.map(toBackendNotification).filter(Boolean) as InAppNotification[];
+    await writeOfflineStructuredCache(cacheKey, normalized);
+    return normalized;
+  } catch {
+    return cached?.data ?? [];
+  }
 };
 
 export const fetchInAppNotifications = async (): Promise<InAppNotification[]> => {

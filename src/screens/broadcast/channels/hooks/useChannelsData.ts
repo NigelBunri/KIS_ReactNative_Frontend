@@ -3,6 +3,11 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import { patchRequest } from '@/network/patch';
+import {
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+} from '@/storage/offlineStructuredCache';
 import { putData as putRequest } from '@/network/put';
 import { emitMainTabBadgeRefresh } from '@/services/mainTabNotificationBadges';
 import {
@@ -593,11 +598,22 @@ export const upvoteQAQuestion = async (questionId: string) => {
 
 // Watch history settings
 export const fetchWatchHistorySettings = async (): Promise<{ is_paused: boolean }> => {
-  const response = await getRequest(watchHistorySettingsEndpoint, { errorMessage: 'Unable to load history settings.' });
-  return response?.success ? response.data : { is_paused: false };
+  const cacheKey = offlineStructuredCacheKey('settings', 'watch-history');
+  const cached = await readOfflineStructuredCache<{ is_paused: boolean }>(cacheKey);
+  try {
+    const response = await getRequest(watchHistorySettingsEndpoint, { errorMessage: 'Unable to load history settings.' });
+    const settings = response?.success ? response.data : cached?.data ?? { is_paused: false };
+    await writeOfflineStructuredCache(cacheKey, settings);
+    return settings;
+  } catch {
+    return cached?.data ?? { is_paused: false };
+  }
 };
 export const updateWatchHistorySettings = async (isPaused: boolean) => {
   const response = await patchRequest(watchHistorySettingsEndpoint, { is_paused: isPaused }, { errorMessage: 'Unable to update history settings.' });
+  if (response?.success) {
+    await writeOfflineStructuredCache(offlineStructuredCacheKey('settings', 'watch-history'), { is_paused: isPaused });
+  }
   return response?.success;
 };
 

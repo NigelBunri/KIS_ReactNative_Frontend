@@ -14,7 +14,6 @@ import {
   TextInput,
   ScrollView,
   Platform,
-  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,12 +42,21 @@ import { formatCompactCount } from './feedUtils';
 import { KISIcon } from '@/constants/kisIcons';
 import { FeedComposerPayload } from './composer/types';
 import RichTextRenderer from './RichTextRenderer';
+import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import {
+  freshOfflineMeta,
+  offlineStructuredCacheKey,
+  readOfflineStructuredCache,
+  writeOfflineStructuredCache,
+  type OfflineCacheMeta,
+} from '@/storage/offlineStructuredCache';
 import FeedComposerSheet from './composer/FeedComposerSheet';
 import { logFeedEvent, type FeedType } from '@/network/personalization';
 import { getAccessToken } from '@/security/authStorage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 const PERSONALIZATION_HISTORY_KEY = '@kis:personalization-history';
 
@@ -85,7 +93,12 @@ export type FeedPost = {
   reactions?: { emoji?: string; count?: number }[];
   has_reacted?: boolean;
   created_at?: string;
-  author?: { display_name?: string; id?: string; connection_degree?: number | null };
+  author?: {
+    display_name?: string;
+    id?: string;
+    connection_degree?: number | null;
+    avatar_url?: string | null;
+  };
 };
 
 type ComposerContext = { key: string; value: string };
@@ -268,6 +281,7 @@ export default function FeedScreen<T extends FeedPost>({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterOptionKey>('all');
   const [loading, setLoading] = useState(true);
+  const [feedCacheMeta, setFeedCacheMeta] = useState<OfflineCacheMeta | null>(null);
   const [posts, setPosts] = useState<T[]>([]);
   const [composerVisible, setComposerVisible] = useState(false);
   const [userHasPersonalizedHistory, setUserHasPersonalizedHistory] = useState(false);
@@ -333,19 +347,40 @@ export default function FeedScreen<T extends FeedPost>({
     [normalizedFeedType],
   );
 
-  const loadFeed = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await loadPosts();
+  const applyFeedPosts = useCallback(
+    (list: T[], meta: OfflineCacheMeta | null) => {
       const normalized = Array.isArray(list) ? list : [];
       const shouldShuffle = !userHasPersonalizedHistory && normalized.length > 1;
       const finalList = shouldShuffle ? shuffleItems(normalized) : normalized;
       setPosts(finalList);
+      setFeedCacheMeta(meta);
       logImpression(finalList.length);
+    },
+    [logImpression, userHasPersonalizedHistory],
+  );
+
+  const loadFeed = useCallback(async () => {
+    const cacheKey = offlineStructuredCacheKey(
+      'feed',
+      feedType || entityTitle,
+      composerEndpoint || 'default',
+      JSON.stringify(composerContext || {}),
+    );
+    setLoading(true);
+    const cached = await readOfflineStructuredCache<T[]>(cacheKey);
+    if (cached?.data) {
+      applyFeedPosts(cached.data, cached.meta);
+      setLoading(false);
+    }
+    try {
+      const list = await loadPosts();
+      const normalized = Array.isArray(list) ? list : [];
+      applyFeedPosts(normalized, freshOfflineMeta);
+      await writeOfflineStructuredCache(cacheKey, normalized);
     } finally {
       setLoading(false);
     }
-  }, [loadPosts, logImpression, userHasPersonalizedHistory]);
+  }, [applyFeedPosts, composerContext, composerEndpoint, entityTitle, feedType, loadPosts]);
 
   useEffect(() => {
     loadFeed();
@@ -866,6 +901,7 @@ export default function FeedScreen<T extends FeedPost>({
       {loading ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
           {renderSearchFilters()}
+          <OfflineDataBadge meta={feedCacheMeta} style={{ marginTop: 10 }} />
 
           <View style={{ marginTop: 14, gap: 14 }}>
             {Array.from({ length: 3 }).map((_, idx) => (
@@ -895,7 +931,12 @@ export default function FeedScreen<T extends FeedPost>({
           ref={listRef}
           data={feedItems}
           keyExtractor={(item, idx) => (item.type === 'post' ? item.data.id : item.id ?? String(idx))}
-          ListHeaderComponent={renderSearchFilters}
+          ListHeaderComponent={() => (
+            <>
+              <OfflineDataBadge meta={feedCacheMeta} />
+              {renderSearchFilters()}
+            </>
+          )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 110 }}
           onScrollToIndexFailed={(info) => {
             listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
@@ -973,7 +1014,16 @@ export default function FeedScreen<T extends FeedPost>({
               <View style={[styles.card, styles.cardShadow]}>
                 <View style={styles.postTopRow}>
                   <View style={styles.avatarStack}>
-                    <ImagePlaceholder size={40} radius={20} style={styles.avatarNew} />
+                    {post.author?.avatar_url ? (
+                      <PermanentRemoteImage
+                        uri={post.author.avatar_url}
+                        domain="Feeds"
+                        stableKey={`feed_author_${post.author?.id ?? post.id}_${post.author.avatar_url}`}
+                        containerStyle={[styles.avatarNew, { borderRadius: 20 }]}
+                      />
+                    ) : (
+                      <ImagePlaceholder size={40} radius={20} style={styles.avatarNew} />
+                    )}
                     {/* tiny “heart badge” like mock */}
                     <View style={styles.avatarBadge}>
                       <Text style={styles.avatarBadgeText}>❤</Text>
@@ -1048,7 +1098,12 @@ export default function FeedScreen<T extends FeedPost>({
                         })
                       }
                     >
-                      <Image source={{ uri: thumbUrl ?? attachmentUrl }} style={styles.mediaNew} resizeMode="cover" />
+                      <PermanentRemoteImage
+                        uri={thumbUrl ?? attachmentUrl}
+                        domain="Feeds"
+                        stableKey={`feed_video_thumb_${post.id}_${attachment?.id ?? thumbUrl ?? attachmentUrl}`}
+                        containerStyle={styles.mediaNew}
+                      />
                       <View style={styles.playOverlayNew} pointerEvents="none">
                         <View style={styles.playCircleNew}>
                           <Text style={styles.playTriangle}>▶</Text>
@@ -1057,7 +1112,12 @@ export default function FeedScreen<T extends FeedPost>({
                     </Pressable>
                   ) : (
                     <View style={styles.mediaWrapNew}>
-                      <Image source={{ uri: attachmentUrl }} style={styles.mediaNew} resizeMode="cover" />
+                      <PermanentRemoteImage
+                        uri={attachmentUrl}
+                        domain="Feeds"
+                        stableKey={`feed_image_${post.id}_${attachment?.id ?? attachmentUrl}`}
+                        containerStyle={styles.mediaNew}
+                      />
                     </View>
                   )
                 ) : null}

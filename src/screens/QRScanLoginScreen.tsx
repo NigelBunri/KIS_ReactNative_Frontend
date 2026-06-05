@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Platform,
   Pressable,
   StyleSheet,
@@ -122,6 +123,7 @@ export default function QRScanLoginScreen() {
           if (__DEV__) console.warn('[QRScanLogin] initial prefetch failed:', err?.message ?? err);
         });
       }
+      DeviceEventEmitter.emit('auth.device.changed', { source: 'qr-secondary-login', deviceId });
       setAuth(true);
       navigation.dispatch(
         CommonActions.reset({

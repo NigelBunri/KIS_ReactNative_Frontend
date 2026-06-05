@@ -23,7 +23,53 @@ import {
 } from './ForAttachments/AttachmentPreviewPage';
 import type { AttachmentFilePayload, FilesType, UploadStatus } from '../../ChatRoomPage';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+import { copyUriToChatMedia, fileUriForPath, sanitizeChatMediaFileName } from '../../chatMediaStorage';
 export type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
+
+
+const ensureDurablePickedFile = async (
+  file: DocumentPickerResponse,
+  fallbackName: string,
+  fallbackType: string | null,
+): Promise<FilesType> => {
+  const name = sanitizeChatMediaFileName(file.name ?? fallbackName);
+  const sourceUri = file.fileCopyUri || file.uri;
+
+  try {
+    if (sourceUri?.startsWith('file://')) {
+      const targetPath = await copyUriToChatMedia(
+        sourceUri,
+        'uploads',
+        name,
+        `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      );
+      if (targetPath) {
+        return {
+          uri: fileUriForPath(targetPath),
+          name,
+          type: file.type ?? fallbackType,
+          size: file.size,
+        };
+      }
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[AttachmentSheet] durable file copy failed; using picker URI', {
+        name,
+        uri: sourceUri,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    uri: sourceUri,
+    name,
+    type: file.type ?? fallbackType,
+    size: file.size,
+  };
+};
+
 
 type AttachmentSheetProps = {
   visible: boolean;
@@ -164,6 +210,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       const options: any = {
         type: [DocumentPicker.types.allFiles],
         allowMultiSelection: true,
+        copyTo: 'cachesDirectory',
       };
 
       const result = await DocumentPicker.pick(options);
@@ -172,12 +219,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         ? result
         : [result];
 
-      const rawPayload: FilesType[] = resultsArray.map(file => ({
-        uri: file.uri,
-        name: file.name ?? 'file',
-        type: file.type ?? null,
-        size: file.size,
-      }));
+      const rawPayload: FilesType[] = await Promise.all(
+        resultsArray.map(file => ensureDurablePickedFile(file, 'file', null)),
+      );
 
       // filter out images/videos – they must come from CameraCaptureModal, not here
       const payload = rawPayload.filter(f => {
@@ -243,6 +287,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       const options: any = {
         type: [DocumentPicker.types.audio],
         allowMultiSelection: true,
+        copyTo: 'cachesDirectory',
       };
 
       const result = await DocumentPicker.pick(options);
@@ -251,12 +296,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
         ? result
         : [result];
 
-      const payload: FilesType[] = resultsArray.map(file => ({
-        uri: file.uri,
-        name: file.name ?? 'audio',
-        type: file.type ?? 'audio/*',
-        size: file.size,
-      }));
+      const payload: FilesType[] = await Promise.all(
+        resultsArray.map(file => ensureDurablePickedFile(file, 'audio', 'audio/*')),
+      );
 
       if (!payload.length) {
         return;

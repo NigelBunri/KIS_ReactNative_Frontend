@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -47,6 +46,7 @@ import {
   type SectionType,
 } from '@/components/section-builder/types';
 import { resolveBackgroundColor } from '@/components/section-builder/backgroundOptions';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const safeUploadedHealthImageUrl = (uploaded: any) => {
   if (!uploaded || uploaded.quarantined || uploaded.requires_review) {
