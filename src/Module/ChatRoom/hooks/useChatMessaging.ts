@@ -991,14 +991,14 @@ export function useChatMessaging({
           return m;
         }
         return { ...m, status: 'read' };
-      });
+      }, currentUserId);
       replaceMessages(updated);
       DeviceEventEmitter.emit('conversation.read', {
         conversationId,
         readCount: unread.length,
       });
     },
-    [socket, conversationId, storageRoomId, replaceMessages],
+    [socket, conversationId, storageRoomId, replaceMessages, currentUserId],
   );
 
   useEffect(() => {
@@ -1520,7 +1520,7 @@ export function useChatMessaging({
             patch.readBy = merged;
           }
           return patch;
-        });
+        }, currentUserId);
         replaceMessagesRef.current(updated);
         const changed = updated.find(
           (m) => String(m.serverId ?? m.id ?? '') === String(messageId),
@@ -1625,6 +1625,7 @@ export function useChatMessaging({
       const roomId = String(storageRoomId);
       bulkUpdateMessages(roomId, (m) =>
         m.serverId === id || m.id === id ? { ...m, reactions } : m,
+        currentUserId,
       ).then((updated) => replaceMessagesRef.current(updated));
     };
 
@@ -1793,11 +1794,11 @@ export function useChatMessaging({
     mapServerMessage,
     replaceMessages,
     localDeleteMessage: async (messageId: string) => {
-      const updated = await removeMessage(String(storageRoomId), messageId);
+      const updated = await removeMessage(String(storageRoomId), messageId, currentUserId);
       replaceMessages(updated);
     },
     clearAllMessages: async () => {
-      await clearMessages(String(storageRoomId));
+      await clearMessages(String(storageRoomId), currentUserId);
       replaceMessages([]);
     },
   };

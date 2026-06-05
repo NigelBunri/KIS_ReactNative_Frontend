@@ -1,12 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 import type { BibleTranslation, BibleVerse } from '@/screens/tabs/bible/useBibleData';
 
 const EVENTS_KEY = 'kis.bible.local.reading_events.v1';
 const HIGHLIGHTS_KEY = 'kis.bible.local.highlights.v1';
 const NOTES_KEY = 'kis.bible.local.notes.v1';
 const BOOKMARKS_KEY = 'kis.bible.local.bookmarks.v1';
+
+const scopedKey = async (baseKey: string) => {
+  const userId = await getCurrentAuthUserId().catch(() => null);
+  return userId ? `${baseKey}:${userId}` : baseKey;
+};
 
 export const BIBLE_READING_EVENTS_UPDATED_EVENT = 'bible.readingEvents.updated';
 
@@ -43,7 +49,7 @@ export type LocalBibleLibraryItem = {
 
 const readJson = async <T>(key: string, fallback: T): Promise<T> => {
   try {
-    const raw = await AsyncStorage.getItem(key);
+    const raw = await AsyncStorage.getItem(await scopedKey(key));
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return parsed as T;
@@ -53,7 +59,7 @@ const readJson = async <T>(key: string, fallback: T): Promise<T> => {
 };
 
 const writeJson = async (key: string, value: unknown) => {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
+  await AsyncStorage.setItem(await scopedKey(key), JSON.stringify(value));
 };
 
 const nowIso = () => new Date().toISOString();

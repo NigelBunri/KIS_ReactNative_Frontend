@@ -52,30 +52,68 @@ import AdminBiblePanel from '@/components/partners/AdminBiblePanel';
 import AdminKISAppPanel from '@/components/partners/AdminKISAppPanel';
 import AppBuilderPanel from '@/components/partners/AppBuilderPanel';
 import GeolocationPanel from '@/components/partners/GeolocationPanel';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
+import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
+import {
+  getCurrentAuthUserId,
+  readScopedProfileCache,
+  writeScopedProfileCache,
+} from '@/storage/userScopedProfileCache';
 
-const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 
 export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
   const [isSuperuser, setIsSuperuser] = React.useState(false);
+  const isGoUser = React.useCallback((user: any) => {
+    const roles = Array.isArray(user?.roles) ? user.roles.map((role: any) => String(role).toLowerCase()) : [];
+    const roleText = String(user?.role ?? user?.account_role ?? user?.user_role ?? '').toLowerCase();
+    return Boolean(
+      user?.is_superuser ||
+        user?.is_staff ||
+        user?.is_admin ||
+        user?.is_go ||
+        user?.isGo ||
+        user?.is_global_owner ||
+        user?.isGlobalOwner ||
+        user?.is_platform_owner ||
+        roles.includes('go') ||
+        roles.includes('owner') ||
+        roles.includes('superuser') ||
+        roleText === 'go' ||
+        roleText === 'owner',
+    );
+  }, []);
   const checkSuperuser = React.useCallback(() => {
-    AsyncStorage.getItem(PROFILE_CACHE_KEY)
-      .then(raw => {
-        if (!raw) return;
-        const payload = JSON.parse(raw);
-        const user = payload?.user ?? payload?.profile?.user;
-        setIsSuperuser(
-          !!(user?.is_superuser || user?.is_staff || user?.is_admin),
-        );
+    let cacheMatched = false;
+    readScopedProfileCache()
+      .then(async raw => {
+        if (raw) {
+          cacheMatched = true;
+          const payload = JSON.parse(raw);
+          const user = payload?.user ?? payload?.profile?.user;
+          setIsSuperuser(isGoUser(user));
+        }
+        const authUserId = await getCurrentAuthUserId();
+        const res = await getRequest(ROUTES.profiles.me, {
+          cacheKey: `partners_profile_role_check_v1:${authUserId ?? 'unknown'}`,
+          staleWhileRevalidate: true,
+          errorMessage: 'Unable to confirm partner access.',
+        }).catch(() => null);
+        if (res?.success && res.data) {
+          await writeScopedProfileCache(res.data);
+          const user = res.data?.user ?? res.data?.profile?.user;
+          setIsSuperuser(isGoUser(user));
+        } else if (!cacheMatched) {
+          setIsSuperuser(false);
+        }
       })
       .catch(() => {});
-  }, []);
+  }, [isGoUser]);
   React.useEffect(() => { checkSuperuser(); }, [checkSuperuser]);
   useFocusEffect(checkSuperuser);
   const rootNavigation = navigation.getParent?.() as

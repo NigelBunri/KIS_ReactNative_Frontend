@@ -12,6 +12,13 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import { CacheConfig } from '@/network/cacheKeys';
 import { clearAuthTokens } from '@/security/authStorage';
+import {
+  clearScopedProfileCache,
+  extractProfileUserId,
+  getCurrentAuthUserId,
+  readScopedProfileCache,
+  writeScopedProfileCache,
+} from '@/storage/userScopedProfileCache';
 
 import {
   DraftProfile,
@@ -29,7 +36,6 @@ import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
 import type { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
 
 const MICROS_PER_CENT = 10;
-const PROFILE_CACHE_KEY = 'kis_profile_cache_v1';
 const DEFAULT_PROFILE_LANGUAGE = 'English';
 const POPULAR_PROFILE_LANGUAGE_MAP = new Map(
   popularLanguages.map(label => [
@@ -900,7 +906,7 @@ export const useProfileController = (opts: {
 
       try {
         if (!forceNetwork) {
-          const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+          const cached = await readScopedProfileCache(profile?.user?.id);
           if (cached) {
             const cachedPayload = JSON.parse(cached) as ProfilePayload;
             applyProfilePayload(cachedPayload);
@@ -912,8 +918,12 @@ export const useProfileController = (opts: {
           }
         }
 
+        const authUserId = profile?.user?.id ?? await getCurrentAuthUserId();
+        const profileCacheKey = authUserId
+          ? `${CacheConfig.userProfile.key}:${authUserId}`
+          : CacheConfig.userProfile.key;
         const res = await getRequest(ROUTES.profiles.me, {
-          cacheKey: CacheConfig.userProfile.key,
+          cacheKey: profileCacheKey,
           cacheType: CacheConfig.userProfile.type,
           forceNetwork,
         });
@@ -925,10 +935,7 @@ export const useProfileController = (opts: {
           loadKisWallet(payload?.account?.wallet_balance_cents);
           loadWalletLedger();
           void loadBroadcastProfiles();
-          await AsyncStorage.setItem(
-            PROFILE_CACHE_KEY,
-            JSON.stringify(payload),
-          );
+          await writeScopedProfileCache(payload, extractProfileUserId(profile));
         } else {
           if (Number(res?.status) === 429) {
             profileRateLimitedUntilRef.current = Date.now() + 15000;
@@ -982,7 +989,8 @@ export const useProfileController = (opts: {
         // Continue with local session cleanup even if server logout fails.
       }
       await clearAuthTokens();
-      await AsyncStorage.multiRemove(['user_phone', PROFILE_CACHE_KEY]);
+      await clearScopedProfileCache(profile?.user?.id);
+      await AsyncStorage.removeItem('user_phone');
       setPhone?.(null);
       setAuth(false);
     } catch (e: any) {
@@ -1274,7 +1282,7 @@ export const useProfileController = (opts: {
         }
       }
 
-      await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+      await clearScopedProfileCache(profile?.user?.id);
       await loadProfile(true);
       closeSheet();
 

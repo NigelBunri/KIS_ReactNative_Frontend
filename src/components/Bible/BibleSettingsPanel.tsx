@@ -272,7 +272,7 @@ export default function BibleSettingsPanel({ translations }: Props) {
 
             {renderToggle('Audio sync', Boolean(preference?.enable_audio_sync), 'enable_audio_sync', 'Keep audio playback linked to verse timing when audio exists.')}
             {renderToggle('Daily reminders', Boolean(preference?.enable_daily_reminders), 'enable_daily_reminders', 'Prepare daily passage reminder preferences for notifications.')}
-            {renderToggle('Offline cache', Boolean(preference?.enable_offline_cache), 'enable_offline_cache', 'Mark Bible content for future offline cache support.')}
+            {renderToggle('Offline Bible downloads', Boolean(preference?.enable_offline_cache), 'enable_offline_cache', 'Enable saved Bible versions for offline reading from the Bible reader.')}
 
             <View style={[styles.noticeBox, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
               <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Notification readiness</Text>

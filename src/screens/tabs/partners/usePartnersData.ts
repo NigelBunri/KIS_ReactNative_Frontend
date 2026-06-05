@@ -3,6 +3,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 import {
   Partner,
   PartnerChannel,
@@ -101,8 +102,11 @@ export const usePartnersData = (isSuperuser = false) => {
   const loadPartners = useCallback(async () => {
     setPartnersLoading(true);
     try {
+      const userId = await getCurrentAuthUserId();
       const res = await getRequest(ROUTES.partners.list, {
         errorMessage: 'Unable to load partners.',
+        cacheKey: `partners_list_v1:${userId ?? 'unknown'}`,
+        staleWhileRevalidate: true,
       });
       const list = (res?.data?.results ?? res?.data ?? res ?? []) as any[];
       const mapped = Array.isArray(list)
@@ -123,8 +127,11 @@ export const usePartnersData = (isSuperuser = false) => {
   }, [selectedPartnerId, applyOwnerOverride]);
 
   const loadPartnerDetail = useCallback(async (partnerId: string) => {
+    const userId = await getCurrentAuthUserId();
     const res = await getRequest(ROUTES.partners.detail(partnerId), {
       errorMessage: 'Unable to load partner details.',
+      cacheKey: `partners_detail_v1:${userId ?? 'unknown'}:${partnerId}`,
+      staleWhileRevalidate: true,
     });
     if (!res?.success || !res?.data) return;
     setPartners((prev) =>
@@ -137,8 +144,11 @@ export const usePartnersData = (isSuperuser = false) => {
   }, [applyOwnerOverride]);
 
   const loadPartnerDiscordSummary = useCallback(async (partnerId: string) => {
+    const userId = await getCurrentAuthUserId();
     const res = await getRequest(ROUTES.partners.discordSummary(partnerId), {
       errorMessage: 'Unable to load partner workspace summary.',
+      cacheKey: `partners_discord_v1:${userId ?? 'unknown'}:${partnerId}`,
+      staleWhileRevalidate: true,
     });
     if (!res?.success || !res?.data) return;
     const summary = res.data as PartnerDiscordSummary;
@@ -150,24 +160,33 @@ export const usePartnersData = (isSuperuser = false) => {
   }, []);
 
   const loadPartnerCommunities = useCallback(async (partnerId: string) => {
+    const userId = await getCurrentAuthUserId();
     const res = await getRequest(`${ROUTES.community.list}?partner=${partnerId}`, {
       errorMessage: 'Unable to load partner communities.',
+      cacheKey: `partners_communities_v1:${userId ?? 'unknown'}:${partnerId}`,
+      staleWhileRevalidate: true,
     });
     const list = (res?.data?.results ?? res?.data ?? res ?? []) as PartnerCommunity[];
     setPartnerCommunities(Array.isArray(list) ? list : []);
   }, []);
 
   const loadPartnerGroups = useCallback(async (partnerId: string) => {
+    const userId = await getCurrentAuthUserId();
     const res = await getRequest(`${ROUTES.groups.list}?partner=${partnerId}`, {
       errorMessage: 'Unable to load partner groups.',
+      cacheKey: `partners_groups_v1:${userId ?? 'unknown'}:${partnerId}`,
+      staleWhileRevalidate: true,
     });
     const list = (res?.data?.results ?? res?.data ?? res ?? []) as PartnerGroup[];
     setPartnerGroups(Array.isArray(list) ? list : []);
   }, []);
 
   const loadPartnerChannels = useCallback(async (partnerId: string) => {
+    const userId = await getCurrentAuthUserId();
     const res = await getRequest(`${ROUTES.channels.getAllChannels}?partner=${partnerId}`, {
       errorMessage: 'Unable to load partner channels.',
+      cacheKey: `partners_channels_v1:${userId ?? 'unknown'}:${partnerId}`,
+      staleWhileRevalidate: true,
     });
     const list = (res?.data?.results ?? res?.data ?? res ?? []) as PartnerChannel[];
     setPartnerChannels(Array.isArray(list) ? list : []);

@@ -175,10 +175,12 @@ export default function useFeedsData({ q = '', code = null }: Params) {
 
   const nextUrlRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const itemsRef = useRef<BroadcastFeedItem[]>([]);
 
   const paramsKey = useMemo(() => `${q}::${code ?? ''}`, [q, code]);
 
   const applyItems = useCallback((nextItems: BroadcastFeedItem[]) => {
+    itemsRef.current = nextItems;
     setItems(nextItems);
     const topTrending = getTopTrendingFeeds(nextItems);
     setTrendingFeeds(topTrending);
@@ -196,6 +198,10 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     try {
       const res = await getRequest(url, {
         errorMessage: 'Unable to load feeds.',
+        cacheKey: `broadcast_feeds_v1:${paramsKey}`,
+        offlineTtlSeconds: 30 * 60,
+        staleWhileRevalidate: true,
+        forceNetwork: true,
       });
       if (!mountedRef.current) return;
       const payload = res?.data ?? res;
@@ -203,18 +209,19 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       const normalizedResults = (page.results ?? []).map(item =>
         normalizeFeedItem(item),
       );
-      applyItems(
-        shuffleFeedItems(
-          normalizedResults.filter(item => !isHealthcareFeedItem(item)),
-        ),
-      );
+      const visibleResults = normalizedResults.filter(item => !isHealthcareFeedItem(item));
+      if (visibleResults.length === 0 && itemsRef.current.length > 0) {
+        nextUrlRef.current = page.next ?? null;
+        return;
+      }
+      applyItems(shuffleFeedItems(visibleResults));
       nextUrlRef.current = page.next ?? null;
     } finally {
       if (mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [applyItems, code, q]);
+  }, [applyItems, code, paramsKey, q]);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -251,6 +258,7 @@ export default function useFeedsData({ q = '', code = null }: Params) {
         if (!have.has(it.id)) merged.push(it);
       }
       if (!mountedRef.current) return prev;
+      itemsRef.current = merged;
       const topTrending = getTopTrendingFeeds(merged);
       setTrendingFeeds(topTrending);
       setTrending(topTrending.map(toTrendingClipItem));

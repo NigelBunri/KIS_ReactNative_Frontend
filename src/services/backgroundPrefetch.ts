@@ -15,6 +15,7 @@ import {
   normalizeConversation,
 } from '@/Module/ChatRoom/normalizeConversation';
 import { isOnline } from '@/services/networkMonitor';
+import { getCurrentAuthUserId, writeScopedProfileCache } from '@/storage/userScopedProfileCache';
 
 let prefetchStarted = false;
 let appStateListenerStarted = false;
@@ -27,7 +28,6 @@ const RESUME_PREFETCH_DELAY_MS = 2500;
 const MIN_PREFETCH_INTERVAL_MS = 8 * 60 * 1000;
 const TASK_GROUP_PAUSE_MS = 900;
 const DEFAULT_OFFLINE_TTL_SECONDS = 30 * 60;
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function safe(label: string, fn: () => Promise<void>) {
@@ -85,21 +85,21 @@ async function runPrefetch(currentUserId?: string | null, ignoreInterval = false
   try {
     await Promise.allSettled([
       safe('messages', () => prefetchMessages(currentUserId)),
-      safe('profile', prefetchProfile),
+      safe('profile', () => prefetchProfile(currentUserId)),
     ]);
 
     await delay(TASK_GROUP_PAUSE_MS);
     await Promise.allSettled([
-      safe('partners', prefetchPartners),
+      safe('partners', () => prefetchPartners(currentUserId)),
       safe('bible', prefetchBible),
-      safe('feeds', prefetchFeeds),
+      safe('feeds', () => prefetchFeeds(currentUserId)),
     ]);
 
     await delay(TASK_GROUP_PAUSE_MS);
     await Promise.allSettled([
       safe('education', prefetchEducation),
       safe('commerce', prefetchCommerce),
-      safe('broadcast', prefetchBroadcast),
+      safe('broadcast', () => prefetchBroadcast(currentUserId)),
     ]);
   } finally {
     prefetchInFlight = false;
@@ -107,43 +107,49 @@ async function runPrefetch(currentUserId?: string | null, ignoreInterval = false
 }
 
 async function prefetchMessages(currentUserId?: string | null): Promise<void> {
+  const effectiveUserId = currentUserId ? String(currentUserId).trim() : await getCurrentAuthUserId().catch(() => null);
+  if (!effectiveUserId) return;
   const res = await getRequest(ROUTES.chat.listConversations, {
-    cacheKey: `${CONVERSATION_CACHE_KEY}:${currentUserId ? String(currentUserId).trim() : 'anon'}`,
+    cacheKey: `${CONVERSATION_CACHE_KEY}:${effectiveUserId}`,
     cacheType: CONVERSATION_CACHE_TYPE,
     offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
     staleWhileRevalidate: true,
   });
   const rawList = Array.isArray(res?.data?.results) ? res.data.results : [];
   if (!rawList.length) return;
-  const normalized = rawList.map((item: any) => normalizeConversation(item, currentUserId ?? undefined));
-  await AsyncStorage.setItem(`kis.conversations_cache:${currentUserId ? String(currentUserId).trim() : 'anon'}`, JSON.stringify(normalized));
+  const normalized = rawList.map((item: any) => normalizeConversation(item, effectiveUserId));
+  await AsyncStorage.setItem(`kis.conversations_cache:${effectiveUserId}`, JSON.stringify(normalized));
   await setCache(
     CONVERSATION_CACHE_TYPE,
-    `${CONVERSATION_CACHE_KEY}:${currentUserId ? String(currentUserId).trim() : 'anon'}`,
+    `${CONVERSATION_CACHE_KEY}:${effectiveUserId}`,
     rawList,
   );
 }
 
-async function prefetchProfile(): Promise<void> {
+async function prefetchProfile(currentUserId?: string | null): Promise<void> {
+  const effectiveUserId = currentUserId ? String(currentUserId).trim() : await getCurrentAuthUserId().catch(() => null);
+  if (!effectiveUserId) return;
   const res = await getRequest(ROUTES.profiles.me, {
-    cacheKey: 'user_profile',
+    cacheKey: `user_profile:${effectiveUserId}`,
     offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
     staleWhileRevalidate: true,
   });
   if (res?.data) {
-    await AsyncStorage.setItem('kis_profile_cache_v1', JSON.stringify(res.data));
+    await writeScopedProfileCache(res.data, effectiveUserId);
   }
 }
 
-async function prefetchPartners(): Promise<void> {
+async function prefetchPartners(currentUserId?: string | null): Promise<void> {
+  const effectiveUserId = currentUserId ? String(currentUserId).trim() : await getCurrentAuthUserId().catch(() => null);
+  if (!effectiveUserId) return;
   await Promise.allSettled([
     getRequest(ROUTES.partners.list, {
-      cacheKey: 'partners_list_v1',
+      cacheKey: `partners_list_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
     getRequest(ROUTES.partners.discover, {
-      cacheKey: 'partners_discover_v1',
+      cacheKey: `partners_discover_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
@@ -175,15 +181,17 @@ async function prefetchBible(): Promise<void> {
   ]);
 }
 
-async function prefetchFeeds(): Promise<void> {
+async function prefetchFeeds(currentUserId?: string | null): Promise<void> {
+  const effectiveUserId = currentUserId ? String(currentUserId).trim() : await getCurrentAuthUserId().catch(() => null);
+  if (!effectiveUserId) return;
   await Promise.allSettled([
     getRequest(`${FEEDS_ENDPOINT}?category=for_you&page=1`, {
-      cacheKey: 'feeds_for_you_page_1_v1',
+      cacheKey: `feeds_for_you_page_1_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
     getRequest(`${FEEDS_ENDPOINT}?category=following&page=1`, {
-      cacheKey: 'feeds_following_page_1_v1',
+      cacheKey: `feeds_following_page_1_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
@@ -240,20 +248,22 @@ async function prefetchCommerce(): Promise<void> {
   }
 }
 
-async function prefetchBroadcast(): Promise<void> {
+async function prefetchBroadcast(currentUserId?: string | null): Promise<void> {
+  const effectiveUserId = currentUserId ? String(currentUserId).trim() : await getCurrentAuthUserId().catch(() => null);
+  if (!effectiveUserId) return;
   await Promise.allSettled([
     getRequest(ROUTES.broadcasts.channels, {
-      cacheKey: 'broadcast_channels_v1',
+      cacheKey: `broadcast_channels_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
     getRequest(ROUTES.broadcasts.watchHistory, {
-      cacheKey: 'broadcast_watch_history_v1',
+      cacheKey: `broadcast_watch_history_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),
     getRequest(ROUTES.broadcasts.userPlaylists, {
-      cacheKey: 'broadcast_user_playlists_v1',
+      cacheKey: `broadcast_user_playlists_v1:${effectiveUserId}`,
       offlineTtlSeconds: DEFAULT_OFFLINE_TTL_SECONDS,
       staleWhileRevalidate: true,
     }),

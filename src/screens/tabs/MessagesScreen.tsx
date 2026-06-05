@@ -57,6 +57,7 @@ import { MessageStatus } from '@/Module/ChatRoom/chatTypes';
 import { decryptConversationPayload, ENCRYPTION_VERSION } from '@/security/customE2EE';
 import { translateString } from '@/languages';
 import { normalizeChatDisplayText, resolveChatPreviewText } from '@/Module/ChatRoom/safeChatText';
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
 const Tab = createMaterialTopTabNavigator();
 type MessagesScreenProps = {
@@ -173,6 +174,8 @@ const [conversationMeta, setConversationMeta] = useState<Record<string, Conversa
 const [communityByConversationId, setCommunityByConversationId] = useState<Record<string, { id: string; name: string }>>({});
 const [communityGroupConversationIds, setCommunityGroupConversationIds] = useState<Set<string>>(new Set());
 const { socket, isConnected, typingByConversation, currentUserId, presenceByUser, startCall } = useSocket();
+const [authCacheUserId, setAuthCacheUserId] = useState<string | null>(null);
+const effectiveCurrentUserId = currentUserId || authCacheUserId || null;
 const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
@@ -180,8 +183,11 @@ const avatarAnim = useRef(new Animated.Value(0)).current;
 const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
 const userScopedCacheKey = useCallback(
-  (baseKey: string) => `${baseKey}:${currentUserId ?? 'anon'}`,
-  [currentUserId],
+  (baseKey: string) => {
+    const userId = effectiveCurrentUserId ? String(effectiveCurrentUserId).trim() : '';
+    return userId ? `${baseKey}:${userId}` : null;
+  },
+  [effectiveCurrentUserId],
 );
 
 const mountedRef = useRef(true);
@@ -191,9 +197,23 @@ const metaRefreshQueue = useRef(new Set<string>());
 const metaRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 const metaPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+useEffect(() => {
+  let active = true;
+  getCurrentAuthUserId()
+    .then(userId => {
+      if (active) setAuthCacheUserId(userId);
+    })
+    .catch(() => {});
+  return () => {
+    active = false;
+  };
+}, [effectiveCurrentUserId]);
+
 // On mount: restore persisted unread counts into conversationMeta
 useEffect(() => {
-  AsyncStorage.getItem(userScopedCacheKey('KIS_CONV_META_V1')).then((raw) => {
+  const cacheKey = userScopedCacheKey('KIS_CONV_META_V1');
+  if (!cacheKey) return;
+  AsyncStorage.getItem(cacheKey).then((raw) => {
     if (!raw) return;
     try {
       const saved: Record<string, number> = JSON.parse(raw);
@@ -230,7 +250,10 @@ useEffect(() => {
         toSave[convId] = entry.unreadCount;
       }
     }
-    AsyncStorage.setItem(userScopedCacheKey('KIS_CONV_META_V1'), JSON.stringify(toSave)).catch(() => {});
+    const cacheKey = userScopedCacheKey('KIS_CONV_META_V1');
+    if (cacheKey) {
+      AsyncStorage.setItem(cacheKey, JSON.stringify(toSave)).catch(() => {});
+    }
   }, 1500);
   return () => {
     if (metaPersistTimer.current) {
@@ -253,7 +276,7 @@ const refreshConversationMeta = useCallback(
   async (convId: string) => {
     if (!convId) return;
     try {
-      const messages = await loadMessages(convId);
+      const messages = await loadMessages(convId, effectiveCurrentUserId);
       if (!mountedRef.current) return;
       if (!messages.length) {
         setConversationMeta((prev) => {
@@ -281,7 +304,7 @@ const refreshConversationMeta = useCallback(
       console.warn('[MessagesScreen] refresh meta failed', error);
     }
   },
-  [],
+  [effectiveCurrentUserId],
 );
 
 const queueMetaRefresh = useCallback(
@@ -317,7 +340,7 @@ const handleStartQuickCall = useCallback(
     }
 
     const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
-      (id) => String(id) !== String(currentUserId ?? ''),
+      (id) => String(id) !== String(effectiveCurrentUserId ?? ''),
     );
 
     await startCall({
@@ -327,12 +350,12 @@ const handleStartQuickCall = useCallback(
       inviteeUserIds,
     });
   },
-  [startCall, currentUserId],
+  [startCall, effectiveCurrentUserId],
 );
 
 const refreshConversations = useCallback(async (force?: boolean) => {
   const currentList = conversationsRef.current;
-  const convs = await fetchConversationsForCurrentUser(currentList, currentUserId ?? undefined, !!force);
+  const convs = await fetchConversationsForCurrentUser(currentList, effectiveCurrentUserId ?? undefined, !!force);
   if (convs.length === 0 && currentList.length > 0) return;
   // Override server unread counts with local zero-reads — prevents stale server counts
   // from showing after the user has already read those messages in a prior session.
@@ -349,43 +372,45 @@ const refreshConversations = useCallback(async (force?: boolean) => {
   if (force) {
     await loadCommunitiesRef.current();
   }
-}, [currentUserId]);
+}, [effectiveCurrentUserId]);
 
 const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
 
 // Load cached conversations on mount before the API call completes
 useEffect(() => {
   let active = true;
-  AsyncStorage.getItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY)).then(async (raw) => {
+  const cacheKey = userScopedCacheKey(CONVERSATIONS_CACHE_KEY);
+  if (!cacheKey) return;
+  AsyncStorage.getItem(cacheKey).then(async (raw) => {
     try {
       const cached = raw ? JSON.parse(raw) as Chat[] : [];
       if (Array.isArray(cached) && cached.length > 0) {
         if (active) setConversations((prev) => (prev.length === 0 ? cached : prev));
         return;
       }
-      const canonical = await fetchConversationsForCurrentUser(conversationsRef.current, currentUserId ?? undefined);
+      const canonical = await fetchConversationsForCurrentUser(conversationsRef.current, effectiveCurrentUserId ?? undefined);
       if (active && canonical.length > 0) {
         setConversations((prev) => (prev.length === 0 ? canonical : prev));
-        AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(canonical)).catch(() => {});
+        AsyncStorage.setItem(cacheKey, JSON.stringify(canonical)).catch(() => {});
       }
     } catch { /* silent */ }
   }).catch(() => {});
   return () => {
     active = false;
   };
-}, [currentUserId, userScopedCacheKey]);
+}, [effectiveCurrentUserId, userScopedCacheKey]);
 
 useEffect(() => {
   let active = true;
   (async () => {
     const term = query.trim();
     if (term.length >= 2) {
-      const convs = await searchConversationsFromServer(term, currentUserId ?? undefined);
+      const convs = await searchConversationsFromServer(term, effectiveCurrentUserId ?? undefined);
       if (active && convs.length > 0) setConversations(convs);
       if (active) setConversationsLoading(false);
       return;
     }
-    const convs = await fetchConversationsForCurrentUser(conversationsRef.current, currentUserId ?? undefined);
+    const convs = await fetchConversationsForCurrentUser(conversationsRef.current, effectiveCurrentUserId ?? undefined);
     if (active) {
       // Apply local zero-read overrides so server's stale unread counts don't re-appear
       const meta = conversationMetaRef.current;
@@ -404,14 +429,15 @@ useEffect(() => {
       // Persist fresh list for offline use, but never overwrite a usable
       // local list with an empty transient backend/offline response.
       if (merged.length > 0) {
-        AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(merged)).catch(() => {});
+        const cacheKey = userScopedCacheKey(CONVERSATIONS_CACHE_KEY);
+        if (cacheKey) AsyncStorage.setItem(cacheKey, JSON.stringify(merged)).catch(() => {});
       }
     }
   })().catch(() => {});
   return () => {
     active = false;
   };
-}, [currentUserId, query, userScopedCacheKey]);
+}, [effectiveCurrentUserId, query, userScopedCacheKey]);
 
 const chatConversationKey = useCallback((chat: Chat | any) => {
   return String(chat?.conversationId ?? chat?.id ?? '');
@@ -437,7 +463,7 @@ useEffect(() => {
     setGlobalSearchLoading(true);
     try {
       const [serverConversations, participantRes] = await Promise.all([
-        searchConversationsFromServer(term, currentUserId ?? undefined),
+        searchConversationsFromServer(term, effectiveCurrentUserId ?? undefined),
         getRequest(`${ROUTES.chat.searchParticipants}?q=${encodeURIComponent(term)}`, {
           errorMessage: 'Unable to search participants.',
         }).catch(() => null),
@@ -516,7 +542,7 @@ useEffect(() => {
         messageCandidates.map(async (chat: any) => {
           const convId = chatConversationKey(chat);
           if (!convId) return [];
-          const messages = await loadMessages(convId).catch(() => []);
+          const messages = await loadMessages(convId, effectiveCurrentUserId).catch(() => []);
           return messages
             .filter((message: any) => {
               const text = normalizeChatDisplayText(message?.text) || normalizeChatDisplayText(message?.styledText?.text);
@@ -562,7 +588,7 @@ useEffect(() => {
   communityByConversationId,
   conversationMeta,
   conversations,
-  currentUserId,
+  effectiveCurrentUserId,
   query,
   resultMatches,
 ]);
@@ -820,7 +846,7 @@ useEffect(() => {
       payload?.userId ??
       payload?.user_id;
     const senderId = rawSenderId != null ? String(rawSenderId) : '';
-    const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
+    const isFromMe = senderId.length > 0 && senderId === String(effectiveCurrentUserId);
     const rawPreviewText =
       payload?.text ??
       payload?.previewText ??
@@ -835,7 +861,7 @@ useEffect(() => {
         attachments: payload?.attachments,
         media: payload?.media,
       },
-      conversationMeta[convId]?.lastMessage,
+      conversationMetaRef.current[convId]?.lastMessage,
       hasEncrypted ? '' : getMessagePreviewText(payload),
     );
 
@@ -938,10 +964,10 @@ useEffect(() => {
     try {
       const mapped = mapBackendToChatMessage(
         payload,
-        String(currentUserId ?? ''),
+        String(effectiveCurrentUserId ?? ''),
         convId,
       );
-      upsertMessage(convId, mapped).catch(() => {});
+      upsertMessage(convId, mapped, effectiveCurrentUserId).catch(() => {});
     } catch (err: any) {
       console.warn('[MessagesScreen] failed to map/upsert incoming message', err?.message);
     }
@@ -953,17 +979,17 @@ useEffect(() => {
       const recipients = Array.isArray(encMeta?.recipients) ? encMeta.recipients : null;
       const currentDeviceId = deviceIdRef.current;
       const isOwnCurrentDeviceMessage =
-        String(payload?.senderId ?? payload?.sender_id ?? payload?.sender?.id ?? '') === String(currentUserId) &&
+        String(payload?.senderId ?? payload?.sender_id ?? payload?.sender?.id ?? '') === String(effectiveCurrentUserId) &&
         !!currentDeviceId &&
         String(senderDeviceId) === String(currentDeviceId);
       const recipientCipher = recipients
         ? currentDeviceId
           ? recipients.find(
               (r: any) =>
-                String(r.userId) === String(currentUserId) &&
+                String(r.userId) === String(effectiveCurrentUserId) &&
                 String(r.deviceId) === String(currentDeviceId),
             )
-          : recipients.find((r: any) => String(r.userId) === String(currentUserId))
+          : recipients.find((r: any) => String(r.userId) === String(effectiveCurrentUserId))
         : null;
       if (isOwnCurrentDeviceMessage && !recipientCipher) return;
       const ciphertext = recipientCipher?.ciphertext ?? payload?.ciphertext;
@@ -994,7 +1020,7 @@ useEffect(() => {
             }));
             const mappedInner = mapBackendToChatMessage(
               payload,
-              String(currentUserId ?? ''),
+              String(effectiveCurrentUserId ?? ''),
               convId,
             );
             const patched = {
@@ -1011,7 +1037,7 @@ useEffect(() => {
               replyToId: parsed?.replyToId ?? mappedInner.replyToId,
               kind: parsed?.kind ?? mappedInner.kind,
             };
-            upsertMessage(convId, patched).catch(() => {});
+            upsertMessage(convId, patched, effectiveCurrentUserId).catch(() => {});
           })
           .catch(() => {});
       }
@@ -1053,7 +1079,7 @@ useEffect(() => {
           }));
           const mappedInner = mapBackendToChatMessage(
             payload,
-            String(currentUserId ?? ''),
+            String(effectiveCurrentUserId ?? ''),
             convId,
           );
           const patched = {
@@ -1070,7 +1096,7 @@ useEffect(() => {
             replyToId: parsed?.replyToId ?? mappedInner.replyToId,
             kind: parsed?.kind ?? mappedInner.kind,
           };
-          upsertMessage(convId, patched).catch(() => {});
+          upsertMessage(convId, patched, effectiveCurrentUserId).catch(() => {});
         } catch (error) {
           console.warn('[customE2EE] decrypt fallback failed', error);
         }
@@ -1086,7 +1112,7 @@ useEffect(() => {
     const rawPreview = payload?.preview ?? payload?.previewText ?? payload?.preview_text;
     const lastAt = payload?.lastMessageAt ?? payload?.last_message_at ?? new Date().toISOString();
     const senderId = payload?.senderId ? String(payload.senderId) : '';
-    const isFromMe = senderId.length > 0 && senderId === String(currentUserId);
+    const isFromMe = senderId.length > 0 && senderId === String(effectiveCurrentUserId);
 
     if (rawPreview !== undefined) {
       setConversationMeta((prev) => {
@@ -1109,8 +1135,8 @@ useEffect(() => {
           if (id !== convId) return item;
           return {
             ...item,
-            last_message_preview: resolveConversationPreview(payload, conversationMeta[convId]?.lastMessage),
-            lastMessage: resolveConversationPreview(payload, conversationMeta[convId]?.lastMessage),
+            last_message_preview: resolveConversationPreview(payload, conversationMetaRef.current[convId]?.lastMessage),
+            lastMessage: resolveConversationPreview(payload, conversationMetaRef.current[convId]?.lastMessage),
             last_message_at: lastAt,
             lastAt,
             updated_at: lastAt,
@@ -1130,7 +1156,7 @@ useEffect(() => {
     socket.off('conversation.updated', onConversationUpdated);
     socket.off('conversation.created', onConversationUpdated);
   };
-}, [socket, isConnected, currentUserId, queueMetaRefresh, setConversations, setConversationMeta, refreshConversations]);
+}, [socket, isConnected, effectiveCurrentUserId, queueMetaRefresh, setConversations, setConversationMeta, refreshConversations]);
 
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('message.status', (payload: any) => {
@@ -1230,7 +1256,10 @@ const handleOpenChat = useCallback((chat: Chat) => {
         return cId === convId ? { ...c, unreadCount: 0 } : c;
       });
       // Persist immediately so the cache has unreadCount:0 on next reload
-      AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(updated)).catch(() => {});
+      const cacheKey = userScopedCacheKey(CONVERSATIONS_CACHE_KEY);
+      if (cacheKey) {
+        AsyncStorage.setItem(cacheKey, JSON.stringify(updated)).catch(() => {});
+      }
       return updated;
     });
   }
@@ -2300,7 +2329,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 search={query}
                 typingByConversation={typingByConversation}
                 presenceByUser={presenceByUser}
-                currentUserId={currentUserId ?? undefined}
+                currentUserId={effectiveCurrentUserId ?? undefined}
                 contactNameByPhone={contactNameByPhone}
                 conversationMeta={conversationMeta}
                 communityByConversationId={communityByConversationId}
@@ -2511,7 +2540,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                       if (onOpenInfo) {
                         onOpenInfo({
                           chat: avatarPreview.chat,
-                          currentUserId: currentUserId ?? null,
+                          currentUserId: effectiveCurrentUserId ?? null,
                         });
                         return;
                       }

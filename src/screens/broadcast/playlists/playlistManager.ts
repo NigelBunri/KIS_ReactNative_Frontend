@@ -26,6 +26,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,22 @@ type PlaylistState = {
 // ─── Internal state ───────────────────────────────────────────────────────────
 
 const STORAGE_KEY = '@kis:playlists-v1';
+let activeStorageUserId: string | null = null;
+
+const resolveStorageUserId = async () => await getCurrentAuthUserId().catch(() => null);
+
+const storageKeyForCurrentUser = async () => {
+  const userId = await resolveStorageUserId();
+  return userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
+};
+
+const ensureUserScopedState = async () => {
+  const userId = await resolveStorageUserId();
+  if (activeStorageUserId === userId) return;
+  activeStorageUserId = userId;
+  state = { playlists: [], hydrated: false };
+  emit();
+};
 const VALID_LOOP_MODES: LoopMode[] = ['none', 'all', 'one', 'selected'];
 
 let state: PlaylistState = { playlists: [], hydrated: false };
@@ -97,7 +114,7 @@ const generateId = (): string => {
 
 const persistState = async (): Promise<void> => {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state.playlists));
+    await AsyncStorage.setItem(await storageKeyForCurrentUser(), JSON.stringify(state.playlists));
   } catch {
     // silently ignore — we will retry on next mutation
   }
@@ -130,7 +147,8 @@ const normalisePlaylist = (raw: any): Playlist => ({
 
 const hydrateFromStorage = async (): Promise<void> => {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    await ensureUserScopedState();
+    const raw = await AsyncStorage.getItem(await storageKeyForCurrentUser());
     if (raw) {
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -157,6 +175,7 @@ const hydrateFromStorage = async (): Promise<void> => {
  */
 const hydrateFromBackend = async (): Promise<void> => {
   try {
+    await ensureUserScopedState();
     const res = await getRequest(ROUTES.broadcasts.userPlaylists, {
       errorMessage: 'Unable to fetch playlists.',
       forceNetwork: true,
@@ -330,12 +349,17 @@ export const subscribeToPlaylists = (
 
 /** Re-sync from the server (call when the screen regains focus). */
 export const refreshPlaylistsFromServer = (): void => {
-  void hydrateFromBackend();
+  void (async () => {
+    await ensureUserScopedState();
+    await hydrateFromStorage();
+    await hydrateFromBackend();
+  })();
 };
 
 // ─── Playlist CRUD ────────────────────────────────────────────────────────────
 
 export const createPlaylist = (name: string): Playlist => {
+  void ensureUserScopedState();
   const now = new Date().toISOString();
   const pl: Playlist = {
     id: generateId(),
@@ -355,6 +379,7 @@ export const createPlaylist = (name: string): Playlist => {
 };
 
 export const renamePlaylist = (id: string, name: string): void => {
+  void ensureUserScopedState();
   const trimmed = name.trim();
   state = {
     ...state,
@@ -378,6 +403,7 @@ export const renamePlaylist = (id: string, name: string): void => {
 };
 
 export const deletePlaylist = (id: string): void => {
+  void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === id);
   state = { ...state, playlists: state.playlists.filter(p => p.id !== id) };
   emit();
@@ -391,6 +417,7 @@ export const deletePlaylist = (id: string): void => {
 };
 
 export const setPlaylistLoopMode = (id: string, loopMode: LoopMode): void => {
+  void ensureUserScopedState();
   state = {
     ...state,
     playlists: state.playlists.map(pl =>
@@ -420,6 +447,7 @@ export const addItemToPlaylist = (
   playlistId: string,
   item: PlaylistFeedItem,
 ): AddToPlaylistResult => {
+  void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === playlistId);
   if (!pl) return 'not_found';
   if (pl.items.some(it => it.broadcastId === item.id)) return 'duplicate';
@@ -454,6 +482,7 @@ export const removeItemFromPlaylist = (
   playlistId: string,
   itemId: string,
 ): void => {
+  void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === playlistId);
   const item = pl?.items.find(it => it.id === itemId);
 
@@ -484,6 +513,7 @@ export const toggleItemSelectedForLoop = (
   playlistId: string,
   itemId: string,
 ): void => {
+  void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === playlistId);
   const item = pl?.items.find(it => it.id === itemId);
   const nextSelected = !item?.selectedForLoop;
@@ -520,6 +550,7 @@ export const movePlaylistItem = (
   fromIndex: number,
   direction: 'up' | 'down',
 ): void => {
+  void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === playlistId);
   if (!pl) return;
   const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;

@@ -3,6 +3,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import {
+  BIBLE_OFFLINE_DOWNLOADS_UPDATED_EVENT,
   BibleOfflineManifest,
   cacheBibleChapter,
   getBibleOfflinePriorityCodes,
@@ -257,11 +258,17 @@ export function useBibleData() {
         setPreferredTranslationId(preference?.default_translation || null);
       })
       .finally(() => setOfflineManifestLoaded(true));
-    const sub = DeviceEventEmitter.addListener(BIBLE_PREFERENCES_UPDATED_EVENT, (preference: any) => {
+    const preferenceSub = DeviceEventEmitter.addListener(BIBLE_PREFERENCES_UPDATED_EVENT, (preference: any) => {
       setPreferredTranslationCode(preference?.default_translation_code || null);
       setPreferredTranslationId(preference?.default_translation || null);
     });
-    return () => sub.remove();
+    const downloadsSub = DeviceEventEmitter.addListener(BIBLE_OFFLINE_DOWNLOADS_UPDATED_EVENT, () => {
+      readBibleOfflineManifest().then(setOfflineManifest).catch(() => undefined);
+    });
+    return () => {
+      preferenceSub.remove();
+      downloadsSub.remove();
+    };
   }, []);
 
   const loadTranslations = useCallback(async () => {

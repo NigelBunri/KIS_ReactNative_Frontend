@@ -503,11 +503,11 @@ export function useChatPersistence(
 
     (async () => {
       try {
-        const loaded = await loadMessages(roomId);
+        const loaded = await loadMessages(roomId, currentUserId);
         const previousRoomId = previousRoomIdRef.current;
         const migrated =
           previousRoomId && previousRoomId !== roomId
-            ? await loadMessages(previousRoomId)
+            ? await loadMessages(previousRoomId, currentUserId)
             : [];
         if (!mounted) return;
         const byIdentity = new Map<string, ChatMessage>();
@@ -525,7 +525,7 @@ export function useChatPersistence(
         const sorted = cleanupHistoricalUploadDuplicates(sortMessages(normalized));
         setMessages(sorted);
         if (currentUserId) {
-          await saveMessages(roomId, sorted);
+          await saveMessages(roomId, sorted, currentUserId);
         }
       } catch (err) {
         console.warn('[useChatPersistence] load error', err);
@@ -552,9 +552,9 @@ export function useChatPersistence(
       // latest list instead of the stale pre-render snapshot.
       messagesRef.current = sorted;
       setMessages(sorted);
-      await saveMessages(roomIdRef.current, sorted);
+      await saveMessages(roomIdRef.current, sorted, currentUserId);
     },
-    [],
+    [currentUserId],
   );
 
   /* ------------------------------------------------------------------------
@@ -603,7 +603,7 @@ export function useChatPersistence(
       ];
 
       await persist(optimistic);
-      markRoomHasPending(roomId).catch(() => {});
+      markRoomHasPending(roomId, currentUserId).catch(() => {});
 
       if (!sendOverNetwork) return;
 
@@ -797,12 +797,12 @@ export function useChatPersistence(
         const hasPending = messagesRef.current.some(
           m => m.status === STATUS_QUEUED || m.status === STATUS_FAILED,
         );
-        if (!hasPending) unmarkRoomHasPending(roomIdRef.current).catch(() => {});
+        if (!hasPending) unmarkRoomHasPending(roomIdRef.current, currentUserId).catch(() => {});
       } finally {
         flushInFlightRef.current = false;
       }
     },
-    [persist, sendOverNetwork],
+    [persist, sendOverNetwork, currentUserId],
   );
 
   /* ------------------------------------------------------------------------

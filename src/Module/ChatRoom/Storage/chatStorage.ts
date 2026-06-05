@@ -6,8 +6,10 @@ import { ChatMessage } from '../chatTypes';
 /**
  * ⚠️ Storage versioning:
  * - V1: 'KIS_CHAT_MESSAGES_BY_ROOM_V1:' (old structure / legacy)
- * - V2: 'KIS_CHAT_MESSAGES_BY_ROOM_V2:' (current ChatMessage structure aligned with backend)
+ * - V2: 'KIS_CHAT_MESSAGES_BY_ROOM_V2:' (legacy room-only cache)
+ * - V3: 'KIS_CHAT_MESSAGES_BY_USER_ROOM_V3:' (current user-scoped room cache)
  */
+const STORAGE_KEY_PREFIX_V3 = 'KIS_CHAT_MESSAGES_BY_USER_ROOM_V3:';
 const STORAGE_KEY_PREFIX_V2 = 'KIS_CHAT_MESSAGES_BY_ROOM_V2:';
 const LEGACY_STORAGE_KEY_PREFIX_V1 = 'KIS_CHAT_MESSAGES_BY_ROOM_V1:';
 
@@ -15,33 +17,49 @@ const LEGACY_STORAGE_KEY_PREFIX_V1 = 'KIS_CHAT_MESSAGES_BY_ROOM_V1:';
 // flush service can retry them even after the ChatRoom component unmounts.
 const PENDING_ROOMS_KEY = 'KIS_PENDING_ROOMS_V1';
 
-export async function markRoomHasPending(roomId: string): Promise<void> {
+const scopedRoomId = (roomId: string, currentUserId?: string | null) => {
+  const userId = currentUserId != null ? String(currentUserId).trim() : '';
+  return userId ? `${userId}:${roomId}` : roomId;
+};
+
+export async function markRoomHasPending(roomId: string, currentUserId?: string | null): Promise<void> {
   try {
+    const key = scopedRoomId(roomId, currentUserId);
     const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
     const rooms: string[] = raw ? JSON.parse(raw) : [];
-    if (!rooms.includes(roomId)) {
-      await AsyncStorage.setItem(PENDING_ROOMS_KEY, JSON.stringify([...rooms, roomId]));
+    if (!rooms.includes(key)) {
+      await AsyncStorage.setItem(PENDING_ROOMS_KEY, JSON.stringify([...rooms, key]));
     }
   } catch {}
 }
 
-export async function unmarkRoomHasPending(roomId: string): Promise<void> {
+export async function unmarkRoomHasPending(roomId: string, currentUserId?: string | null): Promise<void> {
   try {
+    const key = scopedRoomId(roomId, currentUserId);
     const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
     if (!raw) return;
     const rooms: string[] = JSON.parse(raw);
-    const next = rooms.filter(r => r !== roomId);
+    const next = rooms.filter(r => r !== key && r !== roomId);
     await AsyncStorage.setItem(PENDING_ROOMS_KEY, JSON.stringify(next));
   } catch {}
 }
 
-export async function getAllRoomsWithPendingMessages(): Promise<string[]> {
+export async function getAllRoomsWithPendingMessages(currentUserId?: string | null): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(PENDING_ROOMS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const rooms: string[] = raw ? JSON.parse(raw) : [];
+    const userId = currentUserId != null ? String(currentUserId).trim() : '';
+    if (!userId) return rooms;
+    return rooms
+      .filter(room => room === String(room).split(':').slice(1).join(':') || room.startsWith(`${userId}:`))
+      .map(room => (room.startsWith(`${userId}:`) ? room.slice(userId.length + 1) : room));
   } catch { return []; }
 }
 
+const buildKeyV3 = (roomId: string, currentUserId?: string | null) => {
+  const userId = currentUserId != null ? String(currentUserId).trim() : '';
+  return userId ? `${STORAGE_KEY_PREFIX_V3}${userId}:${roomId}` : `${STORAGE_KEY_PREFIX_V2}${roomId}`;
+};
 const buildKeyV2 = (roomId: string) => `${STORAGE_KEY_PREFIX_V2}${roomId}`;
 const buildLegacyKeyV1 = (roomId: string) =>
   `${LEGACY_STORAGE_KEY_PREFIX_V1}${roomId}`;
@@ -69,31 +87,38 @@ function normalizeParsedMessages(parsed: unknown): ChatMessage[] {
  * - Primary: V2 key
  * - Fallback: V1 key (migrates to V2 on first load)
  */
-export async function loadMessages(roomId: string): Promise<ChatMessage[]> {
+const messagesForRoom = (roomId: string, messages: ChatMessage[]) =>
+  messages.filter(message => {
+    const convId = (message as any).conversationId ?? (message as any).roomId;
+    return !convId || String(convId) === String(roomId);
+  });
+
+export async function loadMessages(roomId: string, currentUserId?: string | null): Promise<ChatMessage[]> {
   try {
-    // 1. Try V2
+    const rawV3 = await AsyncStorage.getItem(buildKeyV3(roomId, currentUserId));
+    if (rawV3) {
+      const parsed = JSON.parse(rawV3);
+      return messagesForRoom(roomId, normalizeParsedMessages(parsed));
+    }
+
+    // Migration fallback: old builds stored room messages without user scope.
+    // Read it only when the scoped cache is empty, then save into V3.
     const rawV2 = await AsyncStorage.getItem(buildKeyV2(roomId));
     if (rawV2) {
       const parsed = JSON.parse(rawV2);
-      return normalizeParsedMessages(parsed);
-    }
-
-    // 2. Fallback: try legacy V1
-    const rawV1 = await AsyncStorage.getItem(buildLegacyKeyV1(roomId));
-    if (rawV1) {
-      const parsed = JSON.parse(rawV1);
-      const normalized = normalizeParsedMessages(parsed);
-
-      // 🔁 Migrate to V2 for future loads
-      await saveMessages(roomId, normalized);
-
-      // (optional) You can also remove the legacy key if you want:
-      // await AsyncStorage.removeItem(buildLegacyKeyV1(roomId));
-
+      const normalized = messagesForRoom(roomId, normalizeParsedMessages(parsed));
+      if (normalized.length) await saveMessages(roomId, normalized, currentUserId);
       return normalized;
     }
 
-    // Nothing stored
+    const rawV1 = await AsyncStorage.getItem(buildLegacyKeyV1(roomId));
+    if (rawV1) {
+      const parsed = JSON.parse(rawV1);
+      const normalized = messagesForRoom(roomId, normalizeParsedMessages(parsed));
+      if (normalized.length) await saveMessages(roomId, normalized, currentUserId);
+      return normalized;
+    }
+
     return [];
   } catch (e) {
     console.warn('[chatStorage] loadMessages error', e);
@@ -104,6 +129,7 @@ export async function loadMessages(roomId: string): Promise<ChatMessage[]> {
 export async function saveMessages(
   roomId: string,
   messages: ChatMessage[],
+  currentUserId?: string | null,
 ): Promise<void> {
   try {
     // Make sure messages are sorted by createdAt before saving
@@ -112,7 +138,7 @@ export async function saveMessages(
       return a.createdAt.localeCompare(b.createdAt);
     });
 
-    await AsyncStorage.setItem(buildKeyV2(roomId), JSON.stringify(sorted));
+    await AsyncStorage.setItem(buildKeyV3(roomId, currentUserId), JSON.stringify(sorted));
   } catch (e) {
     console.warn('[chatStorage] saveMessages error', e);
   }
@@ -144,8 +170,9 @@ const messagesShareIdentity = (
 export async function upsertMessage(
   roomId: string,
   message: ChatMessage,
+  currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const existing = await loadMessages(roomId);
+  const existing = await loadMessages(roomId, currentUserId);
   const index = existing.findIndex((m) => messagesShareIdentity(m, message));
   let next: ChatMessage[];
 
@@ -156,17 +183,18 @@ export async function upsertMessage(
     next[index] = { ...existing[index], ...message };
   }
 
-  await saveMessages(roomId, next);
+  await saveMessages(roomId, next, currentUserId);
   return next;
 }
 
 export async function removeMessage(
   roomId: string,
   messageId: string,
+  currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const existing = await loadMessages(roomId);
+  const existing = await loadMessages(roomId, currentUserId);
   const next = existing.filter((m) => m.id !== messageId);
-  await saveMessages(roomId, next);
+  await saveMessages(roomId, next, currentUserId);
   return next;
 }
 
@@ -174,12 +202,13 @@ export async function updateMessageStatus(
   roomId: string,
   messageId: string,
   status: ChatMessage['status'],
+  currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const existing = await loadMessages(roomId);
+  const existing = await loadMessages(roomId, currentUserId);
   const next = existing.map((m) =>
     m.id === messageId ? { ...m, status } : m,
   );
-  await saveMessages(roomId, next);
+  await saveMessages(roomId, next, currentUserId);
   return next;
 }
 
@@ -190,16 +219,17 @@ export async function updateMessageStatus(
 export async function bulkUpdateMessages(
   roomId: string,
   updater: (message: ChatMessage) => ChatMessage,
+  currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const existing = await loadMessages(roomId);
+  const existing = await loadMessages(roomId, currentUserId);
   const next = existing.map(updater);
-  await saveMessages(roomId, next);
+  await saveMessages(roomId, next, currentUserId);
   return next;
 }
 
-export async function clearMessages(roomId: string): Promise<void> {
+export async function clearMessages(roomId: string, currentUserId?: string | null): Promise<void> {
   try {
-    await AsyncStorage.removeItem(buildKeyV2(roomId));
+    await AsyncStorage.removeItem(buildKeyV3(roomId, currentUserId));
   } catch (e) {
     console.warn('[chatStorage] clearMessages error', e);
   }

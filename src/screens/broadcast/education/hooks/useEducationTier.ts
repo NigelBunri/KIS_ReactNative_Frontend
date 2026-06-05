@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import { readScopedProfileCache } from '@/storage/userScopedProfileCache';
 
 const TIER_ORDER = ['free', 'pro', 'business', 'business pro', 'partner', 'partner pro'];
 const TIER_ALIASES: Record<string, string> = {
@@ -38,7 +38,7 @@ export default function useEducationTier() {
     if (now < blockedUntilRef.current) return;
     setLoading(true);
     try {
-      const cached = await AsyncStorage.getItem('kis_profile_cache_v1');
+      const cached = await readScopedProfileCache();
       if (cached) {
         const parsed = JSON.parse(cached);
         const cachedTier = parsed?.account?.tier ?? parsed?.tier ?? null;
