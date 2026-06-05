@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
@@ -106,7 +106,14 @@ export default function UserProfileScreen() {
     const profileId = profile?.profile_id ?? profile?.id ?? userId;
     setEndorsingSkillId(skillId);
     try {
-      await postRequest(ROUTES.profiles.endorseSkill(profileId), { skill_id: skillId });
+      await queueableJsonRequest({
+        domain: 'Profile',
+        kind: 'profile.endorse_skill',
+        method: 'POST',
+        url: ROUTES.profiles.endorseSkill(profileId),
+        body: { skill_id: skillId },
+        dedupeKey: `profile:endorse:${profileId}:${skillId}`,
+      });
       setEndorsedSkillIds(prev => new Set(prev).add(skillId));
       setSkillEndorseCounts(prev => ({
         ...prev,
@@ -123,8 +130,13 @@ export default function UserProfileScreen() {
     if (connectionStatus !== 'none') return;
     setConnecting(true);
     try {
-      const res = await postRequest(ROUTES.connections.list, {
-        user_id: userId,
+      const res = await queueableJsonRequest({
+        domain: 'Profile',
+        kind: 'profile.connect',
+        method: 'POST',
+        url: ROUTES.connections.list,
+        body: { user_id: userId },
+        dedupeKey: `profile:connect:${userId}`,
       });
       if (res?.success || res?.data || res?.id) {
         const status = res?.data?.status ?? res?.status;

@@ -355,16 +355,25 @@ const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
 
 // Load cached conversations on mount before the API call completes
 useEffect(() => {
-  AsyncStorage.getItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY)).then((raw) => {
-    if (!raw) return;
+  let active = true;
+  AsyncStorage.getItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY)).then(async (raw) => {
     try {
-      const cached = JSON.parse(raw) as Chat[];
+      const cached = raw ? JSON.parse(raw) as Chat[] : [];
       if (Array.isArray(cached) && cached.length > 0) {
-        setConversations((prev) => (prev.length === 0 ? cached : prev));
+        if (active) setConversations((prev) => (prev.length === 0 ? cached : prev));
+        return;
+      }
+      const canonical = await fetchConversationsForCurrentUser(conversationsRef.current, currentUserId ?? undefined);
+      if (active && canonical.length > 0) {
+        setConversations((prev) => (prev.length === 0 ? canonical : prev));
+        AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(canonical)).catch(() => {});
       }
     } catch { /* silent */ }
   }).catch(() => {});
-}, [userScopedCacheKey]);
+  return () => {
+    active = false;
+  };
+}, [currentUserId, userScopedCacheKey]);
 
 useEffect(() => {
   let active = true;
@@ -392,8 +401,11 @@ useEffect(() => {
         setConversations(merged);
       }
       setConversationsLoading(false);
-      // Persist fresh list for offline use
-      AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(merged)).catch(() => {});
+      // Persist fresh list for offline use, but never overwrite a usable
+      // local list with an empty transient backend/offline response.
+      if (merged.length > 0) {
+        AsyncStorage.setItem(userScopedCacheKey(CONVERSATIONS_CACHE_KEY), JSON.stringify(merged)).catch(() => {});
+      }
     }
   })().catch(() => {});
   return () => {

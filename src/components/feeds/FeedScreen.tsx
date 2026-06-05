@@ -29,6 +29,8 @@ import ROUTES, {
   type MediaHeaders,
 } from '@/network';
 import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
+import { queueMediaUpload } from '@/services/mediaTransferQueue';
 import { prepareBroadcastVideoPayload } from './videoAttachmentHelpers';
 import FeedPostActionsSheet from './FeedPostActionsSheet';
 import ShareRenderer, { type SharePayload } from './ShareRenderer';
@@ -177,9 +179,25 @@ const uploadFeedAttachment = async (attachment: any, token: string): Promise<any
     });
     return { ...attachment, ...uploaded };
   } catch (error) {
-    console.warn('[FeedScreen] uploadFeedAttachment failed', error);
-    Alert.alert('Upload failed', 'Unable to upload attachment. Please try again.');
-    return null;
+    console.warn('[FeedScreen] uploadFeedAttachment failed; queueing media upload', error);
+    try {
+      const job = await queueMediaUpload({
+        file,
+        domain: 'Feeds',
+        uploadContext: 'feed',
+        relatedEntityIds: { composer: 'feed' },
+      });
+      return {
+        ...attachment,
+        localUri: job.localUri,
+        localPath: job.localPath,
+        offlineMediaJobId: job.id,
+        uploadStatus: 'queued',
+      };
+    } catch {
+      Alert.alert('Upload failed', 'Unable to prepare attachment for background upload. Please try again.');
+      return null;
+    }
   }
 };
 
@@ -544,11 +562,21 @@ export default function FeedScreen<T extends FeedPost>({
 
       const contextPayload = composerContext ? { [composerContext.key]: composerContext.value } : {};
 
-      const res = await postRequest(
-        composerEndpoint,
-        { ...contextPayload, ...requestPayload },
-        { errorMessage: composerErrorMessage ?? 'Unable to post.' },
-      );
+      const mediaJobIds = Array.isArray((requestPayload as any).attachments)
+        ? (requestPayload as any).attachments
+            .map((item: any) => item?.offlineMediaJobId)
+            .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+        : [];
+
+      const res = await queueableJsonRequest({
+        domain: 'Feeds',
+        kind: 'feed.create_post',
+        method: 'POST',
+        url: composerEndpoint,
+        body: { ...contextPayload, ...requestPayload },
+        mediaJobIds,
+        errorMessage: composerErrorMessage ?? 'Unable to post.',
+      });
       if (res?.success) loadFeed();
     },
     [composerContext, composerEndpoint, composerErrorMessage, loadFeed],
@@ -656,11 +684,16 @@ export default function FeedScreen<T extends FeedPost>({
         [postId]: Math.max(0, (prev[postId] ?? 0) + (nextLiked ? 1 : -1)),
       }));
 
-      const res = await postRequest(
-        reactEndpoint(postId),
-        { emoji: '👍', action: nextLiked ? 'add' : 'remove' },
-        { errorMessage: 'Unable to react.' },
-      );
+      const res = await queueableJsonRequest({
+        domain: 'Feeds',
+        kind: 'feed.react',
+        method: 'POST',
+        url: reactEndpoint(postId),
+        body: { emoji: '👍', action: nextLiked ? 'add' : 'remove' },
+        dedupeKey: `feed:react:${postId}`,
+        replaceExisting: true,
+        errorMessage: 'Unable to react.',
+      });
 
       if (res?.data?.has_reacted !== undefined) {
         setLikedPostIds((prev) => ({ ...prev, [postId]: Boolean(res.data.has_reacted) }));
@@ -760,7 +793,15 @@ export default function FeedScreen<T extends FeedPost>({
 
   const handleDelete = useCallback(
     async (postId: string) => {
-      const res = await postRequest(deleteEndpoint(postId), {}, { errorMessage: 'Unable to delete post.' });
+      const res = await queueableJsonRequest({
+        domain: 'Feeds',
+        kind: 'feed.delete_post',
+        method: 'POST',
+        url: deleteEndpoint(postId),
+        body: {},
+        dedupeKey: `feed:delete:${postId}`,
+        errorMessage: 'Unable to delete post.',
+      });
       if (res?.success) setPosts((prev) => prev.filter((p) => p.id !== postId));
     },
     [deleteEndpoint],
@@ -768,7 +809,15 @@ export default function FeedScreen<T extends FeedPost>({
 
   const handleBroadcast = useCallback(
     async (postId: string) => {
-      const res = await postRequest(broadcastEndpoint(postId), {}, { errorMessage: 'Unable to broadcast post.' });
+      const res = await queueableJsonRequest({
+        domain: 'Feeds',
+        kind: 'feed.broadcast_post',
+        method: 'POST',
+        url: broadcastEndpoint(postId),
+        body: {},
+        dedupeKey: `feed:broadcast:${postId}`,
+        errorMessage: 'Unable to broadcast post.',
+      });
       if (res?.success) Alert.alert('Broadcast', 'Post added to broadcast.');
     },
     [broadcastEndpoint],
@@ -776,20 +825,28 @@ export default function FeedScreen<T extends FeedPost>({
 
   const handleBlockUser = useCallback(async (userId?: string) => {
     if (!userId) return;
-    const res = await postRequest(
-      ROUTES.moderation.userBlocks,
-      { blocked: userId, reason: 'feed_block' },
-      { errorMessage: 'Unable to block user.' },
-    );
+    const res = await queueableJsonRequest({
+      domain: 'Feeds',
+      kind: 'feed.block_user',
+      method: 'POST',
+      url: ROUTES.moderation.userBlocks,
+      body: { blocked: userId, reason: 'feed_block' },
+      dedupeKey: `feed:block:${userId}`,
+      errorMessage: 'Unable to block user.',
+    });
     if (res?.success) setPosts((prev) => prev.filter((p) => p.author?.id !== userId));
   }, []);
 
   const handleReport = useCallback(async (postId: string) => {
-    const res = await postRequest(
-      ROUTES.moderation.flags,
-      { source: 'USER', target_type: 'POST', target_id: postId, reason: 'Reported from feed', severity: 'LOW' },
-      { errorMessage: 'Unable to report post.' },
-    );
+    const res = await queueableJsonRequest({
+      domain: 'Feeds',
+      kind: 'feed.report_post',
+      method: 'POST',
+      url: ROUTES.moderation.flags,
+      body: { source: 'USER', target_type: 'POST', target_id: postId, reason: 'Reported from feed', severity: 'LOW' },
+      dedupeKey: `feed:report:${postId}`,
+      errorMessage: 'Unable to report post.',
+    });
     if (res?.success) Alert.alert('Report', 'Thanks for letting us know.');
   }, []);
 

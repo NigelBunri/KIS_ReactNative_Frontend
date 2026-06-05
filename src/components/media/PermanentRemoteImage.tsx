@@ -11,7 +11,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import RNFS from 'react-native-fs';
 import NetInfo from '@react-native-community/netinfo';
 
 import { KISIcon } from '@/constants/kisIcons';
@@ -20,10 +19,9 @@ import {
   buildPermanentMediaPath,
   fileUriForPath,
   permanentMediaExists,
-  stripFileScheme,
   type PermanentMediaDomain,
 } from '@/storage/permanentMediaStorage';
-import { getAccessToken } from '@/security/authStorage';
+import { getMediaTransferQueue, queueMediaDownload } from '@/services/mediaTransferQueue';
 
 type Props = {
   uri?: string | null;
@@ -106,28 +104,30 @@ export default function PermanentRemoteImage({
     setDownloading(true);
     setProgress(0);
     try {
-      const target = await buildPermanentMediaPath(domain, 'Downloads', cacheName, cacheKey);
-      const token = await getAccessToken().catch(() => null);
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-      const job = RNFS.downloadFile({
-        fromUrl: remoteUri,
-        toFile: target,
-        headers,
-        progressDivider: 1,
-        progress: (event) => {
-          const total = Number(event.contentLength || 0);
-          if (total > 0) {
-            setProgress(Math.min(100, Math.round((event.bytesWritten / total) * 100)));
-          }
-        },
+      const job = await queueMediaDownload({
+        remoteUrl: remoteUri,
+        filename: cacheName,
+        domain,
+        stableKey: cacheKey,
       });
-      const result = await job.promise;
-      if (result.statusCode >= 200 && result.statusCode < 300) {
-        setLocalPath(target);
-      } else {
-        await RNFS.unlink(target).catch(() => {});
-      }
-    } finally {
+      const startedAt = Date.now();
+      const timer = setInterval(async () => {
+        const current = (await getMediaTransferQueue()).find(item => item.id === job.id);
+        if (!current) return;
+        setProgress(Math.min(100, Math.round((current.progress || 0) * 100)));
+        if (current.status === 'completed') {
+          clearInterval(timer);
+          setLocalPath(current.localPath);
+          setDownloading(false);
+        } else if (current.status === 'failed' || current.status === 'cancelled') {
+          clearInterval(timer);
+          setDownloading(false);
+        } else if (Date.now() - startedAt > 10 * 60 * 1000) {
+          clearInterval(timer);
+          setDownloading(false);
+        }
+      }, 800);
+    } catch {
       setDownloading(false);
     }
   }, [cacheKey, cacheName, domain, downloading, remoteUri]);

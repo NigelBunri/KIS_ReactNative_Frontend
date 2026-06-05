@@ -23,7 +23,7 @@ import KISTextInput from '@/constants/KISTextInput';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import EducationRevenuePreviewCard from '@/components/profitability/EducationRevenuePreviewCard';
 import {
@@ -658,16 +658,21 @@ export default function EducationDetailSheet({
     currentModuleId?: string,
   ) => {
     setProgressBusy(true);
-    const response = await postRequest(
-      ROUTES.education.progress,
-      {
+    const response = await queueableJsonRequest({
+      domain: 'Education',
+      kind: 'education.progress',
+      method: 'POST',
+      url: ROUTES.education.progress,
+      body: {
         content_id: content.id,
         action,
         current_item_id: currentItemId,
         current_module_id: currentModuleId,
       },
-      { errorMessage: 'Unable to update learning progress.' },
-    );
+      dedupeKey: `education:progress:${content.id}:${action}:${currentItemId || 'none'}`,
+      replaceExisting: action === 'set_current',
+      errorMessage: 'Unable to update learning progress.',
+    });
     setProgressBusy(false);
     if (!response?.success) {
       Alert.alert(
@@ -787,14 +792,18 @@ export default function EducationDetailSheet({
     if (!content?.institutionId || !viewerBooking?.id) return;
     try {
       setBookingBusy(true);
-      const response = await postRequest(
-        ROUTES.education.bookingSatisfy(
+      const response = await queueableJsonRequest({
+        domain: 'Education',
+        kind: 'education.booking_satisfy',
+        method: 'POST',
+        url: ROUTES.education.bookingSatisfy(
           content.institutionId,
           viewerBooking.id,
         ),
-        {},
-        { errorMessage: 'Unable to confirm satisfaction right now.' },
-      );
+        body: {},
+        dedupeKey: `education:satisfy:${viewerBooking.id}`,
+        errorMessage: 'Unable to confirm satisfaction right now.',
+      });
       if (!response?.success) {
         throw new Error(
           response?.message || 'Unable to confirm satisfaction right now.',
@@ -822,11 +831,15 @@ export default function EducationDetailSheet({
   ) => {
     if (!selectedItem) return;
     setProgressBusy(true);
-    const response = await postRequest(
-      ROUTES.education.itemAction(content.id, selectedItem.id),
-      { action, submission_id: assessmentSubmission?.id, ...payload },
-      { errorMessage: 'Unable to complete this learning action.' },
-    );
+    const response = await queueableJsonRequest({
+      domain: 'Education',
+      kind: 'education.item_action',
+      method: 'POST',
+      url: ROUTES.education.itemAction(content.id, selectedItem.id),
+      body: { action, submission_id: assessmentSubmission?.id, ...payload },
+      dedupeKey: `education:item-action:${content.id}:${selectedItem.id}:${action}`,
+      errorMessage: 'Unable to complete this learning action.',
+    });
     setProgressBusy(false);
     if (!response?.success) {
       Alert.alert(

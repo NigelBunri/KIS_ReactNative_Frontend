@@ -8,6 +8,7 @@ import {
   readOfflineStructuredCache,
   writeOfflineStructuredCache,
 } from '@/storage/offlineStructuredCache';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import { putData as putRequest } from '@/network/put';
 import { emitMainTabBadgeRefresh } from '@/services/mainTabNotificationBadges';
 import {
@@ -230,7 +231,16 @@ export const fetchChannelContentDetail = async (contentId: string): Promise<Broa
 };
 
 export const toggleChannelSubscription = async (channelId: string, subscribe: boolean) => {
-  const response = await postRequest(channelSubscribeEndpoint(channelId), { subscribe }, { errorMessage: 'Unable to update subscription.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.subscription',
+    method: 'POST',
+    url: channelSubscribeEndpoint(channelId),
+    body: { subscribe },
+    dedupeKey: `channel:subscribe:${channelId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to update subscription.',
+  });
   if (response?.success) emitMainTabBadgeRefresh('channel_subscription_updated');
   return response;
 };
@@ -264,37 +274,94 @@ export const fetchChannelComments = async (contentId: string, sort = 'new'): Pro
 };
 
 export const postChannelComment = async (contentId: string, body: string) => {
-  const response = await postRequest(channelContentCommentsEndpoint(contentId), { body }, { errorMessage: 'Unable to post comment.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.comment',
+    method: 'POST',
+    url: channelContentCommentsEndpoint(contentId),
+    body: { body },
+    errorMessage: 'Unable to post comment.',
+  });
   return response?.success ? { comment: normalizeChannelComment(response.data), data: response.data } : null;
 };
 
 export const reactToChannelContent = async (contentId: string, reaction = 'like') => {
-  const response = await postRequest(channelContentReactEndpoint(contentId), { reaction }, { errorMessage: 'Unable to react.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_react',
+    method: 'POST',
+    url: channelContentReactEndpoint(contentId),
+    body: { reaction },
+    dedupeKey: `channel:content-react:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to react.',
+  });
   return response?.success ? response.data : null;
 };
 
 export const removeChannelContentReaction = async (contentId: string) => {
-  const response = await deleteRequest(channelContentReactEndpoint(contentId), { errorMessage: 'Unable to remove reaction.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_unreact',
+    method: 'DELETE',
+    url: channelContentReactEndpoint(contentId),
+    dedupeKey: `channel:content-react:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to remove reaction.',
+  });
   return response?.success ? response.data : null;
 };
 
 export const saveChannelContent = async (contentId: string) => {
-  const response = await postRequest(channelContentSaveEndpoint(contentId), {}, { errorMessage: 'Unable to save content.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_save',
+    method: 'POST',
+    url: channelContentSaveEndpoint(contentId),
+    body: {},
+    dedupeKey: `channel:content-save:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to save content.',
+  });
   return response?.success ? response.data : null;
 };
 
 export const removeSavedChannelContent = async (contentId: string) => {
-  const response = await deleteRequest(channelContentSaveEndpoint(contentId), { errorMessage: 'Unable to remove saved content.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_unsave',
+    method: 'DELETE',
+    url: channelContentSaveEndpoint(contentId),
+    dedupeKey: `channel:content-save:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to remove saved content.',
+  });
   return response?.success ? response.data : null;
 };
 
 export const shareChannelContent = async (contentId: string, completed = true) => {
-  const response = await postRequest(channelContentShareEndpoint(contentId), { completed }, { errorMessage: 'Unable to record share.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_share',
+    method: 'POST',
+    url: channelContentShareEndpoint(contentId),
+    body: { completed },
+    errorMessage: 'Unable to record share.',
+  });
   return response?.success ? response.data : null;
 };
 
 export const recordChannelContentView = async (contentId: string, payload: Record<string, any> = {}) => {
-  const response = await postRequest(channelContentViewEndpoint(contentId), payload, { errorMessage: 'Unable to record view.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.content_view',
+    method: 'POST',
+    url: channelContentViewEndpoint(contentId),
+    body: payload,
+    dedupeKey: `channel:content-view:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to record view.',
+  });
   if (response?.success) emitMainTabBadgeRefresh('channel_content_viewed');
   return response?.success ? response.data : null;
 };
@@ -389,12 +456,28 @@ export const pinChannelComment = async (commentId: string, pin: boolean) => {
 };
 
 export const postChannelCommentReply = async (contentId: string, body: string, parentId: string) => {
-  const response = await postRequest(channelContentCommentsEndpoint(contentId), { body, parent: parentId }, { errorMessage: 'Unable to post reply.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.comment_reply',
+    method: 'POST',
+    url: channelContentCommentsEndpoint(contentId),
+    body: { body, parent: parentId },
+    errorMessage: 'Unable to post reply.',
+  });
   return response?.success ? { comment: normalizeChannelComment(response.data), data: response.data } : null;
 };
 
 export const recordWatchHistory = async (contentId: string, payload: Record<string, any> = {}) => {
-  const response = await postRequest(watchHistoryEndpoint, { content_id: contentId, ...payload }, { errorMessage: 'Unable to record watch history.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.watch_history',
+    method: 'POST',
+    url: watchHistoryEndpoint,
+    body: { content_id: contentId, ...payload },
+    dedupeKey: `channel:watch-history:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to record watch history.',
+  });
   return response?.success ? response.data : null;
 };
 
@@ -436,7 +519,15 @@ export const shareChannelClip = async (clipId: string, platform = 'app') => {
 };
 
 export const removeFromWatchHistory = async (contentId: string) => {
-  const response = await deleteRequest(`${watchHistoryEndpoint}?content_id=${contentId}`, { errorMessage: 'Unable to remove from history.' });
+  const response = await queueableJsonRequest({
+    domain: 'Broadcast',
+    kind: 'channel.watch_history_remove',
+    method: 'DELETE',
+    url: `${watchHistoryEndpoint}?content_id=${contentId}`,
+    dedupeKey: `channel:watch-history:${contentId}`,
+    replaceExisting: true,
+    errorMessage: 'Unable to remove from history.',
+  });
   return response?.success;
 };
 
@@ -610,7 +701,16 @@ export const fetchWatchHistorySettings = async (): Promise<{ is_paused: boolean 
   }
 };
 export const updateWatchHistorySettings = async (isPaused: boolean) => {
-  const response = await patchRequest(watchHistorySettingsEndpoint, { is_paused: isPaused }, { errorMessage: 'Unable to update history settings.' });
+  const response = await queueableJsonRequest({
+    domain: 'Settings',
+    kind: 'settings.watch_history',
+    method: 'PATCH',
+    url: watchHistorySettingsEndpoint,
+    body: { is_paused: isPaused },
+    dedupeKey: 'settings:watch-history',
+    replaceExisting: true,
+    errorMessage: 'Unable to update history settings.',
+  });
   if (response?.success) {
     await writeOfflineStructuredCache(offlineStructuredCacheKey('settings', 'watch-history'), { is_paused: isPaused });
   }

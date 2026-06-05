@@ -36,6 +36,8 @@ import {
   type PermissionStatus,
 } from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
+import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
 
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -226,6 +228,15 @@ function AppContent() {
   );
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+
+  useEffect(() => {
+    startOfflineActionQueue();
+    startMediaTransferQueue();
+    return () => {
+      stopMediaTransferQueue();
+      stopOfflineActionQueue();
+    };
+  }, []);
 
   const syncLocationCountry = useCallback(
     async (requestPermission: boolean = false) => {

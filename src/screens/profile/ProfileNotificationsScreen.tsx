@@ -13,7 +13,7 @@ import {
 } from '@/services/inAppNotificationService';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import { getRequest } from '@/network/get';
-import { patchRequest } from '@/network/patch';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import ROUTES from '@/network';
 
 type NotificationRule = {
@@ -66,7 +66,15 @@ function NotificationPreferencesPanel() {
     const newEnabled = !rule.enabled;
     setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: newEnabled } : r));
     try {
-      await patchRequest(ROUTES.notificationRules.detail(rule.id), { enabled: newEnabled }, {});
+      await queueableJsonRequest({
+        domain: 'Settings',
+        kind: 'settings.notification_rule',
+        method: 'PATCH',
+        url: ROUTES.notificationRules.detail(rule.id),
+        body: { enabled: newEnabled },
+        dedupeKey: `settings:notification-rule:${rule.id}`,
+        replaceExisting: true,
+      });
     } catch {
       setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: rule.enabled } : r));
     } finally {

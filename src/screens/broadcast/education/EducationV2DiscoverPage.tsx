@@ -16,7 +16,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
-import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import { getRequest } from '@/network/get';
 import EducationContentCard from '@/screens/broadcast/education/components/EducationContentCard';
 import EducationContinueLearning from '@/screens/broadcast/education/components/EducationContinueLearning';
@@ -346,13 +346,15 @@ export default function EducationV2DiscoverPage({
     async (item: EducationContentItem) => {
       setPaymentState('processing');
       setReceiptUrl(null);
-      const response = await postRequest(
-        ROUTES.education.enroll(item.id),
-        {},
-        {
-          errorMessage: 'Unable to complete this education action.',
-        },
-      );
+      const response = await queueableJsonRequest({
+        domain: 'Education',
+        kind: 'education.enroll',
+        method: 'POST',
+        url: ROUTES.education.enroll(item.id),
+        body: {},
+        dedupeKey: `education:enroll:${item.id}`,
+        errorMessage: 'Unable to complete this education action.',
+      });
       if (!response?.success) {
         setPaymentState('error');
         Alert.alert(

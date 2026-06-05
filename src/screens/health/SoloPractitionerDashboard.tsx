@@ -21,6 +21,7 @@ import { getHealthThemeColors, HEALTH_THEME_SPACING } from '@/theme/health';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import ROUTES from '@/network';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -318,11 +319,16 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
   const setAvailability = useCallback(async (status: 'online' | 'busy' | 'offline') => {
     setProfile((prev) => ({ ...prev, availabilityStatus: status }));
     try {
-      await patchRequest(
-        ROUTES.core.profiles,
-        { availability_status: status },
-        { errorMessage: '' },
-      );
+      await queueableJsonRequest({
+        domain: 'Healthcare',
+        kind: 'healthcare.availability_status',
+        method: 'PATCH',
+        url: ROUTES.core.profiles,
+        body: { availability_status: status },
+        dedupeKey: 'healthcare:availability-status',
+        replaceExisting: true,
+        errorMessage: '',
+      });
     } catch (_) {}
   }, []);
 

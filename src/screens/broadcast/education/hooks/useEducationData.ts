@@ -3,7 +3,7 @@ import { DeviceEventEmitter } from 'react-native';
 
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import {
   EducationCourse,
   EducationHomePayload,
@@ -165,7 +165,13 @@ export default function useEducationData({ q = '', activeProfileId = null }: Par
   }, [q, activeProfileId]);
 
   const enrollLesson = useCallback(async (lessonId: string) => {
-    const res = await postRequest(ROUTES.broadcasts.lessonEnroll(lessonId), {}, {
+    const res = await queueableJsonRequest({
+      domain: 'Education',
+      kind: 'education.lesson_enroll',
+      method: 'POST',
+      url: ROUTES.broadcasts.lessonEnroll(lessonId),
+      body: {},
+      dedupeKey: `education:lesson-enroll:${lessonId}`,
       errorMessage: 'Unable to enroll in lesson.',
     });
     if (res?.success === false) return { ok: false };

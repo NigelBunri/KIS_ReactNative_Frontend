@@ -11,6 +11,8 @@ import {
   getPermanentMediaUsage,
   type PermanentMediaDomainUsage,
 } from '@/storage/permanentMediaStorage';
+import { getMediaTransferSummary, clearCompletedMediaTransfers, type MediaTransferSummary } from '@/services/mediaTransferQueue';
+import { getOfflineActionQueue } from '@/services/offlineActionQueue';
 
 export default function CacheManagementScreen() {
   const { palette } = useKISTheme();
@@ -18,13 +20,22 @@ export default function CacheManagementScreen() {
   const [rows, setRows] = useState<PermanentMediaDomainUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState<string | null>(null);
+  const [mediaQueue, setMediaQueue] = useState<MediaTransferSummary | null>(null);
+  const [actionQueueCount, setActionQueueCount] = useState(0);
 
   const totalBytes = useMemo(() => rows.reduce((sum, row) => sum + row.bytes, 0), [rows]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await getPermanentMediaUsage());
+      const [usage, transferSummary, actionQueue] = await Promise.all([
+        getPermanentMediaUsage(),
+        getMediaTransferSummary(),
+        getOfflineActionQueue(),
+      ]);
+      setRows(usage);
+      setMediaQueue(transferSummary);
+      setActionQueueCount(actionQueue.length);
     } finally {
       setLoading(false);
     }
@@ -72,6 +83,37 @@ export default function CacheManagementScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: palette.divider,
+              backgroundColor: palette.surface,
+              borderRadius: 14,
+              padding: 14,
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Sync queues</Text>
+            <Text style={{ color: palette.subtext, fontWeight: '700' }}>
+              Media: {mediaQueue?.queued ?? 0} queued, {mediaQueue?.running ?? 0} running, {mediaQueue?.failed ?? 0} failed
+            </Text>
+            <Text style={{ color: palette.subtext, fontWeight: '700' }}>
+              Actions: {actionQueueCount} waiting to sync
+            </Text>
+            <Pressable
+              onPress={() => clearCompletedMediaTransfers().then(load)}
+              style={{
+                alignSelf: 'flex-start',
+                borderWidth: 1,
+                borderColor: palette.primary,
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
+            >
+              <Text style={{ color: palette.primary, fontWeight: '900' }}>Clear completed transfers</Text>
+            </Pressable>
+          </View>
           {rows.map((row) => (
             <View
               key={row.domain}

@@ -29,6 +29,7 @@ import {
   writeOfflineStructuredCache,
   type OfflineCacheMeta,
 } from '@/storage/offlineStructuredCache';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 
 type Params = {
   ownerId?: string | null;
@@ -154,11 +155,15 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
 
   const joinShop = useCallback(
     async (shopId: string) => {
-      const res = await postRequest(
-        MARKET_JOIN_SHOP_ENDPOINT(shopId),
-        {},
-        { errorMessage: 'Unable to join shop.' },
-      );
+      const res = await queueableJsonRequest({
+        domain: 'Market',
+        kind: 'market.join_shop',
+        method: 'POST',
+        url: MARKET_JOIN_SHOP_ENDPOINT(shopId),
+        body: {},
+        dedupeKey: `market:join-shop:${shopId}`,
+        errorMessage: 'Unable to join shop.',
+      });
       if (res?.success === false) return { ok: false };
       DeviceEventEmitter.emit('broadcast.refresh');
       await reloadAll();
@@ -169,11 +174,15 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
 
   const subscribeProduct = useCallback(
     async (productId: string) => {
-      const res = await postRequest(
-        MARKET_SUBSCRIBE_PRODUCT_ENDPOINT(productId),
-        {},
-        { errorMessage: 'Unable to subscribe.' },
-      );
+      const res = await queueableJsonRequest({
+        domain: 'Market',
+        kind: 'market.subscribe_product',
+        method: 'POST',
+        url: MARKET_SUBSCRIBE_PRODUCT_ENDPOINT(productId),
+        body: {},
+        dedupeKey: `market:subscribe-product:${productId}`,
+        errorMessage: 'Unable to subscribe.',
+      });
       if (res?.success === false) return { ok: false };
       await reloadAll();
       return { ok: true };
@@ -183,11 +192,15 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
 
   const broadcastProduct = useCallback(
     async (productId: string) => {
-      const res = await postRequest(
-        MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
-        {},
-        { errorMessage: 'Unable to broadcast product.' },
-      );
+      const res = await queueableJsonRequest({
+        domain: 'Market',
+        kind: 'market.broadcast_product',
+        method: 'POST',
+        url: MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
+        body: {},
+        dedupeKey: `market:broadcast-product:${productId}`,
+        errorMessage: 'Unable to broadcast product.',
+      });
       if (res?.success === false) return { ok: false };
       await reloadAll();
       DeviceEventEmitter.emit('broadcast.refresh');
@@ -198,10 +211,15 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
 
   const unpublishProduct = useCallback(
     async (productId: string) => {
-      const res = await deleteRequest(
-        MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
-        { errorMessage: 'Unable to remove broadcast.' },
-      );
+      const res = await queueableJsonRequest({
+        domain: 'Market',
+        kind: 'market.unbroadcast_product',
+        method: 'DELETE',
+        url: MARKET_BROADCAST_PRODUCT_ENDPOINT(productId),
+        dedupeKey: `market:broadcast-product:${productId}`,
+        replaceExisting: true,
+        errorMessage: 'Unable to remove broadcast.',
+      });
       if (res?.success === false) return { ok: false };
       await reloadAll();
       DeviceEventEmitter.emit('broadcast.refresh');

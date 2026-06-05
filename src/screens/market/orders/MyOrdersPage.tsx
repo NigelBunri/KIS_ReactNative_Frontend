@@ -15,8 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { deleteRequest } from '@/network/delete';
-import { postRequest } from '@/network/post';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import RNFS from 'react-native-fs';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
@@ -103,10 +102,15 @@ export default function MyOrdersPage() {
     ) => {
       setActionLoading(prev => ({ ...prev, [orderId]: key }));
       try {
-        const response =
-          method === 'post'
-            ? await postRequest(endpoint, undefined, { errorMessage: message })
-            : await deleteRequest(endpoint, { errorMessage: message });
+        const response = await queueableJsonRequest({
+          domain: 'Market',
+          kind: `market.order.${key}`,
+          method: method === 'post' ? 'POST' : 'DELETE',
+          url: endpoint,
+          body: method === 'post' ? undefined : undefined,
+          dedupeKey: `market:order:${orderId}:${key}`,
+          errorMessage: message,
+        });
         if (!response.success) {
           throw new Error(response.message || message);
         }

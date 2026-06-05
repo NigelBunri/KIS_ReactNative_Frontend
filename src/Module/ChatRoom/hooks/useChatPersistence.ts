@@ -500,7 +500,6 @@ export function useChatPersistence(
     let mounted = true;
 
     setIsLoading(true);
-    setMessages([]);
 
     (async () => {
       try {
@@ -530,7 +529,6 @@ export function useChatPersistence(
         }
       } catch (err) {
         console.warn('[useChatPersistence] load error', err);
-        setMessages([]);
       } finally {
         if (mounted) setIsLoading(false);
       }

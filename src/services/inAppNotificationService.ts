@@ -2,13 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
-import { deleteRequest } from '@/network/delete';
 import {
   offlineStructuredCacheKey,
   readOfflineStructuredCache,
   writeOfflineStructuredCache,
 } from '@/storage/offlineStructuredCache';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 
 const IN_APP_NOTIFICATIONS_KEY = 'kis_in_app_notifications_v1';
 const AVAILABILITY_REMINDERS_KEY = 'kis_availability_reminders_v1';
@@ -156,7 +155,14 @@ export const fetchUnreadInAppNotificationsCount = async (): Promise<number> => {
 
 export const markInAppNotificationAsRead = async (notificationId: string) => {
   if (!isLocalNotification(notificationId)) {
-    const res = await postRequest(`${ROUTES.notifications.notifications}${notificationId}/mark_read/`, {});
+    const res = await queueableJsonRequest({
+      domain: 'Notifications',
+      kind: 'notifications.mark_read',
+      method: 'POST',
+      url: `${ROUTES.notifications.notifications}${notificationId}/mark_read/`,
+      body: {},
+      dedupeKey: `notifications:read:${notificationId}`,
+    });
     if (!res?.success) throw new Error(res?.message || 'Unable to mark notification as read.');
     emitUpdated();
     return;
@@ -176,7 +182,13 @@ export const markInAppNotificationAsRead = async (notificationId: string) => {
 
 export const deleteInAppNotification = async (notificationId: string) => {
   if (!isLocalNotification(notificationId)) {
-    const res = await deleteRequest(`${ROUTES.notifications.notifications}${notificationId}/`);
+    const res = await queueableJsonRequest({
+      domain: 'Notifications',
+      kind: 'notifications.delete',
+      method: 'DELETE',
+      url: `${ROUTES.notifications.notifications}${notificationId}/`,
+      dedupeKey: `notifications:delete:${notificationId}`,
+    });
     if (!res?.success) {
       throw new Error(res?.message || 'Unable to delete notification.');
     }
