@@ -67,7 +67,7 @@ export default function BibleScreen() {
       { key: 'meditations', label: 'Meditations', icon: 'sparkles' },
       { key: 'prayer-calendar', label: 'Prayer Calendar', icon: 'heart' },
       { key: 'reading-planner', label: 'Reading Planner', icon: 'list' },
-      { key: 'lessons', label: 'Lessons', icon: 'layers' },
+      { key: 'discipleship', label: 'Discipleship', icon: 'layers' },
       { key: 'books', label: 'Books', icon: 'library' },
       { key: 'messages', label: 'Messages', icon: 'videocam' },
       { key: 'settings', label: 'Settings', icon: 'settings' },

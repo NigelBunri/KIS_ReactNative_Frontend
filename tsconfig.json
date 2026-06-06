@@ -9,11 +9,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/src/*": ["src/*"],
-      "@/SocketProvider": ["SocketProvider.tsx"]
+      "@/*": ["./src/*"],
+      "@/src/*": ["./src/*"],
+      "@/SocketProvider": ["./SocketProvider.tsx"]
     },
     "resolveJsonModule": true
   },

@@ -230,7 +230,7 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
     { key: 'meditations', label: '🧘 Meditations' },
     { key: 'prayer', label: '🙏 Prayer Calendar' },
     { key: 'plans', label: '🗺 Reading Plans' },
-    { key: 'lessons', label: '🎓 Bible Lessons' },
+    { key: 'discipleship', label: '🎓 Discipleship' },
     { key: 'books', label: '📚 Books Library' },
     { key: 'community', label: '💬 Prayer Requests' },
   ];

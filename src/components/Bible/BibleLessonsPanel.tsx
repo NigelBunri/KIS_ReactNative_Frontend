@@ -209,7 +209,7 @@ export default function BibleLessonsPanel() {
       <BibleSectionCard>
         <View style={[styles.headerRow, compact && styles.wrapRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Lessons</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22 }]}>Discipleship</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
               KCAN foundational lessons for discipleship and biblical growth.
             </Text>
