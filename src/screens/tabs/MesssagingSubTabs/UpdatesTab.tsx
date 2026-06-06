@@ -45,6 +45,7 @@ type StatusItem = {
   durationMs?: number;
   viewed?: boolean;
   visibility?: StatusVisibility;
+  audienceUserIds?: string[];
   replyPermission?: StatusReplyPermission;
   replyAllowed?: boolean;
   style?: {
@@ -95,6 +96,51 @@ const STATUS_FONT_FAMILIES = [
   'Times New Roman',
   'Courier New',
 ];
+
+
+const normalizeAudienceIds = (value: any): string[] => {
+  if (!value) return [];
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+    ? (() => {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : value.split(',');
+        } catch {
+          return value.split(',');
+        }
+      })()
+    : [];
+  return Array.from(
+    new Set(
+      source
+        .map(item => String(item ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
+const appendStatusAudienceFields = (
+  form: FormData,
+  visibility: StatusVisibility,
+  userIds: string[],
+) => {
+  const normalized = normalizeAudienceIds(userIds);
+  form.append('visibility', visibility);
+  form.append('audience_mode', visibility);
+  if (visibility === 'contacts' || normalized.length === 0) return;
+
+  const serialized = JSON.stringify(normalized);
+  form.append('target_user_ids', serialized);
+  if (visibility === 'contacts_except') {
+    form.append('excluded_user_ids', serialized);
+    form.append('except_user_ids', serialized);
+  } else if (visibility === 'only_share_with') {
+    form.append('allowed_user_ids', serialized);
+    form.append('only_user_ids', serialized);
+  }
+};
 
 type UpdatesTabProps = {
   searchTerm?: string;
@@ -321,6 +367,12 @@ export default function UpdatesTab({
                   style: item.style ?? undefined,
                   viewed: Boolean(item.viewed),
                   visibility: item.visibility ?? 'contacts',
+                  audienceUserIds: normalizeAudienceIds(
+                    item.audience_user_ids ??
+                      item.target_user_ids ??
+                      item.allowed_user_ids ??
+                      item.excluded_user_ids,
+                  ),
                   replyPermission: item.reply_permission ?? 'contacts',
                   replyAllowed: Boolean(item.reply_allowed),
                 }))
@@ -1488,14 +1540,12 @@ export default function UpdatesTab({
                     form.append('type', statusDraftType);
                     form.append('text', statusDraftText.trim());
                     form.append('style', JSON.stringify(statusDraftStyle));
-                    form.append('visibility', statusDraftVisibility);
+                    appendStatusAudienceFields(
+                      form,
+                      statusDraftVisibility,
+                      statusDraftTargetUserIds,
+                    );
                     form.append('reply_permission', statusDraftReplyPermission);
-                    if (statusDraftTargetUserIds.length > 0) {
-                      form.append(
-                        'target_user_ids',
-                        JSON.stringify(statusDraftTargetUserIds),
-                      );
-                    }
                     const res = await postRequest(
                       ROUTES.statuses.create,
                       form,
@@ -1548,17 +1598,15 @@ export default function UpdatesTab({
                           String(Math.round(durationMs)),
                         );
                       }
-                      form.append('visibility', statusDraftVisibility);
+                      appendStatusAudienceFields(
+                        form,
+                        statusDraftVisibility,
+                        statusDraftTargetUserIds,
+                      );
                       form.append(
                         'reply_permission',
                         statusDraftReplyPermission,
                       );
-                      if (statusDraftTargetUserIds.length > 0) {
-                        form.append(
-                          'target_user_ids',
-                          JSON.stringify(statusDraftTargetUserIds),
-                        );
-                      }
                       const res = await postRequest(
                         ROUTES.statuses.create,
                         form,

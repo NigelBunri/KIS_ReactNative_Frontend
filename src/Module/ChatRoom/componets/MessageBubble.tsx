@@ -1112,17 +1112,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const bubbleWidthRatio = responsive.isTablet ? 0.68 : responsive.isWatch ? 0.92 : responsive.isCompactPhone ? 0.88 : 0.8;
     const gridGap = 6;
     const gridOuterWidth = Math.max(220, Math.floor(width * bubbleWidthRatio) - (bubblePaddingX * 2));
-    const gridItemWidth = attachments.length > 1
-      ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
-      : Math.min(220, gridOuterWidth);
     const gridItemHight = attachments.length > 1
       ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
       : Math.min(220, gridOuterWidth);
     const gridItemWidth2 = attachments.length > 1
       ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2.11))
       : "100%";
-    const pdfTileHeight = Math.max(170, Math.floor(gridItemWidth * 1.25));
-    const videoTileHeight = Math.max(96, Math.floor(gridItemWidth * 0.68));
 
     return (
       <View
@@ -1238,8 +1233,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Pressable
                 key={key}
                 style={{
-                  width: gridItemWidth,
-                  height: pdfTileHeight,
+                  width: gridItemWidth2,
+                  height: gridItemHight,
                   borderRadius: 18,
                   overflow: 'hidden',
                   marginHorizontal: 0,
@@ -1322,8 +1317,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Pressable
                 key={key}
                 style={{
-                  width: gridItemWidth,
-                  height: videoTileHeight,
+                  width: gridItemWidth2,
+                  height: gridItemHight,
                   borderRadius: 18,
                   overflow: 'hidden',
                   marginHorizontal: 0,
@@ -1367,7 +1362,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  width: attachments.length > 1 ? gridItemWidth : Math.min(300, gridOuterWidth),
+                  width: gridItemWidth2,
+                  height: gridItemHight,
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   marginHorizontal: 0,
@@ -1406,7 +1402,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               style={{
                 flexDirection: 'row',
                 alignItems: 'flex-start',
-                width: attachments.length > 1 ? gridItemWidth : Math.min(340, gridOuterWidth),
+               width: gridItemWidth2,
+                  height: gridItemHight,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 marginHorizontal: 0,

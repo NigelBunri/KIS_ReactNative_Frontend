@@ -108,7 +108,8 @@ import { initPushHandlers } from './src/push/notifications';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
-import { getAccessToken } from './src/security/authStorage';
+import { getAccessToken, getRefreshToken } from './src/security/authStorage';
+import { refreshAccessToken } from './src/security/tokenRefresh';
 import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
@@ -118,7 +119,6 @@ import {
   DEFAULT_CALLING_CODE,
   DEFAULT_COUNTRY_ISO,
   LocationCountryError,
-  callingCodeForCountry,
   resolveLocationCountry,
   wasLocationPermissionEverGranted,
   getLastCachedLocationCountry,
@@ -200,7 +200,7 @@ const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
 
 function AppContent() {
-  const { language, languageVersion } = useLanguage();
+  const { languageVersion } = useLanguage();
   const scheme = useColorScheme();
   const [booting, setBooting] = useState(true);
 
@@ -223,7 +223,7 @@ function AppContent() {
   const [locationStatus, setLocationStatus] = useState<PermissionStatus | null>(
     null,
   );
-  const [locationError, setLocationError] = useState(
+  const [_locationError, setLocationError] = useState(
     'Location access is required to use KIS.',
   );
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -364,7 +364,8 @@ function AppContent() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const token = await getAccessToken();
+      let token = await getAccessToken();
+      const refreshToken = await getRefreshToken();
       const storedPhone = await AsyncStorage.getItem('user_phone');
       const netState = await NetInfo.fetch().catch(() => null);
       const online = !!(netState?.isConnected && netState.isInternetReachable !== false);
@@ -373,9 +374,21 @@ function AppContent() {
 
       setPhone(storedPhone);
 
-      if (!token) {
+      if (!token && refreshToken) {
+        token = await refreshAccessToken();
+      }
+
+      if (!token && !refreshToken) {
         setUser(null);
         setAuth(false);
+        return;
+      }
+
+      if (!token && refreshToken) {
+        // Refresh may fail during a transient network/backend issue. A stored
+        // refresh token means the user has not intentionally logged out, so do
+        // not show Welcome just because startup could not refresh immediately.
+        setAuth(true);
         return;
       }
 
@@ -433,8 +446,7 @@ function AppContent() {
               (u as any)?.phone_number ||
               '';
             setPendingVerificationPhone(pendingPhone);
-            setUser(null);
-            setAuth(false);
+            setAuth(true);
             return;
           }
           setUser(u);
@@ -451,8 +463,10 @@ function AppContent() {
           setUser(u);
           setAuth(true);
         } else {
-          setUser(null);
-          setAuth(false);
+          // A failed status check must not eject an existing local session.
+          // Django token lifetime / refresh-token expiry is the real logout gate.
+          setUser(u ?? null);
+          setAuth(true);
         }
       } catch (networkErr: any) {
         console.log('[checkAuth] network error:', networkErr?.message);
@@ -462,8 +476,9 @@ function AppContent() {
     } catch (e: any) {
       console.log('[checkAuth] outer error:', e?.message);
       const token = await getAccessToken().catch(() => null);
+      const refreshToken = await getRefreshToken().catch(() => null);
       setUser(null);
-      setAuth(!!token);
+      setAuth(!!(token || refreshToken));
     }
   }, []);
 

@@ -32,7 +32,8 @@ import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 // NEW: consume app-wide auth context (optional but nice to keep in sync)
 import { useAuth } from '../../App';
-import { getAccessToken } from '@/security/authStorage';
+import { getAccessToken, getRefreshToken } from '@/security/authStorage';
+import { refreshAccessToken } from '@/security/tokenRefresh';
 
 const PRIVACY_URL = 'https://christiancommunit.netlify.app';
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
@@ -127,11 +128,19 @@ export default function WelcomeScreen() {
     loginCheckInFlightRef.current = true;
     lastLoginCheckAtRef.current = now;
     try {
-      const token = await getAccessToken();
+      let token = await getAccessToken();
+      const refreshToken = await getRefreshToken();
       const storedPhone = await AsyncStorage.getItem('user_phone');
       if (storedPhone) setPhone?.(storedPhone);
 
-      if (!token) return; // not logged in locally
+      if (!token && refreshToken) {
+        token = await refreshAccessToken();
+      }
+      if (!token && !refreshToken) return; // not logged in locally
+      if (!token && refreshToken) {
+        setAuth?.(true);
+        return;
+      }
       const netState = await NetInfo.fetch().catch(() => null);
       const online = !!(netState?.isConnected && netState.isInternetReachable !== false);
       if (!online) {
@@ -153,26 +162,16 @@ export default function WelcomeScreen() {
         }
         // Only explicit auth failures should log out. Network/cache failures
         // with a local token should keep the user inside the app.
-        if (Number(res?.status) === 401 || Number(res?.status) === 403) {
-          setAuth?.(false);
-        } else {
-          setAuth?.(true);
-        }
+        setAuth?.(true);
         return;
       }
 
-      const u = res?.data?.user ?? res?.data ?? {};
-      const active = res?.success && (u.is_active || u.status === 'active');
-
-      if (active) {
-        setAuth?.(true); // App.tsx will switch navigator branch to MainTabs
-      } else {
-        setAuth?.(false);
-      }
+      setAuth?.(true); // App.tsx will switch navigator branch to MainTabs
     } catch {
       // Offline/network failure with a local token should not log out the user.
       const token = await getAccessToken().catch(() => null);
-      if (token) setAuth?.(true);
+      const refreshToken = await getRefreshToken().catch(() => null);
+      if (token || refreshToken) setAuth?.(true);
     } finally {
       loginCheckInFlightRef.current = false;
     }
