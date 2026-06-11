@@ -380,11 +380,14 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     try {
       const conversationId =
         group?.conversation_id ?? group?.conversationId ?? group?.conversation?.id ?? group?.conversation;
+      if (!conversationId) {
+        throw new Error('Django did not return a backing chat conversation.');
+      }
       const baseChat = normalizeConversation(group?.conversation ?? group);
       const chat: Chat = {
         ...baseChat,
-        id: conversationId ? String(conversationId) : baseChat.id,
-        conversationId: conversationId ? String(conversationId) : baseChat.conversationId,
+        id: String(conversationId),
+        conversationId: String(conversationId),
         isGroup: true,
         isGroupChat: true,
         kind: baseChat.kind ?? 'group',
@@ -396,8 +399,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
       DeviceEventEmitter.emit('conversation.refresh');
       if (group?.partner) DeviceEventEmitter.emit('partner.data.refresh');
       setTimeout(() => onOpenChat(chat), 150);
-    } catch {
-      Alert.alert('Error', 'Group was created, but we could not open the conversation.');
+    } catch (caughtError: any) {
+      Alert.alert(
+        'Group chat unavailable',
+        caughtError?.message || 'Group was created, but Django did not create its chat conversation.',
+      );
     }
   };
 
@@ -407,11 +413,14 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
         community?.main_conversation_id ?? community?.mainConversationId ??
         community?.conversation_id ?? community?.conversationId ??
         community?.conversation?.id ?? community?.conversation;
+      if (!conversationId) {
+        throw new Error('Django did not return a backing community conversation.');
+      }
       const baseChat = normalizeConversation(community?.conversation ?? community);
       const chat: Chat = {
         ...baseChat,
-        id: conversationId ? String(conversationId) : baseChat.id,
-        conversationId: conversationId ? String(conversationId) : baseChat.conversationId,
+        id: String(conversationId),
+        conversationId: String(conversationId),
         isGroup: false,
         isGroupChat: false,
         isCommunityChat: true,
@@ -425,8 +434,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
       DeviceEventEmitter.emit('community.refresh');
       if (community?.partner) DeviceEventEmitter.emit('partner.data.refresh');
       setTimeout(() => onOpenChat(chat), 150);
-    } catch {
-      Alert.alert('Error', 'Community was created, but we could not open the conversation.');
+    } catch (caughtError: any) {
+      Alert.alert(
+        'Community chat unavailable',
+        caughtError?.message || 'Community was created without its chat conversation.',
+      );
     }
   };
 

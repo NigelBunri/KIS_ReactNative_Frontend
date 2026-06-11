@@ -4,8 +4,10 @@ import apiService from '../../services/apiService';
 import { setCache } from '../cache';
 import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
-import { getAccessToken } from '@/security/authStorage';
-import { refreshAccessToken } from '@/security/tokenRefresh';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 const MAX_POST_RETRIES = 2;
@@ -52,6 +54,13 @@ const sanitizeFileData = (obj: any): any => {
   return obj;
 };
 
+/**
+ * Generate a stable idempotency key for a namespace.
+ * Reuse the same key on retries to let the server deduplicate.
+ */
+export const generateIdempotencyKey = (namespace: string): string =>
+  `${namespace}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 export const postRequest = async (
   url: string,
   data: any,
@@ -61,12 +70,14 @@ export const postRequest = async (
     cacheType?: string;
     successMessage?: string;
     errorMessage?: string;
+    /** If provided, sent as X-Idempotency-Key header */
+    idempotencyKey?: string;
   } = {}
 ): Promise<ApiResult> => {
   try {
     // if (!(await isOnline())) throw new Error('No internet connection.');
 
-    const token = await getAccessToken();
+    const token = await getAccessTokenForRequest();
     const deviceId = await AsyncStorage.getItem('device_id');
 
     // 🔑 Robust FormData detection for React Native
@@ -87,6 +98,9 @@ export const postRequest = async (
     if (token) baseHeaders.Authorization = `Bearer ${token}`;
     if (deviceId) baseHeaders['X-Device-Id'] = deviceId;
 
+    if (options.idempotencyKey) {
+      baseHeaders['X-Idempotency-Key'] = options.idempotencyKey;
+    }
     const headers = { ...baseHeaders, ...(options.headers ?? {}) };
 
     // ❗ Do NOT sanitize FormData or convert it
@@ -123,7 +137,7 @@ export const postRequest = async (
 
     // Attempt a silent token refresh on 401, then retry once.
     if (response.status === 401) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
         const retryResponse = await fetchPostWithRetry(() => apiService.post(url, payload, retryHeaders));

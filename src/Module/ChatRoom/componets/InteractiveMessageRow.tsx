@@ -49,6 +49,7 @@ type Props = {
   onLocalDeleteMessage?: (message: ChatMessage) => void;
   onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
+  participantMap?: Record<string, string>;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -150,6 +151,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onLocalDeleteMessage,
   onUpdateMessage,
   mentionMap,
+  participantMap,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -290,7 +292,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
       });
     }
 
-    if (onForwardMessage) {
+    if (onForwardMessage && !message.noForward) {
       actions.push({
         type: 'action',
         key: 'forward',
@@ -402,6 +404,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             onShowReadReceipts={onShowReadReceipts}
             onViewOnce={onViewOnce}
             mentionMap={mentionMap}
+            participantMap={participantMap}
             senderId={(message as any).senderId}
             onUpdateMessage={onUpdateMessage}
           />

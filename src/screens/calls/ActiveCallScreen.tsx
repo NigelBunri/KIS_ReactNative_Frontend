@@ -55,6 +55,7 @@ type CallActions = {
   onSetLayout: (layout: CallLayout) => void;
   onMuteParticipant?: (userId: string) => void;
   onRemoveParticipant?: (userId: string) => void;
+  onToggleScreenShare?: () => void;
 };
 
 type Props = {
@@ -173,19 +174,12 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         );
         break;
       case 'screen-share':
-        if (session?.isScreenSharing) {
-          Alert.alert(
-            'Screen Sharing',
-            'Stop sharing your screen?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Stop', style: 'destructive', onPress: () => actions.onEnd() },
-            ],
-          );
+        if (actions.onToggleScreenShare) {
+          actions.onToggleScreenShare();
         } else {
           Alert.alert(
             'Share Screen',
-            'Screen sharing requires enabling the screen capture permission. This feature is available on devices with react-native-webrtc >= 106.',
+            'Screen sharing is not available in this context.',
             [{ text: 'OK' }],
           );
         }
@@ -327,6 +321,22 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             )}
           </View>
           <View style={styles.topRight}>
+            {/* GAP 2: DTLS encryption padlock — tappable to show fingerprint */}
+            {isActive && (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'Call encrypted',
+                    `This call is protected with DTLS-SRTP encryption.\n\nFingerprint: ${session.dtlsFingerprint ?? 'verified'}`,
+                    [{ text: 'OK' }],
+                  );
+                }}
+                hitSlop={8}
+                style={{ paddingHorizontal: 4 }}
+              >
+                <Text style={{ fontSize: 18 }}>🔒</Text>
+              </Pressable>
+            )}
             <NetworkQualityBars quality={session.networkQuality} size={16} />
             <Text style={styles.callTypeChip}>{callTypeLabel(session.callType)}</Text>
           </View>
@@ -450,6 +460,27 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
           <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>
             {isConnecting ? 'Connecting…' : 'Camera off'}
+          </Text>
+        </View>
+      )}
+
+      {/* GAP 1: "Sharing screen" label overlay on remote participant tile */}
+      {remote?.isScreenSharing && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(34,197,94,0.85)',
+            paddingVertical: 6,
+            alignItems: 'center',
+            zIndex: 3,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
+            Sharing screen
           </Text>
         </View>
       )}

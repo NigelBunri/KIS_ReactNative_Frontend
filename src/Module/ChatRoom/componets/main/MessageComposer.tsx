@@ -6,6 +6,8 @@ import {
   Text,
   Image,
   ActivityIndicator,
+  Alert,
+  Modal,
   FlatList,
 } from 'react-native';
 import { postRequest } from '@/network/post';
@@ -170,6 +172,21 @@ type MessageComposerProps = {
   onSendLocation?: (loc: LocationMessage) => void;
   onScheduleSend?: (scheduledAt: string) => void;
 
+  /** GAP 3: scanned document send */
+  onSendScannedDocument?: (uri: string, mimeType: string, filename: string) => void;
+
+  /**
+   * GAP 4: Called when the user creates a payment message.
+   * Receives the payment fields; the parent is responsible for building and
+   * sending the ChatMessage with kind='payment'.
+   */
+  onSendPayment?: (payment: {
+    amount: number;
+    currency: string;
+    note?: string;
+    recipientId?: string;
+  }) => void;
+
   bottomInset?: number;
 };
 
@@ -203,6 +220,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSendGif,
   onSendLocation,
   onScheduleSend,
+  onSendScannedDocument,
+  onSendPayment,
   bottomInset = 0,
 }) => {
   /* ----------------------------- VOICE STATE ----------------------------- */
@@ -247,6 +266,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
   /* ----------------------------- SCHEDULE SHEET --------------------------- */
   const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
+
+  /* ----------------------------- PAYMENT MODAL (GAP 4) -------------------- */
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentCurrency, setPaymentCurrency] = useState('USD');
+  const [paymentNote, setPaymentNote] = useState('');
 
   /* ----------------------------- STICKER STORAGE -------------------------- */
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -937,6 +962,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           onCreateEvent?.(event);
         }}
         onShareLocation={onSendLocation ? () => setLocationPickerVisible(true) : undefined}
+        onSendScannedDocument={onSendScannedDocument}
+        onSendPayment={onSendPayment ? () => setPaymentModalVisible(true) : undefined}
       />
 
       {/* CAMERA FULL-SCREEN MODAL (ONLY source for images/videos) */}
@@ -970,6 +997,134 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           setScheduleSheetVisible(false);
         }}
       />
+
+      {/* GAP 4: PAYMENT MODAL */}
+      <Modal
+        visible={paymentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)', justifyContent: 'flex-end' }}
+          onPress={() => setPaymentModalVisible(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: palette.surface ?? '#fff',
+              borderTopLeftRadius: 22,
+              borderTopRightRadius: 22,
+              padding: 20,
+              paddingBottom: 32,
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            {/* Handle */}
+            <View style={{ width: 40, height: 4, borderRadius: 4, backgroundColor: palette.divider ?? '#ccc', alignSelf: 'center', marginBottom: 14 }} />
+
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text ?? '#111', marginBottom: 16 }}>
+              Send payment
+            </Text>
+
+            {/* Amount */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Amount</Text>
+            <TextInput
+              value={paymentAmount}
+              onChangeText={setPaymentAmount}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              style={{
+                borderWidth: 1,
+                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 16,
+                color: palette.text ?? '#111',
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                marginBottom: 12,
+              }}
+            />
+
+            {/* Currency */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Currency</Text>
+            <TextInput
+              value={paymentCurrency}
+              onChangeText={(v) => setPaymentCurrency(v.toUpperCase().slice(0, 3))}
+              placeholder="USD"
+              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              autoCapitalize="characters"
+              maxLength={3}
+              style={{
+                borderWidth: 1,
+                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 16,
+                color: palette.text ?? '#111',
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                marginBottom: 12,
+              }}
+            />
+
+            {/* Note */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Note (optional)</Text>
+            <TextInput
+              value={paymentNote}
+              onChangeText={setPaymentNote}
+              placeholder="What's this for?"
+              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              style={{
+                borderWidth: 1,
+                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 15,
+                color: palette.text ?? '#111',
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                marginBottom: 20,
+              }}
+            />
+
+            <Pressable
+              onPress={() => {
+                const amount = parseFloat(paymentAmount.replace(',', '.'));
+                if (isNaN(amount) || amount <= 0) {
+                  Alert.alert('Invalid amount', 'Please enter a valid positive amount.');
+                  return;
+                }
+                if (!paymentCurrency.trim()) {
+                  Alert.alert('Currency required', 'Please enter a currency code.');
+                  return;
+                }
+                onSendPayment?.({
+                  amount,
+                  currency: paymentCurrency.trim().toUpperCase(),
+                  note: paymentNote.trim() || undefined,
+                });
+                setPaymentAmount('');
+                setPaymentCurrency('USD');
+                setPaymentNote('');
+                setPaymentModalVisible(false);
+              }}
+              style={({ pressed }) => ({
+                backgroundColor: palette.primary ?? '#C9A227',
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: 'center',
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 15, fontWeight: '700' }}>
+                Send payment
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };

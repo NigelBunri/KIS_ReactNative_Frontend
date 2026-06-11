@@ -2,7 +2,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../../services/apiService';
 import type { ApiResult, HeadersInit } from '../types';
-import { getAccessToken } from '@/security/authStorage';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 
 export const deleteRequest = async (
   url: string,
@@ -13,7 +16,7 @@ export const deleteRequest = async (
   } = {}
 ): Promise<ApiResult> => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessTokenForRequest();
     const deviceId = await AsyncStorage.getItem('device_id');
     const baseHeaders: HeadersInit = {};
     if (token) baseHeaders.Authorization = `Bearer ${token}`;
@@ -25,6 +28,37 @@ export const deleteRequest = async (
 
     if (response.ok) {
       return { success: true, data: responseData, message: options.successMessage || '' };
+    }
+
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken(token);
+      if (newToken) {
+        const retryHeaders = {
+          ...headers,
+          Authorization: `Bearer ${newToken}`,
+        };
+        const retryResponse = await apiService.delete(url, retryHeaders);
+        const retryData = await retryResponse.json().catch(() => ({}));
+        if (retryResponse.ok) {
+          return {
+            success: true,
+            data: retryData,
+            message: options.successMessage || '',
+          };
+        }
+        return {
+          success: false,
+          message: options.errorMessage || 'Session expired.',
+          status: retryResponse.status,
+          data: retryData,
+        };
+      }
+      return {
+        success: false,
+        message: 'Session expired. Please log in again.',
+        status: 401,
+        data: responseData,
+      };
     }
 
     const msg =

@@ -369,8 +369,14 @@ export function TextComposerPage({
   const renderDropdownPanel = () => {
     if (!openMenu) return null;
 
-    const chip = (label: string, active: boolean, onPress: () => void) => (
+    const chip = (
+      label: string,
+      active: boolean,
+      onPress: () => void,
+      key: React.Key = label,
+    ) => (
       <Pressable
+        key={key}
         onPress={onPress}
         style={[
           styles.menuChip,
@@ -555,7 +561,7 @@ export function TextComposerPage({
                     setFontSize(s);
                     setFontSizeDraft(String(s));
                     onApplyFontSizeToText(s);
-                  }),
+                  }, `font-size-${s}`),
                 )}
               </View>
             </View>

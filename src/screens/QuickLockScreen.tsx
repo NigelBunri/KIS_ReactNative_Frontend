@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +11,19 @@ import {
 } from 'react-native';
 import { validatePIN, clearPIN } from '@/services/QuickLockService';
 import { useAuth } from '../../App';
+
+async function tryBiometricAuth(): Promise<boolean> {
+  try {
+    const mod = require('react-native-biometrics');
+    const rnBiometrics = new (mod.default ?? mod.ReactNativeBiometrics)();
+    const { available } = await rnBiometrics.isSensorAvailable();
+    if (!available) return false;
+    const { success } = await rnBiometrics.simplePrompt({ promptMessage: 'Unlock KIS' });
+    return !!success;
+  } catch {
+    return false;
+  }
+}
 
 const MAX_ATTEMPTS = 5;
 const PIN_LENGTH = 6;
@@ -23,6 +37,7 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   const [pin, setPin] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState('');
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const shake = useCallback(() => {
@@ -39,6 +54,30 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   const handleCorrectPIN = useCallback(() => {
     onDismiss();
   }, [onDismiss]);
+
+  const handleBiometric = useCallback(async () => {
+    const success = await tryBiometricAuth();
+    if (success) handleCorrectPIN();
+    else setError('Biometric authentication failed. Enter your PIN.');
+  }, [handleCorrectPIN]);
+
+  // Check biometric availability and auto-prompt on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = require('react-native-biometrics');
+        const rnBiometrics = new (mod.default ?? mod.ReactNativeBiometrics)();
+        const { available } = await rnBiometrics.isSensorAvailable();
+        if (!cancelled) setBiometricAvailable(!!available);
+        if (available && !cancelled) {
+          const { success } = await rnBiometrics.simplePrompt({ promptMessage: 'Unlock KIS' });
+          if (!cancelled && success) handleCorrectPIN();
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [handleCorrectPIN]);
 
   const handleWrongPIN = useCallback((nextAttempts: number) => {
     shake();
@@ -139,6 +178,17 @@ export default function QuickLockScreen({ onDismiss }: Props) {
             );
           })}
         </View>
+
+        {biometricAvailable && (
+          <Pressable
+            style={[styles.forgotButton, { marginTop: 4 }]}
+            onPress={handleBiometric}
+          >
+            <Text style={styles.forgotText}>
+              {Platform.OS === 'ios' ? '🔒 Use Face ID / Touch ID' : '🔒 Use Biometrics'}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable style={styles.forgotButton} onPress={handleForgotPIN}>
           <Text style={styles.forgotText}>Forgot PIN / Use password</Text>

@@ -7,6 +7,7 @@ import {
   FlatList,
   Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Chat } from '../../messagesUtils';
 import { KISIcon } from '@/constants/kisIcons';
@@ -29,6 +30,7 @@ export const ForwardChatSheet: React.FC<ForwardChatSheetProps> = ({
   onClose,
   onConfirm,
 }) => {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
   const translateX = useRef(new Animated.Value(1)).current;
@@ -108,7 +110,8 @@ export const ForwardChatSheet: React.FC<ForwardChatSheetProps> = ({
             flexDirection: 'row',
             alignItems: 'center',
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingTop: insets.top + 10,
+            paddingBottom: 10,
             borderBottomWidth: 1,
             borderColor: palette.divider,
           }}

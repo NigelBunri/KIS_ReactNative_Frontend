@@ -18,6 +18,7 @@ import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
+import { getFeedPlainText } from '@/components/feeds/richTextValue';
 
 type Community = {
   id: string;
@@ -35,7 +36,9 @@ type Group = {
 
 type Post = {
   id: string;
-  text?: string;
+  text?: unknown;
+  text_plain?: string;
+  text_preview?: string;
   created_at?: string;
   author?: { display_name?: string };
 };
@@ -65,7 +68,7 @@ export default function CommunityRoomPage({
   const loadCommunityData = useCallback(async () => {
     setLoading(true);
     try {
-      const [postsRes, groupsRes] = await Promise.all([
+      const [postsResult, groupsResult] = await Promise.allSettled([
         getRequest(`${ROUTES.community.posts}?community=${community.id}`, {
           errorMessage: 'Failed to load posts',
         }),
@@ -74,21 +77,34 @@ export default function CommunityRoomPage({
         }),
       ]);
 
-      const postList = postsRes?.data ?? postsRes ?? [];
-      setPosts(Array.isArray(postList) ? postList : []);
+      if (postsResult.status === 'fulfilled') {
+        const postsRes = postsResult.value;
+        const postList = Array.isArray(postsRes?.data?.results)
+          ? postsRes.data.results
+          : Array.isArray(postsRes?.results)
+          ? postsRes.results
+          : postsRes?.data ?? postsRes ?? [];
+        setPosts(Array.isArray(postList) ? postList : []);
+      }
 
-      const groupList = Array.isArray(groupsRes?.data?.results)
-        ? groupsRes.data.results
-        : Array.isArray(groupsRes?.results)
-        ? groupsRes.results
-        : groupsRes?.data ?? groupsRes ?? [];
-      setGroups(Array.isArray(groupList) ? groupList : []);
+      if (groupsResult.status === 'fulfilled') {
+        const groupsRes = groupsResult.value;
+        const groupList = Array.isArray(groupsRes?.data?.results)
+          ? groupsRes.data.results
+          : Array.isArray(groupsRes?.results)
+          ? groupsRes.results
+          : groupsRes?.data ?? groupsRes ?? [];
+        setGroups(Array.isArray(groupList) ? groupList : []);
+      }
     } finally {
       setLoading(false);
     }
   }, [community.id]);
 
   useEffect(() => {
+    setPosts([]);
+    setGroups([]);
+    setGroupMeta({});
     loadCommunityData();
   }, [loadCommunityData]);
 
@@ -165,7 +181,10 @@ export default function CommunityRoomPage({
     return (
       <CommunityFeedScreen
         community={community}
-        onBack={() => setShowFeed(false)}
+        onBack={() => {
+          setShowFeed(false);
+          loadCommunityData().catch(() => undefined);
+        }}
       />
     );
   }
@@ -190,47 +209,41 @@ export default function CommunityRoomPage({
         </Pressable>
       </View>
 
-      {loading ? (
-        <View style={{ padding: 16, gap: 12 }}>
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <View
-              key={`group-skel-${idx}`}
-              style={[styles.card, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
-            >
-              <View style={styles.cardRow}>
-                <Skeleton width={44} height={44} radius={22} />
-                <View style={{ flex: 1 }}>
-                  <Skeleton width="60%" height={12} radius={6} />
-                  <Skeleton width="40%" height={10} radius={6} style={{ marginTop: 6 }} />
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <FlatList
-          data={sortedGroups}
-          keyExtractor={(item) => item.id}
-          onViewableItemsChanged={({ viewableItems }) => {
-            const ids = viewableItems
-              .map((v) => v.item?.id)
-              .filter(Boolean) as string[];
-            if (ids.length) loadMetaFor(ids);
-          }}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
-          ListHeaderComponent={
+      <FlatList
+        data={loading ? [] : sortedGroups}
+        keyExtractor={(item) => item.id}
+        onViewableItemsChanged={({ viewableItems }) => {
+          const ids = viewableItems
+            .map((v) => v.item?.id)
+            .filter(Boolean) as string[];
+          if (ids.length) loadMetaFor(ids);
+        }}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
+        ListHeaderComponent={
+          <>
             <View style={styles.section}>
               <Pressable
                 onPress={() => setShowFeed(true)}
-                style={[styles.feedCard, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
+                style={[
+                  styles.feedCard,
+                  {
+                    borderColor: palette.primaryStrong,
+                    backgroundColor: palette.card,
+                  },
+                ]}
               >
                 <View style={styles.feedHeaderRow}>
-                  <Text style={[styles.sectionTitle, { color: palette.subtext }]}>Feed</Text>
+                  <Text style={[styles.sectionTitle, { color: palette.subtext }]}>Main feed</Text>
                   <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </View>
-                {posts.length === 0 ? (
+                {loading ? (
+                  <View style={styles.feedLoading}>
+                    <Skeleton width="70%" height={11} radius={6} />
+                    <Skeleton width="48%" height={9} radius={5} style={styles.feedLoadingLine} />
+                  </View>
+                ) : posts.length === 0 ? (
                   <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    No posts yet.
+                    No posts yet. Tap to open the community feed.
                   </Text>
                 ) : (
                   posts.slice(0, 2).map((p) => (
@@ -239,14 +252,33 @@ export default function CommunityRoomPage({
                         {p.author?.display_name ?? 'Member'}
                       </Text>
                       <Text style={{ color: palette.text, marginTop: 4 }} numberOfLines={2}>
-                        {p.text ?? ''}
+                        {getFeedPlainText(p)}
                       </Text>
                     </View>
                   ))
                 )}
               </Pressable>
             </View>
-          }
+            {loading ? (
+              <View style={styles.loadingGroups}>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <View
+                    key={`group-skel-${idx}`}
+                    style={[styles.card, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
+                  >
+                    <View style={styles.cardRow}>
+                      <Skeleton width={44} height={44} radius={22} />
+                      <View style={styles.skeletonText}>
+                        <Skeleton width="60%" height={12} radius={6} />
+                        <Skeleton width="40%" height={10} radius={6} style={styles.skeletonLine} />
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </>
+        }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => openGroupChat(item)}
@@ -280,8 +312,7 @@ export default function CommunityRoomPage({
               <Text style={{ color: palette.subtext }}>No groups yet.</Text>
             </View>
           }
-        />
-      )}
+      />
 
       {showGroupCreate ? (
         <View style={styles.overlay}>
@@ -339,8 +370,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
   card: { borderWidth: 2, borderRadius: 16, padding: 12 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  feedCard: { borderWidth: 2, borderRadius: 12, padding: 12, marginBottom: 10 },
+  feedCard: { borderWidth: 1, borderRadius: 26, padding: 16, marginBottom: 10 },
   feedHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  feedLoading: { paddingVertical: 4 },
+  feedLoadingLine: { marginTop: 7 },
+  loadingGroups: { gap: 12 },
+  skeletonText: { flex: 1 },
+  skeletonLine: { marginTop: 6 },
   overlay: {
     position: 'absolute',
     top: 0,

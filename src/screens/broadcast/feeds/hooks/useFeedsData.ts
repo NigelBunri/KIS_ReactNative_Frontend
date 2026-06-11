@@ -3,6 +3,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { enqueueMutation } from '@/services/pendingMutationsQueue';
 
 import { FEEDS_ENDPOINT } from '@/screens/broadcast/feeds/api/feeds.endpoints';
 import { recordWatchHistory as _recordWatchHistory } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -320,17 +321,12 @@ export default function useFeedsData({ q = '', code = null }: Params) {
         );
         return { ok: true };
       } catch (error) {
-        setItems(prev =>
-          prev.map(item =>
-            item.id === itemId
-              ? {
-                  ...item,
-                  reaction_count: previousReactionCount,
-                  viewer_reaction: previousReaction,
-                }
-              : item,
-          ),
-        );
+        // Queue for retry when offline — optimistic state stays intact
+        enqueueMutation({
+          method: 'POST',
+          url: ROUTES.broadcasts.react(itemId),
+          payload: { emoji },
+        }).catch(() => {});
         return { ok: false, error };
       }
     },
@@ -338,25 +334,33 @@ export default function useFeedsData({ q = '', code = null }: Params) {
   );
 
   const recordShare = useCallback(async (itemId: string) => {
-    const res = await postRequest(
-      ROUTES.broadcasts.share(itemId),
-      { platform: 'app' },
-      { errorMessage: 'Unable to log share.' },
-    );
-    if (res?.success === false) {
-      return { ok: false };
-    }
+    // Optimistic share count increment
     setItems(prev =>
       prev.map(item =>
         item.id === itemId
-          ? {
-              ...item,
-              share_count: Number(item.share_count ?? 0) + 1,
-            }
+          ? { ...item, share_count: Number(item.share_count ?? 0) + 1 }
           : item,
       ),
     );
-    return { ok: true };
+    try {
+      const res = await postRequest(
+        ROUTES.broadcasts.share(itemId),
+        { platform: 'app' },
+        { errorMessage: 'Unable to log share.' },
+      );
+      if (res?.success === false) {
+        throw new Error(res?.message || 'Unable to log share.');
+      }
+      return { ok: true };
+    } catch {
+      // Queue for retry; keep optimistic count
+      enqueueMutation({
+        method: 'POST',
+        url: ROUTES.broadcasts.share(itemId),
+        payload: { platform: 'app' },
+      }).catch(() => {});
+      return { ok: false };
+    }
   }, []);
 
   const hideItem = useCallback(
@@ -378,31 +382,37 @@ export default function useFeedsData({ q = '', code = null }: Params) {
   const toggleSaved = useCallback(
     async (itemId: string, currentlySaved: boolean) => {
       const endpoint = ROUTES.broadcasts.save(itemId);
-      const res = currentlySaved
-        ? await postRequest(
-            `${endpoint}?action=unsave`,
-            {},
-            { errorMessage: 'Unable to remove saved broadcast.' },
-          )
-        : await postRequest(
-            endpoint,
-            {},
-            { errorMessage: 'Unable to save broadcast.' },
-          );
-      if (res?.success === false) {
-        return { ok: false };
-      }
+      // Optimistic update
       setItems(prev =>
         prev.map(item =>
-          item.id === itemId
-            ? {
-                ...item,
-                viewer_saved: !currentlySaved,
-              }
-            : item,
+          item.id === itemId ? { ...item, viewer_saved: !currentlySaved } : item,
         ),
       );
-      return { ok: true, saved: !currentlySaved };
+      try {
+        const res = currentlySaved
+          ? await postRequest(
+              `${endpoint}?action=unsave`,
+              {},
+              { errorMessage: 'Unable to remove saved broadcast.' },
+            )
+          : await postRequest(
+              endpoint,
+              {},
+              { errorMessage: 'Unable to save broadcast.' },
+            );
+        if (res?.success === false) {
+          throw new Error(res?.message || 'Failed');
+        }
+        return { ok: true, saved: !currentlySaved };
+      } catch {
+        // Queue for retry; optimistic state stays
+        enqueueMutation({
+          method: 'POST',
+          url: currentlySaved ? `${endpoint}?action=unsave` : endpoint,
+          payload: {},
+        }).catch(() => {});
+        return { ok: false };
+      }
     },
     [],
   );

@@ -118,6 +118,10 @@ export type BroadcastChannelLiveStream = {
   metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
+  // Stream settings (YouTube-parity fields)
+  latency_mode?: 'normal' | 'low' | 'ultra_low';
+  dvr_enabled?: boolean;
+  dvr_window_seconds?: number;
 };
 
 export type BroadcastChannelLiveStreamsResponse = {

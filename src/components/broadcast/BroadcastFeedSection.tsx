@@ -350,6 +350,39 @@ export default function BroadcastFeedSection({
   }, [broadcastConversationIds]);
 
   useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('chat.message.global', (payload: any) => {
+      const convId = String(payload?.conversationId ?? payload?.conversation_id ?? '');
+      if (!convId) return;
+      const convMap = broadcastConversationIdsRef.current;
+      const postId = Object.keys(convMap).find((pid) => convMap[pid] === convId);
+      if (!postId) return;
+      setCommentCounts((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + 1,
+      }));
+      DeviceEventEmitter.emit('post.comment.added', { postId, conversationId: convId });
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('post.reaction_updated', (payload: any) => {
+      const postId = String(payload?.postId ?? payload?.post_id ?? '');
+      if (!postId) return;
+      setBroadcasts((prev) =>
+        prev.map((item) => {
+          if (String(item.id) !== postId) return item;
+          return {
+            ...item,
+            reaction_count: payload?.reaction_count ?? payload?.reactionCount ?? item.reaction_count,
+          };
+        }),
+      );
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     setBroadcastConversationIds(prev => {
       let changed = false;
       const next = { ...prev };

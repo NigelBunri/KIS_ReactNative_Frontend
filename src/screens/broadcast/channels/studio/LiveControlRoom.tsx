@@ -28,6 +28,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -37,6 +38,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { deleteRequest } from '@/network/delete';
+import { patchRequest } from '@/network/patch';
 import {
   endLiveStream,
   fetchChannelLiveStreams,
@@ -367,6 +369,19 @@ const recStyles = StyleSheet.create({
 
 // ── Broadcaster control panel ─────────────────────────────────────────────────
 
+type LatencyMode = 'normal' | 'low' | 'ultra_low';
+const LATENCY_OPTIONS: Array<{ value: LatencyMode; label: string }> = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'low', label: 'Low Latency' },
+  { value: 'ultra_low', label: 'Ultra Low' },
+];
+const DVR_WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 1800, label: '30 min' },
+  { value: 3600, label: '1 hr' },
+  { value: 7200, label: '2 hr' },
+  { value: 14400, label: '4 hr' },
+];
+
 function BroadcasterPanel({
   stream,
   palette,
@@ -379,6 +394,44 @@ function BroadcasterPanel({
   const [streamKey,   setStreamKey]     = useState('');
   const [keyLoading,  setKeyLoading]    = useState(false);
   const [switching,   setSwitching]     = useState(false);
+
+  // Stream settings state
+  const [latencyMode, setLatencyMode] = useState<LatencyMode>(stream.latency_mode ?? 'normal');
+  const [dvrEnabled, setDvrEnabled]   = useState<boolean>(stream.dvr_enabled ?? false);
+  const [dvrWindow, setDvrWindow]     = useState<number>(stream.dvr_window_seconds ?? 3600);
+  const [patchingSettings, setPatchingSettings] = useState(false);
+
+  const patchSettings = useCallback(async (patch: Record<string, unknown>) => {
+    setPatchingSettings(true);
+    try {
+      await patchRequest(
+        ROUTES.broadcasts.liveStreamSettings(stream.id),
+        patch,
+        { errorMessage: '' },
+      );
+    } catch {
+      Alert.alert('Error', 'Could not update stream settings.');
+    } finally {
+      setPatchingSettings(false);
+    }
+  }, [stream.id]);
+
+  const handleLatencyChange = useCallback(async (mode: LatencyMode) => {
+    setLatencyMode(mode);
+    await patchSettings({ latency_mode: mode });
+  }, [patchSettings]);
+
+  const handleDvrToggle = useCallback(async (val: boolean) => {
+    setDvrEnabled(val);
+    const patch: Record<string, unknown> = { dvr_enabled: val };
+    if (val) patch.dvr_window_seconds = dvrWindow;
+    await patchSettings(patch);
+  }, [dvrWindow, patchSettings]);
+
+  const handleDvrWindowChange = useCallback(async (secs: number) => {
+    setDvrWindow(secs);
+    await patchSettings({ dvr_window_seconds: secs });
+  }, [patchSettings]);
 
   const {
     viewerCount,
@@ -567,6 +620,77 @@ function BroadcasterPanel({
           palette={palette}
         />
       )}
+
+      {/* Stream Settings — Latency + DVR */}
+      <View style={[styles.settingsCard, { borderColor: palette.border, backgroundColor: palette.bg }]}>
+        <View style={styles.settingsHeader}>
+          <KISIcon name="settings" size={14} color={palette.primaryStrong} />
+          <Text style={[styles.settingsTitle, { color: palette.text }]}>Stream Settings</Text>
+          {patchingSettings && <ActivityIndicator size="small" color={palette.primaryStrong} />}
+        </View>
+
+        {/* Latency mode */}
+        <Text style={[styles.settingsLabel, { color: palette.subtext }]}>Latency Mode</Text>
+        <View style={styles.pillRow}>
+          {LATENCY_OPTIONS.map(opt => {
+            const active = latencyMode === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => void handleLatencyChange(opt.value)}
+                style={[
+                  styles.settingsPill,
+                  {
+                    backgroundColor: active ? palette.primaryStrong : (palette.card ?? palette.surface),
+                    borderColor: active ? palette.primaryStrong : palette.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.settingsPillText, { color: active ? '#fff' : palette.text }]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* DVR */}
+        <View style={styles.dvrRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.settingsLabel, { color: palette.subtext }]}>DVR (rewind)</Text>
+          </View>
+          <Switch
+            value={dvrEnabled}
+            onValueChange={val => void handleDvrToggle(val)}
+            trackColor={{ true: palette.primaryStrong }}
+            thumbColor="#fff"
+          />
+        </View>
+        {dvrEnabled && (
+          <View style={styles.pillRow}>
+            {DVR_WINDOW_OPTIONS.map(opt => {
+              const active = dvrWindow === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => void handleDvrWindowChange(opt.value)}
+                  style={[
+                    styles.settingsPill,
+                    {
+                      backgroundColor: active ? palette.primaryStrong : (palette.card ?? palette.surface),
+                      borderColor: active ? palette.primaryStrong : palette.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.settingsPillText, { color: active ? '#fff' : palette.text }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -1022,4 +1146,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   guideNoteText: { flex: 1, fontSize: 11, fontWeight: '700', lineHeight: 17 },
+
+  // Stream settings
+  settingsCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    gap: 8,
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 4,
+  },
+  settingsTitle: { flex: 1, fontSize: 13, fontWeight: '900' },
+  settingsLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  pillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  settingsPill: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  settingsPillText: { fontSize: 12, fontWeight: '700' },
+  dvrRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
 });

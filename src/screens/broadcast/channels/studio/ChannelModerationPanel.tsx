@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { ChannelModerationRecord } from '@/screens/broadcast/channels/api/channels.types';
 import { actionChannelModerationRecord, fetchChannelModerationQueue } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import KeywordFilterPanel from '@/screens/broadcast/channels/studio/KeywordFilterPanel';
 
 type Props = { channelId?: string };
 const ACTIONS = [
@@ -52,21 +53,29 @@ export default function ChannelModerationPanel({ channelId }: Props) {
         {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       </View>
       {records.length ? records.map(record => (
-        <View key={record.id} style={[styles.record, { borderColor: palette.border }]}> 
+        <View key={record.id} style={[styles.record, { borderColor: palette.border }]}>
           <Text style={[styles.recordTitle, { color: palette.text }]}>{record.content_title || record.comment_body || record.target_type}</Text>
           <Text style={[styles.recordMeta, { color: palette.subtext }]}>{record.target_type} · {record.reason || 'No reason supplied'}</Text>
           <View style={styles.actions}>
             {ACTIONS.map(action => (
-              <Pressable key={action.id} disabled={busyId === record.id} onPress={() => act(record.id, action.id)} style={[styles.actionButton, { backgroundColor: action.id === 'remove' ? '#fff1f2' : palette.card, borderColor: palette.border }]}> 
+              <Pressable key={action.id} disabled={busyId === record.id} onPress={() => act(record.id, action.id)} style={[styles.actionButton, { backgroundColor: action.id === 'remove' ? '#fff1f2' : palette.card, borderColor: palette.border }]}>
                 <Text style={[styles.actionText, { color: action.id === 'remove' ? '#be123c' : palette.text }]}>{action.label}</Text>
               </Pressable>
             ))}
           </View>
         </View>
       )) : (
-        <View style={[styles.empty, { borderColor: palette.border, backgroundColor: palette.card }]}> 
+        <View style={[styles.empty, { borderColor: palette.border, backgroundColor: palette.card }]}>
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No open reports</Text>
           <Text style={[styles.emptyText, { color: palette.subtext }]}>Reported content and comments will appear here for channel owners and moderators.</Text>
+        </View>
+      )}
+
+      {/* Keyword Filters */}
+      {channelId && (
+        <View style={styles.keywordSection}>
+          <Text style={[styles.sectionHeading, { color: palette.text }]}>Keyword Filters</Text>
+          <KeywordFilterPanel channelId={channelId} />
         </View>
       )}
     </View>
@@ -87,4 +96,6 @@ const styles = StyleSheet.create({
   empty: { borderWidth: 1, borderRadius: 8, padding: 12 },
   emptyTitle: { fontSize: 13, fontWeight: '900' },
   emptyText: { marginTop: 4, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  keywordSection: { marginTop: 16 },
+  sectionHeading: { fontSize: 13, fontWeight: '900', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
 });

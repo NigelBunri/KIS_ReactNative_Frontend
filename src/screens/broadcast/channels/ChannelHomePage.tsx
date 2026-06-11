@@ -436,6 +436,64 @@ export default function ChannelHomePage() {
           </View>
         ) : (
           <>
+            {activeTab === 'home' && (channel as any)?.trailer_content ? (
+              <Pressable
+                onPress={() => openContent((channel as any).trailer_content)}
+                style={[styles.miniCard, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter }]}
+              >
+                <View style={styles.miniCardMedia}>
+                  {(channel as any).trailer_content.thumbnail_url ? (
+                    <PermanentRemoteImage
+                      uri={resolveBackendAssetUrl((channel as any).trailer_content.thumbnail_url)}
+                      domain="Broadcast"
+                      stableKey={`channel_trailer_${(channel as any).trailer_content.id}`}
+                      containerStyle={StyleSheet.absoluteFillObject}
+                    />
+                  ) : (
+                    <LinearGradient colors={[palette.primarySoft, palette.surface]} style={StyleSheet.absoluteFillObject} />
+                  )}
+                  <View style={styles.miniCardPlayOverlay}>
+                    <KISIcon name="play" size={22} color="#fff" />
+                  </View>
+                </View>
+                <View style={styles.miniCardBody}>
+                  <Text style={[styles.miniCardEyebrow, { color: palette.primaryStrong }]}>Channel Trailer</Text>
+                  <Text numberOfLines={2} style={[styles.miniCardTitle, { color: palette.text }]}>
+                    {(channel as any).trailer_content.title || 'Channel Trailer'}
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            {activeTab === 'home' && (channel as any)?.featured_content ? (
+              <Pressable
+                onPress={() => openContent((channel as any).featured_content)}
+                style={[styles.miniCard, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter, marginTop: 10 }]}
+              >
+                <View style={styles.miniCardMedia}>
+                  {(channel as any).featured_content.thumbnail_url ? (
+                    <PermanentRemoteImage
+                      uri={resolveBackendAssetUrl((channel as any).featured_content.thumbnail_url)}
+                      domain="Broadcast"
+                      stableKey={`channel_featured_content_${(channel as any).featured_content.id}`}
+                      containerStyle={StyleSheet.absoluteFillObject}
+                    />
+                  ) : (
+                    <LinearGradient colors={[palette.primarySoft, palette.surface]} style={StyleSheet.absoluteFillObject} />
+                  )}
+                  <View style={styles.miniCardPlayOverlay}>
+                    <KISIcon name="play" size={22} color="#fff" />
+                  </View>
+                </View>
+                <View style={styles.miniCardBody}>
+                  <Text style={[styles.miniCardEyebrow, { color: palette.primaryStrong }]}>Featured</Text>
+                  <Text numberOfLines={2} style={[styles.miniCardTitle, { color: palette.text }]}>
+                    {(channel as any).featured_content.title || 'Featured Content'}
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
+
             {activeTab === 'home' && featured ? (
               <Pressable onPress={() => openContent(featured)} style={[styles.featuredHero, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: responsive.pageGutter }]}> 
                 <View style={[styles.featuredMedia, { height: compact ? 150 : 190 }]}>
@@ -528,6 +586,41 @@ const styles = StyleSheet.create({
   liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   durationBadge: { position: 'absolute', right: 8, bottom: 8, backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5 },
   durationText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  miniCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  miniCardMedia: {
+    width: 96,
+    height: 72,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  miniCardPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  miniCardBody: {
+    flex: 1,
+    padding: 10,
+    gap: 4,
+    justifyContent: 'center',
+  },
+  miniCardEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  miniCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
   channelActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
   actionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   actionChipText: { fontSize: 13, fontWeight: '800' },

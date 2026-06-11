@@ -327,13 +327,19 @@ export const flushMediaTransferQueue = async () => {
           updatedAt: new Date().toISOString(),
         }));
       } catch (error: any) {
+        const transferErrorMessage =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+            ? error
+            : 'Unable to complete media transfer.';
         await updateJob(job.id, current => {
           const shouldFail = current.attempts >= MAX_TRANSFER_ATTEMPTS;
           const retryDelay = computeRetryDelayMs(current.attempts, 1_000, 60_000);
           return {
             ...current,
             status: shouldFail ? 'failed' : 'queued',
-            lastError: error?.message || 'Unable to complete media transfer.',
+            lastError: transferErrorMessage,
             nextAttemptAt: shouldFail ? undefined : new Date(Date.now() + retryDelay).toISOString(),
             updatedAt: new Date().toISOString(),
           };

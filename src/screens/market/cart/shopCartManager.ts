@@ -5,6 +5,7 @@ import ROUTES from '@/network';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import { normalizeCurrencyValue } from '@/utils/currency';
+import { enqueueMutation } from '@/services/pendingMutationsQueue';
 
 export type ShopCartItem = {
   id: string;
@@ -560,7 +561,18 @@ const syncCartItemWithBackend = async (shopId: string, item: ShopCartItem) => {
     });
     return { remoteCartId, remoteCartItemId };
   } catch (error) {
-    console.warn('Failed to sync cart item to backend', error);
+    console.warn('Failed to sync cart item to backend — queuing for retry', error);
+    // Queue for retry when network recovers
+    const existingCart = state.carts[shopId];
+    const cartId = existingCart?.remoteCartId ?? item.remoteCartId;
+    if (cartId) {
+      const payload = buildCartItemPayload(cartId, item);
+      await enqueueMutation({
+        method: item.remoteCartItemId ? 'PATCH' : 'POST',
+        url: item.remoteCartItemId ? ROUTES.commerce.cartItem(item.remoteCartItemId) : ROUTES.commerce.cartItems,
+        payload,
+      }).catch(() => {});
+    }
     return null;
   }
 };

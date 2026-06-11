@@ -52,9 +52,15 @@ export const mapCommentPayload = (
   const senderName =
     payload?.senderName ??
     payload?.sender?.display_name ??
+    payload?.sender?.full_name ??
     payload?.sender?.name ??
+    payload?.sender?.username ??
     payload?.user?.display_name ??
+    payload?.user?.full_name ??
     payload?.user?.name ??
+    payload?.user?.username ??
+    payload?.display_name ??
+    payload?.username ??
     'Someone';
   const createdAt =
     payload?.createdAt ??

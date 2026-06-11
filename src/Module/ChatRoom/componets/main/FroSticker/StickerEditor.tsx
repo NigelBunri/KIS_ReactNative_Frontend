@@ -8,10 +8,13 @@ import {
   Pressable,
   Animated,
   Dimensions,
-  PanResponder,
+  FlatList,
   Image,
+  Modal,
+  PanResponder,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import ViewShot from 'react-native-view-shot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +23,14 @@ import ImageResizer from 'react-native-image-resizer';
 
 import { KISIcon } from '@/constants/kisIcons';
 import { StickerBackgroundRemovalScreen } from './StickerBackgroundRemovalScreen';
+import {
+  fetchRemotePacks,
+  loadCachedPacks,
+  getInstalledPackIds,
+  installPack,
+  uninstallPack,
+  type StickerPack,
+} from './StickerPackStore';
 
 export type Sticker = {
   id: string;
@@ -91,6 +102,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
   const [textPos, setTextPos] = useState({ x: 40, y: 40 });
   const textStartPosRef = useRef({ x: 40, y: 40 });
 
+  const insets = useSafeAreaInsets();
   const viewShotRef = useRef<ViewShot | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -98,9 +110,29 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
   // ❗ NEW: control the background-removal bottom sheet
   const [showBgRemoval, setShowBgRemoval] = useState(false);
 
+  // Sticker pack discovery
+  const [showPackStore, setShowPackStore] = useState(false);
+  const [remotePacks, setRemotePacks] = useState<StickerPack[]>([]);
+  const [installedPackIds, setInstalledPackIds] = useState<string[]>([]);
+  const [packsLoading, setPacksLoading] = useState(false);
+
   const handleOpenBgRemoval = () => {
     if (!imageUri) return;
     setShowBgRemoval(true);
+  };
+
+  const handleOpenPackStore = async () => {
+    setPacksLoading(true);
+    setShowPackStore(true);
+    try {
+      const [cached, ids] = await Promise.all([loadCachedPacks(), getInstalledPackIds()]);
+      setRemotePacks(cached);
+      setInstalledPackIds(ids);
+      const fresh = await fetchRemotePacks();
+      setRemotePacks(fresh);
+    } finally {
+      setPacksLoading(false);
+    }
   };
 
   /* ------------------------------------------------------------- */
@@ -332,7 +364,8 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingTop: insets.top + 12,
+          paddingBottom: 12,
           backgroundColor: palette.card,
         }}
       >
@@ -350,6 +383,13 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
         >
           Create Sticker
         </Text>
+
+        <Pressable
+          onPress={handleOpenPackStore}
+          style={{ paddingHorizontal: 8, paddingVertical: 6 }}
+        >
+          <Text style={{ color: palette.primary, fontSize: 13 }}>Browse</Text>
+        </Pressable>
 
         <Pressable
           onPress={handleSave}
@@ -587,6 +627,83 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
             }}
           />
       )}
+
+      {/* Sticker Pack Store */}
+      <Modal
+        transparent
+        visible={showPackStore}
+        animationType="slide"
+        onRequestClose={() => setShowPackStore(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          onPress={() => setShowPackStore(false)}
+        >
+          <View style={{ backgroundColor: palette.card ?? '#1c1c1e', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '70%' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
+              <Text style={{ flex: 1, color: palette.text, fontWeight: '700', fontSize: 16 }}>Sticker Packs</Text>
+              <Pressable onPress={() => setShowPackStore(false)} hitSlop={8}>
+                <KISIcon name="close" size={20} color={palette.subtext} />
+              </Pressable>
+            </View>
+
+            {packsLoading && remotePacks.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: palette.subtext }}>Loading packs…</Text>
+              </View>
+            ) : remotePacks.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: palette.subtext }}>No sticker packs available.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={remotePacks}
+                keyExtractor={p => p.id}
+                contentContainerStyle={{ padding: 16 }}
+                renderItem={({ item: pack }) => {
+                  const isInstalled = installedPackIds.includes(pack.id);
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                      {pack.coverUrl ? (
+                        <Image source={{ uri: pack.coverUrl }} style={{ width: 56, height: 56, borderRadius: 10, marginRight: 12 }} />
+                      ) : (
+                        <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: palette.surfaceSoft, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 28 }}>🎨</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: palette.text, fontWeight: '600', fontSize: 15 }}>{pack.name}</Text>
+                        <Text style={{ color: palette.subtext, fontSize: 12 }}>{pack.stickers.length} stickers</Text>
+                      </View>
+                      <Pressable
+                        onPress={async () => {
+                          if (isInstalled) {
+                            await uninstallPack(pack.id);
+                            setInstalledPackIds(prev => prev.filter(id => id !== pack.id));
+                          } else {
+                            await installPack(pack.id);
+                            setInstalledPackIds(prev => [...prev, pack.id]);
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 7,
+                          borderRadius: 14,
+                          backgroundColor: isInstalled ? palette.surface : palette.primary,
+                        }}
+                      >
+                        <Text style={{ color: isInstalled ? palette.subtext : palette.onPrimary, fontSize: 13, fontWeight: '600' }}>
+                          {isInstalled ? 'Remove' : 'Add'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </Animated.View>
   );
 };

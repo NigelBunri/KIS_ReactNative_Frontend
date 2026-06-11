@@ -9,8 +9,10 @@ import {
   type MediaSafetyPayload,
 } from '@/services/mediaSafety';
 import { FEATURE_FLAGS } from '@/constants/featureFlags';
-import { refreshAccessToken } from '@/security/tokenRefresh';
-import { getAccessToken } from '@/security/authStorage';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -76,6 +78,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   gif: 'image/gif',
   webp: 'image/webp',
   heic: 'image/heic',
+  heif: 'image/heif',
   pdf: 'application/pdf',
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -93,6 +96,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ogg: 'audio/ogg',
   mp4: 'video/mp4',
   mov: 'video/quicktime',
+  m4v: 'video/x-m4v',
   webm: 'video/webm',
 };
 
@@ -314,7 +318,10 @@ export async function uploadFileToBackend(opts: {
       xhr.send(form as any);
     });
 
-  const firstToken = (await getAccessToken().catch(() => null)) || authToken || null;
+  const firstToken =
+    (await getAccessTokenForRequest().catch(() => null)) ||
+    authToken ||
+    null;
   if (!firstToken) {
     onStatus?.('failed');
     throw new Error('Authentication token missing. Please reconnect and try again.');
@@ -329,7 +336,7 @@ export async function uploadFileToBackend(opts: {
       throw err;
     }
 
-    const refreshedToken = await refreshAccessToken();
+    const refreshedToken = await refreshAccessToken(firstToken);
     if (!refreshedToken) {
       onStatus?.('failed');
       throw err;
@@ -348,11 +355,10 @@ export async function uploadFileToBackend(opts: {
   const safety = attachment.safety as MediaSafetyPayload | undefined;
 
   if (FEATURE_FLAGS.MEDIA_VERIFICATION_ENABLED) {
-    const notConfigured = safety?.status === 'not_configured';
-    if (isMediaSafetyBlocked(safety) || notConfigured) {
-      const msg = notConfigured
-        ? 'Verification failed: AI safety keys are not configured on the server.'
-        : (getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.');
+    // 'not_configured' means the AI scan is disabled on this server — the file
+    // was never checked, so it is not condemned. Never block on not_configured.
+    if (isMediaSafetyBlocked(safety)) {
+      const msg = getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.';
       onStatus?.('verification_failed');
       throw new VerificationFailedError(msg);
     }

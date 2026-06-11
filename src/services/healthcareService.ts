@@ -1,7 +1,64 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
+
+const PENDING_HEALTHCARE_KEY = 'KIS_PENDING_HEALTHCARE';
+
+const generateClientId = () => `hc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+type PendingHealthcareItem = {
+  clientId: string;
+  url: string;
+  payload: Record<string, any>;
+  method: 'POST' | 'PATCH';
+  createdAt: string;
+};
+
+async function enqueueHealthcare(url: string, payload: Record<string, any>, method: 'POST' | 'PATCH' = 'POST'): Promise<void> {
+  const raw = await AsyncStorage.getItem(PENDING_HEALTHCARE_KEY).catch(() => null);
+  const queue: PendingHealthcareItem[] = raw ? JSON.parse(raw) : [];
+  queue.push({
+    clientId: generateClientId(),
+    url,
+    payload,
+    method,
+    createdAt: new Date().toISOString(),
+  });
+  await AsyncStorage.setItem(PENDING_HEALTHCARE_KEY, JSON.stringify(queue));
+}
+
+export async function flushPendingHealthcare(): Promise<void> {
+  const raw = await AsyncStorage.getItem(PENDING_HEALTHCARE_KEY).catch(() => null);
+  if (!raw) return;
+  let queue: PendingHealthcareItem[];
+  try {
+    queue = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!queue.length) return;
+  const remaining: PendingHealthcareItem[] = [];
+  for (const item of queue) {
+    try {
+      const payloadWithId = { ...item.payload, client_id: item.clientId };
+      const res = item.method === 'PATCH'
+        ? await patchRequest(item.url, payloadWithId)
+        : await postRequest(item.url, payloadWithId);
+      if (!res?.success) {
+        remaining.push(item);
+      }
+    } catch {
+      remaining.push(item);
+    }
+  }
+  if (remaining.length) {
+    await AsyncStorage.setItem(PENDING_HEALTHCARE_KEY, JSON.stringify(remaining));
+  } else {
+    await AsyncStorage.removeItem(PENDING_HEALTHCARE_KEY);
+  }
+}
 
 export const fetchHealthcareOrganizations = () =>
   getRequest(ROUTES.healthcare.organizations);
@@ -15,7 +72,11 @@ export const fetchHealthcareOrganization = (organizationId: string) =>
   });
 
 export const fetchTelemedicineSessions = () =>
-  getRequest(ROUTES.telemedicine.sessions);
+  getRequest(ROUTES.telemedicine.sessions, {
+    cacheKey: 'KIS_APPOINTMENTS_LIST',
+    offlineTtlSeconds: 10 * 60,
+    staleWhileRevalidate: true,
+  });
 
 export const startTelemedicineSession = (sessionId: string) =>
   postRequest(ROUTES.telemedicine.sessionStart(sessionId), {});
@@ -23,10 +84,17 @@ export const startTelemedicineSession = (sessionId: string) =>
 export const endTelemedicineSession = (sessionId: string) =>
   postRequest(ROUTES.telemedicine.sessionEnd(sessionId), {});
 
-export const createAppointment = (payload: Record<string, any>) =>
-  postRequest(ROUTES.patients.appointments, payload, {
-    errorMessage: 'Unable to schedule appointment.',
-  });
+export const createAppointment = async (payload: Record<string, any>) => {
+  const clientId = generateClientId();
+  try {
+    return await postRequest(ROUTES.patients.appointments, { ...payload, client_id: clientId }, {
+      errorMessage: 'Unable to schedule appointment.',
+    });
+  } catch (err) {
+    await enqueueHealthcare(ROUTES.patients.appointments, { ...payload, client_id: clientId });
+    throw err;
+  }
+};
 
 export const startHealthServiceSession = ({
   serviceId,
@@ -39,6 +107,9 @@ export const startHealthServiceSession = ({
 export const fetchAppointmentBooking = (bookingId: string) =>
   getRequest(ROUTES.healthOps.appointment(bookingId), {
     errorMessage: 'Unable to load appointment booking.',
+    cacheKey: `KIS_SESSION_${bookingId}`,
+    offlineTtlSeconds: 5 * 60,
+    staleWhileRevalidate: true,
   });
 
 export const cancelAppointmentBooking = (bookingId: string, reason?: string) =>
@@ -107,10 +178,17 @@ export const fetchTriageRecords = (params?: Record<string, any>) =>
     errorMessage: 'Unable to load triage history.',
   });
 
-export const createTriageRecord = (payload: Record<string, any>) =>
-  postRequest(ROUTES.clinical.triage, payload, {
-    errorMessage: 'Unable to run triage.',
-  });
+export const createTriageRecord = async (payload: Record<string, any>) => {
+  const clientId = generateClientId();
+  try {
+    return await postRequest(ROUTES.clinical.triage, { ...payload, client_id: clientId }, {
+      errorMessage: 'Unable to run triage.',
+    });
+  } catch (err) {
+    await enqueueHealthcare(ROUTES.clinical.triage, { ...payload, client_id: clientId });
+    throw err;
+  }
+};
 
 export const fetchReferralRoutes = (params?: Record<string, any>) =>
   getRequest(ROUTES.clinical.referrals, {
@@ -118,10 +196,17 @@ export const fetchReferralRoutes = (params?: Record<string, any>) =>
     errorMessage: 'Unable to load referrals.',
   });
 
-export const createReferralRoute = (payload: Record<string, any>) =>
-  postRequest(ROUTES.clinical.referrals, payload, {
-    errorMessage: 'Unable to create referral.',
-  });
+export const createReferralRoute = async (payload: Record<string, any>) => {
+  const clientId = generateClientId();
+  try {
+    return await postRequest(ROUTES.clinical.referrals, { ...payload, client_id: clientId }, {
+      errorMessage: 'Unable to create referral.',
+    });
+  } catch (err) {
+    await enqueueHealthcare(ROUTES.clinical.referrals, { ...payload, client_id: clientId });
+    throw err;
+  }
+};
 
 export const fetchClinicalEvents = (params?: Record<string, any>) =>
   getRequest(ROUTES.clinical.events, {

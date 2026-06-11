@@ -9,6 +9,12 @@ type SearchSnippet = {
   suffix: string;
 };
 
+type Participant = {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+};
+
 type Props = {
   palette: any;
   chat: Chat | null;
@@ -44,6 +50,8 @@ type Props = {
   searchLoading: boolean;
   onSelectSearchResult: (id: string) => void;
   buildSearchSnippet: (text: string, query: string) => SearchSnippet;
+  // GAP 4: participants for sender filter
+  participants?: Participant[];
 };
 
 export default function ChatRoomOverlays({
@@ -81,6 +89,7 @@ export default function ChatRoomOverlays({
   searchLoading,
   onSelectSearchResult,
   buildSearchSnippet,
+  participants,
 }: Props) {
   return (
     <>
@@ -122,6 +131,7 @@ export default function ChatRoomOverlays({
         searchLoading={searchLoading}
         onSelectSearchResult={onSelectSearchResult}
         buildSearchSnippet={buildSearchSnippet}
+        participants={participants}
       />
     </>
   );

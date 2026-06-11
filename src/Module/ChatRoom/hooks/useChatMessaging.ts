@@ -20,7 +20,17 @@ import {
   useChatPersistence,
   type SendOverNetworkFn,
 } from './useChatPersistence';
-import { bulkUpdateMessages, removeMessage, clearMessages } from '../Storage/chatStorage';
+import {
+  bulkUpdateMessages,
+  clearMessages,
+  filterLocallyDeletedMessages,
+  rememberLocallyDeletedMessageIds,
+  removeMessage,
+} from '../Storage/chatStorage';
+import {
+  loadDecryptedMessage,
+  saveDecryptedMessage,
+} from '../Storage/decryptedMessageStorage';
 
 import type {
   ChatMessage,
@@ -152,6 +162,9 @@ const resolveParticipantUserIdForE2EE = (participant: any): string | null => {
 
 const resolveE2EERecipientIds = (chat: any, currentUserId: string): string[] => {
   const recipients = new Set<string>();
+  const selfUserId = normalizeUuid(currentUserId);
+  if (selfUserId) recipients.add(selfUserId);
+
   const directCandidates = [
     chat?.peer_user_id,
     chat?.peerUserId,
@@ -163,13 +176,13 @@ const resolveE2EERecipientIds = (chat: any, currentUserId: string): string[] => 
   ];
   for (const candidate of directCandidates) {
     const userId = normalizeUuid(candidate);
-    if (userId && userId !== String(currentUserId)) recipients.add(userId);
+    if (userId) recipients.add(userId);
   }
 
   const participants = Array.isArray(chat?.participants) ? chat.participants : [];
   for (const participant of participants) {
     const userId = resolveParticipantUserIdForE2EE(participant);
-    if (userId && userId !== String(currentUserId)) recipients.add(userId);
+    if (userId) recipients.add(userId);
   }
   return Array.from(recipients);
 };
@@ -210,6 +223,7 @@ export function useChatMessaging({
   const historySyncRef = useRef<number>(0);
   const flushInFlightRef = useRef(false);
   const historyLoadRef = useRef(false);
+  const lastKnownSeqRef = useRef<Record<string, number>>({});
   const decryptInFlightRef = useRef<Set<string>>(new Set());
   const decryptFailedAtRef = useRef<Map<string, number>>(new Map());
   const decryptSkippedRef = useRef<Set<string>>(new Set());
@@ -328,7 +342,27 @@ export function useChatMessaging({
 
   useEffect(() => {
     messagesRef.current = messages;
-  }, [messages]);
+    for (const message of messages) {
+      const text = typeof message.text === 'string' ? message.text.trim() : '';
+      const encrypted = Boolean(
+        message.encryptionMeta ?? message.ciphertext ?? (message as any).encrypted,
+      );
+      if (!encrypted || !text || text.toLowerCase() === 'encrypted message') continue;
+      void saveDecryptedMessage(String(currentUserId), message, {
+        text: message.text,
+        styledText: message.styledText,
+        attachments: message.attachments,
+        media: (message as any).media,
+        contacts: message.contacts,
+        poll: message.poll,
+        event: message.event,
+        voice: message.voice,
+        sticker: message.sticker,
+        replyToId: message.replyToId,
+        kind: message.kind,
+      }).catch(() => {});
+    }
+  }, [messages, currentUserId]);
 
   const conversationIdRef =
     useRef<string | null>(conversationId);
@@ -336,6 +370,7 @@ export function useChatMessaging({
     if (conversationIdRef.current !== conversationId) {
       // New conversation — allow full history load for this room.
       hasInitialLoadRef.current = false;
+      if (conversationId) delete lastKnownSeqRef.current[conversationId];
     }
     conversationIdRef.current = conversationId;
   }, [conversationId]);
@@ -387,14 +422,14 @@ export function useChatMessaging({
   }, []);
 
   const patchDecryptedMessage = useCallback(
-    (messageId: string, patch: Partial<ChatMessage>) => {
+    async (messageId: string, patch: Partial<ChatMessage>) => {
       if (!mountedRef.current) return;
       const next = messagesRef.current.map((message) =>
         message.serverId === messageId || message.id === messageId
           ? { ...message, ...patch }
           : message,
       );
-      replaceMessages(next);
+      await replaceMessages(next);
       const updated = next.find((message) => message.serverId === messageId || message.id === messageId);
       const convId = updated?.conversationId ?? conversationIdRef.current;
       if (convId) {
@@ -427,6 +462,15 @@ export function useChatMessaging({
           })
         : null;
       if (existingReadable) return;
+
+      const storedPlaintext = await loadDecryptedMessage(
+        String(currentUserId),
+        mapped,
+      );
+      if (storedPlaintext) {
+        await patchDecryptedMessage(messageId, storedPlaintext);
+        return;
+      }
 
       const decryptKey = [
         messageId || 'unknown',
@@ -516,7 +560,7 @@ export function useChatMessaging({
             ? parsed.media
             : (Array.isArray(parsed?.attachments) ? { attachments: parsed.attachments } : undefined);
           const nextMedia = parsedMedia ?? (mapped as any).media;
-          patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
+          const decryptedPatch = {
             text: parsed ? normalizeChatSendText(parsed?.text) : normalizeChatDisplayText(plaintext),
             styledText: parsed?.styledText ?? mapped.styledText,
             attachments: Array.isArray(nextMedia?.attachments)
@@ -530,7 +574,9 @@ export function useChatMessaging({
             sticker: parsed?.sticker ?? mapped.sticker,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
-          });
+          };
+          await saveDecryptedMessage(String(currentUserId), mapped, decryptedPatch);
+          await patchDecryptedMessage(String(mapped.serverId ?? mapped.id), decryptedPatch);
           return;
         }
 
@@ -557,7 +603,7 @@ export function useChatMessaging({
             ? parsed.media
             : (Array.isArray(parsed?.attachments) ? { attachments: parsed.attachments } : undefined);
           const nextMedia = parsedMedia ?? (mapped as any).media;
-          patchDecryptedMessage(String(mapped.serverId ?? mapped.id), {
+          const decryptedPatch = {
             text: parsed ? normalizeChatSendText(parsed?.text) : normalizeChatDisplayText(plaintext),
             styledText: parsed?.styledText ?? mapped.styledText,
             attachments: Array.isArray(nextMedia?.attachments)
@@ -571,7 +617,9 @@ export function useChatMessaging({
             sticker: parsed?.sticker ?? mapped.sticker,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
-          });
+          };
+          await saveDecryptedMessage(String(currentUserId), mapped, decryptedPatch);
+          await patchDecryptedMessage(String(mapped.serverId ?? mapped.id), decryptedPatch);
         }
         decryptFailedAtRef.current.delete(decryptKey);
       } catch (error) {
@@ -628,33 +676,84 @@ export function useChatMessaging({
   const decryptChatMessageRef = useRef(decryptChatMessage);
   useEffect(() => { decryptChatMessageRef.current = decryptChatMessage; });
 
+  // On initial cache load: any message stored in AsyncStorage with an encrypted
+  // payload but no readable text needs decryption triggered here.  The socket
+  // path (loadFullHistory / live events) only covers messages that arrive while
+  // the room is open. Older messages that were only ever received encrypted and
+  // never patched in a previous session stay as "Encrypted message" on reload
+  // unless we explicitly kick off decryption after the cache comes back.
+  // decryptChatMessage checks EncryptedStorage first so this is a fast no-network
+  // path for anything we've already seen.
+  const hasRunInitialDecryptRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) {
+      // Room changed or remounted — allow the pass to run again.
+      hasRunInitialDecryptRef.current = false;
+      return;
+    }
+    if (hasRunInitialDecryptRef.current) return;
+    hasRunInitialDecryptRef.current = true;
+
+    for (const msg of messages) {
+      const hasEncryption = Boolean(
+        msg.encryptionMeta ?? msg.ciphertext ?? (msg as any).encrypted,
+      );
+      if (!hasEncryption) continue;
+      const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+      if (text && text.toLowerCase() !== 'encrypted message') continue;
+      void decryptChatMessageRef.current(msg);
+    }
+  }, [isLoading, messages]);
+
   const mapServerMessage = useCallback(
     (serverMsg: any): ChatMessage => {
       const mapAttachments = (list: any[]) =>
         list.map((raw) => {
-          const a = raw?.attachment ?? raw ?? {};
+          const a = raw?.attachment ?? raw?.asset ?? raw?.media ?? raw?.file ?? raw ?? {};
+          const localPath = a.localPath ?? a.local_path ?? a.path;
+          const localUri = a.localUri ?? a.local_uri ?? a.uri;
+          const displayUrl =
+            a.displayUrl ??
+            a.display_url ??
+            a.url ??
+            a.downloadUrl ??
+            a.download_url ??
+            a.publicUrl ??
+            a.public_url ??
+            a.fileUrl ??
+            a.file_url ??
+            a.secureUrl ??
+            a.secure_url ??
+            a.signedUrl ??
+            a.signed_url ??
+            localUri ??
+            (typeof localPath === 'string' && localPath ? `file://${localPath}` : undefined);
           return {
-            id: a.id ?? a.key,
-            url: a.url ?? a.displayUrl ?? a.downloadUrl ?? a.publicUrl ?? a.uri,
-            publicUrl: a.publicUrl,
-            downloadUrl: a.downloadUrl,
-            displayUrl: a.displayUrl,
-            assetId: a.assetId,
-            mediaAssetId: a.mediaAssetId,
-            mediaAssetRef: a.mediaAssetRef,
-            originalName: a.originalName ?? a.name ?? a.filename,
-            mimeType: a.mimeType ?? a.mime ?? a.contentType,
-            size: a.size ?? a.sizeBytes,
+            ...a,
+            id: a.id ?? a.key ?? a.assetId ?? a.asset_id ?? a.mediaAssetId ?? a.media_asset_id ?? displayUrl,
+            url: displayUrl,
+            publicUrl: a.publicUrl ?? a.public_url,
+            downloadUrl: a.downloadUrl ?? a.download_url ?? a.fileUrl ?? a.file_url ?? a.secureUrl ?? a.secure_url ?? a.signedUrl ?? a.signed_url,
+            displayUrl,
+            assetId: a.assetId ?? a.asset_id,
+            mediaAssetId: a.mediaAssetId ?? a.media_asset_id,
+            mediaAssetRef: a.mediaAssetRef ?? a.media_asset_ref,
+            originalName: a.originalName ?? a.original_name ?? a.name ?? a.filename,
+            mimeType: a.mimeType ?? a.mime_type ?? a.mimetype ?? a.mime ?? a.contentType ?? a.content_type,
+            size: a.size ?? a.sizeBytes ?? a.size_bytes,
             kind: a.kind,
             width: a.width,
             height: a.height,
-            durationMs: a.durationMs,
-            durationSeconds: a.durationSeconds,
-            thumbUrl: a.thumbUrl,
+            durationMs: a.durationMs ?? a.duration_ms,
+            durationSeconds: a.durationSeconds ?? a.duration_seconds,
+            thumbUrl: a.thumbUrl ?? a.thumb_url ?? a.thumbnailUrl ?? a.thumbnail_url,
+            expiresAt: a.expiresAt ?? undefined,
+            expired: a.expired ?? false,
             private: a.private,
-            scanStatus: a.scanStatus,
-          localUri: a.localUri,
-          localPath: a.localPath,
+            scanStatus: a.scanStatus ?? a.scan_status,
+            localUri,
+            localPath,
+            localUploadKey: a.localUploadKey ?? a.local_upload_key,
             quarantined: a.quarantined,
           };
         });
@@ -698,6 +797,11 @@ export function useChatMessaging({
                     text: String(opt?.text ?? opt?.label ?? ''),
                     votes:
                       typeof opt?.votes === 'number' ? opt.votes : undefined,
+                    voterIds: Array.isArray(opt?.voter_ids)
+                      ? opt.voter_ids.map(String)
+                      : Array.isArray(opt?.voterIds)
+                        ? opt.voterIds.map(String)
+                        : undefined,
                   }))
                 : [],
             }
@@ -748,13 +852,21 @@ export function useChatMessaging({
       const hasEncryptedMeta = !!(serverMsg.encryptionMeta ?? serverMsg.encryption_meta);
       const rawText = serverMsg.text ?? serverMsg.previewText ?? serverMsg.preview_text ?? '';
       const text = hasEncryptedMeta || rawCiphertext
-        ? (String(rawText).trim().toLowerCase() === 'encrypted message' ? '' : normalizeChatDisplayText(rawText))
+        ? (String(rawText).trim().toLowerCase() === 'encrypted message' ? 'Encrypted message' : normalizeChatDisplayText(rawText))
         : normalizeChatDisplayText(rawText);
 
+      // Always stringify — .lean() MongoDB queries return _id as an ObjectId
+      // object (no `id` virtual). An ObjectId key never matches stored string
+      // keys in mergeMessages, causing history messages to bypass the merge
+      // and appear as new encrypted-placeholder entries alongside the cached
+      // decrypted versions.
+      const rawId = serverMsg.id ?? serverMsg._id;
+      const idStr = rawId != null ? String(rawId) : '';
+
       return {
-        id: serverMsg.id ?? serverMsg._id,
+        id: idStr,
         clientId: serverMsg.clientId,
-        serverId: serverMsg.id ?? serverMsg._id,
+        serverId: idStr,
         seq: typeof serverMsg.seq === 'number' ? serverMsg.seq : undefined,
         conversationId: normalizedConversationId,
         senderId,
@@ -812,6 +924,17 @@ export function useChatMessaging({
         conversationId: String(convId),
       });
 
+      // Fetch server-starred message IDs and apply to local messages
+      socket.emit('chat.get_starred', { conversationId: String(convId) }, (res: any) => {
+        const ids: string[] = res?.data?.messageIds ?? [];
+        if (!ids.length) return;
+        const idSet = new Set(ids.map(String));
+        const updated = messagesRef.current.map(m =>
+          idSet.has(String(m.serverId ?? m.id)) ? { ...m, isStarred: true } : m,
+        );
+        replaceMessagesRef.current(updated);
+      });
+
       // Mark conversation as read when joining — send a receipt for the last
       // message from another user so the server updates unread counts.
       const msgs = messagesRef.current;
@@ -851,7 +974,12 @@ export function useChatMessaging({
           if (err || !ack?.ok) return;
           const items = Array.isArray(ack?.data?.messages) ? ack.data.messages : [];
           if (!items.length) return;
-          const mapped = items.map((m: any) => mapServerMessage(m));
+          const mapped = await filterLocallyDeletedMessages(
+            String(storageRoomId),
+            items.map((m: any) => mapServerMessage(m)),
+            currentUserId,
+          );
+          if (!mapped.length) return;
           // Await so messagesRef is current before decryption reads it.
           await replaceMessages(mapped);
           mapped.forEach((message: ChatMessage) => {
@@ -860,7 +988,16 @@ export function useChatMessaging({
         },
       );
     },
-    [socket, isConnected, conversationId, replaceMessages, mapServerMessage, decryptChatMessage],
+    [
+      socket,
+      isConnected,
+      conversationId,
+      replaceMessages,
+      mapServerMessage,
+      decryptChatMessage,
+      storageRoomId,
+      currentUserId,
+    ],
   );
 
   const requestHistoryBatch = useCallback(
@@ -908,6 +1045,13 @@ export function useChatMessaging({
         rounds += 1;
       }
       if (all.length) {
+        all = await filterLocallyDeletedMessages(
+          String(storageRoomId),
+          all,
+          currentUserId,
+        );
+      }
+      if (all.length) {
         // Await so messagesRef is current before decryption patches run.
         await replaceMessages(all);
         all.forEach((message: ChatMessage) => {
@@ -917,7 +1061,14 @@ export function useChatMessaging({
     } finally {
       historyLoadRef.current = false;
     }
-  }, [requestHistoryBatch, replaceMessages, mapServerMessage, decryptChatMessage]);
+  }, [
+    requestHistoryBatch,
+    replaceMessages,
+    mapServerMessage,
+    decryptChatMessage,
+    storageRoomId,
+    currentUserId,
+  ]);
 
   const syncHistory = useCallback(() => {
     const now = Date.now();
@@ -1006,12 +1157,16 @@ export function useChatMessaging({
       return;
 
     joinConversation(conversationId);
-    syncHistory();
 
-    // Full history only on first open — reconnects use syncHistory (delta only).
-    if (!hasInitialLoadRef.current) {
-      hasInitialLoadRef.current = true;
-      loadFullHistory();
+    // Wait for local storage load to complete before fetching full history.
+    // This ensures mergeMessages can find the existing cached messages (with
+    // delivered/read statuses) and won't downgrade them to 'sent'.
+    if (!isLoading) {
+      syncHistory();
+      if (!hasInitialLoadRef.current) {
+        hasInitialLoadRef.current = true;
+        loadFullHistory();
+      }
     }
 
     return () => {
@@ -1021,6 +1176,7 @@ export function useChatMessaging({
     socket,
     isConnected,
     conversationId,
+    isLoading,
     joinConversation,
     leaveConversation,
     replaceMessages,
@@ -1115,6 +1271,11 @@ export function useChatMessaging({
                 text: String(opt?.text ?? opt?.label ?? ''),
                 votes:
                   typeof opt?.votes === 'number' ? opt.votes : undefined,
+                voterIds: Array.isArray(opt?.voter_ids)
+                  ? opt.voter_ids.map(String)
+                  : Array.isArray(opt?.voterIds)
+                    ? opt.voterIds.map(String)
+                    : undefined,
               };
             })
           : [];
@@ -1155,6 +1316,7 @@ export function useChatMessaging({
         contacts: normalizeContacts(message.contacts),
         poll: normalizePoll(message.poll),
         event: message.event ?? undefined,
+        location: (message as any).location ?? undefined,
         styledText: message.styledText ?? null,
         sticker: message.sticker ?? null,
         voice: message.voice
@@ -1165,10 +1327,23 @@ export function useChatMessaging({
           : null,
       };
 
+      await saveDecryptedMessage(
+        String(currentUserId),
+        message,
+        basePayload,
+      ).catch(() => {});
+
       let payloadToSend: any;
-      if (E2EE_ENABLED && chat) {
+      const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
+      if (E2EE_ENABLED && chat && !isPublicRoom) {
         const recipientIds = resolveE2EERecipientIds(chat as any, String(currentUserId));
-        if (recipientIds.length > 0) {
+        // Only encrypt when there is at least one recipient OTHER than the sender.
+        // If the participants list hasn't loaded yet or this is a public open room,
+        // the resolved list contains only the sender — encrypting in that case would
+        // produce a message only the sender can decrypt, leaving all receivers locked.
+        const selfNorm = normalizeUuid(String(currentUserId));
+        const hasExternalRecipients = recipientIds.some(id => id !== selfNorm);
+        if (recipientIds.length > 0 && hasExternalRecipients) {
           try {
             const { encryptionMeta } = await encryptPayloadForRecipients(
               String(currentUserId),
@@ -1240,12 +1415,14 @@ export function useChatMessaging({
             }
           }
         } else {
-          console.warn('[E2EE] no valid recipient user ids; message remains queued locally', {
+          // Either no recipients at all, or only the sender is resolved.
+          // Both cases mean no one else can decrypt the message, so send plaintext.
+          console.warn('[E2EE] no external recipients; falling back to server-encrypted send', {
             conversationId: String(convId),
-            clientId,
+            recipientIds,
             participantCount: Array.isArray((chat as any)?.participants) ? (chat as any).participants.length : 0,
           });
-          return { ok: false };
+          payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
         }
       } else {
         payloadToSend = { ...basePayload, encrypted: false, encryptionMeta: undefined };
@@ -1472,7 +1649,12 @@ export function useChatMessaging({
         return;
       }
 
-      const msg = mapServerMessageRef.current(serverMsg);
+      const [msg] = await filterLocallyDeletedMessages(
+        String(storageRoomId),
+        [mapServerMessageRef.current(serverMsg)],
+        currentUserId,
+      );
+      if (!msg) return;
 
       if (!msg.fromMe && msg.serverId) {
         emitReceiptRef.current(String(msg.conversationId), msg.serverId, 'delivered');
@@ -1489,6 +1671,48 @@ export function useChatMessaging({
 
       await replaceMessagesRef.current([...messagesRef.current, msg]);
       void decryptChatMessageRef.current(msg);
+
+      // Gap detection: if incoming seq skips ahead, request missing messages.
+      const incomingSeq = typeof serverMsg.seq === 'number' ? serverMsg.seq : undefined;
+      if (incomingSeq != null && activeConv) {
+        const prevSeq = lastKnownSeqRef.current[activeConv] ?? (incomingSeq - 1);
+        if (incomingSeq > prevSeq + 1) {
+          const haveSeqs = messagesRef.current
+            .map((m) => (m as any).seq as number | undefined)
+            .filter((s): s is number => typeof s === 'number');
+          socket.emit(
+            'chat.gap_check',
+            { conversationId: activeConv, haveSeqs },
+            (ack: any) => {
+              const missingSeqs: number[] = ack?.data?.missingSeqs ?? [];
+              if (!missingSeqs.length) return;
+              socket.emit(
+                'chat.gap_fill',
+                { conversationId: activeConv, missingSeqs },
+                async (fillAck: any) => {
+                  const filled: any[] = fillAck?.data?.messages ?? [];
+                  if (!filled.length) return;
+                  const mapped = await filterLocallyDeletedMessages(
+                    String(storageRoomId),
+                    filled.map((s) => mapServerMessageRef.current(s)),
+                    currentUserId,
+                  );
+                  if (!mapped.length) return;
+                  await replaceMessagesRef.current([...messagesRef.current, ...mapped]);
+                  for (const m of mapped) void decryptChatMessageRef.current(m);
+                  const maxFilled = Math.max(...mapped.map((m) => (m as any).seq ?? 0));
+                  if (maxFilled > (lastKnownSeqRef.current[activeConv] ?? 0)) {
+                    lastKnownSeqRef.current[activeConv] = maxFilled;
+                  }
+                },
+              );
+            },
+          );
+        }
+        if (incomingSeq > (lastKnownSeqRef.current[activeConv] ?? 0)) {
+          lastKnownSeqRef.current[activeConv] = incomingSeq;
+        }
+      }
     };
 
     socket.on('chat.message', onIncomingMessage);
@@ -1500,25 +1724,39 @@ export function useChatMessaging({
       if (!conversationId || !messageId || !type) return;
 
       const roomId = String(storageRoomId);
-      const status =
-        type === 'read' ? 'read' :
-        type === 'delivered' ? 'delivered' :
-        undefined;
+      const totalParticipants: number | undefined =
+        typeof payload?.totalParticipants === 'number' ? payload.totalParticipants : undefined;
+      const readerId: string | undefined = payload?.userId;
 
-      if (!status) return;
+      if (type !== 'read' && type !== 'delivered') return;
       try {
-        const incomingReadBy: any[] | undefined = Array.isArray(payload?.readBy) ? payload.readBy : undefined;
         const updated = await bulkUpdateMessages(roomId, (m) => {
           if (m.serverId !== messageId && m.id !== messageId) return m;
-          const patch: any = { ...m, status };
-          if (incomingReadBy) {
+          const patch: any = { ...m };
+
+          // Track per-reader readBy list
+          if (type === 'read' && readerId) {
             const existing: any[] = (m as any).readBy ?? [];
-            const merged = [...existing];
-            for (const entry of incomingReadBy) {
-              if (!merged.some((e) => e.userId === entry.userId)) merged.push(entry);
+            if (!existing.some((e: any) => e.userId === readerId)) {
+              patch.readBy = [...existing, { userId: readerId, at: payload?.at ?? Date.now() }];
+            } else {
+              patch.readBy = existing;
             }
-            patch.readBy = merged;
           }
+
+          // For group chats, only go blue (read) when everyone has read.
+          // For DMs (totalParticipants === 2 or undefined), any read receipt means blue.
+          if (type === 'read') {
+            const readByCount = (patch.readBy ?? (m as any).readBy ?? []).length;
+            const threshold = totalParticipants ? totalParticipants - 1 : 1;
+            const alreadyRead = m.status === 'read';
+            if (alreadyRead || readByCount >= threshold) {
+              patch.status = 'read';
+            }
+          } else if (type === 'delivered' && m.status !== 'read') {
+            patch.status = 'delivered';
+          }
+
           return patch;
         }, currentUserId);
         replaceMessagesRef.current(updated);
@@ -1528,7 +1766,7 @@ export function useChatMessaging({
         DeviceEventEmitter.emit('message.status', {
           conversationId,
           messageId,
-          status,
+          status: (changed as any)?.status,
           fromMe: !!changed?.fromMe,
         });
       } catch (error) {
@@ -1549,27 +1787,31 @@ export function useChatMessaging({
 
       const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
 
-      const next = messagesRef.current.map((m) =>
-        m.serverId === id || m.id === id
-          ? {
-              ...m,
-              text: serverMsg.text ?? m.text,
-              styledText: serverMsg.styledText ?? m.styledText,
-              ciphertext: serverMsg.ciphertext ?? m.ciphertext,
-              encryptionMeta:
-                serverMsg.encryptionMeta ??
-                serverMsg.encryption_meta ??
-                m.encryptionMeta,
-              iv: serverMsg.iv ?? m.iv,
-              tag: serverMsg.tag ?? m.tag,
-              aad: serverMsg.aad ?? m.aad,
-              encryptionVersion: serverMsg.encryptionVersion ?? m.encryptionVersion,
-              encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? m.encryptionKeyVersion,
-              isEdited: true,
-              updatedAt: serverMsg.updatedAt ?? new Date().toISOString(),
-            }
-          : m,
-      );
+      const editedAt = serverMsg.updatedAt ?? new Date().toISOString();
+      const next = messagesRef.current.map((m) => {
+        if (m.serverId !== id && m.id !== id) return m;
+        const prevText = m.text ?? '';
+        const historyEntry = prevText ? { text: prevText, editedAt } : null;
+        const prevHistory = m.editHistory ?? [];
+        return {
+          ...m,
+          text: serverMsg.text ?? m.text,
+          styledText: serverMsg.styledText ?? m.styledText,
+          ciphertext: serverMsg.ciphertext ?? m.ciphertext,
+          encryptionMeta:
+            serverMsg.encryptionMeta ??
+            serverMsg.encryption_meta ??
+            m.encryptionMeta,
+          iv: serverMsg.iv ?? m.iv,
+          tag: serverMsg.tag ?? m.tag,
+          aad: serverMsg.aad ?? m.aad,
+          encryptionVersion: serverMsg.encryptionVersion ?? m.encryptionVersion,
+          encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? m.encryptionKeyVersion,
+          isEdited: true,
+          updatedAt: editedAt,
+          editHistory: historyEntry ? [...prevHistory, historyEntry] : prevHistory,
+        };
+      });
 
       replaceMessagesRef.current(next);
       const updated = next.find((m) => m.serverId === id || m.id === id);
@@ -1660,6 +1902,31 @@ export function useChatMessaging({
     socket.on('chat.disappear.set', onDisappear);
     socket.on('chat.disappear.update', onDisappear);
 
+    const onLocationUpdate = (payload: any) => {
+      const activeConv = conversationIdRef.current;
+      if (!activeConv || String(payload?.conversationId) !== String(activeConv)) return;
+      const { messageId, latitude, longitude, address, expiresAt } = payload || {};
+      if (!messageId) return;
+      const next = messagesRef.current.map((m) =>
+        m.serverId === messageId || m.id === messageId
+          ? {
+              ...m,
+              location: {
+                ...(m as any).location,
+                latitude,
+                longitude,
+                address: address ?? (m as any).location?.address,
+                isLive: true,
+                expiresAt,
+              },
+            }
+          : m,
+      );
+      replaceMessagesRef.current(next);
+    };
+
+    socket.on('chat.location_update', onLocationUpdate);
+
     return () => {
       socket.off('chat.message', onIncomingMessage);
       socket.off('chat.message_receipt', onReceipt);
@@ -1670,6 +1937,7 @@ export function useChatMessaging({
       socket.off('chat.message_pinned', onPin);
       socket.off('chat.disappear.set', onDisappear);
       socket.off('chat.disappear.update', onDisappear);
+      socket.off('chat.location_update', onLocationUpdate);
     };
   }, [socket, storageRoomId, currentUserId]);
 
@@ -1703,6 +1971,21 @@ export function useChatMessaging({
       socket.off('conversation.last_message', onConversationLastMessage);
     };
   }, [socket]);
+
+  /* ---------------------------------------------------------------------
+   * DISAPPEARING MESSAGES — delete when timer fires
+   * ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('message.expired', async ({ messageId, conversationId: expiredConvId }: any) => {
+      if (!messageId) return;
+      const activeConv = conversationIdRef.current;
+      if (expiredConvId && activeConv && String(expiredConvId) !== String(activeConv)) return;
+      const updated = await removeMessage(String(storageRoomId), String(messageId), currentUserId).catch(() => null);
+      if (updated) replaceMessagesRef.current(updated);
+    });
+    return () => sub.remove();
+  }, [storageRoomId, currentUserId]);
 
   /* ---------------------------------------------------------------------
    * RETURN API
@@ -1786,6 +2069,27 @@ export function useChatMessaging({
         messageId,
         optionId,
       });
+      // Optimistically add currentUserId to the voted option's voterIds
+      if (currentUserId) {
+        const next = messagesRef.current.map((m) => {
+          if (m.id !== messageId && m.serverId !== messageId) return m;
+          if (!m.poll) return m;
+          return {
+            ...m,
+            poll: {
+              ...m.poll,
+              options: m.poll.options.map((opt) => {
+                if (opt.id !== optionId) return opt;
+                const existing = opt.voterIds ?? [];
+                return existing.includes(String(currentUserId))
+                  ? opt
+                  : { ...opt, votes: (opt.votes ?? 0) + 1, voterIds: [...existing, String(currentUserId)] };
+              }),
+            },
+          };
+        });
+        replaceMessagesRef.current(next);
+      }
     },
     markMessagesRead,
     socket,
@@ -1794,8 +2098,52 @@ export function useChatMessaging({
     mapServerMessage,
     replaceMessages,
     localDeleteMessage: async (messageId: string) => {
-      const updated = await removeMessage(String(storageRoomId), messageId, currentUserId);
-      replaceMessages(updated);
+      const target = messagesRef.current.find(message => {
+        const identities = [
+          message.id,
+          message.serverId,
+          message.clientId,
+          (message as any).messageId,
+        ]
+          .filter(Boolean)
+          .map(value => String(value));
+        return identities.includes(String(messageId));
+      });
+      const targetIds = [
+        target?.id,
+        target?.serverId,
+        target?.clientId,
+        (target as any)?.messageId,
+        messageId,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .map(value => String(value));
+      const targetIdSet = new Set(targetIds);
+
+      const nextMessages = messagesRef.current.filter(message => {
+        const identities = [
+          message.id,
+          message.serverId,
+          message.clientId,
+          (message as any).messageId,
+        ]
+          .filter(Boolean)
+          .map(value => String(value));
+        return !identities.some(identity => targetIdSet.has(identity));
+      });
+
+      await rememberLocallyDeletedMessageIds(
+        String(storageRoomId),
+        targetIds,
+        currentUserId,
+      );
+      replaceMessagesRef.current(nextMessages);
+
+      await removeMessage(
+        String(storageRoomId),
+        targetIds,
+        currentUserId,
+      );
     },
     clearAllMessages: async () => {
       await clearMessages(String(storageRoomId), currentUserId);

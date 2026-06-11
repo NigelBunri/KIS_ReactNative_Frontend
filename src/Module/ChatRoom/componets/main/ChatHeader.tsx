@@ -32,6 +32,7 @@ type ChatHeaderProps = {
   // NEW: pinned + sub-room header indicators
   pinnedCount?: number;
   subRoomCount?: number;
+  subRoomUnread?: number;
   onOpenPinned?: () => void;
   onOpenSubRooms?: () => void;
 
@@ -78,6 +79,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   pinnedCount = 0,
   subRoomCount = 0,
+  subRoomUnread = 0,
   onOpenPinned,
   onOpenSubRooms,
 
@@ -324,6 +326,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               >
                 {title}
               </Text>
+              {isE2EE && !isConnecting && (
+                <KISIcon name="lock" size={11} color={palette.headerSubtext ?? palette.subtext} />
+              )}
               {chat?.isPartner && (
                 <View style={{
                   backgroundColor: palette.primary ?? '#2196F3',
@@ -355,18 +360,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 </Text>
               </Pressable>
             ) : null}
-            {isE2EE ? (
+            {isConnecting ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {isConnecting ? (
-                  <ActivityIndicator size="small" color={palette.headerSubtext ?? palette.subtext} />
-                ) : (
-                  <KISIcon name="lock" size={10} color={palette.headerSubtext ?? palette.subtext} />
-                )}
+                <ActivityIndicator size="small" color={palette.headerSubtext ?? palette.subtext} />
                 <Text
                   style={[styles.headerSubtitle, { color: palette.headerSubtext ?? palette.subtext }]}
                   numberOfLines={1}
                 >
-                  {isConnecting ? 'Connecting...' : 'End-to-end encrypted'}
+                  Connecting...
                 </Text>
               </View>
             ) : (
@@ -526,10 +527,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                     palette.surfaceSoft ??
                     palette.surface,
                   opacity: pressed ? 0.7 : 1,
+                  gap: 6,
                 },
               ]}
             >
-              {/* NOTE: adjust icon name if needed to match your KISIcon set */}
               <KISIcon
                 name="layers"
                 size={14}
@@ -537,13 +538,35 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               />
               <Text
                 style={{
-                  marginLeft: 6,
                   fontSize: 12,
                   color: palette.onHeader ?? palette.text,
                 }}
               >
                 Sub-rooms ({subRoomCount})
               </Text>
+              {subRoomUnread > 0 && (
+                <View
+                  style={{
+                    minWidth: 18,
+                    paddingHorizontal: 4,
+                    height: 18,
+                    borderRadius: 9,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: palette.error ?? '#FF3B30',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {subRoomUnread > 99 ? '99+' : subRoomUnread}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           )}
         </View>

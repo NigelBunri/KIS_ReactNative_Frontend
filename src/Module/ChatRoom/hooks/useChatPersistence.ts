@@ -21,6 +21,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   ChatMessage,
@@ -34,6 +36,7 @@ import {
   markRoomHasPending,
   unmarkRoomHasPending,
 } from '../Storage/chatStorage';
+import { hydrateDecryptedMessages } from '../Storage/decryptedMessageStorage';
 
 /* ============================================================================
  * NETWORK CONTRACT TYPES (STRICT)
@@ -351,8 +354,37 @@ function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage 
   if (!n.replyTo && p.replyTo) merged.replyTo = p.replyTo;
   if (!n.sticker && p.sticker) merged.sticker = p.sticker;
   if (!n.voice && p.voice) merged.voice = p.voice;
-  if (!(n.attachments?.length) && p.attachments?.length) merged.attachments = p.attachments;
-  if (!n.media && p.media) merged.media = p.media;
+  if (!(n.attachments?.length) && p.attachments?.length) {
+    merged.attachments = p.attachments;
+  } else if (n.attachments?.length && p.attachments?.length) {
+    // Server version strips localUri/localPath — restore them per-attachment
+    // so the sender can still open their own file from local storage.
+    merged.attachments = (n.attachments as any[]).map((nAtt: any, idx: number) => {
+      const pAtt: any = (p.attachments as any[])[idx];
+      if (!pAtt) return nAtt;
+      return {
+        ...nAtt,
+        localUri: nAtt.localUri ?? pAtt.localUri,
+        localPath: nAtt.localPath ?? pAtt.localPath,
+      };
+    });
+  }
+  if (!n.media && p.media) {
+    merged.media = p.media;
+  } else if (n.media?.attachments?.length && p.media?.attachments?.length) {
+    merged.media = {
+      ...n.media,
+      attachments: (n.media.attachments as any[]).map((nAtt: any, idx: number) => {
+        const pAtt: any = (p.media.attachments as any[])[idx];
+        if (!pAtt) return nAtt;
+        return {
+          ...nAtt,
+          localUri: nAtt.localUri ?? pAtt.localUri,
+          localPath: nAtt.localPath ?? pAtt.localPath,
+        };
+      }),
+    };
+  }
   if (!n.poll && p.poll) merged.poll = p.poll;
   if (!n.event && p.event) merged.event = p.event;
   if (!(n.contacts?.length) && p.contacts?.length) merged.contacts = p.contacts;
@@ -476,6 +508,8 @@ export function useChatPersistence(
   const roomIdRef = useRef<string>(roomId);
   const previousRoomIdRef = useRef<string | null>(null);
   const flushInFlightRef = useRef(false);
+  const retryAttemptsRef = useRef<Record<string, number>>({});
+  const RETRY_KEY = `kis.retry_attempts.${roomId}.${currentUserId ?? 'anon'}`;
 
   /* ------------------------------------------------------------------------
    * REF SYNC
@@ -503,26 +537,54 @@ export function useChatPersistence(
 
     (async () => {
       try {
+        // Restore retry attempt counts so backoff survives app restarts
+        try {
+          const retryRaw = await AsyncStorage.getItem(RETRY_KEY);
+          if (retryRaw) retryAttemptsRef.current = JSON.parse(retryRaw);
+        } catch {}
+
         const loaded = await loadMessages(roomId, currentUserId);
         const previousRoomId = previousRoomIdRef.current;
         const migrated =
           previousRoomId && previousRoomId !== roomId
             ? await loadMessages(previousRoomId, currentUserId)
             : [];
+        const hydrated = await hydrateDecryptedMessages(
+          currentUserId,
+          loaded ?? [],
+        );
+        const hydratedMigrated = await hydrateDecryptedMessages(
+          currentUserId,
+          migrated ?? [],
+        );
         if (!mounted) return;
         const byIdentity = new Map<string, ChatMessage>();
-        [...(loaded ?? []), ...(migrated ?? []), ...messagesRef.current].forEach((m) => {
+        [...hydrated, ...hydratedMigrated, ...messagesRef.current].forEach((m) => {
           const convId = m.conversationId ?? m.roomId ?? '';
           const belongsToRoom = String(convId) === String(roomId) || String(m.roomId ?? '') === String(roomId);
           const migratedToRoom = previousRoomId && String(m.roomId ?? '') === String(previousRoomId) && String(convId) === String(roomId);
           if (!belongsToRoom && !migratedToRoom) return;
           const key = String(m.serverId ?? m.id ?? m.clientId ?? `${m.createdAt}-${m.senderId}`);
-          byIdentity.set(key, { ...m, roomId, conversationId: m.conversationId ?? roomId });
+          const normalizedMessage = {
+            ...m,
+            roomId,
+            conversationId: m.conversationId ?? roomId,
+          };
+          const existing = byIdentity.get(key);
+          byIdentity.set(
+            key,
+            existing
+              ? mergePreservingRich(existing, normalizedMessage)
+              : normalizedMessage,
+          );
         });
         const normalized = Array.from(byIdentity.values()).map((m) =>
           normalizeSender(m, currentUserId),
         );
         const sorted = cleanupHistoricalUploadDuplicates(sortMessages(normalized));
+        // Update ref synchronously before the React render cycle so any
+        // concurrent history fetch can merge against the loaded messages.
+        messagesRef.current = sorted;
         setMessages(sorted);
         if (currentUserId) {
           await saveMessages(roomId, sorted, currentUserId);
@@ -570,6 +632,7 @@ export function useChatPersistence(
           payload.sticker ||
           payload.poll ||
           payload.event ||
+          (payload as any).location ||
           payload.attachments?.length ||
           payload.contacts?.length,
       );
@@ -607,12 +670,15 @@ export function useChatPersistence(
 
       if (!sendOverNetwork) return;
 
+      // Fire the "sending" status update without blocking the network call —
+      // the optimistic render already shows the message, and the status change
+      // from pending → sending is cosmetic.
       const sending = optimistic.map((m) =>
         m.clientId === clientId
           ? { ...m, status: 'sending' as MessageStatus }
           : m,
       );
-      await persist(sending);
+      persist(sending).catch(() => {});
 
       const result = await sendOverNetwork(draft).catch(
         () => ({ ok: false } as SendOverNetworkNack),
@@ -763,6 +829,13 @@ export function useChatPersistence(
           .map((m) => ({ ...m }));
 
         for (const msg of queue) {
+          const key = msg.clientId ?? msg.id;
+          const attempt = retryAttemptsRef.current[key] ?? 0;
+          // Exponential backoff: skip messages that haven't waited long enough
+          const backoffMs = Math.min(30_000, 1_000 * Math.pow(2, attempt));
+          const lastFailedAt = (msg as any)._lastFailedAt ?? 0;
+          if (attempt > 0 && Date.now() - lastFailedAt < backoffMs) continue;
+
           if (!silent) {
             const marking = messagesRef.current.map((m) =>
               m.clientId === msg.clientId
@@ -780,15 +853,27 @@ export function useChatPersistence(
           // during the await and must NOT be overwritten with a stale snapshot.
           const reconciled = messagesRef.current.map((m) => {
             if (m.clientId !== msg.clientId) return m;
-            // Already confirmed by an echo-back — don't downgrade.
             if (m.status === STATUS_SENT || m.status === 'delivered' || m.status === 'read') return m;
+            if (result.ok) {
+              delete retryAttemptsRef.current[key];
+              AsyncStorage.setItem(RETRY_KEY, JSON.stringify(retryAttemptsRef.current)).catch(() => {});
+              return {
+                ...m,
+                status: STATUS_SENT,
+                serverId: m.serverId ?? result.serverId,
+                seq: typeof result.seq === 'number' ? result.seq : m.seq,
+                createdAt: result.createdAt ?? m.createdAt,
+                isLocalOnly: false,
+              };
+            }
+            // Failed — increment backoff counter
+            retryAttemptsRef.current[key] = attempt + 1;
+            AsyncStorage.setItem(RETRY_KEY, JSON.stringify(retryAttemptsRef.current)).catch(() => {});
             return {
               ...m,
-              status: result.ok ? STATUS_SENT : result.queued ? STATUS_QUEUED : silent ? m.status : STATUS_FAILED,
-              serverId: result.ok ? (m.serverId ?? result.serverId) : m.serverId,
-              seq: result.ok && typeof result.seq === 'number' ? result.seq : m.seq,
-              createdAt: result.ok && result.createdAt ? result.createdAt : m.createdAt,
-              isLocalOnly: result.ok ? false : m.isLocalOnly,
+              status: result.queued ? STATUS_QUEUED : silent ? m.status : STATUS_FAILED,
+              isLocalOnly: m.isLocalOnly,
+              _lastFailedAt: Date.now(),
             };
           });
           await persist(reconciled);

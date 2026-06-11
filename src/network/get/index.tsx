@@ -4,8 +4,10 @@ import apiService from '../../services/apiService';
 import { getOfflineCache, setCache, setOfflineCache } from '../cache';
 import { CacheTypes } from '../cacheKeys';
 import type { ApiResult, HeadersInit } from '../types';
-import { getAccessToken } from '@/security/authStorage';
-import { refreshAccessToken } from '@/security/tokenRefresh';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 import { recordRedactedPerformanceEvent, computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 export type GetResponse<T = any> = ApiResult<T>;
@@ -154,7 +156,7 @@ export const getRequest = async (
 ) => {
   const execute = async (): Promise<GetResponse> => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessTokenForRequest();
     const deviceId = await getCachedDeviceId();
     const baseHeaders: HeadersInit = {};
     if (token) baseHeaders.Authorization = `Bearer ${token}`;
@@ -230,7 +232,7 @@ export const getRequest = async (
 
     // Silent token refresh on 401, then retry once.
     if (response.status === 401) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
         const retryResponse = await apiService.get(finalUrl, retryHeaders);

@@ -26,6 +26,8 @@ type Props = {
   onCloseSubRooms: () => void;
   subRooms: SubRoom[];
   onOpenSubRoom: (subRoom: SubRoom) => void;
+  // GAP 20: thread subject editing
+  onEditThreadSubject?: (subRoom: SubRoom) => void;
 
   // Starred
   starredSheetVisible: boolean;
@@ -64,6 +66,7 @@ export default function ChatRoomSheets({
   onCloseSubRooms,
   subRooms,
   onOpenSubRoom,
+  onEditThreadSubject,
   starredSheetVisible,
   onCloseStarred,
   readReceiptsSheetVisible,
@@ -96,6 +99,7 @@ export default function ChatRoomSheets({
         subRooms={subRooms}
         palette={palette}
         onOpenSubRoom={onOpenSubRoom}
+        onEditThreadSubject={onEditThreadSubject}
       />
 
       <ForwardChatSheet

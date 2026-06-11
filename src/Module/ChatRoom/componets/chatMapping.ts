@@ -11,18 +11,46 @@ export const mapBackendToChatMessage = (
 ): ChatMessage => {
   const mapAttachments = (list: any[]) =>
     list.map((raw) => {
-      const a = raw?.attachment ?? raw ?? {};
+      const a = raw?.attachment ?? raw?.asset ?? raw?.media ?? raw?.file ?? raw ?? {};
+      const localPath = a.localPath ?? a.local_path ?? a.path;
+      const localUri = a.localUri ?? a.local_uri ?? a.uri;
+      const displayUrl =
+        a.displayUrl ??
+        a.display_url ??
+        a.url ??
+        a.downloadUrl ??
+        a.download_url ??
+        a.publicUrl ??
+        a.public_url ??
+        a.fileUrl ??
+        a.file_url ??
+        a.secureUrl ??
+        a.secure_url ??
+        a.signedUrl ??
+        a.signed_url ??
+        localUri ??
+        (typeof localPath === 'string' && localPath ? `file://${localPath}` : '');
       return {
-        id: a.id ?? a.key,
-        url: a.url ?? a.uri,
-        originalName: a.originalName ?? a.name ?? a.filename,
-        mimeType: a.mimeType ?? a.mime ?? a.contentType,
-        size: a.size ?? a.sizeBytes,
+        ...a,
+        id: a.id ?? a.key ?? a.assetId ?? a.asset_id ?? a.mediaAssetId ?? a.media_asset_id ?? displayUrl,
+        url: displayUrl,
+        publicUrl: a.publicUrl ?? a.public_url,
+        downloadUrl: a.downloadUrl ?? a.download_url ?? a.fileUrl ?? a.file_url ?? a.secureUrl ?? a.secure_url ?? a.signedUrl ?? a.signed_url,
+        displayUrl,
+        assetId: a.assetId ?? a.asset_id,
+        mediaAssetId: a.mediaAssetId ?? a.media_asset_id,
+        mediaAssetRef: a.mediaAssetRef ?? a.media_asset_ref,
+        originalName: a.originalName ?? a.original_name ?? a.name ?? a.filename,
+        mimeType: a.mimeType ?? a.mime_type ?? a.mimetype ?? a.mime ?? a.contentType ?? a.content_type,
+        size: a.size ?? a.sizeBytes ?? a.size_bytes,
         kind: a.kind,
         width: a.width,
         height: a.height,
-        durationMs: a.durationMs,
-        thumbUrl: a.thumbUrl,
+        durationMs: a.durationMs ?? a.duration_ms,
+        durationSeconds: a.durationSeconds ?? a.duration_seconds,
+        thumbUrl: a.thumbUrl ?? a.thumb_url ?? a.thumbnailUrl ?? a.thumbnail_url,
+        localUri,
+        localPath,
       };
     });
 

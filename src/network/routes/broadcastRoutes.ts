@@ -263,6 +263,10 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/${id}/verification-status/`,
     verificationStart: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/verification/start/`,
+    invites: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/invites/`,
+    inviteDetail: (id: string, inviteId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/invites/${inviteId}/`,
+    redeemInvite: `${API_BASE_URL}/api/v1/partners/redeem-invite/`,
   },
   broadcasts: {
     list: `${API_BASE_URL}/api/v1/broadcasts/`,
@@ -609,6 +613,91 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/membership/`,
     tipCreator: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcast-items/${contentId}/tip/`,
+    contentTips: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/tips/`,
+    liveStreamTips: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${id}/tips/`,
+    liveStreamTipSend: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${id}/tip/`,
+    contentWatchSegments: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/watch-segments/`,
+    contentWatchEvent: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/watch-event/`,
+    contentAudioTracks: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/audio-tracks/`,
+    contentGeoRestriction: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/geo-restriction/`,
+    contentPremiere: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/premiere/`,
+    contentTranscript: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/transcript/`,
+    channelMonetization: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/monetization/`,
+    channelPayoutRequests: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/payout-requests/`,
+    liveStreamGuests: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${id}/guests/`,
+    liveStreamGuestAction: (streamId: string, guestId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/guests/${guestId}/`,
+    recommendations: `${API_BASE_URL}/api/v1/broadcasts/recommendations/`,
+    contentProducts: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/products/`,
+    contentAutoChapters: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/auto-chapters/`,
+    liveStreamSimulcast: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${id}/simulcast/`,
+    membershipGift: `${API_BASE_URL}/api/v1/broadcasts/memberships/gift/`,
+    membershipGiftRedeem: (token: string) => `${API_BASE_URL}/api/v1/broadcasts/memberships/gift/${token}/redeem/`,
+    channelCopyrightClaims: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/copyright-claims/`,
+    channelDemographics: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/demographics/`,
+    channelAdCampaigns: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/ad-campaigns/`,
+    contentAdSlots: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/ad-slots/`,
+    adSlotImpression: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/ad-slots/${id}/impression/`,
+    queue: `${API_BASE_URL}/api/v1/broadcasts/queue/`,
+    queueReorder: `${API_BASE_URL}/api/v1/broadcasts/queue/reorder/`,
+    trending: `${API_BASE_URL}/api/v1/broadcasts/trending/`,
+    channelRevenue: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/revenue/`,
+    // Comment pin/unpin
+    contentCommentPin: (contentId: string, commentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/comments/${commentId}/pin/`,
+    // Channel trailer / featured
+    channelTrailerFeatured: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/trailer-featured/`,
+    // Analytics: impressions + CTR
+    channelAnalyticsImpressions: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/analytics/impressions/`,
+    // Analytics: traffic sources
+    channelAnalyticsTrafficSources: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/analytics/traffic-sources/`,
+    // Keyword filters
+    channelKeywordFilters: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/keyword-filters/`,
+    channelKeywordFilter: (filterId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/keyword-filters/${filterId}/`,
+    // Homepage shelves
+    channelShelves: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/shelves/`,
+    channelShelf: (shelfId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/shelves/${shelfId}/`,
+    channelShelfItems: (shelfId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/shelves/${shelfId}/items/`,
+    // Categories
+    categories: `${API_BASE_URL}/api/v1/broadcasts/categories/`,
+    categoryBrowse: (slug: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/categories/${slug}/browse/`,
+    // Content fingerprint
+    contentFingerprint: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/fingerprint/`,
+    // Live stream settings (latency / DVR)
+    liveStreamSettings: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/settings/`,
+    // Broadcast search
+    broadcastSearch: `${API_BASE_URL}/api/v1/broadcasts/search/`,
+    // Subtitles
+    contentSubtitles: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/subtitles/`,
+    contentSubtitle: (subtitleId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/subtitles/${subtitleId}/`,
+    // Manual chapters
+    contentChapters: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/`,
+    contentChapter: (chapterId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/chapters/${chapterId}/`,
+    // End screens
+    contentEndScreen: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/end-screen/`,
+    // Info cards
+    contentCards: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/cards/`,
+    contentCard: (cardId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/cards/${cardId}/`,
+    // Membership tier detail (for perks editor)
+    membershipTier: (tierId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/membership-tiers/${tierId}/`,
   },
   commerce: {
     carts: `${API_BASE_URL}/api/v1/commerce/carts/`,

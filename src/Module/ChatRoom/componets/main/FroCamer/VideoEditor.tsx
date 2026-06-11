@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Asset as ImagePickerAsset } from 'react-native-image-picker';
 import Video from 'react-native-video';
 
@@ -160,11 +161,9 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View
-        style={[
-          styles.root,
-          { backgroundColor: palette.bg },
-        ]}
+      <SafeAreaView
+        style={[styles.root, { backgroundColor: palette.bg }]}
+        edges={['top']}
       >
         {/* HEADER */}
         <View
@@ -172,8 +171,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
             styles.header,
             {
               borderBottomColor: palette.divider,
-              backgroundColor:
-                palette.chatHeaderBg ?? palette.card,
+              backgroundColor: palette.chatHeaderBg ?? palette.card,
             },
           ]}
         >
@@ -663,7 +661,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
             </Text>
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };

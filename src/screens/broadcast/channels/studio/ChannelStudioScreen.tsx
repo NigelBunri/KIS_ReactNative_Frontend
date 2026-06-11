@@ -15,6 +15,17 @@ import ChannelBrandingEditor from '@/screens/broadcast/channels/studio/ChannelBr
 import ChannelContentManager from '@/screens/broadcast/channels/studio/ChannelContentManager';
 import ChannelModerationPanel from '@/screens/broadcast/channels/studio/ChannelModerationPanel';
 import LiveControlRoom from '@/screens/broadcast/channels/studio/LiveControlRoom';
+import RevenueAnalyticsPanel from '@/screens/broadcast/channels/studio/RevenueAnalyticsPanel';
+import AudienceDemographicsPanel from '@/screens/broadcast/channels/studio/AudienceDemographicsPanel';
+import CopyrightClaimsPanel from '@/screens/broadcast/channels/studio/CopyrightClaimsPanel';
+import AdCampaignPanel from '@/screens/broadcast/channels/studio/AdCampaignPanel';
+import ImpressionsAnalyticsPanel from '@/screens/broadcast/channels/studio/ImpressionsAnalyticsPanel';
+import TrafficSourcesPanel from '@/screens/broadcast/channels/studio/TrafficSourcesPanel';
+import SubtitleEditorPanel from '@/screens/broadcast/channels/studio/SubtitleEditorPanel';
+import ChapterEditorPanel from '@/screens/broadcast/channels/studio/ChapterEditorPanel';
+import EndScreenEditor from '@/screens/broadcast/channels/studio/EndScreenEditor';
+import ContentCardsEditor from '@/screens/broadcast/channels/studio/ContentCardsEditor';
+import ChannelHomepageShelfEditor from '@/screens/broadcast/channels/studio/ChannelHomepageShelfEditor';
 import {
   KIS_PROMOTIONAL_CREDIT_SAFETY_COPY,
   getLockedPremiumStateCopy,
@@ -24,7 +35,7 @@ import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPr
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
-type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'settings';
+type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'settings';
 
 type Props = {
   legacyFeeds: any[];
@@ -49,6 +60,17 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'live', label: 'Live' },
   { id: 'analytics', label: 'Analytics' },
   { id: 'moderation', label: 'Moderation' },
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'audience', label: 'Audience' },
+  { id: 'copyright', label: 'Copyright' },
+  { id: 'ads', label: 'Ads' },
+  { id: 'impressions', label: 'Impressions' },
+  { id: 'traffic', label: 'Traffic' },
+  { id: 'subtitles', label: 'Subtitles' },
+  { id: 'chapters', label: 'Chapters' },
+  { id: 'endscreens', label: 'End Screens' },
+  { id: 'cards', label: 'Cards' },
+  { id: 'shelves', label: 'Shelves' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -128,6 +150,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const { user } = useAuth();
   const canUseLiveStreaming = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
+  const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [contents, setContents] = useState<BroadcastChannelContent[]>([]);
   const [playlists, setPlaylists] = useState<BroadcastChannelPlaylist[]>([]);
@@ -235,6 +258,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   useEffect(() => {
     void refreshContent();
   }, [refreshContent]);
+
+  useEffect(() => {
+    if (!selectedContent && contents.length > 0) {
+      setSelectedContent(contents[0] ?? null);
+    }
+  }, [contents, selectedContent]);
 
   const handleToggleChannelBroadcast = useCallback(async () => {
     if (!selectedChannel?.id || channelBroadcasting) return;
@@ -450,6 +479,17 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </>
       );
     }
+    if (activeTab === 'revenue') return <RevenueAnalyticsPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'audience') return <AudienceDemographicsPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'copyright') return <CopyrightClaimsPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'ads') return <AdCampaignPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'impressions') return <ImpressionsAnalyticsPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'traffic') return <TrafficSourcesPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'subtitles') return <SubtitleEditorPanel contentId={selectedContent?.id ?? ''} />;
+    if (activeTab === 'chapters') return <ChapterEditorPanel contentId={selectedContent?.id ?? ''} />;
+    if (activeTab === 'endscreens') return <EndScreenEditor contentId={selectedContent?.id ?? ''} />;
+    if (activeTab === 'cards') return <ContentCardsEditor contentId={selectedContent?.id ?? ''} />;
+    if (activeTab === 'shelves') return <ChannelHomepageShelfEditor channelId={selectedChannel.id} />;
     if (activeTab === 'settings') {
       return (
         <>

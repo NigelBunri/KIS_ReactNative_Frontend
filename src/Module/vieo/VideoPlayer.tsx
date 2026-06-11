@@ -28,6 +28,7 @@ export type VideoPlayerProps = {
   showControls?: boolean;
   allowFullScreen?: boolean;
   pictureInPicture?: boolean;
+  enablePip?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
   videoStyle?: StyleProp<any>;
   onFullScreenPress?: () => void;
@@ -47,6 +48,7 @@ export default function VideoPlayer({
   showControls = true,
   allowFullScreen = false,
   pictureInPicture = false,
+  enablePip = false,
   containerStyle,
   videoStyle,
   onFullScreenPress,
@@ -93,6 +95,12 @@ export default function VideoPlayer({
   const handleReady = () => {
     setShowPoster(false);
     onReady?.();
+  };
+
+  const handlePipPress = () => {
+    try {
+      (videoRef as any).current?.enterPictureInPicture?.();
+    } catch {}
   };
 
   const handleRetry = () => {
@@ -231,6 +239,8 @@ export default function VideoPlayer({
           onSeekComplete={actions.seekTo}
           onFullScreenPress={allowFullScreen ? onFullScreenPress : undefined}
           chapters={chapters}
+          enablePip={enablePip || pictureInPicture}
+          onPipPress={handlePipPress}
         />
       )}
     </View>

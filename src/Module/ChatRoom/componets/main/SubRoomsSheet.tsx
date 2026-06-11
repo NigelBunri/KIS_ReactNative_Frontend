@@ -1,7 +1,7 @@
 // src/screens/chat/componets/SubRoomsSheet.tsx
 
 import React from 'react';
-import { Animated, Modal, View, Text, Pressable, FlatList } from 'react-native';
+import { ActionSheetIOS, Alert, Animated, Modal, Platform, View, Text, Pressable, FlatList } from 'react-native';
 
 import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
@@ -15,6 +15,7 @@ type SubRoomsSheetProps = {
   subRooms: SubRoom[];
   palette: any;
   onOpenSubRoom: (subRoom: SubRoom) => void;
+  onEditThreadSubject?: (subRoom: SubRoom) => void;
 };
 
 export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
@@ -24,6 +25,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
   subRooms,
   palette,
   onOpenSubRoom,
+  onEditThreadSubject,
 }) => {
   const count = subRooms.length;
   const { dragY, panHandlers } = usePullDownToClose({
@@ -38,40 +40,127 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
         ? `Thread from message ${item.rootMessageId.slice(0, 6)}…`
         : 'Sub-room');
 
+    const handleLongPress = () => {
+      if (!onEditThreadSubject) return;
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          { options: ['Edit subject', 'Cancel'], cancelButtonIndex: 1 },
+          (idx) => { if (idx === 0) onEditThreadSubject(item); },
+        );
+      } else {
+        Alert.alert('Thread', 'Edit subject?', [
+          { text: 'Edit', onPress: () => onEditThreadSubject(item) },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      }
+    };
+
+    const formattedTime = (() => {
+      if (!item.lastAt) return '';
+      const dt = new Date(item.lastAt);
+      if (Number.isNaN(dt.getTime())) return '';
+      return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    })();
+
     return (
       <Pressable
-        style={{
+        style={({ pressed }) => ({
           paddingVertical: 10,
           paddingHorizontal: 16,
           borderBottomWidth: 1,
           borderBottomColor: palette.divider,
-        }}
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          opacity: pressed ? 0.7 : 1,
+        })}
         onPress={() => onOpenSubRoom(item)}
+        onLongPress={handleLongPress}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <KISIcon name="layers" size={16} color={palette.primary} />
-          <View style={{ marginLeft: 8, flex: 1 }}>
+        {/* Avatar circle */}
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: palette.pillSubRoomBg ?? palette.surfaceSoft ?? palette.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <KISIcon name="layers" size={20} color={palette.primary} />
+        </View>
+
+        {/* Center: title + preview */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: palette.text,
+            }}
+          >
+            {title}
+          </Text>
+          {item.lastMessage ? (
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={{
-                fontSize: 14,
-                fontWeight: '600',
-                color: palette.text,
-              }}
-            >
-              {title}
-            </Text>
-            <Text
               style={{
                 fontSize: 12,
                 color: palette.subtext,
                 marginTop: 2,
               }}
             >
-              Tap to open the dedicated conversation
+              {item.lastMessage}
             </Text>
-          </View>
+          ) : (
+            <Text
+              style={{
+                fontSize: 12,
+                color: palette.subtext,
+                marginTop: 2,
+                fontStyle: 'italic',
+              }}
+            >
+              Tap to open
+            </Text>
+          )}
+        </View>
+
+        {/* Right: time + unread badge */}
+        <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          {formattedTime ? (
+            <Text style={{ fontSize: 11, color: palette.subtext }}>
+              {formattedTime}
+            </Text>
+          ) : null}
+          {(item.unreadCount ?? 0) > 0 && (
+            <View
+              style={{
+                minWidth: 20,
+                paddingHorizontal: 5,
+                height: 20,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: palette.error ?? '#FF3B30',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: '700',
+                }}
+              >
+                {(item.unreadCount ?? 0) > 99 ? '99+' : item.unreadCount}
+              </Text>
+            </View>
+          )}
         </View>
       </Pressable>
     );
@@ -148,7 +237,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
                   marginTop: 4,
                 }}
               >
-                Long-press a message and use the “continue in sub-room” action
+                Long-press a message and use the "continue in sub-room" action
                 to start a dedicated thread.
               </Text>
             </View>

@@ -1,5 +1,5 @@
 // src/screens/tabs/MessageTabs.tsx
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -70,6 +70,28 @@ type ChatsTabProps = {
   loading?: boolean;
 };
 
+type ChatListItem = Chat & { _isArchivedItem?: boolean };
+
+function Badge({ count, palette }: { count: number; palette: any }) {
+  return (
+    <View
+      style={{
+        minWidth: 20,
+        paddingHorizontal: 5,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#25D366',
+      }}
+    >
+      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+        {count > 99 ? '99+' : count}
+      </Text>
+    </View>
+  );
+}
+
 export function ChatsTab({
   conversations = [],
   filters,
@@ -122,6 +144,29 @@ export function ChatsTab({
 
   const selectionMode = selectedChat.length > 0;
 
+  const [showArchived, setShowArchived] = useState(false);
+
+  /* ------------------------------------------------------------
+   * ARCHIVED DATA
+   * ------------------------------------------------------------ */
+  const archivedData = useMemo(() => {
+    return normalizedChats
+      .filter((c: Chat) => {
+        if (!c.isArchived) return false;
+        return bySearch(c, search);
+      })
+      .sort((a, b) => {
+        const aAt = a.lastAt ?? '';
+        const bAt = b.lastAt ?? '';
+        const aTs = Date.parse(aAt || '');
+        const bTs = Date.parse(bAt || '');
+        if (!Number.isNaN(aTs) && !Number.isNaN(bTs)) return bTs - aTs;
+        if (!Number.isNaN(aTs)) return -1;
+        if (!Number.isNaN(bTs)) return 1;
+        return 0;
+      });
+  }, [normalizedChats, search]);
+
   /* ------------------------------------------------------------
    * FINAL FILTERED DATA
    * ------------------------------------------------------------ */
@@ -131,6 +176,8 @@ export function ChatsTab({
 
     const filtered = normalizedChats.filter((c: Chat) => {
       if (c.kind === 'channel') return false;
+      // Hide archived chats from main list unless the Archived chip is active
+      if (c.isArchived && !activeQuick.has('Archived' as any)) return false;
       const convId = String((c as any).conversationId ?? c.id);
       if (c.isGroup && c.communityId) return false;
       if (communityGroupConversationIds?.has(convId)) return false;
@@ -184,6 +231,26 @@ export function ChatsTab({
   ]);
 
   /* ------------------------------------------------------------
+   * COMBINED LIST DATA (archived items prepended when expanded)
+   * ------------------------------------------------------------ */
+  const listData: ChatListItem[] = useMemo(() => {
+    if (!showArchived || archivedData.length === 0) return data;
+    const archivedItems: ChatListItem[] = archivedData.map((c) => ({
+      ...c,
+      _isArchivedItem: true,
+    }));
+    return [...archivedItems, ...data];
+  }, [data, archivedData, showArchived]);
+
+  const archivedUnreadTotal = useMemo(() => {
+    return archivedData.reduce((sum, c) => {
+      const convId = String((c as any).conversationId ?? c.id);
+      const meta = conversationMeta?.[convId];
+      return sum + (meta?.unreadCount ?? c.unreadCount ?? 0);
+    }, 0);
+  }, [archivedData, conversationMeta]);
+
+  /* ------------------------------------------------------------
    * CHAT SELECTION HANDLING
    * ------------------------------------------------------------ */
   const toggleSelectChat = (chat: Chat) => {
@@ -198,21 +265,420 @@ export function ChatsTab({
   };
 
   /* ------------------------------------------------------------
+   * RENDER HELPERS
+   * ------------------------------------------------------------ */
+  const renderChatItem = (item: ChatListItem) => {
+    const isArchived = Boolean(item._isArchivedItem);
+    const isSelected = selectedChat.some((c) => c.id === item.id);
+    const convId = String((item as any).conversationId ?? item.id);
+    const meta = conversationMeta?.[convId];
+    const metaAt = meta?.lastAt ?? '';
+    const itemAt = item.lastAt ?? '';
+    const metaTs = Date.parse(metaAt || '');
+    const itemTs = Date.parse(itemAt || '');
+    const backendOwnsUnread = item.readStateAuthoritative === true;
+    const useMeta =
+      metaAt &&
+      (!Number.isNaN(metaTs) &&
+        (Number.isNaN(itemTs) || metaTs >= itemTs));
+    const cleanPreview = (value?: string, source?: any) =>
+      resolveChatPreviewText(source ?? value, undefined, value);
+    const displayLastMessage = useMeta
+      ? cleanPreview(meta?.lastMessage) || cleanPreview(item.lastMessage, item)
+      : cleanPreview(item.lastMessage, item) || cleanPreview(meta?.lastMessage);
+    const displayLastAt = useMeta ? metaAt : itemAt;
+    const useMetaUnread =
+      useMeta &&
+      (!backendOwnsUnread ||
+        (Number.isNaN(itemTs) && !Number.isNaN(metaTs)) ||
+        (!Number.isNaN(metaTs) && !Number.isNaN(itemTs) && metaTs > itemTs));
+    const displayUnread = useMetaUnread
+      ? meta?.unreadCount ?? 0
+      : item.unreadCount ?? 0;
+
+    const handlePress = () => {
+      const displayName = (() => {
+        if (item.isDirect) {
+          const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
+          const key = normalizePhoneKey(phone);
+          if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
+        }
+        return item.name;
+      })();
+
+      if (selectionMode) {
+        toggleSelectChat(item);
+      } else {
+        const convKey = String((item as any).conversationId ?? item.id);
+        const community = communityByConversationId?.[convKey];
+        const communityId =
+          item.communityId ??
+          community?.id ??
+          (item.isCommunityChat ? item.id : undefined);
+        const isCommunity =
+          item.isCommunityChat ||
+          item.kind === 'community' ||
+          Boolean(communityId);
+        if (community) {
+          onOpenChat?.({
+            ...item,
+            name: community.name || displayName,
+            isCommunityChat: true,
+            communityId: community.id,
+          });
+          return;
+        }
+        if (isCommunity && communityId) {
+          onOpenChat?.({
+            ...item,
+            name: (item.name || displayName) as string,
+            isCommunityChat: true,
+            communityId,
+          });
+          return;
+        }
+        onOpenChat?.({ ...item, name: displayName });
+      }
+    };
+
+    const handleLongPress = () => {
+      toggleSelectChat(item);
+    };
+
+    const avatarUrl = item.avatarUrl || (item.isDirect
+      ? directConversationAvatar(item.participants ?? [], currentUserId)
+      : null);
+
+    const ids = participantsToIds(item.participants ?? []);
+    const otherId = item.isDirect
+      ? ids.find((u) => u && u !== currentUserId) ?? null
+      : null;
+    const statusInfo = otherId ? statusByUserId?.[otherId] : null;
+    const hasStatus = Boolean(statusInfo?.hasStatus);
+    const ringColor = hasStatus
+      ? statusInfo?.hasUnseen
+        ? palette.primaryStrong ?? palette.primary
+        : palette.subtext ?? palette.divider
+      : null;
+
+    return (
+      <Pressable
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        style={[
+          styles.row,
+          {
+            backgroundColor: isSelected
+              ? palette.goldSoft
+              : isArchived
+              ? (palette.archivedBg ?? palette.surfaceSoft ?? palette.card)
+              : palette.card,
+            borderColor: isSelected
+              ? palette.goldDeep
+              : palette.inputBorder,
+            opacity: isArchived ? 0.88 : 1,
+          },
+          KIS_TOKENS.elevation.card,
+        ]}
+      >
+        {/* AVATAR */}
+        <Pressable
+          onPress={() => {
+            if (hasStatus && otherId) {
+              onOpenStatus?.(otherId);
+              return;
+            }
+            if (avatarUrl) {
+              onOpenAvatarPreview?.({
+                avatarUrl,
+                chat: item,
+                userId: otherId ?? null,
+              });
+            }
+          }}
+          disabled={!hasStatus && !avatarUrl}
+          style={{ position: 'relative' }}
+        >
+          <View
+            style={{
+              borderWidth: ringColor ? 2 : 0,
+              borderColor: ringColor ?? 'transparent',
+              padding: ringColor ? 2 : 0,
+              borderRadius: 28,
+            }}
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
+            )}
+          </View>
+
+          {isArchived && (
+            <View
+              style={{
+                position: 'absolute',
+                right: -2,
+                bottom: -2,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: palette.surface ?? palette.card,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <KISIcon name="archive" size={10} color={palette.subtext} />
+            </View>
+          )}
+
+          {item.isDirect && !isArchived && (() => {
+            const online = otherId ? presenceByUser?.[otherId]?.isOnline : false;
+            if (!online) return null;
+            return (
+              <View
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  bottom: 0,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: '#34C759',
+                  borderWidth: 2,
+                  borderColor: palette.card,
+                }}
+              />
+            );
+          })()}
+
+          {isSelected && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.35)',
+                borderRadius: 30,
+              }}
+            >
+              <Text
+                style={{
+                  color: palette.primaryStrong,
+                  fontSize: 22,
+                  fontWeight: 'bold',
+                }}
+              >
+                ✓
+              </Text>
+            </View>
+          )}
+        </Pressable>
+
+        {/* NAME + LAST MESSAGE */}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.name, { color: palette.text }]}>
+              {(() => {
+                if (item.isDirect) {
+                  const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
+                  const key = normalizePhoneKey(phone);
+                  if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
+                }
+                return item.name;
+              })()}
+            </Text>
+            {item.isBlocked && (
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                  backgroundColor: palette.error ?? palette.primary,
+                }}
+              >
+                <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 10 }}>
+                  Blocked
+                </Text>
+              </View>
+            )}
+            {(item as any).isPinned ? (
+              <KISIcon name="pin" size={14} color={palette.goldDeep ?? palette.primaryStrong} />
+            ) : null}
+            {item.isMuted && (
+              <KISIcon
+                name="volume-mute"
+                size={14}
+                color={palette.subtext}
+              />
+            )}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {(() => {
+              const typingUsers = typingByConversation?.[String(convId)] ?? {};
+              const otherTyping = Object.keys(typingUsers).filter((u) => u !== currentUserId);
+              const isTyping = otherTyping.length > 0;
+              const statusSymbol =
+                meta?.lastMessageFromMe && meta?.lastStatus
+                  ? getStatusSymbol(meta.lastStatus)
+                  : '';
+              const statusColor =
+                meta?.lastStatus === 'read'
+                  ? palette.readStatus ?? palette.primary
+                  : meta?.lastStatus === 'delivered'
+                  ? palette.primary ?? palette.subtext
+                  : palette.subtext;
+
+              if (isTyping) {
+                return (
+                  <>
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: palette.primary,
+                      }}
+                    />
+                    <Text style={{ color: palette.primary }}>
+                      typing...
+                    </Text>
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  {statusSymbol ? (
+                    <Text
+                      style={{
+                        color: statusColor,
+                        fontSize: 12,
+                        marginRight: 4,
+                      }}
+                    >
+                      {statusSymbol}
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={{ color: palette.subtext }}
+                    numberOfLines={1}
+                  >
+                    {displayLastMessage || ''}
+                  </Text>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+
+        {/* RIGHT SIDE INFO */}
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Text style={{ color: palette.subtext }}>
+            {(() => {
+              const raw = displayLastAt || '';
+              if (!raw) return '';
+              const dt = new Date(raw);
+              if (Number.isNaN(dt.getTime())) return String(raw);
+              return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            })()}
+          </Text>
+
+          {displayUnread > 0 && !isSelected && (
+            <View
+              style={{
+                minWidth: 22,
+                paddingHorizontal: 6,
+                height: 22,
+                borderRadius: 11,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: palette.primarySoft,
+              }}
+            >
+              <Text
+                style={{
+                  color: palette.primaryStrong,
+                  fontWeight: '700',
+                  fontSize: 12,
+                }}
+              >
+                {displayUnread}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+    );
+  };
+
+  /* ------------------------------------------------------------
    * RENDER
    * ------------------------------------------------------------ */
   if (loading && conversations.length === 0) {
     return <ChatListSkeleton palette={palette} />;
   }
 
+  const archivedBanner = archivedData.length > 0 ? (
+    <Pressable
+      onPress={() => setShowArchived((v) => !v)}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginBottom: 4,
+        borderRadius: 10,
+        backgroundColor: palette.surfaceSoft ?? palette.surface ?? (palette.isDark ? '#1a1a1a' : '#f5f5f5'),
+        gap: 10,
+      }}
+    >
+      <KISIcon name="archive" size={18} color={palette.subtext} />
+      <Text
+        style={{
+          flex: 1,
+          fontSize: 14,
+          fontWeight: '500',
+          color: palette.text,
+        }}
+      >
+        Archived
+      </Text>
+      <Text
+        style={{
+          fontSize: 13,
+          color: palette.subtext,
+          marginRight: 6,
+        }}
+      >
+        {archivedData.length}
+      </Text>
+      {archivedUnreadTotal > 0 && (
+        <Badge count={archivedUnreadTotal} palette={palette} />
+      )}
+      <KISIcon
+        name={showArchived ? 'chevron-up' : 'chevron-down'}
+        size={14}
+        color={palette.subtext}
+      />
+    </Pressable>
+  ) : null;
+
   return (
     <FlatList
       contentContainerStyle={{ padding: 16 }}
-      data={data}
-      keyExtractor={(i) => i.id}
+      data={listData}
+      keyExtractor={(i) => `${i._isArchivedItem ? 'arch_' : ''}${i.id}`}
       onScroll={onScroll}
       scrollEventThrottle={16}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
+      ListHeaderComponent={archivedBanner}
       ListEmptyComponent={
         <View style={[styles.center, { paddingVertical: 60 }]}>
           <Text style={{ color: palette.subtext }}>
@@ -220,334 +686,7 @@ export function ChatsTab({
           </Text>
         </View>
       }
-      renderItem={({ item }) => {
-        const isSelected = selectedChat.some((c) => c.id === item.id);
-        const convId = String((item as any).conversationId ?? item.id);
-        const meta = conversationMeta?.[convId];
-        const metaAt = meta?.lastAt ?? '';
-        const itemAt = item.lastAt ?? '';
-        const metaTs = Date.parse(metaAt || '');
-        const itemTs = Date.parse(itemAt || '');
-        const backendOwnsUnread = item.readStateAuthoritative === true;
-        const useMeta =
-          metaAt &&
-          (!Number.isNaN(metaTs) &&
-            (Number.isNaN(itemTs) || metaTs >= itemTs));
-        const cleanPreview = (value?: string, source?: any) =>
-          resolveChatPreviewText(source ?? value, undefined, value);
-        const displayLastMessage = useMeta
-          ? cleanPreview(meta?.lastMessage) || cleanPreview(item.lastMessage, item)
-          : cleanPreview(item.lastMessage, item) || cleanPreview(meta?.lastMessage);
-        const displayLastAt = useMeta ? metaAt : itemAt;
-        const useMetaUnread =
-          useMeta &&
-          (!backendOwnsUnread ||
-            (Number.isNaN(itemTs) && !Number.isNaN(metaTs)) ||
-            (!Number.isNaN(metaTs) && !Number.isNaN(itemTs) && metaTs > itemTs));
-        const displayUnread = useMetaUnread
-          ? meta?.unreadCount ?? 0
-          : item.unreadCount ?? 0;
-
-        const handlePress = () => {
-          const displayName = (() => {
-            if (item.isDirect) {
-              const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
-              const key = normalizePhoneKey(phone);
-              if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
-            }
-            return item.name;
-          })();
-
-          if (selectionMode) {
-            toggleSelectChat(item);
-          } else {
-            const convKey = String((item as any).conversationId ?? item.id);
-            const community = communityByConversationId?.[convKey];
-            const communityId =
-              item.communityId ??
-              community?.id ??
-              (item.isCommunityChat ? item.id : undefined);
-            const isCommunity =
-              item.isCommunityChat ||
-              item.kind === 'community' ||
-              Boolean(communityId);
-            if (community) {
-              onOpenChat?.({
-                ...item,
-                name: community.name || displayName,
-                isCommunityChat: true,
-                communityId: community.id,
-              });
-              return;
-            }
-            if (isCommunity && communityId) {
-              onOpenChat?.({
-                ...item,
-                name: (item.name || displayName) as string,
-                isCommunityChat: true,
-                communityId,
-              });
-              return;
-            }
-            onOpenChat?.({ ...item, name: displayName });
-          }
-        };
-
-        const handleLongPress = () => {
-          toggleSelectChat(item);
-        };
-
-        const avatarUrl = item.avatarUrl || (item.isDirect
-          ? directConversationAvatar(item.participants ?? [], currentUserId)
-          : null);
-
-        const ids = participantsToIds(item.participants ?? []);
-        const otherId = item.isDirect
-          ? ids.find((u) => u && u !== currentUserId) ?? null
-          : null;
-        const statusInfo = otherId ? statusByUserId?.[otherId] : null;
-        const hasStatus = Boolean(statusInfo?.hasStatus);
-        const ringColor = hasStatus
-          ? statusInfo?.hasUnseen
-            ? palette.primaryStrong ?? palette.primary
-            : palette.subtext ?? palette.divider
-          : null;
-
-        return (
-          <Pressable
-            onPress={handlePress}
-            onLongPress={handleLongPress}
-            style={[
-              styles.row,
-            {
-              backgroundColor: isSelected
-                  ? palette.goldSoft
-                  : palette.card,
-                borderColor: isSelected
-                  ? palette.goldDeep
-                  : palette.inputBorder,
-              },
-              KIS_TOKENS.elevation.card,
-            ]}
-          >
-            {/* AVATAR */}
-            <Pressable
-              onPress={() => {
-                if (hasStatus && otherId) {
-                  onOpenStatus?.(otherId);
-                  return;
-                }
-                if (avatarUrl) {
-                  onOpenAvatarPreview?.({
-                    avatarUrl,
-                    chat: item,
-                    userId: otherId ?? null,
-                  });
-                }
-              }}
-              disabled={!hasStatus && !avatarUrl}
-              style={{ position: 'relative' }}
-            >
-              <View
-                style={{
-                  borderWidth: ringColor ? 2 : 0,
-                  borderColor: ringColor ?? 'transparent',
-                  padding: ringColor ? 2 : 0,
-                  borderRadius: 28,
-                }}
-              >
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-                ) : (
-                  <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
-                )}
-              </View>
-
-              {item.isDirect && (() => {
-                const online = otherId ? presenceByUser?.[otherId]?.isOnline : false;
-                if (!online) return null;
-                return (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      bottom: 0,
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      backgroundColor: '#34C759',
-                      borderWidth: 2,
-                      borderColor: palette.card,
-                    }}
-                  />
-                );
-              })()}
-
-              {isSelected && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'rgba(0,0,0,0.35)',
-                    borderRadius: 30,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: palette.primaryStrong,
-                      fontSize: 22,
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    ✓
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            {/* NAME + LAST MESSAGE */}
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.name, { color: palette.text }]}>
-                  {(() => {
-                    if (item.isDirect) {
-                      const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
-                      const key = normalizePhoneKey(phone);
-                      if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
-                    }
-                    return item.name;
-                  })()}
-                </Text>
-                {item.isBlocked && (
-                  <View
-                    style={{
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      backgroundColor: palette.error ?? palette.primary,
-                    }}
-                  >
-                    <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 10 }}>
-                      Blocked
-                    </Text>
-                  </View>
-                )}
-                {(item as any).isPinned ? (
-                  <KISIcon name="pin" size={14} color={palette.goldDeep ?? palette.primaryStrong} />
-                ) : null}
-                {item.isMuted && (
-                  <KISIcon
-                    name="volume-mute"
-                    size={14}
-                    color={palette.subtext}
-                  />
-                )}
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {(() => {
-                  const typingUsers = typingByConversation?.[String(convId)] ?? {};
-                  const otherTyping = Object.keys(typingUsers).filter((u) => u !== currentUserId);
-                  const isTyping = otherTyping.length > 0;
-                  const meta = conversationMeta?.[convId];
-                  const statusSymbol =
-                    meta?.lastMessageFromMe && meta?.lastStatus
-                      ? getStatusSymbol(meta.lastStatus)
-                      : '';
-                  const statusColor =
-                    meta?.lastStatus === 'read'
-                      ? palette.readStatus ?? palette.primary
-                      : meta?.lastStatus === 'delivered'
-                      ? palette.primary ?? palette.subtext
-                      : palette.subtext;
-
-                  if (isTyping) {
-                    return (
-                      <>
-                        <View
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: palette.primary,
-                          }}
-                        />
-                        <Text style={{ color: palette.primary }}>
-                          typing...
-                        </Text>
-                      </>
-                    );
-                  }
-
-                  return (
-                    <>
-                      {statusSymbol ? (
-                        <Text
-                          style={{
-                            color: statusColor,
-                            fontSize: 12,
-                            marginRight: 4,
-                          }}
-                        >
-                          {statusSymbol}
-                        </Text>
-                      ) : null}
-                      <Text
-                        style={{ color: palette.subtext }}
-                        numberOfLines={1}
-                      >
-                        {displayLastMessage || ''}
-                      </Text>
-                    </>
-                  );
-                })()}
-              </View>
-            </View>
-
-            {/* RIGHT SIDE INFO */}
-            <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <Text style={{ color: palette.subtext }}>
-                {(() => {
-                  const raw = displayLastAt || '';
-                  if (!raw) return '';
-                  const dt = new Date(raw);
-                  if (Number.isNaN(dt.getTime())) return String(raw);
-                  return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                })()}
-              </Text>
-
-              {displayUnread > 0 && !isSelected && (
-                <View
-                  style={{
-                    minWidth: 22,
-                    paddingHorizontal: 6,
-                    height: 22,
-                    borderRadius: 11,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: palette.primarySoft,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: palette.primaryStrong,
-                      fontWeight: '700',
-                      fontSize: 12,
-                    }}
-                  >
-                    {displayUnread}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Pressable>
-        );
-      }}
+      renderItem={({ item }) => renderChatItem(item)}
     />
   );
 }

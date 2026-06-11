@@ -1,14 +1,20 @@
 import { Platform } from 'react-native';
+import { APP_ENV } from '@/env';
 
-export const DEV_BACKEND_HOST = 'kis-django-backend.onrender.com';
+const trim = (value?: string | null) => String(value ?? '').trim();
+const envBool = (value?: string | null) =>
+  ['1', 'true', 'yes', 'on'].includes(trim(value).toLowerCase());
+
+export const DEV_BACKEND_HOST =
+  trim(APP_ENV.KIS_DEV_BACKEND_HOST) ||
+  (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
 export const API_PORT = 8000;
 export const CHAT_PORT = 4000;
 
-const USE_DEPLOYED_DJANGO = true;
-const USE_DEPLOYED_CHAT = true;
+const USE_LOCAL_BACKENDS = envBool(APP_ENV.KIS_USE_LOCAL_BACKENDS);
 
 // Local dev fallback
-const _localApiHost = Platform.OS === 'android' ? '10.0.2.2' : DEV_BACKEND_HOST;
+const _localApiHost = DEV_BACKEND_HOST;
 const _localApiBase = `http://${_localApiHost}:${API_PORT}`;
 const _localChatBase = `http://${_localApiHost}:${CHAT_PORT}`;
 
@@ -16,30 +22,22 @@ const _localChatBase = `http://${_localApiHost}:${CHAT_PORT}`;
 const _deployedApiBase = 'https://kis-django-backend.onrender.com';
 const _deployedChatBase = 'https://kis-nest-backend.onrender.com';
 
-const _prodApiBase =
-  (process.env.PROD_API_BASE_URL as string | undefined)?.trim() ||
-  _deployedApiBase;
-
-const _prodChatBase =
-  (process.env.PROD_CHAT_BASE_URL as string | undefined)?.trim() ||
-  _deployedChatBase;
+const _envApiBase = trim(APP_ENV.KIS_DJANGO_BASE_URL);
+const _envChatBase = trim(APP_ENV.KIS_NEST_BASE_URL);
+const _envChatWsUrl = trim(APP_ENV.KIS_CHAT_WS_URL);
 
 export const API_BASE_URL = __DEV__
-  ? USE_DEPLOYED_DJANGO
-    ? _deployedApiBase
-    : _localApiBase
-  : _prodApiBase;
+  ? (_envApiBase || (USE_LOCAL_BACKENDS ? _localApiBase : _deployedApiBase))
+  : (_envApiBase || _deployedApiBase);
 
 export const MEDIA_FALLBACK_API_BASE_URL = API_BASE_URL;
 
 export const CHAT_BASE_URL = __DEV__
-  ? USE_DEPLOYED_CHAT
-    ? _deployedChatBase
-    : _localChatBase
-  : _prodChatBase;
+  ? (_envChatBase || (USE_LOCAL_BACKENDS ? _localChatBase : _deployedChatBase))
+  : (_envChatBase || _deployedChatBase);
 
-export const CHAT_WS_URL = CHAT_BASE_URL;
-export const CHAT_WS_PATH = '/ws';
+export const CHAT_WS_URL = _envChatWsUrl || CHAT_BASE_URL;
+export const CHAT_WS_PATH = trim(APP_ENV.KIS_CHAT_WS_PATH) || '/ws';
 export const CHAT_UPLOAD_URL = `${CHAT_BASE_URL}/uploads/file`;
 export const WEBSOCKET_URL = CHAT_WS_URL;
 

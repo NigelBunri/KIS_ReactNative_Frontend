@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 
-// Tenor GIF API — set TENOR_API_KEY in your .env / config
-// Fallback to a public demo key for development only
-const TENOR_API_KEY = (process.env as any).TENOR_API_KEY ?? 'LIVDSRZULELA';
+// Tenor GIF API — set TENOR_API_KEY in your .env file.
+// In development, if no key is configured, GIF search will return an empty result.
+const TENOR_API_KEY: string = (process.env as any).TENOR_API_KEY ?? (__DEV__ ? 'LIVDSRZULELA' : '');
 const TENOR_BASE = 'https://tenor.googleapis.com/v2';
 
 export type TenorGif = {
@@ -28,6 +28,7 @@ export type TenorGif = {
 };
 
 export async function searchTenor(query: string, limit = 24): Promise<TenorGif[]> {
+  if (!TENOR_API_KEY) return [];
   const endpoint = query.trim()
     ? `${TENOR_BASE}/search?q=${encodeURIComponent(query)}&key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`
     : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`;

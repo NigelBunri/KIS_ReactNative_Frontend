@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
@@ -75,6 +76,21 @@ type Props = {
   // calculate the correct offset. Defaults to 0; ChatRoomPage should pass
   // its measured header height.
   keyboardOffset?: number;
+
+  // GAP 12: announcement mode (admin-only posting)
+  announcementMode?: boolean;
+  isAdmin?: boolean;
+
+  // GAP 13: extended activity sub-states
+  activityUsers?: { userId: string; name?: string; activity: 'typing' | 'recording' | 'location' }[];
+
+  // GAP 14: scheduled messages queue
+  scheduledMessages?: { id: string; text: string; scheduledAt: string }[];
+  onSendScheduledNow?: (id: string) => void;
+  onCancelScheduled?: (id: string) => void;
+
+  // GAP 26: wallpaper preference sync
+  conversationId?: string;
 };
 
 export default function ChatRoomBody({
@@ -131,6 +147,13 @@ export default function ChatRoomBody({
   onUpdateMessage,
   typingUsers = [],
   keyboardOffset = 0,
+  announcementMode = false,
+  isAdmin = false,
+  activityUsers = [],
+  scheduledMessages = [],
+  onSendScheduledNow,
+  onCancelScheduled,
+  conversationId,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -142,6 +165,19 @@ export default function ChatRoomBody({
     return map;
   }, [mentionParticipants]);
 
+  // GAP 14: scheduled message modal
+  const [scheduledModalVisible, setScheduledModalVisible] = useState(false);
+
+  // GAP 13: activity sub-state display label
+  const activityLabel = useMemo(() => {
+    if (!activityUsers.length) return null;
+    const first = activityUsers[0];
+    const name = first.name ?? 'Someone';
+    if (first.activity === 'recording') return `🎙 ${name} is recording a voice note`;
+    if (first.activity === 'location') return `📍 ${name} is sharing location`;
+    return null; // typing handled by TypingIndicator
+  }, [activityUsers]);
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
@@ -152,6 +188,7 @@ export default function ChatRoomBody({
         messages={messages}
         palette={palette}
         isEmpty={!chat}
+        isE2EE
         currentUserId={currentUserId}
         selectionMode={selectionMode}
         selectedMessageIds={selectedIds}
@@ -180,7 +217,33 @@ export default function ChatRoomBody({
 
       <TypingIndicator typingUsers={typingUsers} palette={palette} />
 
-      {isChannel && !canPost ? (
+      {/* GAP 13: activity sub-state label */}
+      {activityLabel ? (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
+          <Text style={{ fontSize: 12, fontStyle: 'italic', color: palette.subtext ?? '#888' }}>{activityLabel}</Text>
+        </View>
+      ) : null}
+
+      {/* GAP 14: Scheduled message clock button */}
+      {scheduledMessages.length > 0 && (
+        <Pressable
+          onPress={() => setScheduledModalVisible(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, borderTopWidth: 1, borderTopColor: palette.divider ?? '#e0e0e0' }}
+        >
+          <Text style={{ fontSize: 12, color: palette.primary ?? '#4F46E5', fontWeight: '600' }}>
+            🕐 {scheduledMessages.length} scheduled message{scheduledMessages.length > 1 ? 's' : ''}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* GAP 12: Announcement mode banner */}
+      {announcementMode && !isAdmin ? (
+        <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: palette.inputBorder ?? palette.divider, backgroundColor: palette.card }}>
+          <Text style={{ color: palette.subtext, textAlign: 'center' }}>
+            📢 Announcement mode — only admins can post.
+          </Text>
+        </View>
+      ) : isChannel && !canPost ? (
         <View
           style={{
             padding: 14,
@@ -223,6 +286,46 @@ export default function ChatRoomBody({
           bottomInset={insets.bottom}
         />
       )}
+
+      {/* GAP 14: Scheduled messages modal */}
+      <Modal
+        visible={scheduledModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScheduledModalVisible(false)}
+      >
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }} onPress={() => setScheduledModalVisible(false)}>
+          <View style={{ maxHeight: '55%', backgroundColor: palette.surface ?? '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 }} onStartShouldSetResponder={() => true}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: palette.divider ?? '#00000011' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text ?? '#000' }}>Scheduled messages</Text>
+            </View>
+            <ScrollView>
+              {scheduledMessages.map((msg) => (
+                <View key={msg.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: palette.divider ?? '#00000011' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, color: palette.text ?? '#000' }} numberOfLines={2}>{msg.text}</Text>
+                    <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 3 }}>
+                      {new Date(msg.scheduledAt).toLocaleString()}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => { onSendScheduledNow?.(msg.id); }}
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: palette.primary ?? '#4F46E5', marginLeft: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, color: palette.onPrimary ?? '#fff', fontWeight: '600' }}>Send now</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { onCancelScheduled?.(msg.id); }}
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#DC262611', marginLeft: 6 }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600' }}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

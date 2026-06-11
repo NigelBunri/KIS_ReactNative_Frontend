@@ -2,8 +2,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../../services/apiService';
 import type { ApiResult, HeadersInit } from '../types';
-import { getAccessToken } from '@/security/authStorage';
-import { refreshAccessToken } from '@/security/tokenRefresh';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 const MAX_PUT_RETRIES = 2;
@@ -66,7 +68,7 @@ export const putData = async (
   const errorMsg = options.errorMessage ?? options.messages?.error ?? 'Failed to update data.';
 
   try {
-    const token = await getAccessToken();
+    const token = await getAccessTokenForRequest();
     const deviceId = await AsyncStorage.getItem('device_id');
 
     const isFormData =
@@ -93,7 +95,7 @@ export const putData = async (
 
     // Silent token refresh on 401
     if (response.status === 401) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...baseHeaders, Authorization: `Bearer ${newToken}` };
         const retryResponse = await fetchPutWithRetry(() => apiService.put(url, payload, retryHeaders));

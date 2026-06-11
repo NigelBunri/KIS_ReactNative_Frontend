@@ -34,6 +34,8 @@ export type CallParticipant = {
   role: CallRole;
   handRaised: boolean;
   joinedAt: string;
+  /** DTLS-SRTP fingerprint extracted from remote SDP once the peer reaches connected state. */
+  dtlsFingerprint?: string;
 };
 
 export type InCallMessage = {
@@ -92,6 +94,9 @@ export type CallSession = {
   viewerCount?: number;
   isRecording?: boolean;
   liveStartedAt?: string;
+
+  /** DTLS-SRTP fingerprint for the call — populated once the first peer reaches connected state. */
+  dtlsFingerprint?: string;
 };
 
 export type CallHistoryItem = {

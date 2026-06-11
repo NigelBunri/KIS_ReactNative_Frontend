@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import styles from '@/components/partners/partnersStyles';
@@ -58,6 +59,23 @@ export default function PartnerDiscoveryPanel({
   const [applyRole, setApplyRole] = useState('');
   const [jobPosts, setJobPosts] = useState<PartnerJobPost[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+
+  const redeemInviteCode = async () => {
+    const code = inviteCode.trim().toUpperCase();
+    if (!code) return;
+    setRedeemLoading(true);
+    const res = await postRequest(ROUTES.partners.redeemInvite, { code });
+    setRedeemLoading(false);
+    if (res?.success || res?.detail) {
+      setInviteCode('');
+      Alert.alert('Success', res?.detail ?? 'You have joined the organisation!');
+      onJoined?.();
+    } else {
+      Alert.alert('Invalid code', res?.message ?? res?.detail ?? 'Invite code not found or expired.');
+    }
+  };
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -213,6 +231,72 @@ export default function PartnerDiscoveryPanel({
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Invite code redemption */}
+          <View
+            style={{
+              backgroundColor: palette.surface,
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: palette.borderMuted,
+            }}
+          >
+            <Text style={{ color: palette.text, fontWeight: '700', marginBottom: 4 }}>
+              Have an invite code?
+            </Text>
+            <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 10 }}>
+              Enter your code to join a partner organisation directly.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={{
+                  flex: 1,
+                  height: 44,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  borderColor: palette.borderMuted,
+                  paddingHorizontal: 12,
+                  color: palette.text,
+                  backgroundColor: palette.inputBackground ?? palette.surfaceElevated,
+                  fontSize: 14,
+                  fontWeight: '600',
+                  letterSpacing: 1,
+                }}
+                value={inviteCode}
+                onChangeText={(t) => setInviteCode(t.toUpperCase())}
+                placeholder="INVITE CODE"
+                placeholderTextColor={palette.placeholder ?? palette.subtext}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={redeemInviteCode}
+                editable={!redeemLoading}
+              />
+              <Pressable
+                onPress={redeemInviteCode}
+                disabled={redeemLoading || !inviteCode.trim()}
+                style={({ pressed }) => ({
+                  height: 44,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  backgroundColor: palette.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: redeemLoading || !inviteCode.trim() || pressed ? 0.6 : 1,
+                })}
+              >
+                {redeemLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: palette.buttonText ?? '#fff', fontWeight: '700', fontSize: 13 }}>
+                    Join
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+
           {loading ? (
             <ActivityIndicator color={palette.primaryStrong} />
           ) : partners.length === 0 ? (

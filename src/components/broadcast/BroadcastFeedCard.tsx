@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import KISText from '@/components/common/KISText';
@@ -159,6 +160,12 @@ export default function BroadcastFeedCard({
   onToggleComments,
   onSubscribe,
   watchProgress,
+  showComments,
+  commentConversationId,
+  fetchConversationId,
+  onConversationResolved,
+  onMessageCountChange,
+  contextLabel,
 }: Props) {
   const { palette, tokens } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -627,8 +634,12 @@ export default function BroadcastFeedCard({
             style={styles.engItem}
             hitSlop={10}
           >
-            <KISIcon name="comment" size={18} color={palette.subtext} />
-            <Text style={[styles.engText, { color: palette.subtext }]}>
+            <KISIcon
+              name="comment"
+              size={18}
+              color={showComments ? palette.primaryStrong : palette.subtext}
+            />
+            <Text style={[styles.engText, { color: showComments ? palette.primaryStrong : palette.subtext }]}>
               {item.comment_count ?? 0}
             </Text>
           </Pressable>
@@ -641,6 +652,19 @@ export default function BroadcastFeedCard({
           </Text>
         </Pressable>
       </View>
+
+      {/* ───── Comment thread (expands below engagement row) ───── */}
+      {showComments ? (
+        <CommentThreadPanel
+          postId={item.id}
+          initialConversationId={commentConversationId}
+          fetchConversationId={fetchConversationId}
+          onConversationResolved={onConversationResolved}
+          onMessageCountChange={onMessageCountChange}
+          contextLabel={contextLabel}
+          useScrollView
+        />
+      ) : null}
     </View>
   );
 }

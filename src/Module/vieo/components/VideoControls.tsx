@@ -15,14 +15,17 @@ export type VideoControlsProps = {
   onFullScreenPress?: () => void;
   onSeekComplete?: (value: number) => void;
   chapters?: ChannelContentChapter[];
+  enablePip?: boolean;
+  onPipPress?: () => void;
 };
 
-export default function VideoControls({ state, actions, onFullScreenPress, onSeekComplete, chapters }: VideoControlsProps) {
+export default function VideoControls({ state, actions, onFullScreenPress, onSeekComplete, chapters, enablePip, onPipPress }: VideoControlsProps) {
   const { palette } = useKISTheme();
   const duration = Math.max(state.duration, 0.01);
   const normalizedProgress = Math.min(Math.max(state.progress, 0), duration);
   const [qualityOpen, setQualityOpen] = useState(false);
   const [captionsOpen, setCaptionsOpen] = useState(false);
+  const [speedOpen, setSpeedOpen] = useState(false);
   const [ccSize, setCcSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [ccBg, setCcBg] = useState<'none' | 'semi' | 'full'>('semi');
 
@@ -39,12 +42,6 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
     }
     return found ?? null;
   }, [chapters, normalizedProgress, duration]);
-
-  const cycleSpeed = () => {
-    const idx = SPEED_STEPS.indexOf(state.speed);
-    const next = SPEED_STEPS[(idx + 1) % SPEED_STEPS.length];
-    actions.setSpeed(next);
-  };
 
   const speedLabel = state.speed === 1 ? '1×' : `${state.speed}×`;
 
@@ -74,6 +71,11 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
               <KISIcon name="list" size={16} color={state.captionsEnabled ? (palette.primaryStrong ?? '#f59e0b') : (palette.ivory ?? '#fff')} />
             </Pressable>
           )}
+          {enablePip && onPipPress ? (
+            <Pressable onPress={onPipPress} style={styles.iconHitArea}>
+              <KISIcon name="pip" size={16} color={palette.ivory ?? '#fff'} />
+            </Pressable>
+          ) : null}
           {onFullScreenPress ? (
             <Pressable onPress={onFullScreenPress} style={styles.iconHitArea}>
               <KISIcon name="fullscreen" size={18} color={palette.ivory ?? '#fff'} />
@@ -122,10 +124,29 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Buffering…</Text>
           ) : null}
         </View>
-        <Pressable onPress={cycleSpeed} style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.5)' }]}>
+        <Pressable onPress={() => setSpeedOpen(true)} style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.5)' }]}>
           <Text style={[styles.speedLabel, { color: palette.ivory ?? '#fff' }]}>{speedLabel}</Text>
         </Pressable>
       </View>
+
+      {/* Speed picker modal */}
+      <Modal visible={speedOpen} transparent animationType="fade" onRequestClose={() => setSpeedOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setSpeedOpen(false)}>
+          <View style={[styles.pickerBox, { backgroundColor: palette.card ?? palette.surface }]}>
+            <Text style={[styles.pickerTitle, { color: palette.text }]}>Playback speed</Text>
+            {SPEED_STEPS.map((s) => (
+              <Pressable
+                key={s}
+                onPress={() => { actions.setSpeed(s); setSpeedOpen(false); }}
+                style={[styles.pickerItem, state.speed === s && { backgroundColor: palette.primaryStrong + '22' }]}
+              >
+                <Text style={[styles.pickerItemText, { color: palette.text }]}>{s === 1 ? 'Normal (1×)' : `${s}×`}</Text>
+                {state.speed === s && <KISIcon name="check" size={16} color={palette.primaryStrong} />}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Quality picker modal */}
       <Modal visible={qualityOpen} transparent animationType="fade" onRequestClose={() => setQualityOpen(false)}>

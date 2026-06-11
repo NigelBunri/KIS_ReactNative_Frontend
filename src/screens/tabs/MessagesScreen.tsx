@@ -41,9 +41,11 @@ import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
 import CallsTab from '@/screens/tabs/MesssagingSubTabs/CallsTab';
 import CommunitiesTab from '@/screens/tabs/CommunitiesTab';
+import NetInfo from '@react-native-community/netinfo';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { enqueueMutation, flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { 
   styles,
   type CustomFilter,
@@ -639,6 +641,17 @@ useEffect(() => {
     useNativeDriver: true,
   }).start();
 }, [avatarPreview, avatarAnim]);
+
+// Flush pending mutations when network recovers
+useEffect(() => {
+  const unsubscribe = NetInfo.addEventListener((state) => {
+    const connected = state.isConnected === true && state.isInternetReachable !== false;
+    if (connected) {
+      flushPendingMutations().catch(() => {});
+    }
+  });
+  return () => unsubscribe();
+}, []);
 
 const communitiesMountedRef = useRef(true);
 const loadCommunities = useCallback(async () => {
@@ -1302,9 +1315,13 @@ const handleDeleteSelected = useCallback(() => {
             return next;
           });
           void Promise.allSettled(
-            selectedConversationIds.map(conversationId =>
-              postRequest(conversationActionUrl(conversationId, 'delete-for-me'), {}),
-            ),
+            selectedConversationIds.map(async (conversationId) => {
+              try {
+                await postRequest(conversationActionUrl(conversationId, 'delete-for-me'), {});
+              } catch {
+                await enqueueMutation({ method: 'POST', url: conversationActionUrl(conversationId, 'delete-for-me'), payload: {} });
+              }
+            }),
           );
           handleClearSelection();
         },
@@ -1318,9 +1335,13 @@ const handlePinSelected = useCallback(() => {
   const shouldPin = selectedChat.some(chat => !(chat as any).isPinned);
   updateSelectedConversations(chat => ({ ...chat, isPinned: shouldPin } as Chat));
   void Promise.allSettled(
-    selectedConversationIds.map(conversationId =>
-      postRequest(conversationActionUrl(conversationId, 'pin'), { pinned: shouldPin }),
-    ),
+    selectedConversationIds.map(async (conversationId) => {
+      try {
+        await postRequest(conversationActionUrl(conversationId, 'pin'), { pinned: shouldPin });
+      } catch {
+        await enqueueMutation({ method: 'POST', url: conversationActionUrl(conversationId, 'pin'), payload: { pinned: shouldPin } });
+      }
+    }),
   );
   handleClearSelection();
 }, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
@@ -1330,9 +1351,13 @@ const handleMuteSelected = useCallback(() => {
   const shouldMute = selectedChat.some(chat => !chat.isMuted);
   updateSelectedConversations(chat => ({ ...chat, isMuted: shouldMute }));
   void Promise.allSettled(
-    selectedConversationIds.map(conversationId =>
-      postRequest(conversationActionUrl(conversationId, 'mute'), { muted: shouldMute }),
-    ),
+    selectedConversationIds.map(async (conversationId) => {
+      try {
+        await postRequest(conversationActionUrl(conversationId, 'mute'), { muted: shouldMute });
+      } catch {
+        await enqueueMutation({ method: 'POST', url: conversationActionUrl(conversationId, 'mute'), payload: { muted: shouldMute } });
+      }
+    }),
   );
   handleClearSelection();
 }, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
@@ -1342,9 +1367,13 @@ const handleArchiveSelected = useCallback(() => {
   const shouldArchive = selectedChat.some(chat => !chat.isArchived);
   updateSelectedConversations(chat => ({ ...chat, isArchived: shouldArchive }));
   void Promise.allSettled(
-    selectedConversationIds.map(conversationId =>
-      postRequest(conversationActionUrl(conversationId, 'archive'), { archived: shouldArchive }),
-    ),
+    selectedConversationIds.map(async (conversationId) => {
+      try {
+        await postRequest(conversationActionUrl(conversationId, 'archive'), { archived: shouldArchive });
+      } catch {
+        await enqueueMutation({ method: 'POST', url: conversationActionUrl(conversationId, 'archive'), payload: { archived: shouldArchive } });
+      }
+    }),
   );
   handleClearSelection();
 }, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
@@ -1360,9 +1389,13 @@ const handleMarkReadSelected = useCallback(() => {
     return next;
   });
   void Promise.allSettled(
-    selectedConversationIds.map(conversationId =>
-      postRequest(conversationActionUrl(conversationId, 'mark-read'), {}),
-    ),
+    selectedConversationIds.map(async (conversationId) => {
+      try {
+        await postRequest(conversationActionUrl(conversationId, 'mark-read'), {});
+      } catch {
+        await enqueueMutation({ method: 'POST', url: conversationActionUrl(conversationId, 'mark-read'), payload: {} });
+      }
+    }),
   );
   handleClearSelection();
 }, [conversationActionUrl, handleClearSelection, selectedConversationIds, updateSelectedConversations]);
@@ -1440,122 +1473,82 @@ const handleSelectAllChats = useCallback(() => {
     };
   }, []);
 
-  // ── Animated cluster (header + tab bar) ───────────────────────────────────
-  // hideProgress: 0 = fully shown, 1 = fully hidden
-  const hideProgress = useRef(new Animated.Value(0)).current;
-
-  // Header measurement
+  // ── Animated search + filter header ──────────────────────────────────────
+  // Only the search bar and filter chips animate away on scroll.
+  // The tab bar (Chats/Updates/Calls/Communities) is permanent navigation
+  // and must never hide — users need to always know where they are.
+  const headerHeightAnim = useRef(new Animated.Value(0)).current;
   const headerHRef = useRef(0);
-  const [headerH, setHeaderH] = useState(0);
+  const isHiddenRef = useRef(false);
 
-  // Tab bar measurement
-  const tabHRef = useRef(0);
-  const [tabH, setTabH] = useState(0);
-
-  const onHeaderLayout = (e: LayoutChangeEvent) => {
+  const onHeaderLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.max(0, e.nativeEvent.layout.height || 0);
-    if (h !== headerHRef.current) {
-      headerHRef.current = h;
-      setHeaderH(h);
-    }
-  };
+    if (h === headerHRef.current) return;
+    headerHRef.current = h;
+    if (!isHiddenRef.current) headerHeightAnim.setValue(h);
+  }, [headerHeightAnim]);
 
-  const onTabLayout = (h: number) => {
-    const v = Math.max(0, h || 0);
-    if (v !== tabHRef.current) {
-      tabHRef.current = v;
-      setTabH(v);
-    }
-  };
-
-  const translateHeaderY = hideProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -(headerH || 0)],
-    extrapolate: 'clamp',
-  });
-  const headerNegMargin = hideProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -(headerH || 0)],
-    extrapolate: 'clamp',
-  });
-
-  const translateTabY = hideProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -(tabH || 0)],
-    extrapolate: 'clamp',
-  });
-  const tabNegMargin = hideProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -(tabH || 0)],
-    extrapolate: 'clamp',
-  });
-
-  // ── Scroll heuristics (debounced + velocity aware) ────────────────────────
+  // ── Scroll heuristics ─────────────────────────────────────────────────────
   const lastYRef = useRef(0);
-  const lastTsRef = useRef(0);
   const animatingRef = useRef<null | 'show' | 'hide'>(null);
 
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const runSpring = useCallback(
-    (toValue: 0 | 1) => {
+  const runAnim = useCallback(
+    (hidden: boolean) => {
+      const target = hidden ? 0 : headerHRef.current;
+
       if (reduceMotionRef.current) {
-        hideProgress.setValue(toValue);
+        headerHeightAnim.setValue(target);
+        isHiddenRef.current = hidden;
         animatingRef.current = null;
         return;
       }
-      const nextState = toValue ? 'hide' : 'show';
-      animatingRef.current = nextState;
+
+      animatingRef.current = hidden ? 'hide' : 'show';
       animationRef.current?.stop();
-      animationRef.current = Animated.spring(hideProgress, {
-        toValue,
-        tension: 120,
-        friction: 18,
-        useNativeDriver: false, // layout margins cannot use native driver
+
+      const dur  = hidden ? 180 : 220;
+      const ease = hidden ? Easing.out(Easing.cubic) : Easing.out(Easing.quad);
+
+      animationRef.current = Animated.timing(headerHeightAnim, {
+        toValue: target,
+        duration: dur,
+        easing: ease,
+        useNativeDriver: false,
       });
-      animationRef.current.start(() => {
-        animatingRef.current = null;
+      animationRef.current.start(({ finished }) => {
+        if (finished) {
+          isHiddenRef.current = hidden;
+          animatingRef.current = null;
+        }
         animationRef.current = null;
       });
     },
-    [hideProgress]
+    [headerHeightAnim]
   );
 
-  const animateHidden = (hidden: boolean) => {
-    if (
-      animatingRef.current &&
-      ((hidden && animatingRef.current === 'hide') ||
-        (!hidden && animatingRef.current === 'show'))
-    ) {
-      return; // avoid re-triggering same direction
-    }
-    runSpring(hidden ? 1 : 0);
-  };
+  const animateHidden = useCallback((hidden: boolean) => {
+    const target = hidden ? 'hide' : 'show';
+    if (animatingRef.current === target) return;
+    runAnim(hidden);
+  }, [runAnim]);
 
-  const handleChatsScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { y } = e.nativeEvent.contentOffset;
-    const ts = Date.now();
+  const handleChatsScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
     const dy = y - lastYRef.current;
-    const dt = Math.max(1, ts - (lastTsRef.current || ts));
-    const velocityY = dy / dt; // px per ms (rough)
 
-    // Ignore ultra-small jitters/noise
-    if (Math.abs(dy) < 2) return;
+    // Need at least 6px of intentional scroll before reacting
+    if (Math.abs(dy) < 6) return;
 
-    // Velocity-sensitive thresholds (faster scrolls hide/show sooner)
-    const baseThreshold = 8;
-    const velocityBoost = Math.min(1.5, Math.max(0.5, Math.abs(velocityY) * 120));
-    const threshold = baseThreshold / velocityBoost;
-
-    if (dy > threshold) animateHidden(true); // scrolling down -> hide
-    else if (dy < -threshold) animateHidden(false); // scrolling up -> show
+    if (dy > 0) animateHidden(true);   // scrolling down → hide chrome
+    else animateHidden(false);          // scrolling up → reveal chrome
 
     lastYRef.current = y;
-    lastTsRef.current = ts;
-  };
+  }, [animateHidden]);
 
-  const handleChatsEndReached = () => {
-    animateHidden(false); // reveal at end
-  };
+  const handleChatsEndReached = useCallback(() => {
+    animateHidden(false);
+  }, [animateHidden]);
 
   // ── Load/save custom filters ─────────────────────────────────────────────
   useEffect(() => {
@@ -1624,17 +1617,7 @@ const handleSelectAllChats = useCallback(() => {
       }
     }, [nextTab]);
     return (
-      <Animated.View
-        onLayout={(e) => onTabLayout(e.nativeEvent.layout.height)}
-        style={{
-          transform: [{ translateY: translateTabY }],
-          marginBottom: tabNegMargin, // collapse layout space while hidden
-          backgroundColor: messageTopPanelBg,
-          borderBottomWidth: 0,
-          borderBottomColor: 'transparent',
-          overflow: 'hidden',
-        }}
-      >
+      <View style={{ backgroundColor: messageTopPanelBg, borderBottomWidth: 0, borderBottomColor: 'transparent' }}>
         <MaterialTopTabBar
           {...tabProps}
           style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
@@ -1643,7 +1626,7 @@ const handleSelectAllChats = useCallback(() => {
           activeTintColor={palette.ivory}
           inactiveTintColor={palette.goldSoft}
         />
-      </Animated.View>
+      </View>
     );
   };
 
@@ -2115,11 +2098,10 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
 
       {/* ------------ Animated Elevated Search Bar + Filters ------------ */}
       {(
-        <Animated.View
+        <Animated.View style={{ height: headerHeightAnim, overflow: 'hidden' }}>
+        <View
           onLayout={onHeaderLayout}
           style={{
-            transform: [{ translateY: translateHeaderY }],
-            marginBottom: headerNegMargin, // collapse space so list moves up
             paddingHorizontal: messageHeaderPaddingX,
             paddingTop: 4,
             paddingBottom: 8,
@@ -2129,7 +2111,6 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             borderTopWidth: 0,
             borderBottomLeftRadius: 24,
             borderBottomRightRadius: 24,
-            overflow: 'hidden',
           }}
         >
           <View
@@ -2225,7 +2206,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
 
           {/* Quick chips + Custom filter row */}
           {activeTopTab === 'Chats' ? <View style={styles.chipsRow}>
-            {(['Unread', 'Groups', 'Community', 'Mentions', 'Archived', 'Blocked'] as LocalQuick[]).map(
+            {(['Unread', 'Groups', 'Channels', 'Favourites', 'Community', 'Mentions', 'Archived', 'Blocked'] as LocalQuick[]).map(
               (chip) => (
                 <ToggleChip
                   key={chip}
@@ -2264,6 +2245,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               <Text style={{ color: palette.text, fontSize: 13 }}>Create</Text>
             </Pressable>
           </View> : null}
+        </View>
         </Animated.View>
       )}
       </LinearGradient>

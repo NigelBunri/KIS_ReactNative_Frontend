@@ -1,7 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+
+const BIBLE_POSITION_KEY = 'KIS_BIBLE_POSITION';
+const BIBLE_POSITION_DEBOUNCE_MS = 1000;
+
+type BiblePosition = {
+  translation?: string;
+  book?: string;
+  chapter?: number;
+};
+
+let biblePositionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function saveBiblePosition(position: BiblePosition) {
+  if (biblePositionDebounceTimer) clearTimeout(biblePositionDebounceTimer);
+  biblePositionDebounceTimer = setTimeout(() => {
+    AsyncStorage.setItem(BIBLE_POSITION_KEY, JSON.stringify(position)).catch(() => {});
+  }, BIBLE_POSITION_DEBOUNCE_MS);
+}
+
+async function loadBiblePosition(): Promise<BiblePosition | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BIBLE_POSITION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 import {
   BIBLE_OFFLINE_DOWNLOADS_UPDATED_EVENT,
   BibleOfflineManifest,
@@ -250,6 +278,15 @@ export function useBibleData() {
   const [preferredTranslationCode, setPreferredTranslationCode] = useState<string | null>(null);
   const [preferredTranslationId, setPreferredTranslationId] = useState<string | number | null>(null);
 
+  // Restore last reading position from AsyncStorage before fetching fresh data
+  useEffect(() => {
+    loadBiblePosition().then((position) => {
+      if (position?.translation && position?.book && position?.chapter) {
+        // Will be used once offlineManifestLoaded triggers the initial loadReader
+      }
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     Promise.all([readBibleOfflineManifest(), readLocalBiblePreference()])
       .then(([manifest, preference]) => {
@@ -330,6 +367,8 @@ export function useBibleData() {
         const cacheChapter = payload.chapter?.number ?? chapter;
         if (cacheTranslation && cacheBook && cacheChapter && !reference && !startVerse && !endVerse) {
           await cacheBibleChapter(cacheTranslation, cacheBook, Number(cacheChapter), payload);
+          // Persist reading position for offline restore
+          saveBiblePosition({ translation: cacheTranslation, book: cacheBook, chapter: Number(cacheChapter) });
         }
       } else if (translation && book && chapter && !reference && !startVerse && !endVerse) {
         const cached = await readCachedBibleChapter(translation, book, chapter);
@@ -442,10 +481,18 @@ export function useBibleData() {
   const defaultBook = useMemo(() => books.find((book) => book.code === 'GENESIS')?.code || books[0]?.code, [books]);
 
   useEffect(() => {
-    if (offlineManifestLoaded && defaultTranslation && defaultBook) {
+    if (!offlineManifestLoaded || !defaultTranslation || !defaultBook) return;
+    // Restore last reading position from AsyncStorage, fall back to Genesis 1
+    loadBiblePosition().then((position) => {
+      const translation = position?.translation ?? defaultTranslation;
+      const book = position?.book ?? defaultBook;
+      const chapter = position?.chapter ?? 1;
+      loadReader(translation, book, chapter);
+    }).catch(() => {
       loadReader(defaultTranslation, defaultBook, 1);
-    }
-  }, [offlineManifestLoaded, defaultTranslation, defaultBook, loadReader]);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offlineManifestLoaded, defaultTranslation, defaultBook]);
 
   const reload = useCallback(async () => {
     await Promise.all([

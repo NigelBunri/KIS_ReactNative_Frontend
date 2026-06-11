@@ -1,7 +1,8 @@
 // src/screens/chat/componets/PinnedMessagesSheet.tsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Modal, View, Text, Pressable, FlatList } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
@@ -24,12 +25,37 @@ type PinnedMessagesSheetProps = {
 export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
   visible,
   onClose,
-  roomId: _roomId,
+  roomId,
   pinnedMessages,
   palette,
   onJumpToMessage,
 }) => {
-  const count = pinnedMessages.length;
+  // GAP 27: filter out expired pins
+  const [nonExpiredPins, setNonExpiredPins] = useState<ChatMessage[]>(pinnedMessages);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      const filtered: ChatMessage[] = [];
+      for (const msg of pinnedMessages) {
+        const msgId = msg.serverId ?? msg.id;
+        const expiryKey = `KIS_PIN_EXPIRY_${roomId}_${msgId}`;
+        try {
+          const expiry = await AsyncStorage.getItem(expiryKey);
+          if (expiry && new Date(expiry) <= new Date()) {
+            // Expired — skip it
+            continue;
+          }
+        } catch { /* silent */ }
+        filtered.push(msg);
+      }
+      if (!cancelled) setNonExpiredPins(filtered);
+    })();
+    return () => { cancelled = true; };
+  }, [visible, pinnedMessages, roomId]);
+
+  const count = nonExpiredPins.length;
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
     onClose,
@@ -179,7 +205,7 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
             </View>
           ) : (
             <FlatList
-              data={pinnedMessages}
+              data={nonExpiredPins}
               keyExtractor={item => item.id}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 24 }}

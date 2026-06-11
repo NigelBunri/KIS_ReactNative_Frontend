@@ -65,6 +65,8 @@ export type RootStackParamList = {
   NotificationsDashboard: undefined;
   OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
   OrgAppLaunch: { partnerId: string; appId: string };
+  InviteJoin: { type: 'group' | 'community'; token: string };
+  PartnerRedeemInvite: { code?: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
   HealthInstitutionDetail: {
     institutionId: string;
@@ -184,6 +186,7 @@ export type RootStackParamList = {
   CacheManagement: undefined;
   AdminUserManagement: undefined;
   DeviceManagement: undefined;
+  LinkedDevices: undefined;
   QRScanLogin: undefined;
   ParentRecovery: undefined;
   InvoiceList: undefined;

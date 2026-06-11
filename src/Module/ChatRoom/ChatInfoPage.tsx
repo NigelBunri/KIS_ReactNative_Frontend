@@ -78,7 +78,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
-  const { startCall } = useSocket();
+  const { startCall, socket } = useSocket();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(
     chat.avatarUrl ||
@@ -104,6 +104,9 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   );
   const [savingDescription, setSavingDescription] = useState(false);
 
+  // GAP 3 (new): Reactions admin-only setting
+  const [reactionsAdminOnly, setReactionsAdminOnly] = useState(false);
+
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
 
@@ -114,7 +117,22 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     return chat.participants as ParticipantWire[];
   }, [chat.participants]);
 
-  const groupId = chat.groupId ? String(chat.groupId) : null;
+  const [resolvedGroupId, setResolvedGroupId] = useState<string | null>(
+    chat.groupId ? String(chat.groupId) : ((chat as any).group_id ? String((chat as any).group_id) : null),
+  );
+  const groupId = resolvedGroupId;
+
+  const conversationId = String(chat.conversationId ?? chat.id ?? '');
+
+  useEffect(() => {
+    if (!isGroup || resolvedGroupId || !conversationId) return;
+    getRequest(ROUTES.chat.conversationDetail(conversationId)).then((res) => {
+      const raw = res?.data ?? res;
+      const gid = raw?.group_id ?? raw?.groupId;
+      if (gid) setResolvedGroupId(String(gid));
+    });
+  }, [isGroup, resolvedGroupId, conversationId]);
+
   const directContact = useMemo(() => {
     if (isGroup) return null;
     const meId = currentUserId ? String(currentUserId) : null;
@@ -129,6 +147,16 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     if (!directContact?.user) return null;
     return resolveUserId(directContact.user);
   }, [directContact]);
+
+  const roomId = String(chat.conversationId ?? chat.id ?? '');
+
+  // GAP 3 (new): load reactionsAdminOnly from AsyncStorage
+  useEffect(() => {
+    if (!roomId) return;
+    AsyncStorage.getItem(`KIS_REACTIONS_ADMIN_ONLY_${roomId}`)
+      .then((val) => { if (val === 'true') setReactionsAdminOnly(true); })
+      .catch(() => {});
+  }, [roomId]);
 
   const handleStartCall = async (media: 'voice' | 'video') => {
     if (!startCall) {
@@ -255,7 +283,6 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const handleChangeAvatar = async () => {
     if (!isGroup || !isAdmin) return;
     if (saving) return;
-    const groupId = chat.groupId ? String(chat.groupId) : null;
     if (!groupId) {
       Alert.alert('Missing group', 'This group is missing an id.');
       return;
@@ -330,7 +357,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     setInviteLinkLoading(true);
     try {
       const res = await postRequest(
-        `${ROUTES.groups.detail(groupId)}invite-link/`,
+        ROUTES.groups.inviteLink(groupId),
         {},
         { errorMessage: 'Failed to generate invite link' },
       );
@@ -1085,14 +1112,15 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               ) : (
                 <Pressable
                   onPress={handleFetchInviteLink}
+                  disabled={!groupId}
                   style={({ pressed }) => [
                     styles.inviteLinkBtn,
-                    { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading ? 0.7 : 1 },
+                    { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading || !groupId ? 0.7 : 1 },
                   ]}
                 >
                   <KISIcon name="link" size={14} color={palette.onPrimary ?? '#fff'} />
                   <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
-                    {inviteLinkLoading ? 'Loading...' : 'Generate invite link'}
+                    {inviteLinkLoading ? 'Loading...' : !groupId ? 'Loading group…' : 'Generate invite link'}
                   </Text>
                 </Pressable>
               )}
@@ -1160,6 +1188,60 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 );
               })
             )}
+          </View>
+        )}
+
+        {/* GAP 3 (new): Admin-only reactions toggle — group admins only */}
+        {isGroup && isAdmin && (
+          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Group settings</Text>
+            <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>
+                    Only admins can react
+                  </Text>
+                  <Text style={{ color: palette.subtext ?? '#888', fontSize: 12, marginTop: 2 }}>
+                    Members can view but not add reactions
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    const next = !reactionsAdminOnly;
+                    setReactionsAdminOnly(next);
+                    AsyncStorage.setItem(
+                      `KIS_REACTIONS_ADMIN_ONLY_${roomId}`,
+                      next ? 'true' : 'false',
+                    ).catch(() => {});
+                    try {
+                      socket?.emit('group.update_settings', {
+                        roomId,
+                        reactionsAdminOnly: next,
+                      });
+                    } catch { /* socket may not be connected */ }
+                  }}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 6,
+                    borderRadius: 16,
+                    backgroundColor: reactionsAdminOnly
+                      ? (palette.primary ?? '#4F46E5')
+                      : (palette.surface ?? '#f0f0f0'),
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontWeight: '700',
+                      color: reactionsAdminOnly
+                        ? (palette.onPrimary ?? '#fff')
+                        : (palette.text ?? '#000'),
+                    }}
+                  >
+                    {reactionsAdminOnly ? 'ON' : 'OFF'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
         )}
 

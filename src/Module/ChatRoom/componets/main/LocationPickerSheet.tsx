@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import {
   Animated,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -119,10 +120,18 @@ export const LocationPickerSheet: React.FC<Props> = ({
               <ActivityIndicator color={palette.primary} />
             ) : location ? (
               <>
-                <Text style={{ fontSize: 40, marginBottom: 8 }}>📍</Text>
-                <Text style={[styles.coordText, { color: palette.text }]}>
-                  {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
-                </Text>
+                <Image
+                  source={{
+                    uri: `https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${location.longitude},${location.latitude}&z=15&l=map&size=650,220&pt=${location.longitude},${location.latitude},pm2rdm`,
+                  }}
+                  style={{ width: '100%', height: '100%', borderRadius: 10 }}
+                  resizeMode="cover"
+                />
+                <View style={{ position: 'absolute', bottom: 6, left: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ color: '#fff', fontSize: 11 }}>
+                    {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                  </Text>
+                </View>
               </>
             ) : (
               <KISIcon name="info" size={28} color={palette.subtext} />
@@ -181,6 +190,36 @@ export const LocationPickerSheet: React.FC<Props> = ({
               ]}
             >
               Send Location
+            </Text>
+          </Pressable>
+
+          {/* Live location */}
+          <Pressable
+            style={[
+              styles.sendBtn,
+              { backgroundColor: location ? '#E53935' : palette.divider, marginTop: 8 },
+            ]}
+            disabled={!location || loading}
+            onPress={() => {
+              if (location) {
+                onSendLocation({ ...location, isLive: true, expiresAt: Date.now() + 15 * 60 * 1000 });
+                onClose();
+              }
+            }}
+          >
+            <KISIcon
+              name="pin"
+              size={18}
+              color={location ? '#fff' : palette.subtext}
+              focused
+            />
+            <Text
+              style={[
+                styles.sendText,
+                { color: location ? '#fff' : palette.subtext },
+              ]}
+            >
+              Share Live Location (15 min)
             </Text>
           </Pressable>
         </View>

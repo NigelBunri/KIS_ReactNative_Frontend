@@ -14,6 +14,7 @@ import {
   Linking,
 } from 'react-native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   launchCamera,
@@ -274,7 +275,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top']}>
 
 
         {/* HEADER */}
@@ -482,7 +483,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           }}
         />
 
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   headerIconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {

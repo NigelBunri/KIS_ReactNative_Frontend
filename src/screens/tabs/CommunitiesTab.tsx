@@ -13,11 +13,12 @@ import {
   useWindowDimensions,
   DeviceEventEmitter,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import { deleteRequest } from '@/network/delete';
+import { enqueueMutation } from '@/services/pendingMutationsQueue';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
@@ -27,6 +28,7 @@ import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContac
 import { useSocket } from '../../../SocketProvider';
 import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
 import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
+import { getFeedPlainText } from '@/components/feeds/richTextValue';
 
 type Community = {
   id: string;
@@ -36,11 +38,16 @@ type Community = {
   avatar_url?: string;
   main_conversation_id?: string;
   posts_conversation_id?: string;
+  is_member?: boolean;
+  is_owner?: boolean;
+  current_user_role?: string | null;
 };
 
 type Post = {
   id: string;
-  text?: string;
+  text?: unknown;
+  text_plain?: string;
+  text_preview?: string;
   created_at?: string;
   author?: { id?: string | number; display_name?: string };
   author_id?: string | number;
@@ -132,6 +139,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
     }).start(() => {
       setCommunityVisible(false);
       setActiveCommunity(null);
+      setSelected(null);
     });
   }, [communitySlide, width]);
 
@@ -194,16 +202,45 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       create_main_conversation: true,
       create_posts_conversation: true,
     };
-    const res = await postRequest(ROUTES.community.create, payload, {
-      errorMessage: 'Failed to create community',
-    });
-    if (res?.success) {
-      setCreateVisible(false);
-      setCreateName('');
-      setCreateDesc('');
-      loadCommunities();
+    try {
+      const res = await postRequest(ROUTES.community.create, payload, {
+        errorMessage: 'Failed to create community',
+      });
+      if (res?.success && res.data) {
+        const created = {
+          ...(res.data as Community),
+          description: (res.data as Community).description ?? payload.description,
+          is_member: true,
+          is_owner: true,
+          current_user_role: 'owner',
+        };
+        setCommunities((items) => [
+          created,
+          ...items.filter((item) => item.id !== created.id),
+        ]);
+        setCreateVisible(false);
+        setCreateName('');
+        setCreateDesc('');
+      }
+    } catch {
+      const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
+      if (!netState.isConnected) {
+        await enqueueMutation({ method: 'POST', url: ROUTES.community.create, payload });
+        setCreateVisible(false);
+        setCreateName('');
+        setCreateDesc('');
+        // Optimistic: add a local placeholder so the user sees their action
+        const optimistic: Community = {
+          id: `local_${Date.now()}`,
+          name: createName.trim(),
+          slug: createName.trim().toLowerCase().replace(/\s+/g, '-'),
+          description: createDesc.trim(),
+        };
+        setCommunities((prev) => [optimistic, ...prev]);
+        Alert.alert('Saved offline', 'Community will be created when you are back online.');
+      }
     }
-  }, [createName, createDesc, loadCommunities]);
+  }, [createName, createDesc]);
 
   const createPost = useCallback(async () => {
     if (!selected || !composerText.trim()) return;
@@ -211,52 +248,65 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       community: selected.id,
       text: composerText.trim(),
     };
-    const res = await postRequest(ROUTES.community.posts, payload, {
-      errorMessage: 'Failed to post',
-    });
-    if (res?.success && res.data) {
-      setComposerText('');
-      setPosts((prev) => [res.data as Post, ...prev]);
+    // Optimistic: add a local post immediately
+    const optimisticPost: Post = {
+      id: `local_${Date.now()}`,
+      text: composerText.trim(),
+      created_at: new Date().toISOString(),
+    };
+    setPosts((prev) => [optimisticPost, ...prev]);
+    setComposerText('');
+    try {
+      const res = await postRequest(ROUTES.community.posts, payload, {
+        errorMessage: 'Failed to post',
+      });
+      if (res?.success && res.data) {
+        // Replace the optimistic post with the real one
+        setPosts((prev) => prev.map((p) => (p.id === optimisticPost.id ? (res.data as Post) : p)));
+      } else {
+        // Remove optimistic post on server error
+        setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
+      }
+    } catch {
+      const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
+      if (!netState.isConnected) {
+        await enqueueMutation({ method: 'POST', url: ROUTES.community.posts, payload });
+        // Keep the optimistic post — it will sync when back online
+      } else {
+        setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
+      }
     }
   }, [selected, composerText]);
 
-  const deletePost = useCallback((post: Post) => {
-    Alert.alert(
-      'Delete post?',
-      'This will permanently delete your post.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteRequest(ROUTES.community.postDetail(post.id), {
-                errorMessage: 'Failed to delete post',
-              });
-              setPosts((prev) => prev.filter((p) => p.id !== post.id));
-            } catch (err: any) {
-              Alert.alert('Delete failed', err?.message || 'Unable to delete post.');
-            }
-          },
-        },
-      ],
-    );
-  }, []);
-
   const joinCommunity = useCallback(async (community: Community) => {
-    const res = await postRequest(ROUTES.community.join(community.id), {}, {
-      errorMessage: 'Failed to join community',
-    });
-    if (res?.success) loadCommunityDetail(community);
+    if (community.is_member || community.is_owner) return;
+    try {
+      const res = await postRequest(ROUTES.community.join(community.id), {}, {
+        errorMessage: 'Failed to join community',
+      });
+      if (res?.success) {
+        const joined = { ...community, is_member: true, current_user_role: 'member' };
+        setCommunities((items) => items.some((item) => item.id === joined.id) ? items : [joined, ...items]);
+        setDiscoverResults((items) =>
+          items.map((item) => item.id === joined.id ? joined : item),
+        );
+        loadCommunityDetail(joined);
+      }
+    } catch {
+      const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
+      if (!netState.isConnected) {
+        await enqueueMutation({ method: 'POST', url: ROUTES.community.join(community.id), payload: {} });
+        Alert.alert('Saved offline', 'You will join this community when back online.');
+      }
+    }
   }, [loadCommunityDetail]);
 
   const searchPublicCommunities = useCallback(async (q: string) => {
     setDiscoverLoading(true);
     try {
-      const url = q.trim()
-        ? `${ROUTES.community.list}?search=${encodeURIComponent(q.trim())}`
-        : ROUTES.community.list;
+      const query = new URLSearchParams({ public: 'true' });
+      if (q.trim()) query.set('search', q.trim());
+      const url = `${ROUTES.community.list}?${query.toString()}`;
       const res = await getRequest(url, { errorMessage: '' });
       const list = Array.isArray(res?.data?.results)
         ? res.data.results
@@ -318,9 +368,22 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       slug: `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
       community: selected.id,
     };
-    const res = await postRequest(ROUTES.groups.create, payload, {
-      errorMessage: 'Failed to create group',
-    });
+    let res: Awaited<ReturnType<typeof postRequest>>;
+    try {
+      res = await postRequest(ROUTES.groups.create, payload, {
+        errorMessage: 'Failed to create group',
+      });
+    } catch {
+      const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
+      if (!netState.isConnected) {
+        await enqueueMutation({ method: 'POST', url: ROUTES.groups.create, payload });
+        setGroupCreateVisible(false);
+        Alert.alert('Saved offline', 'Group will be created when back online.');
+        return;
+      }
+      setGroupCreateError('Failed to create group.');
+      return;
+    }
     if (!res?.success || !res.data) {
       console.warn('Create group failed', res);
       setGroupCreateError(res?.message || 'Failed to create group.');
@@ -479,28 +542,18 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
               <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => {
-                  const authorId = item.author?.id ?? item.author_id;
-                  const isMyPost = authorId != null && String(authorId) === String(currentUserId ?? '');
-                  return (
-                    <Pressable
-                      onLongPress={isMyPost ? () => deletePost(item) : undefined}
+                renderItem={({ item }) => (
+                    <View
                       style={[styles.card, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: palette.text, fontWeight: '600' }}>
-                          {item.author?.display_name ?? 'Member'}
-                        </Text>
-                        {isMyPost && (
-                          <Pressable onPress={() => deletePost(item)} hitSlop={8}>
-                            <KISIcon name="trash" size={15} color={palette.danger ?? '#d9534f'} />
-                          </Pressable>
-                        )}
-                      </View>
-                      <Text style={{ color: palette.text, marginTop: 6 }}>{item.text ?? ''}</Text>
-                    </Pressable>
-                  );
-                }}
+                      <Text style={{ color: palette.text, fontWeight: '600' }}>
+                        {item.author?.display_name ?? 'Member'}
+                      </Text>
+                      <Text style={{ color: palette.text, marginTop: 6 }}>
+                        {getFeedPlainText(item)}
+                      </Text>
+                    </View>
+                )}
                 contentContainerStyle={{ paddingBottom: 24 }}
               />
             </View>
@@ -542,7 +595,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
-                loadCommunityDetail(item);
+                setSelected(null);
                 openCommunity(item);
               }}
               style={[
@@ -558,12 +611,13 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                <Pressable
-                  onPress={() => joinCommunity(item)}
-                  style={[styles.joinBtn, { backgroundColor: palette.primary }]}
-                >
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Join</Text>
-                </Pressable>
+                <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '600' }}>
+                  {item.is_owner
+                    ? 'Owner'
+                    : item.current_user_role
+                    ? item.current_user_role.replace(/^./, (value) => value.toUpperCase())
+                    : 'Member'}
+                </Text>
                 <KISIcon name="chevron-right" size={16} color={palette.subtext} />
               </View>
             </Pressable>
@@ -754,15 +808,21 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                       {item.description || 'No description'}
                     </Text>
                   </View>
-                  <Pressable
-                    onPress={() => {
-                      void joinCommunity(item);
-                      setDiscoverVisible(false);
-                    }}
-                    style={[styles.joinBtn, { backgroundColor: palette.primary }]}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Join</Text>
-                  </Pressable>
+                  {item.is_member || item.is_owner ? (
+                    <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700' }}>
+                      {item.is_owner ? 'Owner' : 'Joined'}
+                    </Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => {
+                        void joinCommunity(item);
+                        setDiscoverVisible(false);
+                      }}
+                      style={[styles.joinBtn, { backgroundColor: palette.primary }]}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Join</Text>
+                    </Pressable>
+                  )}
                 </View>
               )}
             />

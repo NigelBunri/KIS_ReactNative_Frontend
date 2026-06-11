@@ -62,6 +62,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { loadMessages } from './Storage/chatStorage';
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -130,7 +131,11 @@ export type AttachmentFilePayload = {
   onUploadedReady?: () => void;
 };
 
-const normalizeSubRoom = (row: any, parentRoomId: string): SubRoom | null => {
+const normalizeSubRoom = (
+  row: any,
+  parentRoomId: string,
+  meta?: { unreadCount?: number; lastMessage?: string; lastAt?: string },
+): SubRoom | null => {
   const conversationId =
     row?.child_conversation_id ??
     row?.childConversationId ??
@@ -150,6 +155,9 @@ const normalizeSubRoom = (row: any, parentRoomId: string): SubRoom | null => {
       row?.childConversation?.title ??
       row?.title ??
       'Sub-room',
+    unreadCount: meta?.unreadCount,
+    lastMessage: meta?.lastMessage,
+    lastAt: meta?.lastAt,
   };
 };
 
@@ -476,18 +484,60 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       const normalized = rows
         .map((row: any) => normalizeSubRoom(row, convId))
         .filter(Boolean) as SubRoom[];
-      setSubRooms(normalized);
+
+      const enriched = await Promise.all(
+        normalized.map(async (sr) => {
+          try {
+            const msgs = await loadMessages(sr.conversationId, currentUserId ?? undefined);
+            const unread = msgs.filter((m) => !m.fromMe && m.status !== 'read').length;
+            const last = msgs[msgs.length - 1];
+            return {
+              ...sr,
+              unreadCount: unread || undefined,
+              lastMessage: last
+                ? typeof last.text === 'string' ? last.text.slice(0, 80) : undefined
+                : undefined,
+              lastAt: last?.createdAt ?? undefined,
+            };
+          } catch {
+            return sr;
+          }
+        }),
+      );
+
+      if (!mounted) return;
+      setSubRooms(enriched);
       try {
-        await AsyncStorage.setItem(`${SUBROOMS_CACHE_PREFIX}${convId}`, JSON.stringify(normalized));
+        await AsyncStorage.setItem(`${SUBROOMS_CACHE_PREFIX}${convId}`, JSON.stringify(enriched));
       } catch { /* silent */ }
     } catch { /* silent */ }
 
     return () => { mounted = false; };
-  }, [chat?.conversationId, chat?.id, conversationId]);
+  }, [chat?.conversationId, chat?.id, conversationId, currentUserId]);
 
   useEffect(() => {
     loadSubRooms();
   }, [loadSubRooms]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('message.decrypted', (payload: any) => {
+      const convId = String(payload?.conversationId ?? '');
+      if (convId && subRooms.some((sr) => sr.conversationId === convId)) {
+        loadSubRooms();
+      }
+    });
+    return () => sub.remove();
+  }, [subRooms, loadSubRooms]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('subroom.message', (payload: any) => {
+      const convId = String(payload?.conversationId ?? '');
+      if (convId && subRooms.some((sr) => sr.conversationId === convId)) {
+        loadSubRooms();
+      }
+    });
+    return () => sub.remove();
+  }, [subRooms, loadSubRooms]);
   const [messageLocator, setMessageLocator] =
     useState<MessageLocator | null>(null);
   const initialUnreadJumpRef = useRef<string | null>(null);
@@ -1875,6 +1925,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onMoreSelected={selectionMode ? handleMoreSelected : () => setMenuVisible(true)}
           pinnedCount={pinnedCount}
           subRoomCount={subRoomCount}
+          subRoomUnread={subRooms.reduce((acc, sr) => acc + (sr.unreadCount ?? 0), 0)}
           onOpenPinned={() => setPinnedSheetVisible(true)}
           onOpenSubRooms={() => setSubRoomsSheetVisible(true)}
           isSingleSelection={isSingleSelection}

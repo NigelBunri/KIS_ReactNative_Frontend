@@ -17,6 +17,7 @@ import { KIS_TOKENS, kisRadius, KISPalette } from '@/theme/constants';
 import { ContactsModal, SimpleContact } from './ForAttachments/ContactsModal';
 import { PollModal, PollDraft } from './ForAttachments/PollModal';
 import { EventModal, EventDraft } from './ForAttachments/EventModal';
+import DocumentScannerSheet from './DocumentScannerSheet';
 import {
   AttachmentPreviewPage,
   PreviewKind,
@@ -88,6 +89,10 @@ type AttachmentSheetProps = {
   onCreatePoll?: (poll: PollDraft) => void;
   onCreateEvent?: (event: EventDraft) => void;
   onShareLocation?: () => void;
+  /** Called when the user scans a document and taps Send. */
+  onSendScannedDocument?: (uri: string, mimeType: string, filename: string) => void;
+  /** Called when the user taps "Send payment" — opens payment modal in caller. */
+  onSendPayment?: () => void;
 };
 
 export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
@@ -99,6 +104,8 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   onCreatePoll,
   onCreateEvent,
   onShareLocation,
+  onSendScannedDocument,
+  onSendPayment,
 }) => {
   const cardRadius = kisRadius.xl ?? 20;
   const pickInProgressRef = useRef(false);
@@ -110,6 +117,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   const [contactsVisible, setContactsVisible] = useState(false);
   const [pollVisible, setPollVisible] = useState(false);
   const [eventVisible, setEventVisible] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
 
   // Preview page state
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -347,6 +355,16 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     onShareLocation?.();
   };
 
+  const handleScanDocumentPress = () => {
+    onClose();
+    setScannerVisible(true);
+  };
+
+  const handleSendPaymentPress = () => {
+    onClose();
+    onSendPayment?.();
+  };
+
   const attachments = [
     {
       key: 'files',
@@ -396,6 +414,22 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       icon: 'pin' as const,
       color: palette.error ?? '#EF4444',
       onPress: handleShareLocationPress,
+    },
+    {
+      key: 'scan',
+      label: 'Scan document',
+      description: 'Capture and send a document',
+      icon: 'file' as const,
+      color: palette.warning ?? '#F59E0B',
+      onPress: handleScanDocumentPress,
+    },
+    {
+      key: 'payment',
+      label: 'Send payment',
+      description: 'Transfer money to this contact',
+      icon: 'card' as const,
+      color: palette.success ?? '#22C55E',
+      onPress: handleSendPaymentPress,
     },
   ];
 
@@ -590,6 +624,16 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
           if (onCreateEvent) {
             onCreateEvent(event);
           }
+        }}
+      />
+
+      {/* Document scanner sheet */}
+      <DocumentScannerSheet
+        visible={scannerVisible}
+        onClose={() => setScannerVisible(false)}
+        onSend={(uri, mimeType, filename) => {
+          setScannerVisible(false);
+          onSendScannedDocument?.(uri, mimeType, filename);
         }}
       />
     </>

@@ -65,6 +65,8 @@ type MessageListProps = {
   onLocalDeleteMessage?: (message: ChatMessage) => void;
   onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
+  participantMap?: Record<string, string>;
+  isE2EE?: boolean;
 };
 
 
@@ -98,6 +100,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   onLocalDeleteMessage,
   onUpdateMessage,
   mentionMap,
+  participantMap,
+  isE2EE = false,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -330,6 +334,27 @@ export const MessageList: React.FC<MessageListProps> = ({
    * - Other docs: mini preview card (extension badge, filename, mime, size, url hint).
    */
 
+  const E2EEBanner = isE2EE ? (
+    <View style={{
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(0,0,0,0.08)',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      marginTop: 12,
+      marginBottom: 4,
+      marginHorizontal: 24,
+    }}>
+      <Ionicons name="lock-closed" size={12} color={palette.subtext ?? '#888'} />
+      <Text style={{ fontSize: 12, color: palette.subtext ?? '#888', textAlign: 'center', flexShrink: 1 }}>
+        Messages and calls are end-to-end encrypted.
+      </Text>
+    </View>
+  ) : null;
+
   return (
     <View style={{ flex: 1 }}>
       <FlatList
@@ -338,6 +363,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         keyExtractor={(item) => item.id}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesListContent}
+        ListHeaderComponent={E2EEBanner}
         onContentSizeChange={handleContentSizeChange}
         onScroll={handleScroll}
         scrollEventThrottle={32}
@@ -426,6 +452,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onLocalDeleteMessage={onLocalDeleteMessage}
                 onUpdateMessage={onUpdateMessage}
                 mentionMap={mentionMap}
+                participantMap={participantMap}
               />
             </View>
           );

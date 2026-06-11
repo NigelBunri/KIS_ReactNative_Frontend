@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -167,6 +168,7 @@ type MessageBubbleProps = {
   onViewOnce?: (messageId: string) => void;
 
   mentionMap?: Record<string, string>;
+  participantMap?: Record<string, string>;
   senderId?: string;
   onUpdateMessage?: (message: ChatMessage) => void;
 };
@@ -246,10 +248,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onShowReadReceipts,
   onViewOnce,
   mentionMap,
+  participantMap,
   senderId,
   onUpdateMessage,
 }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // ── Auto-download preference ──────────────────────────────────────────────
+  const [autoLoadImages, setAutoLoadImages] = React.useState(true);
+  const [tappedImageIds, setTappedImageIds] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const pref = await AsyncStorage.getItem('KIS_AUTODL_IMAGES');
+        if (cancelled) return;
+        if (pref === 'never') { setAutoLoadImages(false); return; }
+        if (pref === 'always') { setAutoLoadImages(true); return; }
+        // 'wifi' (default): check connection type
+        const NetInfo = require('@react-native-community/netinfo')?.default ?? require('@react-native-community/netinfo');
+        const state = await NetInfo.fetch().catch(() => null);
+        if (cancelled) return;
+        setAutoLoadImages(state?.type === 'wifi' || state?.type === 'ethernet');
+      } catch { /* graceful — default to showing images */ }
+    };
+    void check();
+    return () => { cancelled = true; };
+  }, []);
+
   // ─────────────────────────────────────
   // 🔁 Normalize fields so both shapes work
   // ─────────────────────────────────────
@@ -434,9 +460,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     (message as any).ciphertext ||
     (message as any).encrypted
   );
-  const text = hasAttachments && hasEncryptedPayload && isEncryptedPlaceholderText
-    ? ''
-    : rawText;
+  // Suppress the literal "Encrypted message" placeholder for any encrypted
+  // message — text or media. It will be replaced once decryption resolves.
+  const text = hasEncryptedPayload && isEncryptedPlaceholderText ? '' : rawText;
 
   const isVoiceOnly =
     !!voice &&
@@ -1112,12 +1138,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const bubbleWidthRatio = responsive.isTablet ? 0.68 : responsive.isWatch ? 0.92 : responsive.isCompactPhone ? 0.88 : 0.8;
     const gridGap = 6;
     const gridOuterWidth = Math.max(220, Math.floor(width * bubbleWidthRatio) - (bubblePaddingX * 2));
+    const gridItemWidth = attachments.length > 1
+      ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
+      : Math.min(220, gridOuterWidth);
     const gridItemHight = attachments.length > 1
       ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2))
       : Math.min(220, gridOuterWidth);
     const gridItemWidth2 = attachments.length > 1
       ? Math.max(104, Math.floor((gridOuterWidth - gridGap) / 2.11))
       : "100%";
+    const pdfTileHeight = Math.max(170, Math.floor(gridItemWidth * 1.25));
+    const videoTileHeight = Math.max(96, Math.floor(gridItemWidth * 0.68));
 
     return (
       <View
@@ -1202,12 +1233,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   );
                 }}
               >
-                <Image
-                  source={{ uri: openableUri || uri, headers: mediaHeaders }}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                  blurRadius={shouldBlurUntilDownloaded ? 9 : 0}
-                />
+                {(!autoLoadImages && !tappedImageIds.has(downloadKey)) ? (
+                  <Pressable
+                    style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface ?? '#E0E0E0' }}
+                    onPress={() => setTappedImageIds(prev => new Set([...prev, downloadKey]))}
+                  >
+                    <Text style={{ fontSize: 22 }}>🖼</Text>
+                    <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>Tap to load</Text>
+                  </Pressable>
+                ) : (
+                  <Image
+                    source={{ uri: openableUri || uri, headers: mediaHeaders }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                    blurRadius={shouldBlurUntilDownloaded ? 9 : 0}
+                  />
+                )}
                 {shouldBlurUntilDownloaded && (
                   <View
                     pointerEvents="none"
@@ -1233,8 +1274,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Pressable
                 key={key}
                 style={{
-                  width: gridItemWidth2,
-                  height: gridItemHight,
+                  width: gridItemWidth,
+                  height: pdfTileHeight,
                   borderRadius: 18,
                   overflow: 'hidden',
                   marginHorizontal: 0,
@@ -1317,8 +1358,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Pressable
                 key={key}
                 style={{
-                  width: gridItemWidth2,
-                  height: gridItemHight,
+                  width: gridItemWidth,
+                  height: videoTileHeight,
                   borderRadius: 18,
                   overflow: 'hidden',
                   marginHorizontal: 0,
@@ -1362,8 +1403,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  width: gridItemWidth2,
-                  height: gridItemHight,
+                  width: attachments.length > 1 ? gridItemWidth : Math.min(300, gridOuterWidth),
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   marginHorizontal: 0,
@@ -1402,8 +1442,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               style={{
                 flexDirection: 'row',
                 alignItems: 'flex-start',
-               width: gridItemWidth2,
-                  height: gridItemHight,
+                width: attachments.length > 1 ? gridItemWidth : Math.min(340, gridOuterWidth),
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 marginHorizontal: 0,
@@ -2596,6 +2635,291 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /* ─────────────────────────────────────────
+   * GAP 10: Product / catalog card
+   * ──────────────────────────────────────── */
+  const renderProductCard = () => {
+    const productData = (message as any).product as
+      | { id?: string; name: string; description?: string; price?: string; currency?: string; imageUri?: string; url?: string }
+      | undefined;
+    const isProduct = !!productData || (message as any).kind === 'product';
+    if (!isProduct || !productData) return null;
+
+    const priceColor = palette.primary ?? '#2E7D32';
+    const dividerColor = palette.divider ?? '#e0e0e0';
+
+    return (
+      <View
+        style={{
+          marginTop: text ? 8 : 0,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: dividerColor,
+          overflow: 'hidden',
+          backgroundColor: isMe
+            ? 'rgba(255,255,255,0.10)'
+            : (palette.surface ?? '#fafafa'),
+          minWidth: 200,
+        }}
+      >
+        {/* Product image */}
+        {productData.imageUri ? (
+          <Image
+            source={{ uri: productData.imageUri }}
+            style={{ width: '100%', height: 140, borderRadius: 8 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: '100%',
+              height: 140,
+              borderRadius: 8,
+              backgroundColor: '#D0D0D0',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 36 }}>🛍</Text>
+          </View>
+        )}
+
+        <View style={{ padding: 10, gap: 4 }}>
+          {/* Name */}
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '700',
+              color: isMe ? outgoingTextColor : (palette.text ?? '#000'),
+            }}
+            numberOfLines={2}
+          >
+            {productData.name}
+          </Text>
+
+          {/* Price */}
+          {productData.price !== undefined && productData.price !== null ? (
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: isMe ? '#A5D6A7' : priceColor,
+              }}
+            >
+              {productData.currency ?? '$'}{productData.price}
+            </Text>
+          ) : null}
+
+          {/* Description */}
+          {productData.description ? (
+            <Text
+              style={{
+                fontSize: 13,
+                color: isMe ? outgoingMetaColor : (palette.subtext ?? '#666'),
+              }}
+              numberOfLines={2}
+            >
+              {productData.description}
+            </Text>
+          ) : null}
+
+          {/* View button */}
+          <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
+            <Pressable
+              onPress={() => {
+                if (productData.url) {
+                  Linking.openURL(productData.url).catch(() => {
+                    const { Alert: RNAlert } = require('react-native');
+                    RNAlert.alert('Error', 'Could not open URL.');
+                  });
+                } else {
+                  const { Alert: RNAlert } = require('react-native');
+                  RNAlert.alert('No URL available');
+                }
+              }}
+              style={({ pressed }) => ({
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 10,
+                backgroundColor: isMe
+                  ? 'rgba(255,255,255,0.18)'
+                  : (palette.primary ?? '#2E7D32'),
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: isMe ? outgoingTextColor : (palette.onPrimary ?? '#fff'),
+                }}
+              >
+                View
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  /* ─────────────────────────────────────────
+   * GAP 4: Payment card
+   * ──────────────────────────────────────── */
+  const renderPaymentCard = () => {
+    const paymentData = (message as any).payment as
+      | { amount: number; currency: string; note?: string; status: string; transactionId?: string; recipientName?: string }
+      | undefined;
+    if (!paymentData) return null;
+
+    const statusColors: Record<string, string> = {
+      completed: '#22C55E',
+      pending: '#F59E0B',
+      failed: '#EF4444',
+      cancelled: '#9CA3AF',
+    };
+    const statusLabels: Record<string, string> = {
+      completed: 'Completed',
+      pending: 'Pending',
+      failed: 'Failed',
+      cancelled: 'Cancelled',
+    };
+    const statusColor = statusColors[paymentData.status] ?? '#9CA3AF';
+    const statusLabel = statusLabels[paymentData.status] ?? paymentData.status;
+
+    const currencySymbols: Record<string, string> = {
+      USD: '$', NGN: '₦', EUR: '€', GBP: '£', GHS: '₵', KES: 'Ksh',
+    };
+    const symbol = currencySymbols[paymentData.currency] ?? paymentData.currency;
+
+    const emitPaymentAction = (event: 'payment.accept' | 'payment.decline', transactionId: string | undefined) => {
+      try {
+        const { DeviceEventEmitter } = require('react-native');
+        DeviceEventEmitter.emit('payment.action', { event, transactionId });
+      } catch { /* ignore */ }
+    };
+
+    const isPending = paymentData.status === 'pending' && !isMe;
+
+    return (
+      <View
+        style={{
+          marginTop: text ? 8 : 0,
+          borderRadius: 16,
+          borderWidth: 1.5,
+          borderColor: statusColor + '44',
+          backgroundColor: isMe
+            ? 'rgba(255,255,255,0.12)'
+            : (palette.surfaceSoft ?? 'rgba(0,0,0,0.05)'),
+          padding: 14,
+          minWidth: 200,
+        }}
+      >
+        {/* Amount */}
+        <Text
+          style={{
+            fontSize: 26,
+            fontWeight: '900',
+            color: isMe ? outgoingTextColor : palette.text,
+            marginBottom: 4,
+          }}
+        >
+          {symbol}{paymentData.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </Text>
+
+        {/* Status badge */}
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            backgroundColor: statusColor + '22',
+            borderRadius: 8,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            marginBottom: 6,
+          }}
+        >
+          <Text style={{ fontSize: 11, color: statusColor, fontWeight: '700' }}>
+            {statusLabel}
+          </Text>
+        </View>
+
+        {/* Recipient */}
+        {!!paymentData.recipientName && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: isMe ? outgoingMetaColor : palette.subtext,
+              marginBottom: 4,
+            }}
+          >
+            To: {paymentData.recipientName}
+          </Text>
+        )}
+
+        {/* Note */}
+        {!!paymentData.note && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: isMe ? outgoingMetaColor : palette.subtext,
+              marginBottom: 4,
+            }}
+            numberOfLines={2}
+          >
+            {paymentData.note}
+          </Text>
+        )}
+
+        {!!paymentData.transactionId && (
+          <Text
+            style={{
+              fontSize: 11,
+              color: isMe ? outgoingMetaColor : palette.subtext,
+              marginBottom: 4,
+            }}
+            numberOfLines={1}
+          >
+            Ref: {paymentData.transactionId}
+          </Text>
+        )}
+
+        {/* Accept / Decline buttons for pending incoming payments */}
+        {isPending && (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Pressable
+              onPress={() => emitPaymentAction('payment.accept', paymentData.transactionId)}
+              style={({ pressed }) => ({
+                flex: 1,
+                backgroundColor: '#22C55E',
+                borderRadius: 10,
+                paddingVertical: 10,
+                alignItems: 'center',
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Accept</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => emitPaymentAction('payment.decline', paymentData.transactionId)}
+              style={({ pressed }) => ({
+                flex: 1,
+                backgroundColor: '#EF444422',
+                borderRadius: 10,
+                paddingVertical: 10,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#EF4444',
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Decline</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  /* ─────────────────────────────────────────
    * -1) Deleted message placeholder
    * ──────────────────────────────────────── */
   if (isDeleted) {
@@ -3002,6 +3326,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
         )}
 
+        {/* Shown briefly while decryption is in-flight after a reload */}
+        {hasEncryptedPayload && !text && !voice && !styled && !sticker && !hasAttachments && !contacts && !poll && !eventData && (
+          <Text style={{ fontSize: 13, color: metaColor, fontStyle: 'italic' }}>🔒</Text>
+        )}
+
         {/* Translation */}
         {text && text.length > 15 && !isMe && !translatedText && (
           <Pressable
@@ -3069,11 +3398,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Pressable>
         )}
 
-        {/* Contacts / Poll / Event / Location cards */}
+        {/* Contacts / Poll / Event / Location / Product / Payment cards */}
         {renderContactsCard()}
         {renderPollCard()}
         {renderEventCard()}
         {renderLocationCard()}
+        {renderProductCard()}
+        {renderPaymentCard()}
 
         {/* Attachments (images, files, etc.) */}
         {renderAttachments(attachments, (message as any).fromMe)}
@@ -3132,7 +3463,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           onRequestClose={() => setVideoFullscreenUri(null)}
           statusBarTranslucent
         >
-          <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
             <Video
               source={{ uri: videoFullscreenUri }}
               style={{ flex: 1 }}
@@ -3141,11 +3472,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
             <Pressable
               onPress={() => setVideoFullscreenUri(null)}
-              style={{ position: 'absolute', top: 44, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
-          </View>
+          </SafeAreaView>
         </Modal>
       )}
     </View>

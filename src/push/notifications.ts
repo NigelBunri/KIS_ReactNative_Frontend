@@ -4,6 +4,8 @@ import { postRequest } from '@/network/post';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
 
+const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
+
 const registerPushToken = async (payload: {
   pushToken?: string | null;
   apnsToken?: string | null;
@@ -12,18 +14,46 @@ const registerPushToken = async (payload: {
   if (!pushToken) return;
   const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
   const platform = (await AsyncStorage.getItem('device_platform')) || '';
-  await postRequest(
-    ROUTES.notifications.deviceTokenRegister,
-    {
-      device_id: deviceId,
-      platform,
-      push_token: pushToken,
-      token_type: 'fcm',
-      apns_token: payload.apnsToken || '',
-      metadata: { source: 'react-native-firebase' },
-    },
-    { errorMessage: 'Unable to register push token.' },
-  );
+  try {
+    const res = await postRequest(
+      ROUTES.notifications.deviceTokenRegister,
+      {
+        device_id: deviceId,
+        platform,
+        push_token: pushToken,
+        token_type: 'fcm',
+        apns_token: payload.apnsToken || '',
+        metadata: { source: 'react-native-firebase' },
+      },
+      { errorMessage: 'Unable to register push token.' },
+    );
+    if (res?.success) {
+      await AsyncStorage.removeItem(PENDING_PUSH_TOKEN_KEY).catch(() => {});
+    } else {
+      await AsyncStorage.setItem(
+        PENDING_PUSH_TOKEN_KEY,
+        JSON.stringify({ pushToken, apnsToken: payload.apnsToken || '', timestamp: Date.now() }),
+      ).catch(() => {});
+    }
+  } catch {
+    await AsyncStorage.setItem(
+      PENDING_PUSH_TOKEN_KEY,
+      JSON.stringify({ pushToken, apnsToken: payload.apnsToken || '', timestamp: Date.now() }),
+    ).catch(() => {});
+  }
+};
+
+const retryPendingPushToken = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_PUSH_TOKEN_KEY);
+    if (!raw) return;
+    const pending: { pushToken: string; apnsToken: string; timestamp: number } = JSON.parse(raw);
+    if (!pending?.pushToken) {
+      await AsyncStorage.removeItem(PENDING_PUSH_TOKEN_KEY).catch(() => {});
+      return;
+    }
+    await registerPushToken({ pushToken: pending.pushToken, apnsToken: pending.apnsToken });
+  } catch { /* silent */ }
 };
 
 /** Resolve the raw navigation object from either a plain nav or a React ref. */
@@ -88,6 +118,8 @@ export async function initPushHandlers(navigation?: any) {
       if (apnsToken) {
         await AsyncStorage.setItem('apns_token', apnsToken);
       }
+      // Retry any previously failed push token registration first
+      await retryPendingPushToken();
       await registerPushToken({ pushToken: fcmToken, apnsToken });
     } catch {}
 
@@ -113,6 +145,35 @@ export async function initPushHandlers(navigation?: any) {
           remoteMessage?.data?.body ??
           '';
         const data: Record<string, string> = remoteMessage?.data ?? {};
+
+        // GAP 5: Do Not Disturb quiet hours check
+        try {
+          const dndEnabled = await AsyncStorage.getItem('KIS_DND_ENABLED');
+          if (dndEnabled === 'true') {
+            const dndFrom = (await AsyncStorage.getItem('KIS_DND_FROM')) ?? '22:00';
+            const dndTo = (await AsyncStorage.getItem('KIS_DND_TO')) ?? '08:00';
+            const now = new Date();
+            const [fromH, fromM] = dndFrom.split(':').map(Number);
+            const [toH, toM] = dndTo.split(':').map(Number);
+            const nowMins = now.getHours() * 60 + now.getMinutes();
+            const fromMins = fromH * 60 + fromM;
+            const toMins = toH * 60 + toM;
+            const inQuietWindow =
+              fromMins <= toMins
+                ? nowMins >= fromMins && nowMins < toMins
+                : nowMins >= fromMins || nowMins < toMins; // wraps midnight
+            if (inQuietWindow) return;
+          }
+        } catch { /* silent */ }
+
+        // GAP 6: per-chat notification sound — if 'None', skip toast
+        const convId: string = data?.conversationId ?? data?.conversation_id ?? '';
+        if (convId) {
+          try {
+            const sound = await AsyncStorage.getItem(`KIS_NOTIF_SOUND_${convId}`);
+            if (sound === 'None') return;
+          } catch { /* silent */ }
+        }
 
         InAppNotificationToastRef.current?.show({ title, body, data }, resolveNav(navigation));
       });

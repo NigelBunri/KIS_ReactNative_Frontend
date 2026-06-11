@@ -368,6 +368,9 @@ export type SubRoom = {
   conversationId: string;
   rootMessageId?: string;
   title?: string;
+  unreadCount?: number;
+  lastMessage?: string;
+  lastAt?: string;
 };
 
 /* ============================================================================

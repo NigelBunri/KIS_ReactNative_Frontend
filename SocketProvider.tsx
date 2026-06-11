@@ -17,7 +17,7 @@ import { check, PERMISSIONS, request, RESULTS, openSettings } from 'react-native
 import { useAuth } from './App';
 import ROUTES, { CHAT_WS_URL, CHAT_WS_PATH } from '@/network';
 import { getCache } from '@/network/cache';
-import { getAccessToken } from '@/security/authStorage';
+import { getAccessTokenForRequest } from '@/security/tokenRefresh';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
@@ -704,7 +704,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      let token = await getAccessToken();
+      let token = await getAccessTokenForRequest();
       const cached = await getCache('AUTH_CACHE', 'USER_KEY');
       if (!token) token = cached?.access || cached?.access_token || null;
 
@@ -737,7 +737,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Use a callback so each reconnect attempt fetches a fresh token,
         // preventing silent auth failures when the token expires mid-session.
         auth: async (cb: (data: Record<string, string>) => void) => {
-          let freshToken = await getAccessToken().catch(() => null);
+          let freshToken = await getAccessTokenForRequest().catch(() => null);
           if (!freshToken) freshToken = token;
           cb({ token: freshToken ?? '', deviceId });
         },
@@ -829,6 +829,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       /* ── Broadcast created ── */
       s.on('broadcast.created', (payload: any) => { DeviceEventEmitter.emit('broadcast.created', payload); });
+
+      /* ── Global chat message forwarder (for feed comment count updates) ── */
+      const onGlobalChatMessage = (payload: any) => DeviceEventEmitter.emit('chat.message.global', payload);
+      s.on('chat.message', onGlobalChatMessage);
+
+      /* ── Post reaction/engagement updates ── */
+      const onPostReactionUpdated = (payload: any) => DeviceEventEmitter.emit('post.reaction_updated', payload);
+      const onPostCommentCount = (payload: any) => DeviceEventEmitter.emit('post.comment_count', payload);
+      s.on('post.reaction_updated', onPostReactionUpdated);
+      s.on('post.comment_count', onPostCommentCount);
 
       /* ── Channel live / content events ── */
       const onChannelLiveStarted = (payload: any) => DeviceEventEmitter.emit('channel.live.started', payload);

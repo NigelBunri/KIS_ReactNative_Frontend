@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
@@ -6,10 +6,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +26,7 @@ import { deleteRequest } from '@/network/delete';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
+import { getFeedPlainText } from '@/components/feeds/richTextValue';
 
 type MemberUser = {
   id?: string;
@@ -36,7 +39,17 @@ type CommunityMember = {
   id?: number | string;
   user?: MemberUser | number | string | null;
   base_role?: string;
+  role?: string;
   display_name?: string;
+};
+
+type CommunityPost = {
+  id: string;
+  text?: unknown;
+  text_plain?: string;
+  text_preview?: string;
+  created_at?: string;
+  author?: { display_name?: string | null };
 };
 
 type CommunityInfoPageProps = {
@@ -75,8 +88,11 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState<string>('');
   const [members, setMembers] = useState<CommunityMember[]>([]);
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -104,6 +120,19 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
         if (mounted) {
           setMembers(Array.isArray(list) ? list : []);
         }
+
+        const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
+          errorMessage: 'Failed to load community posts',
+        });
+        const postList =
+          postsRes?.data?.results ??
+          postsRes?.results ??
+          postsRes?.data ??
+          postsRes ??
+          [];
+        if (mounted) {
+          setPosts(Array.isArray(postList) ? postList : []);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -123,8 +152,8 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     }) ?? null;
   }, [members, currentUserId]);
 
-  const role = String(me?.base_role ?? '').toLowerCase();
-  const isAdmin = role === 'owner' || role === 'admin' || role === 'moderator';
+  const role = String(me?.role ?? me?.base_role ?? '').toLowerCase();
+  const isAdmin = role === 'owner' || role === 'admin' || role === 'mod' || role === 'moderator';
 
   const resolveUserId = (member: CommunityMember): string => {
     const u = member.user;
@@ -137,7 +166,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     const userId = resolveUserId(member);
     if (!userId) return;
     const label = member.display_name || resolveUserName(member.user) || 'Member';
-    const memberRole = String(member.base_role ?? '').toLowerCase();
+    const memberRole = String(member.role ?? member.base_role ?? '').toLowerCase();
     const isOwner = memberRole === 'owner';
     const isMemberAdmin = memberRole === 'admin' || memberRole === 'owner' || memberRole === 'moderator';
 
@@ -179,7 +208,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             });
             setMembers((prev) =>
               prev.map((m) =>
-                resolveUserId(m) === userId ? { ...m, base_role: 'member' } : m,
+                resolveUserId(m) === userId ? { ...m, role: 'member', base_role: 'member' } : m,
               ),
             );
           } catch (err: any) {
@@ -195,7 +224,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             });
             setMembers((prev) =>
               prev.map((m) =>
-                resolveUserId(m) === userId ? { ...m, base_role: 'admin' } : m,
+                resolveUserId(m) === userId ? { ...m, role: 'admin', base_role: 'admin' } : m,
               ),
             );
           } catch (err: any) {
@@ -250,7 +279,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
               setMembers((prev) =>
                 prev.filter((m) => resolveUserId(m) !== String(currentUserId ?? '')),
               );
-            } catch (err: any) {
+            } catch {
               // Some backends use POST for leave
               try {
                 await postRequest(ROUTES.community.leave(communityId), {}, {
@@ -267,6 +296,28 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
         },
       ],
     );
+  };
+
+  const handleFetchInviteLink = async () => {
+    if (!communityId || inviteLinkLoading) return;
+    setInviteLinkLoading(true);
+    try {
+      const res = await postRequest(
+        ROUTES.community.inviteLink(communityId),
+        {},
+        { errorMessage: 'Failed to generate invite link' },
+      );
+      const link = res?.data?.invite_link ?? res?.data?.url ?? null;
+      if (link) {
+        setInviteLink(String(link));
+      } else {
+        Alert.alert('Invite link', 'Could not retrieve an invite link.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to fetch invite link.');
+    } finally {
+      setInviteLinkLoading(false);
+    }
   };
 
   const handleChangeAvatar = async () => {
@@ -334,6 +385,26 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     }
   };
 
+  const handleDeletePost = useCallback((post: CommunityPost) => {
+    Alert.alert('Delete post?', 'This removes the post from the community feed.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await postRequest(ROUTES.community.postDelete(post.id), {}, {
+              errorMessage: 'Failed to delete post',
+            });
+            setPosts((items) => items.filter((item) => item.id !== post.id));
+          } catch (err: any) {
+            Alert.alert('Delete failed', err?.message || 'Unable to delete post.');
+          }
+        },
+      },
+    ]);
+  }, []);
+
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
@@ -396,9 +467,9 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             members.map((m, index) => {
               const label = m.display_name || resolveUserName(m.user) || 'Member';
               const phone = resolveUserPhone(m.user);
-              const roleLabel = m.base_role ? String(m.base_role) : '';
+              const roleLabel = m.role || m.base_role ? String(m.role ?? m.base_role) : '';
               const memberId = resolveUserId(m);
-              const memberRole = String(m.base_role ?? '').toLowerCase();
+              const memberRole = String(m.role ?? m.base_role ?? '').toLowerCase();
               const isOwnerMember = memberRole === 'owner';
               const isMe = memberId && memberId === String(currentUserId ?? '');
               return (
@@ -429,6 +500,88 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             })
           )}
         </View>
+
+        {isAdmin ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Manage posts
+            </Text>
+            {posts.length === 0 ? (
+              <Text style={[styles.emptyText, { color: palette.subtext }]}>
+                No community posts.
+              </Text>
+            ) : (
+              posts.map((post) => (
+                <View
+                  key={post.id}
+                  style={[styles.postRow, { borderBottomColor: palette.divider }]}
+                >
+                  <View style={styles.postInfo}>
+                    <Text style={[styles.postAuthor, { color: palette.text }]} numberOfLines={1}>
+                      {post.author?.display_name || 'Member'}
+                    </Text>
+                    <Text style={[styles.postPreview, { color: palette.subtext }]} numberOfLines={2}>
+                      {getFeedPlainText(post) || 'Media post'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleDeletePost(post)}
+                    hitSlop={8}
+                    style={styles.memberActionBtn}
+                  >
+                    <KISIcon name="trash" size={18} color={palette.danger ?? '#d9534f'} />
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {isAdmin && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Invite link</Text>
+            {inviteLink ? (
+              <View>
+                <Text
+                  selectable
+                  style={{ fontSize: 12, color: palette.subtext, marginBottom: 8, fontFamily: 'monospace' }}
+                  numberOfLines={2}
+                >
+                  {inviteLink}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => { Clipboard.setString(inviteLink); Alert.alert('Copied', 'Invite link copied.'); }}
+                    style={({ pressed }) => [styles.inviteLinkBtn, { backgroundColor: palette.primary, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>Copy</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => Share.share({ message: inviteLink }).catch(() => {})}
+                    style={({ pressed }) => [styles.inviteLinkBtn, { borderWidth: 1, borderColor: palette.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>Share</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setInviteLink(null); handleFetchInviteLink(); }}
+                    style={({ pressed }) => [styles.inviteLinkBtn, { borderWidth: 1, borderColor: palette.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>Reset</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                onPress={handleFetchInviteLink}
+                style={({ pressed }) => [styles.inviteLinkBtn, { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                  {inviteLinkLoading ? 'Loading...' : 'Generate invite link'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
 
         {/* Leave community — shown to non-owner members */}
         {me && role !== 'owner' && (
@@ -495,6 +648,15 @@ const styles = StyleSheet.create({
   memberName: { fontSize: 14, fontWeight: '600' },
   memberRole: { fontSize: 12 },
   memberActionBtn: { padding: 6, marginLeft: 4 },
+  postRow: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingVertical: 10,
+  },
+  postInfo: { flex: 1, paddingRight: 10 },
+  postAuthor: { fontSize: 13, fontWeight: '600' },
+  postPreview: { fontSize: 12, marginTop: 3 },
   leaveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,6 +667,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   leaveButtonText: { fontSize: 14, fontWeight: '600' },
+  inviteLinkBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start' },
+  inviteLinkBtnText: { fontSize: 13, fontWeight: '600' },
 });
 
 export default CommunityInfoPage;

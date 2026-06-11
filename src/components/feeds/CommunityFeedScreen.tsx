@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import FeedScreen from './FeedScreen';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import { getFeedPlainText } from './richTextValue';
 
 type CommunityFeedScreenProps = {
   community: {
@@ -35,6 +36,8 @@ export default function CommunityFeedScreen({ community, onBack }: CommunityFeed
       loadPosts={loadPosts}
       reactEndpoint={(postId) => ROUTES.community.postReact(postId)}
       commentRoomEndpoint={(postId) => ROUTES.community.postCommentRoom(postId)}
+      commentsListEndpoint={(postId) => ROUTES.community.postComments(postId)}
+      commentCreateEndpoint={(postId) => ROUTES.community.postComment(postId)}
       deleteEndpoint={(postId) => ROUTES.community.postDelete(postId)}
       broadcastEndpoint={(postId) => ROUTES.community.postBroadcast(postId)}
       feedType="community"
@@ -43,7 +46,7 @@ export default function CommunityFeedScreen({ community, onBack }: CommunityFeed
         communityName: community.name,
       })}
       chatHeaderLabel={(post) =>
-        `Feed: ${post.text_plain ?? post.text ?? community.name}`
+        `Feed: ${getFeedPlainText(post) || community.name}`
       }
     />
   );

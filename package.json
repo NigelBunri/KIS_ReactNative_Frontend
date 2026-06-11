@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "env:sync": "node scripts/sync-env.cjs",
+    "prestart": "node scripts/sync-env.cjs",
+    "preandroid": "node scripts/sync-env.cjs",
+    "preios": "node scripts/sync-env.cjs",
     "android": "react-native run-android",
     "ios": "bash ./scripts/run-ios-both.sh",
     "ios:both": "bash ./scripts/run-ios-both.sh",

@@ -34,6 +34,16 @@ export function useSelectionState(
     setSelectedIds([]);
   }, []);
 
+  /** GAP 3: Select every visible message */
+  const selectAll = useCallback(() => {
+    setSelectedIds(messages.map((m) => m.id));
+  }, [messages]);
+
+  /** GAP 3: Clear all selections (without leaving selection mode) */
+  const deselectAll = useCallback(() => {
+    setSelectedIds([]);
+  }, []);
+
   const selectedMessages = useMemo(
     () => messages.filter((m) => selectedIds.includes(m.id)),
     [messages, selectedIds],
@@ -54,6 +64,8 @@ export function useSelectionState(
     enterSelectionMode,
     toggleSelectMessage,
     exitSelectionMode,
+    selectAll,
+    deselectAll,
     selectedMessages,
     isSingleSelection,
     pinnedMessages,

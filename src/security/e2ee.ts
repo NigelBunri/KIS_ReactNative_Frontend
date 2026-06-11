@@ -18,6 +18,24 @@ let storeCache: SignalStoreCache | null = null;
 const decryptPlaintextCache = new Map<string, string>();
 const decryptInFlight = new Map<string, Promise<string>>();
 const MAX_DECRYPT_CACHE_SIZE = 500;
+const DEVICE_BUNDLE_CACHE_TTL_MS = 30_000;
+const deviceBundleCache = new Map<
+  string,
+  { expiresAt: number; bundles: DeviceBundle[] }
+>();
+const deviceBundleRequests = new Map<string, Promise<DeviceBundle[]>>();
+const sessionBuildRequests = new Map<
+  string,
+  Promise<{ address: any; device_id: string }>
+>();
+
+const clearRuntimeE2EECaches = () => {
+  deviceBundleCache.clear();
+  deviceBundleRequests.clear();
+  sessionBuildRequests.clear();
+  decryptPlaintextCache.clear();
+  decryptInFlight.clear();
+};
 
 const rememberDecryptedPlaintext = (key: string, value: string) => {
   decryptPlaintextCache.set(key, value);
@@ -221,6 +239,7 @@ export const ensureDeviceId = async (): Promise<string> => {
 
 export const rotateDeviceId = async (): Promise<string> => {
   const deviceId = createDeviceId();
+  clearRuntimeE2EECaches();
   storeCache = null;
   await EncryptedStorage.removeItem(STORE_KEY);
   await AsyncStorage.removeItem(E2EE_READY_KEY);
@@ -229,18 +248,23 @@ export const rotateDeviceId = async (): Promise<string> => {
 };
 
 export const resetE2EEStore = async () => {
+  clearRuntimeE2EECaches();
   storeCache = null;
   await EncryptedStorage.removeItem(STORE_KEY);
   await AsyncStorage.removeItem(E2EE_READY_KEY);
 };
 
-export const initE2EE = async (userId?: string | null, options?: { force?: boolean }) => {
-  if (!userId) return;
+const e2eeInitRequests = new Map<string, Promise<void>>();
+
+const initializeE2EE = async (
+  userId: string,
+  deviceId: string,
+  options?: { force?: boolean },
+) => {
   if (!globalThis.crypto || !(globalThis.crypto as any).subtle) {
     throw new Error('Missing WebCrypto: install react-native-quick-crypto and restart the app.');
   }
 
-  const deviceId = await ensureDeviceId();
   const readyKey = `${E2EE_READY_KEY}:${userId}:${deviceId}`;
   const ready = await AsyncStorage.getItem(readyKey);
   if (ready === 'true' && !options?.force) return;
@@ -314,8 +338,29 @@ export const initE2EE = async (userId?: string | null, options?: { force?: boole
   await AsyncStorage.setItem(E2EE_READY_KEY, 'true');
 };
 
+export const initE2EE = async (userId?: string | null, options?: { force?: boolean }) => {
+  if (!userId) return;
+  const deviceId = await ensureDeviceId();
+  const requestKey = `${userId}:${deviceId}`;
+  const existingRequest = e2eeInitRequests.get(requestKey);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const request = initializeE2EE(userId, deviceId, options);
+  e2eeInitRequests.set(requestKey, request);
+  try {
+    await request;
+  } finally {
+    if (e2eeInitRequests.get(requestKey) === request) {
+      e2eeInitRequests.delete(requestKey);
+    }
+  }
+};
+
 export const repairLocalE2EEBundle = async (userId?: string | null) => {
   if (!userId) return;
+  deviceBundleCache.delete(userId);
   const deviceId = await ensureDeviceId();
   const readyKey = `${E2EE_READY_KEY}:${userId}:${deviceId}`;
   await AsyncStorage.removeItem(readyKey);
@@ -378,6 +423,14 @@ const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle
   if (!isUuid(recipientUserId)) {
     throw new Error('Invalid E2EE recipient user id');
   }
+  const cached = deviceBundleCache.get(recipientUserId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.bundles;
+  }
+  const existingRequest = deviceBundleRequests.get(recipientUserId);
+  if (existingRequest) return existingRequest;
+
+  const request = (async () => {
   const deviceId = await ensureDeviceId();
   logE2EE('ensureSession:start', { recipientUserId, deviceId });
   const bundlesRes = await getRequest(
@@ -385,7 +438,12 @@ const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle
     { headers: { 'X-Device-Id': deviceId } },
   );
   if (bundlesRes?.success && Array.isArray(bundlesRes.data?.devices) && bundlesRes.data.devices.length) {
-    return bundlesRes.data.devices as DeviceBundle[];
+    const bundles = bundlesRes.data.devices as DeviceBundle[];
+    deviceBundleCache.set(recipientUserId, {
+      expiresAt: Date.now() + DEVICE_BUNDLE_CACHE_TTL_MS,
+      bundles,
+    });
+    return bundles;
   }
 
   const bundleRes = await getRequest(
@@ -396,16 +454,45 @@ const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle
     logE2EE('ensureSession:bundle_missing', { recipientUserId, deviceId, response: bundleRes });
     throw new Error('Missing E2EE bundle');
   }
-  return [bundleRes.data as DeviceBundle];
+  const bundles = [bundleRes.data as DeviceBundle];
+  deviceBundleCache.set(recipientUserId, {
+    expiresAt: Date.now() + DEVICE_BUNDLE_CACHE_TTL_MS,
+    bundles,
+  });
+  return bundles;
+  })();
+
+  deviceBundleRequests.set(recipientUserId, request);
+  try {
+    return await request;
+  } finally {
+    deviceBundleRequests.delete(recipientUserId);
+  }
 };
 
 const ensureSessionsForUser = async (recipientUserId: string) => {
   const bundles = await fetchDeviceBundles(recipientUserId);
-  const sessions = [];
-  for (const bundle of bundles) {
-    sessions.push(await buildSessionForBundle(bundle));
-  }
-  return sessions;
+  return Promise.all(
+    bundles.map(async (bundle) => {
+      const address = getAddress(bundle.user_id, bundle.device_id);
+      const sessionId = getSessionId(address);
+      const existingSession = await signalStore.loadSession(sessionId);
+      if (existingSession) {
+        return { address, device_id: bundle.device_id };
+      }
+
+      const pending = sessionBuildRequests.get(sessionId);
+      if (pending) return pending;
+
+      const build = buildSessionForBundle(bundle);
+      sessionBuildRequests.set(sessionId, build);
+      try {
+        return await build;
+      } finally {
+        sessionBuildRequests.delete(sessionId);
+      }
+    }),
+  );
 };
 
 export const encryptForUser = async (recipientUserId: string, plaintext: string) => {
@@ -533,14 +620,26 @@ export const decryptFromUser = async (
   if (pending) return pending;
 
   const decryptPromise = (async () => {
-    const cipher = new libsignal.SessionCipher(signalStore, address);
     const bytes = fromB64(ciphertext);
 
     let plaintext;
-    if (metaType === 3) {
-      plaintext = await cipher.decryptPreKeyWhisperMessage(bytes, 'binary');
-    } else {
-      plaintext = await cipher.decryptWhisperMessage(bytes, 'binary');
+    try {
+      const cipher = new libsignal.SessionCipher(signalStore, address);
+      if (metaType === 3) {
+        plaintext = await cipher.decryptPreKeyWhisperMessage(bytes, 'binary');
+      } else {
+        plaintext = await cipher.decryptWhisperMessage(bytes, 'binary');
+      }
+    } catch (error) {
+      const message = String((error as any)?.message ?? '').toLowerCase();
+      if (metaType !== 3 || !message.includes('bad mac')) throw error;
+
+      // A sender from an older build may have rebuilt its prekey session before
+      // every send. Drop only that stale peer session and establish the new one
+      // from this prekey message.
+      await signalStore.removeSession(getSessionId(address));
+      const retryCipher = new libsignal.SessionCipher(signalStore, address);
+      plaintext = await retryCipher.decryptPreKeyWhisperMessage(bytes, 'binary');
     }
 
     const decoded = Buffer.from(new Uint8Array(plaintext)).toString('utf8');

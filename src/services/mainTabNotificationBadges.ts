@@ -32,6 +32,7 @@ export const MAIN_TAB_BADGE_REFRESH_EVENTS = [
   'broadcast.refresh',
   'broadcast.created',
   'broadcast.updated',
+  'chat.message.global',
   'channel.refresh',
   'channel.subscription.updated',
   'channel.content.created',
@@ -144,8 +145,13 @@ export const fetchMainTabBadgeCounts = async (currentUserId?: string | null): Pr
     .filter(isPartnerConversation)
     .reduce((sum, chat) => sum + unreadFromConversation(chat), 0);
 
+  const isCommentRoom = (chat: Chat) => {
+    const kind = String((chat as any).kind ?? '').toLowerCase();
+    return kind === 'post' || kind === 'thread';
+  };
+
   const messageUnread = conversations
-    .filter((chat) => !isPartnerConversation(chat))
+    .filter((chat) => !isPartnerConversation(chat) && !isCommentRoom(chat))
     .reduce((sum, chat) => sum + unreadFromConversation(chat), 0);
 
   return {

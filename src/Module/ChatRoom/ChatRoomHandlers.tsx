@@ -494,6 +494,34 @@ export const handleCreateEvent = async ({
   });
 };
 
+export const handleSendLocation = async ({
+  location,
+  chat,
+  currentUserId,
+  ensureConversationId,
+  sendRichMessage,
+}: {
+  location: { latitude: number; longitude: number; address?: string; title?: string };
+  chat: any;
+  currentUserId: string;
+  ensureConversationId: EnsureConversationId;
+  sendRichMessage: SendRichMessage;
+}) => {
+  if (!chat) return;
+
+  const label = location.title ?? location.address ?? 'Location';
+  const convId = await ensureConversationId(`📍 ${label}`);
+  if (!convId) return;
+
+  await sendRichMessage({
+    kind: 'location',
+    fromMe: true,
+    senderId: currentUserId,
+    conversationId: convId,
+    location,
+  });
+};
+
 /* =========================================================
    REQUEST ACTIONS
 ========================================================= */

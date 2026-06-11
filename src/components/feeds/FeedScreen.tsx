@@ -40,6 +40,7 @@ import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { DEV_BACKEND_HOST } from '@/network/config';
 import { useSocket } from '../../../SocketProvider';
 import CommentThreadPanel from './CommentThreadPanel';
+import CommunityCommentThreadPanel from './CommunityCommentThreadPanel';
 import { formatCompactCount } from './feedUtils';
 import { KISIcon } from '@/constants/kisIcons';
 import { FeedComposerPayload } from './composer/types';
@@ -119,6 +120,8 @@ type FeedScreenProps<T extends FeedPost> = {
   loadPosts: () => Promise<T[]>;
   reactEndpoint: (postId: string) => string;
   commentRoomEndpoint: (postId: string) => string;
+  commentsListEndpoint?: (postId: string) => string;
+  commentCreateEndpoint?: (postId: string) => string;
   deleteEndpoint: (postId: string) => string;
   broadcastEndpoint: (postId: string) => string;
   commentChatContext: (post: T) => Record<string, any>;
@@ -284,6 +287,8 @@ export default function FeedScreen<T extends FeedPost>({
   loadPosts,
   reactEndpoint,
   commentRoomEndpoint,
+  commentsListEndpoint,
+  commentCreateEndpoint,
   deleteEndpoint,
   broadcastEndpoint,
   commentChatContext,
@@ -353,6 +358,7 @@ export default function FeedScreen<T extends FeedPost>({
   const videoPlayerRef = useRef<any>(null);
 
   const normalizedFeedType = feedType;
+  const isCommunityFeed = normalizedFeedType === 'community';
   const logImpression = useCallback(
     (count: number) => {
       if (!normalizedFeedType) return;
@@ -698,6 +704,9 @@ export default function FeedScreen<T extends FeedPost>({
       if (res?.data?.has_reacted !== undefined) {
         setLikedPostIds((prev) => ({ ...prev, [postId]: Boolean(res.data.has_reacted) }));
       }
+      if (typeof res?.data?.reactions_count === 'number') {
+        setLikeCounts((prev) => ({ ...prev, [postId]: res.data.reactions_count }));
+      }
       void markPersonalizationHistory();
     },
     [markPersonalizationHistory, reactEndpoint],
@@ -921,9 +930,12 @@ export default function FeedScreen<T extends FeedPost>({
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
-      {/* Soft background glow like the mock (no extra deps) */}
-      <View pointerEvents="none" style={styles.bgGlowA} />
-      <View pointerEvents="none" style={styles.bgGlowB} />
+      {!isCommunityFeed ? (
+        <>
+          <View pointerEvents="none" style={styles.bgGlowA} />
+          <View pointerEvents="none" style={styles.bgGlowB} />
+        </>
+      ) : null}
 
       {/* Top App Bar (center title, back left, bell right) */}
       <View
@@ -1068,7 +1080,21 @@ export default function FeedScreen<T extends FeedPost>({
             const commentCount = commentCounts[post.id] ?? post.comments_count ?? 0;
 
             return (
-              <View style={[styles.card, styles.cardShadow]}>
+              <View
+                style={[
+                  styles.card,
+                  styles.cardShadow,
+                  isCommunityFeed
+                    ? {
+                        backgroundColor: palette.card,
+                        borderColor: palette.primaryStrong,
+                        borderRadius: 26,
+                        borderWidth: 1,
+                        padding: 16,
+                      }
+                    : null,
+                ]}
+              >
                 <View style={styles.postTopRow}>
                   <View style={styles.avatarStack}>
                     {post.author?.avatar_url ? (
@@ -1082,7 +1108,18 @@ export default function FeedScreen<T extends FeedPost>({
                       <ImagePlaceholder size={40} radius={20} style={styles.avatarNew} />
                     )}
                     {/* tiny “heart badge” like mock */}
-                    <View style={styles.avatarBadge}>
+                    <View
+                      style={[
+                        styles.avatarBadge,
+                        isCommunityFeed
+                          ? {
+                              backgroundColor: palette.surface,
+                              borderColor: palette.divider,
+                              borderWidth: StyleSheet.hairlineWidth,
+                            }
+                          : null,
+                      ]}
+                    >
                       <Text style={styles.avatarBadgeText}>❤</Text>
                     </View>
                   </View>
@@ -1093,7 +1130,13 @@ export default function FeedScreen<T extends FeedPost>({
                       hitSlop={6}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Text style={styles.authorName} numberOfLines={1}>
+                        <Text
+                          style={[
+                            styles.authorName,
+                            isCommunityFeed ? { color: palette.text } : null,
+                          ]}
+                          numberOfLines={1}
+                        >
                           {post.author?.display_name ?? 'Member'}
                         </Text>
                         {post.author?.connection_degree != null && (
@@ -1109,7 +1152,13 @@ export default function FeedScreen<T extends FeedPost>({
                         )}
                       </View>
                     </Pressable>
-                    <Text style={styles.postTime} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.postTime,
+                        isCommunityFeed ? { color: palette.subtext } : null,
+                      ]}
+                      numberOfLines={1}
+                    >
                       {post.created_at ? new Date(post.created_at).toLocaleString() : 'Just now'}
                     </Text>
                   </View>
@@ -1122,7 +1171,14 @@ export default function FeedScreen<T extends FeedPost>({
                     style={styles.moreBtnNew}
                     hitSlop={10}
                   >
-                    <Text style={styles.moreDots}>•••</Text>
+                    <Text
+                      style={[
+                        styles.moreDots,
+                        isCommunityFeed ? { color: palette.subtext } : null,
+                      ]}
+                    >
+                      •••
+                    </Text>
                   </Pressable>
                 </View>
 
@@ -1145,7 +1201,10 @@ export default function FeedScreen<T extends FeedPost>({
                 {attachmentUrl ? (
                   isVideo ? (
                     <Pressable
-                      style={styles.mediaWrapNew}
+                      style={[
+                        styles.mediaWrapNew,
+                        isCommunityFeed ? { backgroundColor: palette.surface } : null,
+                      ]}
                       onPress={() =>
                         void openVideoModal({
                           streamUrl,
@@ -1168,7 +1227,12 @@ export default function FeedScreen<T extends FeedPost>({
                       </View>
                     </Pressable>
                   ) : (
-                    <View style={styles.mediaWrapNew}>
+                    <View
+                      style={[
+                        styles.mediaWrapNew,
+                        isCommunityFeed ? { backgroundColor: palette.surface } : null,
+                      ]}
+                    >
                       <PermanentRemoteImage
                         uri={attachmentUrl}
                         domain="Feeds"
@@ -1185,7 +1249,14 @@ export default function FeedScreen<T extends FeedPost>({
                     <Text style={[styles.actionIconNew, likedPostIds[post.id] ? styles.actionIconLiked : null]}>
                       ❤
                     </Text>
-                    <Text style={styles.actionCountNew}>{formatCompactCount(likeCount)}</Text>
+                    <Text
+                      style={[
+                        styles.actionCountNew,
+                        isCommunityFeed ? { color: palette.subtext } : null,
+                      ]}
+                    >
+                      {formatCompactCount(likeCount)}
+                    </Text>
                   </Pressable>
 
                   <Pressable
@@ -1193,7 +1264,14 @@ export default function FeedScreen<T extends FeedPost>({
                     onPress={() => toggleCommentThread(post.id)}
                   >
                     <Text style={styles.actionIconNew}>💬</Text>
-                    <Text style={styles.actionCountNew}>{formatCompactCount(commentCount)}</Text>
+                    <Text
+                      style={[
+                        styles.actionCountNew,
+                        isCommunityFeed ? { color: palette.subtext } : null,
+                      ]}
+                    >
+                      {formatCompactCount(commentCount)}
+                    </Text>
                   </Pressable>
 
                   <Pressable style={styles.actionItemNew} onPress={() => handleShare(post)}>
@@ -1202,21 +1280,29 @@ export default function FeedScreen<T extends FeedPost>({
                   </Pressable>
                 </View>
 
-                {activeCommentPostId === post.id && (
-                  <CommentThreadPanel
-                    postId={post.id}
-                    initialConversationId={
-                      conversationIds[post.id] ?? post.comment_conversation_id ?? null
-                    }
-                    fetchConversationId={() => fetchConversationIdForPost(post.id)}
-                    onConversationResolved={(id) => setConversationIdForPost(post.id, id)}
-                    onMessageCountChange={(count) => handleCommentCountChange(post.id, count)}
-                    headerLabel="Comments"
-                    contextLabel={formatCommentContextLabel(commentChatContext(post))}
-                    onScrollStart={handleCommentScrollStart}
-                    onScrollEnd={handleCommentScrollEnd}
-                  />
-                )}
+                {activeCommentPostId === post.id &&
+                  (commentsListEndpoint && commentCreateEndpoint ? (
+                    <CommunityCommentThreadPanel
+                      postId={post.id}
+                      listEndpoint={commentsListEndpoint}
+                      createEndpoint={commentCreateEndpoint}
+                      onCountChange={(count) => handleCommentCountChange(post.id, count)}
+                    />
+                  ) : (
+                    <CommentThreadPanel
+                      postId={post.id}
+                      initialConversationId={
+                        conversationIds[post.id] ?? post.comment_conversation_id ?? null
+                      }
+                      fetchConversationId={() => fetchConversationIdForPost(post.id)}
+                      onConversationResolved={(id) => setConversationIdForPost(post.id, id)}
+                      onMessageCountChange={(count) => handleCommentCountChange(post.id, count)}
+                      headerLabel="Comments"
+                      contextLabel={formatCommentContextLabel(commentChatContext(post))}
+                      onScrollStart={handleCommentScrollStart}
+                      onScrollEnd={handleCommentScrollEnd}
+                    />
+                  ))}
               </View>
             );
           }}

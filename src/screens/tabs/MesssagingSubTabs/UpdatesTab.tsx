@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
   FlatList,
@@ -395,6 +396,13 @@ export default function UpdatesTab({
         ...otherUsers,
       ];
       setStatusUsers(merged);
+
+      // Broadcast a summary so the conversation list can render story rings
+      const statusMap: Record<string, { hasStatus: boolean; hasUnseen: boolean }> = {};
+      otherUsers.forEach(u => {
+        if (u.userId) statusMap[u.userId] = { hasStatus: u.items.length > 0, hasUnseen: u.hasUnseen };
+      });
+      DeviceEventEmitter.emit('status.loaded', statusMap);
     } catch (e) {
       console.warn('[UpdatesTab] loadStatuses failed', e);
       setStatusUsers([{ id: 'me', name: 'My status', items: [] }]);
@@ -1766,7 +1774,7 @@ export default function UpdatesTab({
 
       {/* Status viewer */}
       <Modal visible={viewerOpen} transparent animationType="fade">
-        <View style={[styles.viewerWrap, { backgroundColor: palette.bg }]}>
+        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg }]} edges={['top']}>
           <View style={styles.viewerProgressRow} pointerEvents="auto">
             {(activeUser?.items ?? []).map((item, idx) => {
               const fill =
@@ -2012,7 +2020,7 @@ export default function UpdatesTab({
               </Text>
             </Pressable>
           )}
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -2209,7 +2217,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: 12,
-    paddingTop: Platform.select({ ios: 64, android: 36, default: 36 }),
+    paddingTop: 12,
     zIndex: 20,
   },
   viewerMenuButton: {
@@ -2235,7 +2243,7 @@ const styles = StyleSheet.create({
   },
   viewerClose: {
     position: 'absolute',
-    top: 36,
+    top: 8,
     right: 16,
     padding: 8,
     zIndex: 50,

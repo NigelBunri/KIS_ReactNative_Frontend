@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
+import ThumbnailPickerSheet from '@/screens/broadcast/channels/components/ThumbnailPickerSheet';
 
 type Props = {
   contents: BroadcastChannelContent[];
@@ -20,6 +21,7 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
   const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
   const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
+  const [thumbnailTarget, setThumbnailTarget] = useState<BroadcastChannelContent | null>(null);
 
   const handleAddTag = useCallback((contentId: string) => {
     const text = (tagInput[contentId] || '').trim().replace(/,+$/, '');
@@ -103,6 +105,13 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
             </View>
             {expandedTags[item.id] && (
               <View style={styles.tagsSection}>
+                <Pressable
+                  onPress={() => setThumbnailTarget(item)}
+                  style={[styles.thumbnailButton, { borderColor: palette.border }]}
+                >
+                  <KISIcon name="image" size={13} color={palette.subtext} />
+                  <Text style={[styles.thumbnailButtonText, { color: palette.subtext }]}>Change thumbnail</Text>
+                </Pressable>
                 <View style={styles.tagsList}>
                   {(tagsMap[item.id] || []).map(tag => (
                     <View key={tag} style={[styles.tagPill, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}>
@@ -137,6 +146,17 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
           <Text style={[styles.rowMeta, { color: palette.subtext }]}>Use Create to publish into the new normalized channel library.</Text>
         </View>
       )}
+      {thumbnailTarget && (
+        <ThumbnailPickerSheet
+          visible={Boolean(thumbnailTarget)}
+          contentId={thumbnailTarget.id}
+          currentThumbnailUrl={thumbnailTarget.thumbnail_url}
+          onClose={() => setThumbnailTarget(null)}
+          onUpdated={(url) => {
+            setThumbnailTarget(null);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -163,4 +183,6 @@ const styles = StyleSheet.create({
   tagPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { fontSize: 11, fontWeight: '700' },
   tagInput: { minWidth: 90, flex: 1, borderBottomWidth: 1, paddingVertical: 4, paddingHorizontal: 6, fontSize: 12, fontWeight: '600' },
+  thumbnailButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: 10 },
+  thumbnailButtonText: { fontSize: 12, fontWeight: '700' },
 });

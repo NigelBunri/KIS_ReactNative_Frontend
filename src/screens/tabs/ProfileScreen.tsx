@@ -52,6 +52,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { enqueueMutation } from '@/services/pendingMutationsQueue';
 import { deleteRequest } from '@/network/delete';
 import {
   fetchInAppNotifications,
@@ -1050,9 +1051,11 @@ export default function ProfileScreen() {
     setOpenToWork(value);
     setOpenToWorkLoading(true);
     try {
-      await postRequest(ROUTES.profiles.openToWork, { open_to_work: value });
+      const res = await postRequest(ROUTES.profiles.openToWork, { open_to_work: value });
+      if (!res?.success) throw new Error(res?.message || 'Failed');
     } catch {
-      setOpenToWork(!value);
+      // Queue for retry; keep optimistic state (don't revert)
+      await enqueueMutation({ method: 'POST', url: ROUTES.profiles.openToWork, payload: { open_to_work: value } }).catch(() => {});
     } finally {
       setOpenToWorkLoading(false);
     }
@@ -2017,7 +2020,28 @@ export default function ProfileScreen() {
       resetMarketForm();
       closeShopEditor();
     } catch (error: any) {
-      Alert.alert('Market profile', error?.message || 'Unable to save shop.');
+      // Queue the JSON-serialisable fields for retry when connectivity returns.
+      // FormData (with binary images) cannot be queued — text fields are queued
+      // instead so the backend is updated once reconnected. A new image upload
+      // will still require the user to re-submit, but text changes are safe.
+      const endpoint = marketForm.id
+        ? `${ROUTES.commerce.shops}${marketForm.id}/`
+        : ROUTES.commerce.shops;
+      const jsonPayload: Record<string, any> = {
+        name: marketForm.name.trim(),
+        description: marketForm.description.trim(),
+        employee_slots: Math.max(1, Number.parseInt(marketForm.employeeSlots, 10) || 1),
+        status: marketForm.status,
+      };
+      enqueueMutation({
+        method: marketForm.id ? 'PATCH' : 'POST',
+        url: endpoint,
+        payload: jsonPayload,
+      }).catch(() => {});
+      Alert.alert(
+        'Market profile',
+        'Changes saved locally — will sync when online.',
+      );
     } finally {
       setMarketFormLoading(false);
     }

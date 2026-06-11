@@ -5,15 +5,18 @@ import {
   Animated,
   Pressable,
   ScrollView,
+  Share,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 
 type Props = {
   isOpen: boolean;
@@ -21,6 +24,16 @@ type Props = {
   panelTranslateX: Animated.Value;
   partnerId?: string | null;
   onClose: () => void;
+};
+
+type PartnerInvite = {
+  id: string | number;
+  code: string;
+  membership_role?: string;
+  max_uses?: number | null;
+  use_count?: number;
+  expires_at?: string | null;
+  is_active?: boolean;
 };
 
 type AccessRequest = {
@@ -54,6 +67,11 @@ export default function PartnerGovernancePanel({
   const [reviewName, setReviewName] = useState('');
   const [reviewScopeType, setReviewScopeType] = useState('global');
   const [reviewScopeId, setReviewScopeId] = useState('');
+  const [invites, setInvites] = useState<PartnerInvite[]>([]);
+  const [newInviteRole, setNewInviteRole] = useState('member');
+  const [newInviteMaxUses, setNewInviteMaxUses] = useState('');
+  const [newInviteExpiry, setNewInviteExpiry] = useState('');
+  const [inviteCreating, setInviteCreating] = useState(false);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -63,19 +81,60 @@ export default function PartnerGovernancePanel({
 
   const loadAll = useCallback(async () => {
     if (!partnerId) return;
-    const [reqRes, reviewRes] = await Promise.all([
+    const [reqRes, reviewRes, inviteRes] = await Promise.all([
       getRequest(ROUTES.partners.accessRequests(partnerId), {
         errorMessage: 'Unable to load access requests.',
       }),
       getRequest(ROUTES.partners.accessReviews(partnerId), {
         errorMessage: 'Unable to load access reviews.',
       }),
+      getRequest(ROUTES.partners.invites(partnerId), {
+        errorMessage: 'Unable to load invite codes.',
+      }),
     ]);
     const reqList = (reqRes?.data ?? reqRes ?? []) as AccessRequest[];
     const reviewList = (reviewRes?.data ?? reviewRes ?? []) as AccessReview[];
+    const inviteList = (inviteRes?.data ?? inviteRes ?? []) as PartnerInvite[];
     setAccessRequests(Array.isArray(reqList) ? reqList : []);
     setAccessReviews(Array.isArray(reviewList) ? reviewList : []);
+    setInvites(Array.isArray(inviteList) ? inviteList : []);
   }, [partnerId]);
+
+  const createInvite = async () => {
+    if (!partnerId) return;
+    setInviteCreating(true);
+    const body: Record<string, unknown> = { membership_role: newInviteRole.trim() || 'member' };
+    if (newInviteMaxUses.trim()) body.max_uses = parseInt(newInviteMaxUses, 10);
+    if (newInviteExpiry.trim()) body.expires_at = newInviteExpiry.trim();
+    const res = await postRequest(ROUTES.partners.invites(partnerId), body);
+    setInviteCreating(false);
+    if (!res?.success && !res?.id && !res?.code) {
+      Alert.alert('Create failed', res?.message ?? 'Unable to create invite code.');
+      return;
+    }
+    setNewInviteRole('member');
+    setNewInviteMaxUses('');
+    setNewInviteExpiry('');
+    loadAll();
+  };
+
+  const deactivateInvite = async (inviteId: string | number) => {
+    if (!partnerId) return;
+    const res = await patchRequest(
+      ROUTES.partners.inviteDetail(partnerId, String(inviteId)),
+      { is_active: false },
+    );
+    if (!res?.success && !res?.id) {
+      Alert.alert('Deactivate failed', res?.message ?? 'Please try again.');
+      return;
+    }
+    loadAll();
+  };
+
+  const shareInviteCode = (code: string) => {
+    const link = `kis://join/partner/${code}`;
+    Share.share({ message: `Join us on KIS! Use invite code: ${code}\n${link}` });
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -372,6 +431,204 @@ export default function PartnerGovernancePanel({
                   ) : null}
                 </View>
               ))}
+
+              {/* ── Invite Codes ── */}
+              <Text style={[styles.settingsSectionTitle, { color: palette.text, marginTop: 20 }]}>
+                Invite codes
+              </Text>
+              <View
+                style={[
+                  styles.settingsFeatureRow,
+                  { borderColor: palette.borderMuted, backgroundColor: palette.surface },
+                ]}
+              >
+                <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>
+                  Create invite code
+                </Text>
+                <TextInput
+                  value={newInviteRole}
+                  onChangeText={setNewInviteRole}
+                  placeholder="Role (e.g. member, admin)"
+                  placeholderTextColor={palette.subtext}
+                  style={{
+                    color: palette.text,
+                    borderColor: palette.borderMuted,
+                    borderWidth: 2,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginTop: 8,
+                  }}
+                />
+                <TextInput
+                  value={newInviteMaxUses}
+                  onChangeText={setNewInviteMaxUses}
+                  placeholder="Max uses (leave blank for unlimited)"
+                  placeholderTextColor={palette.subtext}
+                  keyboardType="numeric"
+                  style={{
+                    color: palette.text,
+                    borderColor: palette.borderMuted,
+                    borderWidth: 2,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginTop: 8,
+                  }}
+                />
+                <TextInput
+                  value={newInviteExpiry}
+                  onChangeText={setNewInviteExpiry}
+                  placeholder="Expires at (YYYY-MM-DD, optional)"
+                  placeholderTextColor={palette.subtext}
+                  style={{
+                    color: palette.text,
+                    borderColor: palette.borderMuted,
+                    borderWidth: 2,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginTop: 8,
+                  }}
+                />
+                <Pressable
+                  onPress={createInvite}
+                  disabled={inviteCreating}
+                  style={({ pressed }) => [
+                    {
+                      marginTop: 10,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: palette.borderMuted,
+                      backgroundColor: palette.primarySoft ?? palette.surface,
+                      opacity: inviteCreating || pressed ? 0.7 : 1,
+                      alignItems: 'center',
+                    },
+                  ]}
+                >
+                  {inviteCreating ? (
+                    <ActivityIndicator size="small" color={palette.primary} />
+                  ) : (
+                    <Text style={{ color: palette.primaryStrong ?? palette.text, fontWeight: '700' }}>
+                      CREATE CODE
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+
+              {invites.map((invite) => {
+                const fullLink = `kis://join/partner/${invite.code}`;
+                return (
+                <View
+                  key={String(invite.id)}
+                  style={[
+                    styles.settingsFeatureRow,
+                    {
+                      borderColor: invite.is_active !== false ? palette.borderMuted : palette.danger,
+                      backgroundColor: palette.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.settingsFeatureTitle,
+                      { color: palette.text, letterSpacing: 1.5 },
+                    ]}
+                  >
+                    {invite.code}
+                  </Text>
+                  {/* Selectable full link so admins can long-press copy too */}
+                  <Text
+                    selectable
+                    numberOfLines={2}
+                    style={{
+                      color: palette.subtext,
+                      fontSize: 11,
+                      marginTop: 4,
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    {fullLink}
+                  </Text>
+                  <Text style={[styles.settingsFeatureDescription, { color: palette.subtext, marginTop: 4 }]}>
+                    Role: {invite.membership_role ?? 'member'} · Uses:{' '}
+                    {invite.use_count ?? 0}
+                    {invite.max_uses != null ? `/${invite.max_uses}` : ''}
+                    {invite.expires_at ? ` · Expires: ${invite.expires_at.slice(0, 10)}` : ''}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingsFeatureMeta,
+                      { color: invite.is_active !== false ? palette.success : palette.danger },
+                    ]}
+                  >
+                    {invite.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <Pressable
+                      onPress={() => {
+                        Clipboard.setString(fullLink);
+                        Alert.alert('Copied', 'Invite link copied to clipboard.');
+                      }}
+                      style={({ pressed }) => [
+                        {
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: palette.borderMuted,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 12 }}>Copy link</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => shareInviteCode(invite.code)}
+                      style={({ pressed }) => [
+                        {
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: palette.borderMuted,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 12 }}>Share</Text>
+                    </Pressable>
+                    {invite.is_active !== false && (
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert('Deactivate code?', `Code ${invite.code} will be disabled.`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Deactivate', style: 'destructive', onPress: () => deactivateInvite(invite.id) },
+                          ])
+                        }
+                        style={({ pressed }) => [
+                          {
+                            paddingVertical: 5,
+                            paddingHorizontal: 10,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: palette.danger,
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: palette.danger, fontSize: 12 }}>Deactivate</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              ); })}
+              {invites.length === 0 && (
+                <Text style={[styles.settingsFeatureDescription, { color: palette.subtext, paddingHorizontal: 4 }]}>
+                  No invite codes yet. Create one above.
+                </Text>
+              )}
             </>
           )}
         </ScrollView>

@@ -4,8 +4,10 @@ import apiService from '../../services/apiService';
 import { CacheTypes } from '../cacheKeys';
 import { setCache } from '../cache';
 import type { ApiResult, HeadersInit } from '../types';
-import { getAccessToken } from '@/security/authStorage';
-import { refreshAccessToken } from '@/security/tokenRefresh';
+import {
+  getAccessTokenForRequest,
+  refreshAccessToken,
+} from '@/security/tokenRefresh';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 const MAX_PATCH_RETRIES = 2;
@@ -61,7 +63,7 @@ export const patchRequest = async (
   } = {}
 ): Promise<ApiResult> => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessTokenForRequest();
     const deviceId = await AsyncStorage.getItem('device_id');
 
     const isFormData =
@@ -93,7 +95,7 @@ export const patchRequest = async (
 
     // Silent token refresh on 401
     if (response.status === 401) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
         const retryResponse = await fetchPatchWithRetry(() => apiService.patch(url, payload, retryHeaders));
