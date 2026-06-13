@@ -8,10 +8,11 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import CountryPicker, {
+import {
   Country,
   CountryCode,
 } from 'react-native-country-picker-modal';
+import SafeCountryPicker from '@/components/common/SafeCountryPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { KISIcon } from '@/constants/kisIcons';
@@ -321,19 +322,12 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
           </Pressable>
 
           {/* Actual modal */}
-          {countryPickerVisible ? (
-            <CountryPicker
-              visible={countryPickerVisible}
-              countryCode={countryCode}
-              withFilter
-              withCallingCode
-              withFlag
-              withEmoji
-              withCountryNameButton={false}
-              onSelect={handleCountrySelect}
-              onClose={() => setCountryPickerVisible(false)}
-            />
-          ) : null}
+          <SafeCountryPicker
+            visible={countryPickerVisible}
+            countryCode={countryCode}
+            onSelect={handleCountrySelect}
+            onClose={() => setCountryPickerVisible(false)}
+          />
 
           {/* Phone input */}
           <View

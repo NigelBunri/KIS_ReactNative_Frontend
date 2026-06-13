@@ -268,6 +268,7 @@ const healthRoutes = {
       `${API_BASE_URL}/api/v1/health-ops/pharmacy/sessions/${encodeURIComponent(pharmacySessionId)}/tracking/`,
     pharmacySessionEnd: (pharmacySessionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/pharmacy/sessions/${encodeURIComponent(pharmacySessionId)}/end/`,
+    billingSessions: `${API_BASE_URL}/api/v1/health-ops/billing/sessions/`,
     billingSessionStart: `${API_BASE_URL}/api/v1/health-ops/billing/sessions/start/`,
     billingSession: (billingSessionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/billing/sessions/${encodeURIComponent(billingSessionId)}/`,

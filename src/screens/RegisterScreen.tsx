@@ -1,7 +1,8 @@
 // src/screens/RegisterScreen.tsx
 import React, { useCallback, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
+import { Country, CountryCode } from 'react-native-country-picker-modal';
+import SafeCountryPicker from '@/components/common/SafeCountryPicker';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -298,19 +299,12 @@ export default function RegisterScreen({ navigation }: any) {
                 </KISText>
                 <KISText preset="helper" color={palette.subtext}>▾</KISText>
               </Pressable>
-              {countryPickerVisible && (
-                <CountryPicker
-                  visible={countryPickerVisible}
-                  countryCode={countryCode}
-                  withFilter
-                  withCallingCode
-                  withFlag
-                  withEmoji
-                  withCountryNameButton={false}
-                  onSelect={onCountrySelect}
-                  onClose={() => setCountryPickerVisible(false)}
-                />
-              )}
+              <SafeCountryPicker
+                visible={countryPickerVisible}
+                countryCode={countryCode}
+                onSelect={onCountrySelect}
+                onClose={() => setCountryPickerVisible(false)}
+              />
               <TextInput
                 value={regPhone}
                 onChangeText={onChangeRegPhone}

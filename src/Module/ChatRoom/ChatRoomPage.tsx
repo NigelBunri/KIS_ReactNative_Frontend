@@ -25,6 +25,12 @@ import React, {
   useState,
 } from 'react';
 import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
   View,
   Alert,
   DeviceEventEmitter,
@@ -32,8 +38,12 @@ import {
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '../../theme/useTheme';
 import { chatRoomStyles as styles } from './chatRoomStyles';
+import { KISIcon } from '@/constants/kisIcons';
 
 /* -------------------------------------------------------------------------- */
 /*                                   UI PARTS                                 */
@@ -205,6 +215,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const { palette, isDark } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const topInset =
     typeof safeAreaTopInsetOverride === 'number'
       ? safeAreaTopInsetOverride
@@ -541,6 +552,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [messageLocator, setMessageLocator] =
     useState<MessageLocator | null>(null);
   const initialUnreadJumpRef = useRef<string | null>(null);
+  const composerLinkPreviewRef = useRef<{ title?: string; description?: string; image?: string; site_name?: string; url: string } | null>(null);
+
+  // member.tap popup (group sender avatar/name tap)
+  const [memberTap, setMemberTap] = useState<{ userId?: string; name: string; avatarUrl?: string } | null>(null);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -653,6 +668,30 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         return { id, name: String(name) };
       })
       .filter(Boolean) as { id: string; name: string }[];
+  }, [chat?.participants]);
+
+  const participantMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    mentionParticipants.forEach(p => { map[p.id] = p.name; });
+    return map;
+  }, [mentionParticipants]);
+
+  const participantAvatarMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts)) return map;
+    (parts as any[]).forEach((p: any) => {
+      const id = String(p?.id ?? p?.user?.id ?? p ?? '');
+      const avatar =
+        p?.user?.avatar_url ??
+        p?.user?.profile_picture ??
+        p?.user?.avatarUrl ??
+        p?.avatar_url ??
+        p?.profile_picture ??
+        p?.avatarUrl ?? '';
+      if (id && avatar) map[id] = String(avatar);
+    });
+    return map;
   }, [chat?.participants]);
 
   const createForwardClientId = useCallback(
@@ -1350,8 +1389,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /*                              HANDLER BINDINGS                             */
   /* ======================================================================== */
 
-  const handleSend = () =>
-    Handlers.handleSend({
+  const handleSend = () => {
+    const lp = composerLinkPreviewRef.current;
+    composerLinkPreviewRef.current = null;
+    return Handlers.handleSend({
       draft,
       chat,
       editing,
@@ -1359,6 +1400,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       currentUserId,
       draftKey,
       dmRole,
+      linkPreview: lp ?? undefined,
       ensureConversationId,
       editMessage,
       replyToMessage,
@@ -1369,6 +1411,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       setReplyTo,
       setHasLocallyAcceptedRequest: noop,
     });
+  };
 
   const handleToggleMute = async () => {
     const convId = conversationId ?? chat?.id;
@@ -1875,10 +1918,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       if (targetId !== chatId) return;
       handleOpenInfo();
     });
-    return () => {
-      sub.remove();
-    };
+    return () => { sub.remove(); };
   }, [chat?.conversationId, chat?.id, handleOpenInfo]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('member.tap', (payload: any) => {
+      setMemberTap({ userId: payload?.userId, name: String(payload?.name ?? ''), avatarUrl: payload?.avatarUrl });
+    });
+    return () => { sub.remove(); };
+  }, []);
 
   return (
     <View
@@ -2038,10 +2086,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onMessageLocatorReady={setMessageLocator}
           onVisibleMessageIds={handleVisibleMessageIds}
           mentionParticipants={mentionParticipants}
+          participantMap={participantMap}
+          participantAvatarMap={participantAvatarMap}
           senderName={currentUserName ?? ''}
           conversationIdForMentions={String(conversationId ?? chat?.id ?? '')}
           onChangeDraft={handleChangeDraft}
           onSend={handleSend}
+          onLinkPreviewChange={(p: any) => { composerLinkPreviewRef.current = p; }}
           onSendVoice={handleSendVoice}
           onOpenStickerEditor={() => setOpenStickerEditor(true)}
           onChooseTextBackground={setTextCardBg}
@@ -2132,6 +2183,70 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         wallpaperCurrentId={wallpaperId}
         onSelectWallpaper={handleSelectWallpaper}
       />
+
+      {/* ── Member profile popup (triggered by tapping sender avatar/name) ── */}
+      {memberTap && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMemberTap(null)}
+        >
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={() => setMemberTap(null)}>
+            <Pressable onPress={() => {}} style={{ width: 280, borderRadius: 20, overflow: 'hidden', backgroundColor: palette.card ?? '#fff' }}>
+              {/* Avatar */}
+              <View style={{ alignItems: 'center', paddingTop: 28, paddingBottom: 16, backgroundColor: palette.surface }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: (palette.primary ?? '#4F46E5') + '33', alignItems: 'center', justifyContent: 'center' }}>
+                  {memberTap.avatarUrl ? (
+                    <Image source={{ uri: memberTap.avatarUrl }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontSize: 26, fontWeight: '700', color: palette.primary ?? '#4F46E5' }}>
+                      {memberTap.name.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ marginTop: 10, fontSize: 16, fontWeight: '700', color: palette.text }} numberOfLines={1}>{memberTap.name}</Text>
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.divider ?? '#e5e7eb' }}>
+                {[
+                  { icon: 'chat', label: 'Message', onPress: async () => {
+                    if (!memberTap.userId) return;
+                    setMemberTap(null);
+                    try {
+                      const res = await postRequest(ROUTES.chat.directConversation, { other_user_id: memberTap.userId }, {});
+                      const convId = res?.data?.conversation_id ?? res?.data?.id ?? res?.data?.conversationId;
+                      if (convId) DeviceEventEmitter.emit('chat.open', { conversationId: String(convId), name: memberTap.name, kind: 'dm' });
+                    } catch { /* best-effort */ }
+                  }},
+                  { icon: 'phone', label: 'Voice', onPress: () => {
+                    setMemberTap(null);
+                    if (startCall && memberTap.userId) {
+                      void startCall({ conversationId: String(chat?.conversationId ?? chat?.id ?? ''), title: memberTap.name, media: 'voice', inviteeUserIds: [memberTap.userId] });
+                    }
+                  }},
+                  { icon: 'video', label: 'Video', onPress: () => {
+                    setMemberTap(null);
+                    if (startCall && memberTap.userId) {
+                      void startCall({ conversationId: String(chat?.conversationId ?? chat?.id ?? ''), title: memberTap.name, media: 'video', inviteeUserIds: [memberTap.userId] });
+                    }
+                  }},
+                  { icon: 'user', label: 'Profile', onPress: () => {
+                    setMemberTap(null);
+                    if (memberTap.userId) navigation?.navigate('ViewProfile', { userId: memberTap.userId, displayName: memberTap.name });
+                  }},
+                ].map(({ icon, label, onPress }) => (
+                  <Pressable key={label} onPress={onPress} style={({ pressed }) => ({ flex: 1, alignItems: 'center', paddingVertical: 14, opacity: pressed ? 0.6 : 1 })}>
+                    <KISIcon name={icon} size={22} color={palette.primary ?? '#4F46E5'} />
+                    <Text style={{ fontSize: 10, color: palette.subtext, marginTop: 4 }}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 };

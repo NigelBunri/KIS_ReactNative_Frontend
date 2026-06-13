@@ -66,6 +66,7 @@ type MessageListProps = {
   onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
+  participantAvatarMap?: Record<string, string>;
   isE2EE?: boolean;
 };
 
@@ -101,6 +102,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onUpdateMessage,
   mentionMap,
   participantMap,
+  participantAvatarMap,
   isE2EE = false,
 }) => {
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -453,6 +455,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onUpdateMessage={onUpdateMessage}
                 mentionMap={mentionMap}
                 participantMap={participantMap}
+                participantAvatarMap={participantAvatarMap}
               />
             </View>
           );

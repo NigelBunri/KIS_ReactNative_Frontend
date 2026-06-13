@@ -79,7 +79,7 @@ export default function MyApplicationsScreen() {
           onPress: async () => {
             setWithdrawingId(application.id);
             try {
-              const url = application.cancel_url ?? `${ROUTES.jobs.myApplications}${application.id}/cancel/`;
+              const url = application.cancel_url ?? ROUTES.jobs.withdrawApplication(application.id);
               await postRequest(url, {});
               setApplications(prev =>
                 prev.map(a => a.id === application.id ? { ...a, status: 'WITHDRAWN' as ApplicationStatus } : a),

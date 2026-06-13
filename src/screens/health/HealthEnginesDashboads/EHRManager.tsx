@@ -1,31 +1,35 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { useColorScheme } from "react-native";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
 import KISButton from "@/constants/KISButton";
+import ROUTES from "@/network";
+import { getRequest } from "@/network/get";
+import { postRequest } from "@/network/post";
+import { patchRequest } from "@/network/patch";
 
 /* ================= TYPES ================= */
 
 type VisitStatus = "Draft" | "Finalized" | "Locked";
 
-type VisitRecord = {
+type Encounter = {
   id: string;
-  date: number;
+  date: string;
   vitals: string;
-  soap: {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-  };
+  soap_subjective: string;
+  soap_objective: string;
+  soap_assessment: string;
+  soap_plan: string;
   diagnoses: string;
   medications: string;
   allergies: string;
@@ -39,7 +43,6 @@ type Patient = {
   gender: string;
   history: string;
   surgeries: string;
-  visits: VisitRecord[];
 };
 
 /* ================= COMPONENT ================= */
@@ -59,90 +62,152 @@ export default function EHRManager() {
   /* ================= PATIENTS ================= */
 
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [savingPatient, setSavingPatient] = useState(false);
   const [activePatientId, setActivePatientId] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newAge, setNewAge] = useState("");
   const [newGender, setNewGender] = useState("");
 
-  const createPatient = () => {
+  const fetchPatients = useCallback(async () => {
+    setLoadingPatients(true);
+    try {
+      const res = await getRequest(ROUTES.patients.master, {
+        errorMessage: "Unable to load patients.",
+      });
+      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+      setPatients(Array.isArray(list) ? list : []);
+    } catch {
+      setPatients([]);
+    } finally {
+      setLoadingPatients(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
+
+  const createPatient = async () => {
     if (!newName) return;
-
-    const newPatient: Patient = {
-      id: Date.now().toString(),
-      name: newName,
-      age: newAge,
-      gender: newGender,
-      history: "",
-      surgeries: "",
-      visits: [],
-    };
-
-    setPatients((prev) => [...prev, newPatient]);
-    setNewName("");
-    setNewAge("");
-    setNewGender("");
+    setSavingPatient(true);
+    try {
+      const res = await postRequest(ROUTES.patients.master, {
+        name: newName,
+        age: newAge,
+        gender: newGender,
+      });
+      const created = res?.data ?? res;
+      if (created?.id) {
+        setPatients((prev) => [...prev, created]);
+        setNewName("");
+        setNewAge("");
+        setNewGender("");
+      } else {
+        await fetchPatients();
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not create patient.");
+    } finally {
+      setSavingPatient(false);
+    }
   };
 
   const activePatient = patients.find((p) => p.id === activePatientId);
 
-  /* ================= VISITS ================= */
+  /* ================= ENCOUNTERS ================= */
 
-  const addVisit = () => {
+  const [encounters, setEncounters] = useState<Encounter[]>([]);
+  const [loadingEncounters, setLoadingEncounters] = useState(false);
+  const [addingVisit, setAddingVisit] = useState(false);
+
+  const fetchEncounters = useCallback(async (patientId: string) => {
+    setLoadingEncounters(true);
+    try {
+      const res = await getRequest(
+        `${ROUTES.patients.encounters}?patient=${patientId}`,
+        { errorMessage: "Unable to load encounters." }
+      );
+      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+      setEncounters(Array.isArray(list) ? list : []);
+    } catch {
+      setEncounters([]);
+    } finally {
+      setLoadingEncounters(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activePatientId) {
+      fetchEncounters(activePatientId);
+    } else {
+      setEncounters([]);
+    }
+  }, [activePatientId, fetchEncounters]);
+
+  const addVisit = async () => {
     if (!activePatient) return;
-
-    const newVisit: VisitRecord = {
-      id: Date.now().toString(),
-      date: Date.now(),
-      vitals: "",
-      soap: { subjective: "", objective: "", assessment: "", plan: "" },
-      diagnoses: "",
-      medications: "",
-      allergies: "",
-      status: "Draft",
-    };
-
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === activePatient.id
-          ? { ...p, visits: [...p.visits, newVisit] }
-          : p
-      )
-    );
+    setAddingVisit(true);
+    try {
+      const res = await postRequest(ROUTES.patients.encounters, {
+        patient: activePatient.id,
+        status: "Draft",
+      });
+      const created = res?.data ?? res;
+      if (created?.id) {
+        setEncounters((prev) => [...prev, created]);
+      } else {
+        await fetchEncounters(activePatient.id);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not create encounter.");
+    } finally {
+      setAddingVisit(false);
+    }
   };
 
-  const updateVisit = (
-    visitId: string,
-    field: keyof VisitRecord,
-    value: any
+  const updateEncounterField = async (
+    encounterId: string,
+    field: string,
+    value: string
   ) => {
-    if (!activePatient) return;
-
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id !== activePatient.id) return p;
-
-        return {
-          ...p,
-          visits: p.visits.map((v) =>
-            v.id === visitId ? { ...v, [field]: value } : v
-          ),
-        };
-      })
+    setEncounters((prev) =>
+      prev.map((e) => (e.id === encounterId ? { ...e, [field]: value } : e))
     );
+    try {
+      await patchRequest(
+        `${ROUTES.patients.encounters}${encounterId}/`,
+        { [field]: value }
+      );
+    } catch {
+      // optimistic update; local state already reflects change
+    }
+  };
+
+  const updateEncounterStatus = async (
+    encounterId: string,
+    status: VisitStatus
+  ) => {
+    setEncounters((prev) =>
+      prev.map((e) => (e.id === encounterId ? { ...e, status } : e))
+    );
+    try {
+      await patchRequest(
+        `${ROUTES.patients.encounters}${encounterId}/`,
+        { status }
+      );
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not update status.");
+    }
   };
 
   /* ================= ANALYTICS ================= */
 
   const totalPatients = patients.length;
-  const totalVisits = patients.reduce((sum, p) => sum + p.visits.length, 0);
-  const finalizedRecords = patients.reduce(
-    (sum, p) =>
-      sum + p.visits.filter((v) => v.status === "Finalized").length,
-    0
-  );
-
-  const draftRecords = totalVisits - finalizedRecords;
+  const totalVisits = encounters.length;
+  const finalizedRecords = encounters.filter((e) => e.status === "Finalized").length;
+  const draftRecords = encounters.filter((e) => e.status === "Draft").length;
 
   /* ================= UI ================= */
 
@@ -160,23 +225,13 @@ export default function EHRManager() {
           onPress={() => setEnabled(!enabled)}
           variant="outline"
         />
-
         <KISButton
-          title={
-            requireSignature
-              ? "Disable Signature Requirement"
-              : "Require Signature"
-          }
+          title={requireSignature ? "Disable Signature Requirement" : "Require Signature"}
           onPress={() => setRequireSignature(!requireSignature)}
           variant="outline"
         />
-
         <KISButton
-          title={
-            versionTracking
-              ? "Disable Version Tracking"
-              : "Enable Version Tracking"
-          }
+          title={versionTracking ? "Disable Version Tracking" : "Enable Version Tracking"}
           onPress={() => setVersionTracking(!versionTracking)}
           variant="outline"
         />
@@ -198,6 +253,7 @@ export default function EHRManager() {
           placeholder="Age"
           value={newAge}
           onChangeText={setNewAge}
+          keyboardType="numeric"
           style={input(palette, spacing)}
         />
         <TextInput
@@ -207,7 +263,10 @@ export default function EHRManager() {
           style={input(palette, spacing)}
         />
 
-        <KISButton title="Create Patient" onPress={createPatient} />
+        <KISButton
+          title={savingPatient ? "Saving…" : "Create Patient"}
+          onPress={createPatient}
+        />
       </View>
 
       {/* ===== PATIENT LIST ===== */}
@@ -216,125 +275,149 @@ export default function EHRManager() {
           Patients
         </Text>
 
-        {patients.map((patient) => (
-          <TouchableOpacity
-            key={patient.id}
-            onPress={() => setActivePatientId(patient.id)}
-            style={[
-              itemCard(palette, spacing),
-              activePatientId === patient.id && {
-                borderWidth: 2,
-                borderColor: palette.primary,
-              },
-            ]}
-          >
-            <Text style={{ color: palette.text }}>
-              {patient.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {loadingPatients ? (
+          <ActivityIndicator color={palette.primary} />
+        ) : patients.length === 0 ? (
+          <Text style={{ color: palette.subtext }}>No patients found.</Text>
+        ) : (
+          patients.map((patient) => (
+            <TouchableOpacity
+              key={patient.id}
+              onPress={() => setActivePatientId(patient.id)}
+              style={[
+                itemCard(palette, spacing),
+                activePatientId === patient.id && {
+                  borderWidth: 2,
+                  borderColor: palette.primary,
+                },
+              ]}
+            >
+              <Text style={{ color: palette.text }}>{patient.name}</Text>
+              {patient.age ? (
+                <Text style={{ color: palette.subtext }}>
+                  {patient.age} · {patient.gender}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
 
       {/* ===== ACTIVE PATIENT RECORD ===== */}
       {activePatient && (
         <View style={card(palette, spacing)}>
           <Text style={{ ...typography.h2, color: palette.text }}>
-            {activePatient.name} - Record
+            {activePatient.name} — Record
           </Text>
 
-          <TextInput
-            placeholder="Medical History"
-            value={activePatient.history}
-            onChangeText={(text) =>
-              setPatients((prev) =>
-                prev.map((p) =>
-                  p.id === activePatient.id
-                    ? { ...p, history: text }
-                    : p
-                )
-              )
-            }
-            style={input(palette, spacing)}
-          />
-
-          <TextInput
-            placeholder="Surgical History"
-            value={activePatient.surgeries}
-            onChangeText={(text) =>
-              setPatients((prev) =>
-                prev.map((p) =>
-                  p.id === activePatient.id
-                    ? { ...p, surgeries: text }
-                    : p
-                )
-              )
-            }
-            style={input(palette, spacing)}
-          />
-
-          <KISButton title="Add Visit" onPress={addVisit} />
-
-          {activePatient.visits.map((visit) => (
-            <View key={visit.id} style={itemCard(palette, spacing)}>
-              <Text style={{ color: palette.text }}>
-                Visit Date: {new Date(visit.date).toLocaleString()}
-              </Text>
-
-              <TextInput
-                placeholder="Vitals"
-                value={visit.vitals}
-                onChangeText={(text) =>
-                  updateVisit(visit.id, "vitals", text)
-                }
-                style={input(palette, spacing)}
+          {loadingEncounters ? (
+            <ActivityIndicator color={palette.primary} />
+          ) : (
+            <>
+              <KISButton
+                title={addingVisit ? "Adding…" : "Add Visit"}
+                onPress={addVisit}
               />
 
-              <TextInput
-                placeholder="SOAP - Subjective"
-                value={visit.soap.subjective}
-                onChangeText={(text) =>
-                  updateVisit(visit.id, "soap", {
-                    ...visit.soap,
-                    subjective: text,
-                  })
-                }
-                style={input(palette, spacing)}
-              />
+              {encounters.map((enc) => (
+                <View key={enc.id} style={itemCard(palette, spacing)}>
+                  <Text style={{ color: palette.text }}>
+                    Visit:{" "}
+                    {enc.date
+                      ? new Date(enc.date).toLocaleDateString()
+                      : "New"}
+                  </Text>
 
-              <TextInput
-                placeholder="Diagnoses"
-                value={visit.diagnoses}
-                onChangeText={(text) =>
-                  updateVisit(visit.id, "diagnoses", text)
-                }
-                style={input(palette, spacing)}
-              />
+                  <TextInput
+                    placeholder="Vitals"
+                    value={enc.vitals ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "vitals", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
 
-              <TextInput
-                placeholder="Medications"
-                value={visit.medications}
-                onChangeText={(text) =>
-                  updateVisit(visit.id, "medications", text)
-                }
-                style={input(palette, spacing)}
-              />
+                  <TextInput
+                    placeholder="SOAP — Subjective"
+                    value={enc.soap_subjective ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "soap_subjective", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
 
-              <Text style={{ color: palette.subtext }}>
-                Status: {visit.status}
-              </Text>
+                  <TextInput
+                    placeholder="SOAP — Objective"
+                    value={enc.soap_objective ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "soap_objective", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
 
-              {["Draft", "Finalized", "Locked"].map((s) => (
-                <KISButton
-                  key={s}
-                  title={s}
-                  onPress={() =>
-                    updateVisit(visit.id, "status", s)
-                  }
-                  variant="outline"
-                />
+                  <TextInput
+                    placeholder="SOAP — Assessment"
+                    value={enc.soap_assessment ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "soap_assessment", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
+
+                  <TextInput
+                    placeholder="SOAP — Plan"
+                    value={enc.soap_plan ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "soap_plan", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
+
+                  <TextInput
+                    placeholder="Diagnoses"
+                    value={enc.diagnoses ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "diagnoses", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
+
+                  <TextInput
+                    placeholder="Medications"
+                    value={enc.medications ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "medications", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
+
+                  <TextInput
+                    placeholder="Allergies"
+                    value={enc.allergies ?? ""}
+                    onChangeText={(text) =>
+                      updateEncounterField(enc.id, "allergies", text)
+                    }
+                    style={input(palette, spacing)}
+                  />
+
+                  <Text style={{ color: palette.subtext, marginTop: 6 }}>
+                    Status: {enc.status}
+                  </Text>
+
+                  {(["Draft", "Finalized", "Locked"] as VisitStatus[]).map(
+                    (s) => (
+                      <KISButton
+                        key={s}
+                        title={s}
+                        onPress={() => updateEncounterStatus(enc.id, s)}
+                        variant={enc.status === s ? "primary" : "outline"}
+                      />
+                    )
+                  )}
+                </View>
               ))}
-            </View>
-          ))}
+            </>
+          )}
         </View>
       )}
 

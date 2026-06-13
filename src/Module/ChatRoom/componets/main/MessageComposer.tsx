@@ -188,6 +188,9 @@ type MessageComposerProps = {
   }) => void;
 
   bottomInset?: number;
+
+  /** Called whenever the detected link preview changes (or clears). Parent stores this and attaches it to the message on send. */
+  onLinkPreviewChange?: (preview: { title?: string; description?: string; image?: string; site_name?: string; url: string } | null) => void;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -198,6 +201,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   value,
   onChangeText,
   onSend,
+  onLinkPreviewChange,
   canSend,
   palette,
   disabled,
@@ -234,7 +238,60 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const sendButtonSize = responsive.isWatch ? 40 : responsive.isCompactPhone ? 44 : 50;
   const composerIconGlyph = responsive.isWatch ? 18 : 22;
 
-  const previewVisible = false;
+  /* ----------------------------- LINK PREVIEW ----------------------------- */
+  type LinkPreviewData = { title?: string; description?: string; image?: string; site_name?: string; url: string };
+  const [composerLinkPreview, setComposerLinkPreview] = useState<LinkPreviewData | null>(null);
+  const [linkPreviewLoading, setLinkPreviewLoading] = useState(false);
+  const [linkPreviewDismissed, setLinkPreviewDismissed] = useState(false);
+  const lastFetchedUrl = useRef<string | null>(null);
+  const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const urlMatch = value.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/);
+    const url = urlMatch?.[0] ?? null;
+
+    if (!url) {
+      if (linkPreviewDebounceRef.current) clearTimeout(linkPreviewDebounceRef.current);
+      setComposerLinkPreview(null);
+      setLinkPreviewDismissed(false);
+      lastFetchedUrl.current = null;
+      onLinkPreviewChange?.(null);
+      return;
+    }
+
+    if (url === lastFetchedUrl.current || linkPreviewDismissed) return;
+
+    if (linkPreviewDebounceRef.current) clearTimeout(linkPreviewDebounceRef.current);
+    linkPreviewDebounceRef.current = setTimeout(async () => {
+      if (url === lastFetchedUrl.current) return;
+      lastFetchedUrl.current = url;
+      setLinkPreviewLoading(true);
+      try {
+        const { getRequest } = await import('@/network/get');
+        const res = await getRequest(
+          `${ROUTES.linkPreview}?url=${encodeURIComponent(url)}`,
+          { errorMessage: '' },
+        );
+        const d = res?.data;
+        if (d?.title || d?.description || d?.image) {
+          const preview: LinkPreviewData = { ...d, url };
+          setComposerLinkPreview(preview);
+          onLinkPreviewChange?.(preview);
+        }
+      } catch { /* silent */ } finally {
+        setLinkPreviewLoading(false);
+      }
+    }, 600);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const dismissLinkPreview = () => {
+    setComposerLinkPreview(null);
+    setLinkPreviewDismissed(true);
+    onLinkPreviewChange?.(null);
+  };
+
+  const linkPreviewBarVisible = !!(composerLinkPreview || linkPreviewLoading);
 
   /* ----------------------------- ATTACHMENT SHEET ------------------------- */
   const [attachmentMenuVisible, setAttachmentMenuVisible] =
@@ -430,6 +487,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
     setIsSending(true);
     onSend();
+    // Clear link preview after send
+    setComposerLinkPreview(null);
+    setLinkPreviewDismissed(false);
+    lastFetchedUrl.current = null;
+    onLinkPreviewChange?.(null);
     if (sendingTimerRef.current) clearTimeout(sendingTimerRef.current);
     sendingTimerRef.current = setTimeout(() => setIsSending(false), 600);
 
@@ -454,8 +516,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   };
 
-  const isVoiceActive = isRecording || previewVisible;
-  const showTextSend = canSend && !isRecording && !previewVisible;
+  const isVoiceActive = isRecording;
+  const showTextSend = canSend && !isRecording;
 
   /* -------------------------------------------------------------------------- */
   /*                             PANEL CONTENT                                  */
@@ -815,6 +877,61 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       )}
 
       {renderReplyOrEditBanner()}
+
+      {/* LINK PREVIEW CARD */}
+      {(composerLinkPreview || linkPreviewLoading) && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            marginHorizontal: 12,
+            marginBottom: 6,
+            borderRadius: 10,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: palette.divider ?? '#e0e0e0',
+            backgroundColor: palette.surface ?? '#f5f5f5',
+          }}
+        >
+          {composerLinkPreview?.image ? (
+            <Image
+              source={{ uri: composerLinkPreview.image }}
+              style={{ width: 64, height: 64 }}
+              resizeMode="cover"
+            />
+          ) : null}
+          <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}>
+            {linkPreviewLoading && !composerLinkPreview ? (
+              <ActivityIndicator size="small" color={palette.primary} />
+            ) : (
+              <>
+                {composerLinkPreview?.site_name ? (
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: palette.primary, textTransform: 'uppercase', letterSpacing: 0.4 }} numberOfLines={1}>
+                    {composerLinkPreview.site_name}
+                  </Text>
+                ) : null}
+                {composerLinkPreview?.title ? (
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }} numberOfLines={2}>
+                    {composerLinkPreview.title}
+                  </Text>
+                ) : null}
+                {composerLinkPreview?.description ? (
+                  <Text style={{ fontSize: 11, color: palette.subtext }} numberOfLines={2}>
+                    {composerLinkPreview.description}
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+          <Pressable
+            onPress={dismissLinkPreview}
+            hitSlop={8}
+            style={{ padding: 8 }}
+          >
+            <KISIcon name="close" size={16} color={palette.subtext ?? '#888'} />
+          </Pressable>
+        </View>
+      )}
 
       {/* MAIN INPUT ROW */}
       <View style={[styles.composerMainRow, { paddingVertical: responsive.isWatch ? 5 : responsive.isCompactPhone ? 7 : 10 }]}>

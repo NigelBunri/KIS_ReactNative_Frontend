@@ -225,6 +225,8 @@ export function normalizeConversation(raw: any, currentUserId?: string): Chat {
     isContactChat: (raw.type ?? raw.kind) === 'direct',
     isDirect,
 
+    groupId: raw.group_id ?? raw.groupId ?? undefined,
+
     communityId:
       raw.community_id ??
       raw.communityId ??

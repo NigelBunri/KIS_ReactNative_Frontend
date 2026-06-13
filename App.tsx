@@ -1,4 +1,9 @@
 // App.tsx
+// Install the localization runtime patch as early as possible so ALL JSX text
+// is auto-translated before any component ever renders.
+import { installLocalizationRuntime } from '@/languages/runtimePatch';
+installLocalizationRuntime();
+
 import React, {
   useEffect,
   useMemo,
@@ -154,6 +159,7 @@ import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
 import EventsScreen from '@/screens/EventsScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
+import { AgeModeProvider } from '@/theme/ageModeContext';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
 import WalletScreen from '@/screens/WalletScreen';
@@ -1314,7 +1320,9 @@ export default function App() {
     <SafeAreaProvider>
       <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
         <LanguageProvider>
-          <AppContent />
+          <AgeModeProvider>
+            <AppContent />
+          </AgeModeProvider>
         </LanguageProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

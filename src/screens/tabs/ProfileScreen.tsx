@@ -81,6 +81,7 @@ import {
   type FamilyAccessibilityPayload,
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
+import { useAgeMode } from '@/theme/ageModeContext';
 import {
   isPINEnabled,
   getLockTimeout,
@@ -223,6 +224,7 @@ export default function ProfileScreen() {
     [palette, tone],
   );
   const { language, languages, setLanguage } = useLanguage();
+  const { setAgeMode: setGlobalAgeMode } = useAgeMode();
   const { setAuth, setPhone, callingCode } = useAuth();
   const c = useProfileController({
     setAuth,
@@ -569,7 +571,12 @@ export default function ProfileScreen() {
     let active = true;
     fetchFamilyAccessibilityPreferences()
       .then(payload => {
-        if (active) setFamilyAccessibility(payload);
+        if (!active) return;
+        setFamilyAccessibility(payload);
+        // Sync backend age mode into the global context so the entire app
+        // immediately reflects the user's previously-saved preference.
+        const storedMode = payload?.preferences?.age_mode;
+        if (storedMode) setGlobalAgeMode(storedMode);
       })
       .catch(() => {
         if (active) setFamilyAccessibility(null);
@@ -577,7 +584,7 @@ export default function ProfileScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [setGlobalAgeMode]);
 
   const refreshPINState = useCallback(async () => {
     const [enabled, timeout] = await Promise.all([isPINEnabled(), getLockTimeout()]);
@@ -591,6 +598,8 @@ export default function ProfileScreen() {
 
   const applyAgeMode = useCallback(async (ageMode: KISAgeMode) => {
     setFamilyAccessibilitySaving(true);
+    // Apply immediately to the global context so every screen updates at once.
+    setGlobalAgeMode(ageMode);
     try {
       const payload = await saveFamilyAccessibilityPreferences({ age_mode: ageMode });
       setFamilyAccessibility(payload);
@@ -599,7 +608,7 @@ export default function ProfileScreen() {
     } finally {
       setFamilyAccessibilitySaving(false);
     }
-  }, []);
+  }, [setGlobalAgeMode]);
   const editGalleryItems = useMemo(() => {
     const gallery: Array<{
       id: string;

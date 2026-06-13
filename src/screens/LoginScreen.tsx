@@ -1,6 +1,7 @@
 // src/screens/LoginScreen.tsx
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
+import { Country, CountryCode } from 'react-native-country-picker-modal';
+import SafeCountryPicker from '@/components/common/SafeCountryPicker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
   View,
@@ -411,19 +412,12 @@ export default function LoginScreen({ navigation }: any) {
           <KISText preset="body" color={palette.text} style={{ fontWeight: '600' }}>{dialCode}</KISText>
           <KISText preset="helper" color={palette.subtext}>▾</KISText>
         </Pressable>
-        {countryPickerVisible && (
-          <CountryPicker
-            visible={countryPickerVisible}
-            countryCode={countryCode}
-            withFilter
-            withCallingCode
-            withFlag
-            withEmoji
-            withCountryNameButton={false}
-            onSelect={onCountrySelect}
-            onClose={() => setCountryPickerVisible(false)}
-          />
-        )}
+        <SafeCountryPicker
+          visible={countryPickerVisible}
+          countryCode={countryCode}
+          onSelect={onCountrySelect}
+          onClose={() => setCountryPickerVisible(false)}
+        />
         <KISTextInput
           placeholder="e.g. 676139881"
           autoCapitalize="none"
@@ -524,19 +518,12 @@ export default function LoginScreen({ navigation }: any) {
                 <KISText preset="body" color={palette.text} style={{ fontWeight: '600' }}>{forgotDialCode}</KISText>
                 <KISText preset="helper" color={palette.subtext}>▾</KISText>
               </Pressable>
-              {forgotCountryPickerVisible && (
-                <CountryPicker
-                  visible={forgotCountryPickerVisible}
-                  countryCode={forgotCountryCode}
-                  withFilter
-                  withCallingCode
-                  withFlag
-                  withEmoji
-                  withCountryNameButton={false}
-                  onSelect={onForgotCountrySelect}
-                  onClose={() => setForgotCountryPickerVisible(false)}
-                />
-              )}
+              <SafeCountryPicker
+                visible={forgotCountryPickerVisible}
+                countryCode={forgotCountryCode}
+                onSelect={onForgotCountrySelect}
+                onClose={() => setForgotCountryPickerVisible(false)}
+              />
               <KISTextInput
                 placeholder="e.g. 676139881"
                 autoCapitalize="none"

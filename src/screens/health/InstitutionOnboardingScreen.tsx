@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import { styles as profileStyles } from '@/screens/tabs/profile/profile.styles';
 import { KISIcon } from '@/constants/kisIcons';
 import { institutionSchemaMap, allInstitutionTypes, InstitutionSchema, FieldDefinition } from '@/schema/institutionOnboarding';
 import KISTextInput from '@/constants/KISTextInput';
+import ROUTES from '@/network';
+import { postRequest } from '@/network/post';
 
 const STEP_ORDER = ['identity', 'location', 'contact', 'media', 'compliance'];
 
@@ -99,6 +101,7 @@ export default function InstitutionOnboardingScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const schema = useMemo<InstitutionSchema>(() => institutionSchemaMap[selectedType], [selectedType]);
   const [formState, setFormState] = useState<Record<string, any>>({ type: selectedType });
+  const [submitting, setSubmitting] = useState(false);
 
   const sections = schema.sections;
   const activeSection = sections[currentStep];
@@ -118,8 +121,16 @@ export default function InstitutionOnboardingScreen() {
     if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
-  const handleSubmit = () => {
-    Alert.alert('Onboarding saved', 'Draft settings are persisted.');
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await postRequest(ROUTES.healthOps.institutions, formState);
+      Alert.alert('Submitted', 'Institution onboarding submitted successfully.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not submit onboarding. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -159,7 +170,11 @@ export default function InstitutionOnboardingScreen() {
 
       <View style={styles.footerRow}>
         <KISButton title="Previous" variant="outline" onPress={handlePrev} disabled={currentStep === 0} />
-        <KISButton title={currentStep + 1 === sections.length ? 'Submit' : 'Next'} onPress={currentStep + 1 === sections.length ? handleSubmit : handleNext} />
+        <KISButton
+          title={currentStep + 1 === sections.length ? (submitting ? 'Submitting…' : 'Submit') : 'Next'}
+          onPress={currentStep + 1 === sections.length ? handleSubmit : handleNext}
+          disabled={submitting}
+        />
       </View>
     </View>
   );

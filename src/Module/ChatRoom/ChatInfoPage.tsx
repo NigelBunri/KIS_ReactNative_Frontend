@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Image,
@@ -29,6 +30,7 @@ import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { handleRemoveGroupMember } from './ChatRoomHandlers';
+import { loadMessages } from './Storage/chatStorage';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from './uploadFileToBackend';
 import Skeleton from '@/components/common/Skeleton';
@@ -97,6 +99,9 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const avatarAnim = useMemo(() => new Animated.Value(0), []);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [groupIdFetchDone, setGroupIdFetchDone] = useState(
+    !!(chat.groupId ?? (chat as any).group_id),
+  );
   const [roleChanging, setRoleChanging] = useState<string | null>(null);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionInput, setDescriptionInput] = useState<string>(
@@ -104,8 +109,86 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   );
   const [savingDescription, setSavingDescription] = useState(false);
 
-  // GAP 3 (new): Reactions admin-only setting
+  // Group settings toggles
   const [reactionsAdminOnly, setReactionsAdminOnly] = useState(false);
+  const [messagingRestricted, setMessagingRestricted] = useState(
+    !!(chat as any).messagingRestricted || !!(chat as any).messaging_restricted,
+  );
+  const [editInfoRestricted, setEditInfoRestricted] = useState(
+    !!(chat as any).editInfoRestricted || !!(chat as any).edit_info_restricted,
+  );
+  const [approvalRequired, setApprovalRequired] = useState(
+    !!(chat as any).approvalRequired || !!(chat as any).approval_required,
+  );
+
+  // Group name editing
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState<string>(chat.name ?? '');
+  const [savingName, setSavingName] = useState(false);
+
+  // ── Media browser ──────────────────────────────────────────────────────────
+  type MediaTab = 'Images' | 'Files' | 'Links';
+  type MediaItem = { id: string; url: string; kind: string; name?: string; mimeType?: string; size?: number; sentAt?: string };
+  type LinkItem  = { url: string; title?: string; description?: string; image?: string; site_name?: string; sentAt?: string };
+
+  const [mediaTab, setMediaTab]         = useState<MediaTab>('Images');
+  const [mediaImages, setMediaImages]   = useState<MediaItem[]>([]);
+  const [mediaFiles, setMediaFiles]     = useState<MediaItem[]>([]);
+  const [mediaLinks, setMediaLinks]     = useState<LinkItem[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [showAllImages, setShowAllImages] = useState(false);
+  const [showAllFiles, setShowAllFiles]   = useState(false);
+  const [showAllLinks, setShowAllLinks]   = useState(false);
+
+  useEffect(() => {
+    const roomId = String(chat.conversationId ?? chat.id ?? '');
+    if (!roomId) { setMediaLoading(false); return; }
+    setMediaLoading(true);
+    loadMessages(roomId, currentUserId).then((msgs) => {
+      const URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
+      const imgs: MediaItem[] = [];
+      const files: MediaItem[] = [];
+      const links: LinkItem[]  = [];
+      const seenLinks = new Set<string>();
+
+      for (const msg of msgs) {
+        const atts = msg.attachments ?? [];
+        for (const att of atts) {
+          const kind = att.kind ?? '';
+          const item: MediaItem = { id: att.id, url: att.url, kind, name: att.originalName, mimeType: att.mimeType, size: att.size, sentAt: (msg as any).createdAt };
+          if (kind === 'image' || kind === 'video') imgs.push(item);
+          else files.push(item);
+        }
+
+        if (!atts.length) {
+          const k: string = (msg.kind as string | undefined) ?? '';
+          const url: string = (msg as any).url ?? (msg as any).mediaUrl ?? '';
+          if (k === 'image' || k === 'video') {
+            if (url) imgs.push({ id: msg.id, url, kind: k, sentAt: (msg as any).createdAt });
+          } else if (k === 'file' || k === 'audio' || k === 'voice') {
+            if (url) files.push({ id: msg.id, url, kind: k, name: (msg as any).fileName, sentAt: (msg as any).createdAt });
+          }
+        }
+
+        const lp = (msg as any).linkPreview;
+        if (lp?.url && !seenLinks.has(lp.url)) {
+          seenLinks.add(lp.url);
+          links.push({ url: lp.url, title: lp.title, description: lp.description, image: lp.image, site_name: lp.site_name, sentAt: (msg as any).createdAt });
+        } else if ((msg.kind === 'text' || !msg.kind) && !lp) {
+          const matches = ((msg as any).text ?? '').match(URL_RE) as string[] | null;
+          if (matches) {
+            for (const u of [...new Set(matches)]) {
+              if (!seenLinks.has(u)) { seenLinks.add(u); links.push({ url: u, sentAt: (msg as any).createdAt }); }
+            }
+          }
+        }
+      }
+
+      setMediaImages(imgs.reverse());
+      setMediaFiles(files.reverse());
+      setMediaLinks(links.reverse());
+    }).catch(() => {}).finally(() => setMediaLoading(false));
+  }, [chat.conversationId, chat.id, currentUserId]);
 
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
@@ -130,6 +213,8 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
       const raw = res?.data ?? res;
       const gid = raw?.group_id ?? raw?.groupId;
       if (gid) setResolvedGroupId(String(gid));
+    }).finally(() => {
+      setGroupIdFetchDone(true);
     });
   }, [isGroup, resolvedGroupId, conversationId]);
 
@@ -277,8 +362,113 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   }, [participants, currentUserId]);
 
   const role = String(me?.base_role ?? '').toLowerCase();
-  const isAdmin =
-    role === 'owner' || role === 'admin' || role === 'moderator';
+  const isOwner = role === 'owner';
+  const isAdmin = isOwner || role === 'admin' || role === 'moderator';
+
+  // ── Setting toggle helper ─────────────────────────────────────────────────
+  const emitGroupSetting = (key: string, value: boolean) => {
+    try { socket?.emit('group.update_settings', { roomId, [key]: value }); } catch {}
+  };
+
+  const patchConversationSettings = async (payload: Record<string, unknown>) => {
+    try {
+      await postRequest(ROUTES.chat.updateSettings(conversationId), payload, {});
+    } catch { /* best-effort */ }
+  };
+
+  const handleToggleSetting = async (
+    key: string,
+    current: boolean,
+    setter: (v: boolean) => void,
+  ) => {
+    if (!isAdmin) return;
+    const next = !current;
+    setter(next);
+    emitGroupSetting(key, next);
+    await patchConversationSettings({ [key]: next });
+  };
+
+  // ── Save group name ────────────────────────────────────────────────────────
+  const handleSaveGroupName = async () => {
+    if (!groupId || !isAdmin || !nameInput.trim()) return;
+    setSavingName(true);
+    try {
+      const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
+      const headers: Record<string, string> = { Authorization: `Bearer ${token ?? ''}` };
+      if (deviceId) headers['X-Device-Id'] = deviceId;
+      const res = await apiService.patch(ROUTES.groups.detail(groupId), { name: nameInput.trim() }, headers);
+      if (!res.ok) throw new Error();
+      onChatUpdated?.({ ...chat, name: nameInput.trim() });
+      setEditingName(false);
+    } catch {
+      Alert.alert('Error', 'Could not save group name.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  // ── Ban member ────────────────────────────────────────────────────────────
+  const handleBanMember = async (p: ParticipantWire) => {
+    const userId = resolveUserId(p.user);
+    if (!userId || !groupId || !isAdmin) return;
+    const name = resolveUserName(p.user) || 'this member';
+    Alert.alert(
+      `Ban ${name}?`,
+      'They will be removed and prevented from rejoining via invite link.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Ban',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await postRequest(ROUTES.groups.ban(groupId), { user_id: userId }, {});
+              setMemberList(prev => prev.filter(m => resolveUserId(m.user) !== userId));
+            } catch {
+              Alert.alert('Error', 'Could not ban member.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // ── Transfer ownership ────────────────────────────────────────────────────
+  const handleTransferOwnership = (p: ParticipantWire) => {
+    if (!isOwner) return;
+    const userId = resolveUserId(p.user);
+    const name = resolveUserName(p.user) || 'this member';
+    if (!userId) return;
+    Alert.alert(
+      'Transfer ownership',
+      `Make ${name} the new group owner? You will become an admin.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Transfer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const convId = conversationId;
+              await postRequest(ROUTES.chat.setMemberRole(convId), { user_id: userId, base_role: 'owner' }, {});
+              await postRequest(ROUTES.chat.setMemberRole(convId), { user_id: currentUserId, base_role: 'admin' }, {});
+              setMemberList(prev =>
+                prev.map(m => {
+                  const mId = resolveUserId(m.user);
+                  if (mId === userId) return { ...m, base_role: 'owner' };
+                  if (mId === currentUserId) return { ...m, base_role: 'admin' };
+                  return m;
+                }),
+              );
+            } catch {
+              Alert.alert('Error', 'Could not transfer ownership.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleChangeAvatar = async () => {
     if (!isGroup || !isAdmin) return;
@@ -479,45 +669,68 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     const userId = resolveUserId(p.user);
     if (!userId || !isAdmin) return;
     if (userId === currentUserId) return;
-    const currentRole = String(p.base_role ?? 'member').toLowerCase();
-    const isTargetAdmin = currentRole === 'admin' || currentRole === 'owner';
+
+    const targetRole = String(p.base_role ?? 'member').toLowerCase();
+    const isTargetOwner = targetRole === 'owner';
+    const isTargetAdmin = targetRole === 'admin' || isTargetOwner;
     const memberId = String(p.id ?? userId);
-    Alert.alert(
-      resolveUserName(p.user) || 'Member',
-      'Manage this member',
-      [
+    const name = resolveUserName(p.user) || 'Member';
+    const convId = conversationId;
+
+    const removeAction = {
+      text: 'Remove from group',
+      style: 'destructive' as const,
+      onPress: () =>
+        Alert.alert('Remove member', `Remove ${name} from the group?`, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await handleRemoveGroupMember({ conversationId: convId, userId });
+                setMemberList(prev => prev.filter(m => resolveUserId(m.user) !== userId));
+              } catch {
+                Alert.alert('Error', 'Could not remove member.');
+              }
+            },
+          },
+        ]),
+    };
+
+    const options: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [];
+
+    if (!isTargetOwner) {
+      options.push(
         isTargetAdmin
           ? { text: 'Demote to member', onPress: () => void handleSetMemberRole(memberId, userId, 'member') }
           : { text: 'Promote to admin', onPress: () => void handleSetMemberRole(memberId, userId, 'admin') },
-        {
-          text: 'Remove from group',
-          style: 'destructive',
-          onPress: () => {
-            const conversationId = String(chat.conversationId ?? chat.id ?? '');
-            Alert.alert(
-              'Remove member',
-              `Remove ${resolveUserName(p.user) || 'this member'} from the group?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Remove',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await handleRemoveGroupMember({ conversationId, userId });
-                      setMemberList(prev => prev.filter(m => resolveUserId(m.user) !== userId));
-                    } catch {
-                      Alert.alert('Error', 'Could not remove member. Please try again.');
-                    }
-                  },
-                },
-              ],
-            );
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+      );
+    }
+
+    if (isOwner && !isTargetOwner) {
+      options.push({ text: 'Make group owner', onPress: () => handleTransferOwnership(p) });
+    }
+
+    if (!isTargetOwner) {
+      options.push(removeAction);
+      options.push({ text: 'Ban from group', style: 'destructive', onPress: () => handleBanMember(p) });
+    }
+
+    options.push({ text: 'Message', onPress: async () => {
+      try {
+        const res = await postRequest(ROUTES.chat.directConversation, { other_user_id: userId }, {});
+        const convId = res?.data?.conversation_id ?? res?.data?.id ?? res?.data?.conversationId;
+        if (convId) {
+          DeviceEventEmitter.emit('chat.open', { conversationId: String(convId), name, kind: 'dm' });
+        }
+      } catch { /* best-effort */ }
+      onBack?.();
+    }});
+
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(name, isTargetOwner ? 'Group owner' : `Role: ${targetRole}`, options);
   };
 
   const groupMembers = memberList.length ? memberList : participants;
@@ -756,9 +969,38 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               )}
             </View>
           </Pressable>
-          <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
-            {chat.name}
-          </Text>
+          {isGroup && isAdmin && editingName ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8, width: '100%', paddingHorizontal: 16 }}>
+              <TextInput
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoFocus
+                maxLength={80}
+                style={{
+                  flex: 1, fontSize: 18, fontWeight: '700', color: palette.text,
+                  borderBottomWidth: 2, borderBottomColor: palette.primary,
+                  paddingBottom: 4, textAlign: 'center',
+                }}
+              />
+              <Pressable onPress={() => { setEditingName(false); setNameInput(chat.name ?? ''); }} hitSlop={8}>
+                <KISIcon name="x" size={18} color={palette.subtext} />
+              </Pressable>
+              <Pressable onPress={() => void handleSaveGroupName()} disabled={savingName} hitSlop={8}>
+                {savingName ? <ActivityIndicator size="small" color={palette.primary} /> : <KISIcon name="check" size={18} color={palette.primary} />}
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => { if (isGroup && isAdmin) setEditingName(true); }}
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}
+              disabled={!isGroup || !isAdmin}
+            >
+              <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
+                {chat.name}
+              </Text>
+              {isGroup && isAdmin && <KISIcon name="edit" size={14} color={palette.subtext} />}
+            </Pressable>
+          )}
           <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={1}>
             {isGroup ? `${memberCount} members` : 'Direct chat'}
           </Text>
@@ -1120,7 +1362,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 >
                   <KISIcon name="link" size={14} color={palette.onPrimary ?? '#fff'} />
                   <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
-                    {inviteLinkLoading ? 'Loading...' : !groupId ? 'Loading group…' : 'Generate invite link'}
+                    {inviteLinkLoading ? 'Loading...' : !groupId ? (groupIdFetchDone ? 'Unavailable' : 'Loading group…') : 'Generate invite link'}
                   </Text>
                 </Pressable>
               )}
@@ -1130,9 +1372,25 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
         {isGroup && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>
-              Members
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.sectionTitle, { color: palette.text, marginBottom: 0, flex: 1 }]}>
+                Members ({memberCount})
+              </Text>
+              {isAdmin && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert('Add members', 'Select contacts to add', [
+                      { text: 'Close', style: 'cancel' },
+                    ]);
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: palette.primary + '22' }}
+                  hitSlop={8}
+                >
+                  <KISIcon name="plus" size={14} color={palette.primary} />
+                  <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600' }}>Add</Text>
+                </Pressable>
+              )}
+            </View>
             {membersLoading ? (
               <Text style={[styles.emptyText, { color: palette.subtext }]}>
                 Loading members...
@@ -1147,43 +1405,47 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   p.display_name ||
                   resolveUserName(p.user) ||
                   'Member';
-                const roleLabel = p.base_role ? String(p.base_role) : '';
+                const roleLabel = p.base_role ? String(p.base_role).toLowerCase() : 'member';
                 const phone = resolveUserPhone(p.user);
                 const membUserId = resolveUserId(p.user);
                 const isChanging = roleChanging === membUserId;
-                const isAdminOrOwner = roleLabel === 'admin' || roleLabel === 'owner';
+                const isMe = membUserId === currentUserId;
+                const isTargetOwner = roleLabel === 'owner';
+                const isTargetAdmin = roleLabel === 'admin' || isTargetOwner;
+                const initials = label.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                const roleBadgeColor = isTargetOwner ? '#F59E0B' : isTargetAdmin ? (palette.primary ?? '#4F46E5') : 'transparent';
+                const roleBadgeText = isTargetOwner ? 'Owner' : isTargetAdmin ? 'Admin' : '';
                 return (
                   <Pressable
                     key={`${membUserId ?? index}`}
                     style={({ pressed }) => [
                       styles.memberRow,
-                      { borderBottomColor: palette.divider, backgroundColor: pressed ? palette.surface : 'transparent' },
+                      { borderBottomColor: palette.divider, backgroundColor: pressed && isAdmin && !isMe ? palette.surface : 'transparent' },
                     ]}
                     onPress={() => showMemberActions(p)}
-                    disabled={!isAdmin || membUserId === currentUserId}
+                    disabled={!isAdmin || isMe}
                   >
-                    <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface }]} />
+                    <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ color: palette.subtext, fontSize: 14, fontWeight: '700' }}>{initials}</Text>
+                    </View>
                     <View style={[styles.memberInfo, { flex: 1 }]}>
-                      <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
-                        {label}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>{label}</Text>
+                        {isMe && <Text style={{ color: palette.subtext, fontSize: 11 }}>(You)</Text>}
+                      </View>
                       <Text style={[styles.memberRole, { color: palette.subtext }]} numberOfLines={1}>
                         {phone || 'No phone'}
                       </Text>
                     </View>
-                    {(isAdminOrOwner || isChanging) && (
-                      <View style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 10,
-                        backgroundColor: palette.primarySoft ?? palette.surface,
-                        marginLeft: 8,
-                      }}>
-                        <Text style={{ color: palette.primaryStrong ?? palette.primary, fontSize: 11, fontWeight: '700' }}>
-                          {isChanging ? '…' : roleLabel}
-                        </Text>
+                    {isChanging ? (
+                      <ActivityIndicator size="small" color={palette.primary} style={{ marginLeft: 8 }} />
+                    ) : roleBadgeText ? (
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: roleBadgeColor + '22', marginLeft: 8 }}>
+                        <Text style={{ color: roleBadgeColor, fontSize: 11, fontWeight: '700' }}>{roleBadgeText}</Text>
                       </View>
-                    )}
+                    ) : isAdmin && !isMe ? (
+                      <KISIcon name="chevron-right" size={14} color={palette.subtext} />
+                    ) : null}
                   </Pressable>
                 );
               })
@@ -1191,59 +1453,235 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
 
-        {/* GAP 3 (new): Admin-only reactions toggle — group admins only */}
-        {isGroup && isAdmin && (
-          <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Group settings</Text>
-            <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>
-                    Only admins can react
-                  </Text>
-                  <Text style={{ color: palette.subtext ?? '#888', fontSize: 12, marginTop: 2 }}>
-                    Members can view but not add reactions
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => {
-                    const next = !reactionsAdminOnly;
-                    setReactionsAdminOnly(next);
-                    AsyncStorage.setItem(
-                      `KIS_REACTIONS_ADMIN_ONLY_${roomId}`,
-                      next ? 'true' : 'false',
-                    ).catch(() => {});
-                    try {
-                      socket?.emit('group.update_settings', {
-                        roomId,
-                        reactionsAdminOnly: next,
-                      });
-                    } catch { /* socket may not be connected */ }
-                  }}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    backgroundColor: reactionsAdminOnly
-                      ? (palette.primary ?? '#4F46E5')
-                      : (palette.surface ?? '#f0f0f0'),
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontWeight: '700',
-                      color: reactionsAdminOnly
-                        ? (palette.onPrimary ?? '#fff')
-                        : (palette.text ?? '#000'),
+        {/* ── Group settings (admins only) ───────────────────────────────── */}
+        {isGroup && isAdmin && (() => {
+          const Toggle = ({ value, onToggle }: { value: boolean; onToggle: () => void }) => (
+            <Pressable
+              onPress={onToggle}
+              style={{
+                width: 44, height: 26, borderRadius: 13,
+                backgroundColor: value ? (palette.primary ?? '#4F46E5') : (palette.divider ?? '#ccc'),
+                justifyContent: 'center', paddingHorizontal: 2,
+              }}
+            >
+              <View style={{
+                width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff',
+                transform: [{ translateX: value ? 18 : 0 }],
+              }} />
+            </Pressable>
+          );
+
+          const SettingRow = ({ label, sublabel, value, onToggle }: { label: string; sublabel: string; value: boolean; onToggle: () => void }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider }}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>{label}</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{sublabel}</Text>
+              </View>
+              <Toggle value={value} onToggle={onToggle} />
+            </View>
+          );
+
+          return (
+            <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>Group settings</Text>
+              <View style={[styles.card, { borderColor: palette.divider, backgroundColor: palette.card }]}>
+                <SettingRow
+                  label="Only admins can send"
+                  sublabel="Members can read but not send messages"
+                  value={messagingRestricted}
+                  onToggle={() => void handleToggleSetting('messaging_restricted', messagingRestricted, setMessagingRestricted)}
+                />
+                <SettingRow
+                  label="Only admins can edit info"
+                  sublabel="Only admins can change group name, photo & description"
+                  value={editInfoRestricted}
+                  onToggle={() => void handleToggleSetting('edit_info_restricted', editInfoRestricted, setEditInfoRestricted)}
+                />
+                <SettingRow
+                  label="Approval required to join"
+                  sublabel="Admin must approve join requests from invite links"
+                  value={approvalRequired}
+                  onToggle={() => void handleToggleSetting('approval_required', approvalRequired, setApprovalRequired)}
+                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>Only admins can react</Text>
+                    <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>Members can view but not add reactions</Text>
+                  </View>
+                  <Toggle
+                    value={reactionsAdminOnly}
+                    onToggle={() => {
+                      const next = !reactionsAdminOnly;
+                      setReactionsAdminOnly(next);
+                      AsyncStorage.setItem(`KIS_REACTIONS_ADMIN_ONLY_${roomId}`, next ? 'true' : 'false').catch(() => {});
+                      emitGroupSetting('reactionsAdminOnly', next);
                     }}
-                  >
-                    {reactionsAdminOnly ? 'ON' : 'OFF'}
-                  </Text>
-                </Pressable>
+                  />
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
+
+        {/* ── Media, Files & Links browser ──────────────────────────────── */}
+        {(() => {
+          const cellSize = Math.floor((responsive.width - responsive.pageGutter * 2 - 6) / 3);
+          const IMG_LIMIT  = 12;
+          const FILE_LIMIT = 5;
+          const LINK_LIMIT = 5;
+
+          const formatBytes = (b?: number) => {
+            if (!b) return '';
+            if (b < 1024) return `${b} B`;
+            if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+            return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+          };
+
+          const tabCount = (t: MediaTab) =>
+            t === 'Images' ? mediaImages.length : t === 'Files' ? mediaFiles.length : mediaLinks.length;
+
+          return (
+            <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>Media, Files & Links</Text>
+
+              {/* Tab pills */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                {(['Images', 'Files', 'Links'] as MediaTab[]).map((t) => (
+                  <Pressable
+                    key={t}
+                    onPress={() => setMediaTab(t)}
+                    style={{
+                      flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 20,
+                      backgroundColor: mediaTab === t ? palette.primary : (palette.surface ?? palette.card),
+                    }}
+                  >
+                    <Text style={{ color: mediaTab === t ? (palette.onPrimary ?? '#fff') : palette.text, fontWeight: '600', fontSize: 13 }}>
+                      {t}
+                      {!mediaLoading ? ` (${tabCount(t)})` : ''}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {mediaLoading ? (
+                <View style={{ padding: 28, alignItems: 'center' }}>
+                  <ActivityIndicator color={palette.primary} />
+                </View>
+              ) : mediaTab === 'Images' ? (
+                mediaImages.length === 0 ? (
+                  <Text style={{ color: palette.subtext, textAlign: 'center', paddingVertical: 24, fontSize: 13 }}>No images or videos shared yet</Text>
+                ) : (
+                  <>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                      {(showAllImages ? mediaImages : mediaImages.slice(0, IMG_LIMIT)).map((item, i) => (
+                        <Pressable
+                          key={item.id + i}
+                          onPress={() => Linking.openURL(item.url).catch(() => {})}
+                          style={{ width: cellSize, height: cellSize, borderRadius: 6, overflow: 'hidden', backgroundColor: palette.surface }}
+                        >
+                          <Image source={{ uri: item.url }} style={{ width: cellSize, height: cellSize }} resizeMode="cover" />
+                          {item.kind === 'video' && (
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+                              <KISIcon name="play" size={22} color="#fff" />
+                            </View>
+                          )}
+                        </Pressable>
+                      ))}
+                    </View>
+                    {!showAllImages && mediaImages.length > IMG_LIMIT && (
+                      <Pressable onPress={() => setShowAllImages(true)} style={{ marginTop: 10, alignItems: 'center', paddingVertical: 10 }}>
+                        <Text style={{ color: palette.primary, fontWeight: '600', fontSize: 13 }}>View all {mediaImages.length} items</Text>
+                      </Pressable>
+                    )}
+                  </>
+                )
+              ) : mediaTab === 'Files' ? (
+                mediaFiles.length === 0 ? (
+                  <Text style={{ color: palette.subtext, textAlign: 'center', paddingVertical: 24, fontSize: 13 }}>No files shared yet</Text>
+                ) : (
+                  <>
+                    <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card, padding: 0, overflow: 'hidden' }]}>
+                      {(showAllFiles ? mediaFiles : mediaFiles.slice(0, FILE_LIMIT)).map((item, i) => {
+                        const isAudio = item.kind === 'audio' || item.kind === 'voice';
+                        const iconName = isAudio ? 'mic' : 'file';
+                        return (
+                          <Pressable
+                            key={item.id + i}
+                            onPress={() => Linking.openURL(item.url).catch(() => {})}
+                            style={({ pressed }) => [{
+                              flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
+                              borderBottomWidth: i < (showAllFiles ? mediaFiles.length : Math.min(FILE_LIMIT, mediaFiles.length)) - 1 ? StyleSheet.hairlineWidth : 0,
+                              borderBottomColor: palette.divider,
+                              backgroundColor: pressed ? (palette.surface ?? palette.bg) : 'transparent',
+                            }]}
+                          >
+                            <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: palette.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                              <KISIcon name={iconName} size={20} color={palette.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: palette.text, fontSize: 14, fontWeight: '500' }} numberOfLines={1}>{item.name || 'File'}</Text>
+                              <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{formatBytes(item.size)}</Text>
+                            </View>
+                            <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {!showAllFiles && mediaFiles.length > FILE_LIMIT && (
+                      <Pressable onPress={() => setShowAllFiles(true)} style={{ marginTop: 10, alignItems: 'center', paddingVertical: 10 }}>
+                        <Text style={{ color: palette.primary, fontWeight: '600', fontSize: 13 }}>View all {mediaFiles.length} files</Text>
+                      </Pressable>
+                    )}
+                  </>
+                )
+              ) : (
+                mediaLinks.length === 0 ? (
+                  <Text style={{ color: palette.subtext, textAlign: 'center', paddingVertical: 24, fontSize: 13 }}>No links shared yet</Text>
+                ) : (
+                  <>
+                    <View style={[styles.sectionCard, { borderColor: palette.divider, backgroundColor: palette.card, padding: 0, overflow: 'hidden' }]}>
+                      {(showAllLinks ? mediaLinks : mediaLinks.slice(0, LINK_LIMIT)).map((item, i) => {
+                        let domain = '';
+                        try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch { domain = item.url; }
+                        return (
+                          <Pressable
+                            key={item.url + i}
+                            onPress={() => Linking.openURL(item.url).catch(() => {})}
+                            style={({ pressed }) => [{
+                              flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
+                              borderBottomWidth: i < (showAllLinks ? mediaLinks.length : Math.min(LINK_LIMIT, mediaLinks.length)) - 1 ? StyleSheet.hairlineWidth : 0,
+                              borderBottomColor: palette.divider,
+                              backgroundColor: pressed ? (palette.surface ?? palette.bg) : 'transparent',
+                            }]}
+                          >
+                            {item.image ? (
+                              <Image source={{ uri: item.image }} style={{ width: 44, height: 44, borderRadius: 8 }} resizeMode="cover" />
+                            ) : (
+                              <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: palette.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                                <KISIcon name="link" size={20} color={palette.primary} />
+                              </View>
+                            )}
+                            <View style={{ flex: 1 }}>
+                              {item.title ? <Text style={{ color: palette.text, fontSize: 14, fontWeight: '500' }} numberOfLines={1}>{item.title}</Text> : null}
+                              <Text style={{ color: palette.primary, fontSize: 12, marginTop: item.title ? 2 : 0 }} numberOfLines={1}>{item.site_name || domain}</Text>
+                              {item.description ? <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.description}</Text> : null}
+                            </View>
+                            <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {!showAllLinks && mediaLinks.length > LINK_LIMIT && (
+                      <Pressable onPress={() => setShowAllLinks(true)} style={{ marginTop: 10, alignItems: 'center', paddingVertical: 10 }}>
+                        <Text style={{ color: palette.primary, fontWeight: '600', fontSize: 13 }}>View all {mediaLinks.length} links</Text>
+                      </Pressable>
+                    )}
+                  </>
+                )
+              )}
+            </View>
+          );
+        })()}
 
         {isGroup && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter, paddingBottom: 16 }]}>

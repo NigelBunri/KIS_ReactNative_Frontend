@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  DeviceEventEmitter,
   Easing,
   Pressable,
   StyleSheet,
@@ -13,6 +14,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { getRequest } from '@/network/get';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InviteJoin'>;
 
@@ -21,7 +23,8 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
-  const [targetId, setTargetId] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState('');
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -39,19 +42,44 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
           : ROUTES.community.joinByInvite;
 
       const res = await postRequest(url, { invite_token: token });
+      const data = res?.data ?? res;
+      const joinedOrAlready =
+        res?.success ||
+        String(data?.detail ?? '').toLowerCase().includes('joined') ||
+        String(data?.detail ?? '').toLowerCase().includes('already');
 
-      if (res?.success || res?.group_id || res?.community_id || res?.detail) {
-        const id = res?.group_id ?? res?.community_id ?? null;
-        setTargetId(id);
+      if (joinedOrAlready) {
+        const entityId: string | null = data?.group_id ?? data?.community_id ?? null;
+
+        // Fetch group/community details to get the name and conversation_id
+        if (entityId) {
+          try {
+            const detailUrl =
+              type === 'group'
+                ? ROUTES.groups.detail(entityId)
+                : ROUTES.community.detail(entityId);
+            const detail = await getRequest(detailUrl);
+            const d = detail?.data ?? detail;
+            const name: string = d?.name ?? d?.title ?? '';
+            const convId: string = d?.conversation_id
+              ? String(d.conversation_id)
+              : '';
+            if (name) setGroupName(name);
+            if (convId) setConversationId(convId);
+          } catch {
+            // non-fatal — continue without the extra info
+          }
+        }
+
         setStatus('success');
         setMessage(
-          type === 'group'
-            ? 'You have joined the group!'
-            : 'You have joined the community!',
+          String(data?.detail ?? '').toLowerCase().includes('already')
+            ? `You are already a member of this ${type}.`
+            : `You have joined the ${type}!`,
         );
       } else {
         setStatus('error');
-        setMessage(res?.message ?? res?.detail ?? 'The invite link may be invalid or expired.');
+        setMessage(data?.detail ?? res?.message ?? 'The invite link may be invalid or expired.');
       }
     };
 
@@ -59,10 +87,23 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   }, [type, token, fadeAnim]);
 
   const handleContinue = () => {
+    // Refresh the conversation list so the new group appears
+    DeviceEventEmitter.emit('conversation.refresh');
+
+    // Open the chat room directly if we have the conversation ID
+    if (conversationId) {
+      DeviceEventEmitter.emit('chat.open', {
+        conversationId,
+        name: groupName || type,
+        kind: type === 'community' ? 'community' : 'group',
+      });
+    }
+
     navigation.replace('MainTabs');
   };
 
   const label = type === 'group' ? 'group' : 'community';
+  const displayName = groupName ? `"${groupName}"` : label;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
@@ -81,7 +122,9 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
           <>
             <Text style={[styles.icon]}>✓</Text>
             <Text style={[styles.title, { color: palette.text }]}>Welcome!</Text>
-            <Text style={[styles.subtitle, { color: palette.subtext }]}>{message}</Text>
+            <Text style={[styles.subtitle, { color: palette.subtext }]}>
+              {message}{groupName ? `\n${displayName}` : ''}
+            </Text>
             <Pressable
               onPress={handleContinue}
               style={({ pressed }) => [
@@ -90,7 +133,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
               ]}
             >
               <Text style={[styles.btnText, { color: palette.buttonText ?? '#fff' }]}>
-                Continue
+                {conversationId ? 'Open Chat' : 'Continue'}
               </Text>
             </Pressable>
           </>

@@ -7,7 +7,7 @@ export default function AnalyticsDashboardScreen() {
       target="analytics"
       title="Analytics overview"
       description="High-level KPIs for every connected surface, refreshed in real time."
-      footer={<InsightsFooterNote message="Connected to the analytics app via ROUTES.analytics.dashboards." />}
+      footer={<InsightsFooterNote message="Data refreshed in real time from the KIS analytics engine." />}
     />
   );
 }

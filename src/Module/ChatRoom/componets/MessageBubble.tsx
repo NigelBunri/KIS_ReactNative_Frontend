@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -169,6 +169,7 @@ type MessageBubbleProps = {
 
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
+  participantAvatarMap?: Record<string, string>;
   senderId?: string;
   onUpdateMessage?: (message: ChatMessage) => void;
 };
@@ -249,6 +250,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onViewOnce,
   mentionMap,
   participantMap,
+  participantAvatarMap,
   senderId,
   onUpdateMessage,
 }) => {
@@ -816,7 +818,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   useEffect(() => {
     if (serverLinkPreview) { setLinkPreview(serverLinkPreview); return; }
-    if (!text || isMe) return;
+    if (!text) return;
     const urlMatch = text.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/);
     if (!urlMatch) return;
     const url = urlMatch[0];
@@ -830,13 +832,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           `${ROUTES_mod.default.linkPreview}?url=${encodeURIComponent(url)}`,
           { errorMessage: '' },
         );
-        if (!cancelled && (res?.data?.title || res?.data?.description)) {
+        if (!cancelled && (res?.data?.title || res?.data?.description || res?.data?.image)) {
           setLinkPreview({ ...res.data, url });
         }
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
-  }, [text, isMe, serverLinkPreview]);
+  }, [text, serverLinkPreview]);
+
+  const inviteInfo = React.useMemo(() => {
+    if (!text) return null;
+    const m = text.match(/https?:\/\/[^\s]+\/join\/(group|community)\/([A-Za-z0-9_-]+)/);
+    if (!m) return null;
+    return { type: m[1] as 'group' | 'community', token: m[2] };
+  }, [text]);
+
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
   const [reactionViewerVisible, setReactionViewerVisible] = useState(false);
   const [reactionViewerEmoji, setReactionViewerEmoji] = useState<string | null>(null);
@@ -1668,57 +1678,98 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )
     : [];
 
-  const renderMentionText = (raw: string) => {
-    const parts = raw.split(/(@\w+)/g);
+  const INVITE_PATH_RE = /\/join\/(group|community)\/([A-Za-z0-9_-]+)/;
+  const RICH_SPLIT_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+)/g;
+
+  const renderRichText = (raw: string) => {
+    const parts = raw.split(RICH_SPLIT_RE);
     if (parts.length <= 1) {
       return <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>{raw}</Text>;
     }
+    // outgoingTextColor is '#111111' on light bubbles, '#ffffff' on dark bubbles
+    const onLightBubble = isMe && outgoingTextColor === '#111111';
+    const urlColor = isMe
+      ? (onLightBubble ? (palette.primary ?? '#1565C0') : 'rgba(255,255,255,0.9)')
+      : (palette.primary ?? '#2196F3');
+    const inviteColor = isMe
+      ? (onLightBubble ? (palette.primaryStrong ?? palette.primary ?? '#1565C0') : '#fde68a')
+      : (palette.primaryStrong ?? palette.primary ?? '#2196F3');
     return (
       <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>
-        {parts.map((part, i) =>
-          /^@\w+$/.test(part) ? (
-            <Pressable
-              key={i}
-              onPress={() => {
-                const uname = part.slice(1).toLowerCase();
-                const uid = mentionMap?.[uname];
-                if (uid) navigation.navigate('ViewProfile', { userId: uid, displayName: part.slice(1) });
-              }}
-            >
-              <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{part}</Text>
-            </Pressable>
-          ) : (
-            <React.Fragment key={i}>{part}</React.Fragment>
-          ),
-        )}
+        {parts.map((part, i) => {
+          if (/^@\w+$/.test(part)) {
+            return (
+              <Pressable
+                key={i}
+                onPress={() => {
+                  const uname = part.slice(1).toLowerCase();
+                  const uid = mentionMap?.[uname];
+                  if (uid) navigation.navigate('ViewProfile', { userId: uid, displayName: part.slice(1) });
+                }}
+              >
+                <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{part}</Text>
+              </Pressable>
+            );
+          }
+          if (/^https?:\/\//.test(part)) {
+            const inviteMatch = part.match(INVITE_PATH_RE);
+            if (inviteMatch) {
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => navigation.navigate('InviteJoin', {
+                    type: inviteMatch[1] as 'group' | 'community',
+                    token: inviteMatch[2],
+                  })}
+                >
+                  <Text style={{ color: inviteColor, fontWeight: '700', textDecorationLine: 'underline' }}>{part}</Text>
+                </Pressable>
+              );
+            }
+            return (
+              <Pressable key={i} onPress={() => Linking.openURL(part).catch(() => {})}>
+                <Text style={{ color: urlColor, textDecorationLine: 'underline' }}>{part}</Text>
+              </Pressable>
+            );
+          }
+          return <React.Fragment key={i}>{part}</React.Fragment>;
+        })}
       </Text>
     );
   };
 
   /* ─────────────────────────────────────────
-   * Helper: sender name (group chats)
+   * Helper: sender avatar + name (group chats)
    * ──────────────────────────────────────── */
   const renderSenderName = () => {
-    if (isMe || !senderName || !isFirstInGroup) return null;
-    const resolvedSenderId = senderId ?? (message as any).senderId;
+    if (isMe || !isFirstInGroup) return null;
+    const resolvedSenderId = senderId ?? (message as any).senderId ?? '';
+    const effectiveName: string =
+      senderName ||
+      (resolvedSenderId ? participantMap?.[resolvedSenderId] ?? '' : '');
+    if (!effectiveName) return null;
+    const effectiveAvatar: string | undefined =
+      (message as any).senderAvatar ??
+      (message as any).sender_avatar_url ??
+      (resolvedSenderId ? participantAvatarMap?.[resolvedSenderId] : undefined);
+    const initials = effectiveName.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+    const accentColor = palette.senderNameColor ?? palette.primary ?? '#4F46E5';
+
+    const handleTap = () => {
+      DeviceEventEmitter.emit('member.tap', { userId: resolvedSenderId, name: effectiveName, avatarUrl: effectiveAvatar });
+    };
+
     return (
-      <Pressable
-        onPress={() => {
-          if (resolvedSenderId) navigation.navigate('ViewProfile', { userId: resolvedSenderId, displayName: senderName });
-        }}
-        hitSlop={6}
-      >
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: '800',
-            color: palette.senderNameColor ?? palette.primary ?? '#4F46E5',
-            marginBottom: 2,
-            marginLeft: 2,
-          }}
-          numberOfLines={1}
-        >
-          {senderName}
+      <Pressable onPress={handleTap} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, overflow: 'hidden', backgroundColor: accentColor + '33', alignItems: 'center', justifyContent: 'center' }}>
+          {effectiveAvatar ? (
+            <Image source={{ uri: effectiveAvatar }} style={{ width: 26, height: 26 }} resizeMode="cover" />
+          ) : (
+            <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor }}>{initials}</Text>
+          )}
+        </View>
+        <Text style={{ fontSize: 11, fontWeight: '800', color: accentColor }} numberOfLines={1}>
+          {effectiveName}
         </Text>
       </Pressable>
     );
@@ -3312,7 +3363,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
         {!!text && (
           <View>
-            {renderMentionText((displayText ?? '') + (isLongText && !expanded ? '…' : ''))}
+            {renderRichText((displayText ?? '') + (isLongText && !expanded ? '…' : ''))}
             {isLongText && (
               <Pressable onPress={() => setExpanded(prev => !prev)} style={{ marginTop: 2 }}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary ?? '#2196F3') }}>
@@ -3397,6 +3448,56 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           </Pressable>
         )}
+
+        {/* KIS invite card */}
+        {inviteInfo && (() => {
+          const onLight = isMe && outgoingTextColor === '#111111';
+          const cardBorder = isMe
+            ? (onLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)')
+            : (palette.primary ?? '#2196F3');
+          const cardBg = isMe
+            ? (onLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)')
+            : (palette.primarySoft ?? (palette.primary ? palette.primary + '18' : '#e8f0fe'));
+          const iconColor = isMe
+            ? (onLight ? (palette.primary ?? '#9A6A14') : '#fde68a')
+            : (palette.primary ?? '#2196F3');
+          const labelColor = isMe
+            ? (onLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)')
+            : (palette.subtext ?? '#666');
+          const titleColor = isMe ? outgoingTextColor : (palette.text ?? '#000');
+          const chevronColor = isMe
+            ? (onLight ? (palette.primary ?? '#9A6A14') : 'rgba(255,255,255,0.6)')
+            : (palette.primary ?? '#2196F3');
+          return (
+            <Pressable
+              onPress={() => navigation.navigate('InviteJoin', inviteInfo)}
+              style={{
+                marginTop: 8,
+                borderRadius: 12,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: cardBorder,
+                backgroundColor: cardBg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                gap: 10,
+              }}
+            >
+              <KISIcon name="group" size={20} color={iconColor} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: labelColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {inviteInfo.type === 'community' ? 'Community Invite' : 'Group Invite'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: titleColor, marginTop: 1 }}>
+                  Tap to join {inviteInfo.type}
+                </Text>
+              </View>
+              <KISIcon name="chevron-right" size={16} color={chevronColor} />
+            </Pressable>
+          );
+        })()}
 
         {/* Contacts / Poll / Event / Location / Product / Payment cards */}
         {renderContactsCard()}

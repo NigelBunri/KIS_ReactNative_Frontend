@@ -62,7 +62,7 @@ export default function PaymentBillingManager({ institutionId }: Props) {
     setLoading(true);
     try {
       const res = await getRequest(
-        `${ROUTES.health.billingSession("list")}?institution=${institutionId}`,
+        `${ROUTES.healthOps.billingSessions}?institution=${institutionId}`,
       );
       if (Array.isArray(res?.results)) {
         setSessions(res.results);
@@ -84,7 +84,7 @@ export default function PaymentBillingManager({ institutionId }: Props) {
       return;
     }
     const res = await postRequest(
-      ROUTES.health.billingSessionStart,
+      ROUTES.healthOps.billingSessionStart,
       {
         institution: institutionId,
         patient_name: newBill.patientName,

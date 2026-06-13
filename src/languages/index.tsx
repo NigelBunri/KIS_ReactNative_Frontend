@@ -31,6 +31,17 @@ const PROP_NAMES_TO_TRANSLATE = new Set([
   'summary',
   'subtitle',
   'message',
+  'description',
+  'hint',
+  'helperText',
+  'emptyText',
+  'noDataText',
+  'buttonText',
+  'sectionTitle',
+  'footerLabel',
+  'headerLabel',
+  'confirmText',
+  'cancelText',
 ]);
 
 const resources: Record<string, TranslationDictionary> = {};

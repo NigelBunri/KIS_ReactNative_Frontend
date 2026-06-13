@@ -115,6 +115,22 @@ const socialRoutes = {
   stickers: {
     packs: `${API_BASE_URL}/api/v1/stickers/packs/`,
   },
+  jobs: {
+    board: `${API_BASE_URL}/api/v1/partners/jobs/`,
+    myApplications: `${API_BASE_URL}/api/v1/partners/my-applications/`,
+    withdrawApplication: (appId: string) => `${API_BASE_URL}/api/v1/partners/my-applications/${appId}/withdraw/`,
+  },
+  profiles: {
+    discover: `${API_BASE_URL}/api/v1/profiles/discover/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/`,
+    endorseSkill: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/endorse-skill/`,
+    openToWork: `${API_BASE_URL}/api/v1/profiles/open-to-work/`,
+  },
+  connections: {
+    list: `${API_BASE_URL}/api/v1/connections/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/connections/${id}/`,
+    peopleYouMayKnow: `${API_BASE_URL}/api/v1/connections/people-you-may-know/`,
+  },
 };
 
 export default socialRoutes;

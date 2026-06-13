@@ -59,6 +59,7 @@ export const handleSend = async ({
   currentUserId,
   draftKey,
   dmRole,
+  linkPreview,
   ensureConversationId,
   editMessage,
   replyToMessage,
@@ -76,6 +77,7 @@ export const handleSend = async ({
   currentUserId: string;
   draftKey: string;
   dmRole: 'initiator' | 'recipient' | null;
+  linkPreview?: { title?: string; description?: string; image?: string; site_name?: string; url: string };
   ensureConversationId: EnsureConversationId;
   editMessage: Function;
   replyToMessage: Function;
@@ -106,6 +108,7 @@ export const handleSend = async ({
       fromMe: true,
       senderId: currentUserId,
       conversationId: convId,
+      ...(linkPreview ? { linkPreview } : {}),
     });
     setReplyTo(null);
 
@@ -118,6 +121,7 @@ export const handleSend = async ({
       fromMe: true,
       senderId: currentUserId,
       conversationId: convId,
+      ...(linkPreview ? { linkPreview } : {}),
     });
   }
 

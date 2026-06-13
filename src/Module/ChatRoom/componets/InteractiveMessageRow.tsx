@@ -50,6 +50,7 @@ type Props = {
   onUpdateMessage?: (message: ChatMessage) => void;
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
+  participantAvatarMap?: Record<string, string>;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -152,6 +153,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onUpdateMessage,
   mentionMap,
   participantMap,
+  participantAvatarMap,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -405,6 +407,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             onViewOnce={onViewOnce}
             mentionMap={mentionMap}
             participantMap={participantMap}
+            participantAvatarMap={participantAvatarMap}
             senderId={(message as any).senderId}
             onUpdateMessage={onUpdateMessage}
           />

@@ -58,6 +58,8 @@ type Props = {
   onCreateEvent: (event: EventDraft) => void;
   canSend: boolean;
   mentionParticipants?: { id: string; name: string }[];
+  participantMap?: Record<string, string>;
+  participantAvatarMap?: Record<string, string>;
   senderName?: string;
   conversationIdForMentions?: string;
   onLoadOlder?: () => void;
@@ -91,6 +93,8 @@ type Props = {
 
   // GAP 26: wallpaper preference sync
   conversationId?: string;
+
+  onLinkPreviewChange?: (preview: { title?: string; description?: string; image?: string; site_name?: string; url: string } | null) => void;
 };
 
 export default function ChatRoomBody({
@@ -134,6 +138,8 @@ export default function ChatRoomBody({
   onCreateEvent,
   canSend,
   mentionParticipants,
+  participantMap,
+  participantAvatarMap,
   senderName,
   conversationIdForMentions,
   onLoadOlder,
@@ -154,6 +160,7 @@ export default function ChatRoomBody({
   onSendScheduledNow,
   onCancelScheduled,
   conversationId,
+  onLinkPreviewChange,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -213,6 +220,8 @@ export default function ChatRoomBody({
         onLocalDeleteMessage={onLocalDeleteMessage}
         onUpdateMessage={onUpdateMessage}
         mentionMap={mentionMap}
+        participantMap={participantMap}
+        participantAvatarMap={participantAvatarMap}
       />
 
       <TypingIndicator typingUsers={typingUsers} palette={palette} />
@@ -261,6 +270,7 @@ export default function ChatRoomBody({
           value={draft}
           onChangeText={onChangeDraft}
           onSend={onSend}
+          onLinkPreviewChange={onLinkPreviewChange}
           canSend={canSend}
           palette={palette}
           disabled={!chat}
