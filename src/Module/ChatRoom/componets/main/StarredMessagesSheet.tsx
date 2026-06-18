@@ -125,7 +125,7 @@ export const StarredMessagesSheet: React.FC<Props> = ({
       <Animated.View
         style={[
           styles.sheet,
-          { backgroundColor: palette.background ?? palette.surface, transform: [{ translateY }] },
+          { backgroundColor: palette.surface ?? palette.bg, transform: [{ translateY }] },
         ]}
       >
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>

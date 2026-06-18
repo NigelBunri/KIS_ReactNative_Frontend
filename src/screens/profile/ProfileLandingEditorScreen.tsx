@@ -592,7 +592,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
 
   if (loading || !draft) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={palette.accentPrimary} />
           <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading landing builder...</Text>
@@ -602,7 +602,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <TouchableOpacity
@@ -618,6 +618,10 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
               borderRadius: 12,
               padding: spacing.xs,
               backgroundColor: palette.card,
+              minHeight: 44,
+              minWidth: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             accessibilityLabel="Close landing editor"
           >

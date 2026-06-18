@@ -5,7 +5,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
@@ -40,6 +44,9 @@ type HubTabProps = {
 
 export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const styles = makeStyles(responsive.pageGutter);
 
   const [subscribed, setSubscribed] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -172,7 +179,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
       onPress={() => openChannelChat(item)}
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: pressed ? (palette.surface ?? '#f5f5f5') : 'transparent', borderBottomColor: palette.divider ?? palette.inputBorder },
+        { backgroundColor: pressed ? (palette.surface) : 'transparent', borderBottomColor: palette.divider ?? palette.inputBorder },
       ]}
     >
       {item.avatar_url ? (
@@ -181,7 +188,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         </View>
       ) : (
         <View style={[styles.avatar, { backgroundColor: palette.primarySoft ?? palette.surface, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }]}>
-          <KISIcon name="broadcast" size={20} color={palette.primary ?? '#C9A227'} />
+          <KISIcon name="broadcast" size={20} color={palette.primary} />
         </View>
       )}
       <View style={styles.rowContent}>
@@ -230,16 +237,16 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.empty}>
-          <KISIcon name="broadcast" size={48} color={palette.divider ?? '#ccc'} />
+          <KISIcon name="broadcast" size={48} color={palette.divider} />
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No channels yet</Text>
           <Text style={[styles.emptySub, { color: palette.subtext }]}>
             Follow channels to get updates from people and organizations.
           </Text>
           <Pressable
             onPress={() => { setDiscoverVisible(true); void searchChannels(''); }}
-            style={[styles.discoverBtn, { backgroundColor: palette.primary ?? '#C9A227' }]}
+            style={[styles.discoverBtn, { backgroundColor: palette.primary }]}
           >
-            <Text style={{ color: palette.onPrimary ?? '#fff', fontWeight: '700' }}>Find channels</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Find channels</Text>
           </Pressable>
         </View>
       ) : (
@@ -247,7 +254,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={renderChannelRow}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         />
       )}
 
@@ -257,6 +264,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         animationType="slide"
         onRequestClose={() => setDiscoverVisible(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={[styles.root, { backgroundColor: palette.bg }]}>
           <View style={[styles.header, { borderBottomColor: palette.divider ?? palette.inputBorder }]}>
             <Pressable onPress={() => setDiscoverVisible(false)} style={styles.headerBtn} hitSlop={8}>
@@ -298,7 +306,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
                 return (
                   <View style={[styles.discoverCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
                     <View style={[styles.avatar, { backgroundColor: palette.primarySoft ?? palette.surface, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }]}>
-                      <KISIcon name="broadcast" size={20} color={palette.primary ?? '#C9A227'} />
+                      <KISIcon name="broadcast" size={20} color={palette.primary} />
                     </View>
                     <View style={styles.rowContent}>
                       <Text style={[styles.rowName, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
@@ -317,14 +325,14 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
                       style={[
                         styles.subBtn,
                         {
-                          backgroundColor: isSubbed ? 'transparent' : (palette.primary ?? '#C9A227'),
+                          backgroundColor: isSubbed ? 'transparent' : (palette.primary),
                           borderWidth: isSubbed ? 1 : 0,
-                          borderColor: palette.primary ?? '#C9A227',
+                          borderColor: palette.primary,
                           opacity: isBusy ? 0.5 : 1,
                         },
                       ]}
                     >
-                      <Text style={{ color: isSubbed ? (palette.primary ?? '#C9A227') : (palette.onPrimary ?? '#fff'), fontSize: 12, fontWeight: '700' }}>
+                      <Text style={{ color: isSubbed ? (palette.primary) : (palette.onPrimary), fontSize: 12, fontWeight: '700' }}>
                         {isBusy ? '…' : isSubbed ? 'Unfollow' : 'Follow'}
                       </Text>
                     </Pressable>
@@ -334,6 +342,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
             />
           )}
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -359,59 +368,62 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  header: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  title: { flex: 1, fontSize: 18, fontWeight: '700' },
-  headerBtn: { padding: 4 },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 6,
-  },
-  searchInput: { flex: 1, fontSize: 14, padding: 0, margin: 0 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-  },
-  rowContent: { flex: 1, gap: 3 },
-  rowName: { fontSize: 15, fontWeight: '600' },
-  rowSub: { fontSize: 13 },
-  rowRight: { alignItems: 'flex-end', gap: 4 },
-  rowTime: { fontSize: 11 },
-  avatar: { width: 44, height: 44 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  discoverBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginTop: 4 },
-  discoverCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 10,
-    gap: 12,
-  },
-  subBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-});
+// Styles are defined as a factory so they can pick up responsive values at render time
+function makeStyles(gutter: number) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    header: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: gutter,
+      gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    title: { flex: 1, fontSize: 18, fontWeight: '700' },
+    headerBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    searchBar: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      gap: 6,
+    },
+    searchInput: { flex: 1, fontSize: 14, padding: 0, margin: 0 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: gutter,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      gap: 12,
+    },
+    rowContent: { flex: 1, gap: 3 },
+    rowName: { fontSize: 15, fontWeight: '600' },
+    rowSub: { fontSize: 13 },
+    rowRight: { alignItems: 'flex-end', gap: 4 },
+    rowTime: { fontSize: 11 },
+    avatar: { width: 44, height: 44 },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: gutter * 2, gap: 14 },
+    emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
+    emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+    discoverBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginTop: 4 },
+    discoverCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      marginBottom: 10,
+      gap: 12,
+    },
+    subBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 14,
+    },
+  });
+}

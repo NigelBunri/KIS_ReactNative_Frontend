@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
-import type { RevenueStats, EngagementStats, AnalyticsPeriod } from '@/screens/tabs/partners/useAdminAnalyticsPanel';
+import type { RevenueStats, EngagementStats, AnalyticsDashboard, AnalyticsPeriod } from '@/screens/tabs/partners/useAdminAnalyticsPanel';
 
 const PERIODS: { key: AnalyticsPeriod; label: string }[] = [
   { key: '7d', label: '7 days' },
@@ -23,6 +23,7 @@ type Props = {
   panelTranslateX: Animated.Value;
   revenue: RevenueStats | null;
   engagement: EngagementStats | null;
+  dashboards?: AnalyticsDashboard[];
   loading: boolean;
   error: string | null;
   period: AnalyticsPeriod;
@@ -33,7 +34,8 @@ type Props = {
 
 export default function AdminAnalyticsPanel({
   isOpen, panelWidth, panelTranslateX,
-  revenue, engagement, loading, error,
+  revenue, engagement, dashboards = [],
+  loading, error,
   period, onChangePeriod,
   onClose, onRefresh,
 }: Props) {
@@ -93,8 +95,8 @@ export default function AdminAnalyticsPanel({
           </View>
         )}
         {!!error && !loading && (
-          <View style={[styles.errorBox, { backgroundColor: (palette.danger ?? '#d9534f') + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-            <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <View style={[styles.errorBox, { backgroundColor: (palette.danger) + '22', borderColor: palette.danger }]}>
+            <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
           </View>
         )}
         {!loading && (
@@ -139,6 +141,45 @@ export default function AdminAnalyticsPanel({
                 palette={palette}
                 color="#5b8dee"
               />
+            )}
+
+            {/* Dashboards — sourced from /analytics/dashboards/ */}
+            {dashboards.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: palette.text }]}>Dashboards</Text>
+                {dashboards.map((db) => (
+                  <View
+                    key={String(db.id)}
+                    style={[styles.dashboardRow, { borderColor: palette.border, backgroundColor: palette.card ?? palette.surface }]}
+                  >
+                    <Text style={[styles.dashboardTitle, { color: palette.text }]} numberOfLines={1}>
+                      {db.title}
+                    </Text>
+                    {db.description ? (
+                      <Text style={[styles.dashboardSub, { color: palette.subtext }]} numberOfLines={2}>
+                        {db.description}
+                      </Text>
+                    ) : null}
+                    <View style={styles.dashboardMeta}>
+                      {db.target ? (
+                        <Text style={[styles.dashboardPill, { backgroundColor: palette.primary + '22', color: palette.primary }]}>
+                          {db.target}
+                        </Text>
+                      ) : null}
+                      {db.widget_count != null ? (
+                        <Text style={[styles.dashboardPill, { backgroundColor: palette.border, color: palette.subtext }]}>
+                          {db.widget_count} widget{db.widget_count !== 1 ? 's' : ''}
+                        </Text>
+                      ) : null}
+                      {db.is_active === false ? (
+                        <Text style={[styles.dashboardPill, { backgroundColor: palette.danger + '22', color: palette.danger }]}>
+                          inactive
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </>
             )}
           </>
         )}
@@ -209,4 +250,9 @@ const styles = StyleSheet.create({
   barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   bar: { width: '70%', borderRadius: 3 },
   barLabel: { fontSize: 8, marginTop: 2 },
+  dashboardRow: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8, gap: 4 },
+  dashboardTitle: { fontSize: 13, fontWeight: '700' },
+  dashboardSub: { fontSize: 11, lineHeight: 16 },
+  dashboardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  dashboardPill: { fontSize: 10, fontWeight: '700', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
 });

@@ -390,7 +390,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
         <Text
           style={[
             styles.errorText,
-            { color: palette.error ?? '#e53935' },
+            { color: palette.danger },
           ]}
         >
           {error}
@@ -418,7 +418,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
             styles.saveButtonText,
             {
               color: canSave
-                ? palette.onPrimary ?? '#fff'
+                ? palette.onPrimary
                 : palette.subtext,
             },
           ]}

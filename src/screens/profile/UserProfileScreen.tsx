@@ -208,7 +208,7 @@ export default function UserProfileScreen() {
         <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
           {displayName ?? 'Profile'}
         </Text>
-        <View style={{ width: 38 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       {loading ? (
@@ -252,9 +252,9 @@ export default function UserProfileScreen() {
               </Text>
               {degreeLabel(profile?.connection_degree) !== null && (
                 <View style={[degreeStyles.chip, {
-                  backgroundColor: profile?.connection_degree === 1 ? '#16A34A' : profile?.connection_degree === 2 ? '#2563EB' : '#6B7280',
+                  backgroundColor: profile?.connection_degree === 1 ? (palette.success) : profile?.connection_degree === 2 ? (palette.primary) : (palette.subtext),
                 }]}>
-                  <Text style={degreeStyles.chipText}>{degreeLabel(profile?.connection_degree)}</Text>
+                  <Text style={[degreeStyles.chipText, { color: palette.onPrimary }]}>{degreeLabel(profile?.connection_degree)}</Text>
                 </View>
               )}
             </View>
@@ -346,9 +346,9 @@ export default function UserProfileScreen() {
                         disabled={alreadyEndorsed || isEndorsing}
                       >
                         {isEndorsing ? (
-                          <ActivityIndicator size="small" color="#fff" />
+                          <ActivityIndicator size="small" color={palette.onPrimary} />
                         ) : (
-                          <Text style={{ color: alreadyEndorsed ? palette.subtext : '#fff', fontSize: 12, fontWeight: '600' }}>
+                          <Text style={{ color: alreadyEndorsed ? palette.subtext : (palette.onPrimary), fontSize: 12, fontWeight: '600' }}>
                             {alreadyEndorsed ? 'Endorsed' : 'Endorse'}
                           </Text>
                         )}
@@ -431,8 +431,8 @@ function makeStyles(palette: any) {
       backgroundColor: palette.bg,
     },
     backBtn: {
-      width: 38,
-      height: 38,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -514,6 +514,7 @@ function makeStyles(palette: any) {
     },
     actionBtn: {
       minWidth: 120,
+      minHeight: 44,
       paddingVertical: 10,
       paddingHorizontal: 20,
       borderRadius: 24,
@@ -579,7 +580,9 @@ function makeStyles(palette: any) {
       borderRadius: 10,
       borderWidth: 1,
       alignItems: 'center',
+      justifyContent: 'center',
       minWidth: 80,
+      minHeight: 44,
     },
   });
 }
@@ -593,7 +596,6 @@ const degreeStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipText: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '800',
   },

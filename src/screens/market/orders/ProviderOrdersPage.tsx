@@ -9,6 +9,7 @@ import {
   View,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -44,6 +45,7 @@ type MarketplaceOrderSummary = {
 
 export default function ProviderOrdersPage() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<ProviderOrdersNavigation>();
   const [orders, setOrders] = useState<MarketplaceOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,7 +202,7 @@ export default function ProviderOrdersPage() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View
         style={[
           styles.headerSection,
@@ -223,7 +225,7 @@ export default function ProviderOrdersPage() {
         </View>
       ) : error ? (
         <View style={styles.loader}>
-          <Text style={{ color: palette.error || '#E53935' }}>{error}</Text>
+          <Text style={{ color: palette.danger }}>{error}</Text>
         </View>
       ) : (
         <FlatList

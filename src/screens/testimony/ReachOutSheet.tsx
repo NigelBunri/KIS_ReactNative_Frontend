@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -109,6 +111,7 @@ export default function ReachOutSheet() {
 
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView
         style={{ backgroundColor: palette.bg }}
         contentContainerStyle={styles.content}
@@ -140,8 +143,9 @@ export default function ReachOutSheet() {
             </Text>
             <Pressable
               onPress={() => {
+                // Replace this sheet with DeclareTestimonySheet so the user
+                // can go back to the reach-out flow after sharing their story.
                 navigation.navigate('DeclareTestimonySheet', {});
-                navigation.goBack();
               }}
               style={[styles.shareFirstBtn, { borderColor: palette.primary }]}
             >
@@ -173,7 +177,7 @@ export default function ReachOutSheet() {
                   ) : null}
                   {isSelected && (
                     <View style={[styles.selectedBadge, { backgroundColor: palette.primary }]}>
-                      <KISIcon name="check" size={12} color="#fff" />
+                      <KISIcon name="check" size={12} color={palette.onPrimary} />
                     </View>
                   )}
                 </Pressable>
@@ -214,6 +218,7 @@ export default function ReachOutSheet() {
           <Text style={styles.sendBtnText}>{submitting ? 'Sending...' : 'Send Reach-Out'}</Text>
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -231,7 +236,7 @@ function makeStyles(palette: any) {
     sectionLabel: { fontSize: 15, fontWeight: '700' },
     noTestimonyCard: { borderRadius: 12, borderWidth: 1, padding: 16, gap: 12, alignItems: 'center' },
     noTestimonyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-    shareFirstBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+    shareFirstBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     shareFirstBtnText: { fontSize: 14, fontWeight: '600' },
     testimonyCard: { borderRadius: 14, padding: 14, gap: 6, position: 'relative' },
     testimonyTitle: { fontSize: 15, fontWeight: '700' },
@@ -239,6 +244,6 @@ function makeStyles(palette: any) {
     selectedBadge: { position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
     messageInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, lineHeight: 20 },
     sendBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-    sendBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    sendBtnText: { color: palette.onPrimary, fontWeight: '800', fontSize: 16 },
   });
 }

@@ -2,13 +2,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { NetworkQuality } from '@/services/calls/callTypes';
+import { useKISTheme } from '@/theme/useTheme';
 
-const QUALITY_COLORS: Record<NetworkQuality, string> = {
-  1: '#E52B2B',
-  2: '#F59E0B',
-  3: '#22C55E',
-  4: '#22C55E',
-};
 const BAR_HEIGHTS = [4, 7, 10, 13];
 
 type Props = {
@@ -17,6 +12,13 @@ type Props = {
 };
 
 export default function NetworkQualityBars({ quality, size = 16 }: Props) {
+  const { palette } = useKISTheme();
+  const QUALITY_COLORS: Record<NetworkQuality, string> = {
+    1: palette.danger,
+    2: palette.gold,
+    3: palette.success,
+    4: palette.success,
+  };
   const color = QUALITY_COLORS[quality];
   const unit = size / 16;
   return (

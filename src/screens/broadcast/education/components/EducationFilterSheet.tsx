@@ -33,7 +33,7 @@ const Chip = ({ label, active, onPress }: any) => {
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 14,
-        backgroundColor: active ? palette.goldSoft : 'transparent',
+        backgroundColor: active ? palette.goldSoft : palette.surface,
         opacity: pressed ? 0.8 : 1,
         marginRight: 8,
         marginBottom: 8,
@@ -77,7 +77,7 @@ export default function EducationFilterSheet({
 
   return (
     <Modal transparent visible animationType="fade">
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <View style={{ flex: 1, backgroundColor: palette.backdrop ?? 'rgba(0,0,0,0.45)' }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View
           style={{

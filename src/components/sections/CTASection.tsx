@@ -8,7 +8,7 @@ export default function CTASection({ data, palette, typography, spacing }: Secti
       <Text style={{ ...typography.h3, color: palette.text }}>{data?.title || 'Call to action'}</Text>
       <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>{data?.description || ''}</Text>
       <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start', borderRadius: 999, backgroundColor: palette.accentPrimary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
-        <Text style={{ ...typography.label, color: '#fff' }}>{data?.buttonText || 'Learn more'}</Text>
+        <Text style={{ ...typography.label, color: palette.onPrimary }}>{data?.buttonText || 'Learn more'}</Text>
       </View>
     </View>
   );

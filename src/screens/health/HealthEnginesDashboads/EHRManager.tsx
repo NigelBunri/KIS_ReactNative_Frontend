@@ -7,8 +7,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
-import { useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -47,7 +48,9 @@ type Patient = {
 
 /* ================= COMPONENT ================= */
 
-export default function EHRManager() {
+type Props = { institutionId: string; engineKey: string };
+
+export default function EHRManager({ institutionId }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
   const spacing = HEALTH_THEME_SPACING;
@@ -58,6 +61,11 @@ export default function EHRManager() {
   const [enabled, setEnabled] = useState(true);
   const [requireSignature, setRequireSignature] = useState(true);
   const [versionTracking, setVersionTracking] = useState(true);
+
+  const saveConfig = useCallback(async (patch: Record<string, boolean>) => {
+    if (!institutionId) return;
+    await patchRequest(ROUTES.healthDashboard.institution(institutionId), patch).catch(() => undefined);
+  }, [institutionId]);
 
   /* ================= PATIENTS ================= */
 
@@ -212,6 +220,7 @@ export default function EHRManager() {
   /* ================= UI ================= */
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView style={{ padding: spacing.md }}>
 
       {/* ===== CONFIG ===== */}
@@ -222,17 +231,17 @@ export default function EHRManager() {
 
         <KISButton
           title={enabled ? "Disable EHR" : "Enable EHR"}
-          onPress={() => setEnabled(!enabled)}
+          onPress={() => { setEnabled((v) => { saveConfig({ ehr_enabled: !v }); return !v; }); }}
           variant="outline"
         />
         <KISButton
           title={requireSignature ? "Disable Signature Requirement" : "Require Signature"}
-          onPress={() => setRequireSignature(!requireSignature)}
+          onPress={() => { setRequireSignature((v) => { saveConfig({ require_signature: !v }); return !v; }); }}
           variant="outline"
         />
         <KISButton
           title={versionTracking ? "Disable Version Tracking" : "Enable Version Tracking"}
-          onPress={() => setVersionTracking(!versionTracking)}
+          onPress={() => { setVersionTracking((v) => { saveConfig({ version_tracking: !v }); return !v; }); }}
           variant="outline"
         />
       </View>
@@ -245,12 +254,14 @@ export default function EHRManager() {
 
         <TextInput
           placeholder="Full Name"
+          placeholderTextColor={palette.subtext}
           value={newName}
           onChangeText={setNewName}
           style={input(palette, spacing)}
         />
         <TextInput
           placeholder="Age"
+          placeholderTextColor={palette.subtext}
           value={newAge}
           onChangeText={setNewAge}
           keyboardType="numeric"
@@ -258,6 +269,7 @@ export default function EHRManager() {
         />
         <TextInput
           placeholder="Gender"
+          placeholderTextColor={palette.subtext}
           value={newGender}
           onChangeText={setNewGender}
           style={input(palette, spacing)}
@@ -442,6 +454,7 @@ export default function EHRManager() {
       </View>
 
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -464,7 +477,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

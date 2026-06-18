@@ -8,9 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type MediaAsset = {
   id: string;
@@ -48,6 +50,7 @@ const getMediaTypeLabel = (asset: MediaAsset): string => {
 
 export default function MediaDashboardScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [stats, setStats] = useState<MediaStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,7 @@ export default function MediaDashboardScreen() {
     : [];
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Media</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>
@@ -108,12 +111,12 @@ export default function MediaDashboardScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable
             onPress={load}
             style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : (
@@ -121,7 +124,7 @@ export default function MediaDashboardScreen() {
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />
           }
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: responsive.pageGutter }]}
         >
           {statCards.length > 0 && (
             <View style={styles.statsGrid}>
@@ -156,10 +159,10 @@ export default function MediaDashboardScreen() {
             assets.map((asset) => {
               const kind = getMediaTypeLabel(asset);
               const kindColors: Record<string, string> = {
-                image: '#10B981',
-                video: '#8B5CF6',
-                audio: '#F59E0B',
-                file: '#6B7280',
+                image: palette.success,
+                video: palette.primary,
+                audio: palette.gold,
+                file: palette.subtext,
               };
               return (
                 <View
@@ -173,7 +176,7 @@ export default function MediaDashboardScreen() {
                     <View
                       style={[
                         styles.kindDot,
-                        { backgroundColor: kindColors[kind] ?? '#888' },
+                        { backgroundColor: kindColors[kind] ?? palette.subtext },
                       ]}
                     />
                     <Text
@@ -200,7 +203,7 @@ export default function MediaDashboardScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

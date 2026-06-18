@@ -25,12 +25,24 @@ export type EngagementStats = {
   content_series_30d: { date: string; posts: number; conversations: number }[];
 };
 
+export type AnalyticsDashboard = {
+  id: string | number;
+  title: string;
+  description?: string;
+  target?: string;
+  widget_count?: number;
+  is_active?: boolean;
+  created_at?: string;
+  [key: string]: unknown;
+};
+
 export type AnalyticsPeriod = '7d' | '30d' | '90d';
 
 export const useAdminAnalyticsPanel = (width: number) => {
   const [isOpen, setIsOpen] = useState(false);
   const [revenue, setRevenue] = useState<RevenueStats | null>(null);
   const [engagement, setEngagement] = useState<EngagementStats | null>(null);
+  const [dashboards, setDashboards] = useState<AnalyticsDashboard[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
@@ -47,12 +59,20 @@ export const useAdminAnalyticsPanel = (width: number) => {
     const p = opts?.period ?? period;
     const params = new URLSearchParams({ period: p });
     try {
-      const [rev, eng] = await Promise.allSettled([
+      const [rev, eng, dash] = await Promise.allSettled([
         getRequest(`${(ROUTES as any).analytics?.revenue ?? ''}?${params}`, { errorMessage: '' }),
         getRequest(`${(ROUTES as any).analytics?.engagement ?? ''}?${params}`, { errorMessage: '' }),
+        getRequest((ROUTES as any).analytics?.adminDashboards ?? '', { errorMessage: '' }),
       ]);
       if (rev.status === 'fulfilled' && rev.value?.success) setRevenue(rev.value.data);
       if (eng.status === 'fulfilled' && eng.value?.success) setEngagement(eng.value.data);
+      if (dash.status === 'fulfilled' && dash.value?.success) {
+        const raw = dash.value.data;
+        setDashboards(
+          Array.isArray(raw?.results) ? raw.results :
+          Array.isArray(raw) ? raw : [],
+        );
+      }
       if (rev.status === 'rejected' && eng.status === 'rejected') {
         setError('Failed to load analytics data.');
       }
@@ -85,6 +105,6 @@ export const useAdminAnalyticsPanel = (width: number) => {
 
   return {
     panelWidth, panelTranslateX, isOpen, open, close,
-    revenue, engagement, loading, error, period, changePeriod, refresh: load,
+    revenue, engagement, dashboards, loading, error, period, changePeriod, refresh: load,
   };
 };

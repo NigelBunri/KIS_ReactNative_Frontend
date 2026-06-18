@@ -8,9 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type TierPlan = {
   id: string;
@@ -36,6 +38,7 @@ type TierStats = {
 
 export default function TiersDashboardScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [plans, setPlans] = useState<TierPlan[]>([]);
   const [subscriptions, setSubscriptions] = useState<TierSubscription[]>([]);
   const [stats, setStats] = useState<TierStats | null>(null);
@@ -108,7 +111,7 @@ export default function TiersDashboardScreen() {
     plans.length > 0 ? Math.max(...plans.map((p) => p.subscriber_count ?? 0), 1) : 1;
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Tiers</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>
@@ -122,12 +125,12 @@ export default function TiersDashboardScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable
             onPress={load}
             style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : (
@@ -135,7 +138,7 @@ export default function TiersDashboardScreen() {
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />
           }
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: responsive.pageGutter }]}
         >
           {/* Stat cards */}
           {statCards.length > 0 && (
@@ -174,12 +177,12 @@ export default function TiersDashboardScreen() {
                 const pct = maxSubscribers > 0 ? (subs / maxSubscribers) * 100 : 0;
                 const barColor =
                   idx === 0
-                    ? palette.primaryStrong ?? '#4F46E5'
+                    ? palette.primaryStrong
                     : idx === 1
-                    ? '#10B981'
+                    ? palette.success
                     : idx === 2
-                    ? '#F59E0B'
-                    : '#8B5CF6';
+                    ? palette.gold
+                    : palette.primaryStrong;
                 return (
                   <View key={String(plan.id)} style={styles.barRow}>
                     <Text
@@ -191,7 +194,7 @@ export default function TiersDashboardScreen() {
                     <View
                       style={[
                         styles.barTrack,
-                        { backgroundColor: palette.divider ?? '#e5e5e5' },
+                        { backgroundColor: palette.divider },
                       ]}
                     >
                       <View
@@ -227,8 +230,8 @@ export default function TiersDashboardScreen() {
                   : (sub.plan as any)?.name ?? 'Unknown plan';
               const statusColor =
                 sub.status === 'active' || sub.status === 'trialing'
-                  ? '#10B981'
-                  : '#F59E0B';
+                  ? palette.success
+                  : palette.gold;
               return (
                 <View
                   key={String(sub.id)}
@@ -258,7 +261,7 @@ export default function TiersDashboardScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

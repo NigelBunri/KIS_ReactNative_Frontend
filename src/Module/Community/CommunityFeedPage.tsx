@@ -227,7 +227,7 @@ export default function CommunityFeedPage({
     const attachmentUrl = attachment?.url ?? attachment?.uri ?? null;
     const kind = attachment?.kind ?? attachment?.mimeType ?? '';
     const isImage = String(kind).includes('image');
-    const watermarkColor = '#22C55E';
+    const watermarkColor = palette.success;
     const subtitle = 'Community share';
 
     if (attachmentUrl && isImage) {
@@ -685,7 +685,7 @@ export default function CommunityFeedPage({
           },
         ]}
       >
-        <KISIcon name="add" size={20} color={palette.onPrimary ?? '#fff'} />
+        <KISIcon name="add" size={20} color={palette.onPrimary} />
       </Pressable>
 
       <FeedComposerSheet

@@ -21,6 +21,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { getThemeById } from '@/constants/appColorThemes';
 import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { resolveBackendAssetUrl } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -151,6 +152,7 @@ export default function OrganizationAppScreen() {
   const navigation = useNavigation<NavigationProps>();
   const { params } = useRoute<RouteProps>();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const app = params.app;
 
   const appConfig = (app.config ?? {}) as AppConfig;
@@ -537,7 +539,7 @@ export default function OrganizationAppScreen() {
     if (!tabs.length) {
       if (app.type === 'external') {
         return (
-          <View style={styles.embedPreview}>
+          <View style={[styles.embedPreview, { borderColor: palette.divider }]}>
             <Text style={[styles.bodyText, { color: palette.subtext, marginBottom: 8 }]}>
               External URL: {resolvedLink || 'Not configured'}
             </Text>
@@ -598,10 +600,15 @@ export default function OrganizationAppScreen() {
             )}
           </View>
         );
-      case 'side_tabs':
+      case 'side_tabs': {
+        const sideTabWidth = responsive.isCompactPhone ? 60 : responsive.isTablet ? 88 : 72;
         return (
           <View style={{ flex: 1, flexDirection: 'row' }}>
-            {renderTabBar('side')}
+            <View style={[styles.tabBarSide, { width: sideTabWidth, borderColor: palette.divider, backgroundColor: palette.surface }]}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {tabs.map((tab) => renderTabChip(tab, true))}
+              </ScrollView>
+            </View>
             {activeIsFullscreen ? (
               <View style={{ flex: 1 }}>{renderTabContent(activeTab)}</View>
             ) : (
@@ -611,6 +618,7 @@ export default function OrganizationAppScreen() {
             )}
           </View>
         );
+      }
       case 'scroll':
         return (
           <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
@@ -672,7 +680,7 @@ export default function OrganizationAppScreen() {
         </View>
         {app.is_promoted_global ? (
           <View style={[styles.promotedBadge, { backgroundColor: brandPrimary }]}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>⚡ Global</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 10, fontWeight: '800' }}>⚡ Global</Text>
           </View>
         ) : null}
         {canManage && partnerId ? (
@@ -799,6 +807,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     marginHorizontal: 4,
+    minHeight: 44,
     gap: 2,
   },
   tabChipVertical: {
@@ -810,6 +819,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginVertical: 4,
     marginHorizontal: 6,
+    minHeight: 44,
+    minWidth: 44,
     gap: 2,
   },
   tabContent: {
@@ -841,7 +852,7 @@ const styles = StyleSheet.create({
   // States
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
-  embedPreview: { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', margin: 16 },
+  embedPreview: { padding: 16, borderRadius: 16, borderWidth: 1, margin: 16 },
   bodyText: { fontSize: 13, lineHeight: 20 },
   subtext: { fontSize: 12, lineHeight: 18 },
 });

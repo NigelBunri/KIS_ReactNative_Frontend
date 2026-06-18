@@ -29,11 +29,11 @@ const TABS: TabDef[] = [
 ];
 
 export default function BroadcastMainTabs({ value, onChange }: Props) {
-  const { palette, tokens, tone } = useKISTheme();
+  const { palette, tokens } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
-  const inactiveTextColor = palette.ivory ?? '#FFFFFF';
-  const inactiveIconColor = palette.goldSoft ?? 'rgba(255,244,184,0.86)';
+  const inactiveTextColor = 'rgba(255,255,255,0.90)';
+  const inactiveIconColor = 'rgba(255,244,184,0.86)';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
@@ -60,15 +60,15 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
                   paddingHorizontal: compact ? 10 : 15,
                   paddingVertical: compact ? 7 : 8,
                   borderRadius: compact ? 15 : 18,
-                  backgroundColor: active ? 'transparent' : 'rgba(255,255,255,0.08)',
-                  borderColor: active ? palette.goldLight : 'rgba(255,244,184,0.26)',
+                  backgroundColor: active ? 'transparent' : 'rgba(23,17,31,0.18)',
+                  borderColor: active ? 'rgba(255,244,184,0.42)' : 'rgba(255,244,184,0.24)',
                 },
               ]}
               accessibilityRole="button"
             >
               {active ? (
                 <LinearGradient
-                  colors={tone === 'dark' ? [...KIS_ROYAL_GRADIENTS.goldDark] : [...KIS_ROYAL_GRADIENTS.goldLight]}
+                  colors={[...KIS_ROYAL_GRADIENTS.goldDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
@@ -77,11 +77,11 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
               <KISIcon
                 name={t.icon as any}
                 size={compact ? 13 : 15}
-                color={active ? palette.onPrimary : inactiveIconColor}
+                color={active ? palette.onGold : inactiveIconColor}
               />
               <Text
                 style={{
-                  color: active ? palette.onPrimary : inactiveTextColor,
+                  color: active ? palette.onGold : inactiveTextColor,
                   fontWeight: '900',
                   marginLeft: compact ? 4 : 6,
                   fontSize: responsive.isWatch ? 11 : 13,

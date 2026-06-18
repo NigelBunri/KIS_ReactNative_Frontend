@@ -67,7 +67,7 @@ export default function MarketShopCard({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.25)',
+            backgroundColor: 'rgba(0,0,0,0.25)', // intentional image scrim
           }}
         />
         <View
@@ -82,7 +82,7 @@ export default function MarketShopCard({
           }}
         >
           <Text
-            style={{ color: '#fff', fontWeight: '900', fontSize: 15, flex: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 }}
+            style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15, flex: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 }}
             numberOfLines={1}
           >
             {name}
@@ -93,14 +93,14 @@ export default function MarketShopCard({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 4,
-                backgroundColor: verified ? '#27ae60' : '#2980b9',
+                backgroundColor: verified ? (palette.success) : (palette.primary),
                 borderRadius: 8,
                 paddingHorizontal: 7,
                 paddingVertical: 3,
               }}
             >
-              <KISIcon name="check" size={10} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
+              <KISIcon name="check" size={10} color={palette.onPrimary} />
+              <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 10 }}>
                 {trustLabel ?? 'Verified'}
               </Text>
             </View>

@@ -9,7 +9,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -25,17 +27,19 @@ type Props = {
 
 export default function AgeGateScreen({ ageRestriction, onConfirm, onBack }: Props) {
   const { palette } = useKISTheme();
+  const { bodyFontSize, labelFontSize, minTouchTarget } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.overlay}>
+    <View style={[styles.overlay, { backgroundColor: palette.royalInk, paddingTop: 32 + insets.top, paddingBottom: 32 + insets.bottom }]}>
       <View style={styles.content}>
         <Text style={styles.icon}>🛡️</Text>
 
-        <Text style={[styles.title, { color: '#fff' }]}>
+        <Text style={[styles.title, { color: palette.ivory, fontSize: bodyFontSize + 7 }]}>
           Age-Restricted Content
         </Text>
 
-        <Text style={[styles.description, { color: 'rgba(255,255,255,0.75)' }]}>
+        <Text style={[styles.description, { color: palette.subtext, fontSize: bodyFontSize }]}>
           This content is intended for viewers aged {ageRestriction}.{'\n'}
           Confirm your age to continue.
         </Text>
@@ -43,16 +47,19 @@ export default function AgeGateScreen({ ageRestriction, onConfirm, onBack }: Pro
         {/* Primary confirm button */}
         <Pressable
           onPress={onConfirm}
-          style={[styles.confirmBtn, { backgroundColor: palette.gold }]}
+          style={[styles.confirmBtn, { backgroundColor: palette.gold, minHeight: Math.max(50, minTouchTarget) }]}
         >
-          <Text style={styles.confirmText}>
+          <Text style={[styles.confirmText, { color: palette.onPrimary, fontSize: bodyFontSize + 1 }]}>
             I am {ageRestriction} years old
           </Text>
         </Pressable>
 
         {/* Go back */}
-        <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: 'rgba(255,255,255,0.55)' }]}>
+        <Pressable
+          onPress={onBack}
+          style={[styles.backBtn, { minHeight: minTouchTarget, justifyContent: 'center' }]}
+        >
+          <Text style={[styles.backText, { color: palette.subtext, fontSize: labelFontSize }]}>
             Go Back
           </Text>
         </Pressable>
@@ -66,10 +73,9 @@ export default function AgeGateScreen({ ageRestriction, onConfirm, onBack }: Pro
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    paddingHorizontal: 32,
   },
   content: {
     alignItems: 'center',
@@ -81,13 +87,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 14,
   },
   description: {
-    fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
@@ -95,22 +99,18 @@ const styles = StyleSheet.create({
   confirmBtn: {
     width: '100%',
     borderRadius: 12,
-    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
   confirmText: {
-    color: '#fff',
     fontWeight: '800',
-    fontSize: 16,
   },
   backBtn: {
-    paddingVertical: 10,
     paddingHorizontal: 20,
+    alignItems: 'center',
   },
   backText: {
-    fontSize: 14,
     fontWeight: '600',
   },
 });

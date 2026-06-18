@@ -51,6 +51,7 @@ export const livePollEndEndpoint = ROUTES.broadcasts.livePollEnd;
 export const liveStreamQAEndpoint = ROUTES.broadcasts.liveStreamQA;
 export const qaSessionQuestionsEndpoint = ROUTES.broadcasts.qaSessionQuestions;
 export const qaQuestionUpvoteEndpoint = ROUTES.broadcasts.qaQuestionUpvote;
+export const qaQuestionActionEndpoint = ROUTES.broadcasts.qaQuestionAction;
 export const watchHistorySettingsEndpoint = ROUTES.broadcasts.watchHistorySettings;
 export const userPlaylistsEndpoint = ROUTES.broadcasts.userPlaylists;
 export const userPlaylistItemsEndpoint = ROUTES.broadcasts.userPlaylistItems;

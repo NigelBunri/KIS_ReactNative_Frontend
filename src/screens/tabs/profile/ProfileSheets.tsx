@@ -123,7 +123,10 @@ export default function ProfileSheets(props: Props) {
           <Text style={[styles.sheetTitle, { color: palette.text }]}>
             {sheetTitle}
           </Text>
-          <Pressable onPress={closeSheet}>
+          <Pressable
+            onPress={closeSheet}
+            style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
             <KISIcon name="close" size={22} color={palette.subtext} />
           </Pressable>
         </View>

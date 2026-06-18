@@ -8,9 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type NotifItem = {
   id: string;
@@ -39,6 +41,7 @@ const computeRate = (a: number, b: number): string => {
 
 export default function NotificationsDashboardScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [items, setItems] = useState<NotifItem[]>([]);
   const [stats, setStats] = useState<NotifStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,15 +116,15 @@ export default function NotificationsDashboardScreen() {
     : [];
 
   const channelColor = (channel?: string): string => {
-    if (!channel) return '#6B7280';
-    if (channel === 'push' || channel === 'fcm' || channel === 'apns') return '#8B5CF6';
-    if (channel === 'in_app') return '#10B981';
-    if (channel === 'email') return '#F59E0B';
-    return '#6B7280';
+    if (!channel) return palette.subtext;
+    if (channel === 'push' || channel === 'fcm' || channel === 'apns') return palette.primary;
+    if (channel === 'in_app') return palette.success;
+    if (channel === 'email') return palette.gold;
+    return palette.subtext;
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Notifications</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>
@@ -135,12 +138,12 @@ export default function NotificationsDashboardScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable
             onPress={load}
             style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : (
@@ -148,7 +151,7 @@ export default function NotificationsDashboardScreen() {
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />
           }
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: responsive.pageGutter }]}
         >
           {statCards.length > 0 && (
             <View style={styles.statsGrid}>
@@ -229,7 +232,7 @@ export default function NotificationsDashboardScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

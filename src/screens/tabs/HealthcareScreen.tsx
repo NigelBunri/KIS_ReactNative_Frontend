@@ -2,7 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +13,10 @@ import {
   View,
 } from 'react-native';
 import { KIS_TOKENS } from '@/theme/constants';
+import { useSocket } from '../../SocketProvider';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import GlobalShell from '@/components/healthcare/GlobalShell';
 import {
@@ -199,12 +205,16 @@ const INITIAL_DOCUMENT_FORM = {
 
 export default function HealthcareScreen() {
   const { palette, tokens } = useKISTheme();
-  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const insets = useSafeAreaInsets();
+  const { pageGutter } = useResponsiveLayout();
+  const { startCall } = useSocket();
+  const styles = useMemo(() => makeStyles(tokens, pageGutter, palette.divider), [tokens, pageGutter, palette.divider]);
 
   const [medicalContext, setMedicalContext] = useState<any>(null);
   const [teleSessions, setTeleSessions] = useState<any[]>([]);
   const [patientCount, setPatientCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [teleLoading, setTeleLoading] = useState(false);
   const [contextLoading, setContextLoading] = useState(false);
   const [emergencyMode, setEmergencyMode] = useState(false);
@@ -378,23 +388,28 @@ export default function HealthcareScreen() {
   const loadPatientRecords = useCallback(
     async (query?: string) => {
       setLoading(true);
-      const params = query ? { search: query } : undefined;
-      const res = await fetchPatientMasterRecords(params);
-      if (res.success) {
-        const rows = Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res.data?.results)
-          ? res.data.results
-          : [];
-        setPatients(rows);
-        setPatientCount(rows.length);
-        setPatientDetail(null);
-        setPatientHealthSummary(null);
-        setPatientEmergencyCard(null);
-      } else {
-        Alert.alert('Patients', res.message || 'Unable to load patients.');
+      try {
+        const params = query ? { search: query } : undefined;
+        const res = await fetchPatientMasterRecords(params);
+        if (res.success) {
+          const rows = Array.isArray(res.data)
+            ? res.data
+            : Array.isArray(res.data?.results)
+            ? res.data.results
+            : [];
+          setPatients(rows);
+          setPatientCount(rows.length);
+          setPatientDetail(null);
+          setPatientHealthSummary(null);
+          setPatientEmergencyCard(null);
+        } else {
+          Alert.alert('Patients', res.message || 'Unable to load patients.');
+        }
+      } catch (err: any) {
+        Alert.alert('Patients', err?.message || 'Unable to load patient records. Please try again.');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     },
     [],
   );
@@ -948,11 +963,26 @@ export default function HealthcareScreen() {
       const res = await executor(session.id);
       if (res.success) {
         loadTeleSessions();
+        if (action === 'start' && startCall) {
+          const sessionConvId =
+            res.data?.conversation_id ??
+            res.data?.conversationId ??
+            session.conversation_id ??
+            session.conversationId ??
+            String(session.id);
+          const patientName =
+            session.patient_name ?? session.patientName ?? 'Patient';
+          void startCall({
+            conversationId: sessionConvId,
+            title: `Telemedicine — ${patientName}`,
+            media: 'video',
+          });
+        }
         return;
       }
       Alert.alert('Telemedicine', res.message || 'Unable to update session.');
     },
-    [loadTeleSessions],
+    [loadTeleSessions, startCall],
   );
 
   const handleSessionFormChange = useCallback((field: keyof typeof sessionForm, value: string) => {
@@ -1626,6 +1656,7 @@ export default function HealthcareScreen() {
     setAnalyticsLoading(true);
     const res = await computeClinicalAnalyticsReports(medicalContext.active_profile_id);
     setAnalyticsLoading(false);
+    if (!res) return;
     if (res.success) {
       await loadAnalyticsReports();
       Alert.alert('Analytics', 'Reports refresh queued.');
@@ -1638,6 +1669,7 @@ export default function HealthcareScreen() {
     setRiskLoading(true);
     const res = await computeRiskStratification();
     setRiskLoading(false);
+    if (!res) return;
     if (res.success) {
       await loadRiskAssessments();
       Alert.alert('Risk', 'Risk stratification queued.');
@@ -1665,6 +1697,7 @@ export default function HealthcareScreen() {
       notes: outcomeForm.notes.trim(),
     };
     const res = await createOutcomeBenchmark(payload);
+    if (!res) return;
     if (res.success) {
       setOutcomeForm({
         metric_name: '',
@@ -1698,6 +1731,7 @@ export default function HealthcareScreen() {
       profile: medicalContext?.active_profile_id ?? undefined,
     };
     const res = await createPatientSatisfactionScore(payload);
+    if (!res) return;
     if (res.success) {
       setSatisfactionForm((prev) => ({ ...prev, score: '', comments: '' }));
       await loadSatisfactionScores();
@@ -1732,6 +1766,7 @@ export default function HealthcareScreen() {
       status: outreachForm.status,
     };
     const res = await createOutreachCampaign(payload);
+    if (!res) return;
     if (res.success) {
       setOutreachForm({ name: '', channel: 'email', target_population: '', status: 'planned' });
       await loadOutreachCampaigns();
@@ -1744,6 +1779,7 @@ export default function HealthcareScreen() {
   const handleUpdateCampaignStatus = useCallback(
     async (campaignId: string, status: string) => {
       const res = await setOutreachCampaignStatus(campaignId, status);
+      if (!res) return;
       if (res.success) {
         await loadOutreachCampaigns();
         return;
@@ -1772,6 +1808,7 @@ export default function HealthcareScreen() {
       participation_target: parseInt(challengeForm.participation_target, 10) || 0,
     };
     const res = await createWellnessChallenge(payload);
+    if (!res) return;
     if (res.success) {
       setChallengeForm({
         title: '',
@@ -1805,6 +1842,7 @@ export default function HealthcareScreen() {
       notes: habitForm.notes.trim(),
     };
     const res = await createHabitTrackingEntry(payload);
+    if (!res) return;
     if (res.success) {
       setHabitForm({ challengeId: '', habit_name: '', progress_value: '', notes: '' });
       await loadHabitEntries();
@@ -1817,6 +1855,7 @@ export default function HealthcareScreen() {
   const handleProfileSelect = useCallback(
     async (profileId: string) => {
       const res = await setActiveMedicalProfile(profileId);
+      if (!res) return;
       if (res.success) {
         loadContext();
         return;
@@ -2006,10 +2045,21 @@ export default function HealthcareScreen() {
     setEmergencyMode((prev) => !prev);
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.allSettled([loadContext(), loadTeleSessions(), loadPatientRecords()]);
+    setRefreshing(false);
+  }, [loadContext, loadTeleSessions, loadPatientRecords]);
+
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
     <ScrollView
       style={[styles.container, { backgroundColor: palette.bg }]}
-      contentContainerStyle={{ paddingBottom: 48 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: insets.top }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.primary} colors={[palette.primary]} />}
     >
       <GlobalShell
         organizations={medicalContext?.organizations ?? []}
@@ -2758,7 +2808,7 @@ export default function HealthcareScreen() {
                       User {grant.granted_to}
                     </Text>
                     {grant.status === 'active' && (
-                      <Pressable onPress={() => handleRevokeAccessGrant(grant.id)} style={{ marginTop: 2 }}>
+                      <Pressable onPress={() => handleRevokeAccessGrant(grant.id)} hitSlop={10} style={{ marginTop: 2 }}>
                         <Text style={{ color: palette.primaryStrong, fontSize: 11, fontWeight: '800' }}>Revoke</Text>
                       </Pressable>
                     )}
@@ -3986,10 +4036,11 @@ export default function HealthcareScreen() {
         </View>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const makeStyles = (tokens: typeof KIS_TOKENS) =>
+const makeStyles = (tokens: typeof KIS_TOKENS, gutter = 16, dividerColor: string) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -3998,7 +4049,7 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       borderWidth: 2,
       borderRadius: tokens.radius.xl,
       padding: tokens.spacing.lg,
-      marginHorizontal: tokens.spacing.lg,
+      marginHorizontal: gutter,
       marginTop: tokens.spacing.md,
       gap: tokens.spacing.sm,
     },
@@ -4116,7 +4167,7 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       borderRadius: tokens.radius.md,
       paddingHorizontal: tokens.spacing.sm,
       paddingVertical: tokens.spacing.sm,
-      borderColor: '#ccc',
+      borderColor: dividerColor,
     },
     textArea: {
       minHeight: 60,

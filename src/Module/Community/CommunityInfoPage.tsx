@@ -438,13 +438,13 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
               style={({ pressed }) => [
                 styles.editButton,
                 {
-                  backgroundColor: palette.primary ?? '#2E7D32',
+                  backgroundColor: palette.primary,
                   opacity: pressed || saving ? 0.7 : 1,
                 },
               ]}
             >
-              <KISIcon name="camera" size={16} color={palette.onPrimary ?? '#fff'} />
-              <Text style={[styles.editButtonText, { color: palette.onPrimary ?? '#fff' }]}>
+              <KISIcon name="camera" size={16} color={palette.onPrimary} />
+              <Text style={[styles.editButtonText, { color: palette.onPrimary }]}>
                 {saving ? 'Updating...' : 'Change community photo'}
               </Text>
             </Pressable>
@@ -529,7 +529,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                     hitSlop={8}
                     style={styles.memberActionBtn}
                   >
-                    <KISIcon name="trash" size={18} color={palette.danger ?? '#d9534f'} />
+                    <KISIcon name="trash" size={18} color={palette.danger} />
                   </Pressable>
                 </View>
               ))
@@ -554,7 +554,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                     onPress={() => { Clipboard.setString(inviteLink); Alert.alert('Copied', 'Invite link copied.'); }}
                     style={({ pressed }) => [styles.inviteLinkBtn, { backgroundColor: palette.primary, opacity: pressed ? 0.7 : 1 }]}
                   >
-                    <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>Copy</Text>
+                    <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>Copy</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => Share.share({ message: inviteLink }).catch(() => {})}
@@ -575,7 +575,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                 onPress={handleFetchInviteLink}
                 style={({ pressed }) => [styles.inviteLinkBtn, { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading ? 0.7 : 1 }]}
               >
-                <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>
                   {inviteLinkLoading ? 'Loading...' : 'Generate invite link'}
                 </Text>
               </Pressable>
@@ -592,12 +592,12 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                 styles.leaveButton,
                 {
                   backgroundColor: pressed ? (palette.dangerSoft ?? '#ffeaea') : 'transparent',
-                  borderColor: palette.danger ?? '#d9534f',
+                  borderColor: palette.danger,
                 },
               ]}
             >
-              <KISIcon name="arrow-left" size={16} color={palette.danger ?? '#d9534f'} />
-              <Text style={[styles.leaveButtonText, { color: palette.danger ?? '#d9534f' }]}>
+              <KISIcon name="arrow-left" size={16} color={palette.danger} />
+              <Text style={[styles.leaveButtonText, { color: palette.danger }]}>
                 Leave community
               </Text>
             </Pressable>

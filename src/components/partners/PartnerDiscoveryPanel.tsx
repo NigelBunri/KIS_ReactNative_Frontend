@@ -289,7 +289,7 @@ export default function PartnerDiscoveryPanel({
                 {redeemLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={{ color: palette.buttonText ?? '#fff', fontWeight: '700', fontSize: 13 }}>
+                  <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>
                     Join
                   </Text>
                 )}

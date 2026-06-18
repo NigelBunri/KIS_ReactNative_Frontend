@@ -39,6 +39,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { useLiveStream } from './hooks/useLiveStream';
 import LiveChatPanel from './components/LiveChatPanel';
+import SuperChatPanel from './components/SuperChatPanel';
 import LivePollsPanel from './LivePollsPanel';
 import LiveQAPanel from './LiveQAPanel';
 import SubscribeBellButton from './components/SubscribeBellButton';
@@ -80,7 +81,7 @@ function FloatingReactions({ reactions }: { reactions: FloatingEmoji[] }) {
         <Animated.Text
           key={r.id}
           style={[
-            styles.floatingEmoji,
+            { position: 'absolute', bottom: 0, fontSize: 28 },
             {
               left: r.x,
               transform: [
@@ -113,12 +114,14 @@ function ScheduledOverlay({
   channelName,
   thumb,
   palette,
+  styles,
 }: {
   title: string;
   countdown: string;
   channelName?: string;
   thumb?: string;
   palette: any;
+  styles: any;
 }) {
   return (
     <View style={StyleSheet.absoluteFillObject}>
@@ -126,7 +129,7 @@ function ScheduledOverlay({
         <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
       ) : (
         <LinearGradient
-          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          colors={[palette.royalInk, palette.royalInk, palette.surfaceElevated ?? palette.royalInk]}
           style={StyleSheet.absoluteFillObject}
         />
       )}
@@ -137,7 +140,7 @@ function ScheduledOverlay({
         ) : null}
         <Text style={styles.scheduledTitle}>{title}</Text>
         <View style={styles.countdownBox}>
-          <KISIcon name="call-history" size={16} color="#fff" />
+          <KISIcon name="call-history" size={16} color={palette.ivory} />
           <Text style={styles.countdownLabel}>Starting in</Text>
           <Text style={styles.countdownTime}>{countdown || '--:--'}</Text>
         </View>
@@ -149,22 +152,24 @@ function ScheduledOverlay({
 function EndedOverlay({
   title,
   palette,
+  styles,
   onPlayReplay,
 }: {
   title: string;
   palette: any;
+  styles: any;
   onPlayReplay: () => void;
 }) {
   return (
     <View style={[styles.endedOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-      <KISIcon name="video" size={40} color="#fff" />
+      <KISIcon name="video" size={40} color={palette.ivory} />
       <Text style={styles.endedTitle}>{title}</Text>
       <Text style={styles.endedSub}>This stream has ended</Text>
       <Pressable
         onPress={onPlayReplay}
         style={[styles.replayBtn, { backgroundColor: palette.primary }]}
       >
-        <KISIcon name="play" size={16} color="#fff" />
+        <KISIcon name="play" size={16} color={palette.onPrimary} />
         <Text style={styles.replayBtnText}>Watch Replay</Text>
       </Pressable>
     </View>
@@ -180,6 +185,7 @@ export default function LiveWatchPage() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'LiveWatch'>>();
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
 
@@ -204,6 +210,7 @@ export default function LiveWatchPage() {
   const [showReplay,    setShowReplay]    = useState(false);
   const [chatOpen,      setChatOpen]      = useState(true);
   const [activePanel,   setActivePanel]   = useState<'chat' | 'polls' | 'qa'>('chat');
+  const [superChatOpen, setSuperChatOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -251,9 +258,9 @@ export default function LiveWatchPage() {
   // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
     return (
-      <View style={[styles.centered, { backgroundColor: '#000' }]}>
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <ActivityIndicator color="#fff" size="large" />
+      <View style={[styles.centered, { backgroundColor: palette.royalInk }]}>
+        <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} />
+        <ActivityIndicator color={palette.ivory} size="large" />
       </View>
     );
   }
@@ -265,7 +272,7 @@ export default function LiveWatchPage() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+      <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} translucent />
 
       {/* ── Video / background layer ── */}
       <Pressable style={StyleSheet.absoluteFillObject} onPress={showControls}>
@@ -294,6 +301,7 @@ export default function LiveWatchPage() {
             channelName={stream?.channel?.display_name}
             thumb={thumb || undefined}
             palette={palette}
+            styles={styles}
           />
         ) : (
           /* Fallback / failed / ended-not-playing thumbnail */
@@ -302,7 +310,7 @@ export default function LiveWatchPage() {
               <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
             ) : (
               <LinearGradient
-                colors={['#0d0d0d', '#1a1a1a']}
+                colors={[palette.royalInk, palette.royalInk]}
                 style={StyleSheet.absoluteFillObject}
               />
             )}
@@ -313,14 +321,14 @@ export default function LiveWatchPage() {
         {/* Buffering spinner */}
         {buffering && !videoError && (
           <View style={styles.bufferWrap} pointerEvents="none">
-            <ActivityIndicator color="#fff" size="large" />
+            <ActivityIndicator color={palette.ivory} size="large" />
           </View>
         )}
 
         {/* Video error */}
         {videoError && (
           <View style={styles.bufferWrap} pointerEvents="none">
-            <KISIcon name="warning" size={32} color="#fff" />
+            <KISIcon name="warning" size={32} color={palette.ivory} />
             <Text style={styles.errorText}>{videoError}</Text>
           </View>
         )}
@@ -330,6 +338,7 @@ export default function LiveWatchPage() {
           <EndedOverlay
             title={stream?.title ?? 'Stream ended'}
             palette={palette}
+            styles={styles}
             onPlayReplay={() => setShowReplay(true)}
           />
         )}
@@ -337,7 +346,7 @@ export default function LiveWatchPage() {
         {/* Failed / cancelled */}
         {isFailed && (
           <View style={styles.bufferWrap} pointerEvents="none">
-            <KISIcon name="warning" size={36} color="#EF4444" />
+            <KISIcon name="warning" size={36} color={palette.danger} />
             <Text style={styles.errorText}>Stream unavailable</Text>
           </View>
         )}
@@ -365,7 +374,7 @@ export default function LiveWatchPage() {
         <View style={styles.topRow}>
           {/* Back */}
           <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12}>
-            <KISIcon name="arrow-left" size={20} color="#fff" />
+            <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
 
           {/* Title + status */}
@@ -376,7 +385,7 @@ export default function LiveWatchPage() {
               </View>
             )}
             {isEnded && showReplay && (
-              <View style={[styles.liveBadge, { backgroundColor: '#374151' }]}>
+              <View style={[styles.liveBadge, { backgroundColor: palette.surface }]}>
                 <Text style={styles.liveBadgeText}>REPLAY</Text>
               </View>
             )}
@@ -388,7 +397,7 @@ export default function LiveWatchPage() {
           {/* Viewer count */}
           {(isLive || isEnded) && (
             <View style={styles.viewerPill}>
-              <KISIcon name="people" size={12} color="#fff" />
+              <KISIcon name="people" size={12} color={palette.ivory} />
               <Text style={styles.viewerText}>
                 {viewerCount.toLocaleString()}
               </Text>
@@ -398,7 +407,7 @@ export default function LiveWatchPage() {
           {/* Slow mode badge */}
           {isLive && slowModeSecs > 0 && (
             <View style={styles.slowModePill}>
-              <KISIcon name="call-history" size={11} color="#fbbf24" />
+              <KISIcon name="call-history" size={11} color={palette.gold} />
               <Text style={styles.slowModeText}>Slow {slowModeSecs}s</Text>
             </View>
           )}
@@ -406,7 +415,7 @@ export default function LiveWatchPage() {
           {/* Members-only badge */}
           {isLive && membersOnly && (
             <View style={styles.membersOnlyPill}>
-              <KISIcon name="people" size={11} color="#a78bfa" />
+              <KISIcon name="people" size={11} color={palette.primaryStrong} />
               <Text style={styles.membersOnlyText}>Members</Text>
             </View>
           )}
@@ -422,7 +431,7 @@ export default function LiveWatchPage() {
         >
           {paused ? (
             <View style={styles.playPauseCircle}>
-              <KISIcon name="play" size={32} color="#fff" />
+              <KISIcon name="play" size={32} color={palette.ivory} />
             </View>
           ) : null}
         </Pressable>
@@ -437,9 +446,15 @@ export default function LiveWatchPage() {
         pointerEvents="box-none"
       >
         <Pressable style={styles.actionBtn} onPress={handleShare}>
-          <KISIcon name="share" size={22} color="#fff" />
+          <KISIcon name="share" size={22} color={palette.ivory} />
           <Text style={styles.actionLabel}>Share</Text>
         </Pressable>
+        {isLive && streamId ? (
+          <Pressable style={styles.actionBtn} onPress={() => setSuperChatOpen(true)}>
+            <KISIcon name="star" size={22} color={palette.gold} />
+            <Text style={[styles.actionLabel, { color: palette.gold }]}>Super Chat</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* ── Bottom overlay: reactions + subscribe ── */}
@@ -466,7 +481,7 @@ export default function LiveWatchPage() {
                 />
               ) : (
                 <View style={[styles.channelAvatar, { backgroundColor: palette.primary }]}>
-                  <KISIcon name="broadcast" size={14} color="#fff" />
+                  <KISIcon name="broadcast" size={14} color={palette.onPrimary} />
                 </View>
               )}
               <Text style={styles.channelName} numberOfLines={1}>
@@ -516,7 +531,7 @@ export default function LiveWatchPage() {
           ]}
           pointerEvents="none"
         >
-          <KISIcon name="pin" size={13} color="#fbbf24" />
+          <KISIcon name="pin" size={13} color={palette.gold} />
           <View style={{ flex: 1 }}>
             <Text style={styles.pinnedLabel}>Pinned message</Text>
             <Text style={styles.pinnedText} numberOfLines={2}>{pinnedMessage.text}</Text>
@@ -545,12 +560,12 @@ export default function LiveWatchPage() {
                 <KISIcon
                   name={tab.icon}
                   size={13}
-                  color={activePanel === tab.key ? palette.primaryStrong : 'rgba(255,255,255,0.6)'}
+                  color={activePanel === tab.key ? palette.primaryStrong : palette.divider}
                 />
                 <Text
                   style={[
                     styles.panelTabLabel,
-                    { color: activePanel === tab.key ? palette.primaryStrong : 'rgba(255,255,255,0.6)' },
+                    { color: activePanel === tab.key ? palette.primaryStrong : palette.divider },
                   ]}
                 >
                   {tab.label}
@@ -590,16 +605,26 @@ export default function LiveWatchPage() {
           ) : null}
         </View>
       )}
+
+      {/* ── Super Chat modal ── */}
+      {streamId ? (
+        <SuperChatPanel
+          streamId={streamId}
+          visible={superChatOpen}
+          onClose={() => setSuperChatOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+function makeStyles(p: any) {
+  return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: p.royalInk,
   },
   centered: {
     flex: 1,
@@ -628,26 +653,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   topTitle: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 14,
     fontWeight: '800',
     flex: 1,
   },
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.42)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   liveBadge: {
-    backgroundColor: '#C0262D',
+    backgroundColor: p.danger,
     borderRadius: 5,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  liveBadgeText: { color: p.onPrimary, fontSize: 10, fontWeight: '900' },
   viewerPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -657,7 +682,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  viewerText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  viewerText: { color: p.ivory, fontSize: 11, fontWeight: '700' },
 
   bottomOverlay: {
     position: 'absolute',
@@ -688,13 +713,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   channelName: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 13,
     fontWeight: '800',
     flex: 1,
   },
   bottomTitle: {
-    color: 'rgba(255,255,255,0.85)',
+    color: p.divider ?? p.ivory,
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 17,
@@ -719,7 +744,7 @@ const styles = StyleSheet.create({
     gap: 18,
   },
   actionBtn: { alignItems: 'center', gap: 4 },
-  actionLabel: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  actionLabel: { color: p.ivory, fontSize: 10, fontWeight: '700' },
 
   // play/pause center
   playPauseCenter: {
@@ -745,7 +770,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   errorText: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -771,7 +796,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   scheduledChannel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: p.divider ?? p.ivory,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 8,
@@ -779,7 +804,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   scheduledTitle: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
@@ -789,20 +814,20 @@ const styles = StyleSheet.create({
   countdownBox: {
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: p.primarySoft ?? p.surface,
     borderRadius: 16,
     paddingHorizontal: 28,
     paddingVertical: 18,
   },
   countdownLabel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: p.divider ?? p.ivory,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   countdownTime: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 42,
     fontWeight: '900',
     letterSpacing: 2,
@@ -816,14 +841,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   endedTitle: {
-    color: '#fff',
+    color: p.ivory,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
     paddingHorizontal: 32,
   },
   endedSub: {
-    color: 'rgba(255,255,255,0.6)',
+    color: p.divider ?? p.ivory,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -836,33 +861,33 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 8,
   },
-  replayBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  replayBtnText: { color: p.onPrimary, fontSize: 14, fontWeight: '900' },
 
   slowModePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(251,191,36,0.18)',
+    backgroundColor: p.primaryWeak ?? p.primarySoft,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.4)',
+    borderColor: p.gold,
   },
-  slowModeText: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
+  slowModeText: { color: p.gold, fontSize: 10, fontWeight: '800' },
 
   membersOnlyPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(167,139,250,0.18)',
+    backgroundColor: p.primarySoft,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(167,139,250,0.4)',
+    borderColor: p.primaryStrong,
   },
-  membersOnlyText: { color: '#a78bfa', fontSize: 10, fontWeight: '800' },
+  membersOnlyText: { color: p.primaryStrong, fontSize: 10, fontWeight: '800' },
 
   pinnedBanner: {
     position: 'absolute',
@@ -876,10 +901,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderLeftWidth: 3,
-    borderLeftColor: '#fbbf24',
+    borderLeftColor: p.gold,
   },
-  pinnedLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '900', marginBottom: 2 },
-  pinnedText: { color: '#fff', fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  pinnedLabel: { color: p.gold, fontSize: 10, fontWeight: '900', marginBottom: 2 },
+  pinnedText: { color: p.ivory, fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
   // bottom panel tabs
   bottomPanelWrap: {
@@ -906,7 +931,7 @@ const styles = StyleSheet.create({
   },
   panelTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#c9a84c',
+    borderBottomColor: p.gold,
   },
   panelTabLabel: {
     fontSize: 11,
@@ -917,4 +942,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     maxHeight: 340,
   },
-});
+  });
+}

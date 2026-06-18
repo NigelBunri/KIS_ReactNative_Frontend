@@ -437,7 +437,7 @@ export default function FeedComposerSheet({
               >
                 <Text
                   style={{
-                    color: palette.onPrimary ?? '#fff',
+                    color: palette.onPrimary,
                     fontWeight: '900',
                   }}
                 >

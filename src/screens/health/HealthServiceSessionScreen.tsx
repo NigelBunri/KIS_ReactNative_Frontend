@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -109,6 +111,7 @@ import {
   HEALTH_THEME_SPACING,
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
+import { useKISTheme } from '@/theme/useTheme';
 import { RootStackParamList } from '@/navigation/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -654,6 +657,7 @@ export default function HealthServiceSessionScreen({
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const spacing = HEALTH_THEME_SPACING;
   const borders = getHealthThemeBorders(palette);
+  const { palette: kisPalette } = useKISTheme();
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const initialSessionSource: 'broadcasts' | 'health_ops' =
@@ -4033,11 +4037,12 @@ export default function HealthServiceSessionScreen({
   }, [cleanBookingId]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{
             padding: spacing.lg,
@@ -4067,6 +4072,7 @@ export default function HealthServiceSessionScreen({
             </View>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
                 borderWidth: 1,
                 borderColor: palette.divider,
@@ -4311,14 +4317,14 @@ export default function HealthServiceSessionScreen({
                       borderColor: isActive
                         ? `${palette.accentPrimary}AA`
                         : isExpired
-                        ? '#D64B4B'
+                        ? kisPalette.danger
                         : isPassed
                         ? `${palette.accentPrimary}55`
                         : palette.divider,
                       backgroundColor: isActive
                         ? `${palette.accentPrimary}20`
                         : isExpired
-                        ? 'rgba(214, 75, 75, 0.14)'
+                        ? `${kisPalette.danger}24`
                         : isPassed
                         ? `${palette.accentPrimary}12`
                         : palette.surface,
@@ -4480,7 +4486,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -4641,7 +4647,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -4682,75 +4688,106 @@ export default function HealthServiceSessionScreen({
                     const isCompleted =
                       !!videoStepState?.[step.key]?.is_completed;
                     return (
-                      <View
-                        key={step.key}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: isCompleted
-                            ? `${palette.accentPrimary}66`
-                            : palette.divider,
-                          borderRadius: 12,
-                          padding: spacing.sm,
-                          backgroundColor: isCompleted
-                            ? `${palette.accentPrimary}11`
-                            : palette.surface,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                        }}
-                      >
+                      <React.Fragment key={step.key}>
                         <View
                           style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 14,
+                            borderWidth: 1,
+                            borderColor: isCompleted
+                              ? `${palette.accentPrimary}66`
+                              : palette.divider,
+                            borderRadius: 12,
+                            padding: spacing.sm,
                             backgroundColor: isCompleted
-                              ? `${palette.accentPrimary}33`
-                              : `${palette.subtext}22`,
+                              ? `${palette.accentPrimary}11`
+                              : palette.surface,
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            justifyContent: 'center',
                           }}
                         >
-                          <KISIcon
-                            name={step.icon}
-                            size={14}
-                            color={
-                              isCompleted
-                                ? palette.accentPrimary
-                                : palette.subtext
-                            }
-                          />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                          <Text
-                            style={{ ...typography.label, color: palette.text }}
-                          >
-                            {step.label}
-                          </Text>
-                          <Text
+                          <View
                             style={{
-                              ...typography.caption,
-                              color: palette.subtext,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              backgroundColor: isCompleted
+                                ? `${palette.accentPrimary}33`
+                                : `${palette.subtext}22`,
+                              alignItems: 'center',
+                              justifyContent: 'center',
                             }}
                           >
-                            {step.subtitle}
-                          </Text>
+                            <KISIcon
+                              name={step.icon}
+                              size={14}
+                              color={
+                                isCompleted
+                                  ? palette.accentPrimary
+                                  : palette.subtext
+                              }
+                            />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                            <Text
+                              style={{ ...typography.label, color: palette.text }}
+                            >
+                              {step.label}
+                            </Text>
+                            <Text
+                              style={{
+                                ...typography.caption,
+                                color: palette.subtext,
+                              }}
+                            >
+                              {step.subtitle}
+                            </Text>
+                          </View>
+                          {step.key !== 'confirm_consent' || isCompleted ? (
+                            <KISButton
+                              title={isCompleted ? 'Done' : 'Mark Done'}
+                              size="xs"
+                              variant={isCompleted ? 'outline' : 'primary'}
+                              onPress={() => {
+                                completeVideoStep(step.key).catch(() => undefined);
+                              }}
+                              disabled={
+                                videoBusy ||
+                                videoLoading ||
+                                !videoSessionId ||
+                                isCompleted ||
+                                videoStatus === 'cancelled'
+                              }
+                            />
+                          ) : null}
                         </View>
-                        <KISButton
-                          title={isCompleted ? 'Done' : 'Mark Done'}
-                          size="xs"
-                          variant={isCompleted ? 'outline' : 'primary'}
-                          onPress={() => {
-                            completeVideoStep(step.key).catch(() => undefined);
-                          }}
-                          disabled={
-                            videoBusy ||
-                            videoLoading ||
-                            !videoSessionId ||
-                            isCompleted ||
-                            videoStatus === 'cancelled'
-                          }
-                        />
-                      </View>
+                        {step.key === 'confirm_consent' && !isCompleted ? (
+                          <View style={{ padding: 16, gap: 12, borderWidth: 1, borderColor: palette.divider, borderRadius: 12, backgroundColor: palette.surface }}>
+                            <Text style={{ ...typography.body, color: palette.text, fontWeight: '600' }}>
+                              Telemedicine Consent
+                            </Text>
+                            <Text style={{ color: palette.subtext, lineHeight: 22 }}>
+                              By proceeding, you consent to receive telemedicine services via secure video.
+                              Your session will be encrypted and no recordings will be made without your explicit permission.
+                              You may end the session at any time.
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => completeVideoStep(step.key).catch(() => undefined)}
+                              disabled={videoBusy || videoLoading || !videoSessionId || videoStatus === 'cancelled'}
+                              style={{
+                                backgroundColor: palette.primary,
+                                borderRadius: 8,
+                                padding: 14,
+                                alignItems: 'center',
+                                marginTop: 8,
+                                opacity: (videoBusy || videoLoading || !videoSessionId || videoStatus === 'cancelled') ? 0.5 : 1,
+                              }}
+                            >
+                              <Text style={{ color: palette.text, fontWeight: '600' }}>
+                                I Agree — Continue
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : null}
+                      </React.Fragment>
                     );
                   })}
                 </View>
@@ -4780,7 +4817,7 @@ export default function HealthServiceSessionScreen({
                   </View>
 
                   {videoItemsError ? (
-                    <Text style={{ ...typography.caption, color: '#EF4444' }}>
+                    <Text style={{ ...typography.caption, color: kisPalette.danger }}>
                       {videoItemsError}
                     </Text>
                   ) : null}
@@ -5093,7 +5130,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -5502,7 +5539,7 @@ export default function HealthServiceSessionScreen({
                         <Text
                           style={{
                             ...typography.caption,
-                            color: '#EF4444',
+                            color: kisPalette.danger,
                             marginTop: spacing.xs,
                           }}
                         >
@@ -5744,7 +5781,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -6020,7 +6057,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -6344,7 +6381,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -6707,7 +6744,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -6960,7 +6997,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -7300,7 +7337,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -7642,7 +7679,7 @@ export default function HealthServiceSessionScreen({
                 <Text
                   style={{
                     ...typography.caption,
-                    color: '#EF4444',
+                    color: kisPalette.danger,
                     marginTop: spacing.xs,
                   }}
                 >
@@ -7908,6 +7945,7 @@ export default function HealthServiceSessionScreen({
             </View>
           ) : null}
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );

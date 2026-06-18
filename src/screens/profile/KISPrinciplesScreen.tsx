@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type PrincipleCard = {
   key: string;
@@ -110,9 +111,10 @@ export default function KISPrinciplesScreen() {
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
   const isDark = tone === 'dark';
 
-  const styles = useMemo(() => createStyles(palette, isDark), [palette, isDark]);
+  const styles = useMemo(() => createStyles(palette, isDark, responsive), [palette, isDark, responsive]);
 
   return (
     <View style={[styles.root, { paddingTop: Math.max(insets.top, 12) }]}>
@@ -152,8 +154,8 @@ export default function KISPrinciplesScreen() {
             <KISIcon name="shield" size={18} color={palette.goldHighlight} />
           </View>
           <View style={{ flex: 1, gap: 4 }}>
-            <Text style={styles.warningTitle}>Pornography is not allowed anywhere on KIS.</Text>
-            <Text style={styles.warningBody}>
+            <Text style={[styles.warningTitle, { color: palette.surface }]}>Pornography is not allowed anywhere on KIS.</Text>
+            <Text style={[styles.warningBody, { color: palette.surface }]}>
               This applies to uploads, DMs, channels, comments, groups, live
               streams, profile media, shop media, education, health, partner
               spaces, documents, links, and embeds.
@@ -218,26 +220,33 @@ export default function KISPrinciplesScreen() {
   );
 }
 
-const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark: boolean) =>
+const createStyles = (
+  palette: ReturnType<typeof useKISTheme>['palette'],
+  isDark: boolean,
+  responsive: ReturnType<typeof useResponsiveLayout>,
+) =>
   StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: isDark ? palette.bg : '#FFFFFF',
+      backgroundColor: palette.bg,
     },
     scroll: {
       flex: 1,
     },
     content: {
-      padding: 18,
-      gap: 18,
+      padding: responsive.pageGutter,
+      gap: responsive.cardGap,
+      width: '100%',
+      maxWidth: responsive.contentMaxWidth,
+      alignSelf: 'center',
     },
     hero: {
       borderRadius: 28,
       padding: 22,
       gap: 12,
-      backgroundColor: isDark ? '#15101F' : '#FFF8EA',
+      backgroundColor: isDark ? palette.royalInk : palette.surface,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(231,199,109,0.34)' : '#D9A875',
+      borderColor: palette.goldBorder,
       shadowColor: palette.shadow,
       shadowOpacity: isDark ? 0.28 : 0.12,
       shadowRadius: 22,
@@ -250,8 +259,8 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       alignItems: 'center',
     },
     backButton: {
-      width: 42,
-      height: 42,
+      width: responsive.minTouchTarget,
+      height: responsive.minTouchTarget,
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
@@ -278,8 +287,8 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
     },
     heroTitle: {
       color: palette.text,
-      fontSize: 32,
-      lineHeight: 38,
+      fontSize: Math.max(responsive.headerTitleSize, 26),
+      lineHeight: Math.max(responsive.headerTitleSize, 26) * 1.18,
       fontWeight: '900',
     },
     heroBody: {
@@ -294,7 +303,7 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       alignItems: 'flex-start',
       padding: 16,
       borderRadius: 22,
-      backgroundColor: isDark ? '#241329' : '#4B2F2A',
+      backgroundColor: palette.royalInk,
       borderWidth: 1,
       borderColor: palette.goldDeep,
     },
@@ -304,15 +313,13 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(255,244,184,0.16)',
+      backgroundColor: palette.goldSoft,
     },
     warningTitle: {
-      color: '#FFF8EA',
       fontSize: 16,
       fontWeight: '900',
     },
     warningBody: {
-      color: '#F4DDBD',
       fontSize: 13,
       lineHeight: 20,
       fontWeight: '600',
@@ -339,7 +346,7 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       gap: 8,
       backgroundColor: palette.surface,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(231,199,109,0.30)' : '#E7C7A1',
+      borderColor: palette.goldBorder,
     },
     principleIcon: {
       width: 38,
@@ -366,7 +373,7 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       gap: 10,
       backgroundColor: palette.surface,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(231,199,109,0.30)' : '#E7C7A1',
+      borderColor: palette.goldBorder,
     },
     ruleTitle: {
       color: palette.text,
@@ -410,9 +417,9 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       minWidth: 145,
       padding: 14,
       borderRadius: 18,
-      backgroundColor: isDark ? 'rgba(231,199,109,0.10)' : '#FFF2C7',
+      backgroundColor: palette.goldHighlight,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(231,199,109,0.32)' : '#D9A875',
+      borderColor: palette.goldBorder,
       gap: 5,
     },
     ageLabel: {
@@ -433,7 +440,7 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], isDark
       borderRadius: 20,
       backgroundColor: palette.surface,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(231,199,109,0.30)' : '#E7C7A1',
+      borderColor: palette.goldBorder,
     },
     footerText: {
       flex: 1,

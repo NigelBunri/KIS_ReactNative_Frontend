@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { resolveBackendAssetUrl } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
@@ -134,12 +135,13 @@ export default function BroadcastDetailScreen() {
   });
   const [broadcastItem, setBroadcastItem] = useState<any | null>(initialItem);
   const [refreshingTop, setRefreshingTop] = useState(false);
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(!initialItem && !!(route.params?.id));
   const [error, setError] = useState<string | null>(
-    initialItem
+    initialItem || route.params?.id
       ? null
       : 'Broadcast details are only available when navigating from the feed list.',
   );
+  const [fetchRetryCount, setFetchRetryCount] = useState(0);
 
   const normalizedChannelContentId = getChannelContentId(broadcastItem);
 
@@ -151,6 +153,41 @@ export default function BroadcastDetailScreen() {
       channel: broadcastItem.channel || broadcastItem.source || null,
     });
   }, [broadcastItem, navigation, normalizedChannelContentId]);
+
+  // Fetch broadcast by ID when navigated via deep link / push notification (no item param)
+  const deepLinkId = route.params?.id;
+  useEffect(() => {
+    if (initialItem || !deepLinkId) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    // Prefer the NestJS feeds detail endpoint; fall back to Django broadcasts list for legacy deep links.
+    const detailUrl: string = typeof (ROUTES.feeds?.detail) === 'function'
+      ? (ROUTES.feeds.detail as (id: string) => string)(deepLinkId)
+      : `${ROUTES.broadcasts.list}${deepLinkId}/`;
+    getRequest(detailUrl, {
+      errorMessage: 'Unable to load broadcast.',
+    })
+      .then((res) => {
+        if (!active) return;
+        const data = res?.data ?? res;
+        if (data && typeof data === 'object' && data.id) {
+          setBroadcastItem(data);
+          setFeedItems([data]);
+          setError(null);
+        } else {
+          setError('Broadcast not found.');
+        }
+      })
+      .catch(() => {
+        if (active) setError('Failed to load broadcast. Tap retry to try again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [initialItem, deepLinkId, fetchRetryCount]);
+
   const broadcastId = broadcastItem?.id ?? route.params?.id;
   const reactionCount = Number(
     broadcastItem?.reaction_count ?? broadcastItem?.engagement?.reactions ?? 0,
@@ -551,16 +588,24 @@ export default function BroadcastDetailScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: palette.bg }]}>
         <Text style={[styles.error, { color: palette.text }]}>{error}</Text>
-        <Pressable
-          onPress={() =>
-            setError(
-              'Broadcast details are only available when navigating from the feed list.',
-            )
-          }
-          style={styles.retryButton}
-        >
-          <Text style={styles.retryText}>Retry</Text>
-        </Pressable>
+        {deepLinkId ? (
+          <Pressable
+            onPress={() => {
+              setError(null);
+              setFetchRetryCount(c => c + 1);
+            }}
+            style={[styles.retryButton, { backgroundColor: palette.surface }]}
+          >
+            <Text style={[styles.retryText, { color: palette.text }]}>Retry</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={[styles.retryButton, { backgroundColor: palette.surface }]}
+          >
+            <Text style={[styles.retryText, { color: palette.text }]}>Go back</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -575,7 +620,7 @@ export default function BroadcastDetailScreen() {
     );
   }
 
-  const mutedActionColor = 'rgba(255,255,255,0.82)';
+  const mutedActionColor = palette.ivory;
   const nextPreviewTitle = getFeedTitle(nextFeedItem);
   const nextPreviewSource = getFeedSource(nextFeedItem);
   const nextPreviewBody = getFeedBody(nextFeedItem);
@@ -587,7 +632,7 @@ export default function BroadcastDetailScreen() {
 
   return (
     <View
-      style={[styles.fullscreen, { backgroundColor: '#050505' }]}
+      style={[styles.fullscreen, { backgroundColor: palette.royalInk }]}
       {...feedSwipeResponder.panHandlers}
     >
       {previousFeedItem ? (
@@ -595,6 +640,7 @@ export default function BroadcastDetailScreen() {
           pointerEvents="none"
           style={[
             styles.pageFrame,
+            { backgroundColor: palette.royalInk },
             {
               transform: [{ translateY: Animated.add(swipeY, -screenHeight) }],
             },
@@ -604,12 +650,12 @@ export default function BroadcastDetailScreen() {
             {previousPreviewUrl ? (
               <Image
                 source={{ uri: previousPreviewUrl }}
-                style={styles.fullMedia}
+                style={[styles.fullMedia, { backgroundColor: palette.royalInk }]}
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.textOnlyVisual}>
-                <Text style={styles.textOnlyTitle} numberOfLines={5}>
+              <View style={[styles.textOnlyVisual, { backgroundColor: palette.royalInk }]}>
+                <Text style={[styles.textOnlyTitle, { color: palette.ivory }]} numberOfLines={5}>
                   {previousPreviewTitle}
                 </Text>
               </View>
@@ -619,13 +665,13 @@ export default function BroadcastDetailScreen() {
           <View style={styles.scrimBottom} pointerEvents="none" />
           <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
             <View style={styles.backButton}>
-              <KISIcon name="arrow-left" size={22} color="#fff" />
+              <KISIcon name="arrow-left" size={22} color={palette.ivory} />
             </View>
             <View style={styles.titleBlock}>
-              <Text style={styles.heading} numberOfLines={1}>
+              <Text style={[styles.heading, { color: palette.ivory }]} numberOfLines={1}>
                 {previousPreviewTitle}
               </Text>
-              <Text style={styles.sourceName} numberOfLines={1}>
+              <Text style={[styles.sourceName, { color: palette.ivory }]} numberOfLines={1}>
                 {previousPreviewSource}
               </Text>
             </View>
@@ -639,7 +685,7 @@ export default function BroadcastDetailScreen() {
               },
             ]}
           >
-            <Text style={styles.body} numberOfLines={5}>
+            <Text style={[styles.body, { color: palette.ivory }]} numberOfLines={5}>
               {previousPreviewBody || previousPreviewTitle}
             </Text>
           </View>
@@ -651,6 +697,7 @@ export default function BroadcastDetailScreen() {
           pointerEvents="none"
           style={[
             styles.pageFrame,
+            { backgroundColor: palette.royalInk },
             {
               transform: [{ translateY: Animated.add(swipeY, screenHeight) }],
             },
@@ -660,12 +707,12 @@ export default function BroadcastDetailScreen() {
             {nextPreviewUrl ? (
               <Image
                 source={{ uri: nextPreviewUrl }}
-                style={styles.fullMedia}
+                style={[styles.fullMedia, { backgroundColor: palette.royalInk }]}
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.textOnlyVisual}>
-                <Text style={styles.textOnlyTitle} numberOfLines={5}>
+              <View style={[styles.textOnlyVisual, { backgroundColor: palette.royalInk }]}>
+                <Text style={[styles.textOnlyTitle, { color: palette.ivory }]} numberOfLines={5}>
                   {nextPreviewTitle}
                 </Text>
               </View>
@@ -675,13 +722,13 @@ export default function BroadcastDetailScreen() {
           <View style={styles.scrimBottom} pointerEvents="none" />
           <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
             <View style={styles.backButton}>
-              <KISIcon name="arrow-left" size={22} color="#fff" />
+              <KISIcon name="arrow-left" size={22} color={palette.ivory} />
             </View>
             <View style={styles.titleBlock}>
-              <Text style={styles.heading} numberOfLines={1}>
+              <Text style={[styles.heading, { color: palette.ivory }]} numberOfLines={1}>
                 {nextPreviewTitle}
               </Text>
-              <Text style={styles.sourceName} numberOfLines={1}>
+              <Text style={[styles.sourceName, { color: palette.ivory }]} numberOfLines={1}>
                 {nextPreviewSource}
               </Text>
             </View>
@@ -695,7 +742,7 @@ export default function BroadcastDetailScreen() {
               },
             ]}
           >
-            <Text style={styles.body} numberOfLines={5}>
+            <Text style={[styles.body, { color: palette.ivory }]} numberOfLines={5}>
               {nextPreviewBody || nextPreviewTitle}
             </Text>
           </View>
@@ -705,6 +752,7 @@ export default function BroadcastDetailScreen() {
       <Animated.View
         style={[
           styles.pageFrame,
+          { backgroundColor: palette.royalInk },
           {
             transform: [{ translateY: swipeY }],
           },
@@ -722,14 +770,14 @@ export default function BroadcastDetailScreen() {
             ) : attachmentUrl ? (
               <Image
                 source={{ uri: attachmentUrl }}
-                style={styles.fullMedia}
+                style={[styles.fullMedia, { backgroundColor: palette.royalInk }]}
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.textOnlyVisual} />
+              <View style={[styles.textOnlyVisual, { backgroundColor: palette.royalInk }]} />
             )
           ) : (
-            <View style={styles.textOnlyVisual}>
+            <View style={[styles.textOnlyVisual, { backgroundColor: palette.royalInk }]}>
               {richTextValue ? (
                 <RichTextRenderer
                   value={richTextValue}
@@ -737,7 +785,7 @@ export default function BroadcastDetailScreen() {
                   style={styles.textOnlyRich}
                 />
               ) : (
-                <Text style={styles.textOnlyTitle} numberOfLines={8}>
+                <Text style={[styles.textOnlyTitle, { color: palette.ivory }]} numberOfLines={8}>
                   {body || title}
                 </Text>
               )}
@@ -753,13 +801,13 @@ export default function BroadcastDetailScreen() {
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <KISIcon name="arrow-left" size={22} color="#fff" />
+            <KISIcon name="arrow-left" size={22} color={palette.ivory} />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.heading} numberOfLines={1}>
+            <Text style={[styles.heading, { color: palette.ivory }]} numberOfLines={1}>
               {title}
             </Text>
-            <Text style={styles.sourceName} numberOfLines={1}>
+            <Text style={[styles.sourceName, { color: palette.ivory }]} numberOfLines={1}>
               {sourceName}
             </Text>
           </View>
@@ -768,16 +816,16 @@ export default function BroadcastDetailScreen() {
         {showControls ? (
           <>
             <Pressable
-              style={[styles.navButton, styles.navLeft]}
+              style={[styles.navButton, styles.navLeft, { borderColor: palette.ivory }]}
               onPress={handlePrevAttachment}
             >
-              <Text style={styles.navButtonText}>{'‹'}</Text>
+              <Text style={[styles.navButtonText, { color: palette.ivory }]}>{'‹'}</Text>
             </Pressable>
             <Pressable
-              style={[styles.navButton, styles.navRight]}
+              style={[styles.navButton, styles.navRight, { borderColor: palette.ivory }]}
               onPress={handleNextAttachment}
             >
-              <Text style={styles.navButtonText}>{'›'}</Text>
+              <Text style={[styles.navButtonText, { color: palette.ivory }]}>{'›'}</Text>
             </Pressable>
             <View style={[styles.dotRow, { bottom: insets.bottom + 132 }]}>
               {attachmentUrls.map((_: string, dotIndex: number) => (
@@ -788,8 +836,9 @@ export default function BroadcastDetailScreen() {
                     {
                       backgroundColor:
                         dotIndex === activeAttachmentIndex
-                          ? '#fff'
+                          ? palette.ivory
                           : 'rgba(255,255,255,0.38)',
+                      borderColor: palette.ivory,
                     },
                   ]}
                 />
@@ -804,10 +853,10 @@ export default function BroadcastDetailScreen() {
               <KISIcon
                 name="bookmark"
                 size={22}
-                color={viewerSaved ? '#fff' : mutedActionColor}
+                color={viewerSaved ? palette.ivory : mutedActionColor}
               />
             </View>
-            <Text style={styles.actionCount}>
+            <Text style={[styles.actionCount, { color: palette.ivory }]}>
               {viewerSaved ? 'Saved' : 'Save'}
             </Text>
           </Pressable>
@@ -816,22 +865,22 @@ export default function BroadcastDetailScreen() {
               <KISIcon
                 name="heart"
                 size={23}
-                color={viewerReaction ? '#fff' : mutedActionColor}
+                color={viewerReaction ? palette.ivory : mutedActionColor}
               />
             </View>
-            <Text style={styles.actionCount}>{reactionCount}</Text>
+            <Text style={[styles.actionCount, { color: palette.ivory }]}>{reactionCount}</Text>
           </Pressable>
           <Pressable onPress={handleOpenComments} style={styles.floatingAction}>
             <View style={styles.iconBubble}>
               <KISIcon name="comment" size={22} color={mutedActionColor} />
             </View>
-            <Text style={styles.actionCount}>{commentCount}</Text>
+            <Text style={[styles.actionCount, { color: palette.ivory }]}>{commentCount}</Text>
           </Pressable>
           <Pressable onPress={handleShare} style={styles.floatingAction}>
             <View style={styles.iconBubble}>
               <KISIcon name="share" size={22} color={mutedActionColor} />
             </View>
-            <Text style={styles.actionCount}>{shareCount}</Text>
+            <Text style={[styles.actionCount, { color: palette.ivory }]}>{shareCount}</Text>
           </Pressable>
         </View>
 
@@ -852,11 +901,11 @@ export default function BroadcastDetailScreen() {
                 style={styles.overlayRichText}
               />
             ) : body ? (
-              <Text style={styles.body} numberOfLines={5}>
+              <Text style={[styles.body, { color: palette.ivory }]} numberOfLines={5}>
                 {body}
               </Text>
             ) : (
-              <Text style={styles.body} numberOfLines={3}>
+              <Text style={[styles.body, { color: palette.ivory }]} numberOfLines={3}>
                 {title}
               </Text>
             )}
@@ -867,8 +916,8 @@ export default function BroadcastDetailScreen() {
       {refreshingTop ? (
         <View pointerEvents="none" style={styles.refreshOverlay}>
           <View style={styles.refreshPill}>
-            <ActivityIndicator size="small" color="#fff" />
-            <Text style={styles.refreshText}>Refreshing feeds</Text>
+            <ActivityIndicator size="small" color={palette.ivory} />
+            <Text style={[styles.refreshText, { color: palette.ivory }]}>Refreshing feeds</Text>
           </View>
         </View>
       ) : null}
@@ -882,7 +931,6 @@ const styles = StyleSheet.create({
   },
   pageFrame: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#050505',
   },
   refreshOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -899,7 +947,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.62)',
   },
   refreshText: {
-    color: '#fff',
     fontWeight: '900',
     fontSize: 13,
   },
@@ -912,12 +959,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heading: {
-    color: '#fff',
     fontSize: 17,
     fontWeight: '900',
   },
   sourceName: {
-    color: 'rgba(255,255,255,0.78)',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
@@ -925,17 +970,14 @@ const styles = StyleSheet.create({
   fullMedia: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#000',
   },
   textOnlyVisual: {
     flex: 1,
-    backgroundColor: '#111',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
   },
   textOnlyTitle: {
-    color: '#fff',
     fontSize: 34,
     lineHeight: 40,
     fontWeight: '900',
@@ -973,7 +1015,6 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 2,
-    borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -19,
@@ -989,7 +1030,6 @@ const styles = StyleSheet.create({
   navButtonText: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#fff',
   },
   dotRow: {
     position: 'absolute',
@@ -1005,10 +1045,8 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#fff',
   },
   body: {
-    color: '#fff',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1047,6 +1085,9 @@ const styles = StyleSheet.create({
   floatingAction: {
     alignItems: 'center',
     gap: 4,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   iconBubble: {
     width: 48,
@@ -1057,7 +1098,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.42)',
   },
   actionCount: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '900',
     textShadowColor: 'rgba(0,0,0,0.45)',
@@ -1077,7 +1117,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#eee',
   },
   retryText: {
     fontSize: 14,

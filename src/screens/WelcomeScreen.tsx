@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
 import { useKISTheme } from '../theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '../constants/KISButton';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -46,6 +47,7 @@ MaterialCommunityIcons.loadFont?.();
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();
   const { palette, tone } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { setAuth, setPhone } = useAuth(); // keep global auth in sync if we auto-redirect
   const fade = useRef(new Animated.Value(0)).current;
   const loginCheckInFlightRef = useRef(false);
@@ -88,7 +90,7 @@ export default function WelcomeScreen() {
   }, [sparkleScale]);
   const gradientColors = [palette.card, palette.card];
   const cardBorderWidth = tone === 'dark' ? 0 : StyleSheet.hairlineWidth;
-  const cardBorderColor = tone === 'dark' ? 'transparent' : palette.border ?? 'rgba(255,255,255,0.35)';
+  const cardBorderColor = tone === 'dark' ? 'transparent' : palette.border;
 
   const highlightFeatures = [
     {
@@ -207,8 +209,9 @@ export default function WelcomeScreen() {
                 {
                   backgroundColor: palette.card,
                   width: '100%',
-                  maxWidth: 720,
+                  maxWidth: responsive.contentMaxWidth ? Math.min(720, responsive.contentMaxWidth) : 720,
                   alignSelf: 'center',
+                  padding: responsive.pageGutter * 2,
                   borderWidth: cardBorderWidth,
                   borderColor: cardBorderColor,
                 },
@@ -235,13 +238,13 @@ export default function WelcomeScreen() {
                       width: heroSize,
                       height: heroSize,
                       opacity: fade,
-                      backgroundColor: tone === 'dark' ? '#0F0D14' : '#FFFFFF',
+                      backgroundColor: palette.bg,
                       transform: [{ scale: sparkleScale }],
                     },
                   ]}
                 />
                 <LinearGradient
-                  colors={['rgba(255,138,51,0.25)', 'transparent']}
+                  colors={[palette.primarySoft, 'transparent']}
                   style={[
                     styles.heroGlow,
                     { top: heroOffset, right: heroOffset, width: heroSize, height: heroSize },
@@ -268,8 +271,8 @@ export default function WelcomeScreen() {
                   style={[
                     styles.statCard,
                     {
-                      borderColor: tone === 'dark' ? 'rgba(255,255,255,0.15)' : palette.border,
-                      backgroundColor: tone === 'dark' ? 'rgba(255,255,255,0.08)' : palette.surface,
+                      borderColor: tone === 'dark' ? palette.divider : palette.border,
+                      backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface,
                     },
                   ]}
                 >
@@ -299,13 +302,13 @@ export default function WelcomeScreen() {
                  key={item.title}
                   style={[
                     styles.featureCard,
-                    { borderColor: tone === 'dark' ? 'rgba(255,255,255,0.2)' : palette.border },
+                    { borderColor: tone === 'dark' ? palette.divider : palette.border },
                   ]}
                 >
                   <Ionicons
                     name={item.icon}
                     size={28}
-                    color={tone === 'dark' ? '#FFCC57' : '#F97316'}
+                    color={tone === 'dark' ? palette.gold : palette.accent}
                   />
                   <KISText preset="title" color={palette.text} style={styles.featureTitle}>
                     {item.title}
@@ -333,13 +336,13 @@ export default function WelcomeScreen() {
 
             <KISText preset="helper" color={palette.subtext} style={styles.legal}>
               KIS | 2026 ·{' '}
-              <KISText preset="helper" color="#FF8A33" style={styles.link} onPress={openExternal}>
+              <KISText preset="helper" color={palette.accent} style={styles.link} onPress={openExternal}>
                 Privacy
               </KISText>
               {' · '}
               <KISText
                 preset="helper"
-                color="#FF8A33"
+                color={palette.accent}
                 style={styles.link}
                 onPress={() => navigation.navigate('TermsAndConditions')}
               >
@@ -393,7 +396,6 @@ const styles = StyleSheet.create({
   },
   bubble: {
     position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 999,
     width: 90,
     height: 90,

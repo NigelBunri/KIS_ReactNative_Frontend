@@ -189,7 +189,7 @@ const ShopServicesPage = () => {
           <View style={serviceStyles.cardBody}>
             <Image
               source={imageUri ? { uri: imageUri } : fallbackCover}
-              style={serviceStyles.cardImage}
+              style={[serviceStyles.cardImage, { backgroundColor: palette.surface }]}
               resizeMode="cover"
             />
             <View style={serviceStyles.cardContent}>
@@ -294,7 +294,7 @@ const ShopServicesPage = () => {
         <Text
           style={[
             serviceStyles.errorText,
-            { color: palette.error || '#E53935' },
+            { color: palette.danger },
           ]}
         >
           Shop not specified.
@@ -338,7 +338,7 @@ const ShopServicesPage = () => {
           <Text
             style={[
               serviceStyles.errorText,
-              { color: palette.error || '#E53935' },
+              { color: palette.danger },
             ]}
           >
             {error}
@@ -431,7 +431,6 @@ const serviceStyles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
   },
   cardContent: {
     flex: 1,

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { fetchUserClips, shareChannelClip, deleteChannelContentClip } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -35,6 +36,7 @@ function formatTime(seconds: number): string {
 
 export default function ClipsListScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter, cardGap, minTouchTarget, bodyFontSize, labelFontSize, headerTitleSize } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'ClipsListScreen'>>();
   const { contentId } = route.params;
@@ -54,9 +56,11 @@ export default function ClipsListScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const handleShare = useCallback(async (clip: Clip) => {
-    if (clip.clip_url) {
-      await Share.share({ message: clip.title || 'Check out this clip!', url: clip.clip_url });
+    if (!clip.clip_url || clip.status !== 'ready') {
+      Alert.alert('Not ready', 'This clip is still processing. Please try again shortly.');
+      return;
     }
+    await Share.share({ message: clip.title || 'Check out this clip!', url: clip.clip_url });
     await shareChannelClip(clip.id);
   }, []);
 
@@ -77,43 +81,43 @@ export default function ClipsListScreen() {
   const renderClip = useCallback(({ item }: { item: Clip }) => {
     const duration = item.end_seconds - item.start_seconds;
     return (
-      <View style={[styles.row, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+      <View style={[styles.row, { backgroundColor: palette.surface, borderColor: palette.border, gap: cardGap }]}>
         <View style={[styles.thumbPlaceholder, { backgroundColor: palette.primarySoft }]}>
           <KISIcon name="play" size={18} color={palette.primaryStrong} />
-          <Text style={[styles.durationLabel, { color: palette.primaryStrong }]}>{formatTime(duration)}</Text>
+          <Text style={[styles.durationLabel, { color: palette.primaryStrong, fontSize: labelFontSize - 2 }]}>{formatTime(duration)}</Text>
         </View>
         <View style={styles.info}>
-          <Text style={[styles.clipTitle, { color: palette.text }]} numberOfLines={2}>
+          <Text style={[styles.clipTitle, { color: palette.text, fontSize: bodyFontSize }]} numberOfLines={2}>
             {item.title || `Clip ${formatTime(item.start_seconds)}–${formatTime(item.end_seconds)}`}
           </Text>
-          <Text style={[styles.clipMeta, { color: palette.subtext }]}>
+          <Text style={[styles.clipMeta, { color: palette.subtext, fontSize: labelFontSize }]}>
             {item.status === 'ready' ? 'Ready' : item.status}
             {item.created_at ? `  ·  ${new Date(item.created_at).toLocaleDateString()}` : ''}
           </Text>
         </View>
         <Pressable
           onPress={() => handleShare(item)}
-          style={[styles.shareBtn, { borderColor: palette.border }]}
+          style={[styles.shareBtn, { borderColor: palette.border, width: minTouchTarget, height: minTouchTarget, borderRadius: minTouchTarget / 2 }]}
         >
           <KISIcon name="share" size={16} color={palette.primaryStrong} />
         </Pressable>
         <Pressable
           onPress={() => handleDelete(item)}
-          style={[styles.shareBtn, { borderColor: palette.border, marginLeft: 6 }]}
+          style={[styles.shareBtn, { borderColor: palette.border, marginLeft: 6, width: minTouchTarget, height: minTouchTarget, borderRadius: minTouchTarget / 2 }]}
         >
           <KISIcon name="trash" size={16} color={palette.subtext} />
         </Pressable>
       </View>
     );
-  }, [palette, handleShare, handleDelete]);
+  }, [palette, handleShare, handleDelete, cardGap, labelFontSize, bodyFontSize, minTouchTarget]);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>My Clips</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.7 }]}>My Clips</Text>
       </View>
 
       {loading ? (
@@ -133,8 +137,15 @@ export default function ClipsListScreen() {
           data={clips}
           keyExtractor={item => item.id}
           renderItem={renderClip}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { padding: pageGutter }]}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No clips yet
+              </Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>

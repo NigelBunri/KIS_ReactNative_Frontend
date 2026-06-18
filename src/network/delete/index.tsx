@@ -13,6 +13,8 @@ export const deleteRequest = async (
     headers?: HeadersInit;
     successMessage?: string;
     errorMessage?: string;
+    /** Optional JSON body to send with the DELETE request (e.g. for account deletion requiring a password). */
+    body?: Record<string, unknown>;
   } = {}
 ): Promise<ApiResult> => {
   try {
@@ -21,9 +23,14 @@ export const deleteRequest = async (
     const baseHeaders: HeadersInit = {};
     if (token) baseHeaders.Authorization = `Bearer ${token}`;
     if (deviceId) baseHeaders['X-Device-Id'] = deviceId;
+    if (options.body) (baseHeaders as any)['Content-Type'] = 'application/json';
 
     const headers = { ...baseHeaders, ...(options.headers ?? {}) };
-    const response = await apiService.delete(url, headers);
+    const fetchOptions: RequestInit = { method: 'DELETE', headers: headers as any };
+    if (options.body) fetchOptions.body = JSON.stringify(options.body);
+    const response = options.body
+      ? await fetch(url, fetchOptions)
+      : await apiService.delete(url, headers);
     const responseData = await response.json().catch(() => ({}));
 
     if (response.ok) {
@@ -37,7 +44,9 @@ export const deleteRequest = async (
           ...headers,
           Authorization: `Bearer ${newToken}`,
         };
-        const retryResponse = await apiService.delete(url, retryHeaders);
+        const retryResponse = options.body
+          ? await fetch(url, { method: 'DELETE', headers: retryHeaders as any, body: JSON.stringify(options.body) })
+          : await apiService.delete(url, retryHeaders);
         const retryData = await retryResponse.json().catch(() => ({}));
         if (retryResponse.ok) {
           return {

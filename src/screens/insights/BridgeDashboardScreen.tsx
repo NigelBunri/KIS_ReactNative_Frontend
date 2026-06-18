@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 
 type BridgeThread = {
@@ -18,13 +20,15 @@ type Props = NativeStackScreenProps<RootStackParamList, 'BridgeDashboard'>;
 
 export default function BridgeDashboardScreen({ navigation }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [threads, setThreads] = useState<BridgeThread[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
       const [threadsRes, analyticsRes] = await Promise.allSettled([
@@ -42,13 +46,14 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
       setError(e?.message || 'Unable to load bridge data.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>Bridge</Text>
@@ -56,7 +61,7 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('BridgeManagement')}
             style={[styles.manageBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={styles.manageBtnText}>Manage Bridge</Text>
+            <Text style={[styles.manageBtnText, { color: palette.onPrimary }]}>Manage Bridge</Text>
           </Pressable>
         </View>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>
@@ -83,9 +88,9 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
-          <Pressable onPress={load} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
+          <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : threads.length === 0 ? (
@@ -96,7 +101,17 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
         <FlatList
           data={threads}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingHorizontal: responsive.pageGutter }]}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No data available
+              </Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={palette.primaryStrong} colors={[palette.primaryStrong]} />
+          }
           renderItem={({ item }) => (
             <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}>
               <Text style={[styles.cardTitle, { color: palette.text }]}>{item.subject || 'Thread'}</Text>
@@ -114,7 +129,7 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
           )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -124,7 +139,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   title: { fontSize: 22, fontWeight: '800' },
   manageBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  manageBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  manageBtnText: { fontSize: 13, fontWeight: '700' },
   subtitle: { fontSize: 13 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   statBox: { flex: 1, minWidth: 80, borderRadius: 10, padding: 12, alignItems: 'center', gap: 4 },

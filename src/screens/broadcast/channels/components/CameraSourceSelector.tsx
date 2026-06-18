@@ -3,7 +3,7 @@
 // Grid of camera sources (device front/back cameras + external RTMP feeds).
 // Used in LiveControlRoom for multi-camera switching during a live broadcast.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { CameraSource } from '@/services/liveStreamingService';
 
 type Props = {
@@ -30,6 +31,10 @@ const FACING_ICON: Record<string, string> = {
   external: 'monitor',
 };
 
+// Tile width adapts: small for compact phones, standard otherwise
+const TILE_WIDTH_COMPACT = 72;
+const TILE_WIDTH_STANDARD = 88;
+
 export default function CameraSourceSelector({
   sources,
   activeCamId,
@@ -37,6 +42,8 @@ export default function CameraSourceSelector({
   switching = false,
   palette,
 }: Props) {
+  const { isCompactPhone } = useResponsiveLayout();
+  const tileWidth = isCompactPhone ? TILE_WIDTH_COMPACT : TILE_WIDTH_STANDARD;
   if (sources.length === 0) return null;
 
   return (
@@ -62,9 +69,13 @@ export default function CameraSourceSelector({
             <Pressable
               key={src.id}
               onPress={() => !isActive && !switching && onSwitch(src.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Switch to ${src.label} camera`}
+              accessibilityState={{ selected: isActive }}
               style={[
                 styles.tile,
                 {
+                  width: tileWidth,
                   borderColor: isActive ? palette.primary : palette.border,
                   backgroundColor: palette.card,
                 },
@@ -83,8 +94,8 @@ export default function CameraSourceSelector({
                   />
                 )}
                 {isActive && (
-                  <View style={styles.activeDot}>
-                    <View style={styles.activeDotInner} />
+                  <View style={[styles.activeDot, { backgroundColor: palette.ivory }]}>
+                    <View style={[styles.activeDotInner, { backgroundColor: palette.success }]} />
                   </View>
                 )}
               </View>
@@ -100,7 +111,7 @@ export default function CameraSourceSelector({
               </Text>
 
               {src.isExternal && (
-                <View style={[styles.externalBadge, { backgroundColor: `${palette.primaryStrong}22` }]}>
+                <View style={[styles.externalBadge, { backgroundColor: palette.primarySoft ?? palette.primaryWeak }]}>
                   <Text style={[styles.externalText, { color: palette.primaryStrong }]}>RTMP</Text>
                 </View>
               )}
@@ -123,11 +134,11 @@ const styles = StyleSheet.create({
   headerText: { fontSize: 13, fontWeight: '800' },
   scroll: { gap: 8, paddingBottom: 4 },
   tile: {
-    width: 88,
     borderWidth: 2,
     borderRadius: 10,
     overflow: 'hidden',
     paddingBottom: 8,
+    minHeight: 44,
   },
   tileActive: { borderWidth: 2.5 },
   thumb: {
@@ -144,7 +155,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -152,7 +162,6 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#22C55E',
   },
   label: {
     fontSize: 10,

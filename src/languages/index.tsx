@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { getLocales } from 'react-native-localize';
 
 import { LANGUAGE_REGISTRY, type LanguageEntry } from './registry';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 
 export type LanguageCode = string;
 
@@ -195,7 +197,24 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         const fallback = getLocales?.()?.[0]?.languageCode ?? 'en';
-        const nextLanguage = normalizeLanguageCode(stored || fallback);
+        let nextLanguage = normalizeLanguageCode(stored || fallback);
+
+        // Try to sync language preference from backend (cross-device support).
+        // If the backend returns a language, it takes precedence over local cache.
+        try {
+          const { getRequest } = require('@/network/get');
+          const ROUTES = require('@/network').default;
+          const res = await getRequest(ROUTES.profilePreferences.me, { errorMessage: '' });
+          const serverLang = res?.data?.language_preference ?? res?.language_preference;
+          if (serverLang && typeof serverLang === 'string' && serverLang.trim()) {
+            const normalized = normalizeLanguageCode(serverLang);
+            if (normalized !== 'en' || !stored) {
+              nextLanguage = normalized;
+              await AsyncStorage.setItem(STORAGE_KEY, nextLanguage).catch(() => {});
+            }
+          }
+        } catch { /* network unavailable or not authenticated yet — use local cache */ }
+
         activeLanguage = nextLanguage;
         if (mounted) setLanguageState(nextLanguage);
       } finally {
@@ -218,7 +237,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(nextLanguage);
     setLanguageVersion((v) => v + 1);
     notifyListeners();
-    await AsyncStorage.setItem(STORAGE_KEY, nextLanguage);
+    await Promise.allSettled([
+      AsyncStorage.setItem(STORAGE_KEY, nextLanguage),
+      patchRequest(ROUTES.profilePreferences.me, { language_preference: nextLanguage }),
+    ]);
   };
 
   const value = useMemo(

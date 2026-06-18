@@ -1,9 +1,57 @@
-import React from 'react';
-import { Alert, Text } from 'react-native';
+import React, { useSyncExternalStore } from 'react';
+import { Alert, StyleSheet, Text } from 'react-native';
 
 import { localizeNode, localizeProps, subscribeToLanguageChange, translateString } from './index';
 
 let installed = false;
+const nativeCreateElement = React.createElement.bind(React);
+
+// ── Font scale (updated by AgeModeProvider when ageMode changes) ──────────────
+let activeFontScale = 1;
+let fontScaleVersion = 0;
+const fontScaleListeners = new Set<() => void>();
+
+export const setActiveFontScale = (scale: number) => {
+  const normalized =
+    Number.isFinite(scale) && scale > 0 ? Number(scale) : 1;
+  if (normalized === activeFontScale) return;
+  activeFontScale = normalized;
+  fontScaleVersion += 1;
+  fontScaleListeners.forEach(listener => listener());
+};
+export const getActiveFontScale = () => activeFontScale;
+
+const applyFontScale = (props: any): any => {
+  if (!props || activeFontScale === 1) return props;
+  const flattened = StyleSheet.flatten(props.style);
+  if (!flattened || typeof flattened.fontSize !== 'number') return props;
+  return {
+    ...props,
+    style: {
+      ...flattened,
+      fontSize: Math.round(flattened.fontSize * activeFontScale),
+      ...(typeof flattened.lineHeight === 'number'
+        ? { lineHeight: Math.round(flattened.lineHeight * activeFontScale) }
+        : {}),
+    },
+  };
+};
+
+const subscribeToFontScale = (listener: () => void) => {
+  fontScaleListeners.add(listener);
+  return () => fontScaleListeners.delete(listener);
+};
+
+const getFontScaleVersion = () => fontScaleVersion;
+
+const RuntimeScaledText = (props: any) => {
+  useSyncExternalStore(
+    subscribeToFontScale,
+    getFontScaleVersion,
+    getFontScaleVersion,
+  );
+  return nativeCreateElement(Text, applyFontScale(props));
+};
 
 // ── isTextLike cache ─────────────────────────────────────────────────────────
 // `isTextLike` is called for every JSX element (jsx/jsxs). A plain Map keyed
@@ -47,6 +95,16 @@ export const installLocalizationRuntime = () => {
     if (typeof jsxRuntime?.jsx === 'function') {
       const orig = jsxRuntime.jsx;
       jsxRuntime.jsx = (type: any, props: any, key?: any) => {
+        if (type === Text) {
+          const next = localizeProps(props);
+          return orig(
+            RuntimeScaledText,
+            next
+              ? { ...next, children: localizeNode(next.children) }
+              : props,
+            key,
+          );
+        }
         if (!isTextLike(type)) {
           const next = localizeProps(props);
           return orig(type, next, key);
@@ -62,6 +120,16 @@ export const installLocalizationRuntime = () => {
     if (typeof jsxRuntime?.jsxs === 'function') {
       const orig = jsxRuntime.jsxs;
       jsxRuntime.jsxs = (type: any, props: any, key?: any) => {
+        if (type === Text) {
+          const next = localizeProps(props);
+          return orig(
+            RuntimeScaledText,
+            next
+              ? { ...next, children: localizeNode(next.children) }
+              : props,
+            key,
+          );
+        }
         if (!isTextLike(type)) {
           const next = localizeProps(props);
           return orig(type, next, key);
@@ -89,6 +157,19 @@ export const installLocalizationRuntime = () => {
         source?: any,
         self?: any,
       ) => {
+        if (type === Text) {
+          const next = localizeProps(props);
+          return orig(
+            RuntimeScaledText,
+            next
+              ? { ...next, children: localizeNode(next.children) }
+              : props,
+            key,
+            isStatic,
+            source,
+            self,
+          );
+        }
         if (!isTextLike(type)) {
           const next = localizeProps(props);
           return orig(type, next, key, isStatic, source, self);
@@ -112,6 +193,15 @@ export const installLocalizationRuntime = () => {
   // ─── React.createElement (kept for any explicit calls / class components) ────
   const originalCreateElement = React.createElement;
   React.createElement = ((type: any, props: any, ...children: any[]) => {
+    if (type === Text) {
+      const nextProps = localizeProps(props);
+      const nextChildren = children.map(localizeNode);
+      return originalCreateElement(
+        RuntimeScaledText,
+        nextProps,
+        ...nextChildren,
+      );
+    }
     const nextProps = localizeProps(props);
     const nextChildren = isTextLike(type) ? children.map(localizeNode) : children;
     return originalCreateElement(type, nextProps, ...nextChildren);

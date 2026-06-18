@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import { patchRequest } from '@/network/patch';
+import { isOfflineDataEnabled } from '@/services/consentService';
 
 const KEY = 'KIS_PENDING_MUTATIONS';
 
@@ -18,6 +19,7 @@ export type PendingMutation = {
 export async function enqueueMutation(
   mutation: Omit<PendingMutation, 'id' | 'retries' | 'createdAt'>,
 ): Promise<void> {
+  if (!isOfflineDataEnabled()) return;
   const raw = await AsyncStorage.getItem(KEY).catch(() => null);
   const queue: PendingMutation[] = raw ? JSON.parse(raw) : [];
   queue.push({

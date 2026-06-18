@@ -179,7 +179,7 @@ export default function ChatRoomModals({
                   { backgroundColor: palette.primary, borderColor: palette.primary },
                 ]}
               >
-                <Text style={{ color: palette.onPrimary ?? '#fff' }}>Confirm</Text>
+                <Text style={{ color: palette.onPrimary }}>Confirm</Text>
               </Pressable>
             </View>
           </View>
@@ -232,12 +232,12 @@ export default function ChatRoomModals({
                         paddingHorizontal: 14,
                         paddingVertical: 6,
                         borderRadius: 20,
-                        backgroundColor: active ? (palette.primary ?? '#4F46E5') : (palette.inputBg ?? '#f0f0f0'),
+                        backgroundColor: active ? (palette.primary) : (palette.inputBg ?? '#f0f0f0'),
                         borderWidth: active ? 0 : 1,
-                        borderColor: palette.inputBorder ?? '#ccc',
+                        borderColor: palette.inputBorder,
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: active ? (palette.onPrimary ?? '#fff') : (palette.text ?? '#000') }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: active ? (palette.onPrimary) : (palette.text) }}>
                         {chip}
                       </Text>
                     </Pressable>
@@ -249,7 +249,7 @@ export default function ChatRoomModals({
             {/* GAP 4: From: sender filter row */}
             {participants.length > 0 && (
               <View style={{ marginBottom: 8 }}>
-                <Text style={{ color: palette.subtext ?? '#888', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+                <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
                   From:
                 </Text>
                 {/* Active sender chip */}
@@ -262,18 +262,18 @@ export default function ChatRoomModals({
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 16,
-                        backgroundColor: palette.primary ?? '#4F46E5',
+                        backgroundColor: palette.primary,
                         gap: 6,
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: palette.onPrimary ?? '#fff' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: palette.onPrimary }}>
                         From: {activeSenderName}
                       </Text>
                       <Pressable
                         onPress={() => setSearchSenderFilter(null)}
                         hitSlop={6}
                       >
-                        <Text style={{ fontSize: 14, color: palette.onPrimary ?? '#fff', fontWeight: '700' }}>
+                        <Text style={{ fontSize: 14, color: palette.onPrimary, fontWeight: '700' }}>
                           ×
                         </Text>
                       </Pressable>
@@ -300,7 +300,7 @@ export default function ChatRoomModals({
                               height: 36,
                               borderRadius: 18,
                               borderWidth: isSelected ? 2.5 : 0,
-                              borderColor: palette.primary ?? '#4F46E5',
+                              borderColor: palette.primary,
                               overflow: 'hidden',
                               backgroundColor: palette.surfaceSoft ?? '#e0e0e0',
                               alignItems: 'center',
@@ -313,7 +313,7 @@ export default function ChatRoomModals({
                                 style={{ width: 36, height: 36, borderRadius: 18 }}
                               />
                             ) : (
-                              <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text ?? '#555' }}>
+                              <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text }}>
                                 {(p.name ?? '?').charAt(0).toUpperCase()}
                               </Text>
                             )}
@@ -321,13 +321,13 @@ export default function ChatRoomModals({
                           <Text
                             style={{
                               fontSize: 10,
-                              color: isSelected ? (palette.primary ?? '#4F46E5') : (palette.subtext ?? '#888'),
+                              color: isSelected ? (palette.primary) : (palette.subtext),
                               fontWeight: isSelected ? '700' : '400',
                               maxWidth: 44,
                             }}
                             numberOfLines={1}
                           >
-                            {p.name.split(' ')[0]}
+                            {(p.name ?? '').split(' ')[0]}
                           </Text>
                         </Pressable>
                       );
@@ -344,7 +344,7 @@ export default function ChatRoomModals({
                 { backgroundColor: palette.primary, borderColor: palette.primary, alignSelf: 'flex-end' },
               ]}
             >
-              <Text style={{ color: palette.onPrimary ?? '#fff' }}>Search</Text>
+              <Text style={{ color: palette.onPrimary }}>Search</Text>
             </Pressable>
 
             <ScrollView style={{ marginTop: 12, maxHeight: 260 }}>
@@ -371,7 +371,7 @@ export default function ChatRoomModals({
                     ]}
                   >
                     {senderName ? (
-                      <Text style={{ color: palette.primary ?? '#4F46E5', fontSize: 11, fontWeight: '700', marginBottom: 2 }}>
+                      <Text style={{ color: palette.primary, fontSize: 11, fontWeight: '700', marginBottom: 2 }}>
                         {senderName}
                       </Text>
                     ) : null}

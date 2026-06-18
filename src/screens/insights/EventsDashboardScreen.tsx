@@ -9,9 +9,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 type TimeRange = 'week' | 'month' | 'all';
 
@@ -38,6 +40,7 @@ const TIME_RANGES: { label: string; value: TimeRange }[] = [
 
 export default function EventsDashboardScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const [events, setEvents] = useState<EventItem[]>([]);
   const [stats, setStats] = useState<StatCards | null>(null);
@@ -90,7 +93,7 @@ export default function EventsDashboardScreen() {
     : [];
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>
@@ -115,7 +118,7 @@ export default function EventsDashboardScreen() {
               <Text
                 style={[
                   styles.rangeBtnText,
-                  { color: active ? '#fff' : palette.subtext },
+                  { color: active ? palette.onPrimary : palette.subtext },
                 ]}
               >
                 {r.label}
@@ -131,12 +134,12 @@ export default function EventsDashboardScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable
             onPress={load}
             style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : (
@@ -148,7 +151,7 @@ export default function EventsDashboardScreen() {
               tintColor={palette.primary}
             />
           }
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: responsive.pageGutter }]}
         >
           {/* Stat cards 2-column grid */}
           {statCards.length > 0 && (
@@ -212,7 +215,7 @@ export default function EventsDashboardScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

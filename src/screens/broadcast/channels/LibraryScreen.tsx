@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import ROUTES from '@/network';
@@ -51,7 +52,7 @@ function ContinueCard({ item, onPress }: { item: ContinueItem; onPress: () => vo
 
   return (
     <Pressable onPress={onPress} style={[styles.continueCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-      <View style={styles.continueThumb}>
+      <View style={[styles.continueThumb, { backgroundColor: palette.royalInk }]}>
         {thumbUrl ? (
           <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         ) : (
@@ -65,7 +66,7 @@ function ContinueCard({ item, onPress }: { item: ContinueItem; onPress: () => vo
           </View>
         )}
         <View style={styles.progressLabel}>
-          <Text style={styles.progressText}>{formatProgress(item.progress_seconds)}</Text>
+          <Text style={[styles.progressText, { color: palette.ivory }]}>{formatProgress(item.progress_seconds)}</Text>
         </View>
       </View>
       <Text style={[styles.continueTitle, { color: palette.text }]} numberOfLines={2}>
@@ -92,6 +93,7 @@ const LIBRARY_SECTIONS: Array<{
 
 export default function LibraryScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter, cardGap, minTouchTarget, bodyFontSize, labelFontSize, headerTitleSize, columns } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [continueItems, setContinueItems] = useState<ContinueItem[]>([]);
   const [continueLoading, setContinueLoading] = useState(true);
@@ -139,8 +141,8 @@ export default function LibraryScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>Library</Text>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Text style={[styles.headerTitle, { color: palette.text, fontSize: headerTitleSize }]}>Library</Text>
       </View>
 
       <ScrollView
@@ -153,10 +155,10 @@ export default function LibraryScreen() {
         {/* Trending */}
         {trending.length > 0 && (
           <View style={{ marginBottom: 16, marginTop: 16 }}>
-            <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15, paddingHorizontal: 16, marginBottom: 8 }}>
+            <Text style={{ color: palette.text, fontWeight: '900', fontSize: bodyFontSize + 1, paddingHorizontal: pageGutter, marginBottom: 8 }}>
               Trending
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: pageGutter, gap: cardGap }}>
               {trending.map(item => (
                 <Pressable
                   key={item.id}
@@ -170,8 +172,8 @@ export default function LibraryScreen() {
                       <KISIcon name="video" size={24} color={palette.border} />
                     </View>
                   )}
-                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: 12 }} numberOfLines={2}>{item.title}</Text>
-                  <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 11 }} numberOfLines={1}>{item.channel?.name}</Text>
+                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: labelFontSize + 1 }} numberOfLines={2}>{item.title}</Text>
+                  <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: labelFontSize }} numberOfLines={1}>{item.channel?.name}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -180,23 +182,26 @@ export default function LibraryScreen() {
 
         {/* Continue Watching */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Continue Watching</Text>
+          <View style={[styles.sectionHeader, { paddingHorizontal: pageGutter }]}>
+            <Text style={[styles.sectionTitle, { color: palette.text, fontSize: bodyFontSize + 2 }]}>Continue Watching</Text>
             {continueItems.length > 0 && (
-              <Pressable onPress={() => navigation.navigate('WatchHistory')}>
-                <Text style={[styles.seeAll, { color: palette.primaryStrong }]}>See all</Text>
+              <Pressable
+                onPress={() => navigation.navigate('WatchHistory')}
+                style={{ minHeight: minTouchTarget, justifyContent: 'center' }}
+              >
+                <Text style={[styles.seeAll, { color: palette.primaryStrong, fontSize: labelFontSize + 1 }]}>See all</Text>
               </Pressable>
             )}
           </View>
           {continueLoading ? (
             <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 16 }} />
           ) : continueItems.length === 0 ? (
-            <View style={[styles.emptyCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={[styles.emptyCard, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: pageGutter }]}>
               <KISIcon name="play" size={28} color={palette.border} />
-              <Text style={[styles.emptyCardText, { color: palette.subtext }]}>No videos in progress</Text>
+              <Text style={[styles.emptyCardText, { color: palette.subtext, fontSize: labelFontSize + 1 }]}>No videos in progress</Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: pageGutter, gap: cardGap }}>
               {continueItems.map(item => (
                 <ContinueCard
                   key={item.content_id}
@@ -210,19 +215,19 @@ export default function LibraryScreen() {
 
         {/* Quick Access Grid */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: palette.text, paddingHorizontal: 16, marginBottom: 10 }]}>Your Library</Text>
-          <View style={styles.grid}>
+          <Text style={[styles.sectionTitle, { color: palette.text, paddingHorizontal: pageGutter, marginBottom: 10, fontSize: bodyFontSize + 2 }]}>Your Library</Text>
+          <View style={[styles.grid, { paddingHorizontal: pageGutter, gap: cardGap }]}>
             {LIBRARY_SECTIONS.map(section => (
               <Pressable
                 key={section.key}
                 onPress={() => navigation.navigate(section.screen as any)}
-                style={[styles.gridCell, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                style={[styles.gridCell, { backgroundColor: palette.surface, borderColor: palette.border, minHeight: minTouchTarget * 2, flexBasis: (columns as any).dense <= 1 ? '100%' : '47%', flexGrow: 1 }]}
               >
-                <View style={[styles.gridIcon, { backgroundColor: palette.primarySoft }]}>
+                <View style={[styles.gridIcon, { backgroundColor: palette.primarySoft, width: minTouchTarget, height: minTouchTarget }]}>
                   <KISIcon name={section.icon} size={22} color={palette.primaryStrong} />
                 </View>
-                <Text style={[styles.gridLabel, { color: palette.text }]}>{section.label}</Text>
-                <Text style={[styles.gridHint, { color: palette.subtext }]}>{section.hint}</Text>
+                <Text style={[styles.gridLabel, { color: palette.text, fontSize: bodyFontSize }]}>{section.label}</Text>
+                <Text style={[styles.gridHint, { color: palette.subtext, fontSize: labelFontSize }]}>{section.hint}</Text>
               </Pressable>
             ))}
           </View>
@@ -243,14 +248,14 @@ const styles = StyleSheet.create({
   emptyCard: { marginHorizontal: 16, borderWidth: 1, borderRadius: 12, padding: 28, alignItems: 'center', gap: 8 },
   emptyCardText: { fontSize: 13, fontWeight: '600' },
   continueCard: { width: 160, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  continueThumb: { height: 92, backgroundColor: '#111' },
-  progressTrack: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
+  continueThumb: { height: 92 },
+  progressTrack: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   progressBar: { height: 3 },
   progressLabel: { position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  progressText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  progressText: { fontSize: 10, fontWeight: '800' },
   continueTitle: { fontSize: 12, fontWeight: '800', padding: 8, lineHeight: 17 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8 },
-  gridCell: { width: '47%', borderWidth: 1, borderRadius: 16, padding: 16, marginHorizontal: '1.5%', gap: 8 },
+  gridCell: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 8 },
   gridIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   gridLabel: { fontSize: 14, fontWeight: '900', marginTop: 2 },
   gridHint: { fontSize: 11, fontWeight: '600' },

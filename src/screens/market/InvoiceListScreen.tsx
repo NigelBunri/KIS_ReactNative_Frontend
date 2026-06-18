@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -29,16 +31,19 @@ type Invoice = {
   items?: any[];
   recipient?: any;
   issuer?: any;
+  pdf_url?: string;
+  download_url?: string;
+  url?: string;
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  paid: '#16A34A',
-  pending: '#EA580C',
-  overdue: '#DC2626',
-};
+const buildStatusColors = (p: any): Record<string, string> => ({
+  paid: p.success,
+  pending: p.gold,
+  overdue: p.danger,
+});
 
-const statusColor = (status: string) =>
-  STATUS_COLORS[status?.toLowerCase() ?? ''] ?? '#6B7280';
+const buildStatusColor = (p: any) => (status: string) =>
+  buildStatusColors(p)[status?.toLowerCase() ?? ''] ?? p.subtext;
 
 const formatAmount = (amount: number | string, currency?: string) => {
   const num = Number(amount);
@@ -78,11 +83,15 @@ const normalizeInvoices = (payload: any): Invoice[] => {
     items: item?.line_items ?? item?.items ?? [],
     recipient: item?.recipient ?? item?.customer,
     issuer: item?.issuer ?? item?.shop,
+    pdf_url: item?.pdf_url,
+    download_url: item?.download_url,
+    url: item?.url,
   }));
 };
 
 export default function InvoiceListScreen() {
   const { palette } = useKISTheme();
+  const statusColor = buildStatusColor(palette);
   const navigation = useNavigation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +152,7 @@ export default function InvoiceListScreen() {
         </View>
       ) : error ? (
         <View style={s.center}>
-          <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>
+          <Text style={[s.errorText, { color: palette.danger }]}>
             {error}
           </Text>
           <Pressable
@@ -245,7 +254,7 @@ export default function InvoiceListScreen() {
         onRequestClose={() => setSelectedInvoice(null)}
       >
         <Pressable
-          style={s.modalBackdrop}
+          style={[s.modalBackdrop, { backgroundColor: palette.overlay }]}
           onPress={() => setSelectedInvoice(null)}
         >
           <Pressable
@@ -378,13 +387,37 @@ export default function InvoiceListScreen() {
                   ) : null}
 
                   <Pressable
+                    style={[s.downloadBtn, { borderColor: palette.primaryStrong }]}
+                    onPress={() => {
+                      const pdfUrl =
+                        selectedInvoice.pdf_url ??
+                        selectedInvoice.download_url ??
+                        selectedInvoice.url;
+                      if (pdfUrl) {
+                        Linking.openURL(pdfUrl).catch(() => {
+                          Alert.alert('Error', 'Could not open the PDF link.');
+                        });
+                      } else {
+                        Alert.alert(
+                          'Not Available',
+                          'PDF not yet generated for this invoice.',
+                        );
+                      }
+                    }}
+                  >
+                    <Text style={[s.downloadBtnText, { color: palette.primaryStrong }]}>
+                      Download PDF
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
                     style={[
                       s.closeBtn,
                       { backgroundColor: palette.primaryStrong },
                     ]}
                     onPress={() => setSelectedInvoice(null)}
                   >
-                    <Text style={s.closeBtnText}>Close</Text>
+                    <Text style={[s.closeBtnText, { color: palette.onPrimary }]}>Close</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -478,7 +511,6 @@ const s = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   bottomSheet: {
@@ -523,11 +555,19 @@ const s = StyleSheet.create({
   },
   lineItemName: { fontSize: 13, flex: 1, marginRight: 12 },
   lineItemAmount: { fontSize: 13, fontWeight: '700' },
-  closeBtn: {
+  downloadBtn: {
     marginTop: 20,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1.5,
   },
-  closeBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  downloadBtnText: { fontWeight: '700', fontSize: 15 },
+  closeBtn: {
+    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  closeBtnText: { fontWeight: '700', fontSize: 15 },
 });

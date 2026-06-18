@@ -952,13 +952,13 @@ export default function ProductDetailsPage() {
           <View
             style={[styles.errorIconWrap, { backgroundColor: palette.inputBg }]}
           >
-            <KISIcon name="info" size={20} color={palette.error || '#E53935'} />
+            <KISIcon name="info" size={20} color={palette.danger} />
           </View>
           <Text style={[styles.errorTitle, { color: palette.text }]}>
             Something went wrong
           </Text>
           <Text
-            style={[styles.errorText, { color: palette.error || '#E53935' }]}
+            style={[styles.errorText, { color: palette.danger }]}
           >
             {error}
           </Text>
@@ -1239,7 +1239,7 @@ export default function ProductDetailsPage() {
                     color:
                       effectiveStock > 0
                         ? palette.primaryStrong
-                        : palette.error || '#E53935',
+                        : palette.danger,
                   },
                 ]}
               >
@@ -1594,7 +1594,7 @@ export default function ProductDetailsPage() {
                       color:
                         (selectedVariant.stock_qty ?? 0) > 0
                           ? palette.primaryStrong
-                          : palette.error || '#E53935',
+                          : palette.danger,
                     },
                   ]}
                 >
@@ -1943,7 +1943,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderRadius: 28,
       borderWidth: 1,
       padding: 12,
-      shadowColor: palette.shadow ?? '#000',
+      shadowColor: palette.shadow ?? palette.royalInk,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.08,
       shadowRadius: 18,
@@ -1974,7 +1974,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingHorizontal: 10,
       paddingVertical: 6,
       borderRadius: 999,
-      shadowColor: palette.shadow ?? '#000',
+      shadowColor: palette.shadow ?? palette.royalInk,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.12,
       shadowRadius: 8,
@@ -2004,7 +2004,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderWidth: 1,
       padding: 18,
       marginBottom: 14,
-      shadowColor: palette.shadow ?? '#000',
+      shadowColor: palette.shadow ?? palette.royalInk,
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.08,
       shadowRadius: 18,
@@ -2408,7 +2408,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       alignItems: 'center',
       paddingVertical: 8,
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(0,0,0,0.08)',
+      borderBottomColor: palette.divider,
     },
     cartSummaryLabel: {
       fontSize: 13,

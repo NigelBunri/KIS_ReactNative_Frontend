@@ -160,7 +160,7 @@ export default function AdminUsersPanel({
         </View>
       ) : error ? (
         <View style={styles.errorBox}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
         </View>
       ) : (
         <FlatList
@@ -189,8 +189,8 @@ export default function AdminUsersPanel({
 }
 
 function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onSelect, selected }: any) {
-  const statusColor = user.status === 'active' ? palette.success ?? '#28a745'
-    : user.status === 'banned' ? palette.danger ?? '#d9534f'
+  const statusColor = user.status === 'active' ? palette.success
+    : user.status === 'banned' ? palette.danger
     : '#f0ad4e';
 
   return (
@@ -201,8 +201,8 @@ function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onS
             {user.display_name ?? user.username ?? user.email ?? 'Unknown'}
           </Text>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          {user.is_superuser && <Text style={styles.superBadge}>GO</Text>}
-          {user.is_staff && !user.is_superuser && <Text style={styles.staffBadge}>Staff</Text>}
+          {user.is_superuser && <Text style={[styles.superBadge, { backgroundColor: palette.goldHighlight, color: palette.royalInk }]}>GO</Text>}
+          {user.is_staff && !user.is_superuser && <Text style={[styles.staffBadge, { backgroundColor: palette.primary, color: palette.onPrimary }]}>Staff</Text>}
         </View>
         <Text style={[styles.userEmail, { color: palette.subtext }]} numberOfLines={1}>
           {user.email ?? user.phone ?? ''}
@@ -226,9 +226,9 @@ function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onS
             <>
               <ActionBtn label="Tier" color={palette.primary} onPress={onChangeTier} />
               {user.status === 'active' ? (
-                <ActionBtn label="Ban" color={palette.danger ?? '#d9534f'} onPress={onBan} />
+                <ActionBtn label="Ban" color={palette.danger} onPress={onBan} />
               ) : (
-                <ActionBtn label="Unban" color={palette.success ?? '#28a745'} onPress={onUnban} />
+                <ActionBtn label="Unban" color={palette.success} onPress={onUnban} />
               )}
             </>
           )}
@@ -321,12 +321,12 @@ const styles = StyleSheet.create({
   userName: { fontSize: 14, fontWeight: '700', flex: 1 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   superBadge: {
-    fontSize: 10, fontWeight: '900', color: '#fff',
-    backgroundColor: '#9B59B6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4,
+    fontSize: 10, fontWeight: '900',
+    paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4,
   },
   staffBadge: {
-    fontSize: 10, fontWeight: '700', color: '#fff',
-    backgroundColor: '#2980B9', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4,
+    fontSize: 10, fontWeight: '700',
+    paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4,
   },
   userEmail: { fontSize: 11, marginTop: 2 },
   userMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },

@@ -6,6 +6,9 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -63,6 +66,7 @@ export default function MembershipPerksEditor({ tierId, tierTitle, initialPerks 
   }, [perks, tierId]);
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={[styles.container, { borderColor: palette.border, backgroundColor: palette.card }]}>
       <Text style={[styles.heading, { color: palette.text }]}>
         Perks — {tierTitle}
@@ -79,12 +83,9 @@ export default function MembershipPerksEditor({ tierId, tierTitle, initialPerks 
         >
           <Text style={[styles.perkBullet, { color: palette.primaryStrong }]}>•</Text>
           <Text style={[styles.perkText, { color: palette.text, flex: 1 }]}>{perk}</Text>
-          <Text
-            onPress={() => removePerk(idx)}
-            style={[styles.removeBtn, { color: '#EF4444' }]}
-          >
-            ✕
-          </Text>
+          <Pressable onPress={() => removePerk(idx)} style={styles.removeBtn}>
+            <Text style={[styles.removeBtnText, { color: palette.danger }]}>✕</Text>
+          </Pressable>
         </View>
       ))}
 
@@ -99,31 +100,27 @@ export default function MembershipPerksEditor({ tierId, tierTitle, initialPerks 
           returnKeyType="done"
           style={[styles.addInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
         />
-        <Text
-          onPress={addPerk}
-          style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
-        >
-          Add
-        </Text>
+        <Pressable onPress={addPerk} style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>Add</Text>
+        </Pressable>
       </View>
 
       {/* Save */}
       {dirty && (
-        <Text
+        <Pressable
           onPress={saving ? undefined : handleSave}
           style={[styles.saveBtn, { backgroundColor: palette.text, opacity: saving ? 0.5 : 1 }]}
         >
-          {saving ? (
-            'Saving...'
-          ) : (
-            'Save Perks'
-          )}
-        </Text>
+          <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>
+            {saving ? 'Saving...' : 'Save Perks'}
+          </Text>
+        </Pressable>
       )}
       {saving && (
         <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 4 }} />
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -147,7 +144,8 @@ const styles = StyleSheet.create({
   },
   perkBullet: { fontSize: 16, fontWeight: '900' },
   perkText: { fontSize: 13, fontWeight: '700' },
-  removeBtn: { fontSize: 13, fontWeight: '900', paddingHorizontal: 4 },
+  removeBtn: { minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  removeBtnText: { fontSize: 13, fontWeight: '900' },
   addRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   addInput: {
     flex: 1,
@@ -162,21 +160,19 @@ const styles = StyleSheet.create({
   addBtn: {
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  addBtnText: { fontSize: 12, fontWeight: '900' },
   saveBtn: {
     alignSelf: 'flex-start',
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 4,
-    overflow: 'hidden',
   },
+  saveBtnText: { fontSize: 12, fontWeight: '900' },
 });

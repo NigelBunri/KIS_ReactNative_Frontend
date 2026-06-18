@@ -9,8 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
 
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
@@ -91,35 +89,10 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     });
   }, []);
 
-  const handleScheduleProductDrop = useCallback((productId: string) => {
-    const options = [
-      { label: 'In 1 hour', ms: 60 * 60 * 1000 },
-      { label: 'In 24 hours', ms: 24 * 60 * 60 * 1000 },
-      { label: 'In 3 days', ms: 3 * 24 * 60 * 60 * 1000 },
-      { label: 'In 7 days', ms: 7 * 24 * 60 * 60 * 1000 },
-    ];
+  const handleScheduleProductDrop = useCallback((_productId: string) => {
     Alert.alert(
-      'Schedule drop',
-      'When should this product drop go live?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        ...options.map(opt => ({
-          text: opt.label,
-          onPress: async () => {
-            const scheduledAt = new Date(Date.now() + opt.ms).toISOString();
-            const res = await postRequest(
-              ROUTES.commerce.products,
-              { product: productId, scheduled_drop_at: scheduledAt },
-              { errorMessage: 'Unable to schedule drop.' },
-            );
-            if (res?.success || res?.id) {
-              Alert.alert('Scheduled', `Drop scheduled for ${opt.label.toLowerCase()}.`);
-            } else {
-              Alert.alert('Schedule', res?.message ?? 'Unable to schedule. Check your shop is active.');
-            }
-          },
-        })),
-      ],
+      'Coming soon',
+      'Scheduling product drops is not available yet. We are working on bringing timed drops to Market — check back soon.',
     );
   }, []);
   const { categories: catalogCategories, loading: catalogLoading } =

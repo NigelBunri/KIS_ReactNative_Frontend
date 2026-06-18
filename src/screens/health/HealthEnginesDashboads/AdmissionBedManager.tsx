@@ -13,6 +13,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -25,6 +26,7 @@ import {
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
+import { useKISTheme } from '@/theme/useTheme';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
 
@@ -68,6 +70,7 @@ const toSafeCount = (rawValue: string, fallback = 0) => {
 export default function AdmissionBedManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
@@ -143,8 +146,8 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .map((room) => ({ ...room, expanded: prevExpanded.get(room.id) || false }));
       });
-    } catch (error: any) {
-      Alert.alert('Admission & bed', error?.message || 'Unable to load room management data.');
+    } catch (err: any) {
+      Alert.alert('Admission & bed', err?.message || 'Unable to load room management data.');
     } finally {
       setLoading(false);
     }
@@ -361,6 +364,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
   }, [engineKey, institutionId]);
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView style={{ padding: spacing.md }}>
       <View
         style={{
@@ -482,7 +486,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
               <Text
                 style={{
                   fontWeight: '600',
-                  color: roomAvailable ? '#16a34a' : '#dc2626',
+                  color: roomAvailable ? kisPalette.success : kisPalette.danger,
                 }}
               >
                 {roomAvailable ? `${availableBeds} Beds Available` : 'Fully Occupied'}
@@ -502,7 +506,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
             </View>
 
             {room.expanded ? (
-              <View style={{ marginTop: -130 }}>
+              <View style={{ marginTop: spacing.sm }}>
                 {room.image ? (
                   <Image
                     source={{ uri: room.image }}
@@ -520,7 +524,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
                     style={{
                       padding: spacing.sm,
                       borderRadius: 10,
-                      backgroundColor: bed.available ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)',
+                      backgroundColor: bed.available ? kisPalette.successSoft : kisPalette.dangerSoft,
                       marginBottom: spacing.xs,
                     }}
                   >
@@ -552,6 +556,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
         );
       })}
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

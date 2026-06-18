@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,14 +37,13 @@ import {
   removeItemFromPlaylist,
   renamePlaylist,
   setPlaylistLoopMode,
+  setPlaylistVisibility,
   subscribeToPlaylists,
   toggleItemSelectedForLoop,
   type LoopMode,
   type Playlist,
   type PlaylistItem,
 } from './playlistManager';
-import { patchRequest } from '@/network/patch';
-import ROUTES from '@/network';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type RouteT = RouteProp<RootStackParamList, 'PlaylistDetail'>;
@@ -69,6 +69,8 @@ function getItemVideoAttachment(item: PlaylistItem['broadcastItem']): any | null
 
 export default function PlaylistDetailScreen() {
   const { palette, tokens } = useKISTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const videoHeight = Math.round(windowWidth * (9 / 16));
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteT>();
   const { playlistId, startIndex, autoPlay } = route.params;
@@ -318,29 +320,23 @@ export default function PlaylistDetailScreen() {
     Alert.alert('Visibility', 'Set playlist visibility', [
       {
         text: 'Public',
-        onPress: async () => {
+        onPress: () => {
           setVisibility('public');
-          if ((playlist as any).serverId) {
-            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'public' }, { errorMessage: 'Unable to update visibility.' });
-          }
+          setPlaylistVisibility(playlist.id, 'public');
         },
       },
       {
         text: 'Unlisted',
-        onPress: async () => {
+        onPress: () => {
           setVisibility('unlisted');
-          if ((playlist as any).serverId) {
-            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'unlisted' }, { errorMessage: 'Unable to update visibility.' });
-          }
+          setPlaylistVisibility(playlist.id, 'unlisted');
         },
       },
       {
         text: 'Private',
-        onPress: async () => {
+        onPress: () => {
           setVisibility('private');
-          if ((playlist as any).serverId) {
-            await patchRequest(ROUTES.broadcasts.userPlaylistDetail((playlist as any).serverId), { visibility: 'private' }, { errorMessage: 'Unable to update visibility.' });
-          }
+          setPlaylistVisibility(playlist.id, 'private');
         },
       },
       { text: 'Cancel', style: 'cancel' },
@@ -414,7 +410,7 @@ export default function PlaylistDetailScreen() {
               loop={loopMode === 'one'}
               allowFullScreen
               onEnd={handleVideoEnd}
-              containerStyle={styles.videoContainer}
+              containerStyle={[styles.videoContainer, { height: videoHeight }]}
             />
           ) : currentItem ? (
             // Non-video item: show a card

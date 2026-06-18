@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import type { KISPalette } from '@/theme/constants';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   fieldLabels,
   fieldPrivacyDescriptions,
@@ -23,6 +24,7 @@ type PrivacyModalProps = {
 
 export function PrivacyModal(props: PrivacyModalProps) {
   const { palette, draftPrivacy, setDraftPrivacy, saving, savePrivacy, profile } = props;
+  const responsive = useResponsiveLayout();
   const [customEntryDrafts, setCustomEntryDrafts] = useState<Record<string, string>>({});
   const activeFields = useMemo(() => {
     const sections = profile?.sections || {};
@@ -93,6 +95,7 @@ export function PrivacyModal(props: PrivacyModalProps) {
   };
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={{ gap: 16 }}>
       <View
         style={{
@@ -105,7 +108,7 @@ export function PrivacyModal(props: PrivacyModalProps) {
         }}
       >
         <Text style={[styles.privacyLabel, { color: palette.text }]}>Who can see each part of your profile</Text>
-        <Text style={{ color: palette.textMuted, fontSize: 12, lineHeight: 18 }}>
+        <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize, lineHeight: 18 }}>
           Public is visible to everyone. Contacts only is limited to mutual contacts. Custom lets you add specific
           people by user ID or phone number one at a time.
         </Text>
@@ -125,7 +128,7 @@ export function PrivacyModal(props: PrivacyModalProps) {
         >
           <View style={{ gap: 4 }}>
             <Text style={[styles.privacyLabel, { color: palette.text }]}>{group.title}</Text>
-            <Text style={{ color: palette.textMuted, fontSize: 12, lineHeight: 18 }}>{group.description}</Text>
+            <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize, lineHeight: 18 }}>{group.description}</Text>
           </View>
 
           {group.fields.map((key) => {
@@ -147,13 +150,13 @@ export function PrivacyModal(props: PrivacyModalProps) {
                         borderColor: palette.divider,
                       }}
                     >
-                      <Text style={{ color: palette.textMuted, fontSize: 11 }}>
+                      <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize - 1 }}>
                         {hasActiveContent ? 'Visible on profile' : 'No current content'}
                       </Text>
                     </View>
                   </View>
                   {fieldPrivacyDescriptions[key] ? (
-                    <Text style={{ color: palette.textMuted, fontSize: 12, lineHeight: 18 }}>
+                    <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize, lineHeight: 18 }}>
                       {fieldPrivacyDescriptions[key]}
                     </Text>
                   ) : null}
@@ -178,12 +181,12 @@ export function PrivacyModal(props: PrivacyModalProps) {
                         },
                       ]}
                     >
-                      <Text style={{ color: palette.text, fontSize: 12 }}>{opt.label}</Text>
+                      <Text style={{ color: palette.text, fontSize: responsive.labelFontSize }}>{opt.label}</Text>
                     </Pressable>
                   ))}
                 </View>
 
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>
                   {visibilityDescriptions[rule.visibility || 'public'] || visibilityDescriptions.public}
                 </Text>
 
@@ -220,17 +223,26 @@ export function PrivacyModal(props: PrivacyModalProps) {
                               backgroundColor: palette.primarySoft,
                             }}
                           >
-                            <Text style={{ color: palette.text, fontSize: 12, maxWidth: 180 }} numberOfLines={1}>
+                            <Text style={{ color: palette.text, fontSize: responsive.labelFontSize, maxWidth: 180 }} numberOfLines={1}>
                               {value}
                             </Text>
-                            <Pressable onPress={() => removeCustomTarget(key, rule, value)}>
-                              <Text style={{ color: palette.textMuted, fontSize: 12 }}>Remove</Text>
+                            <Pressable
+                              onPress={() => removeCustomTarget(key, rule, value)}
+                              style={{
+                                minHeight: responsive.minTouchTarget,
+                                minWidth: responsive.minTouchTarget,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              hitSlop={8}
+                            >
+                              <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>Remove</Text>
                             </Pressable>
                           </View>
                         ))}
                       </View>
                     ) : (
-                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                      <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>
                         No custom viewers added yet. Until you add someone, this field will stay hidden from other people.
                       </Text>
                     )}
@@ -244,5 +256,6 @@ export function PrivacyModal(props: PrivacyModalProps) {
 
       <KISButton title={saving ? 'Saving privacy...' : 'Save privacy'} onPress={savePrivacy} disabled={saving} />
     </View>
+    </KeyboardAvoidingView>
   );
 }

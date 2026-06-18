@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +11,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
@@ -111,6 +115,8 @@ type Props = {
 
 export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -226,7 +232,8 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const hasResults = results.length > 0;
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       {/* Search header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={[styles.inputRow, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
@@ -278,7 +285,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
                   },
                 ]}
               >
-                <Text style={[styles.filterPillText, { color: active ? '#fff' : palette.subtext }]}>
+                <Text style={[styles.filterPillText, { color: active ? palette.onPrimary : palette.subtext }]}>
                   {tab.label}
                 </Text>
               </Pressable>
@@ -320,7 +327,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
 
       {!loading && error ? (
         <View style={styles.centered}>
-          <Text style={{ color: palette.danger ?? '#d9534f' }}>{error}</Text>
+          <Text style={{ color: palette.danger }}>{error}</Text>
         </View>
       ) : null}
 
@@ -349,6 +356,13 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
         <FlatList
           data={sections}
           keyExtractor={([kind]) => kind}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No results found
+              </Text>
+            </View>
+          }
           renderItem={({ item: [kind, items] }) => (
             <View style={{ marginBottom: 8 }}>
               <Text style={[styles.sectionHeader, { color: palette.subtext }]}>
@@ -376,11 +390,12 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
               ))}
             </View>
           )}
-          contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
           keyboardShouldPersistTaps="handled"
         />
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

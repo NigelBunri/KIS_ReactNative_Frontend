@@ -15,9 +15,11 @@ import {
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useKISTheme } from '../theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '../constants/KISButton';
 import KISTextInput from '../constants/KISTextInput';
 import KISText from '@/components/common/KISText';
@@ -29,7 +31,7 @@ import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { setAuthTokens } from '@/security/authStorage';
 import { KIS_TOKENS } from '@/theme/constants';
 
-const makeStyles = (tokens: typeof KIS_TOKENS) =>
+const makeStyles = (tokens: typeof KIS_TOKENS, modalMaxWidth: number, backdropColor: string) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -75,12 +77,12 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.45)',
+      backgroundColor: backdropColor,
       padding: tokens.spacing.lg,
     },
     modalCard: {
       width: '100%',
-      maxWidth: 360,
+      maxWidth: modalMaxWidth,
       borderRadius: tokens.radius.xl,
       padding: tokens.spacing.lg,
     },
@@ -124,8 +126,11 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
 
 export default function LoginScreen({ navigation }: any) {
   const { palette, tokens } = useKISTheme();
-  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const responsive = useResponsiveLayout();
+  const modalMaxWidth = Math.min(440, responsive.contentMaxWidth - 32);
+  const styles = useMemo(() => makeStyles(tokens, modalMaxWidth, palette.backdrop), [tokens, modalMaxWidth, palette.backdrop]);
   const { setAuth, setPhone, setUser } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState<CountryCode>('CM');
@@ -389,7 +394,7 @@ export default function LoginScreen({ navigation }: any) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.root, { backgroundColor: palette.bg }]}
+        contentContainerStyle={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top || tokens.spacing['2xl'], paddingBottom: insets.bottom + tokens.spacing['2xl'] }]}
         keyboardShouldPersistTaps="handled"
       >
       <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>

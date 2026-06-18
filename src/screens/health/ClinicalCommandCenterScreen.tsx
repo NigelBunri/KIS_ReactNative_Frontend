@@ -27,6 +27,8 @@ import {
   HEALTH_THEME_SPACING,
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
+import { useKISTheme } from '@/theme/useTheme';
+import type { KISPalette } from '@/theme/constants';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ClinicalCommandCenter'>;
 
@@ -43,32 +45,32 @@ const TABS: { id: TabId; label: string }[] = [
 
 // ─── colour helpers ────────────────────────────────────────────────────────
 
-const PRIORITY_COLORS: Record<string, string> = {
-  high: '#EF4444',
-  medium: '#F97316',
-  low: '#22C55E',
-};
+const makePriorityColors = (p: KISPalette): Record<string, string> => ({
+  high: p.danger,
+  medium: p.gold,
+  low: p.success,
+});
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#EF4444',
-  urgent: '#F97316',
-  routine: '#3B82F6',
-};
+const makeSeverityColors = (p: KISPalette): Record<string, string> => ({
+  critical: p.danger,
+  urgent: p.gold,
+  routine: p.primary,
+});
 
-const TRIAGE_COLORS: Record<number, string> = {
-  1: '#EF4444',
-  2: '#F97316',
-  3: '#EAB308',
-  4: '#22C55E',
-  5: '#3B82F6',
-};
+const makeTriageColors = (p: KISPalette): Record<number, string> => ({
+  1: p.danger,
+  2: p.gold,
+  3: p.gold,
+  4: p.success,
+  5: p.primary,
+});
 
-const REFERRAL_STATUS_COLORS: Record<string, string> = {
-  pending: '#F97316',
-  accepted: '#22C55E',
-  completed: '#3B82F6',
-  declined: '#EF4444',
-};
+const makeReferralStatusColors = (p: KISPalette): Record<string, string> => ({
+  pending: p.gold,
+  accepted: p.success,
+  completed: p.primary,
+  declined: p.danger,
+});
 
 // Workflow phase pipeline — ordered list of phases with display metadata.
 type WorkflowPhase =
@@ -79,13 +81,13 @@ type WorkflowPhase =
   | 'billing'
   | 'discharged';
 
-const WORKFLOW_PHASES: Array<{ key: WorkflowPhase; label: string; color: string }> = [
-  { key: 'admission',   label: 'Admission',   color: '#3B82F6' },
-  { key: 'assessment',  label: 'Assessment',  color: '#EAB308' },
-  { key: 'treatment',   label: 'Treatment',   color: '#22C55E' },
-  { key: 'pharmacy',    label: 'Pharmacy',    color: '#A855F7' },
-  { key: 'billing',     label: 'Billing',     color: '#F97316' },
-  { key: 'discharged',  label: 'Discharged',  color: '#6B7280' },
+const makeWorkflowPhases = (p: KISPalette): Array<{ key: WorkflowPhase; label: string; color: string }> => [
+  { key: 'admission',   label: 'Admission',   color: p.primary },
+  { key: 'assessment',  label: 'Assessment',  color: p.gold },
+  { key: 'treatment',   label: 'Treatment',   color: p.success },
+  { key: 'pharmacy',    label: 'Pharmacy',    color: p.primary },
+  { key: 'billing',     label: 'Billing',     color: p.gold },
+  { key: 'discharged',  label: 'Discharged',  color: p.subtext },
 ];
 
 const NEXT_PHASE: Record<WorkflowPhase, WorkflowPhase | null> = {
@@ -143,8 +145,8 @@ function StatCard({
         },
       ]}
     >
-      <Text style={[statStyles.value, { color: accentColor }]}>{value}</Text>
-      <Text style={[statStyles.label, { color: palette.subtext }]}>{label}</Text>
+      <Text style={[statStyles.value, { color: accentColor, fontSize: HEALTH_THEME_TYPOGRAPHY.h2.fontSize }]}>{value}</Text>
+      <Text style={[statStyles.label, { color: palette.subtext, fontSize: HEALTH_THEME_TYPOGRAPHY.caption.fontSize }]}>{label}</Text>
     </View>
   );
 }
@@ -190,6 +192,12 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
+  const { palette: kisPalette } = useKISTheme();
+  const PRIORITY_COLORS = makePriorityColors(kisPalette);
+  const SEVERITY_COLORS = makeSeverityColors(kisPalette);
+  const TRIAGE_COLORS = makeTriageColors(kisPalette);
+  const REFERRAL_STATUS_COLORS = makeReferralStatusColors(kisPalette);
+  const WORKFLOW_PHASES = makeWorkflowPhases(kisPalette);
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -554,12 +562,12 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           At a glance
         </Text>
         <View style={sharedStyles.statsRow}>
-          <StatCard label="Open Tasks" value={openTasks} accentColor="#EF4444" palette={palette} />
-          <StatCard label="Active Escalations" value={activeEscalations} accentColor="#F97316" palette={palette} />
+          <StatCard label="Open Tasks" value={openTasks} accentColor={kisPalette.danger} palette={palette} />
+          <StatCard label="Active Escalations" value={activeEscalations} accentColor={kisPalette.gold} palette={palette} />
         </View>
         <View style={sharedStyles.statsRow}>
-          <StatCard label="Triage Queue" value={triageLength} accentColor="#EAB308" palette={palette} />
-          <StatCard label="Pending Referrals" value={pendingReferrals} accentColor="#3B82F6" palette={palette} />
+          <StatCard label="Triage Queue" value={triageLength} accentColor={kisPalette.gold} palette={palette} />
+          <StatCard label="Pending Referrals" value={pendingReferrals} accentColor={kisPalette.primary} palette={palette} />
         </View>
 
         <Text
@@ -625,7 +633,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   analyticsData.patient_count ??
                   '—'
                 }
-                accentColor="#3B82F6"
+                accentColor={kisPalette.primary}
                 palette={palette}
               />
               <StatCard
@@ -637,7 +645,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                     ? `${Number(analyticsData.avg_satisfaction).toFixed(1)}`
                     : '—'
                 }
-                accentColor="#22C55E"
+                accentColor={kisPalette.success}
                 palette={palette}
               />
             </View>
@@ -650,7 +658,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   analyticsData.outcomes ??
                   '—'
                 }
-                accentColor="#A855F7"
+                accentColor={kisPalette.primary}
                 palette={palette}
               />
               <StatCard
@@ -660,7 +668,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                     ? analyticsData.reports.length
                     : analyticsData.report_count ?? analyticsData.count ?? '—'
                 }
-                accentColor="#F97316"
+                accentColor={kisPalette.gold}
                 palette={palette}
               />
             </View>
@@ -688,13 +696,13 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               <StatCard
                 label="Audit Logs"
                 value={complianceData.auditLogs?.length ?? 0}
-                accentColor="#EAB308"
+                accentColor={kisPalette.gold}
                 palette={palette}
               />
               <StatCard
                 label="Credentials"
                 value={complianceData.credentials?.length ?? 0}
-                accentColor="#3B82F6"
+                accentColor={kisPalette.primary}
                 palette={palette}
               />
             </View>
@@ -747,7 +755,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           >
             {item.title ?? item.name ?? 'Task'}
           </Text>
-          <Badge label={priority} color={PRIORITY_COLORS[priority] ?? '#888'} />
+          <Badge label={priority} color={PRIORITY_COLORS[priority] ?? kisPalette.subtext} />
         </View>
         {item.assignee ? (
           <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
@@ -802,7 +810,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                 <Text
                   style={[
                     chipStyles.chipText,
-                    { color: active ? palette.background : palette.subtext },
+                    { color: active ? palette.bg : palette.subtext },
                   ]}
                 >
                   {f.label}
@@ -852,7 +860,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           >
             {item.patient_name ?? item.patientName ?? item.case_name ?? item.caseName ?? 'Patient'}
           </Text>
-          <Badge label={severity} color={SEVERITY_COLORS[severity] ?? '#888'} />
+          <Badge label={severity} color={SEVERITY_COLORS[severity] ?? kisPalette.subtext} />
         </View>
         {item.escalated_by ?? item.escalatedBy ? (
           <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
@@ -903,7 +911,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
 
   const renderTriageItem = ({ item }: { item: any }) => {
     const level: number = Number(item.triage_level ?? item.triageLevel ?? 5);
-    const levelColor = TRIAGE_COLORS[level] ?? '#888';
+    const levelColor = TRIAGE_COLORS[level] ?? kisPalette.subtext;
     return (
       <TouchableOpacity
         onPress={() => {
@@ -999,7 +1007,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           >
             {item.patient_name ?? item.patientName ?? 'Patient'}
           </Text>
-          <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? '#888'} />
+          <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? kisPalette.subtext} />
         </View>
         <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
           {item.from_clinician ?? item.fromClinician ?? '—'} → {item.to_clinician ?? item.toClinician ?? '—'}
@@ -1082,7 +1090,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                         workflowStyles.phaseChipText,
                         {
                           color: isActive
-                            ? '#fff'
+                            ? kisPalette.onPrimary
                             : isPast
                             ? color
                             : palette.subtext,
@@ -1139,10 +1147,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           <View
             style={[
               workflowStyles.advanceButton,
-              { backgroundColor: '#6B728022', borderColor: '#6B728066', borderWidth: 1, marginTop: 10 },
+              { backgroundColor: `${kisPalette.subtext}22`, borderColor: `${kisPalette.subtext}66`, borderWidth: 1, marginTop: 10 },
             ]}
           >
-            <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: 13 }}>Discharged</Text>
+            <Text style={{ color: kisPalette.subtext, fontWeight: '700', fontSize: 13 }}>Discharged</Text>
           </View>
         ) : nextPhaseMeta ? (
           <TouchableOpacity
@@ -1154,9 +1162,9 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             ]}
           >
             {advancing ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={kisPalette.onPrimary} size="small" />
             ) : (
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+              <Text style={{ color: kisPalette.onPrimary, fontWeight: '700', fontSize: 13 }}>
                 Advance to {nextPhaseMeta.label}
               </Text>
             )}
@@ -1236,7 +1244,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Task detail
               </Text>
-              <TouchableOpacity onPress={() => setTaskModalVisible(false)}>
+              <TouchableOpacity onPress={() => setTaskModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <KISIcon name="close" size={22} color={palette.text} />
               </TouchableOpacity>
             </View>
@@ -1245,7 +1253,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                 {selectedTask.title ?? selectedTask.name ?? 'Task'}
               </Text>
               <View style={{ marginVertical: 8 }}>
-                <Badge label={priority} color={PRIORITY_COLORS[priority] ?? '#888'} />
+                <Badge label={priority} color={PRIORITY_COLORS[priority] ?? kisPalette.subtext} />
               </View>
               {selectedTask.description ? (
                 <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
@@ -1275,9 +1283,9 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   ]}
                 >
                   {taskUpdating ? (
-                    <ActivityIndicator color={palette.background} />
+                    <ActivityIndicator color={palette.bg} />
                   ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: palette.background }]}>
+                    <Text style={[modalStyles.actionButtonText, { color: palette.bg }]}>
                       Mark Complete
                     </Text>
                   )}
@@ -1287,10 +1295,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                 <View
                   style={[
                     modalStyles.actionButton,
-                    { backgroundColor: '#22C55E22', borderColor: '#22C55E66', borderWidth: 1, marginTop: 24 },
+                    { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1, marginTop: 24 },
                   ]}
                 >
-                  <Text style={[modalStyles.actionButtonText, { color: '#22C55E' }]}>
+                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>
                     Completed
                   </Text>
                 </View>
@@ -1320,7 +1328,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Escalation detail
               </Text>
-              <TouchableOpacity onPress={() => setEscalationModalVisible(false)}>
+              <TouchableOpacity onPress={() => setEscalationModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <KISIcon name="close" size={22} color={palette.text} />
               </TouchableOpacity>
             </View>
@@ -1330,7 +1338,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   selectedEscalation.case_name ?? selectedEscalation.caseName ?? 'Patient'}
               </Text>
               <View style={{ marginVertical: 8 }}>
-                <Badge label={severity} color={SEVERITY_COLORS[severity] ?? '#888'} />
+                <Badge label={severity} color={SEVERITY_COLORS[severity] ?? kisPalette.subtext} />
               </View>
               {selectedEscalation.description ? (
                 <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
@@ -1356,13 +1364,13 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   disabled={escalationUpdating}
                   style={[
                     modalStyles.actionButton,
-                    { backgroundColor: '#3B82F6', marginTop: 24 },
+                    { backgroundColor: kisPalette.primary, marginTop: 24 },
                   ]}
                 >
                   {escalationUpdating ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={kisPalette.onPrimary} />
                   ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: '#fff' }]}>
+                    <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>
                       Acknowledge
                     </Text>
                   )}
@@ -1374,13 +1382,13 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   disabled={escalationUpdating}
                   style={[
                     modalStyles.actionButton,
-                    { backgroundColor: '#22C55E', marginTop: 12 },
+                    { backgroundColor: kisPalette.success, marginTop: 12 },
                   ]}
                 >
                   {escalationUpdating ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={kisPalette.onPrimary} />
                   ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: '#fff' }]}>
+                    <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>
                       Resolve
                     </Text>
                   )}
@@ -1390,10 +1398,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                 <View
                   style={[
                     modalStyles.actionButton,
-                    { backgroundColor: '#22C55E22', borderColor: '#22C55E66', borderWidth: 1, marginTop: 24 },
+                    { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1, marginTop: 24 },
                   ]}
                 >
-                  <Text style={[modalStyles.actionButtonText, { color: '#22C55E' }]}>
+                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>
                     Resolved
                   </Text>
                 </View>
@@ -1408,7 +1416,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   const renderTriageModal = () => {
     if (!selectedTriage) return null;
     const level: number = Number(selectedTriage.triage_level ?? selectedTriage.triageLevel ?? 5);
-    const levelColor = TRIAGE_COLORS[level] ?? '#888';
+    const levelColor = TRIAGE_COLORS[level] ?? kisPalette.subtext;
     return (
       <Modal
         visible={triageModalVisible}
@@ -1422,7 +1430,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Triage detail
               </Text>
-              <TouchableOpacity onPress={() => setTriageModalVisible(false)}>
+              <TouchableOpacity onPress={() => setTriageModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <KISIcon name="close" size={22} color={palette.text} />
               </TouchableOpacity>
             </View>
@@ -1455,6 +1463,68 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   {selectedTriage.notes}
                 </Text>
               ) : null}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!selectedTriage?.id) return;
+                    Alert.alert(
+                      'Update triage level',
+                      'Select new acuity level:',
+                      [
+                        {
+                          text: 'Routine',
+                          onPress: async () => {
+                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'routine' }).catch(() => undefined);
+                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'routine' } : t));
+                            setTriageModalVisible(false);
+                          },
+                        },
+                        {
+                          text: 'Elevated',
+                          onPress: async () => {
+                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'elevated' }).catch(() => undefined);
+                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'elevated' } : t));
+                            setTriageModalVisible(false);
+                          },
+                        },
+                        {
+                          text: 'Urgent',
+                          style: 'destructive',
+                          onPress: async () => {
+                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'urgent' }).catch(() => undefined);
+                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'urgent' } : t));
+                            setTriageModalVisible(false);
+                          },
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                      ],
+                    );
+                  }}
+                  style={{ flex: 1, backgroundColor: kisPalette.gold + '22', borderWidth: 1, borderColor: kisPalette.gold, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                >
+                  <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.gold }]}>Update Level</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!selectedTriage?.id) return;
+                    Alert.prompt(
+                      'Reassign clinician',
+                      'Enter clinician name or ID:',
+                      async (clinicianName: string) => {
+                        if (!clinicianName?.trim()) return;
+                        const meta = { ...(selectedTriage.metadata ?? {}), reassigned_to: clinicianName.trim() };
+                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { metadata: meta }).catch(() => undefined);
+                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, metadata: meta } : t));
+                        setTriageModalVisible(false);
+                      },
+                      'plain-text',
+                    );
+                  }}
+                  style={{ flex: 1, backgroundColor: kisPalette.info + '22', borderWidth: 1, borderColor: kisPalette.info, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                >
+                  <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.info }]}>Reassign</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </SafeAreaView>
         </LinearGradient>
@@ -1478,7 +1548,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Referral detail
               </Text>
-              <TouchableOpacity onPress={() => setReferralModalVisible(false)}>
+              <TouchableOpacity onPress={() => setReferralModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <KISIcon name="close" size={22} color={palette.text} />
               </TouchableOpacity>
             </View>
@@ -1487,7 +1557,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                 {selectedReferral.patient_name ?? selectedReferral.patientName ?? 'Patient'}
               </Text>
               <View style={{ marginVertical: 8 }}>
-                <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? '#888'} />
+                <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? kisPalette.subtext} />
               </View>
               <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
                 From: {selectedReferral.from_clinician ?? selectedReferral.fromClinician ?? '—'}
@@ -1510,6 +1580,44 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   {selectedReferral.notes}
                 </Text>
               ) : null}
+              {(selectedReferral.status ?? 'pending').toLowerCase() === 'pending' && (
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'accepted' });
+                        setReferrals((prev) =>
+                          prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'accepted' } : r)),
+                        );
+                        setSelectedReferral((prev: any) => ({ ...prev, status: 'accepted' }));
+                        setReferralModalVisible(false);
+                      } catch (e: any) {
+                        Alert.alert('Accept referral', e?.message || 'Failed to accept referral. Please try again.');
+                      }
+                    }}
+                    style={{ flex: 1, backgroundColor: kisPalette.success + '22', borderWidth: 1, borderColor: kisPalette.success, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                  >
+                    <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.success }]}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'declined' });
+                        setReferrals((prev) =>
+                          prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'declined' } : r)),
+                        );
+                        setSelectedReferral((prev: any) => ({ ...prev, status: 'declined' }));
+                        setReferralModalVisible(false);
+                      } catch (e: any) {
+                        Alert.alert('Decline referral', e?.message || 'Failed to decline referral. Please try again.');
+                      }
+                    }}
+                    style={{ flex: 1, backgroundColor: kisPalette.danger + '22', borderWidth: 1, borderColor: kisPalette.danger, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                  >
+                    <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.danger }]}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </ScrollView>
           </SafeAreaView>
         </LinearGradient>
@@ -1520,7 +1628,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   // ─── root render ──────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         {/* Header */}
         <View
@@ -1533,6 +1641,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             onPress={() => navigation.goBack()}
             style={headerStyles.backButton}
             accessibilityLabel="Go back"
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
           >
             <KISIcon name="arrowleft" size={22} color={palette.text} />
           </TouchableOpacity>
@@ -1633,6 +1742,8 @@ const tabStyles = StyleSheet.create({
   tab: {
     paddingHorizontal: 14,
     paddingVertical: 12,
+    minHeight: 44,
+    justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -1646,6 +1757,8 @@ const chipStyles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 99,
     borderWidth: 1,
   },

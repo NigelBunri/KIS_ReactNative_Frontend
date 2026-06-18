@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -11,6 +13,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -270,7 +273,7 @@ const SectionCard = ({
       backgroundColor: palette.surfaceElevated,
       borderRadius: 20,
       padding: 16,
-      shadowColor: '#000',
+      shadowColor: palette.royalInk,
       shadowOpacity: 0.08,
       shadowRadius: 14,
       elevation: 5,
@@ -288,6 +291,7 @@ const SectionCard = ({
 
 const ServiceBookingScreen = () => {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation();
   const route = useRoute<ServiceBookingRouteProp>();
   const { serviceId, serviceName } = route.params ?? {};
@@ -1190,7 +1194,7 @@ const ServiceBookingScreen = () => {
             </View>
           ) : null}
           {bookingError ? (
-            <Text style={{ color: palette.primaryStrong, fontSize: 13 }}>
+            <Text style={{ color: palette.danger, fontSize: 13 }}>
               {bookingError}
             </Text>
           ) : null}
@@ -1367,7 +1371,7 @@ const ServiceBookingScreen = () => {
             ) : null}
           </SectionCard>
           {bookingError ? (
-            <Text style={{ color: palette.primaryStrong, fontSize: 13 }}>
+            <Text style={{ color: palette.danger, fontSize: 13 }}>
               {bookingError}
             </Text>
           ) : null}
@@ -1431,7 +1435,7 @@ const ServiceBookingScreen = () => {
       <Pressable
         style={{
           flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.35)',
+          backgroundColor: palette.overlay,
           justifyContent: 'center',
           padding: 24,
         }}
@@ -1594,7 +1598,8 @@ const ServiceBookingScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <SectionCard
           title={service?.name ?? serviceName ?? 'Service booking'}
           palette={palette}
@@ -1633,7 +1638,7 @@ const ServiceBookingScreen = () => {
                 }}
               >
                 <Text
-                  style={{ color: palette.onPrimary ?? '#fff', fontSize: 12 }}
+                  style={{ color: palette.onPrimary, fontSize: 12 }}
                 >
                   {text}
                 </Text>
@@ -1754,6 +1759,7 @@ const ServiceBookingScreen = () => {
           )}
         </SectionCard>
       </ScrollView>
+      </KeyboardAvoidingView>
       {slotModal}
     </SafeAreaView>
   );
@@ -1784,7 +1790,7 @@ const buildStepIndicator = (
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>
               {index + 1}
             </Text>
           </View>

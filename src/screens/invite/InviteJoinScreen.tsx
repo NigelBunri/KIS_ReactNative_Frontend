@@ -9,9 +9,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
@@ -21,6 +23,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'InviteJoin'>;
 export default function InviteJoinScreen({ route, navigation }: Props) {
   const { type, token } = route.params;
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -106,8 +110,8 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const displayName = groupName ? `"${groupName}"` : label;
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.bg }]}>
+      <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk, maxWidth: responsive.contentMaxWidth }]}>
         {status === 'loading' && (
           <>
             <ActivityIndicator size="large" color={palette.primary} style={{ marginBottom: 16 }} />
@@ -120,7 +124,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
         {status === 'success' && (
           <>
-            <Text style={[styles.icon]}>✓</Text>
+            <Text style={[styles.icon, { color: palette.success }]}>✓</Text>
             <Text style={[styles.title, { color: palette.text }]}>Welcome!</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               {message}{groupName ? `\n${displayName}` : ''}
@@ -132,7 +136,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
                 { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1 },
               ]}
             >
-              <Text style={[styles.btnText, { color: palette.buttonText ?? '#fff' }]}>
+              <Text style={[styles.btnText, { color: palette.onPrimary }]}>
                 {conversationId ? 'Open Chat' : 'Continue'}
               </Text>
             </Pressable>
@@ -141,7 +145,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
         {status === 'error' && (
           <>
-            <Text style={styles.errorIcon}>✕</Text>
+            <Text style={[styles.errorIcon, { color: palette.danger }]}>✕</Text>
             <Text style={[styles.title, { color: palette.text }]}>Unable to join</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>{message}</Text>
             <Pressable
@@ -169,11 +173,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 360,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -182,12 +184,10 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 48,
     marginBottom: 12,
-    color: '#22c55e',
   },
   errorIcon: {
     fontSize: 48,
     marginBottom: 12,
-    color: '#ef4444',
   },
   title: {
     fontSize: 22,

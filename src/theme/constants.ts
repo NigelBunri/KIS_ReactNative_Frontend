@@ -78,7 +78,7 @@ export const KIS_COLORS = {
 
 export const KIS_ROYAL_GRADIENTS = {
   goldLight: ['#FFF7C8', '#E6C66B', '#B9852E', '#70450D'],
-  goldDark: ['#7A4B16', '#B9852E', '#E7C76D', '#6F4515'],
+  goldDark: ['#3F2506', '#6F4515', '#9A6A14', '#5E3B0A'],
   goldPressed: ['#6B4212', '#9A6A14', '#D6B15E', '#5E3B0A'],
   purpleLight: ['#EEE4FA', '#6E35B7', '#2A0F45'],
   purpleDark: ['#2A0F45', '#4B1D78', '#09070D'],
@@ -140,6 +140,7 @@ export type KISPalette = {
   royalPanelText: string;
   royalPanelSubtext: string;
   goldReadable: string;
+  onGold: string;
   goldBorder: string;
   selectedBg: string;
   selectedText: string;
@@ -149,6 +150,7 @@ export type KISPalette = {
   focusRing: string;
 
   // Brand tints/intensities used in UI
+  primaryWeak: string;    // very light tint — subtler than primarySoft
   primarySoft: string;
   primaryStrong: string;
 
@@ -211,25 +213,32 @@ export const createPalette = (tone: KISTone): KISPalette => {
   // sensible elevated default when not provided by swatches
   const elevated = tone === 'dark' ? '#3c3847ff' : '#F4DDBD';
 
-  const lightCoffeePrimary = '#7A4B3E';
-  const lightCoffeeStrong = '#5A372D';
-  const lightTanGold = '#D9A875';
+  // KIS brand colors — same hex in both themes for fills and accents
+  const coffeePrimary = '#7A4B3E';
+  const coffeeStrong = '#5A372D';
+  const tanGold = '#D9A875';
+  const coffeeDivider = '#E7C7A1';
   const lightRoyalPurple = '#4B1D78';
   const lightRoyalPurpleSoft = '#F4ECFF';
   const lightRoyalCream = '#FFF9EE';
-  const darkReadableGold = '#E7C76D';
-  const darkReadableGoldStrong = '#FFF0A8';
-  const darkGoldSoftSurface = 'rgba(231,199,109,0.18)';
-  const darkGoldMutedBorder = 'rgba(231,199,109,0.42)';
 
-  // Soft tint derived from the active primary color.
+  // In dark mode, fills use the same coffee-brown/tan-gold as light theme (paired with
+  // white text via onPrimary). For bare text/icons drawn directly on the near-black bg,
+  // tanGold (#D9A875) is the right choice — it IS the light theme's gold and passes
+  // 9.5:1 contrast against #09070D, so it looks identical to what you see in light mode.
+  const goldOnDark = tanGold;
+
+  const primaryWeak =
+    tone === 'dark'
+      ? 'rgba(122,75,62,0.08)'   // very faint coffee-brown tint on dark bg
+      : 'rgba(217,168,117,0.10)'; // very faint tan-gold tint on light bg
+
   const primarySoft =
     tone === 'dark'
-      ? 'rgba(201,162,74,0.20)'
-      : 'rgba(217,168,117,0.24)';
+      ? 'rgba(122,75,62,0.18)'   // coffee-brown tint on dark bg
+      : 'rgba(217,168,117,0.24)'; // tan-gold tint on light bg
 
-  // stronger color used for text/icons on top of primarySoft
-  const primaryStrong = tone === 'dark' ? darkReadableGoldStrong : lightCoffeeStrong;
+  const primaryStrong = tone === 'dark' ? goldOnDark : coffeeStrong;
 
   // dimming veil for modals
   const backdrop =
@@ -278,11 +287,11 @@ export const createPalette = (tone: KISTone): KISPalette => {
   // A distinct teal-blue so "read" ticks are clearly different from grey "delivered" ticks
   const readStatus = tone === 'dark' ? '#34D1BF' : '#1A9E8F';
 
-  const onPrimary = tone === 'dark' ? base.bg : '#FFFFFF';
-  const onPrimaryMuted =
-    tone === 'dark'
-      ? c.brand.goldSoft
-      : '#F6E8BD';
+  // Primary and metallic dark-gold fills use white text/icons. Very light gold
+  // chips should override this locally with royalInk.
+  const onPrimary = '#FFFFFF';
+  const onGold = '#FFFFFF';
+  const onPrimaryMuted = '#F6E8BD';
 
   const disabled =
     tone === 'dark'
@@ -319,26 +328,27 @@ export const createPalette = (tone: KISTone): KISPalette => {
     mutedText: base.subtext,     // 🆕 keeps request banners aligned with subtext
     inverseText: tone === 'dark' ? c.brand.royalInk : '#FFFFFF',
 
-    // Inputs & borders
+    // Inputs & borders — tan-gold (#D9A875) is the light-theme border color and reads
+    // well at 9.5:1 on dark bg, so we use it directly in both themes.
     inputBg: base.inputBg,
-    inputBorder: base.inputBorder,
-    border: base.inputBorder,
-    borderMuted: tone === 'dark' ? c.brand.goldShadow : '#E7C7A1',
-    divider: base.divider,
+    inputBorder: tone === 'dark' ? tanGold : base.inputBorder,
+    border: tone === 'dark' ? tanGold : base.inputBorder,
+    borderMuted: tone === 'dark' ? 'rgba(217,168,117,0.38)' : coffeeDivider,
+    divider: tone === 'dark' ? 'rgba(231,199,161,0.30)' : base.divider,
 
-    // Brand
-    primary: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
-    secondary: tone === 'dark' ? c.brand.secondary : lightCoffeeStrong,
+    // Brand — same brown-gold hex in both themes
+    primary: coffeePrimary,
+    secondary: tone === 'dark' ? c.brand.secondary : coffeeStrong,
     gradientStart: tone === 'dark' ? c.brand.gradientStart : '#F2D8B8',
-    gradientEnd: tone === 'dark' ? c.brand.gradientEnd : lightCoffeePrimary,
+    gradientEnd: tone === 'dark' ? c.brand.gradientEnd : coffeePrimary,
     goldHighlight: c.brand.goldHighlight,
     goldLight: c.brand.goldLight,
-    gold: tone === 'dark' ? darkReadableGold : lightTanGold,
+    gold: tanGold,
     goldRose: c.brand.goldRose,
-    goldDeep: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
+    goldDeep: coffeePrimary,
     goldShadow: tone === 'dark' ? '#B9852E' : c.brand.goldShadow,
-    goldSoft: tone === 'dark' ? darkGoldSoftSurface : c.brand.goldSoft,
-    goldMuted: tone === 'dark' ? darkGoldMutedBorder : c.brand.goldMuted,
+    goldSoft: tone === 'dark' ? 'rgba(217,168,117,0.15)' : c.brand.goldSoft,
+    goldMuted: tone === 'dark' ? 'rgba(217,168,117,0.35)' : c.brand.goldMuted,
     goldGradientStart: c.brand.goldGradientStart,
     goldGradientMid: c.brand.goldGradientMid,
     goldGradientEnd: c.brand.goldGradientEnd,
@@ -354,16 +364,19 @@ export const createPalette = (tone: KISTone): KISPalette => {
     royalPanel: tone === 'dark' ? '#211331' : lightRoyalPurple,
     royalPanelText: tone === 'dark' ? c.brand.goldHighlight : '#FFFFFF',
     royalPanelSubtext: tone === 'dark' ? c.brand.goldSoft : '#F8F1E3',
-    goldReadable: tone === 'dark' ? darkReadableGoldStrong : '#5E3B0A',
-    goldBorder: tone === 'dark' ? darkGoldMutedBorder : '#B9852E',
-    selectedBg: tone === 'dark' ? 'rgba(231,199,109,0.18)' : lightRoyalPurpleSoft,
-    selectedText: tone === 'dark' ? darkReadableGoldStrong : lightRoyalPurple,
-    selectedBorder: tone === 'dark' ? darkReadableGold : '#B9852E',
-    badgeBg: tone === 'dark' ? '#B9852E' : '#5A372D',
+    // goldReadable: tan-gold text on dark bg (9.5:1 contrast) — same color family as light theme
+    goldReadable: tone === 'dark' ? goldOnDark : '#5E3B0A',
+    onGold,
+    goldBorder: tone === 'dark' ? tanGold : '#B9852E',
+    selectedBg: tone === 'dark' ? 'rgba(217,168,117,0.15)' : lightRoyalPurpleSoft,
+    selectedText: tone === 'dark' ? goldOnDark : lightRoyalPurple,
+    selectedBorder: tone === 'dark' ? tanGold : '#B9852E',
+    badgeBg: tone === 'dark' ? coffeePrimary : coffeeStrong,
     badgeText: '#FFFFFF',
-    focusRing: tone === 'dark' ? 'rgba(255,240,168,0.70)' : 'rgba(75,29,120,0.36)',
+    focusRing: tone === 'dark' ? 'rgba(217,168,117,0.70)' : 'rgba(75,29,120,0.36)',
 
     // Brand tints/intensities
+    primaryWeak,
     primarySoft,
     primaryStrong,
 
@@ -408,8 +421,10 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
     // Compatibility aliases
     muted: base.subtext,
-    accent: tone === 'dark' ? darkReadableGold : lightCoffeePrimary,
-    accentPrimary: tone === 'dark' ? darkReadableGoldStrong : lightCoffeePrimary,
+    accent: coffeePrimary,
+    // accentPrimary is used as bare text/icon on the page bg, so dark mode uses
+    // goldOnDark (= tanGold) which is the same color family but readable on near-black.
+    accentPrimary: tone === 'dark' ? goldOnDark : coffeePrimary,
     surfaceSoft: elevated,
     successSoft,
     dangerSoft,

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 
 import FeedItemCard from '@/components/broadcast/FeedItemCard';
@@ -32,6 +32,7 @@ export default function TrendingClipsSection({
   onReact,
 }: Props) {
   const { palette } = useKISTheme();
+  const { width: windowWidth } = useWindowDimensions();
 
   const mapped = useMemo(() => {
     return items.map(it => ({
@@ -66,7 +67,7 @@ export default function TrendingClipsSection({
       >
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {mapped.map(it => (
-            <View key={it.id} style={{ width: 300 }}>
+            <View key={it.id} style={{ width: Math.min(windowWidth * 0.82, 300) }}>
               <FeedItemCard
                 item={it as any}
                 onPress={() => onOpen(it)}

@@ -29,6 +29,11 @@ const authRoutes = {
     twoFactorEnable: `${API_BASE_URL}/api/v1/auth/2fa/enable/`,
     twoFactorDisable: `${API_BASE_URL}/api/v1/auth/2fa/disable/`,
     twoFactorStatus: `${API_BASE_URL}/api/v1/auth/2fa/status/`,
+    accountDelete: `${API_BASE_URL}/api/v1/auth/account/`,
+    dataExport: `${API_BASE_URL}/api/v1/auth/data-export/`,
+    passwordChange: `${API_BASE_URL}/api/v1/auth/password/change/`,
+    quicklockPin: `${API_BASE_URL}/api/v1/auth/quicklock-pin/`,
+    quicklockPinVerify: `${API_BASE_URL}/api/v1/auth/quicklock-pin/verify/`,
   },
   user: {
     profile: `${API_BASE_URL}/api/v1/users/me/`,

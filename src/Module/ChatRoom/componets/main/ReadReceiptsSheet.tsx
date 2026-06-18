@@ -94,7 +94,7 @@ export const ReadReceiptsSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.surface ?? palette.background,
+            backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
           },
         ]}

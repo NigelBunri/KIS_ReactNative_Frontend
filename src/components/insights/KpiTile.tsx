@@ -15,7 +15,7 @@ export default function KpiTile({ kpi }: Props) {
       : typeof kpi.change === 'string'
       ? kpi.change
       : null;
-  const changeColor = kpi.change && Number(kpi.change) >= 0 ? palette.success : palette.error;
+  const changeColor = kpi.change && Number(kpi.change) >= 0 ? palette.success : palette.danger;
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.surface, borderColor: palette.border }]}>

@@ -1,17 +1,19 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  Platform,
   View,
   DeviceEventEmitter,
 } from 'react-native';
@@ -154,10 +156,12 @@ export default function UpdatesTab({
 }: UpdatesTabProps) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const { currentUserId } = useSocket();
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [statusUsers, setStatusUsers] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(false);
@@ -415,6 +419,14 @@ export default function UpdatesTab({
   React.useEffect(() => {
     loadStatuses();
   }, [loadStatuses]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    channelsLastLoadAtRef.current = 0;
+    statusesLastLoadAtRef.current = 0;
+    await Promise.all([loadChannels(), loadStatuses()]);
+    setRefreshing(false);
+  }, [loadChannels, loadStatuses]);
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
@@ -939,8 +951,17 @@ export default function UpdatesTab({
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={palette.primaryStrong}
+          />
+        }
+      >
         {/* Status row */}
         <View style={styles.sectionHeader}>
           <KISText preset="h3" color={palette.text}>
@@ -976,6 +997,11 @@ export default function UpdatesTab({
             keyExtractor={item => item.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.statusRow}
+            ListEmptyComponent={
+              <Text style={{ color: palette.subtext, paddingHorizontal: 16, paddingVertical: 8 }}>
+                No updates yet.
+              </Text>
+            }
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => {
@@ -1143,7 +1169,7 @@ export default function UpdatesTab({
 
       {/* Channel preview + subscribe */}
       <Modal visible={channelPreviewOpen} transparent animationType="slide">
-        <View style={styles.channelPreviewBackdrop}>
+        <View style={[styles.channelPreviewBackdrop, { backgroundColor: palette.royalInk }]}>
           <Pressable
             style={styles.channelPreviewClose}
             onPress={() => {
@@ -1197,7 +1223,7 @@ export default function UpdatesTab({
             >
               <Text
                 style={{
-                  color: palette.onPrimary ?? '#fff',
+                  color: palette.onPrimary,
                   fontWeight: '700',
                 }}
               >
@@ -1211,7 +1237,7 @@ export default function UpdatesTab({
       {/* Create channel modal */}
       <Modal visible={showCreateChannel} transparent animationType="fade">
         <Pressable
-          style={styles.modalBackdrop}
+          style={[styles.modalBackdrop, { backgroundColor: palette.royalInk }]}
           onPress={() => setShowCreateChannel(false)}
         >
           <View />
@@ -1229,7 +1255,8 @@ export default function UpdatesTab({
 
       {/* Status composer */}
       <Modal visible={statusComposerOpen} transparent animationType="slide">
-        <View style={styles.composerBackdrop}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={[styles.composerBackdrop, { backgroundColor: palette.royalInk }]}>
           <View
             style={[styles.composerCard, { backgroundColor: palette.card }]}
           >
@@ -1651,7 +1678,7 @@ export default function UpdatesTab({
                   },
                 ]}
               >
-                <Text style={{ color: palette.inverseText ?? '#fff' }}>
+                <Text style={{ color: palette.onPrimary }}>
                   Post
                 </Text>
               </Pressable>
@@ -1770,6 +1797,7 @@ export default function UpdatesTab({
             ) : null}
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Status viewer */}
@@ -1961,17 +1989,17 @@ export default function UpdatesTab({
               onLayout={e => { seekBarWidthRef.current = e.nativeEvent.layout.width; }}
               {...seekPanResponder.panHandlers}
             >
-              <View style={[styles.videoSeekTrack, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+              <View style={[styles.videoSeekTrack, { backgroundColor: palette.divider }]}>
                 <View
                   style={[
                     styles.videoSeekFill,
-                    { width: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%`, backgroundColor: '#fff' },
+                    { width: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%`, backgroundColor: palette.ivory },
                   ]}
                 />
                 <View
                   style={[
                     styles.videoSeekThumb,
-                    { left: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%` },
+                    { left: `${Math.round(Math.max(0, Math.min(1, viewerProgress)) * 100)}%`, backgroundColor: palette.ivory },
                   ]}
                 />
               </View>
@@ -1980,13 +2008,13 @@ export default function UpdatesTab({
 
           {/* Status reply input — shown for other users' statuses when replies are allowed */}
           {activeUser && activeUser.id !== 'me' && activeUser.userId !== currentUserId && currentItem?.replyPermission !== 'nobody' && (
-            <View style={[styles.viewerReplyRow, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
+            <View style={[styles.viewerReplyRow, { backgroundColor: palette.royalInk }]}>
               <TextInput
                 value={viewerReplyText}
                 onChangeText={setViewerReplyText}
                 placeholder={`Reply to ${activeUser.name}…`}
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                style={[styles.viewerReplyInput, { color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }]}
+                placeholderTextColor={palette.subtext}
+                style={[styles.viewerReplyInput, { color: palette.ivory, borderColor: palette.divider }]}
                 returnKeyType="send"
                 onSubmitEditing={handleSendReply}
               />
@@ -1995,7 +2023,7 @@ export default function UpdatesTab({
                 disabled={sendingReply || !viewerReplyText.trim()}
                 style={[styles.viewerReplySend, { backgroundColor: palette.primary }]}
               >
-                <KISIcon name="send" size={16} color="#fff" />
+                <KISIcon name="send" size={16} color={palette.onPrimary} />
               </Pressable>
             </View>
           )}
@@ -2014,8 +2042,8 @@ export default function UpdatesTab({
                 }
               }}
             >
-              <KISIcon name="eye" size={14} color="rgba(255,255,255,0.8)" />
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginLeft: 4 }}>
+              <KISIcon name="eye" size={14} color={palette.ivory} />
+              <Text style={{ color: palette.ivory, fontSize: 12, marginLeft: 4 }}>
                 {currentItem.viewed ? 'Seen' : 'Not yet seen'}
               </Text>
             </Pressable>
@@ -2092,11 +2120,9 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   channelPreviewBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     padding: 20,
   },
@@ -2132,7 +2158,6 @@ const styles = StyleSheet.create({
   },
   composerBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
   composerCard: {
@@ -2233,19 +2258,21 @@ const styles = StyleSheet.create({
   progressTrack: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 999,
     overflow: 'hidden',
   },
   progressFill: {
     height: 3,
-    backgroundColor: '#fff',
   },
   viewerClose: {
     position: 'absolute',
     top: 8,
     right: 16,
-    padding: 8,
+    padding: 13,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 50,
   },
   viewerTapZone: {
@@ -2280,7 +2307,6 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#fff',
     marginLeft: -8,
   },
   viewerReplyRow: {
@@ -2300,9 +2326,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   viewerReplySend: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2311,6 +2337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 12,
+    minHeight: 44,
     zIndex: 15,
   },
   viewerContent: {

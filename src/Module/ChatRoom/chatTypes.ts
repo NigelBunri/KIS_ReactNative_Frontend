@@ -144,6 +144,7 @@ export type PollOption = {
   id: string;
   text: string;
   votes?: number;
+  voterIds?: string[];
 };
 
 export type PollMessage = {
@@ -179,6 +180,8 @@ export type LocationMessage = {
   longitude: number;
   address?: string;
   title?: string;
+  isLive?: boolean;
+  expiresAt?: number | string;
 };
 
 /* ============================================================================
@@ -355,6 +358,12 @@ export type ChatMessage = {
 
   /** Mentioned user IDs (extracted from @mentions in text) */
   mentionedUserIds?: string[];
+
+  /** Prevents this message from being forwarded */
+  noForward?: boolean;
+
+  /** Edit history entries (previous text snapshots) */
+  editHistory?: Array<{ editedAt: string; previousText?: string }>;
 };
 
 /* ============================================================================

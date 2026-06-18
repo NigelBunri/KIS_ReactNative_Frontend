@@ -194,7 +194,7 @@ const ShopProductsPage = () => {
           <View style={productStyles.cardBody}>
             <Image
               source={imageUri ? { uri: imageUri } : fallbackCover}
-              style={productStyles.cardImage}
+              style={[productStyles.cardImage, { backgroundColor: palette.surface }]}
               resizeMode="cover"
             />
             <View style={productStyles.cardContent}>
@@ -258,7 +258,7 @@ const ShopProductsPage = () => {
             />
             {!alreadyInCart && (
               <KISButton
-                title="Add to cart"
+                title="Buy now"
                 size="xs"
                 style={productStyles.actionButton}
                 onPress={() => openProductDetail(String(item.id ?? ''))}
@@ -289,7 +289,7 @@ const ShopProductsPage = () => {
         <Text
           style={[
             productStyles.errorText,
-            { color: palette.error || '#E53935' },
+            { color: palette.danger },
           ]}
         >
           Shop not specified.
@@ -331,7 +331,7 @@ const ShopProductsPage = () => {
           <Text
             style={[
               productStyles.errorText,
-              { color: palette.error || '#E53935' },
+              { color: palette.danger },
             ]}
           >
             {error}
@@ -432,7 +432,6 @@ const productStyles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
   },
   cardContent: {
     flex: 1,

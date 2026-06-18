@@ -4,10 +4,10 @@ import {
   View,
   Modal,
   useColorScheme,
-  ScrollView,
-  SafeAreaView,
   TouchableOpacity,
+  Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -76,10 +76,10 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
       return <AppointmentEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Video Consultation Engine":
-      return <VideoConsultationEngine />;
+      return <VideoConsultationEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Secure Messaging Engine":
-      return <SecureMessagingEngine />;
+      return <SecureMessagingEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "E-Prescription Engine":
       return <EPrescriptionEngine institutionId={institutionId} engineKey={engineKey} />;
@@ -91,32 +91,79 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
       return <ImagingOrderEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Emergency Dispatch Engine":
-      return <EmergencyDispatchEngine />;
+      return <EmergencyDispatchEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Pharmacy & Fulfillment Engine":
       return <PharmacyManager institutionId={institutionId} engineKey={engineKey} />;
 
     case "Home Logistics Engine":
-      return <HomeLogisticsEngine />;
+      return <HomeLogisticsEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Wellness Program Engine":
-      return <WellnessProgramEngine />;
+      return <WellnessProgramEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "EHR / Health Records Engine":
-      return <EHRManager />;
+      return <EHRManager institutionId={institutionId} engineKey={engineKey} />;
 
     case "Notification & Reminder Engine":
-      return <NotificationReminderEngine />;
+      return <NotificationReminderEngine institutionId={institutionId} engineKey={engineKey} />;
 
     case "Payment & Billing Engine":
       return <PaymentBillingManager institutionId={institutionId} engineKey={engineKey} />;
 
     default:
       return (
-        <View style={{ padding: spacing.lg }}>
-          <Text style={{ color: palette.text, ...typography.body }}>
-            Management panel not implemented.
+        <View style={{ padding: spacing.lg, gap: spacing.md }}>
+          <Text
+            style={{
+              color: palette.text,
+              ...typography.h3,
+              fontWeight: "700",
+            }}
+          >
+            {data.name}
           </Text>
+          <Text style={{ color: palette.subtext, ...typography.body }}>
+            This engine type is not yet available in this version of the app.
+          </Text>
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL("mailto:support@kisapp.com")
+            }
+            style={{
+              marginTop: spacing.sm,
+              alignSelf: "flex-start",
+              backgroundColor: palette.primary + "18",
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: palette.primary + "40",
+            }}
+            accessibilityLabel="Contact support"
+          >
+            <Text
+              style={{
+                color: palette.primary,
+                ...typography.body,
+                fontWeight: "600",
+              }}
+            >
+              Contact support
+            </Text>
+          </TouchableOpacity>
+          {__DEV__ && (
+            <Text
+              style={{
+                color: palette.subtext,
+                fontSize: 11,
+                marginTop: spacing.sm,
+                opacity: 0.6,
+              }}
+            >
+              [DEV] engine key: {engineKey}
+            </Text>
+          )}
         </View>
       );
   }
@@ -131,7 +178,7 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: palette.background,
+          backgroundColor: palette.bg,
         }}
       >
         {/* HEADER */}
@@ -181,7 +228,7 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
           <Text
             style={{
               marginTop: spacing.sm,
-              color: palette.textSecondary,
+              color: palette.subtext,
               ...typography.body,
             }}
           >
@@ -213,16 +260,10 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
           )}
         </View>
 
-        {/* ENGINE CONTENT */}
-        <ScrollView
-          contentContainerStyle={{
-            padding: spacing.lg,
-            paddingBottom: spacing.xl * 2,
-          }}
-          showsVerticalScrollIndicator={false}
-        >
+        {/* ENGINE CONTENT — each engine provides its own ScrollView */}
+        <View style={{ flex: 1 }}>
           {renderEngine()}
-        </ScrollView>
+        </View>
       </SafeAreaView>
     </Modal>
   );

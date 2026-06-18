@@ -2,12 +2,14 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
+  Alert,
   ScrollView,
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  useColorScheme,
 } from "react-native";
-import { useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -16,6 +18,11 @@ import ROUTES from "@/network";
 import { getRequest } from "@/network/get";
 import { postRequest } from "@/network/post";
 import { patchRequest } from "@/network/patch";
+import {
+  createInstitutionEngineManagedItem,
+  fetchInstitutionEngineManagedItems,
+  updateInstitutionEngineManagedItem,
+} from "@/services/healthOpsEngineManagerService";
 
 /* ================= TYPES ================= */
 
@@ -88,7 +95,9 @@ const normalizeRequest = (raw: any): EmergencyRequest => ({
 
 /* ================= COMPONENT ================= */
 
-export default function EmergencyDispatchManager() {
+type Props = { institutionId: string; engineKey: string };
+
+export default function EmergencyDispatchManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
   const spacing = HEALTH_THEME_SPACING;
@@ -97,6 +106,7 @@ export default function EmergencyDispatchManager() {
   /* ================= CONFIG ================= */
 
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [baseFee, setBaseFee] = useState("200");
   const [perKmFee, setPerKmFee] = useState("20");
   const [autoAssign, setAutoAssign] = useState(true);
@@ -121,21 +131,12 @@ export default function EmergencyDispatchManager() {
     setError(null);
 
     try {
-      // Load emergency sessions (active requests) and staff (fleet)
-      const [sessionsRes, staffRes] = await Promise.all([
-        getRequest(ROUTES.healthOps.emergencySessionStart.replace("/start/", "/"), {}),
-        getRequest(ROUTES.core.staff, {}),
-      ]);
-
-      if (sessionsRes.success) {
-        const data = sessionsRes.data;
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.results)
-          ? data.results
-          : [];
-        setRequests(list.map(normalizeRequest));
-      }
+      // NOTE: there is no backend endpoint to list emergency dispatch sessions
+      // for an institution yet — health-ops/emergency/sessions/start/ only
+      // supports POST (creating one session at a time). New requests persist
+      // via the POST below, but won't be listed on reload until a list
+      // endpoint exists. Only staff/fleet data is fetched here.
+      const staffRes = await getRequest(ROUTES.core.staff, {});
 
       if (staffRes.success) {
         const data = staffRes.data;
@@ -157,6 +158,41 @@ export default function EmergencyDispatchManager() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEngineEnabled(!next);
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
 
   /* ================= FLEET ACTIONS ================= */
 
@@ -270,13 +306,14 @@ export default function EmergencyDispatchManager() {
 
   const updateRequestStatus = useCallback(
     async (id: string, status: EmergencyStatus) => {
-      const res = await patchRequest(ROUTES.healthOps.emergencySession(id), {
-        status,
-      });
-      if (res.success || true) {
-        setRequests((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, status } : r))
-        );
+      // Optimistic update first for instant UI response
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+      // Terminal statuses use the end endpoint; intermediate statuses have no backend equivalent yet
+      if (status === 'Completed' || status === 'Cancelled') {
+        await postRequest(
+          ROUTES.healthOps.emergencySessionEnd(id),
+          { status: status.toLowerCase() },
+        ).catch(() => undefined);
       }
     },
     []
@@ -294,31 +331,36 @@ export default function EmergencyDispatchManager() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={palette.primary} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          padding: spacing.md,
-        }}
-      >
-        <Text style={{ color: palette.text, marginBottom: spacing.md }}>
-          {error}
-        </Text>
-        <KISButton title="Retry" onPress={() => fetchData()} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: spacing.md,
+          }}
+        >
+          <Text style={{ color: palette.text, marginBottom: spacing.md }}>
+            {error}
+          </Text>
+          <KISButton title="Retry" onPress={() => fetchData()} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView
       style={{ padding: spacing.md }}
       refreshControl={
@@ -337,7 +379,7 @@ export default function EmergencyDispatchManager() {
 
         <KISButton
           title={engineEnabled ? "Disable Engine" : "Enable Engine"}
-          onPress={() => setEngineEnabled(!engineEnabled)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
 
@@ -540,6 +582,7 @@ export default function EmergencyDispatchManager() {
       </View>
 
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -562,7 +605,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

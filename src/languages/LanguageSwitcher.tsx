@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useLanguage, useTranslation } from './index';
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 
 export default function LanguageSwitcher({ visible: controlledVisible, onClose }: Props = {}) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { language, languages, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -30,7 +32,7 @@ export default function LanguageSwitcher({ visible: controlledVisible, onClose }
       onRequestClose={close}
     >
       <Pressable style={styles.backdrop} onPress={close}>
-        <Pressable style={[styles.card, { backgroundColor: palette.card }]} onPress={() => {}}>
+        <Pressable style={[styles.card, { backgroundColor: palette.card, maxWidth: responsive.contentMaxWidth }]} onPress={() => {}}>
           <Text style={[styles.title, { color: palette.text }]}>
             {t('Choose language')}
           </Text>
@@ -91,7 +93,6 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 360,
     borderRadius: 20,
     padding: 20,
   },

@@ -91,14 +91,14 @@ type InstitutionCardDetails = {
   viewerCanManage: boolean;
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  available: '#10B981',
-  limited: '#F59E0B',
-  fully_booked: '#EF4444',
-  on_call: '#3B82F6',
-  holiday: '#8B5CF6',
-  blocked: '#6B7280',
-};
+const buildHealthStatusColor = (p: any): Record<string, string> => ({
+  available: p.success,
+  limited: p.gold,
+  fully_booked: p.danger,
+  on_call: p.primary,
+  holiday: p.primaryStrong,
+  blocked: p.subtext,
+});
 
 const BOOKING_ENGINE_TO_FLOW_KEY: Record<string, string> = {
   appointment: 'appointment',
@@ -253,6 +253,7 @@ export default function BroadcastHealthcarePage({
   searchContext,
 }: Props) {
   const { palette } = useKISTheme();
+  const STATUS_COLOR = React.useMemo(() => buildHealthStatusColor(palette), [palette]);
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<HealthcareBroadcastCard[]>([]);
@@ -703,7 +704,7 @@ export default function BroadcastHealthcarePage({
             justifyContent: 'center',
           }}
         >
-          <KISIcon name="person-circle-outline" size={24} color="#fff" />
+          <KISIcon name="person-circle-outline" size={24} color={palette.onPrimary} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>
@@ -729,7 +730,7 @@ export default function BroadcastHealthcarePage({
       {withTimeFilter.map(item => {
         const card = item.health_card || {};
         const statusKey = String(card.status || 'available').toLowerCase();
-        const statusColor = STATUS_COLOR[statusKey] || '#10B981';
+        const statusColor = STATUS_COLOR[statusKey] || palette.success;
         const institutionId = resolveInstitutionIdFromBroadcast(item);
         const institution = institutionMeta[institutionId];
         const institutionCardData = institutionDetails[institutionId];
@@ -1056,7 +1057,7 @@ export default function BroadcastHealthcarePage({
                           width: 22,
                           height: 22,
                           borderRadius: 11,
-                          backgroundColor: '#FFFFFFAA',
+                          backgroundColor: `${palette.ivory}AA`,
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}

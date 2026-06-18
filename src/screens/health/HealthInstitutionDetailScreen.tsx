@@ -16,7 +16,6 @@ import {
   fetchInstitutionDashboardAnalytics,
   type InstitutionDashboardAnalyticsResult,
 } from '@/services/healthDashboardService';
-import { fetchHealthProfileState } from '@/services/healthProfileService';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { fetchHealthOpsCareSummary } from '@/services/healthOpsWorkflowService';
@@ -96,9 +95,9 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
       if (!bootstrap?.success) {
         throw new Error(bootstrap?.message || 'Unable to initialize institution dashboard.');
       }
-      const [analyticsRes, healthState, meRes, careSummaryRes] = await Promise.all([
+      const [analyticsRes, institutionRes, meRes, careSummaryRes] = await Promise.all([
         fetchInstitutionDashboardAnalytics(institutionId, timeRange),
-        fetchHealthProfileState(),
+        getRequest(ROUTES.healthOps.institution(institutionId)),
         getRequest(ROUTES.auth.checkLogin),
         fetchHealthOpsCareSummary(),
       ]);
@@ -113,16 +112,20 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
       }
 
       const me = resolveHealthAccessUser(meRes);
-      const currentUserId = me.id || '';
       const currentUserPhone = normalizePhone(me.phone);
-      const institutions = Array.isArray(healthState.profile?.institutions) ? healthState.profile.institutions : [];
-      const institution = institutions.find((item: any) => String(item?.id) === String(institutionId));
+      // Use the institution fetched directly from the API — it includes server-computed
+      // viewer.role and can_manage, which are authoritative and not subject to cache staleness.
+      const instData = (institutionRes as any)?.data?.institution ?? (institutionRes as any)?.data ?? null;
       const actorRole = String(
-        getInstitutionRoleForUser(institution, {
-          id: currentUserId || undefined,
+        getInstitutionRoleForUser(instData, {
+          id: me.id || undefined,
           phone: currentUserPhone || undefined,
           email: me.email,
-        }) || 'unassigned',
+        }) ||
+          (bootstrap as any)?.data?.viewer?.role ||
+          ((bootstrap as any)?.data?.viewer?.can_manage || (bootstrap as any)?.data?.viewer?.canManage
+            ? 'owner'
+            : 'unassigned'),
       ).toLowerCase();
 
       const rolePermissions: Record<string, { profile: boolean; schedules: boolean; services: boolean; members: boolean }> = {
@@ -193,7 +196,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
 
   if (!dashboardType) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, padding: HEALTH_THEME_SPACING.lg }}>
           <View style={{ alignItems: 'flex-end' }}>
             <TouchableOpacity
@@ -206,6 +209,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
                 backgroundColor: palette.card,
               }}
               accessibilityLabel="Close dashboard"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </TouchableOpacity>
@@ -228,7 +232,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
 
   if (loading && !analytics) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -244,6 +248,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
                 backgroundColor: palette.card,
               }}
               accessibilityLabel="Close dashboard"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </TouchableOpacity>
@@ -264,7 +269,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: HEALTH_THEME_SPACING.lg, paddingTop: HEALTH_THEME_SPACING.sm }}>
           <TouchableOpacity
@@ -277,6 +282,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
               backgroundColor: palette.card,
             }}
             accessibilityLabel="Close dashboard"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <KISIcon name="close" size={18} color={palette.text} />
           </TouchableOpacity>

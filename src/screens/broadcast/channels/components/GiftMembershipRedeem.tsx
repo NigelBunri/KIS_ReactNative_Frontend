@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 
@@ -32,6 +33,7 @@ type Props = {
 
 export default function GiftMembershipRedeem({ token: initialToken, onSuccess }: Props) {
   const { palette } = useKISTheme();
+  const { bodyFontSize, labelFontSize, minTouchTarget } = useResponsiveLayout();
   const [token, setToken] = useState(initialToken ?? '');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -117,8 +119,8 @@ export default function GiftMembershipRedeem({ token: initialToken, onSuccess }:
   return (
     <View style={[styles.container, { backgroundColor: palette.surface }]}>
       <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>Redeem Gift Membership</Text>
-        <Text style={[styles.cardSubtext, { color: palette.subtext }]}>
+        <Text style={[styles.cardTitle, { color: palette.text, fontSize: bodyFontSize + 3 }]}>Redeem Gift Membership</Text>
+        <Text style={[styles.cardSubtext, { color: palette.subtext, fontSize: labelFontSize }]}>
           Enter the gift token you received to activate your membership.
         </Text>
 
@@ -132,11 +134,11 @@ export default function GiftMembershipRedeem({ token: initialToken, onSuccess }:
           placeholderTextColor={palette.subtext}
           autoCapitalize="none"
           autoCorrect={false}
-          style={[styles.input, { color: palette.text, borderColor: errorMsg ? '#EF4444' : palette.border }]}
+          style={[styles.input, { color: palette.text, borderColor: errorMsg ? palette.danger : palette.border }]}
         />
 
         {errorMsg ? (
-          <Text style={styles.errorText}>{errorMsg}</Text>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{errorMsg}</Text>
         ) : null}
 
         <Pressable
@@ -151,9 +153,9 @@ export default function GiftMembershipRedeem({ token: initialToken, onSuccess }:
           ]}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={palette.ivory} />
           ) : (
-            <Text style={styles.redeemBtnText}>Redeem Gift</Text>
+            <Text style={[styles.redeemBtnText, { color: palette.onPrimary, fontSize: bodyFontSize }]}>Redeem Gift</Text>
           )}
         </Pressable>
       </View>
@@ -171,8 +173,8 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
-  cardTitle: { fontSize: 18, fontWeight: '900' },
-  cardSubtext: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  cardTitle: { fontWeight: '900' },
+  cardSubtext: { fontWeight: '600', lineHeight: 18 },
   input: {
     borderWidth: 1,
     borderRadius: 10,
@@ -185,16 +187,15 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#EF4444',
   },
   redeemBtn: {
     borderRadius: 12,
-    height: 50,
+    minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  redeemBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+  redeemBtnText: { fontWeight: '900' },
   successCard: {
     borderWidth: 1,
     borderRadius: 12,

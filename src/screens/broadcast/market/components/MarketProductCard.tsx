@@ -37,7 +37,7 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
           key={i}
           name={stars >= i ? 'star' : stars >= i - 0.5 ? 'star-half' : 'star-outline'}
           size={responsive.isWatch ? 10 : 11}
-          color="#f5a623"
+          color={palette.gold}
         />
       ))}
       {count !== undefined && count > 0 && (
@@ -92,7 +92,7 @@ export default function MarketProductCard({
     return null;
   }, [stockQty, stockStatus]);
 
-  const stockColor = stockLabel === 'Out of stock' ? '#e74c3c' : '#f39c12';
+  const stockColor = stockLabel === 'Out of stock' ? (palette.danger) : (palette.gold);
 
   return (
     <Pressable
@@ -124,13 +124,13 @@ export default function MarketProductCard({
               position: 'absolute',
               top: 8,
               left: 8,
-              backgroundColor: '#e74c3c',
+              backgroundColor: palette.danger,
               borderRadius: 8,
               paddingHorizontal: 7,
               paddingVertical: 4,
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>-{discountPct}%</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 11 }}>-{discountPct}%</Text>
           </View>
         )}
 
@@ -166,7 +166,7 @@ export default function MarketProductCard({
               paddingVertical: 4,
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>{stockLabel}</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 10 }}>{stockLabel}</Text>
           </View>
         )}
       </View>

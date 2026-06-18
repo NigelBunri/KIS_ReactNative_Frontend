@@ -10,6 +10,7 @@ import {
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { copyUriToChatMedia, fileUriForPath } from './chatMediaStorage';
 import { postRequest } from '@/network/post';
+import { blockContact } from '@/screens/tabs/BlockedContactsScreen';
 
 import type { ChatMessage } from './chatTypes';
 
@@ -558,17 +559,29 @@ export const handleAcceptRequest = async ({
   setHasLocallyAcceptedRequest(true);
 };
 
-export const handleBlockRequest = async (chatId?: string) => {
+export const handleBlockRequest = async (
+  chatId?: string,
+  blockedUser?: { userId: string; displayName: string },
+) => {
   if (!chatId) return;
 
-  const moderationUrl = `${NEST_API_BASE_URL}/moderation/block`;
-  await postRequest(moderationUrl, {
+  await postRequest(ROUTES.moderation.block, {
     conversationId: chatId,
     blocked: true,
   });
 
   const url = `${ROUTES.chat.listConversations}${chatId}/block_chat/`;
   await postRequest(url, {});
+
+  if (blockedUser?.userId) {
+    await blockContact({
+      userId: blockedUser.userId,
+      displayName: blockedUser.displayName,
+      blockedAt: new Date().toISOString(),
+    });
+    DeviceEventEmitter.emit('blocked.contacts.refresh');
+  }
+
   notifyConversationRefresh();
 };
 
@@ -576,7 +589,7 @@ export const handleArchiveRequest = async (conversationId?: string, archived?: b
   if (!conversationId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/archive/`;
   await postRequest(url, { archived: archived ?? true });
-  await postRequest(`${NEST_API_BASE_URL}/conversations/broadcast`, {
+  await postRequest(ROUTES.conversations.broadcast, {
     conversationId,
     type: 'archived',
     payload: { archived: archived ?? true },
@@ -587,7 +600,7 @@ export const handleLockConversation = async (conversationId?: string, locked?: b
   if (!conversationId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/lock/`;
   await postRequest(url, { locked: locked ?? true });
-  await postRequest(`${NEST_API_BASE_URL}/conversations/broadcast`, {
+  await postRequest(ROUTES.conversations.broadcast, {
     conversationId,
     type: 'locked',
     payload: { locked: locked ?? true },
@@ -654,8 +667,7 @@ export const handleSetPinned = async ({
   pinned: boolean;
 }) => {
   if (!conversationId || !messageId) return;
-  const url = `${NEST_API_BASE_URL}/pins/set`;
-  await postRequest(url, {
+  await postRequest(ROUTES.pins.set, {
     conversationId,
     messageId,
     pinned,
@@ -672,8 +684,7 @@ export const handleMuteConversation = async ({
   untilMs?: number;
 }) => {
   if (!conversationId) return;
-  const url = `${NEST_API_BASE_URL}/moderation/mute`;
-  await postRequest(url, {
+  await postRequest(ROUTES.moderation.mute, {
     conversationId,
     muted,
     untilMs,
@@ -693,8 +704,7 @@ export const handleReportMessage = async ({
   note?: string;
 }) => {
   if (!conversationId || !messageId) return;
-  const url = `${NEST_API_BASE_URL}/moderation/report`;
-  const res = await postRequest(url, {
+  const res = await postRequest(ROUTES.moderation.report, {
     conversationId,
     messageId,
     reason,

@@ -89,8 +89,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerBack: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -101,6 +101,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSpacer: {
-    width: 32,
+    width: 44,
   },
 });

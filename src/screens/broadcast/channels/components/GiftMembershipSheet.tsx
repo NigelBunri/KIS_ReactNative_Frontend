@@ -60,8 +60,14 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
       Alert.alert('Select a tier', 'Please select a membership tier to gift.');
       return;
     }
-    if (!recipient.trim()) {
-      Alert.alert('Recipient required', 'Please enter a username or email.');
+    const recipientValue = recipient.trim();
+    if (!recipientValue) {
+      Alert.alert('Recipient required', 'Please enter the recipient’s email address.');
+      return;
+    }
+    const isEmail = /\S+@\S+\.\S+/.test(recipientValue);
+    if (!isEmail) {
+      Alert.alert('Invalid email', 'Please enter a valid email address for the recipient.');
       return;
     }
     setLoading(true);
@@ -71,7 +77,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
         {
           channel_id: channelId,
           tier_id: selectedTierId,
-          recipient: recipient.trim(),
+          recipient_email: recipientValue,
           message: message.trim() || undefined,
         },
         { errorMessage: 'Could not send gift.' },
@@ -103,7 +109,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
       transparent
       onRequestClose={handleClose}
     >
-      <Pressable style={styles.overlay} onPress={handleClose} />
+      <Pressable style={[styles.overlay, { backgroundColor: palette.royalInk, opacity: 0.5 }]} onPress={handleClose} />
       <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: palette.card }]}>
         {/* Handle bar */}
         <View style={styles.handleRow}>
@@ -126,7 +132,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
                 onPress={handleClose}
                 style={[styles.doneBtn, { backgroundColor: palette.primaryStrong }]}
               >
-                <Text style={styles.doneBtnText}>Done</Text>
+                <Text style={[styles.doneBtnText, { color: palette.onPrimary }]}>Done</Text>
               </Pressable>
             </View>
           ) : (
@@ -177,12 +183,12 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
 
               {/* Recipient */}
               <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
-                Recipient (username or email)
+                Recipient email
               </Text>
               <TextInput
                 value={recipient}
                 onChangeText={setRecipient}
-                placeholder="@username or email"
+                placeholder="recipient@example.com"
                 placeholderTextColor={palette.subtext}
                 autoCapitalize="none"
                 keyboardType="email-address"
@@ -216,9 +222,9 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
                 style={[styles.giftBtn, { backgroundColor: palette.primaryStrong }]}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={palette.ivory} />
                 ) : (
-                  <Text style={styles.giftBtnText}>Gift Membership</Text>
+                  <Text style={[styles.giftBtnText, { color: palette.onPrimary }]}>Gift Membership</Text>
                 )}
               </Pressable>
             </>
@@ -232,7 +238,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  overlay: { flex: 1 },
   sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -270,7 +276,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
   },
-  giftBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+  giftBtnText: { fontWeight: '900', fontSize: 15 },
   successContainer: { alignItems: 'center', gap: 12, paddingVertical: 24 },
   successEmoji: { fontSize: 56 },
   successTitle: { fontSize: 20, fontWeight: '900' },
@@ -281,5 +287,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 8,
   },
-  doneBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  doneBtnText: { fontWeight: '800', fontSize: 14 },
 });

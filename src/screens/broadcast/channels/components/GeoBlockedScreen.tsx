@@ -10,7 +10,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -22,25 +24,27 @@ type Props = {
 
 export default function GeoBlockedScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
+  const { bodyFontSize, minTouchTarget } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: palette.royalInk, paddingTop: 32 + insets.top, paddingBottom: 32 + insets.bottom }]}>
       <View style={styles.content}>
         <Text style={styles.icon}>🌍</Text>
 
-        <Text style={[styles.title, { color: '#fff' }]}>
+        <Text style={[styles.title, { color: palette.ivory, fontSize: bodyFontSize + 6 }]}>
           Not Available in Your Region
         </Text>
 
-        <Text style={[styles.subtitle, { color: 'rgba(255,255,255,0.65)' }]}>
+        <Text style={[styles.subtitle, { color: palette.subtext, fontSize: bodyFontSize }]}>
           This content isn't available in your country.
         </Text>
 
         <Pressable
           onPress={onBack}
-          style={[styles.backBtn, { borderColor: palette.border }]}
+          style={[styles.backBtn, { borderColor: palette.border, minHeight: Math.max(50, minTouchTarget) }]}
         >
-          <Text style={[styles.backText, { color: '#fff' }]}>Go Back</Text>
+          <Text style={[styles.backText, { color: palette.ivory, fontSize: bodyFontSize }]}>Go Back</Text>
         </Pressable>
       </View>
     </View>
@@ -52,10 +56,9 @@ export default function GeoBlockedScreen({ onBack }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    paddingHorizontal: 32,
   },
   content: {
     alignItems: 'center',
@@ -67,13 +70,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 21,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
-    fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 36,
@@ -83,9 +84,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 36,
     paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
-    fontSize: 15,
     fontWeight: '700',
   },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import InsightLayout from './components/InsightLayout';
 import { useInsights } from './useInsightsHooks';
 
@@ -39,6 +40,7 @@ export default function InsightScreen({
 
 export function InsightsFooterNote({ message }: { message: string }) {
   const { palette } = useKISTheme();
+  const { labelFontSize } = useResponsiveLayout();
   return (
     <View
       style={[
@@ -46,7 +48,7 @@ export function InsightsFooterNote({ message }: { message: string }) {
         { borderColor: palette.divider, backgroundColor: palette.surface },
       ]}
     >
-      <Text style={{ color: palette.subtext, fontSize: 13 }}>{message}</Text>
+      <Text style={{ color: palette.subtext, fontSize: labelFontSize }}>{message}</Text>
     </View>
   );
 }

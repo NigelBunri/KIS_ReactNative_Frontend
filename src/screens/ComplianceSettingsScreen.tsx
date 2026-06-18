@@ -17,8 +17,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
-import { API_BASE_URL } from '@/network';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
+import { useResponsiveLayout, type ResponsiveLayout } from '@/theme/responsive';
+import { updateConsentCache } from '@/services/consentService';
 import type { RootStackParamList } from '@/navigation/types';
 
 const APP_VERSION = '0.0.1';
@@ -33,12 +35,12 @@ const AUTH_KEYS_TO_PRESERVE = ['access_token', 'refresh_token', 'kis_device_id',
 export default function ComplianceSettingsScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const responsive = useResponsiveLayout();
 
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [personalizationEnabled, setPersonalizationEnabled] = useState(true);
   const [offlineDataEnabled, setOfflineDataEnabled] = useState(true);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
   const [dataExportLoading, setDataExportLoading] = useState(false);
   const [cacheClearLoading, setCacheClearLoading] = useState(false);
 
@@ -47,7 +49,24 @@ export default function ComplianceSettingsScreen() {
     void load2FAStatus();
   }, []);
 
+  const syncConsentToBackend = useCallback(async (update: { analytics?: boolean; personalization?: boolean; offline_data?: boolean }) => {
+    try {
+      await patchRequest(ROUTES.profilePreferences.me, { consent_preferences: update });
+    } catch { /* non-blocking — local state already updated */ }
+  }, []);
+
   const loadPreferences = async () => {
+    try {
+      // Try backend first for cross-device consistency
+      const res = await getRequest(ROUTES.profilePreferences.me, { errorMessage: '' });
+      if (res?.success && res.data?.consent_preferences) {
+        const prefs = res.data.consent_preferences;
+        if (prefs.analytics !== undefined) setAnalyticsEnabled(Boolean(prefs.analytics));
+        if (prefs.personalization !== undefined) setPersonalizationEnabled(Boolean(prefs.personalization));
+        if (prefs.offline_data !== undefined) setOfflineDataEnabled(Boolean(prefs.offline_data));
+        return;
+      }
+    } catch { /* fall through */ }
     try {
       const [analytics, personalization, offline] = await Promise.all([
         AsyncStorage.getItem(ANALYTICS_ENABLED_KEY),
@@ -62,7 +81,7 @@ export default function ComplianceSettingsScreen() {
 
   const load2FAStatus = async () => {
     try {
-      const res = await getRequest(`${API_BASE_URL}/api/v1/auth/2fa/status/`, {
+      const res = await getRequest(ROUTES.auth.twoFactorStatus, {
         errorMessage: 'Unable to load 2FA status.',
       });
       if (res?.success) {
@@ -73,24 +92,30 @@ export default function ComplianceSettingsScreen() {
 
   const handleAnalyticsToggle = useCallback(async (value: boolean) => {
     setAnalyticsEnabled(value);
-    try {
-      await AsyncStorage.setItem(ANALYTICS_ENABLED_KEY, String(value));
-    } catch {}
-  }, []);
+    updateConsentCache({ analytics: value });
+    await Promise.allSettled([
+      AsyncStorage.setItem(ANALYTICS_ENABLED_KEY, String(value)),
+      syncConsentToBackend({ analytics: value }),
+    ]);
+  }, [syncConsentToBackend]);
 
   const handlePersonalizationToggle = useCallback(async (value: boolean) => {
     setPersonalizationEnabled(value);
-    try {
-      await AsyncStorage.setItem(PERSONALIZATION_ENABLED_KEY, String(value));
-    } catch {}
-  }, []);
+    updateConsentCache({ personalization: value });
+    await Promise.allSettled([
+      AsyncStorage.setItem(PERSONALIZATION_ENABLED_KEY, String(value)),
+      syncConsentToBackend({ personalization: value }),
+    ]);
+  }, [syncConsentToBackend]);
 
   const handleOfflineDataToggle = useCallback(async (value: boolean) => {
     setOfflineDataEnabled(value);
-    try {
-      await AsyncStorage.setItem(OFFLINE_DATA_ENABLED_KEY, String(value));
-    } catch {}
-  }, []);
+    updateConsentCache({ offlineData: value });
+    await Promise.allSettled([
+      AsyncStorage.setItem(OFFLINE_DATA_ENABLED_KEY, String(value)),
+      syncConsentToBackend({ offline_data: value }),
+    ]);
+  }, [syncConsentToBackend]);
 
   const handleDownloadData = useCallback(() => {
     Alert.alert(
@@ -103,7 +128,7 @@ export default function ComplianceSettingsScreen() {
           onPress: async () => {
             setDataExportLoading(true);
             try {
-              const res = await getRequest(`${API_BASE_URL}/api/v1/auth/data-export/`, {
+              const res = await getRequest(ROUTES.auth.dataExport, {
                 errorMessage: 'Unable to request data export.',
               });
               if (res?.success) {
@@ -120,31 +145,6 @@ export default function ComplianceSettingsScreen() {
         },
       ],
     );
-  }, []);
-
-  const handle2FAToggle = useCallback(async (value: boolean) => {
-    setTwoFactorLoading(true);
-    try {
-      const endpoint = value
-        ? `${API_BASE_URL}/api/v1/auth/2fa/enable/`
-        : `${API_BASE_URL}/api/v1/auth/2fa/disable/`;
-      const res = await postRequest(endpoint, {}, {
-        errorMessage: `Unable to ${value ? 'enable' : 'disable'} two-factor authentication.`,
-      });
-      if (res?.success) {
-        setTwoFactorEnabled(value);
-        Alert.alert(
-          'Two-Factor Authentication',
-          value ? '2FA has been enabled on your account.' : '2FA has been disabled.',
-        );
-      } else {
-        Alert.alert('Two-Factor Authentication', res?.message || `Unable to ${value ? 'enable' : 'disable'} 2FA.`);
-      }
-    } catch (err: any) {
-      Alert.alert('Two-Factor Authentication', err?.message || 'Unable to update 2FA settings.');
-    } finally {
-      setTwoFactorLoading(false);
-    }
   }, []);
 
   const handleClearCache = useCallback(() => {
@@ -189,7 +189,7 @@ export default function ComplianceSettingsScreen() {
     }
   }, []);
 
-  const styles = createStyles(palette);
+  const styles = createStyles(palette, responsive);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg }]} edges={['top']}>
@@ -199,7 +199,7 @@ export default function ComplianceSettingsScreen() {
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Privacy &amp; Compliance</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: responsive.minTouchTarget }} />
       </View>
 
       <ScrollView
@@ -220,7 +220,7 @@ export default function ComplianceSettingsScreen() {
               value={analyticsEnabled}
               onValueChange={handleAnalyticsToggle}
               trackColor={{ false: palette.divider, true: palette.primaryStrong }}
-              thumbColor="#fff"
+              thumbColor={palette.onPrimary}
             />
           </View>
 
@@ -237,7 +237,7 @@ export default function ComplianceSettingsScreen() {
               value={personalizationEnabled}
               onValueChange={handlePersonalizationToggle}
               trackColor={{ false: palette.divider, true: palette.primaryStrong }}
-              thumbColor="#fff"
+              thumbColor={palette.onPrimary}
             />
           </View>
 
@@ -272,14 +272,14 @@ export default function ComplianceSettingsScreen() {
             onPress={() => navigation.navigate('AccountDeletion')}
           >
             <View style={styles.rowContent}>
-              <Text style={[styles.rowTitle, { color: palette.danger ?? '#E53935' }]}>
+              <Text style={[styles.rowTitle, { color: palette.danger }]}>
                 Delete All My Data
               </Text>
               <Text style={[styles.rowSubtitle, { color: palette.subtext }]}>
                 Permanently remove your account and all associated data
               </Text>
             </View>
-            <KISIcon name="chevron-right" size={16} color={palette.danger ?? '#E53935'} />
+            <KISIcon name="chevron-right" size={16} color={palette.danger} />
           </Pressable>
         </View>
 
@@ -322,21 +322,21 @@ export default function ComplianceSettingsScreen() {
 
           <View style={[styles.separator, { backgroundColor: palette.divider }]} />
 
-          <View style={styles.row}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.row,
+              pressed && { backgroundColor: palette.surfaceElevated },
+            ]}
+            onPress={() => navigation.navigate('TwoFactor', {})}
+          >
             <View style={styles.rowContent}>
               <Text style={[styles.rowTitle, { color: palette.text }]}>Two-Factor Authentication</Text>
               <Text style={[styles.rowSubtitle, { color: palette.subtext }]}>
-                {twoFactorEnabled ? 'Enabled — adds an extra layer of security' : 'Add an extra layer of login security'}
+                {twoFactorEnabled ? 'Enabled — tap to manage' : 'Disabled — tap to set up'}
               </Text>
             </View>
-            <Switch
-              value={twoFactorEnabled}
-              onValueChange={handle2FAToggle}
-              disabled={twoFactorLoading}
-              trackColor={{ false: palette.divider, true: palette.primaryStrong }}
-              thumbColor="#fff"
-            />
-          </View>
+            <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+          </Pressable>
         </View>
 
         {/* Section 3: Data & Storage */}
@@ -374,7 +374,7 @@ export default function ComplianceSettingsScreen() {
               value={offlineDataEnabled}
               onValueChange={handleOfflineDataToggle}
               trackColor={{ false: palette.divider, true: palette.primaryStrong }}
-              thumbColor="#fff"
+              thumbColor={palette.onPrimary}
             />
           </View>
         </View>
@@ -443,7 +443,8 @@ export default function ComplianceSettingsScreen() {
   );
 }
 
-function createStyles(palette: any) {
+function createStyles(palette: any, responsive: ResponsiveLayout) {
+  const gutter = responsive.pageGutter;
   return StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -452,26 +453,29 @@ function createStyles(palette: any) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
+      paddingHorizontal: gutter,
       paddingVertical: 14,
+      minHeight: responsive.minTouchTarget,
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
     backButton: {
-      width: 40,
+      width: responsive.minTouchTarget,
+      minHeight: responsive.minTouchTarget,
       alignItems: 'flex-start',
+      justifyContent: 'center',
     },
     headerTitle: {
-      fontSize: 17,
+      fontSize: responsive.bodyFontSize + 2,
       fontWeight: '700',
     },
     scroll: {
-      paddingHorizontal: 16,
+      paddingHorizontal: gutter,
       paddingTop: 20,
       paddingBottom: 48,
       gap: 8,
     },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: responsive.labelFontSize,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.6,
@@ -490,6 +494,7 @@ function createStyles(palette: any) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 14,
+      minHeight: responsive.minTouchTarget,
       gap: 12,
     },
     rowContent: {
@@ -497,11 +502,11 @@ function createStyles(palette: any) {
       gap: 2,
     },
     rowTitle: {
-      fontSize: 15,
+      fontSize: responsive.bodyFontSize,
       fontWeight: '600',
     },
     rowSubtitle: {
-      fontSize: 12,
+      fontSize: responsive.labelFontSize,
       lineHeight: 17,
     },
     separator: {

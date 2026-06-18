@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { KISIcon } from '@/constants/kisIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,8 @@ type MyCoinsTabProps = {
 };
 
 function MyCoinsTab({ palette, refreshing, onRefresh, onScrollToEarn, onScrollToSpend }: MyCoinsTabProps) {
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [coinsData, setCoinsData] = useState<CoinsBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +165,7 @@ function MyCoinsTab({ palette, refreshing, onRefresh, onScrollToEarn, onScrollTo
   if (error) {
     return (
       <View style={s.center}>
-        <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>{error}</Text>
+        <Text style={[s.errorText, { color: palette.danger }]}>{error}</Text>
         <Pressable onPress={() => load()} style={[s.retryBtn, { borderColor: palette.primaryStrong }]}>
           <Text style={[s.retryText, { color: palette.primaryStrong }]}>Retry</Text>
         </Pressable>
@@ -174,29 +177,29 @@ function MyCoinsTab({ palette, refreshing, onRefresh, onScrollToEarn, onScrollTo
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
       }
     >
       {/* Balance hero card */}
       <View style={[s.heroCard, { backgroundColor: palette.primaryStrong }]}>
-        <Text style={s.heroLabel}>KIS Coins Balance</Text>
+        <Text style={[s.heroLabel, { color: palette.onPrimary }]}>KIS Coins Balance</Text>
         <View style={s.heroCoinsRow}>
           <Text style={s.heroCoinIcon}>🪙</Text>
-          <Text style={s.heroAmount}>{balance.toLocaleString()}</Text>
+          <Text style={[s.heroAmount, { color: palette.onPrimary }]}>{balance.toLocaleString()}</Text>
         </View>
-        <Text style={s.heroTagline}>
+        <Text style={[s.heroTagline, { color: palette.onPrimary }]}>
           KIS Coins — earn through engagement, never redeemable for cash
         </Text>
         <View style={s.heroSubCards}>
-          <View style={s.heroSubCard}>
-            <Text style={s.heroSubLabel}>This Week</Text>
-            <Text style={s.heroSubValue}>+{(coinsData?.earned_this_week ?? 0).toLocaleString()}</Text>
+          <View style={[s.heroSubCard, { backgroundColor: palette.primaryWeak }]}>
+            <Text style={[s.heroSubLabel, { color: palette.onPrimary }]}>This Week</Text>
+            <Text style={[s.heroSubValue, { color: palette.onPrimary }]}>+{(coinsData?.earned_this_week ?? 0).toLocaleString()}</Text>
           </View>
-          <View style={s.heroSubCard}>
-            <Text style={s.heroSubLabel}>This Month</Text>
-            <Text style={s.heroSubValue}>+{(coinsData?.earned_this_month ?? 0).toLocaleString()}</Text>
+          <View style={[s.heroSubCard, { backgroundColor: palette.primaryWeak }]}>
+            <Text style={[s.heroSubLabel, { color: palette.onPrimary }]}>This Month</Text>
+            <Text style={[s.heroSubValue, { color: palette.onPrimary }]}>+{(coinsData?.earned_this_month ?? 0).toLocaleString()}</Text>
           </View>
         </View>
       </View>
@@ -240,6 +243,8 @@ type EarnTabProps = {
 };
 
 function EarnTab({ palette, refreshing, onRefresh, scrollRef }: EarnTabProps) {
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [rules, setRules] = useState<LoyaltyRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,7 +280,7 @@ function EarnTab({ palette, refreshing, onRefresh, scrollRef }: EarnTabProps) {
   if (error) {
     return (
       <View style={s.center}>
-        <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>{error}</Text>
+        <Text style={[s.errorText, { color: palette.danger }]}>{error}</Text>
         <Pressable onPress={() => load()} style={[s.retryBtn, { borderColor: palette.primaryStrong }]}>
           <Text style={[s.retryText, { color: palette.primaryStrong }]}>Retry</Text>
         </Pressable>
@@ -297,7 +302,7 @@ function EarnTab({ palette, refreshing, onRefresh, scrollRef }: EarnTabProps) {
   return (
     <ScrollView
       ref={scrollRef as any}
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, gap: 12, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
       }
@@ -342,6 +347,8 @@ type HistoryTabProps = {
 };
 
 function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabProps) {
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [activities, setActivities] = useState<LoyaltyActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -376,7 +383,7 @@ function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabPro
   if (error) {
     return (
       <View style={s.center}>
-        <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>{error}</Text>
+        <Text style={[s.errorText, { color: palette.danger }]}>{error}</Text>
         <Pressable onPress={() => load()} style={[s.retryBtn, { borderColor: palette.primaryStrong }]}>
           <Text style={[s.retryText, { color: palette.primaryStrong }]}>Retry</Text>
         </Pressable>
@@ -387,7 +394,7 @@ function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabPro
   return (
     <ScrollView
       ref={scrollRef as any}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
       }
@@ -410,9 +417,9 @@ function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabPro
               style={[s.historyRow, { borderBottomColor: palette.divider }]}
             >
               <View style={[s.historyIconWrap, {
-                backgroundColor: isEarn ? '#dcfce7' : '#fee2e2',
+                backgroundColor: isEarn ? (palette.success) + '22' : (palette.danger) + '22',
               }]}>
-                <Text style={s.historyIconText}>{isEarn ? '+' : '−'}</Text>
+                <Text style={[s.historyIconText, { color: palette.text }]}>{isEarn ? '+' : '−'}</Text>
               </View>
               <View style={s.historyContent}>
                 <Text style={[s.historyDesc, { color: palette.text }]} numberOfLines={1}>
@@ -422,7 +429,7 @@ function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabPro
                   {formatDate(item.date ?? item.created_at)}
                 </Text>
               </View>
-              <Text style={[s.historyCoins, { color: isEarn ? '#16A34A' : '#EA580C' }]}>
+              <Text style={[s.historyCoins, { color: isEarn ? (palette.success) : (palette.gold) }]}>
                 {isEarn ? '+' : ''}{coins.toLocaleString()}
               </Text>
             </View>
@@ -442,6 +449,8 @@ type BillingTabProps = {
 };
 
 function BillingTab({ palette, refreshing, onRefresh }: BillingTabProps) {
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -493,7 +502,7 @@ function BillingTab({ palette, refreshing, onRefresh }: BillingTabProps) {
   if (error) {
     return (
       <View style={s.center}>
-        <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>{error}</Text>
+        <Text style={[s.errorText, { color: palette.danger }]}>{error}</Text>
         <Pressable onPress={() => load()} style={[s.retryBtn, { borderColor: palette.primaryStrong }]}>
           <Text style={[s.retryText, { color: palette.primaryStrong }]}>Retry</Text>
         </Pressable>
@@ -503,7 +512,7 @@ function BillingTab({ palette, refreshing, onRefresh }: BillingTabProps) {
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, gap: 12, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primaryStrong} />
       }
@@ -556,6 +565,7 @@ type SubTab = 'coins' | 'earn' | 'history' | 'billing';
 export default function WalletScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
   const [activeTab, setActiveTab] = useState<SubTab>('coins');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -678,7 +688,7 @@ const s = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { width: 60 },
+  backBtn: { width: 60, minHeight: 44, justifyContent: 'center' },
   backText: { fontSize: 15, fontWeight: '600' },
   headerTitle: {
     flex: 1,
@@ -712,7 +722,6 @@ const s = StyleSheet.create({
     gap: 4,
   },
   heroLabel: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -728,13 +737,11 @@ const s = StyleSheet.create({
     fontSize: 36,
   },
   heroAmount: {
-    color: '#fff',
     fontSize: 52,
     fontWeight: '900',
     lineHeight: 60,
   },
   heroTagline: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
@@ -749,20 +756,17 @@ const s = StyleSheet.create({
   },
   heroSubCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
   },
   heroSubLabel: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   heroSubValue: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '800',
     marginTop: 2,
@@ -851,7 +855,6 @@ const s = StyleSheet.create({
   historyIconText: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#374151',
   },
   historyContent: { flex: 1 },
   historyDesc: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
@@ -861,7 +864,7 @@ const s = StyleSheet.create({
   // Empty state
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: 32,
     gap: 8,
   },
   emptyIcon: { fontSize: 48 },

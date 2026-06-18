@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useColorScheme } from 'react-native';
 import KISButton from '@/constants/KISButton';
@@ -40,6 +41,7 @@ export function InstitutionsListScreen({
   currentUser = null,
   onRefresh,
 }: InstitutionsListScreenProps) {
+  const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const spacing = HEALTH_THEME_SPACING;
@@ -47,14 +49,6 @@ export function InstitutionsListScreen({
   const [fallbackInstitutions, setFallbackInstitutions] = useState<HealthInstitution[]>([]);
   const [loadingFallback, setLoadingFallback] = useState(false);
   const [preferFallbackData, setPreferFallbackData] = useState(false);
-
-  if (__DEV__) console.log('InstitutionsListScreen render', {
-    institutions: institutions,
-    fallbackCount: fallbackInstitutions.length,
-    loading,
-    loadingFallback,
-    refreshing,
-  });
 
   const loadFallbackInstitutions = useCallback(async (options?: { forceNetwork?: boolean }) => {
     setLoadingFallback(true);
@@ -73,14 +67,6 @@ export function InstitutionsListScreen({
     if (institutions.length > 0) return;
     loadFallbackInstitutions().catch(() => {});
   }, [institutions.length, loadFallbackInstitutions]);
-
-  if (__DEV__) console.log('InstitutionsListScreen after data load', {
-    institutions: institutions,
-    fallback: fallbackInstitutions,
-    loading,
-    loadingFallback,
-    refreshing,
-  });
 
   const displayInstitutions = useMemo(() => {
     if (onRefresh) return institutions.length > 0 ? institutions : fallbackInstitutions;
@@ -111,7 +97,7 @@ export function InstitutionsListScreen({
   return (
     <LinearGradient
       colors={[palette.gradientStart, palette.gradientEnd]}
-      style={{ flex: 1 }}
+      style={{ flex: 1, paddingTop: insets.top }}
     >
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, flexGrow: 1 }}
@@ -152,6 +138,29 @@ export function InstitutionsListScreen({
               </View>
             ))}
           </View>
+        ) : visibleInstitutions.length === 0 ? (
+          <View
+            style={{
+              borderRadius: spacing.lg,
+              backgroundColor: palette.card,
+              padding: spacing.md,
+              marginBottom: spacing.sm,
+              ...borders.card,
+            }}
+          >
+            <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h3, color: palette.text }}>
+              No institutions yet
+            </Text>
+            <Text
+              style={{
+                ...HEALTH_THEME_TYPOGRAPHY.body,
+                color: palette.subtext,
+                marginTop: 4,
+              }}
+            >
+              Add your first health institution to get started.
+            </Text>
+          </View>
         ) : (
           visibleInstitutions.map((institution) => {
             const canEditInstitution = canUserManageInstitution(institution, currentUser);
@@ -177,7 +186,7 @@ export function InstitutionsListScreen({
                     marginTop: 4,
                   }}
                 >
-                  {institution.type.replace('_', ' ')} · {institution.employees?.length ?? 0} members
+                  {String(institution.institution_type ?? institution.type ?? '').replace(/_/g, ' ')} · {institution.employees?.length ?? 0} members
                 </Text>
                 <Text
                   style={{

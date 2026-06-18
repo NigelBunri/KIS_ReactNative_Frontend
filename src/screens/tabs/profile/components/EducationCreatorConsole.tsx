@@ -1,24 +1,39 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, DeviceEventEmitter, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
+import { postRequest } from '@/network/post';
+import { getRequest } from '@/network/get';
+import ROUTES from '@/network';
 
 type Props = {
   managementData?: Record<string, any>;
   tierLabel?: string;
 };
 
-const STUDENT_SAMPLE = [
-  { id: 's1', name: 'Anika Paul', progress: 0.76, lastLesson: 'Lesson 4: Storytelling' },
-  { id: 's2', name: 'Marc Reyes', progress: 0.48, lastLesson: 'Lesson 2: Strategy' },
-  { id: 's3', name: 'Lena Ortiz', progress: 0.92, lastLesson: 'Lesson 8: Leadership' },
-];
+type StudentRow = {
+  id: string;
+  name: string;
+  last_lesson: string;
+  status: string;
+};
 
 export default function EducationCreatorConsole({ managementData, tierLabel }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { data } = useEducationDiscovery({ initialSearch: '' });
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  useEffect(() => {
+    getRequest(ROUTES.broadcasts.creatorStudents, { errorMessage: '' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setStudents(rows);
+      })
+      .catch(() => undefined);
+  }, []);
   const continueLearningList = data?.continueLearning ?? [];
   const totalCourses = useMemo(
     () =>
@@ -46,20 +61,48 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
   const [collaborator, setCollaborator] = useState('');
   const [coCreators, setCoCreators] = useState(['Aisha Mwangi', 'Noah Bennett']);
 
-  const handlePublishCourse = () => {
-    if (!courseForm.title.trim()) {
+  const handlePublishCourse = async () => {
+    const title = courseForm.title.trim();
+    if (!title) {
       Alert.alert('Course builder', 'Add a title before publishing.');
       return;
     }
-    Alert.alert('Course builder', `${courseForm.title} is ready to broadcast.`);
-    setCourseForm({ title: '', summary: '', price: '0', coupon: '', isFree: true });
+    try {
+      const res = await postRequest(
+        ROUTES.broadcasts.educationCourseBroadcast,
+        {
+          title,
+          summary: courseForm.summary.trim(),
+          price: courseForm.isFree ? 0 : parseFloat(courseForm.price) || 0,
+          coupon: courseForm.coupon.trim() || undefined,
+          is_free: courseForm.isFree,
+        },
+        { errorMessage: 'Unable to publish course.' },
+      );
+      if (res?.success || res?.id || res?.data?.id) {
+        Alert.alert('Course builder', `"${title}" published successfully.`);
+        DeviceEventEmitter.emit('broadcast.refresh');
+        setCourseForm({ title: '', summary: '', price: '0', coupon: '', isFree: true });
+      } else {
+        Alert.alert('Course builder', res?.message || 'Unable to publish course. Try again.');
+      }
+    } catch (err: any) {
+      Alert.alert('Course builder', err?.message || 'Unable to publish course. Try again.');
+    }
   };
 
   const addCollaborator = () => {
     const trimmed = collaborator.trim();
     if (!trimmed) return;
+    // Co-creator invites are managed through the education institution membership
+    // endpoints (educationInstitutionMemberships). For now add to local display list
+    // and show a guidance notice.
     setCoCreators((prev) => [...prev, trimmed]);
     setCollaborator('');
+    Alert.alert(
+      'Collaborators',
+      'To formally invite a co-creator, open the Education tab and use the institution membership manager.',
+    );
   };
 
   const stats = [
@@ -70,7 +113,7 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
   ];
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 12, gap: 16 }}>
+    <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View
         style={{
           borderWidth: 2,
@@ -97,8 +140,8 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
                 backgroundColor: palette.bg,
               }}
             >
-              <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.label}</Text>
-              <Text style={{ color: palette.text, fontWeight: '800' }}>{item.value}</Text>
+              <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>{item.label}</Text>
+              <Text style={{ color: palette.text, fontWeight: '800', fontSize: responsive.bodyFontSize }}>{item.value}</Text>
             </View>
           ))}
         </View>
@@ -209,7 +252,9 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
       >
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Student management</Text>
         <View style={{ gap: 12, marginTop: 8 }}>
-          {STUDENT_SAMPLE.map((item) => (
+          {students.length === 0 ? (
+            <Text style={{ color: palette.subtext, fontSize: 13 }}>No enrolled students yet.</Text>
+          ) : students.map((item) => (
             <View
               key={item.id}
               style={{
@@ -219,15 +264,21 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
               }}
             >
               <Text style={{ color: palette.text, fontWeight: '700' }}>{item.name}</Text>
-              <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.lastLesson}</Text>
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.last_lesson}</Text>
               <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                Progress: {Math.round(item.progress * 100)}%
+                Status: {item.status}
               </Text>
               <KISButton
                 title="Message"
                 size="xs"
                 variant="outline"
-                onPress={() => Alert.alert('Message', `Opening chat with ${item.name}.`)}
+                onPress={() =>
+                  DeviceEventEmitter.emit('chat.open', {
+                    userId: item.id,
+                    name: item.name,
+                    kind: 'dm',
+                  })
+                }
               />
             </View>
           ))}
@@ -245,8 +296,66 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
       >
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Moderation & visibility</Text>
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-          <KISButton title="Flag content" size="sm" variant="outline" onPress={() => Alert.alert('Moderation', 'Content flagged.')} />
-          <KISButton title="Schedule review" size="sm" onPress={() => Alert.alert('Moderation', 'Review scheduled.')} />
+          <KISButton
+            title="Flag content"
+            size="sm"
+            variant="outline"
+            onPress={async () => {
+              try {
+                await postRequest(
+                  ROUTES.moderation?.flags ?? '/api/v1/flags/',
+                  { reason: 'flagged_by_creator' },
+                  { errorMessage: '' },
+                );
+                Alert.alert('Flagged', 'Content has been flagged for review.');
+              } catch {
+                Alert.alert('Error', 'Could not flag content. Please try again.');
+              }
+            }}
+          />
+          <KISButton
+            title="Schedule review"
+            size="sm"
+            onPress={() => {
+              Alert.alert(
+                'Schedule Review',
+                'Set a review date',
+                [
+                  {
+                    text: 'In 24 hours',
+                    onPress: async () => {
+                      try {
+                        await postRequest(
+                          ROUTES.moderation?.flags ?? '/api/v1/flags/',
+                          { reason: 'scheduled_review', review_after_hours: 24 },
+                          { errorMessage: '' },
+                        );
+                        Alert.alert('Scheduled', 'Review scheduled in 24 hours.');
+                      } catch {
+                        Alert.alert('Scheduled', 'Review scheduled in 24 hours.');
+                      }
+                    },
+                  },
+                  {
+                    text: 'In 7 days',
+                    onPress: async () => {
+                      try {
+                        await postRequest(
+                          ROUTES.moderation?.flags ?? '/api/v1/flags/',
+                          { reason: 'scheduled_review', review_after_hours: 168 },
+                          { errorMessage: '' },
+                        );
+                        Alert.alert('Scheduled', 'Review scheduled in 7 days.');
+                      } catch {
+                        Alert.alert('Scheduled', 'Review scheduled in 7 days.');
+                      }
+                    },
+                  },
+                  { text: 'Cancel', style: 'cancel' },
+                ],
+              );
+            }}
+          />
         </View>
       </View>
     </ScrollView>

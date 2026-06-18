@@ -209,9 +209,9 @@ export default function ProductTagStudio({ contentId }: Props) {
           style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={palette.ivory} />
           ) : (
-            <Text style={styles.addBtnText}>Tag Product</Text>
+            <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>Tag Product</Text>
           )}
         </Pressable>
       </View>
@@ -256,7 +256,7 @@ export default function ProductTagStudio({ contentId }: Props) {
               {removingId === tag.id ? (
                 <ActivityIndicator size="small" color={palette.subtext} />
               ) : (
-                <Text style={styles.removeBtnText}>Remove</Text>
+                <Text style={[styles.removeBtnText, { color: palette.danger }]}>Remove</Text>
               )}
             </Pressable>
           </View>
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     borderRadius: 8,
-    height: 42,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  addBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  addBtnText: { fontWeight: '800', fontSize: 14 },
   sectionTitle: { fontSize: 14, fontWeight: '800' },
   tagCard: {
     flexDirection: 'row',
@@ -301,8 +301,8 @@ const styles = StyleSheet.create({
   tagTitle: { fontSize: 13, fontWeight: '800' },
   tagPrice: { fontSize: 12, fontWeight: '700' },
   tagTimestamp: { fontSize: 11, fontWeight: '600' },
-  removeBtn: { paddingHorizontal: 10, paddingVertical: 6 },
-  removeBtnText: { color: '#EF4444', fontSize: 12, fontWeight: '800' },
+  removeBtn: { paddingHorizontal: 10, paddingVertical: 6, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  removeBtnText: { fontSize: 12, fontWeight: '800' },
   emptyState: {
     borderWidth: 1,
     borderRadius: 10,

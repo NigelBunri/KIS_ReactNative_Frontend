@@ -150,8 +150,8 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         <Text style={[styles.author, { color: palette.text }]}>{comment.user_display || 'KIS user'}</Text>
         {comment.has_creator_heart && (
           <View style={styles.heartCrownBadge}>
-            <KISIcon name="heart" size={11} color="#ef4444" />
-            <KISIcon name="crown" size={10} color="#f59e0b" />
+            <KISIcon name="heart" size={11} color={palette.danger} />
+            <KISIcon name="crown" size={10} color={palette.gold} />
           </View>
         )}
       </View>
@@ -175,14 +175,14 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         <Text style={[styles.body, { color: palette.subtext }]}>{comment.body}</Text>
       )}
       <View style={styles.commentActions}>
-        <Pressable onPress={toggleLike} style={styles.actionBtn}>
-          <KISIcon name="heart" focused={comment.is_liked} size={14} color={comment.is_liked ? '#ef4444' : palette.subtext} />
+        <Pressable onPress={toggleLike} style={styles.actionBtn} hitSlop={10}>
+          <KISIcon name="heart" focused={comment.is_liked} size={14} color={comment.is_liked ? palette.danger : palette.subtext} />
           {(comment.like_count ?? 0) > 0 && (
             <Text style={[styles.actionCount, { color: palette.subtext }]}>{comment.like_count}</Text>
           )}
         </Pressable>
         {depth === 0 && (
-          <Pressable onPress={() => setReplyOpen(v => !v)} style={styles.actionBtn}>
+          <Pressable onPress={() => setReplyOpen(v => !v)} style={styles.actionBtn} hitSlop={10}>
             <KISIcon name="reply" size={13} color={palette.subtext} />
             <Text style={[styles.actionLabel, { color: palette.subtext }]}>Reply</Text>
             {(comment.reply_count ?? 0) > 0 && (
@@ -191,23 +191,23 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
           </Pressable>
         )}
         {isAdmin && depth === 0 && (
-          <Pressable onPress={togglePin} style={styles.actionBtn}>
+          <Pressable onPress={togglePin} style={styles.actionBtn} hitSlop={10}>
             <KISIcon name="pin" size={13} color={comment.is_pinned ? palette.primaryStrong : palette.subtext} />
           </Pressable>
         )}
         {isAdmin && (
-          <Pressable onPress={toggleHeart} style={styles.actionBtn}>
-            <KISIcon name="heart" size={13} color={comment.has_creator_heart ? '#ef4444' : palette.subtext} />
-            <KISIcon name="crown" size={11} color={comment.has_creator_heart ? '#f59e0b' : palette.subtext} />
+          <Pressable onPress={toggleHeart} style={styles.actionBtn} hitSlop={10}>
+            <KISIcon name="heart" size={13} color={comment.has_creator_heart ? palette.danger : palette.subtext} />
+            <KISIcon name="crown" size={11} color={comment.has_creator_heart ? palette.gold : palette.subtext} />
           </Pressable>
         )}
         {isOwnComment && !editMode && (
-          <Pressable onPress={() => { setEditMode(true); setEditText(comment.body); }} style={styles.actionBtn}>
+          <Pressable onPress={() => { setEditMode(true); setEditText(comment.body); }} style={styles.actionBtn} hitSlop={10}>
             <KISIcon name="edit" size={13} color={palette.subtext} />
           </Pressable>
         )}
         {(isOwnComment || isAdmin) && (
-          <Pressable onPress={handleDelete} style={styles.actionBtn}>
+          <Pressable onPress={handleDelete} style={styles.actionBtn} hitSlop={10}>
             <KISIcon name="trash" size={13} color={palette.subtext} />
           </Pressable>
         )}
@@ -226,6 +226,7 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
             ]);
           }}
           style={styles.actionBtn}
+          hitSlop={10}
         >
           <KISIcon name="report" size={13} color={palette.subtext} />
         </Pressable>

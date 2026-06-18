@@ -658,7 +658,7 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
           },
         ]}
       >
-        <KISIcon name="add" size={20} color={palette.onPrimary ?? '#fff'} />
+        <KISIcon name="add" size={20} color={palette.onPrimary} />
       </Pressable>
 
       <FeedComposerSheet

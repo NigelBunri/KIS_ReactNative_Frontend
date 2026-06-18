@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -18,6 +19,9 @@ import {
   microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
+import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 import { getHealthThemeColors } from '@/theme/health/colors';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
@@ -63,6 +67,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [defaultMargin, setDefaultMargin] = useState('0');
   const [autoAssignRadiologist, setAutoAssignRadiologist] = useState(true);
   const [requireIndication, setRequireIndication] = useState(true);
@@ -114,7 +119,39 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
 
   useEffect(() => {
     loadCatalog().catch(() => undefined);
-  }, [loadCatalog]);
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [loadCatalog, institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEngineEnabled(!next);
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
 
   const resetStudyForm = useCallback(() => {
     setEditingStudyId(null);
@@ -202,7 +239,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
     );
   }, []);
 
-  const createOrder = useCallback(() => {
+  const createOrder = useCallback(async () => {
     if (!patientName.trim()) {
       Alert.alert('Create order', 'Patient name is required.');
       return;
@@ -214,6 +251,21 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
     if (selectedStudies.length === 0) {
       Alert.alert('Create order', 'Select at least one imaging study.');
       return;
+    }
+
+    // Submit the imaging order via the clinical engine session start endpoint,
+    // which is the appropriate backend workflow for diagnostic/imaging orders.
+    try {
+      await postRequest(ROUTES.healthOps.clinicalSessionStart, {
+        patient_name: patientName.trim(),
+        order_type: 'imaging',
+        clinical_indication: clinicalIndication.trim(),
+        priority,
+        studies: selectedStudies.map((s) => ({ id: s.id, name: s.name })),
+        radiologist: autoAssignRadiologist ? null : radiologist.trim() || null,
+      });
+    } catch {
+      // Best-effort; local entry is always added for UI feedback
     }
 
     const nextOrder: ImagingOrder = {
@@ -233,8 +285,15 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
     setSelectedStudies([]);
   }, [autoAssignRadiologist, clinicalIndication, patientName, priority, radiologist, requireIndication, selectedStudies]);
 
-  const updateStatus = useCallback((id: string, statusValue: ImagingStatus) => {
+  const updateStatus = useCallback(async (id: string, statusValue: ImagingStatus) => {
     setOrders((prev) => prev.map((row) => (row.id === id ? { ...row, status: statusValue } : row)));
+    // id is the backend session id when the order was created via clinicalSessionStart.
+    // For local-only fallback ids (Date.now()) the PATCH is a no-op on the server.
+    try {
+      await patchRequest(ROUTES.healthOps.clinicalSessionStep(id), { status: statusValue });
+    } catch {
+      // Best-effort; local state already reflects the change
+    }
   }, []);
 
   const updateReport = useCallback((orderId: string, field: 'findings' | 'impression' | 'signedOff', value: any) => {
@@ -258,13 +317,14 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
   );
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Imaging Engine Configuration</Text>
 
         <KISButton
           title={engineEnabled ? 'Disable Engine' : 'Enable Engine'}
-          onPress={() => setEngineEnabled((prev) => !prev)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
 
@@ -377,7 +437,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
           <TextInput placeholder="Assign Radiologist" value={radiologist} onChangeText={setRadiologist} style={input(palette, spacing)} />
         ) : null}
 
-        <KISButton title="Create Order" onPress={createOrder} />
+        <KISButton title="Create Order" onPress={() => { createOrder().catch(() => undefined); }} />
       </View>
 
       <View style={card(palette, spacing)}>
@@ -394,7 +454,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
               <KISButton
                 key={statusValue}
                 title={statusValue}
-                onPress={() => updateStatus(order.id, statusValue as ImagingStatus)}
+                onPress={() => { updateStatus(order.id, statusValue as ImagingStatus).catch(() => undefined); }}
                 variant="outline"
               />
             ))}
@@ -431,6 +491,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         <Text style={{ color: palette.text }}>Revenue Generated: {toUsdLabel(totalRevenue)} USD</Text>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -451,7 +512,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

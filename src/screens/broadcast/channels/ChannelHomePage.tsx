@@ -144,17 +144,17 @@ function ContentTile({ content, mode = 'grid', onPress }: { content: BroadcastCh
         )}
         <View style={styles.mediaScrim} />
         <View style={styles.mediaBadge}>
-          <KISIcon name={content.content_type === 'audio' ? 'audio' : content.content_type === 'document' ? 'file' : 'play'} size={13} color="#fff" />
-          <Text style={styles.mediaBadgeText}>{contentLabel(content.content_type)}</Text>
+          <KISIcon name={content.content_type === 'audio' ? 'audio' : content.content_type === 'document' ? 'file' : 'play'} size={13} color={palette.ivory} />
+          <Text style={[styles.mediaBadgeText, { color: palette.ivory }]}>{contentLabel(content.content_type)}</Text>
         </View>
         {isLive && (
-          <View style={[styles.liveBadge, { backgroundColor: '#e74c3c' }]}>
-            <Text style={styles.liveBadgeText}>LIVE</Text>
+          <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}>
+            <Text style={[styles.liveBadgeText, { color: palette.ivory }]}>LIVE</Text>
           </View>
         )}
         {duration && !isLive && (
           <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{duration}</Text>
+            <Text style={[styles.durationText, { color: palette.ivory }]}>{duration}</Text>
           </View>
         )}
       </View>
@@ -237,7 +237,12 @@ export default function ChannelHomePage() {
   }, [load]);
 
   const openContent = useCallback((content: BroadcastChannelContent) => {
-    navigation.navigate('ChannelContentDetail', { contentId: content.id, item: content, channel });
+    const isLiveContent = content.content_type === 'live_stream' || content.status === 'live' || content.status === 'scheduled';
+    if (isLiveContent) {
+      navigation.navigate('LiveWatch', { streamId: content.id, stream: content as any });
+    } else {
+      navigation.navigate('ChannelContentDetail', { contentId: content.id, item: content, channel });
+    }
   }, [channel, navigation]);
 
   const handleShare = useCallback(async () => {
@@ -302,7 +307,7 @@ export default function ChannelHomePage() {
             <View style={styles.heroShade} />
           </View>
           <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}>
-            <KISIcon name="arrow-left" size={20} color="#fff" />
+            <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
         </View>
 
@@ -425,13 +430,18 @@ export default function ChannelHomePage() {
           <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>Playlists</Text>
             {playlists.length ? playlists.map(item => (
-              <View key={item.id} style={[styles.playlistCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
+              <Pressable
+                key={item.id}
+                onPress={() => navigation.navigate('PlaylistDetail', { playlistId: item.id })}
+                style={({ pressed }) => [styles.playlistCard, { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed ? 0.85 : 1 }]}
+              >
                 <KISIcon name="list" size={18} color={palette.primaryStrong} />
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={[styles.playlistTitle, { color: palette.text }]}>{item.title}</Text>
                   <Text numberOfLines={2} style={[styles.tileMeta, { color: palette.subtext }]}>{item.description || 'Curated channel collection'}</Text>
                 </View>
-              </View>
+                <KISIcon name="chevron-right" size={14} color={palette.subtext} />
+              </Pressable>
             )) : <Text style={[styles.emptyText, { color: palette.subtext }]}>No public playlists yet.</Text>}
           </View>
         ) : (
@@ -453,7 +463,7 @@ export default function ChannelHomePage() {
                     <LinearGradient colors={[palette.primarySoft, palette.surface]} style={StyleSheet.absoluteFillObject} />
                   )}
                   <View style={styles.miniCardPlayOverlay}>
-                    <KISIcon name="play" size={22} color="#fff" />
+                    <KISIcon name="play" size={22} color={palette.ivory} />
                   </View>
                 </View>
                 <View style={styles.miniCardBody}>
@@ -482,7 +492,7 @@ export default function ChannelHomePage() {
                     <LinearGradient colors={[palette.primarySoft, palette.surface]} style={StyleSheet.absoluteFillObject} />
                   )}
                   <View style={styles.miniCardPlayOverlay}>
-                    <KISIcon name="play" size={22} color="#fff" />
+                    <KISIcon name="play" size={22} color={palette.ivory} />
                   </View>
                 </View>
                 <View style={styles.miniCardBody}>
@@ -516,10 +526,12 @@ export default function ChannelHomePage() {
               </Pressable>
             ) : null}
 
-            {activeTab === 'home' ? <PlaylistRail playlists={playlists} onSeeAll={() => setActiveTab('playlists')} /> : null}
+            {activeTab === 'home' ? <PlaylistRail playlists={playlists} onSeeAll={() => setActiveTab('playlists')} onPressPlaylist={pl => navigation.navigate('PlaylistDetail', { playlistId: pl.id })} /> : null}
             <View style={[styles.sectionBlock, { paddingHorizontal: responsive.pageGutter }]}>
               <Text style={[styles.sectionTitle, { color: palette.text }]}>{activeTab === 'home' ? 'Latest uploads' : TABS.find(tab => tab.id === activeTab)?.label}</Text>
-              {tabContents.length ? (
+              {loading && tabContents.length === 0 ? (
+                <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 24 }} />
+              ) : tabContents.length ? (
                 <FlatList
                   data={tabContents}
                   keyExtractor={item => item.id}
@@ -527,6 +539,13 @@ export default function ChannelHomePage() {
                   scrollEnabled={false}
                   columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
                   renderItem={({ item }) => <ContentTile content={item} onPress={() => openContent(item)} />}
+                  ListEmptyComponent={
+                    !loading ? (
+                      <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                        <Text style={{ color: palette.subtext, fontSize: 14 }}>No content yet</Text>
+                      </View>
+                    ) : null
+                  }
                 />
               ) : <Text style={[styles.emptyText, { color: palette.subtext }]}>Nothing published here yet.</Text>}
             </View>
@@ -543,7 +562,7 @@ const styles = StyleSheet.create({
   heroWrap: { height: 184 },
   banner: { height: 184, overflow: 'hidden' },
   heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.18)' },
-  backButton: { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.34)' },
+  backButton: { position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.34)' },
   avatarOverlap: { marginTop: -50, marginBottom: 12 },
   avatarFallback: { borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
   headerTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -571,7 +590,7 @@ const styles = StyleSheet.create({
   wideMedia: { height: 196, overflow: 'hidden' },
   mediaScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.08)' },
   mediaBadge: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  mediaBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  mediaBadgeText: { fontSize: 10, fontWeight: '900' },
   tileBody: { padding: 10 },
   wideBody: { padding: 12 },
   tileTitle: { fontSize: 13, lineHeight: 18, fontWeight: '900' },
@@ -583,9 +602,9 @@ const styles = StyleSheet.create({
   playlistTitle: { fontSize: 14, fontWeight: '900' },
   emptyText: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
   liveBadge: { position: 'absolute', left: 8, top: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  liveBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   durationBadge: { position: 'absolute', right: 8, bottom: 8, backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5 },
-  durationText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  durationText: { fontSize: 11, fontWeight: '800' },
   miniCard: {
     flexDirection: 'row',
     borderWidth: 1,
@@ -642,7 +661,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => Style
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    shadowColor: palette.shadow ?? '#000',
+    shadowColor: palette.shadow ?? palette.royalInk,
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },

@@ -7,6 +7,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,9 +19,7 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
-import { patchRequest } from '@/network/patch';
-import { deleteRequest } from '@/network/delete';
+import { putData as putRequest } from '@/network/put';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,12 +51,8 @@ type Props = {
 
 const ELEMENT_TYPES: ElementType[] = ['video', 'subscribe', 'channel', 'link'];
 
-const TYPE_COLOR: Record<ElementType, string> = {
-  video: '#3B82F6',
-  subscribe: '#EF4444',
-  channel: '#8B5CF6',
-  link: '#F59E0B',
-};
+const elementTypeColor = (type: ElementType, p: any): string =>
+  ({ video: p.primary, subscribe: p.danger, channel: p.primaryStrong, link: p.gold } as Record<ElementType, string>)[type] ?? p.subtext;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -96,19 +93,27 @@ export default function EndScreenEditor({ contentId }: Props) {
     void fetchEndScreen();
   }, [fetchEndScreen]);
 
+  // The backend end-screen endpoint is a single config-blob resource (PUT).
+  // There are no per-element sub-paths; the full list is sent on every write.
+  const putConfig = useCallback(async (config: EndScreenElement[]) => {
+    await putRequest(
+      ROUTES.broadcasts.contentEndScreen(contentId),
+      { config, is_enabled: true },
+      { errorMessage: 'Could not save end screen.' },
+    );
+  }, [contentId]);
+
   const handleAdd = useCallback(async () => {
     setSaving(true);
     try {
-      await postRequest(
-        ROUTES.broadcasts.contentEndScreen(contentId),
-        {
-          element_type: formType,
-          target_url: formTargetUrl.trim() || undefined,
-          start_seconds: formStartSec ? Number(formStartSec) : undefined,
-          end_seconds: formEndSec ? Number(formEndSec) : undefined,
-        },
-        { errorMessage: 'Could not add end screen element.' },
-      );
+      const newEl: EndScreenElement = {
+        element_type: formType,
+        target_url: formTargetUrl.trim() || undefined,
+        start_seconds: formStartSec ? Number(formStartSec) : undefined,
+        end_seconds: formEndSec ? Number(formEndSec) : undefined,
+      };
+      const updated = [...(endScreen?.elements ?? []), newEl];
+      await putConfig(updated);
       setFormType('video');
       setFormTargetUrl('');
       setFormStartSec('');
@@ -120,21 +125,21 @@ export default function EndScreenEditor({ contentId }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [contentId, fetchEndScreen, formEndSec, formStartSec, formTargetUrl, formType]);
+  }, [contentId, endScreen, fetchEndScreen, formEndSec, formStartSec, formTargetUrl, formType, putConfig]);
 
   const handleDelete = useCallback((el: EndScreenElement) => {
-    if (!el.id) return;
     Alert.alert('Remove element?', `The ${el.element_type} element will be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          setDeletingId(el.id!);
+          setDeletingId(el.id ?? el.element_type);
           try {
-            await deleteRequest(
-              `${ROUTES.broadcasts.contentEndScreen(contentId)}${el.id}/`,
+            const updated = (endScreen?.elements ?? []).filter(e =>
+              el.id ? e.id !== el.id : e !== el,
             );
+            await putConfig(updated);
             await fetchEndScreen();
           } catch {
             Alert.alert('Error', 'Could not remove element.');
@@ -144,7 +149,7 @@ export default function EndScreenEditor({ contentId }: Props) {
         },
       },
     ]);
-  }, [contentId, fetchEndScreen]);
+  }, [endScreen, fetchEndScreen, putConfig]);
 
   const elements = endScreen?.elements ?? [];
 
@@ -165,9 +170,11 @@ export default function EndScreenEditor({ contentId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
     >
       <Text style={[styles.heading, { color: palette.text }]}>End Screen Elements</Text>
       <Text style={[styles.hint, { color: palette.subtext }]}>
@@ -181,7 +188,7 @@ export default function EndScreenEditor({ contentId }: Props) {
       )}
 
       {elements.map((el, idx) => {
-        const color = TYPE_COLOR[el.element_type] ?? palette.primaryStrong;
+        const color = elementTypeColor(el.element_type, palette);
         return (
           <View
             key={el.id ?? idx}
@@ -207,17 +214,19 @@ export default function EndScreenEditor({ contentId }: Props) {
                 </Text>
               )}
             </View>
-            {el.id && (
-              <Text
-                onPress={() => {
-                  if (deletingId === el.id) return;
-                  handleDelete(el);
-                }}
-                style={[styles.deleteBtn, { color: '#EF4444', opacity: deletingId === el.id ? 0.4 : 1 }]}
-              >
-                {deletingId === el.id ? '...' : 'Remove'}
+            <Pressable
+              hitSlop={10}
+              style={styles.deleteTouch}
+              onPress={() => {
+                const key = el.id ?? el.element_type;
+                if (deletingId === key) return;
+                handleDelete(el);
+              }}
+            >
+              <Text style={[styles.deleteBtn, { color: palette.danger, opacity: deletingId === (el.id ?? el.element_type) ? 0.4 : 1 }]}>
+                {deletingId === (el.id ?? el.element_type) ? '...' : 'Remove'}
               </Text>
-            )}
+            </Pressable>
           </View>
         );
       })}
@@ -232,20 +241,19 @@ export default function EndScreenEditor({ contentId }: Props) {
             {ELEMENT_TYPES.map(t => {
               const active = formType === t;
               return (
-                <Text
+                <Pressable
                   key={t}
                   onPress={() => setFormType(t)}
                   style={[
                     styles.typeChip,
                     {
-                      backgroundColor: active ? TYPE_COLOR[t] : palette.surface,
-                      borderColor: active ? TYPE_COLOR[t] : palette.border,
-                      color: active ? '#fff' : palette.text,
+                      backgroundColor: active ? elementTypeColor(t, palette) : palette.surface,
+                      borderColor: active ? elementTypeColor(t, palette) : palette.border,
                     },
                   ]}
                 >
-                  {t}
-                </Text>
+                  <Text style={[styles.typeChipText, { color: active ? palette.onPrimary : palette.text }]}>{t}</Text>
+                </Pressable>
               );
             })}
           </View>
@@ -281,29 +289,21 @@ export default function EndScreenEditor({ contentId }: Props) {
           </View>
 
           <View style={styles.formActions}>
-            <Text
-              onPress={() => setShowForm(false)}
-              style={[styles.cancelBtn, { color: palette.subtext, borderColor: palette.border }]}
-            >
-              Cancel
-            </Text>
-            <Text
-              onPress={saving ? undefined : handleAdd}
-              style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}
-            >
-              {saving ? 'Adding...' : 'Add Element'}
-            </Text>
+            <Pressable onPress={() => setShowForm(false)} style={[styles.cancelBtn, { borderColor: palette.border }]}>
+              <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+            <Pressable disabled={saving} onPress={handleAdd} style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}>
+              <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>{saving ? 'Adding...' : 'Add Element'}</Text>
+            </Pressable>
           </View>
         </View>
       ) : (
-        <Text
-          onPress={() => setShowForm(true)}
-          style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
-        >
-          + Add Element
-        </Text>
+        <Pressable onPress={() => setShowForm(true)} style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>+ Add Element</Text>
+        </Pressable>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -330,6 +330,7 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, fontWeight: '700' },
   metaTime: { fontSize: 11, fontWeight: '600', marginTop: 2 },
   metaPos: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+  deleteTouch: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { fontSize: 12, fontWeight: '900' },
   formCard: {
     borderWidth: 1,
@@ -340,14 +341,14 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 14, fontWeight: '900' },
   typePicker: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   typeChip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 12,
-    fontWeight: '700',
-    overflow: 'hidden',
   },
+  typeChipText: { fontSize: 12, fontWeight: '700' },
   input: {
     minHeight: 42,
     borderWidth: 1,
@@ -370,34 +371,31 @@ const styles = StyleSheet.create({
   },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   saveBtn: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    overflow: 'hidden',
   },
+  saveBtnText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   addBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
   },
+  addBtnText: { fontSize: 13, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

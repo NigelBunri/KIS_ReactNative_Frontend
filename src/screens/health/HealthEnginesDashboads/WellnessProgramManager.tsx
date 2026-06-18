@@ -2,12 +2,14 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
+  Alert,
   ScrollView,
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  useColorScheme,
 } from "react-native";
-import { useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -16,6 +18,11 @@ import ROUTES from "@/network";
 import { getRequest } from "@/network/get";
 import { postRequest } from "@/network/post";
 import { patchRequest } from "@/network/patch";
+import {
+  createInstitutionEngineManagedItem,
+  fetchInstitutionEngineManagedItems,
+  updateInstitutionEngineManagedItem,
+} from "@/services/healthOpsEngineManagerService";
 
 /* ================= TYPES ================= */
 
@@ -82,7 +89,9 @@ const normalizeEnrollment = (raw: any): PatientEnrollment => ({
 
 /* ================= COMPONENT ================= */
 
-export default function WellnessProgramManager() {
+type Props = { institutionId: string; engineKey: string };
+
+export default function WellnessProgramManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
   const spacing = HEALTH_THEME_SPACING;
@@ -90,6 +99,7 @@ export default function WellnessProgramManager() {
 
   /* ================= CONFIG ================= */
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [pointsPerActivity, setPointsPerActivity] = useState("10");
   const [maxActivitiesPerDay, setMaxActivitiesPerDay] = useState("5");
   const [autoApprove, setAutoApprove] = useState(true);
@@ -115,23 +125,13 @@ export default function WellnessProgramManager() {
     setError(null);
 
     try {
-      const [sessionsRes, challengesRes] = await Promise.all([
-        getRequest(
-          ROUTES.healthOps.wellnessSessionStart.replace("/start/", "/"),
-          {}
-        ),
-        getRequest(ROUTES.analytics.wellnessChallenges, {}),
-      ]);
-
-      if (sessionsRes.success) {
-        const data = sessionsRes.data;
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.results)
-          ? data.results
-          : [];
-        setEnrollments(list.map(normalizeEnrollment));
-      }
+      // NOTE: there is no backend endpoint to list wellness-program enrollment
+      // sessions for an institution yet — health-ops/wellness/sessions/start/
+      // only supports POST (creating one enrollment session at a time). New
+      // enrollments persist via the POST below, but won't be listed on reload
+      // until a list endpoint exists. Program/activity data comes from the
+      // real wellness-challenges API.
+      const challengesRes = await getRequest(ROUTES.analytics.wellnessChallenges, {});
 
       if (challengesRes.success) {
         const data = challengesRes.data;
@@ -161,6 +161,41 @@ export default function WellnessProgramManager() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEngineEnabled(!next);
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
 
   /* ================= PROGRAM MANAGEMENT ================= */
 
@@ -289,29 +324,28 @@ export default function WellnessProgramManager() {
       const activityPoints =
         activities.find((a) => a.id === activityId)?.points ?? 0;
 
-      if (res.success || true) {
-        setEnrollments((prev) =>
-          prev.map((e) => {
-            if (e.id === enrollmentId && !e.completedActivities.includes(activityId)) {
-              return {
-                ...e,
-                completedActivities: [...e.completedActivities, activityId],
-                pointsEarned: e.pointsEarned + activityPoints,
-              };
-            }
-            return e;
-          })
-        );
+      // Optimistic update: apply completion locally regardless of server response
+      setEnrollments((prev) =>
+        prev.map((e) => {
+          if (e.id === enrollmentId && !e.completedActivities.includes(activityId)) {
+            return {
+              ...e,
+              completedActivities: [...e.completedActivities, activityId],
+              pointsEarned: e.pointsEarned + activityPoints,
+            };
+          }
+          return e;
+        })
+      );
 
-        if (autoApprove) {
-          setActivities((prev) =>
-            prev.map((a) =>
-              a.id === activityId
-                ? { ...a, completedBy: [...a.completedBy, enrollmentId] }
-                : a
-            )
-          );
-        }
+      if (autoApprove) {
+        setActivities((prev) =>
+          prev.map((a) =>
+            a.id === activityId
+              ? { ...a, completedBy: [...a.completedBy, enrollmentId] }
+              : a
+          )
+        );
       }
     },
     [enrollments, activities, autoApprove]
@@ -321,31 +355,36 @@ export default function WellnessProgramManager() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={palette.primary} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          padding: spacing.md,
-        }}
-      >
-        <Text style={{ color: palette.text, marginBottom: spacing.md }}>
-          {error}
-        </Text>
-        <KISButton title="Retry" onPress={() => fetchData()} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: spacing.md,
+          }}
+        >
+          <Text style={{ color: palette.text, marginBottom: spacing.md }}>
+            {error}
+          </Text>
+          <KISButton title="Retry" onPress={() => fetchData()} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
     <ScrollView
       style={{ padding: spacing.md }}
       refreshControl={
@@ -363,7 +402,7 @@ export default function WellnessProgramManager() {
         </Text>
         <KISButton
           title={engineEnabled ? "Disable Engine" : "Enable Engine"}
-          onPress={() => setEngineEnabled(!engineEnabled)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
         <TextInput
@@ -565,6 +604,7 @@ export default function WellnessProgramManager() {
       </View>
 
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -586,7 +626,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

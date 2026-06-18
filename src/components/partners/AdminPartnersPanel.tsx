@@ -102,8 +102,8 @@ export default function AdminPartnersPanel({
         </View>
       )}
       {!!error && !loading && (
-        <View style={[styles.errorBox, { backgroundColor: (palette.danger ?? '#d9534f') + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+        <View style={[styles.errorBox, { backgroundColor: (palette.danger) + '22', borderColor: palette.danger }]}>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
         </View>
       )}
 
@@ -144,7 +144,7 @@ export default function AdminPartnersPanel({
                 >
                   {actionLoading === item.id
                     ? <ActivityIndicator size="small" color={palette.primary} />
-                    : <Text style={[styles.actionBtnText, { color: item.is_active ? palette.danger ?? '#e74c3c' : '#4caf50' }]}>
+                    : <Text style={[styles.actionBtnText, { color: item.is_active ? palette.danger : '#4caf50' }]}>
                         {item.is_active ? 'Deactivate' : 'Activate'}
                       </Text>
                   }

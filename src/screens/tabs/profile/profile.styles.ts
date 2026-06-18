@@ -392,6 +392,7 @@ export const styles = StyleSheet.create({
   thumb: { width: 48, height: 48, borderRadius: 14 },
 
   rowActions: { flexDirection: 'row', gap: 12 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   /** ─────────────────────────
    *  Chips
@@ -447,6 +448,9 @@ export const styles = StyleSheet.create({
   privacyChip: {
     paddingHorizontal: 10,
     paddingVertical: 7,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 2,
   },
@@ -459,6 +463,9 @@ export const styles = StyleSheet.create({
   walletModeChip: {
     paddingHorizontal: 10,
     paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
     borderRadius: 999,
     borderWidth: 2,
   },

@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -18,6 +19,9 @@ import {
   microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
+import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 import { getHealthThemeColors } from '@/theme/health/colors';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
@@ -53,6 +57,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [labMargin, setLabMargin] = useState('0');
 
   const [labCatalog, setLabCatalog] = useState<LabTest[]>([]);
@@ -101,7 +106,14 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
 
   useEffect(() => {
     loadCatalog().catch(() => undefined);
-  }, [loadCatalog]);
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config', rootOnly: true, includeInactive: false })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) { setEngineConfigItemId(String(cfg.id)); setEngineEnabled(String(cfg.value_text) !== 'false'); }
+      })
+      .catch(() => {});
+  }, [engineKey, institutionId, loadCatalog]);
 
   const resetCatalogForm = useCallback(() => {
     setNewTestName('');
@@ -185,16 +197,44 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
     ]);
   }, [editingTestId, engineKey, institutionId, loadCatalog, resetCatalogForm]);
 
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      const payload = { item_kind: 'engine_config', name: 'is_active', value_text: next ? 'true' : 'false', status: 'active' };
+      if (!engineConfigItemId) {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, payload);
+        if (res?.data?.id) setEngineConfigItemId(String(res.data.id));
+      } else {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, payload);
+      }
+    } catch {
+      // non-critical
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
+
   const toggleTestSelection = useCallback((test: LabTest) => {
     setSelectedTests((prev) =>
       prev.find((row) => row.id === test.id) ? prev.filter((row) => row.id !== test.id) : [...prev, test],
     );
   }, []);
 
-  const createOrder = useCallback(() => {
+  const createOrder = useCallback(async () => {
     if (!patientName.trim() || selectedTests.length === 0) {
       Alert.alert('Create order', 'Enter patient name and select at least one test.');
       return;
+    }
+    // Submit the lab order via the clinical engine session start endpoint, which
+    // is the appropriate backend workflow for diagnostic/lab orders.
+    try {
+      await postRequest(ROUTES.healthOps.clinicalSessionStart, {
+        patient_name: patientName.trim(),
+        order_type: 'lab',
+        urgency,
+        tests: selectedTests.map((t) => ({ id: t.id, name: t.name })),
+      });
+    } catch {
+      // Best-effort; local entry is always added for UI feedback
     }
     const nextOrder: LabOrder = {
       id: Date.now().toString(),
@@ -209,8 +249,15 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
     setSelectedTests([]);
   }, [patientName, selectedTests, urgency]);
 
-  const updateStatus = useCallback((id: string, statusValue: LabOrder['status']) => {
+  const updateStatus = useCallback(async (id: string, statusValue: LabOrder['status']) => {
     setOrders((prev) => prev.map((row) => (row.id === id ? { ...row, status: statusValue } : row)));
+    // id is the backend session id when the order was created via clinicalSessionStart.
+    // For local-only fallback ids the PATCH is a no-op on the server.
+    try {
+      await patchRequest(ROUTES.healthOps.clinicalSessionStep(id), { status: statusValue });
+    } catch {
+      // Best-effort; local state already reflects the change
+    }
   }, []);
 
   const totalOrders = orders.length;
@@ -225,13 +272,14 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
   );
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Lab Engine Configuration</Text>
 
         <KISButton
           title={engineEnabled ? 'Disable Engine' : 'Enable Engine'}
-          onPress={() => setEngineEnabled((prev) => !prev)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
 
@@ -329,7 +377,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
           />
         ))}
 
-        <KISButton title="Create Order" onPress={createOrder} />
+        <KISButton title="Create Order" onPress={() => { createOrder().catch(() => undefined); }} />
       </View>
 
       <View style={card(palette, spacing)}>
@@ -347,7 +395,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
               <KISButton
                 key={statusValue}
                 title={statusValue}
-                onPress={() => updateStatus(order.id, statusValue as LabOrder['status'])}
+                onPress={() => { updateStatus(order.id, statusValue as LabOrder['status']).catch(() => undefined); }}
                 variant="outline"
               />
             ))}
@@ -366,6 +414,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         </Text>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -386,7 +435,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

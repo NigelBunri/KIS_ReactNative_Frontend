@@ -13,7 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -63,11 +65,12 @@ type Tab = 'queue' | 'users' | 'audit';
 // ─── Severity badge ───────────────────────────────────────────────────────────
 
 function SeverityBadge({ severity }: { severity: Flag['severity'] }) {
+  const { palette } = useKISTheme();
   const colors: Record<Flag['severity'], string> = {
-    LOW: '#4CAF50',
-    MEDIUM: '#FF9800',
-    HIGH: '#F44336',
-    CRITICAL: '#9C27B0',
+    LOW: palette.success,
+    MEDIUM: palette.gold,
+    HIGH: palette.danger,
+    CRITICAL: palette.primaryStrong,
   };
   return (
     <View style={[badgeStyles.root, { backgroundColor: colors[severity] + '22', borderColor: colors[severity] }]}>
@@ -84,13 +87,14 @@ const badgeStyles = StyleSheet.create({
 // ─── Status chip ─────────────────────────────────────────────────────────────
 
 function StatusChip({ status }: { status: Flag['status'] }) {
+  const { palette } = useKISTheme();
   const map: Record<Flag['status'], [string, string]> = {
-    PENDING: ['#FF9800', 'Pending'],
-    REVIEWED: ['#2196F3', 'Reviewed'],
-    ACTIONED: ['#4CAF50', 'Actioned'],
-    DISMISSED: ['#9E9E9E', 'Dismissed'],
+    PENDING: [palette.gold, 'Pending'],
+    REVIEWED: [palette.primary, 'Reviewed'],
+    ACTIONED: [palette.success, 'Actioned'],
+    DISMISSED: [palette.subtext, 'Dismissed'],
   };
-  const [color, label] = map[status] ?? ['#9E9E9E', status];
+  const [color, label] = map[status] ?? [palette.subtext, status];
   return (
     <View style={[badgeStyles.root, { backgroundColor: color + '22', borderColor: color }]}>
       <Text style={[badgeStyles.label, { color }]}>{label}</Text>
@@ -157,7 +161,7 @@ function FlagActionSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={sheet.overlay} onPress={onClose} />
       <View style={[sheet.panel, { backgroundColor: palette.bg }]}>
-        <View style={sheet.handle} />
+        <View style={[sheet.handle, { backgroundColor: palette.divider }]} />
         <Text style={[sheet.title, { color: palette.text }]}>Flag action</Text>
         <Text style={[sheet.sub, { color: palette.subtext }]} numberOfLines={3}>{flag.reason}</Text>
         <View style={sheet.row}>
@@ -170,26 +174,26 @@ function FlagActionSheet({
         ) : (
           <>
             {flag.status === 'PENDING' && (
-              <TouchableOpacity style={[sheet.btn, { backgroundColor: '#2196F322', borderColor: '#2196F3' }]} onPress={() => doAction('review')}>
-                <Text style={[sheet.btnTxt, { color: '#2196F3' }]}>Mark reviewed</Text>
+              <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]} onPress={() => doAction('review')}>
+                <Text style={[sheet.btnTxt, { color: palette.primary }]}>Mark reviewed</Text>
               </TouchableOpacity>
             )}
             {(flag.status === 'PENDING' || flag.status === 'REVIEWED') && (
               <>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: '#FF980022', borderColor: '#FF9800' }]} onPress={() => doModAction('WARN')}>
-                  <Text style={[sheet.btnTxt, { color: '#FF9800' }]}>Warn user</Text>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.goldHighlight, borderColor: palette.gold }]} onPress={() => doModAction('WARN')}>
+                  <Text style={[sheet.btnTxt, { color: palette.gold }]}>Warn user</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: '#F4433622', borderColor: '#F44336' }]} onPress={() => doModAction('SUSPEND')}>
-                  <Text style={[sheet.btnTxt, { color: '#F44336' }]}>Suspend</Text>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => doModAction('SUSPEND')}>
+                  <Text style={[sheet.btnTxt, { color: palette.danger }]}>Suspend</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: '#9C27B022', borderColor: '#9C27B0' }]} onPress={() => doModAction('BAN')}>
-                  <Text style={[sheet.btnTxt, { color: '#9C27B0' }]}>Ban user</Text>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]} onPress={() => doModAction('BAN')}>
+                  <Text style={[sheet.btnTxt, { color: palette.primaryStrong }]}>Ban user</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: '#f4433622', borderColor: '#F44336' }]} onPress={() => doModAction('DELETE')}>
-                  <Text style={[sheet.btnTxt, { color: '#F44336' }]}>Delete content</Text>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => doModAction('DELETE')}>
+                  <Text style={[sheet.btnTxt, { color: palette.danger }]}>Delete content</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: '#4CAF5022', borderColor: '#4CAF50' }]} onPress={() => doAction('resolve')}>
-                  <Text style={[sheet.btnTxt, { color: '#4CAF50' }]}>Resolve (no action)</Text>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.successSoft, borderColor: palette.success }]} onPress={() => doAction('resolve')}>
+                  <Text style={[sheet.btnTxt, { color: palette.success }]}>Resolve (no action)</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -206,7 +210,7 @@ function FlagActionSheet({
 const sheet = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   panel: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 10 },
-  handle: { width: 40, height: 4, backgroundColor: '#ccc', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   title: { fontSize: 18, fontWeight: '700' },
   sub: { fontSize: 13, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
@@ -219,6 +223,7 @@ const sheet = StyleSheet.create({
 
 function ModerationQueueTab() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [flags, setFlags] = useState<Flag[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -272,7 +277,7 @@ function ModerationQueueTab() {
           data={flags}
           keyExtractor={f => f.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
-          contentContainerStyle={{ padding: 12, gap: 10 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
           ListEmptyComponent={<Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 40 }}>No {statusFilter.toLowerCase()} flags</Text>}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -326,6 +331,7 @@ const flagCard = StyleSheet.create({
 
 function UserManagementTab() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<KISUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -400,7 +406,7 @@ function UserManagementTab() {
           data={users}
           keyExtractor={u => u.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); search(query, true); }} />}
-          contentContainerStyle={{ padding: 12, gap: 10 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
           ListEmptyComponent={<Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 40 }}>No users found</Text>}
           renderItem={({ item }) => (
             <View style={[userTab.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
@@ -411,23 +417,23 @@ function UserManagementTab() {
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
                   <Text style={[userTab.tier, { color: palette.primaryStrong }]}>{item.tier || 'free'}</Text>
-                  <Text style={[userTab.score, { color: item.trust_score > 80 ? '#4CAF50' : item.trust_score > 50 ? '#FF9800' : '#F44336' }]}>
+                  <Text style={[userTab.score, { color: item.trust_score > 80 ? palette.success : item.trust_score > 50 ? palette.gold : palette.danger }]}>
                     Trust {(item.trust_score ?? 0).toFixed(0)}
                   </Text>
                 </View>
               </View>
               <View style={userTab.cardFooter}>
                 <Text style={[userTab.meta, { color: palette.subtext }]}>
-                  Status: <Text style={{ color: item.status === 'active' ? '#4CAF50' : '#F44336' }}>{item.status || 'active'}</Text>
+                  Status: <Text style={{ color: item.status === 'active' ? palette.success : palette.danger }}>{item.status || 'active'}</Text>
                 </Text>
                 <Text style={[userTab.meta, { color: palette.subtext }]}>
                   Joined {new Date(item.created_at).toLocaleDateString()}
                 </Text>
                 <TouchableOpacity
                   onPress={() => handleSuspend(item)}
-                  style={[userTab.suspendBtn, { borderColor: '#F44336' }]}
+                  style={[userTab.suspendBtn, { borderColor: palette.danger }]}
                 >
-                  <Text style={{ color: '#F44336', fontWeight: '700', fontSize: 12 }}>Suspend</Text>
+                  <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 12 }}>Suspend</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -448,13 +454,14 @@ const userTab = StyleSheet.create({
   tier: { fontWeight: '600', fontSize: 12, textTransform: 'uppercase' },
   score: { fontWeight: '700', fontSize: 12 },
   meta: { fontSize: 12 },
-  suspendBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 'auto' },
+  suspendBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginLeft: 'auto' },
 });
 
 // ─── Audit Log Tab ────────────────────────────────────────────────────────────
 
 function AuditLogTab() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -486,7 +493,7 @@ function AuditLogTab() {
       data={entries}
       keyExtractor={e => e.id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
-      contentContainerStyle={{ padding: 12, gap: 8 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, gap: 8, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       ListEmptyComponent={<Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 40 }}>No audit entries</Text>}
       renderItem={({ item }) => (
         <View style={[auditCard.root, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
@@ -529,7 +536,7 @@ export default function ModerationConsoleScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Moderation Console</Text>
@@ -556,7 +563,7 @@ export default function ModerationConsoleScreen() {
         {tab === 'users' && <UserManagementTab />}
         {tab === 'audit' && <AuditLogTab />}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

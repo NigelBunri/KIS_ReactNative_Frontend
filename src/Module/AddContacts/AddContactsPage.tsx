@@ -700,12 +700,12 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
                 width: 72,
                 height: 72,
                 borderRadius: 36,
-                backgroundColor: (palette.primary ?? '#4F46E5') + '18',
+                backgroundColor: (palette.primary) + '18',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <KISIcon name="contacts" size={36} color={palette.primary ?? '#4F46E5'} />
+              <KISIcon name="contacts" size={36} color={palette.primary} />
             </View>
             <Text style={{ fontSize: 18, fontWeight: '800', color: palette.text, textAlign: 'center' }}>
               Allow access to contacts
@@ -722,8 +722,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
                 paddingVertical: 14,
                 borderRadius: 14,
                 backgroundColor: pressed
-                  ? (palette.primaryStrong ?? palette.primary ?? '#3730A3')
-                  : (palette.primary ?? '#4F46E5'),
+                  ? palette.primaryStrong
+                  : (palette.primary),
               })}
             >
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
@@ -744,7 +744,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
 
         {/* Error */}
         {permissionStatus === 'granted' && error && (
-          <Text style={[styles.errorText, { color: palette.error ?? '#e53935', marginTop: 8 }]}>
+          <Text style={[styles.errorText, { color: palette.danger, marginTop: 8 }]}>
             {error}
           </Text>
         )}

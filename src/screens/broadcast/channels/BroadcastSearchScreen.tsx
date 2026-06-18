@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +16,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
+import { KISIcon } from '@/constants/kisIcons';
+import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 
@@ -58,7 +65,10 @@ const DEBOUNCE_MS = 400;
 
 export default function BroadcastSearchScreen() {
   const route = useRoute<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { palette } = useKISTheme();
+  const { pageGutter, cardGap, minTouchTarget, columns } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
 
   const initialQuery: string = route.params?.query ?? '';
 
@@ -107,7 +117,7 @@ export default function BroadcastSearchScreen() {
   }, [query, activeType, activeSort, runSearch]);
 
   const renderSkeleton = () => (
-    <View style={styles.grid}>
+    <View style={[styles.grid, { padding: pageGutter, gap: cardGap }]}>
       {SKELETON_KEYS.map(key => (
         <View
           key={key}
@@ -125,6 +135,7 @@ export default function BroadcastSearchScreen() {
 
   const renderCard = ({ item }: { item: SearchResult }) => (
     <Pressable
+      onPress={() => navigation.navigate('ChannelContentDetail', { contentId: item.id })}
       style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}
     >
       <View style={styles.thumbnailContainer}>
@@ -150,7 +161,11 @@ export default function BroadcastSearchScreen() {
     </Pressable>
   );
 
+  const numColumns = Math.max(2, columns.dense);
+
   return (
+    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.card }]} edges={['top']}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={[styles.container, { backgroundColor: palette.card }]}>
       {/* Search bar */}
       <View
@@ -159,12 +174,12 @@ export default function BroadcastSearchScreen() {
           {
             backgroundColor: palette.surface,
             borderColor: focused ? palette.primaryStrong : palette.border,
+            marginHorizontal: pageGutter,
+            minHeight: minTouchTarget,
           },
         ]}
       >
-        <Text style={[styles.searchIcon, { color: focused ? palette.primaryStrong : palette.subtext }]}>
-          🔍
-        </Text>
+        <KISIcon name="search" size={16} color={focused ? palette.primaryStrong : palette.subtext} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -178,8 +193,8 @@ export default function BroadcastSearchScreen() {
           autoCorrect={false}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-            <Text style={[styles.clearText, { color: palette.subtext }]}>✕</Text>
+          <Pressable onPress={() => setQuery('')} style={styles.clearButton} hitSlop={10}>
+            <KISIcon name="close" size={16} color={palette.subtext} />
           </Pressable>
         )}
       </View>
@@ -201,10 +216,12 @@ export default function BroadcastSearchScreen() {
                 {
                   backgroundColor: active ? palette.primaryStrong : palette.surface,
                   borderColor: active ? palette.primaryStrong : palette.border,
+                  minHeight: minTouchTarget,
+                  justifyContent: 'center',
                 },
               ]}
             >
-              <Text style={[styles.pillText, { color: active ? '#fff' : palette.text }]}>
+              <Text style={[styles.pillText, { color: active ? palette.onPrimary : palette.text }]}>
                 {ct.label}
               </Text>
             </Pressable>
@@ -229,6 +246,8 @@ export default function BroadcastSearchScreen() {
                 {
                   backgroundColor: active ? palette.primarySoft ?? palette.surface : 'transparent',
                   borderColor: active ? palette.primary ?? palette.primaryStrong : palette.border,
+                  minHeight: minTouchTarget,
+                  justifyContent: 'center',
                 },
               ]}
             >
@@ -248,7 +267,7 @@ export default function BroadcastSearchScreen() {
       {/* Results */}
       {!query.trim() ? (
         <View style={styles.emptyState}>
-          <Text style={[styles.emptyIcon]}>🔍</Text>
+          <KISIcon name="search" size={40} color={palette.border} />
           <Text style={[styles.emptyTitle, { color: palette.text }]}>
             Search for videos, channels, and more
           </Text>
@@ -263,16 +282,26 @@ export default function BroadcastSearchScreen() {
         </View>
       ) : (
         <FlatList
+          key={`search-cols-${numColumns}`}
           data={results}
           keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
+          numColumns={numColumns}
+          columnWrapperStyle={[styles.columnWrapper, { gap: cardGap, paddingHorizontal: pageGutter }]}
           renderItem={renderCard}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { gap: cardGap }]}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No results found
+              </Text>
+            </View>
+          }
         />
       )}
     </View>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

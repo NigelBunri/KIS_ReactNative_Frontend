@@ -48,13 +48,13 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={styles.topRow}>
-        <Text style={[styles.timeText, { color: palette.ivory ?? '#fff' }]}>
+        <Text style={[styles.timeText, { color: palette.ivory }]}>
           {formatVideoTime(normalizedProgress)} / {formatVideoTime(duration)}
         </Text>
         <View style={styles.topActions}>
           {state.availableQualities.length > 0 && (
             <Pressable onPress={() => setQualityOpen(true)} style={styles.iconHitArea}>
-              <KISIcon name="settings" size={16} color={palette.ivory ?? '#fff'} />
+              <KISIcon name="settings" size={16} color={palette.ivory} />
             </Pressable>
           )}
           {state.availableCaptions.length > 0 && (
@@ -68,17 +68,17 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
               }}
               style={[styles.iconHitArea, state.captionsEnabled && styles.activeButton]}
             >
-              <KISIcon name="list" size={16} color={state.captionsEnabled ? (palette.primaryStrong ?? '#f59e0b') : (palette.ivory ?? '#fff')} />
+              <KISIcon name="list" size={16} color={state.captionsEnabled ? palette.primaryStrong : palette.ivory} />
             </Pressable>
           )}
           {enablePip && onPipPress ? (
             <Pressable onPress={onPipPress} style={styles.iconHitArea}>
-              <KISIcon name="pip" size={16} color={palette.ivory ?? '#fff'} />
+              <KISIcon name="pip" size={16} color={palette.ivory} />
             </Pressable>
           ) : null}
           {onFullScreenPress ? (
             <Pressable onPress={onFullScreenPress} style={styles.iconHitArea}>
-              <KISIcon name="fullscreen" size={18} color={palette.ivory ?? '#fff'} />
+              <KISIcon name="fullscreen" size={18} color={palette.ivory} />
             </Pressable>
           ) : null}
         </View>
@@ -115,17 +115,17 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
           <Pressable onPress={actions.togglePlay} style={styles.iconHitArea}>
-            <KISIcon name={state.playing ? 'pause' : 'play'} size={24} color={palette.ivory ?? '#fff'} />
+            <KISIcon name={state.playing ? 'pause' : 'play'} size={24} color={palette.ivory} />
           </Pressable>
           <Pressable onPress={() => actions.setMuted(!state.muted)} style={styles.iconHitArea}>
-            <KISIcon name={state.muted ? 'mute' : 'volume'} size={20} color={palette.ivory ?? '#fff'} />
+            <KISIcon name={state.muted ? 'mute' : 'volume'} size={20} color={palette.ivory} />
           </Pressable>
           {state.isBuffering ? (
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Buffering…</Text>
           ) : null}
         </View>
         <Pressable onPress={() => setSpeedOpen(true)} style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.5)' }]}>
-          <Text style={[styles.speedLabel, { color: palette.ivory ?? '#fff' }]}>{speedLabel}</Text>
+          <Text style={[styles.speedLabel, { color: palette.ivory }]}>{speedLabel}</Text>
         </Pressable>
       </View>
 
@@ -200,7 +200,7 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
                   <Pressable
                     key={s}
                     onPress={() => setCcSize(s)}
-                    style={[styles.ccPill, { borderColor: ccSize === s ? palette.primaryStrong : palette.border ?? '#555', backgroundColor: ccSize === s ? palette.primaryStrong + '22' : 'transparent' }]}
+                    style={[styles.ccPill, { borderColor: ccSize === s ? palette.primaryStrong : palette.border, backgroundColor: ccSize === s ? palette.primaryStrong + '22' : 'transparent' }]}
                   >
                     <Text style={{ color: ccSize === s ? palette.primaryStrong : palette.text, fontWeight: '700', fontSize: 11, textTransform: 'capitalize' }}>{s}</Text>
                   </Pressable>
@@ -212,7 +212,7 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
                   <Pressable
                     key={b}
                     onPress={() => setCcBg(b)}
-                    style={[styles.ccPill, { borderColor: ccBg === b ? palette.primaryStrong : palette.border ?? '#555', backgroundColor: ccBg === b ? palette.primaryStrong + '22' : 'transparent' }]}
+                    style={[styles.ccPill, { borderColor: ccBg === b ? palette.primaryStrong : palette.border, backgroundColor: ccBg === b ? palette.primaryStrong + '22' : 'transparent' }]}
                   >
                     <Text style={{ color: ccBg === b ? palette.primaryStrong : palette.text, fontWeight: '700', fontSize: 11, textTransform: 'capitalize' }}>{b}</Text>
                   </Pressable>
@@ -220,7 +220,7 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
               </View>
               {/* Preview */}
               <View style={{ alignSelf: 'stretch', backgroundColor: ccBgColor, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4 }}>
-                <Text style={{ color: '#fff', fontSize: ccFontSize, fontWeight: '700' }}>Caption preview text</Text>
+                <Text style={{ color: palette.ivory, fontSize: ccFontSize, fontWeight: '700' }}>Caption preview text</Text>
               </View>
             </View>
           </View>

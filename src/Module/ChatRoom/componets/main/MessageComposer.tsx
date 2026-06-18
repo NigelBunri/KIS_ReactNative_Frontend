@@ -175,6 +175,9 @@ type MessageComposerProps = {
   /** GAP 3: scanned document send */
   onSendScannedDocument?: (uri: string, mimeType: string, filename: string) => void;
 
+  /** Called when the view-once toggle changes; parent attaches viewOnce to the message payload. */
+  onViewOnceChange?: (enabled: boolean) => void;
+
   /**
    * GAP 4: Called when the user creates a payment message.
    * Receives the payment fields; the parent is responsible for building and
@@ -226,8 +229,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onScheduleSend,
   onSendScannedDocument,
   onSendPayment,
+  onViewOnceChange,
   bottomInset = 0,
 }) => {
+  /* ----------------------------- VIEW ONCE -------------------------------- */
+  const [viewOnce, setViewOnce] = useState(false);
+  const toggleViewOnce = () => {
+    const next = !viewOnce;
+    setViewOnce(next);
+    onViewOnceChange?.(next);
+  };
+
   /* ----------------------------- VOICE STATE ----------------------------- */
   const [isRecording, setIsRecording] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -487,6 +499,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
     setIsSending(true);
     onSend();
+    // Reset view-once after send
+    if (viewOnce) {
+      setViewOnce(false);
+      onViewOnceChange?.(false);
+    }
     // Clear link preview after send
     setComposerLinkPreview(null);
     setLinkPreviewDismissed(false);
@@ -832,8 +849,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         <View
           style={{
             borderTopWidth: 1,
-            borderTopColor: palette.divider ?? '#e0e0e0',
-            backgroundColor: palette.surface ?? '#fff',
+            borderTopColor: palette.divider,
+            backgroundColor: palette.surface,
             maxHeight: 180,
           }}
         >
@@ -847,10 +864,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 backgroundColor: pressed
-                  ? (palette.surfaceSoft ?? '#f5f5f5')
+                  ? (palette.surfaceSoft ?? palette.surface)
                   : 'transparent',
                 borderBottomWidth: 1,
-                borderBottomColor: palette.divider ?? '#f0f0f0',
+                borderBottomColor: palette.divider,
               })}
             >
               <View
@@ -858,13 +875,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                   width: 32,
                   height: 32,
                   borderRadius: 16,
-                  backgroundColor: palette.primary ?? '#4F46E5',
+                  backgroundColor: palette.primary,
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: 10,
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>
                   {p.name.charAt(0).toUpperCase()}
                 </Text>
               </View>
@@ -889,8 +906,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             borderRadius: 10,
             overflow: 'hidden',
             borderWidth: 1,
-            borderColor: palette.divider ?? '#e0e0e0',
-            backgroundColor: palette.surface ?? '#f5f5f5',
+            borderColor: palette.divider,
+            backgroundColor: palette.surface,
           }}
         >
           {composerLinkPreview?.image ? (
@@ -928,7 +945,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             hitSlop={8}
             style={{ padding: 8 }}
           >
-            <KISIcon name="close" size={16} color={palette.subtext ?? '#888'} />
+            <KISIcon name="close" size={16} color={palette.subtext} />
           </Pressable>
         </View>
       )}
@@ -1000,6 +1017,27 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               onPress={openCameraModal}
             >
               <KISIcon name="camera" size={composerIconGlyph} color={palette.subtext} />
+            </Pressable>
+
+            {/* View-once toggle */}
+            <Pressable
+              style={[
+                styles.iconTextButton,
+                {
+                  width: composerIconSize,
+                  height: composerIconSize,
+                  borderRadius: composerIconSize / 2,
+                  backgroundColor: viewOnce ? palette.primary : 'transparent',
+                  display: isTinyDevice && value.trim().length > 0 ? 'none' : 'flex',
+                },
+              ]}
+              onPress={toggleViewOnce}
+            >
+              <KISIcon
+                name={viewOnce ? 'eye' : 'eye-closed'}
+                size={composerIconGlyph}
+                color={viewOnce ? palette.onPrimary : palette.subtext}
+              />
             </Pressable>
 
           </>
@@ -1128,7 +1166,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         >
           <Pressable
             style={{
-              backgroundColor: palette.surface ?? '#fff',
+              backgroundColor: palette.surface,
               borderTopLeftRadius: 22,
               borderTopRightRadius: 22,
               padding: 20,
@@ -1137,71 +1175,71 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             onStartShouldSetResponder={() => true}
           >
             {/* Handle */}
-            <View style={{ width: 40, height: 4, borderRadius: 4, backgroundColor: palette.divider ?? '#ccc', alignSelf: 'center', marginBottom: 14 }} />
+            <View style={{ width: 40, height: 4, borderRadius: 4, backgroundColor: palette.divider, alignSelf: 'center', marginBottom: 14 }} />
 
-            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text ?? '#111', marginBottom: 16 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text, marginBottom: 16 }}>
               Send payment
             </Text>
 
             {/* Amount */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Amount</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Amount</Text>
             <TextInput
               value={paymentAmount}
               onChangeText={setPaymentAmount}
               keyboardType="decimal-pad"
               placeholder="0.00"
-              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              placeholderTextColor={palette.placeholder ?? palette.subtext}
               style={{
                 borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderColor: palette.inputBorder ?? palette.divider,
                 borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 fontSize: 16,
-                color: palette.text ?? '#111',
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                color: palette.text,
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
                 marginBottom: 12,
               }}
             />
 
             {/* Currency */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Currency</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Currency</Text>
             <TextInput
               value={paymentCurrency}
               onChangeText={(v) => setPaymentCurrency(v.toUpperCase().slice(0, 3))}
               placeholder="USD"
-              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              placeholderTextColor={palette.placeholder ?? palette.subtext}
               autoCapitalize="characters"
               maxLength={3}
               style={{
                 borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderColor: palette.inputBorder ?? palette.divider,
                 borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 fontSize: 16,
-                color: palette.text ?? '#111',
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                color: palette.text,
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
                 marginBottom: 12,
               }}
             />
 
             {/* Note */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext ?? '#666', marginBottom: 6 }}>Note (optional)</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Note (optional)</Text>
             <TextInput
               value={paymentNote}
               onChangeText={setPaymentNote}
               placeholder="What's this for?"
-              placeholderTextColor={palette.placeholder ?? '#bbb'}
+              placeholderTextColor={palette.placeholder ?? palette.subtext}
               style={{
                 borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider ?? '#ddd',
+                borderColor: palette.inputBorder ?? palette.divider,
                 borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 fontSize: 15,
-                color: palette.text ?? '#111',
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? '#f9f9f9',
+                color: palette.text,
+                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
                 marginBottom: 20,
               }}
             />
@@ -1228,14 +1266,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 setPaymentModalVisible(false);
               }}
               style={({ pressed }) => ({
-                backgroundColor: palette.primary ?? '#C9A227',
+                backgroundColor: palette.primary,
                 borderRadius: 14,
                 paddingVertical: 14,
                 alignItems: 'center',
                 opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 15, fontWeight: '700' }}>
+              <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '700' }}>
                 Send payment
               </Text>
             </Pressable>

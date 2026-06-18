@@ -100,8 +100,8 @@ export default function AdminDashboardPanel({
         )}
 
         {!!error && !loading && (
-          <View style={[styles.errorBox, { backgroundColor: palette.danger ?? '#d9534f' + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-            <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <View style={[styles.errorBox, { backgroundColor: palette.danger + '22', borderColor: palette.danger }]}>
+            <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
           </View>
         )}
 
@@ -246,13 +246,13 @@ function QuickActionTile({ label, icon, value, sub, palette, onPress, highlight 
       style={[
         styles.tile,
         {
-          backgroundColor: highlight ? (palette.danger ?? '#d9534f') + '18' : palette.card ?? palette.surface,
-          borderColor: highlight ? (palette.danger ?? '#d9534f') : palette.border,
+          backgroundColor: highlight ? (palette.danger) + '18' : palette.card ?? palette.surface,
+          borderColor: highlight ? (palette.danger) : palette.border,
         },
       ]}
     >
       <Text style={styles.tileIcon}>{icon}</Text>
-      <Text style={[styles.tileValue, { color: highlight ? (palette.danger ?? '#d9534f') : palette.text }]}>
+      <Text style={[styles.tileValue, { color: highlight ? (palette.danger) : palette.text }]}>
         {value}
       </Text>
       <Text style={[styles.tileLabel, { color: palette.text }]}>{label}</Text>
@@ -264,7 +264,7 @@ function QuickActionTile({ label, icon, value, sub, palette, onPress, highlight 
 function StatBadge({ label, value, palette, warn }: any) {
   return (
     <View style={[styles.badge, { backgroundColor: palette.card ?? palette.surface, borderColor: palette.border }]}>
-      <Text style={[styles.badgeValue, { color: warn ? (palette.danger ?? '#d9534f') : palette.text }]}>{value}</Text>
+      <Text style={[styles.badgeValue, { color: warn ? (palette.danger) : palette.text }]}>{value}</Text>
       <Text style={[styles.badgeLabel, { color: palette.subtext }]}>{label}</Text>
     </View>
   );
@@ -281,7 +281,7 @@ function AdminNavCard({ icon, title, description, palette, onPress, badge }: any
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={[styles.navCardTitle, { color: palette.text }]}>{title}</Text>
           {badge && (
-            <View style={[styles.badgePill, { backgroundColor: palette.danger ?? '#d9534f' }]}>
+            <View style={[styles.badgePill, { backgroundColor: palette.danger }]}>
               <Text style={styles.badgePillText}>{badge}</Text>
             </View>
           )}

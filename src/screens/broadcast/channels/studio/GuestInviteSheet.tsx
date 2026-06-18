@@ -46,12 +46,8 @@ type Props = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<GuestStatus, string> = {
-  invited:  '#F59E0B',
-  accepted: '#3B82F6',
-  active:   '#22C55E',
-  declined: '#EF4444',
-};
+const guestStatusColor = (status: GuestStatus, p: any): string =>
+  ({ invited: p.gold, accepted: p.primary, active: p.success, declined: p.danger } as Record<GuestStatus, string>)[status] ?? p.subtext;
 
 const ROLE_LABEL: Record<GuestRole, string> = {
   CO_HOST: 'CO-HOST',
@@ -163,14 +159,14 @@ export default function GuestInviteSheet({
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={[styles.backdrop, { backgroundColor: palette.backdrop }]} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: palette.surface }]}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: palette.text }]}>
               Co-streaming Guests
             </Text>
-            <Pressable onPress={onClose}>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.closeTouch}>
               <Text style={[styles.closeTxt, { color: palette.subtext }]}>✕</Text>
             </Pressable>
           </View>
@@ -194,7 +190,7 @@ export default function GuestInviteSheet({
                   style={[styles.guestRow, { backgroundColor: palette.surfaceElevated }]}
                 >
                   <View style={[styles.avatar, { backgroundColor: palette.gold }]}>
-                    <Text style={styles.avatarLetter}>
+                    <Text style={[styles.avatarLetter, { color: palette.ivory }]}>
                       {(guest.display_name || '?').charAt(0).toUpperCase()}
                     </Text>
                   </View>
@@ -214,8 +210,8 @@ export default function GuestInviteSheet({
                           {ROLE_LABEL[guest.role]}
                         </Text>
                       </View>
-                      <View style={[styles.badge, { backgroundColor: STATUS_COLOR[guest.status] + '22' }]}>
-                        <Text style={[styles.badgeText, { color: STATUS_COLOR[guest.status] }]}>
+                      <View style={[styles.badge, { backgroundColor: guestStatusColor(guest.status, palette) + '22' }]}>
+                        <Text style={[styles.badgeText, { color: guestStatusColor(guest.status, palette) }]}>
                           {guest.status.toUpperCase()}
                         </Text>
                       </View>
@@ -228,12 +224,12 @@ export default function GuestInviteSheet({
                         <Pressable
                           onPress={() => handleGuestAction(guest.id, 'remove')}
                           disabled={actioning === guest.id}
-                          style={[styles.actionBtn, { backgroundColor: '#EF444422' }]}
+                          style={[styles.actionBtn, { backgroundColor: palette.dangerSoft }]}
                         >
                           {actioning === guest.id ? (
-                            <ActivityIndicator size="small" color="#EF4444" />
+                            <ActivityIndicator size="small" color={palette.danger} />
                           ) : (
-                            <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>
+                            <Text style={[styles.actionBtnText, { color: palette.danger }]}>
                               Remove
                             </Text>
                           )}
@@ -243,12 +239,12 @@ export default function GuestInviteSheet({
                         <Pressable
                           onPress={() => handleGuestAction(guest.id, 'activate')}
                           disabled={actioning === guest.id}
-                          style={[styles.actionBtn, { backgroundColor: '#22C55E22' }]}
+                          style={[styles.actionBtn, { backgroundColor: palette.successSoft }]}
                         >
                           {actioning === guest.id ? (
-                            <ActivityIndicator size="small" color="#22C55E" />
+                            <ActivityIndicator size="small" color={palette.success} />
                           ) : (
-                            <Text style={[styles.actionBtnText, { color: '#22C55E' }]}>
+                            <Text style={[styles.actionBtnText, { color: palette.success }]}>
                               Activate
                             </Text>
                           )}
@@ -299,7 +295,7 @@ export default function GuestInviteSheet({
                       <Text
                         style={[
                           styles.rolePillText,
-                          { color: inviteRole === role ? '#fff' : palette.text },
+                          { color: inviteRole === role ? palette.onPrimary : palette.text },
                         ]}
                       >
                         {role === 'CO_HOST' ? 'Co-Host' : 'Guest'}
@@ -322,9 +318,9 @@ export default function GuestInviteSheet({
                   ]}
                 >
                   {inviting ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={palette.onPrimary} />
                   ) : (
-                    <Text style={styles.inviteBtnText}>Send Invite</Text>
+                    <Text style={[styles.inviteBtnText, { color: palette.onPrimary }]}>Send Invite</Text>
                   )}
                 </Pressable>
               </View>
@@ -345,7 +341,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: undefined,
   },
   sheet: {
     borderTopLeftRadius: 20,
@@ -361,7 +357,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   title: { fontSize: 17, fontWeight: '700' },
-  closeTxt: { fontSize: 18, padding: 4 },
+  closeTouch: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  closeTxt: { fontSize: 18 },
   body: { flex: 1 },
   bodyContent: { padding: 14, gap: 10 },
   loader: { marginVertical: 20 },
@@ -380,7 +377,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  avatarLetter: { fontWeight: '800', fontSize: 16 },
   guestInfo: { flex: 1, gap: 4 },
   guestName: { fontWeight: '700', fontSize: 14 },
   guestEmail: { fontSize: 12 },
@@ -391,9 +388,10 @@ const styles = StyleSheet.create({
   actionBtn: {
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    minHeight: 44,
     minWidth: 70,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionBtnText: { fontWeight: '700', fontSize: 12 },
   inviteSection: {
@@ -412,10 +410,11 @@ const styles = StyleSheet.create({
   },
   roleRow: { flexDirection: 'row', gap: 10 },
   rolePill: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
   },
   rolePillText: { fontWeight: '700', fontSize: 13 },
   inviteBtn: {
@@ -424,5 +423,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inviteBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  inviteBtnText: { fontWeight: '800', fontSize: 14 },
 });

@@ -295,14 +295,14 @@ export default function PartnerPanels({
         canManageApps={appsPanel.canManageApps}
       />
 
-        <PartnerCoursesPanel
-          isOpen={coursesPanel.isOpen}
-          panelWidth={coursesPanel.panelWidth}
-          panelTranslateX={coursesPanel.panelTranslateX}
-          partnerId={selectedPartnerId}
-          partnerName={coursesPanel.partnerName}
-          onClose={coursesPanel.onClose}
-        />
+      <PartnerCoursesPanel
+        isOpen={coursesPanel.isOpen}
+        panelWidth={coursesPanel.panelWidth}
+        panelTranslateX={coursesPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        partnerName={coursesPanel.partnerName}
+        onClose={coursesPanel.onClose}
+      />
       <PartnerLinksPanel
         isOpen={linksPanel.isOpen}
         panelWidth={linksPanel.panelWidth}

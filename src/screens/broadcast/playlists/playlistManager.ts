@@ -402,6 +402,29 @@ export const renamePlaylist = (id: string, name: string): void => {
   }
 };
 
+export const setPlaylistVisibility = (id: string, visibility: string): void => {
+  void ensureUserScopedState();
+  state = {
+    ...state,
+    playlists: state.playlists.map(pl =>
+      pl.id === id
+        ? { ...pl, visibility, updatedAt: new Date().toISOString() }
+        : pl,
+    ),
+  };
+  emit();
+  void persistState();
+
+  const pl = state.playlists.find(p => p.id === id);
+  if (pl?.serverId) {
+    void patchRequest(
+      ROUTES.broadcasts.userPlaylistDetail(pl.serverId),
+      { visibility },
+      { errorMessage: 'Unable to update playlist visibility.' },
+    );
+  }
+};
+
 export const deletePlaylist = (id: string): void => {
   void ensureUserScopedState();
   const pl = state.playlists.find(p => p.id === id);

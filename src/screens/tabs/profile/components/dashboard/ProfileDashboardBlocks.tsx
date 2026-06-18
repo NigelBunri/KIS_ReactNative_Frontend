@@ -183,7 +183,11 @@ const SectionHeader = ({
         ) : null}
       </View>
       {actionLabel ? (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <Pressable
+          onPress={onAction}
+          hitSlop={8}
+          style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
           <Text style={[dashboardTheme.sectionHeader.actionLabel, { color: palette.primaryStrong }]}>
             {actionLabel}
           </Text>
@@ -233,13 +237,12 @@ export const ProfileHeroCard = ({
       <View
         style={[
           dashboardStyles.heroBackdrop,
-          { backgroundColor: isDark  ? 'rgba(0,0,0,0.5)'
-        : 'rgba(0, 0, 0, 0.92)', },
+          { backgroundColor: isDark ? `${palette.royalInk}80` : palette.royalInk },
         ]}
       >
         {coverUrl ? (
           <>
-          <View style={{backgroundColor: 'rgba(0, 0, 0, 0.46)', height: '100%', width: '100%', zIndex: 9}} />
+          <View style={{backgroundColor: `${palette.royalInk}75`, height: '100%', width: '100%', zIndex: 9}} />
           <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
           </>
         ) : null}
@@ -265,7 +268,7 @@ export const ProfileHeroCard = ({
             <KISIcon name="bell" size={20} color={dashboardTheme.hero.iconColor} />
             {notificationCount ? (
               <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
-                <Text style={dashboardStyles.heroNotificationText}>{notificationCount}</Text>
+                <Text style={[dashboardStyles.heroNotificationText, { color: palette.onPrimary }]}>{notificationCount}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -283,7 +286,7 @@ export const ProfileHeroCard = ({
         <View style={[dashboardStyles.heroIdentityRow, compact && dashboardStyles.heroIdentityCompact]}>
           <View style={[dashboardStyles.heroAvatarWrap, { width: compact ? 78 : 112, height: compact ? 78 : 112, borderRadius: compact ? 39 : 56 }]}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={[dashboardStyles.heroAvatar, { borderRadius: compact ? 39 : 56 }]} />
+              <Image source={{ uri: avatarUrl }} style={[dashboardStyles.heroAvatar, { borderRadius: compact ? 39 : 56, borderColor: palette.ivory }]} />
             ) : (
               <View style={[dashboardStyles.heroAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
                 <KISIcon name="person" size={compact ? 30 : 40} color={palette.subtext} />
@@ -298,14 +301,14 @@ export const ProfileHeroCard = ({
           </View>
 
           <View style={dashboardStyles.heroTextBlock}>
-            <Text style={[dashboardStyles.heroName, { fontSize: compact ? 24 : 34 }]} numberOfLines={compact ? 2 : 1}>
+            <Text style={[dashboardStyles.heroName, { fontSize: compact ? 24 : 34, color: palette.onPrimary }]} numberOfLines={compact ? 2 : 1}>
               {displayName}
             </Text>
-            <Text style={[dashboardStyles.heroHandle, { fontSize: compact ? 14 : 17 }]} numberOfLines={1}>
+            <Text style={[dashboardStyles.heroHandle, { fontSize: compact ? 14 : 17, color: palette.ivory }]} numberOfLines={1}>
               {handle}
             </Text>
             {headline ? (
-              <Text style={[dashboardStyles.heroHeadline, { fontSize: compact ? 13 : 14 }]} numberOfLines={2}>
+              <Text style={[dashboardStyles.heroHeadline, { fontSize: compact ? 13 : 14, color: palette.ivory }]} numberOfLines={2}>
                 {headline}
               </Text>
             ) : null}
@@ -325,7 +328,11 @@ export const ProfileHeroCard = ({
                   </Text>
                 </View>
               ) : null}
-              <Pressable onPress={onVerificationPress} disabled={!onVerificationPress}>
+              <Pressable
+                onPress={onVerificationPress}
+                disabled={!onVerificationPress}
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
                 <VerificationBadgeRow palette={palette} summary={verificationSummary} compact />
               </Pressable>
             </View>
@@ -467,7 +474,7 @@ export const RecentActivityTimeline = ({
             <Pressable
               key={item.id}
               onPress={item.onPress}
-              style={dashboardStyles.timelineRow}
+              style={[dashboardStyles.timelineRow, { minHeight: 44 }]}
             >
               <View style={dashboardStyles.timelineRail}>
                 <View style={[dashboardStyles.timelineDot, { backgroundColor: toneColors.bg }]}>
@@ -768,7 +775,11 @@ export const NotificationSummaryCard = ({
               ) : null}
             </View>
             {onDeleteItem ? (
-              <Pressable onPress={() => onDeleteItem(item.id)} hitSlop={8}>
+              <Pressable
+                onPress={() => onDeleteItem(item.id)}
+                hitSlop={8}
+                style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
                 <KISIcon name="trash" size={16} color={palette.subtext} />
               </Pressable>
             ) : null}
@@ -924,9 +935,9 @@ const dashboardStyles = StyleSheet.create({
     gap: 10,
   },
   heroIconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -943,7 +954,6 @@ const dashboardStyles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   heroNotificationText: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -976,7 +986,7 @@ const dashboardStyles = StyleSheet.create({
     height: '100%',
     borderRadius: 56,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.9)',
+    // borderColor set inline using palette.ivory
   },
   heroAvatarFallback: {
     width: '100%',
@@ -987,11 +997,11 @@ const dashboardStyles = StyleSheet.create({
   },
   heroEditButton: {
     position: 'absolute',
-    right: -2,
-    bottom: -4,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    right: -4,
+    bottom: -6,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1001,18 +1011,17 @@ const dashboardStyles = StyleSheet.create({
     paddingBottom: 4,
   },
   heroName: {
-    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '800',
     letterSpacing: -1,
   },
   heroHandle: {
-    color: 'rgba(255,255,255,0.82)',
+    // Always rendered over a dark hero backdrop; ivory gives correct on-dark contrast
     fontSize: 17,
     fontWeight: '600',
   },
   heroHeadline: {
-    color: 'rgba(255,255,255,0.9)',
+    // Always rendered over a dark hero backdrop; ivory gives correct on-dark contrast
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1213,5 +1222,9 @@ const dashboardStyles = StyleSheet.create({
   },
   languageChip: {
     marginRight: 10,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

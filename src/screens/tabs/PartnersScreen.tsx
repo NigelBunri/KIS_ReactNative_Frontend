@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { Alert, Animated, DeviceEventEmitter, useWindowDimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useAuth } from '../../../App';
 import PartnerLayout from './partners/PartnerLayout';
 import { normalizePartnerRole } from '@/components/partners/settings/partnerSettingsData';
@@ -68,6 +69,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
+  const { pageGutter } = useResponsiveLayout();
   const [isSuperuser, setIsSuperuser] = React.useState(false);
   const isGoUser = React.useCallback((user: any) => {
     const roles = Array.isArray(user?.roles) ? user.roles.map((role: any) => String(role).toLowerCase()) : [];
@@ -781,6 +783,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelTranslateX={adminAnalytics.panelTranslateX}
             revenue={adminAnalytics.revenue}
             engagement={adminAnalytics.engagement}
+            dashboards={adminAnalytics.dashboards}
             loading={adminAnalytics.loading}
             error={adminAnalytics.error}
             period={adminAnalytics.period}

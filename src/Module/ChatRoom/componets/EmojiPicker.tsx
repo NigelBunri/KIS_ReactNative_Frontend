@@ -611,7 +611,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         margin: 4,
         borderRadius: 20,
       }}
-      android_ripple={{ color: '#ccc', borderless: true }}
+      android_ripple={{ color: palette.divider, borderless: true }}
     >
       <Text style={{ fontSize: 30 }}>{emoji}</Text>
     </Pressable>
@@ -626,7 +626,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   const renderSectionHeader = ({ section }: { section: any }) => (
     <Text
       style={{
-        color: palette.textSecondary ?? '#888',
+        color: palette.subtext,
         fontSize: 14,
         marginVertical: 4,
         paddingHorizontal: 8,
@@ -649,8 +649,8 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <ActivityIndicator size="small" color={palette.textSecondary ?? '#888'} />
-          <Text style={{ marginLeft: 8, color: palette.textSecondary ?? '#888' }}>
+          <ActivityIndicator size="small" color={palette.subtext} />
+          <Text style={{ marginLeft: 8, color: palette.subtext }}>
             Loading emojis…
           </Text>
         </View>
@@ -690,14 +690,14 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
           value={emojiSearchQuery}
           onChangeText={setEmojiSearchQuery}
           placeholder="Search emoji…"
-          placeholderTextColor={palette.subtext ?? '#999'}
+          placeholderTextColor={palette.subtext}
           style={{
             backgroundColor: palette.input ?? '#F5F5F5',
             borderRadius: 20,
             paddingHorizontal: 12,
             height: 36,
             fontSize: 14,
-            color: palette.text ?? '#000',
+            color: palette.text,
           }}
           autoCapitalize="none"
           autoCorrect={false}
@@ -710,7 +710,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       {emojiSearchQuery.trim().length > 0 ? (
         <View style={{ paddingHorizontal: 8 }}>
           {searchResults.length === 0 ? (
-            <Text style={{ color: palette.subtext ?? '#888', fontSize: 13, padding: 8 }}>
+            <Text style={{ color: palette.subtext, fontSize: 13, padding: 8 }}>
               No emojis found
             </Text>
           ) : (
@@ -730,7 +730,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
             <View style={{ paddingHorizontal: 8, marginBottom: 4 }}>
               <Text
                 style={{
-                  color: palette.textSecondary ?? '#888',
+                  color: palette.subtext,
                   fontSize: 13,
                   marginVertical: 4,
                   paddingHorizontal: 4,

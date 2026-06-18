@@ -46,10 +46,10 @@ const REFRESH_INTERVAL_MS = 15000;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function amountColor(amount: number): string {
-  if (amount >= 10) return '#C9A24A'; // gold
-  if (amount >= 5) return '#3B82F6';  // blue
-  return '#22C55E';                   // green
+function amountColor(amount: number, palette: any): string {
+  if (amount >= 10) return palette.gold;    // gold for large tips
+  if (amount >= 5) return palette.primary;  // primary blue for mid tips
+  return palette.success;                   // green for small tips
 }
 
 function avatarLetter(username: string): string {
@@ -132,24 +132,24 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const renderTip = useCallback(({ item }: { item: SuperTip }) => {
-    const color = amountColor(item.amount);
+    const color = amountColor(item.amount, palette);
     const isPinned = item.is_pinned;
     return (
       <View
         style={[
           styles.tipCard,
-          { backgroundColor: isPinned ? `${color}22` : palette.surfaceElevated },
+          { backgroundColor: isPinned ? palette.primarySoft ?? palette.surfaceElevated : palette.surfaceElevated },
           isPinned && { borderColor: color, borderWidth: 1 },
         ]}
       >
         <View style={[styles.avatar, { backgroundColor: color }]}>
-          <Text style={styles.avatarLetter}>{avatarLetter(item.username)}</Text>
+          <Text style={[styles.avatarLetter, { color: palette.ivory }]}>{avatarLetter(item.username)}</Text>
         </View>
         <View style={styles.tipBody}>
           <View style={styles.tipHeader}>
             <Text style={[styles.tipName, { color: palette.text }]}>{item.username}</Text>
             <View style={[styles.amountBadge, { backgroundColor: color }]}>
-              <Text style={styles.amountText}>${item.amount}</Text>
+              <Text style={[styles.amountText, { color: palette.ivory }]}>${item.amount}</Text>
             </View>
           </View>
           {!!item.message && (
@@ -171,7 +171,7 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.5 }]} onPress={onClose} />
         <View style={[styles.panel, { backgroundColor: palette.surface }]}>
           {/* Header */}
           <View style={styles.panelHeader}>
@@ -220,7 +220,7 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
                     <Text
                       style={[
                         styles.chipText,
-                        { color: selectedAmount === amt ? '#fff' : palette.text },
+                        { color: selectedAmount === amt ? palette.onPrimary : palette.text },
                       ]}
                     >
                       ${amt}
@@ -256,9 +256,9 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
                 ]}
               >
                 {sending ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={palette.ivory} />
                 ) : (
-                  <Text style={styles.sendBtnText}>Send Super Chat</Text>
+                  <Text style={[styles.sendBtnText, { color: palette.onPrimary }]}>Send Super Chat</Text>
                 )}
               </Pressable>
             </View>
@@ -267,7 +267,7 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
               onPress={() => setShowForm(true)}
               style={[styles.openFormBtn, { backgroundColor: palette.gold }]}
             >
-              <Text style={styles.openFormText}>⚡ Super Chat</Text>
+              <Text style={[styles.openFormText, { color: palette.onPrimary }]}>⚡ Super Chat</Text>
             </Pressable>
           )}
         </View>
@@ -285,7 +285,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   panel: {
     borderTopLeftRadius: 20,
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
-  closeBtn: { padding: 4 },
+  closeBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   closeTxt: { fontSize: 18 },
   loader: { marginVertical: 20 },
   list: { maxHeight: 280 },
@@ -325,7 +324,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  avatarLetter: { fontWeight: '800', fontSize: 15 },
   tipBody: { flex: 1 },
   tipHeader: {
     flexDirection: 'row',
@@ -339,7 +338,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  amountText: { color: '#fff', fontWeight: '800', fontSize: 11 },
+  amountText: { fontWeight: '800', fontSize: 11 },
   tipMsg: { fontSize: 12, lineHeight: 17 },
   form: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -379,7 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  sendBtnText: { fontWeight: '800', fontSize: 15 },
   openFormBtn: {
     marginHorizontal: 14,
     marginTop: 8,
@@ -388,5 +387,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  openFormText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  openFormText: { fontWeight: '800', fontSize: 15 },
 });

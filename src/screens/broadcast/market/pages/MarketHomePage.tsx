@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -64,6 +65,7 @@ function formatCountdown(ms: number): string {
 function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { width: windowWidth } = useWindowDimensions();
   const remaining = useCountdown(drop.ends_at);
   const imgSource = drop.cover_url ? { uri: drop.cover_url } : fallbackCover;
 
@@ -71,9 +73,9 @@ function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
     <Pressable
       onPress={() => drop.shop_id ? navigation.navigate('ShopProducts', { shopId: drop.shop_id, shopName: drop.shop_name ?? undefined }) : undefined}
       style={{
-        width: 200,
+        width: Math.min(windowWidth * 0.48, 200),
         borderWidth: 1.5,
-        borderColor: drop.is_live ? '#e74c3c' : palette.primary,
+        borderColor: drop.is_live ? palette.danger : palette.primary,
         backgroundColor: palette.surface,
         borderRadius: 18,
         overflow: 'hidden',
@@ -89,7 +91,7 @@ function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
               position: 'absolute',
               top: 8,
               left: 8,
-              backgroundColor: '#e74c3c',
+              backgroundColor: palette.danger,
               borderRadius: 6,
               paddingHorizontal: 7,
               paddingVertical: 3,
@@ -98,8 +100,8 @@ function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
               gap: 4,
             }}
           >
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>LIVE</Text>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.ivory }} />
+            <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 10 }}>LIVE</Text>
           </View>
         )}
       </View>
@@ -114,10 +116,10 @@ function DropCountdownBadge({ drop }: { drop: MarketDrop }) {
         )}
         {remaining !== null && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <KISIcon name="time-outline" size={12} color={remaining < 3600000 ? '#e74c3c' : palette.subtext} />
+            <KISIcon name="time-outline" size={12} color={remaining < 3600000 ? palette.danger : palette.subtext} />
             <Text
               style={{
-                color: remaining < 3600000 ? '#e74c3c' : palette.subtext,
+                color: remaining < 3600000 ? palette.danger : palette.subtext,
                 fontWeight: '800',
                 fontSize: 12,
                 fontVariant: ['tabular-nums'],
@@ -147,6 +149,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
 }
 
 function PulseDot() {
+  const { palette } = useKISTheme();
   const anim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.loop(
@@ -162,7 +165,7 @@ function PulseDot() {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#e74c3c',
+        backgroundColor: palette.danger,
         transform: [{ scale: anim }],
       }}
     />
@@ -179,6 +182,7 @@ type Props = {
 export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeAllProducts, onSeeAllShops }: Props) {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { width: windowWidth } = useWindowDimensions();
   const { home, loadingHome, homeCacheMeta, subscribeProduct, joinShop, reloadAll } = useMarketData({
     ownerId,
     q: searchTerm,
@@ -259,14 +263,14 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 5,
-                    backgroundColor: '#e74c3c',
+                    backgroundColor: palette.danger,
                     borderRadius: 8,
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                   }}
                 >
                   <PulseDot />
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>LIVE DROP</Text>
+                  <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 12 }}>LIVE DROP</Text>
                 </View>
               ) : (
                 <View
@@ -279,7 +283,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                     paddingVertical: 5,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                  <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 12 }}>
                     {loadingHome ? 'Loading…' : 'Featured Drop'}
                   </Text>
                 </View>
@@ -287,7 +291,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
             </View>
 
             <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16, gap: 6 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 20, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 }}>
+              <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 20, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 }}>
                 {featuredDrop?.title ?? 'Market Drops'}
               </Text>
               <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 13 }}>
@@ -302,15 +306,15 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 5,
-                    backgroundColor: featuredCountdown < 3600000 ? '#e74c3c' : 'rgba(0,0,0,0.5)',
+                    backgroundColor: featuredCountdown < 3600000 ? palette.danger : 'rgba(0,0,0,0.5)',
                     borderRadius: 8,
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                   }}
                 >
-                  <KISIcon name="time-outline" size={13} color="#fff" />
+                  <KISIcon name="time-outline" size={13} color={palette.ivory} />
                   <Text
-                    style={{ color: '#fff', fontWeight: '900', fontSize: 13, fontVariant: ['tabular-nums'] }}
+                    style={{ color: palette.ivory, fontWeight: '900', fontSize: 13, fontVariant: ['tabular-nums'] }}
                   >
                     {formatCountdown(featuredCountdown)} left
                   </Text>
@@ -366,14 +370,14 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 4,
-                    backgroundColor: '#e74c3c',
+                    backgroundColor: palette.danger,
                     borderRadius: 8,
                     paddingHorizontal: 8,
                     paddingVertical: 3,
                   }}
                 >
                   <PulseDot />
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>
+                  <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 11 }}>
                     {liveDrops.length} LIVE
                   </Text>
                 </View>
@@ -467,7 +471,7 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
               contentContainerStyle={{ paddingHorizontal: 12, gap: 12, flexDirection: 'row' }}
             >
               {home.popular_shops!.slice(0, 6).map((s) => (
-                <View key={s.id} style={{ width: 220 }}>
+                <View key={s.id} style={{ width: Math.min(windowWidth * 0.48, 220) }}>
                   <MarketShopCard
                     name={s.name ?? 'Shop'}
                     description={s.description}

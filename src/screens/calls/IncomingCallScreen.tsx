@@ -10,21 +10,25 @@ import {
   Text,
   Vibration,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import type { CallSession } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { KISIcon } from '@/constants/kisIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useKISTheme } from '@/theme/useTheme';
 
-// Each call type has its own royal accent colour
-const ACCENT: Record<string, string> = {
-  voice: '#C9A227',
-  video: '#8B5CF6',
-  'voice-group': '#3B82F6',
-  'video-group': '#06B6D4',
-  broadcast: '#EC4899',
-};
+// Per call type, resolve accent from palette tokens only — no hardcoded hex.
+// voice-group → palette.info (sky blue), video-group → palette.info,
+// broadcast → palette.danger (red-pink is close enough and avoids hardcoding).
+const buildAccent = (p: any): Record<string, string> => ({
+  voice: p.primary,
+  video: p.primaryStrong,
+  'voice-group': p.info,
+  'video-group': p.info,
+  broadcast: p.danger,
+});
 
 type Props = {
   session: CallSession | null;
@@ -35,6 +39,9 @@ type Props = {
 const VIBRATE_PATTERN = [0, 400, 200, 400];
 
 export default function IncomingCallScreen({ session, onAnswer, onDecline }: Props) {
+  const { palette } = useKISTheme();
+  const { width: screenWidth } = useWindowDimensions();
+
   const ring1 = useRef(new Animated.Value(1)).current;
   const ring2 = useRef(new Animated.Value(1)).current;
   const ring3 = useRef(new Animated.Value(1)).current;
@@ -85,17 +92,36 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
   const initials = session.title.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const typeLabel = callTypeLabel(session.callType);
   const typeIcon = callTypeIcon(session.callType);
-  const accent = ACCENT[session.callType] ?? '#C9A227';
+
+  const ACCENT = buildAccent(palette);
+  const accent = ACCENT[session.callType] ?? palette.primary;
+
   const isVideo = session.callType === 'video' || session.callType === 'video-group';
   const extraCount = session.participants.length;
 
+  // Screen-relative ring sizes — capped to prevent overflow on narrow devices
+  const ringSize = Math.min(168, screenWidth * 0.44);
+  const ringRadius = ringSize / 2;
+  const ringsWrapSize = Math.min(200, screenWidth * 0.53);
+  const glowSize = Math.min(380, screenWidth - 16);
+
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
-      <StatusBar barStyle="light-content" backgroundColor="#080814" />
-      <View style={styles.bg}>
+      <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
+      <View style={[styles.bg, { backgroundColor: palette.bg }]}>
 
         {/* Ambient glow blob centred behind the avatar */}
-        <View style={[styles.glow, { backgroundColor: accent }]} />
+        <View
+          style={[
+            styles.glow,
+            {
+              backgroundColor: accent,
+              width: glowSize,
+              height: glowSize,
+              borderRadius: glowSize / 2,
+            },
+          ]}
+        />
 
         <SafeAreaView style={styles.safe}>
 
@@ -109,13 +135,19 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
 
           {/* ── Avatar + pulsing rings ── */}
           <View style={styles.centerSection}>
-            <View style={styles.ringsWrap}>
+            <View style={{ width: ringsWrapSize, height: ringsWrapSize, alignItems: 'center', justifyContent: 'center' }}>
               {[ring1, ring2, ring3].map((anim, i) => (
                 <Animated.View
                   key={i}
                   style={[
-                    styles.ring,
-                    { borderColor: accent },
+                    {
+                      position: 'absolute',
+                      width: ringSize,
+                      height: ringSize,
+                      borderRadius: ringRadius,
+                      borderWidth: 1.5,
+                      borderColor: accent,
+                    },
                     {
                       opacity: anim.interpolate({ inputRange: [1, 2.8], outputRange: [0.5, 0] }),
                       transform: [{ scale: anim }],
@@ -129,16 +161,16 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
                 style={[styles.avatarBorder, { borderColor: accent, transform: [{ scale: avatarPulse }] }]}
               >
                 <View style={[styles.avatar, { backgroundColor: accent + 'CC' }]}>
-                  <Text style={styles.avatarText}>{initials}</Text>
+                  <Text style={[styles.avatarText, { color: palette.card }]}>{initials}</Text>
                 </View>
               </Animated.View>
             </View>
 
             {/* Name */}
-            <Text style={styles.callerName}>{session.title}</Text>
+            <Text style={[styles.callerName, { color: palette.text }]}>{session.title}</Text>
 
             {/* Subtitle */}
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: `${palette.text}66` }]}>
               {extraCount > 0
                 ? `+${extraCount} other${extraCount !== 1 ? 's' : ''} in this call`
                 : `Incoming ${typeLabel.toLowerCase()} call`}
@@ -150,14 +182,20 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
             <CallActionButton
               icon="phone-off"
               label="Decline"
-              color="#DC2626"
+              color={palette.danger}
+              iconColor={palette.card}
+              labelColor={`${palette.text}99`}
               onPress={onDecline}
+              accessibilityLabel="Decline call"
             />
             <CallActionButton
               icon={isVideo ? 'video' : 'phone'}
               label="Accept"
-              color="#16A34A"
+              color={palette.success}
+              iconColor={palette.card}
+              labelColor={`${palette.text}99`}
               onPress={onAnswer}
+              accessibilityLabel="Accept call"
             />
           </View>
 
@@ -171,17 +209,25 @@ function CallActionButton({
   icon,
   label,
   color,
+  iconColor,
+  labelColor,
   onPress,
+  accessibilityLabel,
 }: {
   icon: string;
   label: string;
   color: string;
+  iconColor: string;
+  labelColor: string;
   onPress: () => void;
+  accessibilityLabel: string;
 }) {
   return (
     <View style={styles.actionCol}>
       <Pressable
         onPress={onPress}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
         style={({ pressed }) => [
           styles.actionBtn,
           { backgroundColor: color, shadowColor: color },
@@ -189,9 +235,9 @@ function CallActionButton({
         ]}
         android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: true, radius: 40 }}
       >
-        <KISIcon name={icon} size={32} color="#fff" />
+        <KISIcon name={icon} size={32} color={iconColor} />
       </Pressable>
-      <Text style={styles.actionLabel}>{label}</Text>
+      <Text style={[styles.actionLabel, { color: labelColor }]}>{label}</Text>
     </View>
   );
 }
@@ -199,13 +245,9 @@ function CallActionButton({
 const styles = StyleSheet.create({
   bg: {
     flex: 1,
-    backgroundColor: '#080814',
   },
   glow: {
     position: 'absolute',
-    width: 380,
-    height: 380,
-    borderRadius: 190,
     alignSelf: 'center',
     top: '10%',
     opacity: 0.12,
@@ -243,19 +285,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 20,
   },
-  ringsWrap: {
-    width: 200,
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    width: 168,
-    height: 168,
-    borderRadius: 84,
-    borderWidth: 1.5,
-  },
   avatarBorder: {
     width: 128,
     height: 128,
@@ -273,13 +302,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#fff',
     fontSize: 46,
     fontWeight: '900',
     letterSpacing: -1,
   },
   callerName: {
-    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
     textAlign: 'center',
@@ -287,7 +314,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.4)',
     fontSize: 15,
     fontWeight: '500',
     textAlign: 'center',
@@ -315,7 +341,6 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   actionLabel: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,

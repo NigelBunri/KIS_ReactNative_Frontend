@@ -171,7 +171,7 @@ export default function TestimonyReachInboxScreen() {
             <Pressable
               disabled={isUpdating}
               onPress={() => handleUpdateStatus(String(item.id), 'accepted')}
-              style={[styles.acceptBtn, { borderColor: '#2E7D32' }]}
+              style={[styles.acceptBtn, { borderColor: palette.success }]}
             >
               <Text style={[styles.acceptBtnText]}>Accept</Text>
             </Pressable>
@@ -186,8 +186,8 @@ export default function TestimonyReachInboxScreen() {
         )}
         {isAccepted && (
           <View style={styles.actionRow}>
-            <View style={[styles.statusChip, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={{ color: '#2E7D32', fontWeight: '700', fontSize: 13 }}>✓ Accepted</Text>
+            <View style={[styles.statusChip, { backgroundColor: palette.successSoft }]}>
+              <Text style={{ color: palette.success, fontWeight: '700', fontSize: 13 }}>✓ Accepted</Text>
             </View>
             <Pressable
               onPress={() => DeviceEventEmitter.emit('chat.open', {
@@ -214,8 +214,8 @@ export default function TestimonyReachInboxScreen() {
     const toName = item?.to_user?.display_name ?? 'Someone';
     const initials = toName[0].toUpperCase();
     const statusColors: Record<string, { bg: string; text: string }> = {
-      pending: { bg: '#FFF8E1', text: '#F57F17' },
-      accepted: { bg: '#E8F5E9', text: '#2E7D32' },
+      pending: { bg: palette.goldHighlight, text: palette.gold },
+      accepted: { bg: palette.successSoft, text: palette.success },
       declined: { bg: palette.surface, text: palette.subtext },
     };
     const statusStyle = statusColors[item.status] ?? statusColors.pending;
@@ -259,7 +259,7 @@ export default function TestimonyReachInboxScreen() {
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.onPrimary }]}>Reach-out Inbox</Text>
+        <Text style={[styles.headerTitle, { color: palette.text }]}>Reach-out Inbox</Text>
       </View>
 
       <View style={[styles.tabs, { borderBottomColor: palette.divider }]}>
@@ -271,7 +271,7 @@ export default function TestimonyReachInboxScreen() {
               onPress={() => setActiveTab(tab)}
               style={[
                 styles.tab,
-                { borderBottomColor: isActive ? palette.primary : 'transparent', borderBottomWidth: 2 },
+                { borderBottomColor: isActive ? palette.primary : palette.bg, borderBottomWidth: 2 },
               ]}
             >
               <Text style={[styles.tabText, { color: isActive ? palette.primary : palette.subtext }]}>
@@ -307,7 +307,7 @@ export default function TestimonyReachInboxScreen() {
 function makeStyles(palette: any) {
   return StyleSheet.create({
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-    backBtn: { padding: 4 },
+    backBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 20, fontWeight: '800' },
     tabs: { flexDirection: 'row', borderBottomWidth: 1 },
     tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
@@ -316,7 +316,7 @@ function makeStyles(palette: any) {
     card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
     cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+    avatarText: { color: palette.onPrimary, fontWeight: '800', fontSize: 18 },
     name: { fontSize: 15, fontWeight: '700' },
     testimonyItalic: { fontSize: 13, fontStyle: 'italic' },
     catChip: { alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
@@ -324,12 +324,12 @@ function makeStyles(palette: any) {
     message: { fontSize: 14, lineHeight: 20 },
     timeAgo: { fontSize: 12 },
     actionRow: { flexDirection: 'row', gap: 10 },
-    acceptBtn: { flex: 1, borderWidth: 1.5, borderRadius: 20, paddingVertical: 10, alignItems: 'center' },
-    acceptBtnText: { color: '#2E7D32', fontWeight: '700', fontSize: 14 },
-    declineBtn: { flex: 1, borderWidth: 1.5, borderRadius: 20, paddingVertical: 10, alignItems: 'center' },
+    acceptBtn: { flex: 1, borderWidth: 1.5, borderRadius: 20, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+    acceptBtnText: { color: palette.success, fontWeight: '700', fontSize: 14 },
+    declineBtn: { flex: 1, borderWidth: 1.5, borderRadius: 20, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
     declineBtnText: { fontWeight: '700', fontSize: 14 },
     statusChip: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
-    messageBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+    messageBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     messageBtnText: { fontWeight: '700', fontSize: 14 },
     statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start' },
     statusBadgeText: { fontSize: 11, fontWeight: '800' },

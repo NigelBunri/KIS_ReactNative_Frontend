@@ -103,11 +103,13 @@ const fetchGetWithRetry = async (
 
 /* ── Existing helpers ─────────────────────────────────────────────────────── */
 
-const getPathname = (value: string): string => {
+const getPathname = (value: unknown): string => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) return '';
   try {
-    return new URL(value).pathname;
+    return new URL(normalized).pathname;
   } catch {
-    return value.split('?')[0] ?? value;
+    return normalized.split('?')[0] ?? normalized;
   }
 };
 
@@ -154,6 +156,16 @@ export const getRequest = async (
     staleWhileRevalidate?: boolean;
   } = {}
 ) => {
+  if (typeof url !== 'string' || !url.trim()) {
+    console.warn('[getRequest] Request endpoint is not configured.', {
+      url,
+    });
+    return {
+      success: false,
+      message: 'Request endpoint is not configured.',
+    };
+  }
+
   const execute = async (): Promise<GetResponse> => {
   try {
     const token = await getAccessTokenForRequest();

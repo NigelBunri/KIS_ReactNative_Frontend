@@ -1,8 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import { KISIcon } from '@/constants/kisIcons';
 import {
@@ -21,6 +23,7 @@ type NotificationRule = {
   type: string | null;
   enabled: boolean;
   channels_json?: string[];
+  _isPlaceholder?: boolean;
 };
 
 const RULE_LABELS: Record<string, string> = {
@@ -43,9 +46,11 @@ function NotificationPreferencesPanel() {
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadRules = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(ROUTES.notificationRules.list, { errorMessage: 'Could not load preferences' });
       const list: NotificationRule[] = Array.isArray(res?.data?.results)
@@ -54,6 +59,8 @@ function NotificationPreferencesPanel() {
         ? res.data
         : [];
       setRules(list);
+    } catch {
+      setError('Could not load notification preferences. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,27 +71,48 @@ function NotificationPreferencesPanel() {
   const toggle = useCallback(async (rule: NotificationRule) => {
     setToggling(rule.id);
     const newEnabled = !rule.enabled;
-    setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: newEnabled } : r));
+    // Optimistically update the display list
+    setRules((prev) =>
+      prev.length > 0
+        ? prev.map((r) => r.id === rule.id ? { ...r, enabled: newEnabled } : r)
+        : prev,
+    );
     try {
-      await queueableJsonRequest({
-        domain: 'Settings',
-        kind: 'settings.notification_rule',
-        method: 'PATCH',
-        url: ROUTES.notificationRules.detail(rule.id),
-        body: { enabled: newEnabled },
-        dedupeKey: `settings:notification-rule:${rule.id}`,
-        replaceExisting: true,
-      });
+      if (rule._isPlaceholder) {
+        // No backend rule exists yet — create it via POST
+        await queueableJsonRequest({
+          domain: 'Settings',
+          kind: 'settings.notification_rule',
+          method: 'POST',
+          url: ROUTES.notificationRules.list,
+          body: { type: rule.type, enabled: newEnabled },
+          dedupeKey: `settings:notification-rule-create:${rule.type}`,
+          replaceExisting: true,
+        });
+        // Reload to get the real ids
+        void loadRules();
+      } else {
+        await queueableJsonRequest({
+          domain: 'Settings',
+          kind: 'settings.notification_rule',
+          method: 'PATCH',
+          url: ROUTES.notificationRules.detail(rule.id),
+          body: { enabled: newEnabled },
+          dedupeKey: `settings:notification-rule:${rule.id}`,
+          replaceExisting: true,
+        });
+      }
     } catch {
       setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, enabled: rule.enabled } : r));
     } finally {
       setToggling(null);
     }
-  }, []);
+  }, [loadRules]);
 
-  const displayRules = useMemo(() => {
+  const displayRules = useMemo((): NotificationRule[] => {
     if (rules.length > 0) return rules;
-    return DEFAULT_TYPES.map((t) => ({ id: t, type: t, enabled: true }));
+    // Return placeholder rules that will create real backend rules when toggled
+    return DEFAULT_TYPES.map((t) => ({ id: t, type: t, enabled: true, _isPlaceholder: true }));
   }, [rules]);
 
   return (
@@ -92,7 +120,17 @@ function NotificationPreferencesPanel() {
       <Text style={{ color: palette.text, fontSize: 17, fontWeight: '700', marginBottom: 10 }}>
         Notification preferences
       </Text>
-      {loading ? (
+      {error ? (
+        <View style={{ alignItems: 'center', paddingVertical: 16, gap: 8 }}>
+          <Text style={{ color: palette.danger, fontSize: 13, textAlign: 'center' }}>{error}</Text>
+          <Pressable
+            onPress={() => void loadRules()}
+            style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: palette.primary, borderRadius: 8 }}
+          >
+            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : loading ? (
         <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 8 }} />
       ) : (
         <View
@@ -124,9 +162,9 @@ function NotificationPreferencesPanel() {
                 <Switch
                   value={rule.enabled}
                   onValueChange={() => toggle(rule)}
-                  disabled={toggling === rule.id || rules.length === 0}
+                  disabled={toggling === rule.id}
                   trackColor={{ false: palette.divider, true: palette.primary }}
-                  thumbColor="#fff"
+                  thumbColor={palette.ivory}
                 />
               </View>
             );
@@ -145,6 +183,7 @@ function NotificationPreferencesPanel() {
 export default function ProfileNotificationsScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const responsive = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<InAppNotification[]>([]);
@@ -195,9 +234,10 @@ export default function ProfileNotificationsScreen() {
   }, []);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ padding: 20, gap: 14 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View style={{ gap: 6 }}>
-        <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>Notifications</Text>
+        <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Notifications</Text>
         <Text style={{ color: palette.subtext }}>{unreadCount} unread notification{unreadCount === 1 ? '' : 's'}.</Text>
       </View>
 
@@ -211,7 +251,7 @@ export default function ProfileNotificationsScreen() {
       />
 
       {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
-      {error ? <Text style={{ color: palette.error || '#E53935' }}>{error}</Text> : null}
+      {error ? <Text style={{ color: palette.danger }}>{error}</Text> : null}
 
       {!loading && !items.length ? (
         <View style={{ padding: 18, borderWidth: 1, borderColor: palette.divider, borderRadius: 18, backgroundColor: palette.surface }}>
@@ -240,16 +280,17 @@ export default function ProfileNotificationsScreen() {
               {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Unknown time'}
             </Text>
           </Pressable>
-          <View style={{ alignItems: 'center', gap: 10 }}>
-            <Pressable onPress={() => openNotification(item)}>
+          <View style={{ alignItems: 'center', gap: 6 }}>
+            <Pressable onPress={() => openNotification(item)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
               <KISIcon name="chevron-right" size={18} color={palette.subtext} />
             </Pressable>
-            <Pressable onPress={() => removeNotification(item)}>
+            <Pressable onPress={() => removeNotification(item)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
               <KISIcon name="trash" size={16} color={palette.subtext} />
             </Pressable>
           </View>
         </View>
       ))}
     </ScrollView>
+    </SafeAreaView>
   );
 }

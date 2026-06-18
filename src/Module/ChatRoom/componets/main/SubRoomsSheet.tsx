@@ -147,12 +147,12 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
                 borderRadius: 10,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: palette.error ?? '#FF3B30',
+                backgroundColor: palette.danger,
               }}
             >
               <Text
                 style={{
-                  color: '#fff',
+                  color: palette.ivory,
                   fontSize: 11,
                   fontWeight: '700',
                 }}

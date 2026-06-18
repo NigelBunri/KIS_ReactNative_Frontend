@@ -112,6 +112,14 @@ export type DraftProfile = {
   cover_file?: PickedImage | null;
   avatar_preview?: string;
   cover_preview?: string;
+  // profile preference fields surfaced in edit form
+  location_city?: string;
+  location_country?: string;
+  skills?: string;
+  website?: string;
+  instagram?: string;
+  twitter?: string;
+  linkedin?: string;
 };
 
 export type PrefsDraft = {

@@ -8,17 +8,21 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
 import KISButton from "@/constants/KISButton";
-import ROUTES from "@/network";
-import { getRequest } from "@/network/get";
-import { postRequest } from "@/network/post";
-import { patchRequest } from "@/network/patch";
+import {
+  createInstitutionEngineManagedItem,
+  fetchInstitutionEngineManagedItems,
+  updateInstitutionEngineManagedItem,
+} from "@/services/healthOpsEngineManagerService";
 
 /* ================= TYPES ================= */
+
+type Props = { institutionId: string; engineKey: string };
 
 type Channel = "Push" | "SMS" | "Email" | "In-App";
 type Priority = "Low" | "Normal" | "High" | "Critical";
@@ -44,7 +48,7 @@ interface NotificationItem {
 
 /* ================= COMPONENT ================= */
 
-const NotificationReminderManager: FC = () => {
+const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
   const spacing = HEALTH_THEME_SPACING;
@@ -53,6 +57,7 @@ const NotificationReminderManager: FC = () => {
   /* ================= CONFIG ================= */
 
   const [engineEnabled, setEngineEnabled] = useState<boolean>(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(true);
 
   /* ================= TEMPLATES ================= */
@@ -63,47 +68,61 @@ const NotificationReminderManager: FC = () => {
   const [templateName, setTemplateName] = useState<string>("");
   const [templateMessage, setTemplateMessage] = useState<string>("");
 
+  // NOTE: the backend's reminders/sessions/start/ endpoint only supports POST
+  // and requires a workflow_session_id tied to an active clinical workflow —
+  // there is no standalone "template" list/create API yet. Rather than call
+  // an endpoint that will always 404/400, surface a clear "coming soon" state.
   const fetchTemplates = useCallback(async () => {
     setLoadingTemplates(true);
-    try {
-      const res = await getRequest(ROUTES.healthOps.reminderSessionStart, {
-        errorMessage: "Unable to load templates.",
-      });
-      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
-      setTemplates(Array.isArray(list) ? list : []);
-    } catch {
-      setTemplates([]);
-    } finally {
-      setLoadingTemplates(false);
-    }
+    setTemplates([]);
+    setLoadingTemplates(false);
   }, []);
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  useEffect(() => {
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEngineEnabled(!next);
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
+
   const createTemplate = async () => {
     if (!templateName || !templateMessage) return;
-    setSavingTemplate(true);
-    try {
-      const res = await postRequest(ROUTES.healthOps.reminderSessionStart, {
-        name: templateName,
-        message: templateMessage,
-        type: "template",
-      });
-      const created = res?.data ?? res;
-      if (created?.id) {
-        setTemplates((prev) => [...prev, created]);
-      } else {
-        await fetchTemplates();
-      }
-      setTemplateName("");
-      setTemplateMessage("");
-    } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Could not save template.");
-    } finally {
-      setSavingTemplate(false);
-    }
+    Alert.alert(
+      "Coming soon",
+      "Reusable notification templates are not available yet. You can still send one-off notifications below."
+    );
   };
 
   /* ================= NOTIFICATIONS ================= */
@@ -119,19 +138,14 @@ const NotificationReminderManager: FC = () => {
   const [priority, setPriority] = useState<Priority>("Normal");
   const [scheduleDate, setScheduleDate] = useState<string>("");
 
+  // NOTE: same backend limitation as templates above — reminders/sessions/start/
+  // requires a workflow_session_id and does not support GET for listing history.
+  // There is no freeform notification-broadcast API yet, so we surface a clear
+  // "coming soon" state instead of silently failing requests.
   const fetchNotifications = useCallback(async () => {
     setLoadingNotifications(true);
-    try {
-      const res = await getRequest(ROUTES.healthOps.reminderSessionStart, {
-        errorMessage: "Unable to load notification history.",
-      });
-      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
-      setNotifications(Array.isArray(list) ? list : []);
-    } catch {
-      setNotifications([]);
-    } finally {
-      setLoadingNotifications(false);
-    }
+    setNotifications([]);
+    setLoadingNotifications(false);
   }, []);
 
   useEffect(() => {
@@ -140,60 +154,22 @@ const NotificationReminderManager: FC = () => {
 
   const createNotification = async () => {
     if (!title || !message || !recipient) return;
-    setSendingNotification(true);
-    try {
-      const res = await postRequest(ROUTES.healthOps.reminderSessionStart, {
-        title,
-        message,
-        recipient,
-        channel,
-        priority,
-        scheduled_for: scheduleDate || null,
-        auto_send: autoSendEnabled,
-      });
-      const created = res?.data ?? res;
-      if (created?.id) {
-        setNotifications((prev) => [...prev, created]);
-      } else {
-        await fetchNotifications();
-      }
-      setTitle("");
-      setMessage("");
-      setRecipient("");
-      setScheduleDate("");
-    } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Could not send notification.");
-    } finally {
-      setSendingNotification(false);
-    }
+    Alert.alert(
+      "Coming soon",
+      "Sending standalone notifications is not available yet. Reminders are currently triggered automatically from clinical workflows."
+    );
   };
 
   const updateStatus = async (id: string, status: Status) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, status } : n))
     );
-    try {
-      await patchRequest(
-        ROUTES.healthOps.reminderSessionStep(id),
-        { status }
-      );
-    } catch {
-      // optimistic update already applied
-    }
   };
 
   const markAsRead = async (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true, status: "Read" } : n))
     );
-    try {
-      await patchRequest(
-        ROUTES.healthOps.reminderSessionDelivery(id),
-        { read: true, status: "Read" }
-      );
-    } catch {
-      // optimistic update already applied
-    }
   };
 
   /* ================= ANALYTICS ================= */
@@ -206,8 +182,9 @@ const NotificationReminderManager: FC = () => {
   /* ================= UI ================= */
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={["top"]}>
     <ScrollView
-      style={{ flex: 1, backgroundColor: palette.background }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.md }}
     >
       {/* CONFIGURATION */}
@@ -218,12 +195,18 @@ const NotificationReminderManager: FC = () => {
 
         <KISButton
           title={engineEnabled ? "Disable Engine" : "Enable Engine"}
-          onPress={() => setEngineEnabled(!engineEnabled)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
         <KISButton
           title={autoSendEnabled ? "Disable Auto Send" : "Enable Auto Send"}
-          onPress={() => setAutoSendEnabled(!autoSendEnabled)}
+          onPress={() => {
+            setAutoSendEnabled(!autoSendEnabled);
+            Alert.alert(
+              "Coming soon",
+              "Auto-send configuration will be persisted once a notification engine settings endpoint is available."
+            );
+          }}
           variant="outline"
         />
       </View>
@@ -378,6 +361,7 @@ const NotificationReminderManager: FC = () => {
         <Text style={{ color: palette.text }}>Scheduled: {scheduledCount}</Text>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -402,7 +386,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const item = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

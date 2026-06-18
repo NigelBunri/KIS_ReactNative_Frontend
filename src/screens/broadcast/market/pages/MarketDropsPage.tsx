@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, DeviceEventEmitter, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import { MarketDrop } from '@/screens/broadcast/market/api/market.types';
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
 
 const fallbackCover = require('@/assets/logo-light.png');
 
@@ -51,6 +50,7 @@ function formatStartAt(iso?: string): string {
 }
 
 function PulseDot() {
+  const { palette } = useKISTheme();
   const anim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.loop(
@@ -62,7 +62,7 @@ function PulseDot() {
   }, [anim]);
   return (
     <Animated.View
-      style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#e74c3c', transform: [{ scale: anim }] }}
+      style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.danger, transform: [{ scale: anim }] }}
     />
   );
 }
@@ -80,7 +80,7 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
     <View
       style={{
         borderWidth: 1.5,
-        borderColor: drop.is_live ? '#e74c3c' : isEndingSoon ? '#f39c12' : palette.divider,
+        borderColor: drop.is_live ? palette.danger : isEndingSoon ? palette.gold : palette.divider,
         backgroundColor: palette.surface,
         borderRadius: 20,
         overflow: 'hidden',
@@ -97,14 +97,14 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 5,
-                backgroundColor: '#e74c3c',
+                backgroundColor: palette.danger,
                 borderRadius: 8,
                 paddingHorizontal: 8,
                 paddingVertical: 4,
               }}
             >
               <PulseDot />
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>LIVE NOW</Text>
+              <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 11 }}>LIVE NOW</Text>
             </View>
           ) : (
             <View
@@ -115,13 +115,13 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
                 paddingVertical: 4,
               }}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>UPCOMING</Text>
+              <Text style={{ color: palette.ivory, fontWeight: '800', fontSize: 11 }}>UPCOMING</Text>
             </View>
           )}
         </View>
 
         <View style={{ position: 'absolute', bottom: 10, left: 12, right: 12, gap: 4 }}>
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 4 }} numberOfLines={1}>
+          <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 16, textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 4 }} numberOfLines={1}>
             {drop.title ?? 'Drop'}
           </Text>
           {drop.shop_name && (
@@ -139,17 +139,17 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
-              backgroundColor: isEndingSoon ? '#e74c3c15' : palette.card,
+              backgroundColor: isEndingSoon ? `${palette.danger}15` : palette.card,
               borderRadius: 10,
               padding: 10,
             }}
           >
-            <KISIcon name="time-outline" size={16} color={isEndingSoon ? '#e74c3c' : palette.subtext} />
+            <KISIcon name="time-outline" size={16} color={isEndingSoon ? palette.danger : palette.subtext} />
             <View>
               <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 11 }}>Ends in</Text>
               <Text
                 style={{
-                  color: isEndingSoon ? '#e74c3c' : palette.text,
+                  color: isEndingSoon ? palette.danger : palette.text,
                   fontWeight: '900',
                   fontSize: 18,
                   fontVariant: ['tabular-nums'],
@@ -201,8 +201,8 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
           onPress={onJoin}
           style={{
             borderWidth: 1.5,
-            borderColor: drop.is_live ? '#e74c3c' : palette.primary,
-            backgroundColor: drop.is_live ? '#e74c3c15' : palette.primarySoft,
+            borderColor: drop.is_live ? palette.danger : palette.primary,
+            backgroundColor: drop.is_live ? `${palette.danger}15` : palette.primarySoft,
             borderRadius: 12,
             paddingVertical: 10,
             alignItems: 'center',
@@ -210,7 +210,7 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
         >
           <Text
             style={{
-              color: drop.is_live ? '#e74c3c' : palette.primaryStrong,
+              color: drop.is_live ? palette.danger : palette.primaryStrong,
               fontWeight: '900',
               fontSize: 14,
             }}
@@ -223,39 +223,51 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
   );
 }
 
+const DROP_REMINDERS_KEY = '@kis_drop_reminders';
+
 export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Props) {
   const { palette } = useKISTheme();
   const { home, loadingHome, reloadAll } = useMarketData({ ownerId, q: searchTerm });
+  const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    AsyncStorage.getItem(DROP_REMINDERS_KEY)
+      .then((raw) => {
+        if (raw) setRemindedIds(new Set(JSON.parse(raw)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const liveDrops = (home.drops ?? []).filter((d) => d.is_live);
   const scheduled = (home.drops ?? []).filter((d) => !d.is_live);
 
+  const handleJoinLiveDrop = useCallback((drop: MarketDrop) => {
+    if (drop.shop_id) {
+      DeviceEventEmitter.emit('market.openShop', { shopId: drop.shop_id });
+    } else {
+      DeviceEventEmitter.emit('market.openDrop', { dropId: drop.id });
+    }
+  }, []);
+
+  const handleSetReminder = useCallback(async (drop: MarketDrop) => {
+    const next = new Set(remindedIds);
+    if (next.has(drop.id)) {
+      next.delete(drop.id);
+      Alert.alert('Reminder removed', `You will no longer be notified about "${drop.title ?? 'this drop'}".`);
+    } else {
+      next.add(drop.id);
+      Alert.alert('Reminder set', `We will notify you when "${drop.title ?? 'this drop'}" goes live.`);
+    }
+    setRemindedIds(next);
+    await AsyncStorage.setItem(DROP_REMINDERS_KEY, JSON.stringify(Array.from(next))).catch(() => undefined);
+  }, [remindedIds]);
+
   const handleStartLiveDrop = useCallback(() => {
     Alert.alert(
-      'Start a Live Drop',
-      'Launch a limited-time live sale. Viewers can purchase products in real time.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start now',
-          onPress: async () => {
-            const res = await postRequest(
-              ROUTES.commerce.products,
-              { is_live: true, is_drop: true },
-              { errorMessage: 'Unable to start live drop.' },
-            );
-            if (res?.success || res?.id) {
-              reloadAll();
-              Alert.alert('Live!', 'Your live drop has started. Share the link with your audience.');
-            } else {
-              DeviceEventEmitter.emit('market.studio.tab', 'drops');
-              Alert.alert('Live drop', res?.message ?? 'Set up your shop and products in Market Studio first, then start a live drop.');
-            }
-          },
-        },
-      ],
+      'Coming soon',
+      'Live drops are not available yet. We are working on bringing limited-time live sales to Market — check back soon.',
     );
-  }, [reloadAll]);
+  }, []);
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -307,21 +319,21 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 4,
-                  backgroundColor: '#e74c3c',
+                  backgroundColor: palette.danger,
                   borderRadius: 8,
                   paddingHorizontal: 8,
                   paddingVertical: 3,
                 }}
               >
                 <PulseDot />
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>{liveDrops.length}</Text>
+                <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 11 }}>{liveDrops.length}</Text>
               </View>
             </View>
             {liveDrops.map((d) => (
               <DropCard
                 key={d.id}
                 drop={d}
-                onJoin={() => Alert.alert('Live Drop', `Joining "${d.title ?? 'drop'}"…`)}
+                onJoin={() => handleJoinLiveDrop(d)}
               />
             ))}
           </View>
@@ -335,7 +347,7 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
               <DropCard
                 key={d.id}
                 drop={d}
-                onJoin={() => Alert.alert('Drop Reminder', `Reminder set for "${d.title ?? 'drop'}"`)}
+                onJoin={() => handleSetReminder(d)}
               />
             ))}
           </View>
@@ -385,7 +397,7 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
               justifyContent: 'center',
             }}
           >
-            <KISIcon name="videocam-outline" size={22} color="#fff" />
+            <KISIcon name="videocam-outline" size={22} color={palette.ivory} />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>

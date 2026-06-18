@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Animated,
   Image,
@@ -264,6 +265,7 @@ export default function ServiceEditorDrawer({
   onClose,
   onSave,
 }: ServiceEditorDrawerProps) {
+  const insets = useSafeAreaInsets();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -620,6 +622,7 @@ export default function ServiceEditorDrawer({
             left: compactDrawer ? 0 : undefined,
             transform: [{ translateX: slide }],
             backgroundColor: palette.card,
+            paddingTop: insets.top,
           },
         ]}
       >
@@ -690,7 +693,7 @@ export default function ServiceEditorDrawer({
                             {category.name || 'Category'}
                           </Text>
                           <Pressable onPress={() => handleServiceCategorySelect(category.id)} style={{ padding: 4 }}>
-                            <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                            <KISIcon name="close" size={12} color={palette.danger} />
                           </Pressable>
                         </View>
                       ))}
@@ -1145,7 +1148,7 @@ export default function ServiceEditorDrawer({
                       padding: 4,
                     }}
                   >
-                    <KISIcon name="close" size={14} color={palette.error ?? '#E53935'} />
+                    <KISIcon name="close" size={14} color={palette.danger} />
                   </Pressable>
                 </View>
               ) : null}
@@ -1168,7 +1171,7 @@ export default function ServiceEditorDrawer({
                             padding: 2,
                           }}
                         >
-                          <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                          <KISIcon name="close" size={12} color={palette.danger} />
                         </Pressable>
                       </View>
                     ))}

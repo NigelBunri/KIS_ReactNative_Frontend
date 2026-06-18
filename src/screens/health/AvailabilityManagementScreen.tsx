@@ -24,6 +24,8 @@ import {
   HEALTH_THEME_SPACING,
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
+import { useKISTheme } from '@/theme/useTheme';
+import type { KISPalette } from '@/theme/constants';
 import {
   ensureInstitutionDashboardExists,
   fetchInstitutionAvailability,
@@ -83,48 +85,31 @@ type AvailabilityStatusKey =
   | 'holiday'
   | 'blocked';
 
-const STATUS_OPTIONS: Array<{
+type StatusOptionBase = {
   key: AvailabilityStatusKey;
   label: string;
   description: string;
-  color: string;
-}> = [
-  {
-    key: 'available',
-    label: 'Available',
-    description: 'Open for booking',
-    color: '#10B981',
-  },
-  {
-    key: 'limited',
-    label: 'Limited',
-    description: 'Few slots available',
-    color: '#F59E0B',
-  },
-  {
-    key: 'fully_booked',
-    label: 'Booked',
-    description: 'No free slots',
-    color: '#EF4444',
-  },
-  {
-    key: 'on_call',
-    label: 'On call',
-    description: 'Available on request',
-    color: '#3B82F6',
-  },
-  {
-    key: 'holiday',
-    label: 'Holiday',
-    description: 'Closed for holiday',
-    color: '#8B5CF6',
-  },
-  {
-    key: 'blocked',
-    label: 'Blocked',
-    description: 'Unavailable / blocked',
-    color: '#6B7280',
-  },
+};
+
+const STATUS_OPTION_BASES: StatusOptionBase[] = [
+  { key: 'available',   label: 'Available', description: 'Open for booking' },
+  { key: 'limited',     label: 'Limited',   description: 'Few slots available' },
+  { key: 'fully_booked',label: 'Booked',    description: 'No free slots' },
+  { key: 'on_call',     label: 'On call',   description: 'Available on request' },
+  { key: 'holiday',     label: 'Holiday',   description: 'Closed for holiday' },
+  { key: 'blocked',     label: 'Blocked',   description: 'Unavailable / blocked' },
+];
+
+// Module-level constant used only for key/label lookups (no color needed here).
+const STATUS_OPTIONS = STATUS_OPTION_BASES;
+
+const makeStatusOptions = (p: KISPalette): Array<StatusOptionBase & { color: string }> => [
+  { ...STATUS_OPTION_BASES[0], color: p.success },
+  { ...STATUS_OPTION_BASES[1], color: p.gold },
+  { ...STATUS_OPTION_BASES[2], color: p.danger },
+  { ...STATUS_OPTION_BASES[3], color: p.primary },
+  { ...STATUS_OPTION_BASES[4], color: p.primary },
+  { ...STATUS_OPTION_BASES[5], color: p.subtext },
 ];
 
 const CLEAR_STATUS_KEY = 'clear';
@@ -748,6 +733,8 @@ export default function AvailabilityManagementScreen({
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
   const spacing = HEALTH_THEME_SPACING;
+  const { palette: kisPalette } = useKISTheme();
+  const STATUS_OPTIONS_WITH_COLORS = makeStatusOptions(kisPalette);
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const dashboardType = useMemo(() => {
@@ -1347,7 +1334,7 @@ export default function AvailabilityManagementScreen({
     (date: Date, compact = false, rowLayoutKey?: string) => {
       const dateKey = toDateOnlyIso(date);
       const statusKey = draft?.dayStatuses?.[dateKey];
-      const statusMeta = STATUS_OPTIONS.find(
+      const statusMeta = STATUS_OPTIONS_WITH_COLORS.find(
         option => option.key === statusKey,
       );
       const timeMode = resolveDateTimeMode(draft, dateKey);
@@ -1401,12 +1388,12 @@ export default function AvailabilityManagementScreen({
                 }
           }
           style={{
-            width: compact ? 20 : 42,
-            height: compact ? 20 : 42,
+            width: compact ? 20 : 44,
+            height: compact ? 20 : 44,
             borderRadius: compact ? 6 : 10,
             borderWidth: 1,
             borderColor: isActive ? palette.accentPrimary : border,
-            backgroundColor: inYear ? baseBg : palette.background,
+            backgroundColor: inYear ? baseBg : palette.bg,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: isSelectable ? 1 : 0.3,
@@ -1443,7 +1430,7 @@ export default function AvailabilityManagementScreen({
                   style={{
                     fontSize: 9,
                     lineHeight: 9,
-                    color: '#FFFFFF',
+                    color: palette.text,
                     textAlign: 'center',
                     marginTop: -1,
                     includeFontPadding: false,
@@ -1471,7 +1458,7 @@ export default function AvailabilityManagementScreen({
       handleDayPress,
       nowMs,
       palette.accentPrimary,
-      palette.background,
+      palette.bg,
       palette.divider,
       palette.subtext,
       palette.surface,
@@ -1502,7 +1489,7 @@ export default function AvailabilityManagementScreen({
                   style={{
                     ...typography.caption,
                     color: palette.subtext,
-                    width: 42,
+                    width: 44,
                     textAlign: 'center',
                   }}
                 >
@@ -1667,7 +1654,7 @@ export default function AvailabilityManagementScreen({
 
   if (!dashboardType) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, padding: spacing.lg }}
@@ -1675,6 +1662,7 @@ export default function AvailabilityManagementScreen({
           <View style={{ alignItems: 'flex-end' }}>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
                 borderWidth: 1,
                 borderColor: palette.divider,
@@ -1715,7 +1703,7 @@ export default function AvailabilityManagementScreen({
 
   if (loading || !draft) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -1736,7 +1724,7 @@ export default function AvailabilityManagementScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}
@@ -1750,6 +1738,7 @@ export default function AvailabilityManagementScreen({
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             style={{
               borderWidth: 1,
               borderColor: palette.divider,
@@ -1815,6 +1804,8 @@ export default function AvailabilityManagementScreen({
                         : palette.surface,
                     paddingHorizontal: spacing.md,
                     paddingVertical: spacing.xs,
+                    minHeight: 44,
+                    justifyContent: 'center',
                   }}
                 >
                   <Text style={{ ...typography.label, color: palette.text }}>
@@ -1858,6 +1849,8 @@ export default function AvailabilityManagementScreen({
                         : palette.surface,
                     paddingHorizontal: spacing.md,
                     paddingVertical: spacing.xs,
+                    minHeight: 44,
+                    justifyContent: 'center',
                   }}
                 >
                   <Text style={{ ...typography.label, color: palette.text }}>
@@ -2140,7 +2133,7 @@ export default function AvailabilityManagementScreen({
                                 }}
                               >
                                 {selected ? (
-                                  <Text style={{ color: '#fff', fontSize: 11 }}>
+                                  <Text style={{ color: kisPalette.ivory, fontSize: 11 }}>
                                     ✓
                                   </Text>
                                 ) : null}
@@ -2319,7 +2312,7 @@ export default function AvailabilityManagementScreen({
               Day Status Color Legend
             </Text>
             <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
-              {STATUS_OPTIONS.map(option => (
+              {STATUS_OPTIONS_WITH_COLORS.map(option => (
                 <TouchableOpacity
                   key={option.key}
                   onPress={() => setSelectedStatus(option.key)}

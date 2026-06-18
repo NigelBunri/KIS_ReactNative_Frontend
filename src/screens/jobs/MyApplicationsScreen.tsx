@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -32,15 +33,16 @@ type Application = {
   cancel_url?: string;
 };
 
-const STATUS_CONFIG: Record<ApplicationStatus, { label: string; bg: string; text: string }> = {
-  PENDING: { label: 'Pending', bg: '#FEF3C7', text: '#92400E' },
-  APPROVED: { label: 'Approved', bg: '#D1FAE5', text: '#065F46' },
-  REJECTED: { label: 'Rejected', bg: '#FEE2E2', text: '#991B1B' },
-  WITHDRAWN: { label: 'Withdrawn', bg: '#F3F4F6', text: '#6B7280' },
-};
+const getStatusConfig = (palette: ReturnType<typeof useKISTheme>['palette']): Record<ApplicationStatus, { label: string; bg: string; text: string }> => ({
+  PENDING: { label: 'Pending', bg: palette.goldHighlight, text: palette.gold },
+  APPROVED: { label: 'Approved', bg: palette.successSoft, text: palette.success },
+  REJECTED: { label: 'Rejected', bg: palette.dangerSoft, text: palette.danger },
+  WITHDRAWN: { label: 'Withdrawn', bg: palette.surface, text: palette.subtext },
+});
 
 export default function MyApplicationsScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<Nav>();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(false);
@@ -106,6 +108,7 @@ export default function MyApplicationsScreen() {
   };
 
   const renderItem = ({ item }: { item: Application }) => {
+    const STATUS_CONFIG = getStatusConfig(palette);
     const statusConf = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.PENDING;
     return (
       <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
@@ -163,7 +166,7 @@ export default function MyApplicationsScreen() {
           data={applications}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => fetchApplications(true)} />
           }

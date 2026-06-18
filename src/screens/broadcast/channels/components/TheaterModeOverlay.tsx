@@ -1,48 +1,89 @@
 // src/screens/broadcast/channels/components/TheaterModeOverlay.tsx
 //
 // Theater and ambient mode toggle controls for the video player controls bar.
-// Purely controlled — no network calls.
+// Persists preferences to AsyncStorage so they survive app restarts.
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+
+const STORAGE_KEY = 'KIS_VIDEO_PREFS';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Props = {
-  isTheaterMode: boolean;
-  onToggle: () => void;
-  isAmbientMode: boolean;
-  onAmbientToggle: () => void;
+  isTheaterMode?: boolean;
+  onToggle?: (value: boolean) => void;
+  isAmbientMode?: boolean;
+  onAmbientToggle?: (value: boolean) => void;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TheaterModeOverlay({
-  isTheaterMode,
+  isTheaterMode: controlledTheater,
   onToggle,
-  isAmbientMode,
+  isAmbientMode: controlledAmbient,
   onAmbientToggle,
 }: Props) {
   const { palette } = useKISTheme();
+  const [theaterMode, setTheaterMode] = useState(controlledTheater ?? false);
+  const [ambientMode, setAmbientMode] = useState(controlledAmbient ?? false);
+
+  // Load persisted prefs on mount (only if not fully controlled)
+  useEffect(() => {
+    if (controlledTheater !== undefined || controlledAmbient !== undefined) return;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then(raw => {
+        if (!raw) return;
+        const prefs = JSON.parse(raw);
+        if (typeof prefs.theater === 'boolean') setTheaterMode(prefs.theater);
+        if (typeof prefs.ambient === 'boolean') setAmbientMode(prefs.ambient);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Keep local state in sync when controlled from outside
+  useEffect(() => { if (controlledTheater !== undefined) setTheaterMode(controlledTheater); }, [controlledTheater]);
+  useEffect(() => { if (controlledAmbient !== undefined) setAmbientMode(controlledAmbient); }, [controlledAmbient]);
+
+  const persist = useCallback((theater: boolean, ambient: boolean) => {
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ theater, ambient })).catch(() => {});
+  }, []);
+
+  const handleTheaterToggle = useCallback(() => {
+    const next = !theaterMode;
+    setTheaterMode(next);
+    onToggle?.(next);
+    persist(next, ambientMode);
+  }, [ambientMode, onToggle, persist, theaterMode]);
+
+  const handleAmbientToggle = useCallback(() => {
+    const next = !ambientMode;
+    setAmbientMode(next);
+    onAmbientToggle?.(next);
+    persist(theaterMode, next);
+  }, [ambientMode, onAmbientToggle, persist, theaterMode]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.royalInk }]}>
       {/* Theater mode button */}
       <Pressable
-        onPress={onToggle}
+        onPress={handleTheaterToggle}
         style={[
           styles.button,
-          isTheaterMode && styles.buttonActive,
-          isTheaterMode && { borderColor: palette.primaryStrong },
+          { borderColor: theaterMode ? palette.primaryStrong : palette.royalInk },
+          theaterMode && styles.buttonActive,
         ]}
-        accessibilityLabel={isTheaterMode ? 'Exit theater mode' : 'Enter theater mode'}
+        hitSlop={8}
+        accessibilityLabel={theaterMode ? 'Exit theater mode' : 'Enter theater mode'}
         accessibilityRole="button"
       >
         <KISIcon
@@ -50,28 +91,29 @@ export default function TheaterModeOverlay({
           size={20}
           color={palette.surface}
         />
-        {isTheaterMode && (
+        {theaterMode && (
           <View style={[styles.badge, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={styles.badgeText}>Theater</Text>
+            <Text style={[styles.badgeText, { color: palette.ivory }]}>Theater</Text>
           </View>
         )}
       </Pressable>
 
       {/* Ambient mode button */}
       <Pressable
-        onPress={onAmbientToggle}
+        onPress={handleAmbientToggle}
         style={[
           styles.button,
-          isAmbientMode && styles.buttonActive,
-          isAmbientMode && { borderColor: palette.primaryStrong },
+          { borderColor: ambientMode ? palette.primaryStrong : palette.royalInk },
+          ambientMode && styles.buttonActive,
         ]}
-        accessibilityLabel={isAmbientMode ? 'Disable ambient mode' : 'Enable ambient mode'}
+        hitSlop={8}
+        accessibilityLabel={ambientMode ? 'Disable ambient mode' : 'Enable ambient mode'}
         accessibilityRole="button"
       >
         <KISIcon
           name="star"
           size={20}
-          color={isAmbientMode ? palette.primaryStrong : palette.surface}
+          color={ambientMode ? palette.primaryStrong : palette.surface}
         />
       </Pressable>
     </View>
@@ -96,7 +138,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'transparent',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   buttonActive: {
     borderWidth: 1.5,
@@ -107,7 +150,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   badgeText: {
-    color: '#fff',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0,

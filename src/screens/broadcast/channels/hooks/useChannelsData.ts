@@ -59,6 +59,7 @@ import {
   liveStreamQAEndpoint,
   qaSessionQuestionsEndpoint,
   qaQuestionUpvoteEndpoint,
+  qaQuestionActionEndpoint,
   watchHistorySettingsEndpoint,
   userPlaylistsEndpoint,
   userPlaylistItemsEndpoint,
@@ -166,6 +167,7 @@ export const normalizeChannelContent = (item: any): BroadcastChannelContent | nu
     stats: item.stats && typeof item.stats === 'object' ? item.stats : {},
     engagement_counts: item.engagement_counts || item.engagementCounts || {},
     metadata: item.metadata && typeof item.metadata === 'object' ? item.metadata : {},
+    tags: Array.isArray(item.tags) ? item.tags.map((t: any) => String(t)) : [],
     scheduled_at: item.scheduled_at || item.scheduledAt || null,
     created_at: item.created_at || item.createdAt || '',
     updated_at: item.updated_at || item.updatedAt || '',
@@ -417,6 +419,14 @@ export const reportChannelContent = async (contentId: string, reason: string) =>
   return response?.success ? response.data : null;
 };
 
+export const updateChannelDetail = async (
+  handleOrId: string,
+  payload: Record<string, any>,
+): Promise<BroadcastChannelDetail | null> => {
+  const response = await patchRequest(channelDetailEndpoint(handleOrId), payload, { errorMessage: 'Unable to update channel.' });
+  return response?.success ? normalizeChannel(response.data) as BroadcastChannelDetail | null : null;
+};
+
 export const setChannelBroadcastState = async (channelId: string, broadcast: boolean): Promise<BroadcastChannelDetail | null> => {
   const endpoint = channelBroadcastEndpoint(channelId);
   const response = broadcast
@@ -430,6 +440,15 @@ export const setChannelContentBroadcastState = async (contentId: string, broadca
   const response = broadcast
     ? await postRequest(endpoint, {}, { errorMessage: 'Unable to broadcast content.' })
     : await deleteRequest(endpoint, { errorMessage: 'Unable to stop broadcasting content.' });
+  return response?.success ? normalizeChannelContent(response.data) : null;
+};
+
+export const setChannelContentTags = async (contentId: string, tags: string[]): Promise<BroadcastChannelContent | null> => {
+  const response = await patchRequest(
+    channelContentDetailEndpoint(contentId),
+    { tags },
+    { errorMessage: 'Unable to update tags.' },
+  );
   return response?.success ? normalizeChannelContent(response.data) : null;
 };
 
@@ -635,10 +654,15 @@ export const fetchChannelActivity = async (channelId: string) => {
 };
 
 // Subscribers
-export const fetchChannelSubscribers = async (channelId: string) => {
-  const response = await getRequest(channelSubscribersEndpoint(channelId), { errorMessage: 'Unable to load subscribers.' });
-  if (!response?.success) return [];
-  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+export const fetchChannelSubscribers = async (channelId: string, cursor?: string | null) => {
+  const url = cursor
+    ? `${channelSubscribersEndpoint(channelId)}?cursor=${encodeURIComponent(cursor)}`
+    : channelSubscribersEndpoint(channelId);
+  const response = await getRequest(url, { errorMessage: 'Unable to load subscribers.' });
+  if (!response?.success) return { results: [], nextCursor: null };
+  const results = Array.isArray(response.data?.results) ? response.data.results : (Array.isArray(response.data) ? response.data : []);
+  const nextCursor = response.data?.next_cursor ?? response.data?.next ?? null;
+  return { results, nextCursor };
 };
 
 // Live polls
@@ -684,6 +708,14 @@ export const submitQAQuestion = async (sessionId: string, questionText: string) 
 };
 export const upvoteQAQuestion = async (questionId: string) => {
   const response = await postRequest(qaQuestionUpvoteEndpoint(questionId), {}, { errorMessage: 'Unable to upvote.' });
+  return response?.success;
+};
+export const markQAQuestionAnswered = async (questionId: string, isAnswered = true) => {
+  const response = await patchRequest(qaQuestionActionEndpoint(questionId), { is_answered: isAnswered }, { errorMessage: 'Unable to update question.' });
+  return response?.success ? response.data : null;
+};
+export const deleteQAQuestion = async (questionId: string) => {
+  const response = await deleteRequest(qaQuestionActionEndpoint(questionId), { errorMessage: 'Unable to remove question.' });
   return response?.success;
 };
 

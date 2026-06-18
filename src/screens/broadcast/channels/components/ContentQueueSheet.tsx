@@ -9,13 +9,14 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -41,6 +42,7 @@ type Props = {
 
 export default function ContentQueueSheet({ visible, onClose, onPlayContent }: Props) {
   const { palette } = useKISTheme();
+  const { minTouchTarget } = useResponsiveLayout();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
@@ -73,10 +75,11 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
       await postRequest(
         `${ROUTES.broadcasts.queue}${item.id}/remove/`,
         {},
-        { errorMessage: '' },
-      ).catch(() => {});
+        { errorMessage: 'Could not remove item from queue.' },
+      );
     } catch {
       // restore on failure
+      Alert.alert('Error', 'Could not remove item from queue.');
       await fetchQueue();
     }
   }, [fetchQueue, items]);
@@ -88,12 +91,17 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
     next[index - 1] = next[index];
     next[index] = temp;
     setItems(next);
-    await postRequest(
-      ROUTES.broadcasts.queueReorder,
-      { order: next.map(i => i.id) },
-      { errorMessage: '' },
-    ).catch(() => {});
-  }, [items]);
+    try {
+      await postRequest(
+        ROUTES.broadcasts.queueReorder,
+        { order: next.map(i => i.id) },
+        { errorMessage: 'Could not reorder queue.' },
+      );
+    } catch {
+      Alert.alert('Error', 'Could not reorder queue.');
+      await fetchQueue();
+    }
+  }, [fetchQueue, items]);
 
   const handleMoveDown = useCallback(async (index: number) => {
     if (index >= items.length - 1) return;
@@ -102,12 +110,17 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
     next[index + 1] = next[index];
     next[index] = temp;
     setItems(next);
-    await postRequest(
-      ROUTES.broadcasts.queueReorder,
-      { order: next.map(i => i.id) },
-      { errorMessage: '' },
-    ).catch(() => {});
-  }, [items]);
+    try {
+      await postRequest(
+        ROUTES.broadcasts.queueReorder,
+        { order: next.map(i => i.id) },
+        { errorMessage: 'Could not reorder queue.' },
+      );
+    } catch {
+      Alert.alert('Error', 'Could not reorder queue.');
+      await fetchQueue();
+    }
+  }, [fetchQueue, items]);
 
   const handleClear = () => {
     Alert.alert('Clear Queue', 'Remove all items from your queue?', [
@@ -121,9 +134,11 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
             await postRequest(
               `${ROUTES.broadcasts.queue}clear/`,
               {},
-              { errorMessage: '' },
-            ).catch(() => {});
+              { errorMessage: 'Could not clear queue.' },
+            );
             setItems([]);
+          } catch {
+            Alert.alert('Error', 'Could not clear queue.');
           } finally {
             setClearing(false);
           }
@@ -139,7 +154,7 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
       transparent
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose} />
+      <Pressable style={[styles.overlay, { backgroundColor: palette.royalInk, opacity: 0.5 }]} onPress={onClose} />
       <SafeAreaView style={[styles.sheet, { backgroundColor: palette.card }]}>
         {/* Handle bar */}
         <View style={styles.handleRow}>
@@ -199,14 +214,26 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
                   ) : null}
                 </Pressable>
                 <View style={styles.itemActions}>
-                  <Pressable onPress={() => handleMoveUp(index)} style={styles.arrowBtn}>
+                  <Pressable
+                    onPress={() => handleMoveUp(index)}
+                    style={[styles.arrowBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
+                    hitSlop={8}
+                  >
                     <Text style={[styles.arrowText, { color: palette.subtext }]}>↑</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleMoveDown(index)} style={styles.arrowBtn}>
+                  <Pressable
+                    onPress={() => handleMoveDown(index)}
+                    style={[styles.arrowBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
+                    hitSlop={8}
+                  >
                     <Text style={[styles.arrowText, { color: palette.subtext }]}>↓</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleRemove(item)} style={styles.removeBtn}>
-                    <Text style={[styles.removeText, { color: '#EF4444' }]}>✕</Text>
+                  <Pressable
+                    onPress={() => handleRemove(item)}
+                    style={[styles.removeBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.removeText, { color: palette.danger }]}>✕</Text>
                   </Pressable>
                 </View>
               </View>
@@ -220,12 +247,12 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
             <Pressable
               onPress={handleClear}
               disabled={clearing}
-              style={[styles.clearBtn, { borderColor: '#EF4444' }]}
+              style={[styles.clearBtn, { borderColor: palette.danger }]}
             >
               {clearing ? (
-                <ActivityIndicator size="small" color="#EF4444" />
+                <ActivityIndicator size="small" color={palette.danger} />
               ) : (
-                <Text style={styles.clearBtnText}>Clear Queue</Text>
+                <Text style={[styles.clearBtnText, { color: palette.danger }]}>Clear Queue</Text>
               )}
             </Pressable>
           </View>
@@ -238,7 +265,7 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  overlay: { flex: 1 },
   sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -272,11 +299,11 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 13, fontWeight: '800' },
   itemChannel: { fontSize: 11, fontWeight: '600', marginTop: 2 },
   itemActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  arrowBtn: { padding: 6 },
+  arrowBtn: { padding: 6, alignItems: 'center', justifyContent: 'center' },
   arrowText: { fontSize: 16, fontWeight: '700' },
-  removeBtn: { padding: 6 },
+  removeBtn: { padding: 6, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: 15, fontWeight: '800' },
   footer: { borderTopWidth: 1, padding: 14 },
   clearBtn: { borderWidth: 1.5, borderRadius: 8, height: 42, alignItems: 'center', justifyContent: 'center' },
-  clearBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 14 },
+  clearBtnText: { fontWeight: '800', fontSize: 14 },
 });

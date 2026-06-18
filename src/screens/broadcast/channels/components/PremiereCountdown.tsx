@@ -4,15 +4,20 @@
 // a "Set Reminder" button, optional pre-chat and trailer buttons. When the
 // countdown reaches zero, shows a "Going Live Now!" + "Watch Now" state.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   ImageBackground,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import ROUTES from '@/network';
+import { postRequest } from '@/network/post';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +32,7 @@ type Props = {
   onWatch: () => void;
   onSetReminder: () => void;
   onJoinPreChat: (lobbyConversationId?: string) => void;
+  onWatchTrailer?: (trailerUrl: string) => void;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -58,14 +64,38 @@ export default function PremiereCountdown({
   onWatch,
   onSetReminder,
   onJoinPreChat,
+  onWatchTrailer,
 }: Props) {
   const { palette } = useKISTheme();
+  const styles = useMemo(() => makeStyles(palette), [palette]);
+  const insets = useSafeAreaInsets();
   const [remaining, setRemaining] = useState(() => secondsUntil(scheduledAt));
   const isLive = remaining <= 0;
+  const [reminderSet, setReminderSet] = useState(false);
+  const [settingReminder, setSettingReminder] = useState(false);
 
   const preChatOpen =
     !!preChatOpensAt &&
     Date.now() >= new Date(preChatOpensAt).getTime();
+
+  const handleSetReminder = useCallback(async () => {
+    if (settingReminder || reminderSet) return;
+    setSettingReminder(true);
+    try {
+      await postRequest(
+        ROUTES.broadcasts.contentPremiere(contentId),
+        { notify: true },
+        { errorMessage: '' },
+      );
+      setReminderSet(true);
+      onSetReminder();
+      Alert.alert('Reminder set', 'We\'ll notify you before this premiere starts.');
+    } catch {
+      Alert.alert('Error', 'Could not set reminder. Please try again.');
+    } finally {
+      setSettingReminder(false);
+    }
+  }, [contentId, settingReminder, reminderSet, onSetReminder]);
 
   useEffect(() => {
     if (isLive) return;
@@ -78,7 +108,7 @@ export default function PremiereCountdown({
   }, [scheduledAt, isLive]);
 
   const Inner = (
-    <View style={styles.inner}>
+    <View style={[styles.inner, { paddingTop: 16 + insets.top, paddingBottom: 16 + insets.bottom }]}>
       {/* Back */}
       <Pressable onPress={onBack} style={styles.backBtn}>
         <Text style={styles.backArrow}>‹</Text>
@@ -88,7 +118,7 @@ export default function PremiereCountdown({
       <View style={styles.centerContent}>
         {/* Channel name + PREMIERE badge */}
         <View style={styles.badgeRow}>
-          <Text style={[styles.channelName, { color: '#fff' }]}>{channelName}</Text>
+          <Text style={styles.channelName}>{channelName}</Text>
           <View style={[styles.premiereBadge, { backgroundColor: palette.gold }]}>
             <Text style={styles.premiereText}>PREMIERE</Text>
           </View>
@@ -118,10 +148,17 @@ export default function PremiereCountdown({
 
             {/* Set Reminder */}
             <Pressable
-              onPress={onSetReminder}
-              style={[styles.reminderBtn, { borderColor: 'rgba(255,255,255,0.5)' }]}
+              onPress={handleSetReminder}
+              disabled={settingReminder || reminderSet}
+              style={[styles.reminderBtn, { borderColor: palette.divider, opacity: reminderSet ? 0.6 : 1 }]}
             >
-              <Text style={styles.reminderText}>🔔  Set Reminder</Text>
+              {settingReminder ? (
+                <ActivityIndicator size="small" color={palette.ivory} />
+              ) : (
+                <Text style={styles.reminderText}>
+                  {reminderSet ? '🔔  Reminder Set' : '🔔  Set Reminder'}
+                </Text>
+              )}
             </Pressable>
           </>
         )}
@@ -130,7 +167,7 @@ export default function PremiereCountdown({
         {preChatOpen && (
           <Pressable
             onPress={() => onJoinPreChat()}
-            style={[styles.preChatBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+            style={[styles.preChatBtn, { backgroundColor: palette.primaryWeak }]}
           >
             <Text style={styles.preChatText}>💬  Join Pre-chat</Text>
           </Pressable>
@@ -139,7 +176,11 @@ export default function PremiereCountdown({
         {/* Trailer button */}
         {!!trailerUrl && (
           <Pressable
-            onPress={() => {/* parent handles trailer playback */}}
+            onPress={() => {
+              if (onWatchTrailer) {
+                onWatchTrailer(trailerUrl);
+              }
+            }}
             style={styles.trailerBtn}
           >
             <Text style={[styles.trailerText, { color: palette.gold }]}>
@@ -165,7 +206,7 @@ export default function PremiereCountdown({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#0A0A0A' }]}>
+    <View style={[styles.container, { backgroundColor: palette.royalInk }]}>
       {Inner}
     </View>
   );
@@ -173,121 +214,123 @@ export default function PremiereCountdown({
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  dimOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-  },
-  inner: {
-    flex: 1,
-    paddingTop: 50,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  backArrow: { color: '#fff', fontSize: 24, lineHeight: 26 },
-  backText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  channelName: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  premiereBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  premiereText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 11,
-    letterSpacing: 1.5,
-  },
-  countdownBox: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  countdownValue: {
-    color: '#fff',
-    fontSize: 44,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 2,
-  },
-  countdownLabels: {
-    flexDirection: 'row',
-    gap: 28,
-  },
-  countdownLabel: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontWeight: '600',
-    width: 24,
-    textAlign: 'center',
-  },
-  liveNow: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  watchBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 36,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  watchBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  reminderBtn: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-  },
-  reminderText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  preChatBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-  },
-  preChatText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  trailerBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  trailerText: {
-    fontWeight: '700',
-    fontSize: 14,
-  },
-});
+function makeStyles(p: any) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    dimOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: p.royalInk,
+      opacity: 0.75,
+    },
+    inner: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    backBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 4,
+      paddingVertical: 8,
+      paddingHorizontal: 4,
+    },
+    backArrow: { color: p.ivory, fontSize: 24, lineHeight: 26 },
+    backText: { color: p.ivory, fontSize: 15, fontWeight: '600' },
+    centerContent: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 18,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    channelName: {
+      color: p.ivory,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    premiereBadge: {
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    premiereText: {
+      color: p.onPrimary,
+      fontWeight: '900',
+      fontSize: 11,
+      letterSpacing: 1.5,
+    },
+    countdownBox: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    countdownValue: {
+      color: p.ivory,
+      fontSize: 44,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+      letterSpacing: 2,
+    },
+    countdownLabels: {
+      flexDirection: 'row',
+      gap: 28,
+    },
+    countdownLabel: {
+      color: p.subtext,
+      fontSize: 11,
+      fontWeight: '600',
+      width: 24,
+      textAlign: 'center',
+    },
+    liveNow: {
+      color: p.ivory,
+      fontSize: 28,
+      fontWeight: '800',
+    },
+    watchBtn: {
+      borderRadius: 12,
+      paddingHorizontal: 36,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    watchBtnText: {
+      color: p.onPrimary,
+      fontWeight: '800',
+      fontSize: 16,
+    },
+    reminderBtn: {
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 28,
+      paddingVertical: 12,
+    },
+    reminderText: {
+      color: p.ivory,
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    preChatBtn: {
+      borderRadius: 12,
+      paddingHorizontal: 24,
+      paddingVertical: 10,
+    },
+    preChatText: {
+      color: p.ivory,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    trailerBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    trailerText: {
+      fontWeight: '700',
+      fontSize: 14,
+    },
+  });
+}

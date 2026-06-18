@@ -43,6 +43,7 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
+import { loadConsentPreferences } from '@/services/consentService';
 
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -67,6 +68,9 @@ import DownloadsScreen from '@/screens/broadcast/channels/DownloadsScreen';
 import SubscriptionsScreen from '@/screens/broadcast/channels/SubscriptionsScreen';
 import LibraryScreen from '@/screens/broadcast/channels/LibraryScreen';
 import ClipsListScreen from '@/screens/broadcast/channels/ClipsListScreen';
+import TrendingScreen from '@/screens/broadcast/channels/TrendingScreen';
+import CategoryBrowsePage from '@/screens/broadcast/channels/CategoryBrowsePage';
+import BroadcastSearchScreen from '@/screens/broadcast/channels/BroadcastSearchScreen';
 import ActivityNotificationsScreen from '@/screens/broadcast/channels/ActivityNotificationsScreen';
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
 import MembershipScreen from '@/screens/broadcast/channels/MembershipScreen';
@@ -159,7 +163,8 @@ import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
 import EventsScreen from '@/screens/EventsScreen';
 import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
-import { AgeModeProvider } from '@/theme/ageModeContext';
+import { AgeModeProvider, useAgeMode } from '@/theme/ageModeContext';
+import { ThemeModeProvider, useThemeMode } from '@/theme/themeModeContext';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
 import WalletScreen from '@/screens/WalletScreen';
@@ -167,7 +172,7 @@ import SubscriptionManagementScreen from '@/screens/SubscriptionManagementScreen
 import AIIntegrationScreen from './src/screens/insights/AIIntegrationScreen';
 import MediaAssetManagerScreen from './src/screens/insights/MediaAssetManagerScreen';
 import SurveyManagerScreen from './src/screens/insights/SurveyManagerScreen';
-import { isPINEnabled, shouldLockAsync } from '@/services/QuickLockService';
+import { isPINEnabled, shouldLockAsync, persistLastActiveAt, getPersistedLastActiveAt } from '@/services/QuickLockService';
 import UserProfileScreen from '@/screens/profile/UserProfileScreen';
 import JobsBoardScreen from '@/screens/jobs/JobsBoardScreen';
 import MyApplicationsScreen from '@/screens/jobs/MyApplicationsScreen';
@@ -180,6 +185,9 @@ import DeclareTestimonySheet from '@/screens/testimony/DeclareTestimonySheet';
 import ReachOutSheet from '@/screens/testimony/ReachOutSheet';
 import TestimonyReachInboxScreen from '@/screens/testimony/TestimonyReachInboxScreen';
 import OfflineBanner from '@/components/OfflineBanner';
+import SyncQueueBanner from '@/components/SyncQueueBanner';
+import LinkedDevicesScreen from '@/screens/LinkedDevicesScreen';
+import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
 
 type AuthCtx = {
   isAuth: boolean;
@@ -210,7 +218,10 @@ let appAuthCheckBlockedUntil = 0;
 
 function AppContent() {
   const { language, languageVersion } = useLanguage();
-  const scheme = useColorScheme();
+  const { ageVersion } = useAgeMode();
+  const { themeMode } = useThemeMode();
+  const sysScheme = useColorScheme();
+  const scheme = themeMode === 'system' ? sysScheme : themeMode;
   const [booting, setBooting] = useState(true);
 
   const navigationRef = useRef<any>(null);
@@ -241,6 +252,7 @@ function AppContent() {
   useEffect(() => {
     startOfflineActionQueue();
     startMediaTransferQueue();
+    void loadConsentPreferences();
     return () => {
       stopMediaTransferQueue();
       stopOfflineActionQueue();
@@ -528,6 +540,35 @@ function AppContent() {
       if (state === 'active') {
         syncLocationCountry(false);
         startInterval();
+        // Drain data-only background notifications stored while killed/backgrounded
+        AsyncStorage.getItem('KIS_BACKGROUND_NOTIFS')
+          .then(raw => {
+            if (!raw) return;
+            const queue: any[] = JSON.parse(raw);
+            if (!queue.length) return;
+            AsyncStorage.removeItem('KIS_BACKGROUND_NOTIFS').catch(() => {});
+            const latest = queue[queue.length - 1];
+            if (latest?.title || latest?.body) {
+              Alert.alert(latest.title || 'New notification', latest.body || '');
+            }
+          })
+          .catch(() => {});
+        // Drain past-due event reminders stored by EventModal
+        AsyncStorage.getItem('KIS_EVENT_REMINDERS')
+          .then(raw => {
+            if (!raw) return;
+            const now = Date.now();
+            const all: Array<{ title: string; startsAt: string; reminderAt: number }> = JSON.parse(raw);
+            const fired = all.filter(r => r.reminderAt <= now);
+            const pending = all.filter(r => r.reminderAt > now);
+            if (fired.length) {
+              AsyncStorage.setItem('KIS_EVENT_REMINDERS', JSON.stringify(pending)).catch(() => {});
+              fired.forEach(r => {
+                Alert.alert('📅 Event reminder', `"${r.title}" is starting soon.`);
+              });
+            }
+          })
+          .catch(() => {});
       } else {
         if (intervalId) {
           clearInterval(intervalId);
@@ -577,6 +618,15 @@ function AppContent() {
     initPushHandlers(navigationRef);
   }, []);
 
+  // Quick Lock: seed lastActiveAtRef from persisted storage so cold restarts
+  // correctly trigger the lock when the timeout has elapsed.
+  useEffect(() => {
+    if (!isAuth) return;
+    getPersistedLastActiveAt().then((ts) => {
+      lastActiveAtRef.current = ts;
+    }).catch(() => {});
+  }, [isAuth]);
+
   // Quick Lock: track background → foreground transitions
   useEffect(() => {
     if (!isAuth) return;
@@ -592,6 +642,7 @@ function AppContent() {
         lastActiveAtRef.current = Date.now();
       } else if (nextState === 'background' || nextState === 'inactive') {
         lastActiveAtRef.current = Date.now();
+        void persistLastActiveAt();
       }
     });
     return () => subscription.remove();
@@ -686,7 +737,7 @@ function AppContent() {
       : countryList;
 
     return (
-      <View key={`location-${languageVersion}`} style={{ flex: 1 }}>
+      <View key={`location-${languageVersion}-age-${ageVersion}`} style={{ flex: 1 }}>
         <View style={locationStyles.root}>
           <Text style={locationStyles.title}>Location Required</Text>
           <Text style={locationStyles.message}>
@@ -802,6 +853,7 @@ function AppContent() {
             barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
           />
           <OfflineBanner />
+          <SyncQueueBanner />
           <NavigationContainer
             ref={navigationRef}
             key={`nav-${languageVersion}`}
@@ -810,12 +862,17 @@ function AppContent() {
               : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
             }
             linking={{
-              prefixes: ['kis://'],
+              prefixes: ['kis://', 'https://kis.app'],
               config: {
                 screens: {
                   OrgAppLaunch: 'org-app/:partnerId/:appId',
                   InviteJoin: 'join/:type/:token',
                   PartnerRedeemInvite: 'join/partner/:code',
+                  BroadcastDetail: 'broadcasts/:id',
+                  ChannelHome: 'channels/:channelId',
+                  ChannelContentDetail: 'content/:contentId',
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  MainTabs: { screens: { Messages: 'messages', Profile: 'profile' } } as any,
                 },
               },
             }}
@@ -871,6 +928,21 @@ function AppContent() {
                     <RootStack.Screen
                       name="ClipsListScreen"
                       component={ClipsListScreen}
+                    />
+                    <RootStack.Screen
+                      name="TrendingScreen"
+                      component={TrendingScreen}
+                      options={{ title: 'Trending' }}
+                    />
+                    <RootStack.Screen
+                      name="CategoryBrowsePage"
+                      component={CategoryBrowsePage}
+                      options={{ title: 'Categories' }}
+                    />
+                    <RootStack.Screen
+                      name="BroadcastSearchScreen"
+                      component={BroadcastSearchScreen}
+                      options={{ title: 'Search' }}
                     />
                     <RootStack.Screen
                       name="ActivityNotifications"
@@ -1250,6 +1322,8 @@ function AppContent() {
                     <RootStack.Screen name="DeclareTestimonySheet" component={DeclareTestimonySheet} options={{ headerShown: false, presentation: 'modal' }} />
                     <RootStack.Screen name="ReachOutSheet" component={ReachOutSheet} options={{ headerShown: false, presentation: 'modal' }} />
                     <RootStack.Screen name="TestimonyReachInbox" component={TestimonyReachInboxScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LinkedDevices" component={LinkedDevicesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
                   </>
                 ) : (
                   <>
@@ -1320,9 +1394,11 @@ export default function App() {
     <SafeAreaProvider>
       <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
         <LanguageProvider>
-          <AgeModeProvider>
-            <AppContent />
-          </AgeModeProvider>
+          <ThemeModeProvider>
+            <AgeModeProvider>
+              <AppContent />
+            </AgeModeProvider>
+          </ThemeModeProvider>
         </LanguageProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

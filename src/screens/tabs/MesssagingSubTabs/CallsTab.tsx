@@ -8,12 +8,14 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
+  RefreshControl,
   DeviceEventEmitter,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import Skeleton from '@/components/common/Skeleton';
 import { getRequest } from '@/network/get';
-import { NEST_API_BASE_URL } from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { useSocket } from '../../../../SocketProvider';
 import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
 import type { CallHistoryItem, CallType } from '@/services/calls/callTypes';
@@ -23,14 +25,14 @@ type CallsTabProps = {
   searchTerm?: string;
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  ended: 'rgba(255,255,255,0.4)',
-  missed: '#E52B2B',
-  active: '#22C55E',
-  ringing: '#F59E0B',
-  busy: '#E52B2B',
-  declined: '#E52B2B',
-};
+const buildStatusColor = (p: any): Record<string, string> => ({
+  ended: p.subtext,
+  missed: p.danger,
+  active: p.success,
+  ringing: p.gold,
+  busy: p.danger,
+  declined: p.danger,
+});
 
 const STATUS_LABEL: Record<string, string> = {
   ended: 'Ended',
@@ -48,16 +50,19 @@ function resolveCallType(item: CallHistoryItem): CallType {
 
 export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   const { palette } = useKISTheme();
+  const STATUS_COLOR = buildStatusColor(palette);
   const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const { currentUserId, startCall } = useSocket();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
   const [conversationNameById, setConversationNameById] = useState<Record<string, string>>({});
 
-  const loadCalls = useCallback(async () => {
-    setLoading(true);
+  const loadCalls = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const url = `${NEST_API_BASE_URL}/calls/history?limit=100`;
+      const url = `${ROUTES.calls.history}?limit=100`;
       const res = await getRequest(url);
       if (res.success && Array.isArray(res.data?.calls)) {
         setCalls(res.data.calls as CallHistoryItem[]);
@@ -66,6 +71,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -137,7 +143,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
         <View style={[
           styles.iconWrap,
           {
-            backgroundColor: isMissed ? 'rgba(229,43,43,0.12)' : isActive ? 'rgba(34,197,94,0.12)' : palette.surface,
+            backgroundColor: isMissed ? `${palette.danger}1E` : isActive ? `${palette.success}1E` : palette.surface,
             width: iconSize + 16,
             height: iconSize + 16,
             borderRadius: (iconSize + 16) / 2,
@@ -146,13 +152,13 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
           <KISIcon
             name={isMissed ? 'phone-missed' : iconName}
             size={iconSize * 0.55}
-            color={isMissed ? '#E52B2B' : isActive ? '#22C55E' : palette.subtext}
+            color={isMissed ? palette.danger : isActive ? palette.success : palette.subtext}
           />
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={[styles.name, { color: isMissed ? '#E52B2B' : palette.text, fontSize: responsive.bodyFontSize }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: isMissed ? palette.danger : palette.text, fontSize: responsive.bodyFontSize }]} numberOfLines={1}>
             {name}
           </Text>
           <View style={styles.metaRow}>
@@ -198,9 +204,9 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
 
         {/* Live badge */}
         {isActive && (
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+          <View style={[styles.liveBadge, { backgroundColor: palette.primaryWeak }]}>
+            <View style={[styles.liveDot, { backgroundColor: palette.success }]} />
+            <Text style={[styles.liveText, { color: palette.success }]}>LIVE</Text>
           </View>
         )}
       </Pressable>
@@ -213,7 +219,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
         <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>
           Calls
         </Text>
-        <Pressable onPress={loadCalls} style={styles.refreshBtn} hitSlop={8}>
+        <Pressable onPress={() => loadCalls()} style={styles.refreshBtn} hitSlop={8}>
           <KISIcon name="refresh-cw" size={17} color={palette.text} />
         </Pressable>
       </View>
@@ -241,8 +247,18 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
           data={rows}
           keyExtractor={item => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No call history
+              </Text>
+            </View>
+          }
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => loadCalls(true)} tintColor={palette.primaryStrong} colors={[palette.primaryStrong]} />
+          }
         />
       )}
     </View>
@@ -266,7 +282,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   headerTitle: { fontWeight: '800' },
-  refreshBtn: { padding: 6 },
+  refreshBtn: { padding: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,9 +301,9 @@ const styles = StyleSheet.create({
   duration: {},
   time: { marginTop: 1 },
   callbackBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -297,13 +313,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(34,197,94,0.15)',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
-  liveText: { color: '#22C55E', fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
+  liveText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60 },
   emptyText: { fontSize: 16, fontWeight: '700' },
   emptySubtext: { fontSize: 13 },

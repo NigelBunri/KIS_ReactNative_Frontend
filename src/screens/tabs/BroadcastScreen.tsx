@@ -12,6 +12,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type {
@@ -116,9 +117,7 @@ export default function BroadcastScreen() {
   const insets = useSafeAreaInsets();
   const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
-  const broadcastGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334'];
+  const broadcastGoldGradient = [...KIS_ROYAL_GRADIENTS.goldDark];
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
@@ -306,10 +305,11 @@ export default function BroadcastScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setVisionVisible(true)}
+                hitSlop={10}
                 style={[styles.visionButton, { paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 9 : 12, borderRadius: compactBroadcast ? 16 : 20 }]}
               >
                 <View style={styles.visionIcon}>
-                  <KISIcon name="sparkles" size={15} color="#FFE8A3" />
+                  <KISIcon name="sparkles" size={15} color={palette.onGold} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.visionButtonTitle}>Our Vision</Text>
@@ -317,7 +317,7 @@ export default function BroadcastScreen() {
                     {compactBroadcast ? 'KCAN purpose and direction.' : 'Discover why KCAN exists and where Kingdom Impact Social is going.'}
                   </Text>
                 </View>
-                <KISIcon name="chevron-right" size={18} color="#FFF8E6" />
+                <KISIcon name="chevron-right" size={18} color={palette.onGold} />
               </Pressable>
             </View>
             <View style={styles.headerSection}>
@@ -459,7 +459,7 @@ export default function BroadcastScreen() {
                 borderColor: palette.primary,
                 width: compactBroadcast ? 48 : 56,
                 height: compactBroadcast ? 48 : 56,
-                shadowColor: palette.shadow ?? '#000',
+                shadowColor: palette.shadow,
               },
             ]}
           >
@@ -503,13 +503,13 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingHorizontal: 0,
       paddingTop: 0,
       paddingBottom: 0,
-      backgroundColor: '#6B4334',
+      backgroundColor: palette.royalInk,
       borderBottomWidth: 0,
-      borderBottomColor: 'transparent',
+      borderBottomColor: palette.divider,
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
       overflow: 'hidden',
-      shadowColor: palette.shadow ?? '#000',
+      shadowColor: palette.shadow,
       shadowOpacity: 0.08,
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 8 },
@@ -531,7 +531,8 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       left: 0,
       right: 0,
       height: 2,
-      backgroundColor: 'rgba(255,244,184,0.45)',
+      backgroundColor: palette.goldHighlight,
+      opacity: 0.45,
     },
     headerInner: {
       paddingHorizontal: 12,
@@ -546,9 +547,11 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderRadius: 22,
       paddingHorizontal: 14,
       paddingVertical: 14,
-      backgroundColor: 'rgba(28,18,12,0.32)',
+      // Semi-transparent royalInk overlay on the gold gradient header
+      backgroundColor: `${palette.royalInk}4D`,
+      opacity: 0.92,
       borderWidth: 1,
-      borderColor: 'rgba(255,232,163,0.45)',
+      borderColor: palette.goldBorder,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
@@ -559,18 +562,19 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(28,18,12,0.50)',
+      // Semi-transparent gold overlay on the gold gradient header
+      backgroundColor: `${palette.ivory}2E`,
       borderWidth: 1,
-      borderColor: 'rgba(255,232,163,0.42)',
+      borderColor: palette.goldBorder,
     },
     visionButtonTitle: {
-      color: '#FFF8E6',
+      color: palette.onGold,
       fontSize: 15,
       fontWeight: '900',
       letterSpacing: 0.2,
     },
     visionButtonText: {
-      color: '#FFF3D2',
+      color: palette.onGold,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '700',
@@ -582,7 +586,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderColor: palette.goldBorder,
       padding: 10,
       backgroundColor: palette.surface,
-      shadowColor: palette.shadow ?? '#000',
+      shadowColor: palette.shadow,
       shadowOpacity: 0.09,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },

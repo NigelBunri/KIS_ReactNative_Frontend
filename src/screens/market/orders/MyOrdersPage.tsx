@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { queueableJsonRequest } from '@/services/offlineActionQueue';
@@ -43,6 +44,7 @@ type MarketplaceOrder = {
 
 export default function MyOrdersPage() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<MyOrdersNavigation>();
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,6 +185,7 @@ export default function MyOrdersPage() {
           {
             borderColor: palette.surfaceDark,
             backgroundColor: palette.surfaceElevated,
+            shadowColor: palette.royalInk,
           },
         ]}
       >
@@ -356,7 +359,7 @@ export default function MyOrdersPage() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View
         style={[
           styles.header,
@@ -383,14 +386,17 @@ export default function MyOrdersPage() {
         </View>
       ) : error ? (
         <View style={styles.loader}>
-          <Text style={{ color: palette.error || '#E53935' }}>{error}</Text>
+          <Text style={{ color: palette.danger }}>{error}</Text>
         </View>
       ) : (
         <FlatList
           data={orders}
           keyExtractor={item => item.id}
           renderItem={renderOrder}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: Math.max(insets.bottom, 32) },
+          ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
@@ -439,7 +445,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 8,
     elevation: 2,
-    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 8 },

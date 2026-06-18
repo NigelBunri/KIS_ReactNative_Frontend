@@ -91,7 +91,7 @@ export default function MiniPlayer() {
             style={[
               styles.thumb,
               {
-                backgroundColor: palette.primarySoft ?? '#3d2b00',
+                backgroundColor: palette.primarySoft,
                 alignItems: 'center',
                 justifyContent: 'center',
               },

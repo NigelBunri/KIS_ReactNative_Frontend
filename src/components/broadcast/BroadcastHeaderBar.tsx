@@ -20,14 +20,13 @@ export default function BroadcastHeaderBar({
   const { palette, tokens, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
-  const headerTextColor = palette.ivory ?? '#FFFFFF';
-  const headerMutedColor = tone === 'dark' ? '#FFF4B8' : '#FFFFFF';
-  const isDark = tone === 'dark';
-  const controlBg = isDark ? palette.primarySoft : 'rgba(255,255,255,0.9)';
-  const controlBorder = isDark ? palette.goldMuted : palette.goldLight;
-  const controlText = isDark ? palette.primaryStrong : palette.primaryStrong;
-  const createBg = isDark ? palette.primarySoft : palette.primaryStrong;
-  const createText = isDark ? palette.primaryStrong : '#FFFFFF';
+  const headerTextColor = palette.onGold;
+  const headerMutedColor = 'rgba(255,244,184,0.88)';
+  const controlBg = 'rgba(23,17,31,0.28)';
+  const controlBorder = 'rgba(255,244,184,0.32)';
+  const controlText = palette.onGold;
+  const createBg = 'rgba(23,17,31,0.34)';
+  const createText = palette.onGold;
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   return (
@@ -100,8 +99,8 @@ export default function BroadcastHeaderBar({
               styles.createBtn,
               {
                 backgroundColor: createBg,
-                borderColor: isDark ? palette.goldMuted : 'transparent',
-                borderWidth: isDark ? 1 : 0,
+                borderColor: controlBorder,
+                borderWidth: 1,
               },
             ]}
             accessibilityRole="button"

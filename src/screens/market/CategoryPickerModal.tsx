@@ -88,7 +88,7 @@ export default function CategoryPickerModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.wrapper} pointerEvents={visible ? 'auto' : 'none'}>
         <Pressable
-          style={[styles.overlay, { backgroundColor: palette.background }]}
+          style={[styles.overlay, { backgroundColor: palette.bg }]}
           onPress={onClose}
         />
         <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}

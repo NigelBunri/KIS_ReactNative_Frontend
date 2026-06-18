@@ -170,7 +170,7 @@ export default function PartnerComplaintsPanel({
           {loading ? (
             <ActivityIndicator color={palette.primaryStrong} />
           ) : error ? (
-            <Text style={{ color: palette.error }}>{error}</Text>
+            <Text style={{ color: palette.danger }}>{error}</Text>
           ) : complaints.length === 0 ? (
             <Text style={{ color: palette.subtext }}>No complaints awaiting review.</Text>
           ) : (
@@ -271,8 +271,8 @@ export default function PartnerComplaintsPanel({
                       title="Refund Payment"
                       size="xs"
                       variant="outline"
-                      style={{ borderColor: palette.error || '#E53935' }}
-                      textStyle={{ color: palette.error || '#E53935' }}
+                      style={{ borderColor: palette.danger }}
+                      textStyle={{ color: palette.danger }}
                       disabled={!isPending || resolving.id === complaint.id}
                       loading={resolving.id === complaint.id && resolving.action === 'refund'}
                       onPress={() => resolveComplaint(complaint.id, 'refund')}

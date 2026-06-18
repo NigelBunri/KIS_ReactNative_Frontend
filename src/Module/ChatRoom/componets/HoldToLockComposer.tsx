@@ -483,13 +483,13 @@ export const HoldToLockComposer: React.FC<Props> = ({
     extrapolate: 'clamp',
   });
 
-  const dangerColor  = palette.danger ?? '#EF4444';
+  const dangerColor  = palette.danger;
   const primaryColor = palette.primary;
-  const onPrimary    = palette.onPrimary ?? '#fff';
+  const onPrimary    = palette.onPrimary;
   const textColor    = palette.text;
   const subtextColor = palette.subtext;
-  const surfaceColor = palette.composerInputBg ?? palette.surface ?? '#f3f4f6';
-  const dividerColor = palette.divider ?? '#e5e7eb';
+  const surfaceColor = palette.inputBg ?? palette.surface;
+  const dividerColor = palette.divider;
 
   /* ── render ─────────────────────────────────────────────────────────────── */
 

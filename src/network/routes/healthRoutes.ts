@@ -22,12 +22,14 @@ const healthRoutes = {
     escalations: `${API_BASE_URL}/api/v1/core/clinical/escalations/`,
     escalation: (id: string) => `${API_BASE_URL}/api/v1/core/clinical/escalations/${id}/`,
     triage: `${API_BASE_URL}/api/v1/core/clinical/triage/`,
+    triageDetail: (id: string) => `${API_BASE_URL}/api/v1/core/clinical/triage/${id}/`,
     referrals: `${API_BASE_URL}/api/v1/core/clinical/referrals/`,
+    referral: (id: string) => `${API_BASE_URL}/api/v1/core/clinical/referrals/${id}/`,
     events: `${API_BASE_URL}/api/v1/core/clinical/events/`,
     commandCenter: `${API_BASE_URL}/api/v1/core/clinical/command-center/`,
-    sessions: `${API_BASE_URL}/api/v1/core/clinical/sessions/`,
+    sessions: `${API_BASE_URL}/api/v1/health-ops/clinical/sessions/`,
     sessionAdvancePhase: (sessionId: string) =>
-      `${API_BASE_URL}/api/v1/core/clinical/sessions/${encodeURIComponent(sessionId)}/advance_phase/`,
+      `${API_BASE_URL}/api/v1/health-ops/clinical/sessions/${encodeURIComponent(sessionId)}/advance_phase/`,
   },
   patients: {
     master: `${API_BASE_URL}/api/v1/patients/master/`,
@@ -35,7 +37,7 @@ const healthRoutes = {
     consents: `${API_BASE_URL}/api/v1/patients/consents/`,
     encounters: `${API_BASE_URL}/api/v1/patients/encounters/`,
     appointments: `${API_BASE_URL}/api/v1/patients/appointments/`,
-    summary: (id: string) => `${API_BASE_URL}/api/v1/core/patients/master/${id}/summary/`,
+    summary: (id: string) => `${API_BASE_URL}/api/v1/patients/master/${id}/summary/`,
     healthProfile: (id: string) => `${API_BASE_URL}/api/v1/patients/master/${id}/health-profile/`,
     healthSummary: (id: string) => `${API_BASE_URL}/api/v1/patients/master/${id}/health-summary/`,
     emergencyCard: (id: string) => `${API_BASE_URL}/api/v1/patients/master/${id}/emergency-card/`,
@@ -102,7 +104,7 @@ const healthRoutes = {
       `${API_BASE_URL}/api/v1/medical/adherence-reminders/${id}/acknowledge/`,
     supplyForecasts: `${API_BASE_URL}/api/v1/medical/supply-forecasts/`,
     supplyForecast: (id: string) => `${API_BASE_URL}/api/v1/medical/supply-forecasts/${id}/`,
-    context: `${API_BASE_URL}/api/v1/medical/context/`,
+    context: `${API_BASE_URL}/api/v1/core/medical/context/`,
     setActiveProfile: (id: string) => `${API_BASE_URL}/api/v1/medical/profiles/${id}/set-active/`,
     staff: `${API_BASE_URL}/api/v1/medical/staff/`,
     staffDetail: (id: string) => `${API_BASE_URL}/api/v1/medical/staff/${id}/`,
@@ -203,15 +205,15 @@ const healthRoutes = {
       `${API_BASE_URL}/api/v1/health-ops/services/${encodeURIComponent(serviceId)}/appointment/slots/`,
     appointmentBook: (serviceId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/services/${encodeURIComponent(serviceId)}/appointment/book/`,
-    appointments: `${API_BASE_URL}/api/v1/health-ops/appointments/`,
+    appointments: `${API_BASE_URL}/api/v1/patients/appointments/`,
     appointment: (bookingId: string) =>
-      `${API_BASE_URL}/api/v1/health-ops/appointments/${encodeURIComponent(bookingId)}/`,
+      `${API_BASE_URL}/api/v1/patients/appointments/${encodeURIComponent(bookingId)}/`,
     appointmentCancel: (bookingId: string) =>
-      `${API_BASE_URL}/api/v1/health-ops/appointments/${encodeURIComponent(bookingId)}/cancel/`,
+      `${API_BASE_URL}/api/v1/patients/appointments/${encodeURIComponent(bookingId)}/cancel/`,
     appointmentReschedule: (bookingId: string) =>
-      `${API_BASE_URL}/api/v1/health-ops/appointments/${encodeURIComponent(bookingId)}/reschedule/`,
+      `${API_BASE_URL}/api/v1/patients/appointments/${encodeURIComponent(bookingId)}/reschedule/`,
     appointmentIcs: (bookingId: string) =>
-      `${API_BASE_URL}/api/v1/health-ops/appointments/${encodeURIComponent(bookingId)}/ics/`,
+      `${API_BASE_URL}/api/v1/patients/appointments/${encodeURIComponent(bookingId)}/ics/`,
     videoSessionStart: `${API_BASE_URL}/api/v1/health-ops/video/sessions/start/`,
     videoSession: (videoSessionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/video/sessions/${encodeURIComponent(videoSessionId)}/`,

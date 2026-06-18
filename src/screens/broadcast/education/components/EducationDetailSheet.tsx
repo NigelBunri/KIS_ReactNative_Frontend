@@ -140,17 +140,17 @@ const inferMaterialKind = (payload: any) => {
   return toText(payload?.kind).toLowerCase() || 'document';
 };
 
-const renderOutcomes = (outcomes?: EducationCourse['outcomes']) => {
+const renderOutcomes = (outcomes?: EducationCourse['outcomes'], palette?: any) => {
   if (!outcomes?.length) return null;
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={{ fontWeight: '800', marginBottom: 8 }}>
+      <Text style={{ fontWeight: '800', marginBottom: 8, color: palette?.text }}>
         What you will achieve
       </Text>
       {outcomes.map(outcome => (
         <Text
           key={outcome.id}
-          style={{ color: '#5d6472', fontSize: 13, marginBottom: 6 }}
+          style={{ color: palette?.subtext, fontSize: 13, marginBottom: 6 }}
         >
           • {outcome.label}
         </Text>
@@ -159,17 +159,17 @@ const renderOutcomes = (outcomes?: EducationCourse['outcomes']) => {
   );
 };
 
-const renderRequirements = (requirements?: EducationCourse['requirements']) => {
+const renderRequirements = (requirements?: EducationCourse['requirements'], palette?: any) => {
   if (!requirements?.length) return null;
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={{ fontWeight: '800', marginBottom: 8 }}>
+      <Text style={{ fontWeight: '800', marginBottom: 8, color: palette?.text }}>
         Before you start
       </Text>
       {requirements.map(req => (
         <Text
           key={req.id}
-          style={{ color: '#5d6472', fontSize: 13, marginBottom: 6 }}
+          style={{ color: palette?.subtext, fontSize: 13, marginBottom: 6 }}
         >
           • {req.label}
         </Text>
@@ -949,7 +949,7 @@ export default function EducationDetailSheet({
                 width: '100%',
                 height: mediaPreviewHeight,
                 borderRadius: 18,
-                backgroundColor: '#000',
+                backgroundColor: palette.royalInk,
               }}
               controls
             />
@@ -963,7 +963,7 @@ export default function EducationDetailSheet({
                 width: '100%',
                 height: 72,
                 borderRadius: 18,
-                backgroundColor: '#000',
+                backgroundColor: palette.royalInk,
               }}
               controls
               audioOnly
@@ -2814,10 +2814,10 @@ export default function EducationDetailSheet({
               </View>
             ) : null}
             {workspaceSection === 'overview'
-              ? renderOutcomes((content as EducationCourse).outcomes)
+              ? renderOutcomes((content as EducationCourse).outcomes, palette)
               : null}
             {workspaceSection === 'overview'
-              ? renderRequirements((content as EducationCourse).requirements)
+              ? renderRequirements((content as EducationCourse).requirements, palette)
               : null}
             {workspaceSection === 'overview' ? (
               <View

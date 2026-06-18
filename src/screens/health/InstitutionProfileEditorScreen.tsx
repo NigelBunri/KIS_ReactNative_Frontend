@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -229,6 +231,13 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
   const [uploadingLandingImage, setUploadingLandingImage] = useState(false);
   const [uploadingLandingLogo, setUploadingLandingLogo] = useState(false);
   const [draft, setDraft] = useState<InstitutionProfileEditorDraft | null>(null);
+  const landingStyleBackground = useMemo(
+    () => resolveBackgroundColor(draft?.landingBackgroundColorKey, palette.card),
+    [draft?.landingBackgroundColorKey, palette.card],
+  );
+  const landingStyleUsesLightBackground = scheme === 'dark' && Boolean(draft?.landingBackgroundColorKey);
+  const landingStyleTextColor = landingStyleUsesLightBackground ? '#3B2416' : palette.text;
+  const landingStyleSubtextColor = landingStyleUsesLightBackground ? '#6E5549' : palette.subtext;
   const [landingPublished, setLandingPublished] = useState(false);
   const [sections, setSections] = useState<DynamicLandingSection[]>([]);
   const [selectedType, setSelectedType] = useState<SectionType | null>(null);
@@ -643,7 +652,7 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
 
   if (!dashboardType) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, padding: spacing.lg }}>
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <Text style={{ ...typography.h2, color: palette.text }}>Unsupported Institution Type</Text>
@@ -661,7 +670,7 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
 
   if (loading || !draft) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={palette.accentPrimary} />
           <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading profile editor...</Text>
@@ -671,7 +680,7 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <TouchableOpacity
@@ -684,12 +693,14 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
               backgroundColor: palette.card,
             }}
             accessibilityLabel="Close profile editor"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <KISIcon name="close" size={18} color={palette.text} />
           </TouchableOpacity>
         </View>
 
-        <ScrollView ref={editorScrollRef} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView ref={editorScrollRef} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} keyboardShouldPersistTaps="handled">
           <View style={{ borderRadius: spacing.lg, padding: spacing.md, backgroundColor: palette.card, ...borders.card }}>
             <Text style={{ ...typography.h2, color: palette.text }}>Institution Profile Editor</Text>
             <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>
@@ -747,20 +758,21 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
                 borderWidth: 1,
                 borderColor: palette.divider,
                 borderRadius: spacing.md,
-                backgroundColor: resolveBackgroundColor(draft?.landingBackgroundColorKey, palette.card),
+                backgroundColor: landingStyleBackground,
                 padding: spacing.sm,
+                minHeight: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={{ ...typography.caption, color: palette.subtext }}>Landing Page Styling</Text>
-                <Text style={{ ...typography.label, color: palette.text, marginTop: 2 }}>
+                <Text style={{ ...typography.caption, color: landingStyleSubtextColor }}>Landing Page Styling</Text>
+                <Text style={{ ...typography.label, color: landingStyleTextColor, marginTop: 2 }}>
                   {isLandingStylePickerOpen ? 'Hide options' : 'Expand options'}
                 </Text>
               </View>
-              <KISIcon name="chevron-down" size={16} color={palette.subtext} />
+              <KISIcon name="chevron-down" size={16} color={landingStyleSubtextColor} />
             </TouchableOpacity>
 
             {isLandingStylePickerOpen ? (
@@ -856,6 +868,7 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
                 borderRadius: spacing.md,
                 backgroundColor: palette.card,
                 padding: spacing.sm,
+                minHeight: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -937,6 +950,7 @@ export default function InstitutionProfileEditorScreen({ navigation, route }: an
             </View>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );

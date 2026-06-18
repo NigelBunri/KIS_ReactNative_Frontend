@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
   FlatList,
   Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -57,7 +59,9 @@ export default function CommunityRoomPage({
   onOpenInfo,
 }: CommunityRoomPageProps) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupMeta, setGroupMeta] = useState<Record<string, { lastAt?: string; lastMessage?: string }>>({});
@@ -67,6 +71,7 @@ export default function CommunityRoomPage({
 
   const loadCommunityData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [postsResult, groupsResult] = await Promise.allSettled([
         getRequest(`${ROUTES.community.posts}?community=${community.id}`, {
@@ -76,6 +81,12 @@ export default function CommunityRoomPage({
           errorMessage: 'Failed to load groups',
         }),
       ]);
+
+      const allFailed =
+        postsResult.status === 'rejected' && groupsResult.status === 'rejected';
+      if (allFailed) {
+        setLoadError(true);
+      }
 
       if (postsResult.status === 'fulfilled') {
         const postsRes = postsResult.value;
@@ -190,7 +201,7 @@ export default function CommunityRoomPage({
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable onPress={onBack} style={styles.headerButton}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
@@ -208,6 +219,25 @@ export default function CommunityRoomPage({
           </Text>
         </Pressable>
       </View>
+
+      {loading && groups.length === 0 && (
+        <View style={[styles.center, { flex: 0, paddingVertical: 32 }]}>
+          <ActivityIndicator color={palette.primary} />
+        </View>
+      )}
+
+      {!loading && loadError && (
+        <View style={{ marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: (palette.danger) + '18', borderWidth: 1, borderColor: palette.danger }}>
+          <Text style={{ color: palette.danger, fontSize: 14, fontWeight: '600', marginBottom: 6 }}>
+            Could not load community data.
+          </Text>
+          <Pressable onPress={() => loadCommunityData()}>
+            <Text style={{ color: palette.danger, fontSize: 13, textDecorationLine: 'underline' }}>
+              Tap to retry
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <FlatList
         data={loading ? [] : sortedGroups}
@@ -306,7 +336,7 @@ export default function CommunityRoomPage({
               <KISIcon name="chevron-right" size={16} color={palette.subtext} />
             </Pressable>
           )}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
           ListEmptyComponent={
             <View style={styles.section}>
               <Text style={{ color: palette.subtext }}>No groups yet.</Text>

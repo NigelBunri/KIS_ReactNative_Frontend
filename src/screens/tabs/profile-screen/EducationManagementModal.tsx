@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -2411,7 +2413,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 width: '100%',
                 height: 220,
                 borderRadius: 18,
-                backgroundColor: palette.background,
+                backgroundColor: palette.bg,
               }}
               resizeMode="contain"
             />
@@ -2423,7 +2425,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 width: '100%',
                 height: 220,
                 borderRadius: 18,
-                backgroundColor: '#000',
+                backgroundColor: palette.royalInk,
               }}
               controls
             />
@@ -2435,7 +2437,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 width: '100%',
                 height: 72,
                 borderRadius: 18,
-                backgroundColor: '#000',
+                backgroundColor: palette.royalInk,
               }}
               controls
               audioOnly
@@ -2486,7 +2488,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       );
     },
     [
-      palette.background,
+      palette.bg,
       palette.divider,
       palette.subtext,
       palette.surface,
@@ -2993,7 +2995,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       return (
         <View
           style={{
-            backgroundColor: palette.background ?? palette.surface,
+            backgroundColor: palette.bg ?? palette.surface,
             paddingTop: 6,
             paddingBottom: 12,
             gap: 10,
@@ -3069,7 +3071,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       );
     },
     [
-      palette.background,
+      palette.bg,
       palette.divider,
       palette.primaryStrong,
       palette.subtext,
@@ -3153,6 +3155,9 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       borderRadius: 999,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
+                      minHeight: 44,
+                      justifyContent: 'center',
+                      alignItems: 'center',
                       backgroundColor: isSelected
                         ? palette.primarySoft
                         : palette.card,
@@ -3258,6 +3263,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     </Text>
                     <Pressable
                       onPress={() => toggleValue(String(item?.id || ''))}
+                      hitSlop={8}
+                      style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
                     >
                       <Text
                         style={{
@@ -3294,6 +3301,9 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       borderRadius: 999,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
+                      minHeight: 44,
+                      justifyContent: 'center',
+                      alignItems: 'center',
                       backgroundColor: isSelected
                         ? palette.primarySoft
                         : palette.card,
@@ -5036,7 +5046,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   borderRadius: 999,
                   paddingHorizontal: 10,
                   paddingVertical: 5,
-                  backgroundColor: palette.background,
+                  backgroundColor: palette.bg,
                 }}
               >
                 <Text
@@ -5083,7 +5093,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       width: 56,
                       height: 56,
                       borderRadius: 16,
-                      backgroundColor: palette.background,
+                      backgroundColor: palette.bg,
                       borderWidth: 1,
                       borderColor: `${palette.primaryStrong}44`,
                     }}
@@ -5156,7 +5166,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     [
       getEducationRecordTitle,
       openDetailForModule,
-      palette.background,
+      palette.bg,
       palette.card,
       palette.divider,
       palette.primarySoft,
@@ -5396,7 +5406,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     borderColor: palette.divider,
                     borderRadius: 14,
                     padding: 12,
-                    backgroundColor: palette.background,
+                    backgroundColor: palette.bg,
                     gap: 6,
                   }}
                 >
@@ -5429,7 +5439,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       );
     },
     [
-      palette.background,
+      palette.bg,
       palette.card,
       palette.divider,
       palette.subtext,
@@ -5843,7 +5853,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   borderColor: palette.divider,
                   borderRadius: 14,
                   padding: 12,
-                  backgroundColor: palette.background,
+                  backgroundColor: palette.bg,
                   gap: 4,
                 }}
               >
@@ -5922,7 +5932,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   borderColor: palette.divider,
                   borderRadius: 14,
                   padding: 12,
-                  backgroundColor: palette.background,
+                  backgroundColor: palette.bg,
                   gap: 4,
                 }}
               >
@@ -6080,7 +6090,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     borderColor: palette.divider,
                     borderRadius: 14,
                     padding: 12,
-                    backgroundColor: palette.background,
+                    backgroundColor: palette.bg,
                     gap: 4,
                   }}
                 >
@@ -6100,7 +6110,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     borderColor: palette.divider,
                     borderRadius: 14,
                     padding: 12,
-                    backgroundColor: palette.background,
+                    backgroundColor: palette.bg,
                     gap: 4,
                   }}
                 >
@@ -6181,7 +6191,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     detailRecordSummary,
     getEducationPersonName,
     handleUpdateStaffMembershipRole,
-    palette.background,
+    palette.bg,
     palette.card,
     palette.divider,
     palette.subtext,
@@ -6787,7 +6797,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 width: '100%',
                 height: 180,
                 borderRadius: 18,
-                backgroundColor: palette.background,
+                backgroundColor: palette.bg,
               }}
               resizeMode="cover"
             />
@@ -6830,7 +6840,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       handlePickModuleCoverImage,
       moduleForm.cover_image_preview_uri,
       moduleSubmitting,
-      palette.background,
+      palette.bg,
       palette.card,
       palette.divider,
       palette.subtext,
@@ -6894,7 +6904,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     width: 96,
                     height: 96,
                     borderRadius: 22,
-                    backgroundColor: palette.background,
+                    backgroundColor: palette.bg,
                   }}
                   resizeMode="cover"
                 />
@@ -7078,7 +7088,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           width: 76,
                           height: 76,
                           borderRadius: 22,
-                          backgroundColor: palette.background,
+                          backgroundColor: palette.bg,
                         }}
                         resizeMode="cover"
                       />
@@ -7172,7 +7182,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             borderRadius: 999,
                             paddingHorizontal: 10,
                             paddingVertical: 5,
-                            backgroundColor: palette.background,
+                            backgroundColor: palette.bg,
                           }}
                         >
                           <Text
@@ -7195,7 +7205,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     style={{
                       borderRadius: 18,
                       padding: 14,
-                      backgroundColor: palette.background,
+                      backgroundColor: palette.bg,
                       borderWidth: 1,
                       borderColor: palette.divider,
                       gap: 6,
@@ -7429,7 +7439,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               borderRadius: 999,
                               paddingHorizontal: 10,
                               paddingVertical: 5,
-                              backgroundColor: palette.background,
+                              backgroundColor: palette.bg,
                             }}
                           >
                             <Text
@@ -7905,7 +7915,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             borderColor: palette.divider,
                             borderRadius: 18,
                             padding: 14,
-                            backgroundColor: palette.background,
+                            backgroundColor: palette.bg,
                           }}
                         >
                           <Text
@@ -7954,7 +7964,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             borderColor: palette.divider,
                             borderRadius: 18,
                             padding: 14,
-                            backgroundColor: palette.background,
+                            backgroundColor: palette.bg,
                           }}
                         >
                           <Text
@@ -8084,7 +8094,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             borderColor: palette.divider,
                             borderRadius: 18,
                             padding: 14,
-                            backgroundColor: palette.background,
+                            backgroundColor: palette.bg,
                           }}
                         >
                           <Text
@@ -8154,7 +8164,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                     width: 88,
                                     height: 88,
                                     borderRadius: 14,
-                                    backgroundColor: palette.background,
+                                    backgroundColor: palette.bg,
                                   }}
                                   resizeMode="cover"
                                 />
@@ -8806,7 +8816,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: palette.background,
+              backgroundColor: palette.bg,
               zIndex: 999,
             }}
           >
@@ -9156,7 +9166,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: palette.background,
+              backgroundColor: palette.bg,
               zIndex: 999,
             }}
           >
@@ -9172,6 +9182,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <>
       <ScrollView
         contentContainerStyle={styles.managementPanelBody}
@@ -9294,7 +9305,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             width: 56,
                             height: 56,
                             borderRadius: 14,
-                            backgroundColor: palette.background,
+                            backgroundColor: palette.bg,
                             borderWidth: 1,
                             borderColor: palette.divider,
                           }}
@@ -9413,7 +9424,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: palette.background,
+            backgroundColor: palette.bg,
             zIndex: 999,
           }}
         >
@@ -9425,5 +9436,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         </View>
       ) : null}
     </>
+    </KeyboardAvoidingView>
   );
 }

@@ -10,14 +10,21 @@ import {
   Modal,
   Animated,
   Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   useWindowDimensions,
   DeviceEventEmitter,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import { enqueueMutation } from '@/services/pendingMutationsQueue';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
@@ -25,6 +32,8 @@ import Skeleton from '@/components/common/Skeleton';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import { styles as chatListStyles } from '@/Module/ChatRoom/messagesUtils';
 import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
+import { getAccessToken } from '@/security/authStorage';
 import { useSocket } from '../../../SocketProvider';
 import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
 import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
@@ -67,11 +76,15 @@ type CommunitiesTabProps = {
 
 export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const responsive = useResponsiveLayout();
   const { currentUserId } = useSocket();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [communitiesPage, setCommunitiesPage] = useState(1);
+  const [communitiesHasMore, setCommunitiesHasMore] = useState(true);
   const [selected, setSelected] = useState<Community | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -86,6 +99,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const [createVisible, setCreateVisible] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createDesc, setCreateDesc] = useState('');
+  const [createAvatarUri, setCreateAvatarUri] = useState<string | null>(null);
   const [discoverVisible, setDiscoverVisible] = useState(false);
   const [discoverQuery, setDiscoverQuery] = useState('');
   const [discoverResults, setDiscoverResults] = useState<Community[]>([]);
@@ -97,11 +111,11 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [groupCreateError, setGroupCreateError] = useState('');
 
-  const loadCommunities = useCallback(async () => {
+  const loadCommunities = useCallback(async (page = 1) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getRequest(ROUTES.community.list, {
+      const res = await getRequest(`${ROUTES.community.list}?page=${page}`, {
         errorMessage: 'Failed to load communities',
       });
       const list = Array.isArray(res?.data?.results)
@@ -113,12 +127,30 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         : Array.isArray(res)
         ? res
         : [];
-      setCommunities(list as Community[]);
+      const hasNext = res?.data?.next != null || res?.next != null;
+      if (list.length < 20 || !hasNext) {
+        setCommunitiesHasMore(false);
+      } else {
+        setCommunitiesHasMore(true);
+      }
+      if (page === 1) {
+        setCommunities(list as Community[]);
+      } else {
+        setCommunities((prev) => [...prev, ...(list as Community[])]);
+      }
     } catch (err: any) {
       setLoadError(err?.message || 'Unable to load communities.');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const handlePickCreateAvatar = useCallback(() => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+      if (response.assets?.[0]?.uri) {
+        setCreateAvatarUri(response.assets[0].uri);
+      }
+    });
   }, []);
 
   const openCommunity = useCallback((community: Community) => {
@@ -195,12 +227,32 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
 
   const createCommunity = useCallback(async () => {
     if (!createName.trim()) return;
-    const payload = {
+
+    let avatarUrl: string | undefined;
+    if (createAvatarUri) {
+      try {
+        const token = await getAccessToken();
+        const uploaded = await uploadFileToBackend({
+          file: {
+            uri: createAvatarUri,
+            name: 'community-avatar.jpg',
+            type: 'image/jpeg',
+          },
+          authToken: token,
+        });
+        avatarUrl = uploaded?.url;
+      } catch {
+        // Non-fatal: proceed without avatar
+      }
+    }
+
+    const payload: Record<string, unknown> = {
       name: createName.trim(),
       slug: createName.trim().toLowerCase().replace(/\s+/g, '-'),
       description: createDesc.trim(),
       create_main_conversation: true,
       create_posts_conversation: true,
+      ...(avatarUrl ? { icon_url: avatarUrl, avatar_url: avatarUrl } : {}),
     };
     try {
       const res = await postRequest(ROUTES.community.create, payload, {
@@ -209,7 +261,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       if (res?.success && res.data) {
         const created = {
           ...(res.data as Community),
-          description: (res.data as Community).description ?? payload.description,
+          description: (res.data as Community).description ?? String(payload.description ?? ''),
           is_member: true,
           is_owner: true,
           current_user_role: 'owner',
@@ -221,6 +273,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         setCreateVisible(false);
         setCreateName('');
         setCreateDesc('');
+        setCreateAvatarUri(null);
       }
     } catch {
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
@@ -229,18 +282,20 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         setCreateVisible(false);
         setCreateName('');
         setCreateDesc('');
+        setCreateAvatarUri(null);
         // Optimistic: add a local placeholder so the user sees their action
         const optimistic: Community = {
           id: `local_${Date.now()}`,
           name: createName.trim(),
           slug: createName.trim().toLowerCase().replace(/\s+/g, '-'),
           description: createDesc.trim(),
+          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         };
         setCommunities((prev) => [optimistic, ...prev]);
         Alert.alert('Saved offline', 'Community will be created when you are back online.');
       }
     }
-  }, [createName, createDesc]);
+  }, [createName, createDesc, createAvatarUri]);
 
   const createPost = useCallback(async () => {
     if (!selected || !composerText.trim()) return;
@@ -413,7 +468,11 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
 
   const openGroupChat = useCallback(
     (group: Group) => {
-      if (!onOpenChat || !group?.conversation_id) return;
+      if (!group?.conversation_id) {
+        Alert.alert('Coming soon', 'This group does not have a chat room yet.');
+        return;
+      }
+      if (!onOpenChat) return;
       onOpenChat({
         id: String(group.conversation_id),
         conversationId: String(group.conversation_id),
@@ -428,12 +487,20 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   );
 
   useEffect(() => {
-    loadCommunities();
+    loadCommunities(1);
   }, [loadCommunities]);
 
   useEffect(() => {
+    if (communitiesPage > 1) {
+      loadCommunities(communitiesPage);
+    }
+  }, [communitiesPage, loadCommunities]);
+
+  useEffect(() => {
     const sub = DeviceEventEmitter.addListener('community.refresh', () => {
-      loadCommunities();
+      setCommunitiesPage(1);
+      setCommunitiesHasMore(true);
+      loadCommunities(1);
     });
     return () => sub.remove();
   }, [loadCommunities]);
@@ -453,11 +520,44 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
     return () => sub.remove();
   }, [searchPublicCommunities]);
 
+  const handleLeaveSelectedCommunity = useCallback(() => {
+    if (!selected) return;
+    Alert.alert(
+      'Leave community',
+      `Are you sure you want to leave "${selected.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRequest(ROUTES.community.leave(selected.id), {
+                errorMessage: 'Failed to leave community',
+              });
+            } catch {
+              try {
+                await postRequest(ROUTES.community.leave(selected.id), {}, {
+                  errorMessage: 'Failed to leave community',
+                });
+              } catch (err2: any) {
+                Alert.alert('Error', err2?.message || 'Unable to leave community.');
+                return;
+              }
+            }
+            setSelected(null);
+            void loadCommunities();
+          },
+        },
+      ],
+    );
+  }, [selected, loadCommunities]);
+
   const header = useMemo(() => {
     if (!selected) {
       return (
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: palette.text }]}>Communities</Text>
+          <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]}>Communities</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => { setDiscoverVisible(true); void searchPublicCommunities(''); }} style={styles.iconBtn}>
               <KISIcon name="search" size={18} color={palette.text} />
@@ -474,10 +574,13 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         <Pressable onPress={() => setSelected(null)} style={styles.iconBtn}>
           <KISIcon name="back" size={18} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>{selected.name}</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]} numberOfLines={1}>{selected.name}</Text>
+        <Pressable onPress={handleLeaveSelectedCommunity} style={styles.iconBtn} accessibilityLabel="Leave community">
+          <KISIcon name="user-minus" size={18} color={palette.danger ?? palette.error} />
+        </Pressable>
       </View>
     );
-  }, [selected, palette.text, searchPublicCommunities]);
+  }, [selected, palette.text, palette.danger, palette.error, responsive.headerTitleSize, searchPublicCommunities, handleLeaveSelectedCommunity]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]}> 
@@ -542,19 +645,24 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
               <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <Text style={{ color: palette.subtext, fontSize: 14 }}>No posts yet. Be the first!</Text>
+                  </View>
+                }
                 renderItem={({ item }) => (
                     <View
                       style={[styles.card, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}
                     >
-                      <Text style={{ color: palette.text, fontWeight: '600' }}>
+                      <Text style={{ color: palette.text, fontWeight: '600' }} numberOfLines={1}>
                         {item.author?.display_name ?? 'Member'}
                       </Text>
-                      <Text style={{ color: palette.text, marginTop: 6 }}>
+                      <Text style={{ color: palette.text, marginTop: 6 }} numberOfLines={5}>
                         {getFeedPlainText(item)}
                       </Text>
                     </View>
                 )}
-                contentContainerStyle={{ paddingBottom: 24 }}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               />
             </View>
           ) : (
@@ -575,7 +683,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                   >
                     <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[chatListStyles.name, { color: palette.text }]}>{item.name}</Text>
+                      <Text style={[chatListStyles.name, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
                       <Text style={{ color: palette.subtext, marginTop: 2 }} numberOfLines={1}>
                         {item.conversation_id ? 'Tap to open chat' : 'No chat linked yet'}
                       </Text>
@@ -583,7 +691,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                     <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                   </Pressable>
                 )}
-                contentContainerStyle={{ paddingBottom: 24 }}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               />
             </View>
           )}
@@ -592,6 +700,12 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         <FlatList
           data={communities}
           keyExtractor={(item) => item.id}
+          onEndReached={() => {
+            if (communitiesHasMore && !loading) {
+              setCommunitiesPage((p) => p + 1);
+            }
+          }}
+          onEndReachedThreshold={0.3}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
@@ -605,7 +719,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
             >
               <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
               <View style={{ flex: 1 }}>
-                <Text style={[chatListStyles.name, { color: palette.text }]}>{item.name}</Text>
+                <Text style={[chatListStyles.name, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
                 <Text style={{ color: palette.subtext, marginTop: 2 }} numberOfLines={2}>
                   {item.description || 'No description'}
                 </Text>
@@ -623,18 +737,46 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
             </Pressable>
           )}
           ListEmptyComponent={
-            <Text style={{ color: loadError ? (palette.danger ?? '#d9534f') : palette.subtext, padding: 8 }}>
+            <Text style={{ color: loadError ? (palette.danger) : palette.subtext, padding: 8 }}>
               {loadError ?? 'No communities yet.'}
             </Text>
           }
-          contentContainerStyle={{ paddingBottom: 24 }}
+          ListFooterComponent={
+            communitiesHasMore && !loading && communities.length > 0
+              ? <ActivityIndicator color={palette.primary} style={{ marginVertical: 12 }} />
+              : null
+          }
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         />
       )}
 
       <Modal visible={createVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}> 
+        <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
+          <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 12 }}>Create Community</Text>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Pressable
+                onPress={handlePickCreateAvatar}
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: palette.surface ?? palette.card,
+                  borderWidth: 2,
+                  borderColor: palette.inputBorder,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {createAvatarUri ? (
+                  <Image source={{ uri: createAvatarUri }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+                ) : (
+                  <KISIcon name="camera" size={24} color={palette.subtext} />
+                )}
+              </Pressable>
+            </View>
             <TextInput
               placeholder="Community name"
               placeholderTextColor={palette.subtext}
@@ -650,20 +792,22 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
               onChangeText={setCreateDesc}
             />
             <View style={styles.modalRow}>
-              <Pressable onPress={() => setCreateVisible(false)} style={styles.iconBtn}>
+              <Pressable onPress={() => { setCreateVisible(false); setCreateAvatarUri(null); }} style={styles.iconBtn}>
                 <Text style={{ color: palette.text }}>Cancel</Text>
               </Pressable>
               <Pressable onPress={createCommunity} style={styles.iconBtn}>
                 <Text style={{ color: palette.primary }}>Create</Text>
               </Pressable>
             </View>
+            </KeyboardAvoidingView>
           </View>
         </View>
       </Modal>
 
       <Modal visible={groupCreateVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
           <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 12 }}>Create Group</Text>
             <TextInput
               placeholder="Group name"
@@ -708,7 +852,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
             )}
 
             {!!groupCreateError && (
-              <Text style={{ color: palette.danger ?? '#d9534f', marginTop: 8 }}>{groupCreateError}</Text>
+              <Text style={{ color: palette.danger, marginTop: 8 }}>{groupCreateError}</Text>
             )}
 
             <View style={styles.modalRow}>
@@ -719,6 +863,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                 <Text style={{ color: palette.primary }}>Create</Text>
               </Pressable>
             </View>
+            </KeyboardAvoidingView>
           </View>
         </View>
       </Modal>
@@ -768,11 +913,11 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
       {/* ── Discover Communities Modal ── */}
       <Modal visible={discoverVisible} animationType="slide" onRequestClose={() => setDiscoverVisible(false)}>
         <View style={{ flex: 1, backgroundColor: palette.bg }}>
-          <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder }]}>
+          <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder, paddingTop: insets.top }]}>
             <Pressable onPress={() => setDiscoverVisible(false)} style={styles.iconBtn}>
               <KISIcon name="close" size={20} color={palette.text} />
             </Pressable>
-            <Text style={[styles.title, { color: palette.text }]}>Discover Communities</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]}>Discover Communities</Text>
           </View>
           <View style={{ padding: 12 }}>
             <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', borderColor: palette.inputBorder, paddingVertical: 8, paddingHorizontal: 12 }]}>
@@ -793,7 +938,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
             <FlatList
               data={discoverResults}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 12, gap: 10 }}
+              contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: insets.bottom + 12 }}
               ListEmptyComponent={
                 <Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 24 }}>
                   {discoverQuery ? 'No communities found.' : 'Start typing to search communities.'}
@@ -803,7 +948,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                 <View style={[chatListStyles.row, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
                   <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[chatListStyles.name, { color: palette.text }]}>{item.name}</Text>
+                    <Text style={[chatListStyles.name, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
                     <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={2}>
                       {item.description || 'No description'}
                     </Text>
@@ -820,7 +965,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                       }}
                       style={[styles.joinBtn, { backgroundColor: palette.primary }]}
                     >
-                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Join</Text>
+                      <Text style={{ color: palette.onPrimary, fontSize: 11, fontWeight: '700' }}>Join</Text>
                     </Pressable>
                   )}
                 </View>
@@ -840,16 +985,16 @@ const styles = StyleSheet.create({
   card: { padding: 12, borderRadius: 12, borderWidth: 2, marginBottom: 10 },
   communityCard: { padding: 12, borderRadius: 12, borderWidth: 2, marginBottom: 10 },
   communityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconBtn: { padding: 6 },
+  iconBtn: { padding: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segment: { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 2, alignItems: 'center' },
   composer: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 10, paddingHorizontal: 8, marginBottom: 12 },
   input: { flex: 1, paddingVertical: 8, paddingHorizontal: 8 },
   primaryBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginBottom: 12 },
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   modalCard: { width: '88%', borderRadius: 14, borderWidth: 2, padding: 16 },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   memberRow: { paddingVertical: 8, paddingHorizontal: 10, borderWidth: 2, borderRadius: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  joinBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  joinBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

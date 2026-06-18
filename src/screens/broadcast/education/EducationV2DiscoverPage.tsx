@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import EducationInstitutionManagementScreen from '@/screens/broadcast/education/EducationInstitutionManagementScreen';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
@@ -164,6 +165,7 @@ export default function EducationV2DiscoverPage({
   onAvailable,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const { data, loading, error, refresh, setSearch, filters, updateFilter, cacheMeta } =
     useEducationDiscovery({
       initialSearch: searchTerm,
@@ -476,7 +478,7 @@ export default function EducationV2DiscoverPage({
         backgroundColor: palette.surface,
         padding: 14,
         marginBottom: 14,
-        shadowColor: palette.shadow ?? '#000',
+        shadowColor: palette.shadow ?? palette.royalInk,
         shadowOpacity: 0.08,
         shadowRadius: 18,
         shadowOffset: { width: 0, height: 8 },
@@ -543,7 +545,7 @@ export default function EducationV2DiscoverPage({
           backgroundColor: palette.surface,
           overflow: 'hidden',
           marginBottom: 12,
-          shadowColor: palette.shadow ?? '#000',
+          shadowColor: palette.shadow ?? palette.royalInk,
           shadowOpacity: 0.07,
           shadowRadius: 14,
           shadowOffset: { width: 0, height: 8 },
@@ -599,7 +601,7 @@ export default function EducationV2DiscoverPage({
           >
             <Text
               style={{
-                color: '#fff',
+                color: palette.ivory,
                 fontSize: 10,
                 fontWeight: '900',
                 textTransform: 'uppercase',
@@ -748,7 +750,7 @@ export default function EducationV2DiscoverPage({
                 backgroundColor: 'rgba(0,0,0,0.58)',
               }}
             >
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+              <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 12 }}>
                 {Math.round(item.progressPercent)}%
               </Text>
             </View>
@@ -871,7 +873,7 @@ export default function EducationV2DiscoverPage({
           >
             <Text
               style={{
-                color: '#fff',
+                color: palette.ivory,
                 fontSize: 10,
                 fontWeight: '900',
                 letterSpacing: 0.7,
@@ -960,7 +962,7 @@ export default function EducationV2DiscoverPage({
         borderColor: palette.border,
         backgroundColor: palette.surface,
         padding: 14,
-        shadowColor: palette.shadow ?? '#000',
+        shadowColor: palette.shadow ?? palette.royalInk,
         shadowOpacity: 0.08,
         shadowRadius: 18,
         shadowOffset: { width: 0, height: 8 },
@@ -1103,7 +1105,7 @@ export default function EducationV2DiscoverPage({
                   backgroundColor: palette.surface,
                   borderWidth: 1,
                   borderColor: palette.border,
-                  shadowColor: palette.shadow ?? '#000',
+                  shadowColor: palette.shadow ?? palette.royalInk,
                   shadowOpacity: 0.07,
                   shadowRadius: 14,
                   shadowOffset: { width: 0, height: 8 },
@@ -1184,7 +1186,7 @@ export default function EducationV2DiscoverPage({
           backgroundColor: palette.surface,
           padding: 16,
           marginBottom: 16,
-          shadowColor: palette.shadow ?? '#000',
+          shadowColor: palette.shadow ?? palette.royalInk,
           shadowOpacity: 0.09,
           shadowRadius: 20,
           shadowOffset: { width: 0, height: 10 },
@@ -1299,6 +1301,13 @@ export default function EducationV2DiscoverPage({
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item: any) => `${item.type}-${item.id}`}
           contentContainerStyle={{ paddingTop: 10, paddingRight: 8 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No courses found
+              </Text>
+            </View>
+          }
           renderItem={({ item }: { item: EducationContentItem }) => (
             <EducationContentCard
               item={item}
@@ -1347,7 +1356,7 @@ export default function EducationV2DiscoverPage({
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={loading}
@@ -1388,7 +1397,7 @@ export default function EducationV2DiscoverPage({
                   justifyContent: 'center',
                 }}
               >
-                <KISIcon name="school-outline" size={22} color="#fff" />
+                <KISIcon name="school-outline" size={22} color={palette.ivory} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>

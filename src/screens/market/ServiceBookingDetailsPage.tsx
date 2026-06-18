@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -334,12 +336,14 @@ const formatSlotLabel = (value: Date) =>
   });
 
 const ServiceBookingDetailsPage = () => {
+  const insets = useSafeAreaInsets();
   const route =
     useRoute<RouteProp<RootStackParamList, 'ServiceBookingDetails'>>();
   const bookingId = route.params?.bookingId;
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1174,7 +1178,7 @@ const ServiceBookingDetailsPage = () => {
     paymentStatusValue === 'pending'
       ? palette.warning
       : paymentStatusValue === 'failed' || paymentStatusValue === 'refunded'
-      ? palette.error ?? palette.warning
+      ? palette.danger
       : palette.success;
   const directPayment = getDirectPaymentInfo(payment, booking);
   const directPaymentPending = isProviderPaymentPending(directPayment.status || paymentStatusValue);
@@ -1412,6 +1416,7 @@ const ServiceBookingDetailsPage = () => {
           backgroundColor: palette.bg,
           alignItems: 'center',
           justifyContent: 'center',
+          paddingTop: insets.top,
         }}
       >
         <ActivityIndicator color={palette.primaryStrong} />
@@ -1428,6 +1433,7 @@ const ServiceBookingDetailsPage = () => {
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
+          paddingTop: insets.top + 24,
         }}
       >
         <Text style={{ color: palette.text, marginBottom: 12 }}>
@@ -1468,7 +1474,7 @@ const ServiceBookingDetailsPage = () => {
     padding: 16,
   };
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}>
       <View
         style={{
           paddingTop: 20,
@@ -1498,7 +1504,7 @@ const ServiceBookingDetailsPage = () => {
           </Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+      <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
         <View style={cardStyle}>
           <Text
             style={{ fontSize: 16, fontWeight: '700', color: palette.text }}
@@ -2222,7 +2228,7 @@ const ServiceBookingDetailsPage = () => {
 
       <Modal visible={rosterModalOpen} transparent animationType="slide">
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          style={{ flex: 1, backgroundColor: palette.overlay }}
           onPress={() => setRosterModalOpen(false)}
         >
           <View style={{ flex: 1 }} />
@@ -2521,7 +2527,7 @@ const ServiceBookingDetailsPage = () => {
 
       <Modal visible={complaintOpen} transparent animationType="slide">
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          style={{ flex: 1, backgroundColor: palette.overlay }}
           onPress={() => setComplaintOpen(false)}
         >
           <View style={{ flex: 1 }} />
@@ -2592,7 +2598,7 @@ const ServiceBookingDetailsPage = () => {
         onRequestClose={() => setRescheduleOpen(false)}
       >
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+          style={{ flex: 1, backgroundColor: palette.overlay }}
           onPress={() => setRescheduleOpen(false)}
         >
           <View style={{ flex: 1 }} />

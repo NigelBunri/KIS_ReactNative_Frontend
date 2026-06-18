@@ -45,6 +45,7 @@ type Props = {
   onPartnerHeaderPress: () => void;
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
+  onOpenInsights?: () => void;
   loading?: boolean;
   onRefresh?: () => Promise<void> | void;
 };
@@ -67,6 +68,7 @@ export default function PartnersCenterPane({
   onPartnerHeaderPress,
   isKcanAdmin,
   onOpenAdminDashboard,
+  onOpenInsights,
   loading = false,
   onRefresh,
 }: Props) {
@@ -252,6 +254,30 @@ export default function PartnersCenterPane({
               Admin Hub
             </Text>
             <KISIcon name="chevron-right" size={15} color={palette.ivory} />
+          </Pressable>
+        )}
+        {onOpenInsights && (
+          <Pressable
+            onPress={onOpenInsights}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 14,
+              backgroundColor: palette.surface,
+              borderWidth: 1,
+              borderColor: palette.goldLight,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 16 }}>📊</Text>
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13, flex: 1 }}>
+              Insights
+            </Text>
+            <KISIcon name="chevron-right" size={15} color={palette.subtext} />
           </Pressable>
         )}
         {!partnerVerificationSummary?.verified && (

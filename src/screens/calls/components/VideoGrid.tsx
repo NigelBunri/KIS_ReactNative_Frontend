@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { View, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import type { CallParticipant, CallLayout } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
+import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
   participants: CallParticipant[];
@@ -27,6 +28,7 @@ export default function VideoGrid({
   availableHeight,
   onPinParticipant,
 }: Props) {
+  const { palette } = useKISTheme();
   const { width: screenW } = useWindowDimensions();
   const contentH = availableHeight - CONTROLS_H;
 
@@ -42,7 +44,7 @@ export default function VideoGrid({
   if (layout === 'speaker' && participants.length > 1) {
     const mainH = pinned ? contentH - MINI_ROW_H - GAP : contentH;
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: palette.royalInk }]}>
         {pinned && (
           <ParticipantTile
             participant={pinned}
@@ -60,7 +62,7 @@ export default function VideoGrid({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.thumbRow}
-          style={{ height: MINI_ROW_H, backgroundColor: '#0D0D1A' }}
+          style={{ height: MINI_ROW_H, backgroundColor: palette.royalInk }}
         >
           {rest.map(p => (
             <ParticipantTile
@@ -88,7 +90,7 @@ export default function VideoGrid({
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: palette.royalInk }]}
       contentContainerStyle={[styles.gallery, { paddingBottom: 4 }]}
       showsVerticalScrollIndicator={false}
     >
@@ -126,7 +128,7 @@ function chunkBy<T>(arr: T[], n: number): T[][] {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D1A' },
+  container: { flex: 1 },
   gallery: { gap: GAP, paddingHorizontal: 0 },
   row: { flexDirection: 'row' },
   thumbRow: { paddingHorizontal: 8, alignItems: 'center', gap: GAP },

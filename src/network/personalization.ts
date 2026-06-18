@@ -1,5 +1,6 @@
 import ROUTES from './index';
 import { postRequest } from './post';
+import { isAnalyticsEnabled, isPersonalizationEnabled } from '@/services/consentService';
 
 export type FeedType = 'broadcast' | 'community' | 'partner';
 
@@ -13,6 +14,8 @@ export type FeedEventPayload = {
 };
 
 export const logFeedEvent = async (payload: FeedEventPayload) => {
+  // Respect user consent — skip if either analytics or personalization is disabled
+  if (!isAnalyticsEnabled() || !isPersonalizationEnabled()) return;
   try {
     const body = {
       feed_type: payload.feedType,

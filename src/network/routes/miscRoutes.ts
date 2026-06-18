@@ -63,6 +63,8 @@ const miscRoutes = {
     message: (id: string) => `${API_BASE_URL}/api/v1/bridge/messages/${id}/`,
     automations: `${API_BASE_URL}/api/v1/bridge/automations/`,
     automation: (id: string) => `${API_BASE_URL}/api/v1/bridge/automations/${id}/`,
+    accountSync: (id: string) => `${API_BASE_URL}/api/v1/bridge/accounts/${id}/sync/`,
+    threadArchive: (id: string) => `${API_BASE_URL}/api/v1/bridge/threads/${id}/archive/`,
     analytics: `${API_BASE_URL}/api/v1/bridge/analytics/`,
   },
   aiIntegration: {
@@ -70,6 +72,10 @@ const miscRoutes = {
     jobs: `${API_BASE_URL}/api/v1/ai-jobs/`,
     translations: `${API_BASE_URL}/api/v1/translations/`,
     qnaSessions: `${API_BASE_URL}/api/v1/qna-sessions/`,
+    schedules: `${API_BASE_URL}/api/v1/schedules/`,
+    schedule: (id: string) => `${API_BASE_URL}/api/v1/schedules/${id}/`,
+    pipelines: `${API_BASE_URL}/api/v1/pipelines/`,
+    pipeline: (id: string) => `${API_BASE_URL}/api/v1/pipelines/${id}/`,
   },
   mediaAssets: {
     assets: `${API_BASE_URL}/api/v1/media/assets/`,

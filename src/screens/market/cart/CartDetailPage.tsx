@@ -4,6 +4,8 @@ import {
   AppState,
   AppStateStatus,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -50,6 +53,7 @@ type CartDetailNavigation = NativeStackNavigationProp<
 
 const CartDetailPage = () => {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<CartDetailNavigation>();
   const route = useRoute<CartDetailRoute>();
   const shopId = route.params?.shopId;
@@ -414,7 +418,7 @@ const CartDetailPage = () => {
         <Text
           style={[
             cartDetailStyles.errorText,
-            { color: palette.error || '#E53935' },
+            { color: palette.danger },
           ]}
         >
           Shop not found.
@@ -429,7 +433,7 @@ const CartDetailPage = () => {
   }
 
   return (
-    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg }]}>
+    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View
         style={[
           cartDetailStyles.header,
@@ -472,7 +476,8 @@ const CartDetailPage = () => {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={cartDetailStyles.content}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={cartDetailStyles.content} keyboardShouldPersistTaps="handled">
           {/* Delivery address — only for physical products */}
           {hasPhysicalProducts && !cartIsCheckedOut && (
             <View style={[cartDetailStyles.addressSection, { borderColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>
@@ -524,7 +529,7 @@ const CartDetailPage = () => {
               {item.imageUrl ? (
                 <Image
                   source={{ uri: item.imageUrl }}
-                  style={cartDetailStyles.itemImage}
+                  style={[cartDetailStyles.itemImage, { backgroundColor: palette.surface }]}
                 />
               ) : null}
               <View style={cartDetailStyles.itemBody}>
@@ -613,13 +618,22 @@ const CartDetailPage = () => {
             </View>
           ))}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
-      <View style={cartDetailStyles.footer}>
+      <View
+        style={[
+          cartDetailStyles.footer,
+          {
+            borderTopColor: palette.divider,
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
+      >
         <View style={{ flex: 1 }}>
           <Text style={[cartDetailStyles.footerText, { color: palette.text }]}>
             Total · {formatUsdAmount(totalAmount)}
           </Text>
-          <Text style={{ color: (palette as any).subtext, fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>
             {items.length} item{items.length !== 1 ? 's' : ''}
           </Text>
         </View>
@@ -695,7 +709,6 @@ const cartDetailStyles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
   },
   itemBody: {
     flex: 1,

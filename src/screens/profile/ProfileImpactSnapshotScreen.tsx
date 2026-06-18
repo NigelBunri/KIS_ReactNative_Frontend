@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import {
@@ -21,6 +23,8 @@ const labelForItem = (item: any) =>
 
 export default function ProfileImpactSnapshotScreen() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -52,10 +56,20 @@ export default function ProfileImpactSnapshotScreen() {
   const sections = useMemo(() => buildImpactSnapshotSections(profile, range), [profile, range]);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ padding: 20, gap: 16 }}>
+    <ScrollView
+      style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg }}
+      contentContainerStyle={{
+        padding: responsive.pageGutter,
+        paddingBottom: responsive.pageGutter + insets.bottom,
+        gap: 16,
+        width: '100%',
+        maxWidth: responsive.contentMaxWidth,
+        alignSelf: 'center',
+      }}
+    >
       <View style={{ gap: 6 }}>
-        <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>Impact snapshot</Text>
-        <Text style={{ color: palette.subtext }}>
+        <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Impact snapshot</Text>
+        <Text style={{ color: palette.subtext, fontSize: responsive.bodyFontSize }}>
           Review your profile impact for all time, this month, or this year based on your profile data.
         </Text>
       </View>
@@ -69,14 +83,15 @@ export default function ProfileImpactSnapshotScreen() {
               onPress={() => setRange(filter.key)}
               style={{
                 paddingHorizontal: 14,
-                paddingVertical: 8,
+                minHeight: responsive.minTouchTarget,
+                justifyContent: 'center',
                 borderRadius: 999,
                 borderWidth: 1,
                 borderColor: selected ? palette.primaryStrong : palette.divider,
                 backgroundColor: selected ? palette.primarySoft : palette.surface,
               }}
             >
-              <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontWeight: '700' }}>
+              <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontWeight: '700', fontSize: responsive.bodyFontSize }}>
                 {filter.label}
               </Text>
             </Pressable>
@@ -85,7 +100,17 @@ export default function ProfileImpactSnapshotScreen() {
       </View>
 
       {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
-      {error ? <Text style={{ color: palette.error || '#E53935' }}>{error}</Text> : null}
+      {error ? (
+        <>
+          <Text style={{ color: palette.danger }}>{error}</Text>
+          <Pressable
+            onPress={() => void loadProfile()}
+            style={{ marginTop: 12, paddingHorizontal: 20, minHeight: responsive.minTouchTarget, justifyContent: 'center', backgroundColor: palette.primary, borderRadius: 8, alignSelf: 'center' }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </>
+      ) : null}
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {stats.map((stat) => (
@@ -102,8 +127,8 @@ export default function ProfileImpactSnapshotScreen() {
               gap: 6,
             }}
           >
-            <Text style={{ color: palette.subtext, fontSize: 12 }}>{stat.label}</Text>
-            <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>{stat.value}</Text>
+            <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>{stat.label}</Text>
+            <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>{stat.value}</Text>
           </View>
         ))}
       </View>

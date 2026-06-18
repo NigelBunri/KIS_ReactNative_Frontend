@@ -38,6 +38,7 @@ import CallTimer from './components/CallTimer';
 import NetworkQualityBars from './components/NetworkQualityBars';
 import NetworkQualityBanner from './components/NetworkQualityBanner';
 import { KISIcon } from '@/constants/kisIcons';
+import { useKISTheme } from '@/theme/useTheme';
 
 const CONTROLS_HIDE_AFTER = 4000;
 
@@ -56,6 +57,7 @@ type CallActions = {
   onMuteParticipant?: (userId: string) => void;
   onRemoveParticipant?: (userId: string) => void;
   onToggleScreenShare?: () => void;
+  onAddParticipant?: () => void;
 };
 
 type Props = {
@@ -66,6 +68,7 @@ type Props = {
 export default function ActiveCallScreen({ session, actions }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { palette } = useKISTheme();
 
   const [showControls, setShowControls] = useState(true);
   const [showChat, setShowChat] = useState(false);
@@ -74,21 +77,45 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Self-preview drag state (video calls only)
-  const selfPanX = useRef(new Animated.Value(screenW - 110)).current;
-  const selfPanY = useRef(new Animated.Value(insets.top + 16)).current;
+  // Self-preview drag state (video calls only).
+  // We keep the animated values at 0 (delta) and bake the initial position into
+  // setOffset so that Animated.event(dx/dy) accumulates correctly without
+  // causing a position jump on the first touch.
+  const selfPanX = useRef(new Animated.Value(0)).current;
+  const selfPanY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    selfPanX.setOffset(screenW - 110);
+    selfPanY.setOffset(insets.top + 16);
+    selfPanX.flattenOffset();
+    selfPanY.flattenOffset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount
   const selfPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        // Capture current absolute position into offset so delta starts at 0
+        selfPanX.setOffset((selfPanX as any)._value ?? 0);
+        selfPanX.setValue(0);
+        selfPanY.setOffset((selfPanY as any)._value ?? 0);
+        selfPanY.setValue(0);
+      },
       onPanResponderMove: Animated.event(
         [null, { dx: selfPanX, dy: selfPanY }],
         { useNativeDriver: false },
       ),
-      onPanResponderRelease: (_, g) => {
-        selfPanX.setOffset((selfPanX as any)._value ?? 0);
-        selfPanY.setOffset((selfPanY as any)._value ?? 0);
+      onPanResponderRelease: () => {
         selfPanX.flattenOffset();
         selfPanY.flattenOffset();
+        // Clamp tile within safe screen bounds
+        const PIP_W = 92;
+        const PIP_H = 132;
+        const rawX = (selfPanX as any)._value ?? 0;
+        const rawY = (selfPanY as any)._value ?? 0;
+        const clampedX = Math.max(0, Math.min(rawX, screenW - PIP_W));
+        const clampedY = Math.max(insets.top + 8, Math.min(rawY, screenH - insets.bottom - PIP_H - 8));
+        if (clampedX !== rawX) Animated.spring(selfPanX, { toValue: clampedX, useNativeDriver: false, bounciness: 6 }).start();
+        if (clampedY !== rawY) Animated.spring(selfPanY, { toValue: clampedY, useNativeDriver: false, bounciness: 6 }).start();
       },
     }),
   ).current;
@@ -187,6 +214,152 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     }
   }, [actions, session?.layout, revealControls]);
 
+  const styles = useMemo(() => StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.royalInk,
+    },
+    content: {
+      flex: 1,
+    },
+    topHud: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+      paddingBottom: 20,
+      zIndex: 10,
+    },
+    topLeft: { flex: 1, gap: 4 },
+    topRight: { alignItems: 'flex-end', gap: 6 },
+    callTitle: { color: palette.ivory, fontSize: 16, fontWeight: '700' },
+    stateLabel: { color: palette.subtext, fontSize: 13 },
+    callTypeChip: {
+      color: palette.gold,
+      fontSize: 11,
+      fontWeight: '700',
+      backgroundColor: `${palette.gold}26`,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: `${palette.gold}4D`,
+      letterSpacing: 0.3,
+    },
+
+    // Voice layout
+    voiceLayout: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+      paddingBottom: 40,
+    },
+    voiceAvatar: {
+      width: 126,
+      height: 126,
+      borderRadius: 63,
+      backgroundColor: palette.goldDeep,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: palette.gold,
+      shadowColor: palette.gold,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.45,
+      shadowRadius: 22,
+      elevation: 14,
+    },
+    voiceInitials: { color: palette.ivory, fontSize: 44, fontWeight: '800' },
+    voiceName: { color: palette.ivory, fontSize: 26, fontWeight: '700' },
+    speakingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    speakingText: { color: palette.success, fontSize: 14, fontWeight: '600' },
+    mutedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: `${palette.danger}26`,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    mutedText: { color: palette.danger, fontSize: 13, fontWeight: '600' },
+
+    // Self preview
+    selfPreview: {
+      position: 'absolute',
+      width: 92,
+      height: 132,
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: `${palette.gold}80`,
+      zIndex: 5,
+      shadowColor: palette.gold,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    selfMutedBadge: {
+      position: 'absolute',
+      bottom: 6,
+      right: 6,
+      backgroundColor: palette.overlay,
+      borderRadius: 10,
+      padding: 3,
+    },
+
+    // Ended card
+    endedBg: {
+      flex: 1,
+      backgroundColor: `${palette.royalInk}F5`,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    endedCard: {
+      backgroundColor: palette.royalInk,
+      borderRadius: 28,
+      padding: 32,
+      alignItems: 'center',
+      gap: 12,
+      width: '85%',
+      maxWidth: 400,
+      borderWidth: 1,
+      borderColor: `${palette.gold}40`,
+      shadowColor: palette.gold,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    endedIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: `${palette.danger}26`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    endedTitle: { color: palette.ivory, fontSize: 22, fontWeight: '800' },
+    endedReason: { color: palette.subtext, fontSize: 14 },
+    endedCloseBtn: {
+      marginTop: 12,
+      backgroundColor: `${palette.gold}26`,
+      borderRadius: 18,
+      paddingHorizontal: 36,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: `${palette.gold}59`,
+    },
+    endedCloseTxt: { color: palette.gold, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+  }), [palette]);
+
   if (!session) return null;
 
   const stateLabel = (() => {
@@ -206,11 +379,11 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       <Modal visible animationType="fade" transparent statusBarTranslucent>
         <View style={styles.endedBg}>
           <View style={styles.endedCard}>
-            <View style={[styles.endedIcon, session.state === 'missed' && { backgroundColor: '#F59E0B33' }]}>
+            <View style={[styles.endedIcon, session.state === 'missed' && { backgroundColor: `${palette.gold}33` }]}>
               <KISIcon
                 name={session.state === 'missed' ? 'phone-missed' : 'phone-off'}
                 size={32}
-                color={session.state === 'missed' ? '#F59E0B' : '#E52B2B'}
+                color={session.state === 'missed' ? palette.gold : palette.danger}
               />
             </View>
             <Text style={styles.endedTitle}>{session.state === 'missed' ? 'Missed call' : 'Call ended'}</Text>
@@ -220,7 +393,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             <CallTimer
               startedAt={session.startedAt}
               running={false}
-              color="rgba(255,255,255,0.5)"
+              color={palette.subtext}
               size={15}
               showDot={false}
             />
@@ -236,7 +409,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   // ─── ACTIVE / DIALING / CONNECTING SCREEN ─────────────────────────────────
   return (
     <Modal visible animationType="slide" transparent={false} statusBarTranslucent>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D1A" />
+      <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} />
       <View style={styles.root}>
 
         {/* ── CONTENT AREA ── */}
@@ -249,6 +422,8 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 session={session}
                 pulseAnim={pulseAnim}
                 isConnecting={isConnecting}
+                styles={styles}
+                palette={palette}
               />
             )}
 
@@ -262,6 +437,8 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 selfPanX={selfPanX}
                 selfPanY={selfPanY}
                 selfPan={selfPan}
+                styles={styles}
+                palette={palette}
               />
             )}
 
@@ -311,7 +488,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               <CallTimer
                 startedAt={session.startedAt}
                 running
-                color="rgba(255,255,255,0.7)"
+                color={palette.ivory}
                 size={13}
                 showDot
               />
@@ -331,8 +508,10 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                     [{ text: 'OK' }],
                   );
                 }}
-                hitSlop={8}
-                style={{ paddingHorizontal: 4 }}
+                hitSlop={14}
+                accessibilityLabel="Call encryption details"
+                accessibilityRole="button"
+                style={{ paddingHorizontal: 4, minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Text style={{ fontSize: 18 }}>🔒</Text>
               </Pressable>
@@ -370,6 +549,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           isHost={isHostOrCoHost}
           onMute={isHostOrCoHost ? actions.onMuteParticipant : undefined}
           onRemove={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
+          onAddParticipant={isHostOrCoHost ? actions.onAddParticipant : undefined}
         />
 
       </View>
@@ -379,10 +559,12 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
 // ── Voice 1:1 Layout ─────────────────────────────────────────────────────────
 
-function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting }: {
+function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting, styles, palette }: {
   session: CallSession;
   pulseAnim: Animated.Value;
   isConnecting: boolean;
+  styles: any;
+  palette: any;
 }) {
   const other = session.participants.find(p => !p.isLocal);
   const initials = (other?.displayName ?? session.title)
@@ -396,13 +578,13 @@ function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting }: {
       <Text style={styles.voiceName}>{other?.displayName ?? session.title}</Text>
       {other?.isSpeaking && !other?.isMuted && (
         <View style={styles.speakingIndicator}>
-          <SpeakingWave />
+          <SpeakingWave palette={palette} />
           <Text style={styles.speakingText}>Speaking</Text>
         </View>
       )}
       {other?.isMuted && (
         <View style={styles.mutedBadge}>
-          <KISIcon name="mic-off" size={14} color="#E52B2B" />
+          <KISIcon name="mic-off" size={14} color={palette.danger} />
           <Text style={styles.mutedText}>Muted</Text>
         </View>
       )}
@@ -410,7 +592,7 @@ function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting }: {
   );
 }
 
-function SpeakingWave() {
+function SpeakingWave({ palette }: { palette: any }) {
   const bar1 = useRef(new Animated.Value(0.3)).current;
   const bar2 = useRef(new Animated.Value(0.7)).current;
   const bar3 = useRef(new Animated.Value(0.5)).current;
@@ -427,7 +609,7 @@ function SpeakingWave() {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 24, gap: 4 }}>
       {[bar1, bar2, bar3].map((b, i) => (
-        <Animated.View key={i} style={{ width: 5, borderRadius: 3, backgroundColor: '#22C55E', height: 24, transform: [{ scaleY: b }] }} />
+        <Animated.View key={i} style={{ width: 5, borderRadius: 3, backgroundColor: palette.success, height: 24, transform: [{ scaleY: b }] }} />
       ))}
     </View>
   );
@@ -435,7 +617,7 @@ function SpeakingWave() {
 
 // ── Video 1:1 Layout ─────────────────────────────────────────────────────────
 
-function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan }: {
+function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan, styles, palette }: {
   session: CallSession;
   remoteParticipants: any[];
   isConnecting: boolean;
@@ -443,6 +625,8 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   selfPanX: Animated.Value;
   selfPanY: Animated.Value;
   selfPan: any;
+  styles: any;
+  palette: any;
 }) {
   const remote = remoteParticipants[0] ?? null;
 
@@ -458,7 +642,7 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>
+          <Text style={{ color: palette.subtext, fontSize: 16 }}>
             {isConnecting ? 'Connecting…' : 'Camera off'}
           </Text>
         </View>
@@ -473,13 +657,13 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
             top: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'rgba(34,197,94,0.85)',
+            backgroundColor: `${palette.success}D9`,
             paddingVertical: 6,
             alignItems: 'center',
             zIndex: 3,
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
+          <Text style={{ color: palette.ivory, fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
             Sharing screen
           </Text>
         </View>
@@ -503,7 +687,7 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
           />
           {session.isMuted && (
             <View style={styles.selfMutedBadge}>
-              <KISIcon name="mic-off" size={11} color="#E52B2B" />
+              <KISIcon name="mic-off" size={11} color={palette.danger} />
             </View>
           )}
         </Animated.View>
@@ -511,148 +695,3 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0D0D1A',
-  },
-  content: {
-    flex: 1,
-  },
-  topHud: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingBottom: 20,
-    zIndex: 10,
-  },
-  topLeft: { flex: 1, gap: 4 },
-  topRight: { alignItems: 'flex-end', gap: 6 },
-  callTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  stateLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
-  callTypeChip: {
-    color: '#C9A227',
-    fontSize: 11,
-    fontWeight: '700',
-    backgroundColor: 'rgba(201,162,39,0.15)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.3)',
-    letterSpacing: 0.3,
-  },
-
-  // Voice layout
-  voiceLayout: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    paddingBottom: 40,
-  },
-  voiceAvatar: {
-    width: 126,
-    height: 126,
-    borderRadius: 63,
-    backgroundColor: '#B8860B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#C9A227',
-    shadowColor: '#C9A227',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 22,
-    elevation: 14,
-  },
-  voiceInitials: { color: '#fff', fontSize: 44, fontWeight: '800' },
-  voiceName: { color: '#fff', fontSize: 26, fontWeight: '700' },
-  speakingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  speakingText: { color: '#22C55E', fontSize: 14, fontWeight: '600' },
-  mutedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(229,43,43,0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  mutedText: { color: '#E52B2B', fontSize: 13, fontWeight: '600' },
-
-  // Self preview
-  selfPreview: {
-    position: 'absolute',
-    width: 92,
-    height: 132,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(201,162,39,0.5)',
-    zIndex: 5,
-    shadowColor: '#C9A227',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  selfMutedBadge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 10,
-    padding: 3,
-  },
-
-  // Ended card
-  endedBg: {
-    flex: 1,
-    backgroundColor: 'rgba(13,13,26,0.96)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endedCard: {
-    backgroundColor: '#0D0D22',
-    borderRadius: 28,
-    padding: 32,
-    alignItems: 'center',
-    gap: 12,
-    width: 300,
-    borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.25)',
-    shadowColor: '#C9A227',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  endedIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(229,43,43,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  endedTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  endedReason: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
-  endedCloseBtn: {
-    marginTop: 12,
-    backgroundColor: 'rgba(201,162,39,0.15)',
-    borderRadius: 18,
-    paddingHorizontal: 36,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.35)',
-  },
-  endedCloseTxt: { color: '#C9A227', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
-});

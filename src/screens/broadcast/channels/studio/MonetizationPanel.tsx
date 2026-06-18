@@ -8,6 +8,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -56,12 +58,8 @@ const PAYOUT_SCHEDULES: Array<{ value: PayoutSchedule; label: string }> = [
   { value: 'on_request', label: 'On Request' },
 ];
 
-const STATUS_COLOR: Record<PayoutRequestStatus, string> = {
-  pending:  '#F59E0B',
-  approved: '#3B82F6',
-  paid:     '#22C55E',
-  rejected: '#EF4444',
-};
+const payoutStatusColor = (status: PayoutRequestStatus, p: any): string =>
+  ({ pending: p.gold, approved: p.primary, paid: p.success, rejected: p.danger } as Record<PayoutRequestStatus, string>)[status] ?? p.subtext;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -183,6 +181,7 @@ export default function MonetizationPanel({ channelId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
@@ -204,7 +203,7 @@ export default function MonetizationPanel({ channelId }: Props) {
               value={row.value}
               onValueChange={row.onChange}
               trackColor={{ false: palette.border, true: palette.gold }}
-              thumbColor="#fff"
+              thumbColor={palette.ivory}
             />
           </View>
         ))}
@@ -260,7 +259,7 @@ export default function MonetizationPanel({ channelId }: Props) {
               <Text
                 style={[
                   styles.pillText,
-                  { color: payoutSchedule === sch.value ? '#fff' : palette.text },
+                  { color: payoutSchedule === sch.value ? palette.onPrimary : palette.text },
                 ]}
               >
                 {sch.label}
@@ -277,9 +276,9 @@ export default function MonetizationPanel({ channelId }: Props) {
         style={[styles.saveBtn, { backgroundColor: palette.gold }]}
       >
         {saving ? (
-          <ActivityIndicator size="small" color="#fff" />
+          <ActivityIndicator size="small" color={palette.onPrimary} />
         ) : (
-          <Text style={styles.saveBtnText}>Save Settings</Text>
+          <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>Save Settings</Text>
         )}
       </Pressable>
 
@@ -313,9 +312,9 @@ export default function MonetizationPanel({ channelId }: Props) {
           ]}
         >
           {requesting ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={palette.onPrimary} />
           ) : (
-            <Text style={styles.payoutBtnText}>Submit Payout Request</Text>
+            <Text style={[styles.payoutBtnText, { color: palette.onPrimary }]}>Submit Payout Request</Text>
           )}
         </Pressable>
       </View>
@@ -337,11 +336,11 @@ export default function MonetizationPanel({ channelId }: Props) {
               <View
                 style={[
                   styles.statusBadge,
-                  { backgroundColor: STATUS_COLOR[req.status] + '22' },
+                  { backgroundColor: payoutStatusColor(req.status, palette) + '22' },
                 ]}
               >
                 <Text
-                  style={[styles.statusText, { color: STATUS_COLOR[req.status] }]}
+                  style={[styles.statusText, { color: payoutStatusColor(req.status, palette) }]}
                 >
                   {req.status.toUpperCase()}
                 </Text>
@@ -354,6 +353,7 @@ export default function MonetizationPanel({ channelId }: Props) {
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -411,6 +411,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pillText: {
     fontWeight: '700',
@@ -423,7 +426,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveBtnText: {
-    color: '#fff',
     fontWeight: '800',
     fontSize: 15,
   },
@@ -439,7 +441,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   payoutBtnText: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 14,
   },

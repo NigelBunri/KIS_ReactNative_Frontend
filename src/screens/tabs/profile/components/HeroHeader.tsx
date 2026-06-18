@@ -28,12 +28,12 @@ export default function HeroHeader({
   const hasCover = !!coverUrl;
 
   // On-cover colors
-  const textColor = hasCover ? '#FFFFFF' : palette.text;
-  const subColor = hasCover ? 'rgba(255,255,255,0.85)' : palette.subtext;
+  const textColor = hasCover ? palette.ivory : palette.text;
+  const subColor = hasCover ? palette.ivory : palette.subtext;
 
   const shadow = hasCover
     ? {
-        textShadowColor: 'rgba(0,0,0,0.65)',
+        textShadowColor: `${palette.royalInk}A6`,
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 10,
       }
@@ -89,13 +89,13 @@ export default function HeroHeader({
               style={[
                 styles.pill,
                 {
-                  backgroundColor: hasCover ? 'rgba(255,255,255,0.18)' : palette.primarySoft,
+                  backgroundColor: hasCover ? `${palette.ivory}2E` : palette.primarySoft,
                   borderWidth: hasCover ? 1 : 0,
-                  borderColor: hasCover ? 'rgba(255,255,255,0.22)' : 'transparent',
+                  borderColor: hasCover ? `${palette.ivory}38` : 'transparent',
                 },
               ]}
             >
-              <Text style={[styles.pillText, { color: hasCover ? '#fff' : palette.primaryStrong }, shadow]}>
+              <Text style={[styles.pillText, { color: hasCover ? palette.ivory : palette.primaryStrong }, shadow]}>
                 {tierName}
               </Text>
             </View>
@@ -104,9 +104,9 @@ export default function HeroHeader({
               style={[
                 styles.pill,
                 {
-                  backgroundColor: hasCover ? 'rgba(0,0,0,0.28)' : palette.surfaceElevated,
+                  backgroundColor: hasCover ? `${palette.royalInk}47` : palette.surfaceElevated,
                   borderWidth: hasCover ? 1 : 0,
-                  borderColor: hasCover ? 'rgba(255,255,255,0.16)' : 'transparent',
+                  borderColor: hasCover ? `${palette.ivory}29` : 'transparent',
                 },
               ]}
             >

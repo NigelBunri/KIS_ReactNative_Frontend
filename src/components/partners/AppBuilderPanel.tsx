@@ -235,7 +235,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
         <Text style={[styles.small, { color: palette.subtext }]}>{block.status ?? 'draft'} · active: {block.is_active ? 'yes' : 'no'}</Text>
       </View>
       <Pressable onPress={() => handleDeleteBlock(block)} style={styles.deleteBtn}>
-        <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '700', fontSize: 12 }}>✕</Text>
+        <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 12 }}>✕</Text>
       </Pressable>
     </View>
   );
@@ -281,7 +281,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
             style={{ padding: 6 }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '700', fontSize: 13 }}>✕</Text>
+            <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
           </Pressable>
         </View>
       </View>
@@ -303,7 +303,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 12 }}>Edit →</Text>
         <Pressable onPress={() => handleDeleteApp(app)}>
-          <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '700', fontSize: 13 }}>✕</Text>
+          <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -324,7 +324,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
         <View style={styles.centered}><ActivityIndicator color={palette.primary} /></View>
       ) : builder.error ? (
         <View style={styles.centered}>
-          <Text style={{ color: palette.danger ?? '#d9534f' }}>{builder.error}</Text>
+          <Text style={{ color: palette.danger }}>{builder.error}</Text>
           <Pressable onPress={builder.loadApps} style={{ marginTop: 12 }}>
             <Text style={{ color: palette.primary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
@@ -594,7 +594,7 @@ function FormField({
 }
 
 function StatusPill({ status, palette }: { status: string; palette: any }) {
-  const color = status === 'published' ? palette.success ?? '#27AE60'
+  const color = status === 'published' ? palette.success
     : status === 'archived' ? palette.subtext
     : palette.primary;
   return (

@@ -504,7 +504,7 @@ const AvailabilityScheduler = ({
                     backgroundColor: palette.primary,
                   }}
                 >
-                  <Text style={{ color: "#fff" }}>Add</Text>
+                  <Text style={{ color: palette.onPrimary }}>Add</Text>
                 </Pressable>
               </View>
             </View>

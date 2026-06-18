@@ -3,17 +3,31 @@
 // "Most Replayed" heatmap overlay. A thin bar composed of segments whose
 // color opacity reflects the relative view_count of each segment.
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace('#', '');
+  // Support shorthand 3-char hex (#ABC → AABBCC)
+  const full = clean.length === 3
+    ? clean.split('').map(c => c + c).join('')
+    : clean;
+  const r = parseInt(full.substring(0, 2), 16) || 0;
+  const g = parseInt(full.substring(2, 4), 16) || 0;
+  const b = parseInt(full.substring(4, 6), 16) || 0;
+  return { r, g, b };
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Segment = {
-  id?: string;
-  start_time: number;   // seconds
-  end_time: number;     // seconds
+  segment_start_seconds: number;   // seconds
+  segment_end_seconds: number;     // seconds
   view_count: number;
 };
 
@@ -26,6 +40,8 @@ type Props = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WatchHeatmap({ contentId, durationSeconds, style }: Props) {
+  const { palette } = useKISTheme();
+  const styles = useMemo(() => makeStyles(palette), [palette]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -61,8 +77,9 @@ export default function WatchHeatmap({ contentId, durationSeconds, style }: Prop
 
   const peakSeg = segments[peakIdx];
   const peakCenterRatio =
-    ((peakSeg.start_time + peakSeg.end_time) / 2) / durationSeconds;
+    ((peakSeg.segment_start_seconds + peakSeg.segment_end_seconds) / 2) / durationSeconds;
   const peakCenterX = peakCenterRatio * containerWidth;
+  const { r: goldR, g: goldG, b: goldB } = hexToRgb(palette.gold);
 
   return (
     <View style={[styles.container, style]} onLayout={handleLayout}>
@@ -71,16 +88,16 @@ export default function WatchHeatmap({ contentId, durationSeconds, style }: Prop
         {segments.map((seg, idx) => {
           const segWidth =
             containerWidth > 0
-              ? ((seg.end_time - seg.start_time) / durationSeconds) * containerWidth
+              ? ((seg.segment_end_seconds - seg.segment_start_seconds) / durationSeconds) * containerWidth
               : 0;
           const opacity = Math.max(0.05, (seg.view_count / maxViewCount) * 0.9);
           return (
             <View
-              key={seg.id ?? idx}
+              key={idx}
               style={{
                 width: segWidth,
                 height: 20,
-                backgroundColor: `rgba(255,210,60,${opacity})`,
+                backgroundColor: `rgba(${goldR},${goldG},${goldB},${opacity})`,
               }}
             />
           );
@@ -113,37 +130,39 @@ export default function WatchHeatmap({ contentId, durationSeconds, style }: Prop
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    height: 20,
-    overflow: 'visible',
-  },
-  bar: {
-    flexDirection: 'row',
-    height: 20,
-    overflow: 'hidden',
-    borderRadius: 2,
-  },
-  label: {
-    position: 'absolute',
-    bottom: 22,
-    alignItems: 'center',
-  },
-  tick: {
-    width: 1,
-    height: 6,
-    backgroundColor: '#FFD23C',
-    marginBottom: 2,
-  },
-  labelBubble: {
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  labelText: {
-    color: '#FFD23C',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-});
+function makeStyles(p: any) {
+  return StyleSheet.create({
+    container: {
+      height: 20,
+      overflow: 'visible',
+    },
+    bar: {
+      flexDirection: 'row',
+      height: 20,
+      overflow: 'hidden',
+      borderRadius: 2,
+    },
+    label: {
+      position: 'absolute',
+      bottom: 22,
+      alignItems: 'center',
+    },
+    tick: {
+      width: 1,
+      height: 6,
+      backgroundColor: p.gold,
+      marginBottom: 2,
+    },
+    labelBubble: {
+      backgroundColor: p.royalInk,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    labelText: {
+      color: p.gold,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+  });
+}

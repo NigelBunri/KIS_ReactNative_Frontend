@@ -93,7 +93,7 @@ export default function PartnersLeftRail({
           style={StyleSheet.absoluteFillObject}
         />
         <View pointerEvents="none" style={localStyles.goldSheen} />
-        <KISIcon name="add" size={compact ? 20 : 24} color={palette.ivory ?? '#fff'} />
+        <KISIcon name="add" size={compact ? 20 : 24} color={palette.ivory} />
       </Pressable>
 
       <FlatList
@@ -159,7 +159,7 @@ export default function PartnersLeftRail({
                   <Text
                     style={{
                       color: isActive
-                        ? palette.ivory ?? '#fff'
+                        ? palette.ivory
                         : palette.text,
                       fontSize: compact ? 12 : 14,
                       fontWeight: '900',

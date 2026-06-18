@@ -1,5 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -30,7 +32,7 @@ const alpha = (hex: string | undefined, opacity: string) => {
   if (/^#[0-9a-fA-F]{6}$/.test(value)) {
     return `${value}${opacity}`;
   }
-  return value || '#000000';
+  return value || 'transparent';
 };
 
 const getFeedMediaIcon = (mediaType: any) => {
@@ -256,6 +258,7 @@ const AttachmentCarousel: React.FC<AttachmentCarouselProps> = ({
             key={`${feed.id}-dot-${idx}`}
             style={[
               modalStyles.carouselDot,
+              { backgroundColor: palette.divider },
               idx === activeIndex && { backgroundColor: palette.primaryStrong },
             ]}
           />
@@ -371,6 +374,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
   const mutedWash = alpha(palette.subtext, '10');
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       contentContainerStyle={[
         styles.managementPanelBody,
@@ -920,6 +924,8 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                       prev.filter((_, idx) => idx !== index),
                     )
                   }
+                  hitSlop={8}
+                  style={{ minHeight: 44, justifyContent: 'center' }}
                 >
                   <Text
                     style={[
@@ -974,7 +980,11 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                     {asset.type ?? 'file'}
                   </Text>
                 </View>
-                <Pressable onPress={() => removeTemporaryFeedAsset(index)}>
+                <Pressable
+                  onPress={() => removeTemporaryFeedAsset(index)}
+                  hitSlop={8}
+                  style={{ minHeight: 44, justifyContent: 'center' }}
+                >
                   <Text
                     style={[
                       modalStyles.attachmentRemoveText,
@@ -1086,6 +1096,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         </Text>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1563,7 +1574,7 @@ const ColorDot: React.FC<{
               backgroundColor:
                 color === 'transparent'
                   ? palette.primaryStrong
-                  : 'rgba(255,255,255,0.92)',
+                  : palette.ivory,
             },
           ]}
         />
@@ -1602,7 +1613,6 @@ const modalStyles = StyleSheet.create({
     padding: 18,
     gap: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
@@ -1676,7 +1686,6 @@ const modalStyles = StyleSheet.create({
     borderRadius: 22,
     padding: 15,
     gap: 14,
-    shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
@@ -1740,7 +1749,6 @@ const modalStyles = StyleSheet.create({
     paddingLeft: 16,
     gap: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
@@ -1877,6 +1885,9 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
     marginRight: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   formActions: {
     marginTop: 10,
@@ -1912,7 +1923,6 @@ const modalStyles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginHorizontal: 2,
-    backgroundColor: '#ccc',
   },
   typeSection: {
     marginTop: 16,
@@ -1940,6 +1950,9 @@ const modalStyles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 13,
     paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   colorRow: {
     flexDirection: 'row',
@@ -1949,6 +1962,7 @@ const modalStyles = StyleSheet.create({
   },
   colorOption: {
     width: 64,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 14,
     paddingVertical: 8,

@@ -151,13 +151,12 @@ export default function PromoCodeScreen() {
     setValidationError(null);
     try {
       const response = await getRequest(
-        `${ROUTES.billing.promoCodes}?code=${encodeURIComponent(code)}`,
+        `${ROUTES.billing.promoCodeValidate}?code=${encodeURIComponent(code)}`,
         { forceNetwork: true, errorMessage: 'Unable to validate code.' },
       );
       if (response?.success) {
         const raw = response.data;
-        const result =
-          raw?.data ?? (Array.isArray(raw?.results) ? raw.results[0] : null) ?? raw;
+        const result = raw?.data ?? raw;
         if (result && (result.code || result.id)) {
           setValidatedCode({
             id: String(result.id ?? ''),
@@ -166,8 +165,8 @@ export default function PromoCodeScreen() {
             discount_value: result.discount_value,
             discount_amount: result.discount_amount,
             discount_percent: result.discount_percent,
-            expiry_date: result.expiry_date,
-            expires_at: result.expires_at,
+            expiry_date: result.expiry_date ?? result.ends_at,
+            expires_at: result.expires_at ?? result.ends_at,
             valid_until: result.valid_until,
             description: result.description,
             minimum_order: result.minimum_order,
@@ -195,7 +194,7 @@ export default function PromoCodeScreen() {
     setRedeeming(true);
     try {
       const response = await postRequest(
-        ROUTES.billing.promoCodes,
+        ROUTES.billing.promoCodeRedeem,
         { code },
         { errorMessage: 'Unable to redeem code.' },
       );
@@ -300,9 +299,9 @@ export default function PromoCodeScreen() {
                 disabled={validating || redeeming}
               >
                 {validating ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={palette.onPrimary} size="small" />
                 ) : (
-                  <Text style={s.btnText}>Apply</Text>
+                  <Text style={[s.btnText, { color: palette.onPrimary }]}>Apply</Text>
                 )}
               </Pressable>
             </View>
@@ -311,10 +310,10 @@ export default function PromoCodeScreen() {
               <View
                 style={[
                   s.errorBanner,
-                  { backgroundColor: '#FEE2E2' },
+                  { backgroundColor: palette.dangerSoft },
                 ]}
               >
-                <Text style={[s.errorBannerText, { color: '#991B1B' }]}>
+                <Text style={[s.errorBannerText, { color: palette.danger }]}>
                   {validationError}
                 </Text>
               </View>
@@ -324,22 +323,22 @@ export default function PromoCodeScreen() {
               <View
                 style={[
                   s.validCard,
-                  { borderColor: '#16A34A', backgroundColor: '#F0FDF4' },
+                  { borderColor: palette.success, backgroundColor: palette.successSoft },
                 ]}
               >
-                <Text style={[s.validTitle, { color: '#15803D' }]}>
+                <Text style={[s.validTitle, { color: palette.success }]}>
                   Valid code: {validatedCode.code}
                 </Text>
-                <Text style={[s.validDiscount, { color: '#15803D' }]}>
+                <Text style={[s.validDiscount, { color: palette.success }]}>
                   {formatDiscount(validatedCode)}
                 </Text>
                 {getExpiry(validatedCode) ? (
-                  <Text style={[s.validMeta, { color: '#166534' }]}>
+                  <Text style={[s.validMeta, { color: palette.success }]}>
                     Expires: {formatDate(getExpiry(validatedCode))}
                   </Text>
                 ) : null}
                 {validatedCode.minimum_order ? (
-                  <Text style={[s.validMeta, { color: '#166534' }]}>
+                  <Text style={[s.validMeta, { color: palette.success }]}>
                     Min. order: {validatedCode.minimum_order}
                   </Text>
                 ) : null}
@@ -347,16 +346,16 @@ export default function PromoCodeScreen() {
                   style={[
                     s.redeemBtn,
                     {
-                      backgroundColor: redeeming ? '#86EFAC' : '#16A34A',
+                      backgroundColor: redeeming ? (palette.successSoft) : (palette.success),
                     },
                   ]}
                   onPress={handleRedeem}
                   disabled={redeeming}
                 >
                   {redeeming ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={palette.onPrimary} size="small" />
                   ) : (
-                    <Text style={s.btnText}>Redeem</Text>
+                    <Text style={[s.btnText, { color: palette.onPrimary }]}>Redeem</Text>
                   )}
                 </Pressable>
               </View>
@@ -373,7 +372,7 @@ export default function PromoCodeScreen() {
                 <ActivityIndicator color={palette.primaryStrong} />
               </View>
             ) : listError ? (
-              <Text style={[s.listError, { color: palette.error ?? '#DC2626' }]}>
+              <Text style={[s.listError, { color: palette.danger }]}>
                 {listError}
               </Text>
             ) : redeemedCodes.length === 0 ? (
@@ -417,8 +416,8 @@ export default function PromoCodeScreen() {
                         {
                           backgroundColor:
                             code.status === 'active'
-                              ? '#DCFCE7'
-                              : '#F3F4F6',
+                              ? (palette.successSoft)
+                              : (palette.surface),
                         },
                       ]}
                     >
@@ -427,7 +426,7 @@ export default function PromoCodeScreen() {
                           s.codeStatusText,
                           {
                             color:
-                              code.status === 'active' ? '#15803D' : '#6B7280',
+                              code.status === 'active' ? (palette.success) : palette.subtext,
                           },
                         ]}
                       >
@@ -492,7 +491,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  btnText: { fontWeight: '700', fontSize: 14 },
   errorBanner: {
     borderRadius: 10,
     padding: 12,

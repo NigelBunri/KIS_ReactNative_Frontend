@@ -224,12 +224,12 @@ export default function VideoPlayer({
 
       {/* -10s overlay */}
       <Animated.View pointerEvents="none" style={[styles.seekOverlay, { left: 16, opacity: leftSeekAnim }]}>
-        <View style={styles.seekBubble}><Text style={styles.seekLabel}>-10s</Text></View>
+        <View style={styles.seekBubble}><Text style={[styles.seekLabel, { color: palette.ivory }]}>-10s</Text></View>
       </Animated.View>
 
       {/* +10s overlay */}
       <Animated.View pointerEvents="none" style={[styles.seekOverlay, { right: 16, opacity: rightSeekAnim }]}>
-        <View style={styles.seekBubble}><Text style={styles.seekLabel}>+10s</Text></View>
+        <View style={styles.seekBubble}><Text style={[styles.seekLabel, { color: palette.ivory }]}>+10s</Text></View>
       </Animated.View>
 
       {showControls && !state.error && (
@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
   },
   unavailableWrap: {
     width: '100%',
@@ -308,7 +307,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   seekLabel: {
-    color: '#fff',
     fontWeight: '900',
     fontSize: 13,
   },

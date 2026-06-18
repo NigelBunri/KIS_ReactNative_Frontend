@@ -66,7 +66,7 @@ export default function DashboardTab({ partnerId, partnerName }: Props) {
   const stats: Stat[] = summary
     ? [
         { icon: '👥', label: 'Members', value: summary.total_members ?? '—' },
-        { icon: '⚡', label: 'Active', value: summary.active_members ?? '—', color: '#16a34a' },
+        { icon: '⚡', label: 'Active', value: summary.active_members ?? '—', color: palette.success },
         { icon: '📝', label: 'Posts', value: summary.total_posts ?? '—' },
         { icon: '👤', label: 'Groups', value: summary.total_groups ?? '—' },
         { icon: '#', label: 'Channels', value: summary.total_channels ?? '—' },

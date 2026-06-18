@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -18,6 +19,9 @@ import {
   microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
+import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 import { getHealthThemeColors } from '@/theme/health/colors';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
@@ -59,6 +63,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [defaultMarkup, setDefaultMarkup] = useState('10');
   const [autoAssign, setAutoAssign] = useState(true);
 
@@ -70,10 +75,59 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
   const [newMed, setNewMed] = useState({ name: '', category: '', stock: '', price: '', expiryDate: '' });
 
   const [orders, setOrders] = useState<PrescriptionOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [creatingOrder, setCreatingOrder] = useState(false);
   const [patientName, setPatientName] = useState('');
   const [selectedMeds, setSelectedMeds] = useState<Medication[]>([]);
   const [priority, setPriority] = useState<Priority>('Normal');
   const [pharmacist, setPharmacist] = useState('');
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      const payload = { item_kind: 'engine_config', name: 'is_active', value_text: next ? 'true' : 'false', status: 'active' };
+      if (!engineConfigItemId) {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, payload);
+        if (res?.data?.id) setEngineConfigItemId(String(res.data.id));
+      } else {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, payload);
+      }
+    } catch {
+      // non-critical, local state already flipped
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
+
+  const loadOrders = useCallback(async () => {
+    if (!institutionId || !engineKey) return;
+    setOrdersLoading(true);
+    try {
+      const response = await fetchInstitutionEngineManagedItems(institutionId, engineKey, {
+        itemKind: 'pharmacy_order',
+        rootOnly: true,
+        includeInactive: true,
+      });
+      const rows = Array.isArray(response?.data?.results) ? response.data.results : [];
+      const mapped: PrescriptionOrder[] = rows.map((row: any, index: number) => {
+        let meds: Medication[] = [];
+        try { meds = JSON.parse(row?.description || '[]'); } catch { meds = []; }
+        return {
+          id: String(row?.id || `order-${index + 1}`),
+          patientName: String(row?.name || '').split(' - ')[0] || 'Unknown',
+          medications: meds,
+          pharmacist: String(row?.value_text || 'Not assigned'),
+          status: (String(row?.status || 'Pending').charAt(0).toUpperCase() + String(row?.status || 'Pending').slice(1)) as OrderStatus,
+          priority: (Number(row?.value_int || 0) > 0 ? 'Urgent' : 'Normal') as Priority,
+          totalPrice: microToUsd(Number(row?.amount_micro || 0)),
+        };
+      });
+      setOrders(mapped);
+    } catch {
+      // non-critical — order list stays empty
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [engineKey, institutionId]);
 
   const loadInventory = useCallback(async () => {
     if (!institutionId || !engineKey) return;
@@ -109,7 +163,18 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
 
   useEffect(() => {
     loadInventory().catch(() => undefined);
-  }, [loadInventory]);
+    loadOrders().catch(() => undefined);
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config', rootOnly: true, includeInactive: false })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(String(cfg.value_text) !== 'false');
+        }
+      })
+      .catch(() => {});
+  }, [engineKey, institutionId, loadInventory, loadOrders]);
 
   const resetMedicationForm = useCallback(() => {
     setEditingMedicationId(null);
@@ -205,7 +270,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
     );
   }, []);
 
-  const createOrder = useCallback(() => {
+  const createOrder = useCallback(async () => {
     if (!patientName.trim() || selectedMeds.length === 0) {
       Alert.alert('Prescription order', 'Enter patient name and select medications.');
       return;
@@ -214,8 +279,25 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
     const totalPrice = selectedMeds.reduce((sum, med) => sum + med.price, 0) + Number(defaultMarkup || 0);
     const assignedPharmacist = autoAssign ? 'Auto Pharmacist' : pharmacist.trim();
 
+    setCreatingOrder(true);
+    let remoteId: string | undefined;
+    try {
+      const res = await postRequest(ROUTES.healthOps.pharmacySessionStart, {
+        patient_name: patientName.trim(),
+        medications: selectedMeds.map((m) => ({ id: m.id, name: m.name })),
+        pharmacist: assignedPharmacist || null,
+        priority,
+        total_price: totalPrice,
+      });
+      remoteId = res?.data?.id ?? res?.id;
+    } catch {
+      // Best-effort; local entry is always added for UI feedback
+    } finally {
+      setCreatingOrder(false);
+    }
+
     const nextOrder: PrescriptionOrder = {
-      id: Date.now().toString(),
+      id: remoteId ?? Date.now().toString(),
       patientName: patientName.trim(),
       medications: selectedMeds,
       pharmacist: assignedPharmacist || 'Not assigned',
@@ -233,10 +315,17 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
     setPatientName('');
     setSelectedMeds([]);
     setPharmacist('');
-  }, [autoAssign, defaultMarkup, inventory, patientName, pharmacist, priority, selectedMeds, updateStock]);
+    void loadOrders();
+  }, [autoAssign, defaultMarkup, inventory, loadOrders, patientName, pharmacist, priority, selectedMeds, updateStock]);
 
-  const updateOrderStatus = useCallback((id: string, statusValue: OrderStatus) => {
+  const updateOrderStatus = useCallback(async (id: string, statusValue: OrderStatus) => {
+    // Optimistic update first for instant UI response
     setOrders((prev) => prev.map((row) => (row.id === id ? { ...row, status: statusValue } : row)));
+    try {
+      await patchRequest(ROUTES.healthOps.pharmacySession(id), { status: statusValue });
+    } catch {
+      // Best-effort; local state already reflects the change
+    }
   }, []);
 
   const totalMedications = inventory.length;
@@ -246,12 +335,13 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
   const revenue = useMemo(() => orders.reduce((sum, row) => sum + row.totalPrice, 0), [orders]);
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <ScrollView style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Pharmacy Configuration</Text>
         <KISButton
           title={engineEnabled ? 'Disable Engine' : 'Enable Engine'}
-          onPress={() => setEngineEnabled((prev) => !prev)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
         <TextInput
@@ -377,7 +467,11 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           />
         ))}
 
-        <KISButton title="Create Order" onPress={createOrder} />
+        <KISButton
+          title={creatingOrder ? 'Creating...' : 'Create Order'}
+          onPress={() => { createOrder().catch(() => undefined); }}
+          disabled={creatingOrder}
+        />
       </View>
 
       <View style={card(palette, spacing)}>
@@ -392,7 +486,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
               <KISButton
                 key={statusValue}
                 title={statusValue}
-                onPress={() => updateOrderStatus(order.id, statusValue as OrderStatus)}
+                onPress={() => { updateOrderStatus(order.id, statusValue as OrderStatus).catch(() => undefined); }}
                 variant="outline"
               />
             ))}
@@ -409,6 +503,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         <Text style={{ color: palette.text }}>Revenue: {toUsdLabel(revenue)} USD</Text>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -429,7 +524,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

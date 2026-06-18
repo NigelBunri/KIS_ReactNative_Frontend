@@ -118,13 +118,13 @@ export default function AdminContentPanel({
             label="Critical"
             value={summary.total_critical}
             palette={palette}
-            color={palette.danger ?? '#C0392B'}
+            color={palette.danger}
           />
           <SummaryTile
             label="Actioned Today"
             value={summary.actioned_today}
             palette={palette}
-            color={palette.success ?? '#27AE60'}
+            color={palette.success}
           />
         </View>
       )}
@@ -154,7 +154,7 @@ export default function AdminContentPanel({
         <View style={styles.centered}><ActivityIndicator color={palette.primary} /></View>
       ) : error ? (
         <View style={styles.errorBox}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
         </View>
       ) : flags.length === 0 ? (
         <View style={styles.centered}>

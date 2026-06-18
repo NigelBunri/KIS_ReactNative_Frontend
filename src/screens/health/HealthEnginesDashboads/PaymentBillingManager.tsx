@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, Text, TextInput, View, useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
+import { useKISTheme } from "@/theme/useTheme";
 import KISButton from "@/constants/KISButton";
 import { getRequest } from "@/network/get";
 import { postRequest } from "@/network/post";
+import { patchRequest } from "@/network/patch";
 import ROUTES from "@/network";
 
 type Props = {
@@ -43,6 +46,7 @@ const input = (palette: any, spacing: any) => ({
 export default function PaymentBillingManager({ institutionId }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
@@ -105,20 +109,28 @@ export default function PaymentBillingManager({ institutionId }: Props) {
   };
 
   const STATUS_COLOR: Record<string, string> = {
-    waiting: "#F59E0B",
-    paid: "#10B981",
-    failed: "#EF4444",
+    waiting: palette.accentPrimary,
+    paid: kisPalette.success,
+    failed: kisPalette.danger,
     refunded: palette.subtext,
   };
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
     <ScrollView style={{ padding: spacing.md }}>
       {/* Engine toggle */}
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Payment & Billing Configuration</Text>
         <KISButton
           title={engineEnabled ? "Disable Engine" : "Enable Engine"}
-          onPress={() => setEngineEnabled(!engineEnabled)}
+          onPress={() => {
+            const next = !engineEnabled;
+            setEngineEnabled(next);
+            patchRequest(
+              ROUTES.healthOps.institution(institutionId),
+              { billing_engine_enabled: next },
+            ).catch(() => undefined);
+          }}
           variant="outline"
         />
         <Text style={{ color: palette.subtext, fontSize: 12 }}>
@@ -167,11 +179,14 @@ export default function PaymentBillingManager({ institutionId }: Props) {
           <Text style={{ ...typography.h2, color: palette.text }}>Billing Sessions</Text>
           <KISButton title="Refresh" size="sm" variant="outline" onPress={loadSessions} />
         </View>
+        <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: spacing.xs }}>
+          Session history listing is coming soon. Sessions you create above are recorded on the server.
+        </Text>
         {loading && (
           <Text style={{ color: palette.subtext }}>Loading…</Text>
         )}
         {!loading && sessions.length === 0 && (
-          <Text style={{ color: palette.subtext }}>No billing sessions yet.</Text>
+          <Text style={{ color: palette.subtext }}>No billing sessions loaded.</Text>
         )}
         {sessions.map(session => (
           <View
@@ -205,5 +220,6 @@ export default function PaymentBillingManager({ institutionId }: Props) {
         ))}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }

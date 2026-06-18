@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
+  Alert,
   TextInput,
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  useColorScheme,
 } from "react-native";
-import { useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -16,6 +18,11 @@ import ROUTES from "@/network";
 import { getRequest } from "@/network/get";
 import { postRequest } from "@/network/post";
 import { patchRequest } from "@/network/patch";
+import {
+  createInstitutionEngineManagedItem,
+  fetchInstitutionEngineManagedItems,
+  updateInstitutionEngineManagedItem,
+} from "@/services/healthOpsEngineManagerService";
 
 /* ================= TYPES ================= */
 
@@ -37,7 +44,9 @@ type AnalyticsSummary = {
   revenue: number;
 };
 
-export default function VideoConsultationManager() {
+type Props = { institutionId: string; engineKey: string };
+
+export default function VideoConsultationManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
   const spacing = HEALTH_THEME_SPACING;
@@ -46,6 +55,7 @@ export default function VideoConsultationManager() {
   /* ================= CONFIG STATE ================= */
 
   const [enabled, setEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [pricePerMinute, setPricePerMinute] = useState("10");
   const [minDuration, setMinDuration] = useState("5");
   const [recordingEnabled, setRecordingEnabled] = useState(false);
@@ -149,6 +159,41 @@ export default function VideoConsultationManager() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEnabled(!next);
+    }
+  }, [engineConfigItemId, enabled, engineKey, institutionId]);
+
   /* ================= ACTIONS ================= */
 
   const admitPatient = useCallback(async (session: VideoSession) => {
@@ -197,22 +242,27 @@ export default function VideoConsultationManager() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={palette.primary} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.md }}>
-        <Text style={{ color: palette.text, marginBottom: spacing.md }}>{error}</Text>
-        <KISButton title="Retry" onPress={() => fetchData()} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.md }}>
+          <Text style={{ color: palette.text, marginBottom: spacing.md }}>{error}</Text>
+          <KISButton title="Retry" onPress={() => fetchData()} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
     <ScrollView
       style={{ padding: spacing.md }}
       refreshControl={
@@ -228,7 +278,7 @@ export default function VideoConsultationManager() {
 
         <KISButton
           title={enabled ? "Disable Engine" : "Enable Engine"}
-          onPress={() => setEnabled(!enabled)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
 
@@ -373,6 +423,7 @@ export default function VideoConsultationManager() {
       </View>
 
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

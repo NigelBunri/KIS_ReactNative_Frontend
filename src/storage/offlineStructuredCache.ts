@@ -1,4 +1,5 @@
 import { getOfflineCache, setOfflineCache } from '@/network/cache';
+import { isOfflineDataEnabled } from '@/services/consentService';
 
 export const OFFLINE_STRUCTURED_CACHE_TYPE = 'OFFLINE_STRUCTURED_CACHE';
 export const DEFAULT_STRUCTURED_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -45,6 +46,7 @@ export const writeOfflineStructuredCache = async <T>(
   data: T,
   ttlSeconds: number = DEFAULT_STRUCTURED_CACHE_TTL_SECONDS,
 ) => {
+  if (!isOfflineDataEnabled()) return;
   await setOfflineCache(OFFLINE_STRUCTURED_CACHE_TYPE, key, data, ttlSeconds);
 };
 

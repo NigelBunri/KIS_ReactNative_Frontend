@@ -16,6 +16,7 @@ import {
   fetchQAQuestions,
   submitQAQuestion,
   upvoteQAQuestion,
+  markQAQuestionAnswered,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 
 type QASession = {
@@ -100,6 +101,11 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
     await upvoteQAQuestion(questionId);
   }, []);
 
+  const handleMarkAnswered = useCallback(async (questionId: string, current: boolean) => {
+    setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, is_answered: !current } : q));
+    await markQAQuestionAnswered(questionId, !current);
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -163,6 +169,14 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
                 {q.upvote_count ?? 0}
               </Text>
             </Pressable>
+            {isManager && (
+              <Pressable
+                onPress={() => handleMarkAnswered(q.id, !!q.is_answered)}
+                style={[styles.upvoteBtn, { backgroundColor: q.is_answered ? palette.primarySoft : palette.bg, borderColor: q.is_answered ? palette.primaryStrong : palette.border }]}
+              >
+                <KISIcon name="check" size={14} color={q.is_answered ? palette.primaryStrong : palette.subtext} />
+              </Pressable>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -199,6 +213,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
+    minHeight: 44,
     borderRadius: 10,
   },
   startBtnText: { fontSize: 14, fontWeight: '900' },
@@ -217,6 +232,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   endBtnText: { fontSize: 12, fontWeight: '700' },
   emptyText: { fontSize: 13, fontWeight: '700', textAlign: 'center', padding: 24 },
@@ -241,7 +258,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 2,
     flexShrink: 0,
-    minWidth: 40,
+    minWidth: 44,
+    minHeight: 44,
   },
   upvoteCount: { fontSize: 12, fontWeight: '800' },
   inputRow: {
@@ -259,9 +277,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

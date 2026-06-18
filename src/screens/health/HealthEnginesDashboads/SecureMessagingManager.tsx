@@ -2,21 +2,29 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
+  Alert,
   ScrollView,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  useColorScheme,
 } from "react-native";
-import { useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
+import { useKISTheme } from "@/theme/useTheme";
 import KISButton from "@/constants/KISButton";
 import ROUTES from "@/network";
 import { getRequest } from "@/network/get";
 import { postRequest } from "@/network/post";
 import { patchRequest } from "@/network/patch";
+import {
+  createInstitutionEngineManagedItem,
+  fetchInstitutionEngineManagedItems,
+  updateInstitutionEngineManagedItem,
+} from "@/services/healthOpsEngineManagerService";
 
 /* ================= TYPES ================= */
 
@@ -72,15 +80,19 @@ const normalizeMessage = (raw: any): Message => ({
 
 /* ================= COMPONENT ================= */
 
-export default function SecureMessagingManager() {
+type Props = { institutionId: string; engineKey: string };
+
+export default function SecureMessagingManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   /* ================= CONFIG ================= */
 
   const [engineEnabled, setEngineEnabled] = useState(true);
+  const [engineConfigItemId, setEngineConfigItemId] = useState<string | null>(null);
   const [defaultEncryption, setDefaultEncryption] = useState(true);
 
   /* ================= REMOTE DATA ================= */
@@ -102,22 +114,13 @@ export default function SecureMessagingManager() {
     }
     setError(null);
 
-    const res2 = await getRequest(
-      ROUTES.healthOps.messagingSessionStart.replace("/start/", "/"),
-      {}
-    );
-
-    if (res2.success) {
-      const data = res2.data;
-      const list: any[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.results)
-        ? data.results
-        : [];
-      setConversations(list.map(normalizeConversation));
-    } else {
-      setError(res2.message || "Failed to load conversations.");
-    }
+    // NOTE: there is no backend endpoint to list secure-messaging sessions for
+    // an institution yet — health-ops/messaging/sessions/start/ only supports
+    // POST (creating one conversation session at a time). Conversations
+    // created below persist on the server, but won't be re-listed on reload
+    // until a list endpoint exists, so we simply start with an empty list
+    // instead of calling an endpoint that will always fail.
+    setConversations((prev) => prev);
 
     setLoading(false);
     setRefreshing(false);
@@ -145,6 +148,41 @@ export default function SecureMessagingManager() {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  useEffect(() => {
+    if (!institutionId || !engineKey) return;
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config' })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) {
+          setEngineConfigItemId(String(cfg.id));
+          setEngineEnabled(cfg.value_bool !== false);
+        }
+      })
+      .catch(() => undefined);
+  }, [institutionId, engineKey]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !engineEnabled;
+    setEngineEnabled(next);
+    try {
+      if (engineConfigItemId) {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, engineConfigItemId, { value_bool: next });
+      } else {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, {
+          item_kind: 'engine_config',
+          name: 'is_active',
+          value_bool: next,
+          status: 'active',
+        });
+        const newId = res?.data?.id ? String(res.data.id) : null;
+        if (newId) setEngineConfigItemId(newId);
+      }
+    } catch {
+      setEngineEnabled(!next);
+    }
+  }, [engineConfigItemId, engineEnabled, engineKey, institutionId]);
 
   /* ================= SELECT CONVERSATION ================= */
 
@@ -235,11 +273,9 @@ export default function SecureMessagingManager() {
     async (messageId: string) => {
       if (!activeConversation) return;
 
-      await patchRequest(
-        `${ROUTES.healthOps.messagingSessionMessages(activeConversation.id)}${messageId}/`,
-        { read: true }
-      );
-
+      // The backend messages endpoint only supports POST (create). Mark-as-read
+      // is signalled via the session step endpoint with a read_message action.
+      // Optimistic local update happens first regardless of outcome.
       setConversations((prev) =>
         prev.map((c) => {
           if (c.id !== activeConversation.id) return c;
@@ -251,6 +287,15 @@ export default function SecureMessagingManager() {
           };
         })
       );
+
+      try {
+        await patchRequest(
+          ROUTES.healthOps.messagingSessionStep(activeConversation.id),
+          { action: 'read_message', message_id: messageId },
+        );
+      } catch {
+        // Best-effort; local state already reflects the change
+      }
     },
     [activeConversation]
   );
@@ -275,31 +320,36 @@ export default function SecureMessagingManager() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={palette.primary} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          padding: spacing.md,
-        }}
-      >
-        <Text style={{ color: palette.text, marginBottom: spacing.md }}>
-          {error}
-        </Text>
-        <KISButton title="Retry" onPress={() => fetchConversations()} />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: spacing.md,
+          }}
+        >
+          <Text style={{ color: palette.text, marginBottom: spacing.md }}>
+            {error}
+          </Text>
+          <KISButton title="Retry" onPress={() => fetchConversations()} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
     <ScrollView
       style={{ padding: spacing.md }}
       refreshControl={
@@ -318,7 +368,7 @@ export default function SecureMessagingManager() {
 
         <KISButton
           title={engineEnabled ? "Disable Messaging" : "Enable Messaging"}
-          onPress={() => setEngineEnabled(!engineEnabled)}
+          onPress={() => { toggleEngine().catch(() => undefined); }}
           variant="outline"
         />
 
@@ -399,7 +449,7 @@ export default function SecureMessagingManager() {
               onPress={() => markAsRead(msg.id)}
               style={[
                 itemCard(palette, spacing),
-                msg.urgent && { borderWidth: 2, borderColor: "red" },
+                msg.urgent && { borderWidth: 2, borderColor: kisPalette.danger },
               ]}
             >
               <Text style={{ color: palette.text }}>{msg.sender}</Text>
@@ -451,6 +501,7 @@ export default function SecureMessagingManager() {
       </View>
 
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -473,7 +524,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.background,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

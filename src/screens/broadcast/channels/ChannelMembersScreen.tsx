@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { fetchChannelSubscribers } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -39,32 +40,48 @@ function formatDate(iso?: string): string {
 
 export default function ChannelMembersScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter, minTouchTarget, bodyFontSize, labelFontSize, headerTitleSize } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'ChannelMembersScreen'>>();
   const { channelId, channelName } = route.params;
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await fetchChannelSubscribers(channelId);
-      setSubscribers(rows);
+      const { results, nextCursor: cursor } = await fetchChannelSubscribers(channelId);
+      setSubscribers(results);
+      setNextCursor(cursor);
     } finally {
       setLoading(false);
     }
   }, [channelId]);
 
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { results, nextCursor: cursor } = await fetchChannelSubscribers(channelId, nextCursor);
+      setSubscribers(prev => [...prev, ...results]);
+      setNextCursor(cursor);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [channelId, loadingMore, nextCursor]);
+
   useEffect(() => { void load(); }, [load]);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>
+        <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.75 }]}>
           {channelName ? `${channelName} · ` : ''}Members{!loading ? ` (${subscribers.length})` : ''}
         </Text>
       </View>
@@ -83,27 +100,41 @@ export default function ChannelMembersScreen() {
           data={subscribers}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 32 }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 16 }} /> : null}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No members yet
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
-            <View style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
+            <Pressable
+              style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: pageGutter }]}
+              onPress={() => navigation.navigate('ViewProfile', { userId: item.id, displayName: item.display_name || item.username })}
+            >
               <View style={[styles.avatar, { backgroundColor: palette.primarySoft }]}>
                 <Text style={[styles.avatarText, { color: palette.primaryStrong }]}>
                   {initialsFor(item.display_name || item.username)}
                 </Text>
               </View>
               <View style={styles.info}>
-                <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
+                <Text style={[styles.name, { color: palette.text, fontSize: bodyFontSize }]} numberOfLines={1}>
                   {item.display_name || item.username || 'KIS user'}
                 </Text>
                 {item.username ? (
-                  <Text style={[styles.username, { color: palette.subtext }]}>@{item.username}</Text>
+                  <Text style={[styles.username, { color: palette.subtext, fontSize: labelFontSize }]}>@{item.username}</Text>
                 ) : null}
                 {item.subscribed_at ? (
-                  <Text style={[styles.meta, { color: palette.subtext }]}>
+                  <Text style={[styles.meta, { color: palette.subtext, fontSize: labelFontSize }]}>
                     Subscriber since {formatDate(item.subscribed_at)}
                   </Text>
                 ) : null}
               </View>
-            </View>
+              <KISIcon name="chevron-right" size={16} color={palette.border} />
+            </Pressable>
           )}
         />
       )}

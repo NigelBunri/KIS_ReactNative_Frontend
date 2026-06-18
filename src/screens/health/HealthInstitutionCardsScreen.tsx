@@ -20,6 +20,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '@/navigation/types';
 import { KISIcon } from '@/constants/kisIcons';
+import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -107,14 +108,19 @@ type HealthCardRow = {
 type CardFilterKey = 'today' | 'upcoming' | 'past';
 type CardTemporalBucket = CardFilterKey;
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  available: { label: 'Available', color: '#10B981' },
-  limited: { label: 'Limited', color: '#F59E0B' },
-  fully_booked: { label: 'Booked', color: '#EF4444' },
-  on_call: { label: 'On call', color: '#3B82F6' },
-  holiday: { label: 'Holiday', color: '#8B5CF6' },
-  blocked: { label: 'Blocked', color: '#6B7280' },
-};
+function buildStatusMeta(p: { success: string; gold: string; danger: string; primary: string; primaryStrong: string; subtext: string }): Record<string, { label: string; color: string }> {
+  return {
+    available:    { label: 'Available', color: p.success },
+    limited:      { label: 'Limited',   color: p.gold },
+    fully_booked: { label: 'Booked',    color: p.danger },
+    on_call:      { label: 'On call',   color: p.primary },
+    holiday:      { label: 'Holiday',   color: p.primaryStrong },
+    blocked:      { label: 'Blocked',   color: p.subtext },
+  };
+}
+const STATUS_META_DEFAULT = buildStatusMeta({
+  success: '', gold: '', danger: '', primary: '', primaryStrong: '', subtext: '',
+});
 
 const BOOKING_ENGINE_TO_FLOW_KEY: Record<string, string> = {
   appointment: 'appointment',
@@ -687,6 +693,7 @@ const isCardIdBroadcasted = (cardId: unknown, broadcastedSet: Set<string>) =>
 const buildCards = (
   institution: any,
   availabilityOverride?: Record<string, unknown> | null,
+  statusMeta: Record<string, { label: string; color: string }> = STATUS_META_DEFAULT,
 ): HealthCardRow[] => {
   const availability =
     availabilityOverride && typeof availabilityOverride === 'object'
@@ -708,7 +715,7 @@ const buildCards = (
   const rows: HealthCardRow[] = [];
   Object.entries(dateServiceIds).forEach(([dateKey, ids]) => {
     const statusKey = String(statuses[dateKey] || 'available');
-    const status = STATUS_META[statusKey] || STATUS_META.available;
+    const status = statusMeta[statusKey] || statusMeta.available;
     const accessMode: 'slots' | 'all_day' =
       timeModes[dateKey] === 'all_day' ? 'all_day' : 'slots';
     const timeOptions =
@@ -1055,6 +1062,8 @@ export default function HealthInstitutionCardsScreen({
   const institutionName = route.params.institutionName ?? 'Health Cards';
 
   const scheme = useColorScheme();
+  const { palette: kisPalette } = useKISTheme();
+  const statusMeta = React.useMemo(() => buildStatusMeta(kisPalette), [kisPalette]);
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
   const spacing = HEALTH_THEME_SPACING;
@@ -1159,7 +1168,7 @@ export default function HealthInstitutionCardsScreen({
   }, [effectiveLandingDraft, institution]);
 
   const cards = useMemo(() => {
-    const localCards = buildCards(institution, availabilityOverride);
+    const localCards = buildCards(institution, availabilityOverride, statusMeta);
     if (!backendCardsLoaded) return localCards;
     const localScheduleKeys = new Set(
       localCards.map(card => toCardScheduleKey(card)),
@@ -1284,13 +1293,13 @@ export default function HealthInstitutionCardsScreen({
             statusKey: String(item?.statusKey || 'available'),
             statusLabel: String(
               item?.statusLabel ||
-                STATUS_META[String(item?.statusKey || 'available')]?.label ||
+                statusMeta[String(item?.statusKey || 'available')]?.label ||
                 'Available',
             ),
             statusColor: String(
               item?.statusColor ||
-                STATUS_META[String(item?.statusKey || 'available')]?.color ||
-                '#10B981',
+                statusMeta[String(item?.statusKey || 'available')]?.color ||
+                kisPalette.success,
             ),
             isBroadcasted: explicitBroadcasted || inferredBroadcasted,
             service,
@@ -1864,7 +1873,7 @@ export default function HealthInstitutionCardsScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -1885,7 +1894,7 @@ export default function HealthInstitutionCardsScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}
@@ -1955,6 +1964,7 @@ export default function HealthInstitutionCardsScreen({
                 padding: spacing.xs,
               }}
               accessibilityLabel="Close health cards"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <KISIcon name="close" size={20} color={palette.text} />
             </TouchableOpacity>
@@ -2028,12 +2038,15 @@ export default function HealthInstitutionCardsScreen({
                     )
                   }
                   disabled={!canManageMembership || saving}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
                   style={{
                     borderWidth: 1,
                     borderColor: palette.divider,
                     borderRadius: 8,
                     paddingHorizontal: 10,
-                    paddingVertical: 4,
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                     marginRight: spacing.xs,
                   }}
                 >
@@ -2048,12 +2061,15 @@ export default function HealthInstitutionCardsScreen({
                     )
                   }
                   disabled={!canManageMembership || saving}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
                   style={{
                     borderWidth: 1,
                     borderColor: palette.divider,
                     borderRadius: 8,
                     paddingHorizontal: 10,
-                    paddingVertical: 4,
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                   }}
                 >
                   <Text style={{ ...typography.label, color: palette.text }}>
@@ -2155,7 +2171,7 @@ export default function HealthInstitutionCardsScreen({
                   }}
                 >
                   <View
-                    style={{ height: 120, backgroundColor: palette.surface }}
+                    style={{ height: spacing.sm * 10, backgroundColor: palette.surface }}
                   >
                     {logoUrl ? (
                       <Image
@@ -2413,7 +2429,7 @@ export default function HealthInstitutionCardsScreen({
                                 width: 22,
                                 height: 22,
                                 borderRadius: 11,
-                                backgroundColor: '#FFFFFFAA',
+                                backgroundColor: `${palette.surface}AA`,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                               }}
@@ -2498,12 +2514,13 @@ export default function HealthInstitutionCardsScreen({
                                 );
                               }}
                               disabled={ratingServiceIdBusy === card.service.id}
-                              style={{ marginRight: 6 }}
+                              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                              style={{ marginRight: 6, minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}
                             >
                               <Text
                                 style={{
                                   fontSize: 20,
-                                  color: filled ? '#F59E0B' : palette.subtext,
+                                  color: filled ? palette.accentPrimary : palette.subtext,
                                 }}
                               >
                                 ★
@@ -2592,7 +2609,7 @@ export default function HealthInstitutionCardsScreen({
                 right: 0,
                 bottom: 0,
                 left: 0,
-                backgroundColor: '#00000066',
+                backgroundColor: 'rgba(0,0,0,0.4)',
               }}
             />
             <View
@@ -2636,6 +2653,8 @@ export default function HealthInstitutionCardsScreen({
                           : palette.surface,
                         paddingHorizontal: spacing.sm,
                         paddingVertical: spacing.xs,
+                        minHeight: 44,
+                        justifyContent: 'center',
                       }}
                     >
                       <Text

@@ -1,6 +1,6 @@
 // src/screens/broadcast/education/components/EducationContinueLearning.tsx
 import React from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Text, View, useWindowDimensions } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -13,6 +13,8 @@ type Props = {
 
 export default function EducationContinueLearning({ items, onResume }: Props) {
   const { palette } = useKISTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = Math.min(windowWidth * 0.72, 320);
 
   if (items.length === 0) {
     return (
@@ -42,17 +44,24 @@ export default function EducationContinueLearning({ items, onResume }: Props) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 8 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+            <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+              No courses in progress
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <View
             style={{
-              width: 248,
+              width: cardWidth,
               borderWidth: 1,
               borderColor: palette.border,
               borderRadius: 24,
               padding: 12,
               backgroundColor: palette.surface,
               marginRight: 10,
-              shadowColor: palette.shadow ?? '#000',
+              shadowColor: palette.shadow ?? palette.royalInk,
               shadowOpacity: 0.07,
               shadowRadius: 14,
               shadowOffset: { width: 0, height: 8 },

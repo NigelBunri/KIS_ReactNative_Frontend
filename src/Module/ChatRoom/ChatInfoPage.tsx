@@ -4,8 +4,10 @@ import {
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -136,6 +138,9 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const [mediaFiles, setMediaFiles]     = useState<MediaItem[]>([]);
   const [mediaLinks, setMediaLinks]     = useState<LinkItem[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
+  const [addMemberModalVisible, setAddMemberModalVisible] = useState(false);
+  const [addMemberInput, setAddMemberInput] = useState('');
+  const [addMemberSubmitting, setAddMemberSubmitting] = useState(false);
   const [showAllImages, setShowAllImages] = useState(false);
   const [showAllFiles, setShowAllFiles]   = useState(false);
   const [showAllLinks, setShowAllLinks]   = useState(false);
@@ -405,6 +410,33 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
       Alert.alert('Error', 'Could not save group name.');
     } finally {
       setSavingName(false);
+    }
+  };
+
+  // ── Add member ────────────────────────────────────────────────────────────
+  const handleAddMemberSubmit = async () => {
+    const userId = addMemberInput.trim();
+    if (!userId || !conversationId) return;
+    setAddMemberSubmitting(true);
+    try {
+      const url = `${ROUTES.chat.listConversations}${conversationId}/members/`;
+      const res = await postRequest(url, { user_id: userId, base_role: 'member' }, {});
+      if (res?.success !== false) {
+        setAddMemberInput('');
+        setAddMemberModalVisible(false);
+        // Refresh member list
+        if (groupId) {
+          const fresh = await getRequest(ROUTES.groups.members(groupId), {});
+          const list = fresh?.data?.results ?? fresh?.results ?? fresh?.data ?? fresh ?? [];
+          if (Array.isArray(list)) setMemberList(list);
+        }
+      } else {
+        Alert.alert('Add member', res?.message ?? 'Unable to add member. Check the user ID.');
+      }
+    } catch {
+      Alert.alert('Add member', 'Unable to add member. Try again.');
+    } finally {
+      setAddMemberSubmitting(false);
     }
   };
 
@@ -1011,13 +1043,13 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               style={({ pressed }) => [
                 styles.editButton,
                 {
-                  backgroundColor: palette.primary ?? '#2E7D32',
+                  backgroundColor: palette.primary,
                   opacity: pressed || saving ? 0.7 : 1,
                 },
               ]}
             >
-              <KISIcon name="camera" size={16} color={palette.onPrimary ?? '#fff'} />
-              <Text style={[styles.editButtonText, { color: palette.onPrimary ?? '#fff' }]}>
+              <KISIcon name="camera" size={16} color={palette.onPrimary} />
+              <Text style={[styles.editButtonText, { color: palette.onPrimary }]}>
                 {saving ? 'Updating...' : 'Change group photo'}
               </Text>
             </Pressable>
@@ -1285,7 +1317,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                       disabled={savingDescription}
                       style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: palette.primary, opacity: savingDescription ? 0.6 : 1 }}
                     >
-                      <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 13, fontWeight: '600' }}>
+                      <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>
                         {savingDescription ? 'Saving…' : 'Save'}
                       </Text>
                     </Pressable>
@@ -1330,8 +1362,8 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                         { backgroundColor: palette.primary, opacity: pressed ? 0.7 : 1 },
                       ]}
                     >
-                      <KISIcon name="copy" size={14} color={palette.onPrimary ?? '#fff'} />
-                      <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                      <KISIcon name="copy" size={14} color={palette.onPrimary} />
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>
                         Copy
                       </Text>
                     </Pressable>
@@ -1360,8 +1392,8 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                     { backgroundColor: palette.primary, opacity: pressed || inviteLinkLoading || !groupId ? 0.7 : 1 },
                   ]}
                 >
-                  <KISIcon name="link" size={14} color={palette.onPrimary ?? '#fff'} />
-                  <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary ?? '#fff' }]}>
+                  <KISIcon name="link" size={14} color={palette.onPrimary} />
+                  <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>
                     {inviteLinkLoading ? 'Loading...' : !groupId ? (groupIdFetchDone ? 'Unavailable' : 'Loading group…') : 'Generate invite link'}
                   </Text>
                 </Pressable>
@@ -1379,12 +1411,13 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               {isAdmin && (
                 <Pressable
                   onPress={() => {
-                    Alert.alert('Add members', 'Select contacts to add', [
-                      { text: 'Close', style: 'cancel' },
-                    ]);
+                    setAddMemberInput('');
+                    setAddMemberModalVisible(true);
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: palette.primary + '22' }}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add member"
                 >
                   <KISIcon name="plus" size={14} color={palette.primary} />
                   <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600' }}>Add</Text>
@@ -1413,7 +1446,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 const isTargetOwner = roleLabel === 'owner';
                 const isTargetAdmin = roleLabel === 'admin' || isTargetOwner;
                 const initials = label.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-                const roleBadgeColor = isTargetOwner ? '#F59E0B' : isTargetAdmin ? (palette.primary ?? '#4F46E5') : 'transparent';
+                const roleBadgeColor = isTargetOwner ? '#F59E0B' : isTargetAdmin ? (palette.primary) : 'transparent';
                 const roleBadgeText = isTargetOwner ? 'Owner' : isTargetAdmin ? 'Admin' : '';
                 return (
                   <Pressable
@@ -1460,12 +1493,12 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               onPress={onToggle}
               style={{
                 width: 44, height: 26, borderRadius: 13,
-                backgroundColor: value ? (palette.primary ?? '#4F46E5') : (palette.divider ?? '#ccc'),
+                backgroundColor: value ? palette.primary : palette.divider,
                 justifyContent: 'center', paddingHorizontal: 2,
               }}
             >
               <View style={{
-                width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff',
+                width: 22, height: 22, borderRadius: 11, backgroundColor: palette.ivory,
                 transform: [{ translateX: value ? 18 : 0 }],
               }} />
             </Pressable>
@@ -1555,7 +1588,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                       backgroundColor: mediaTab === t ? palette.primary : (palette.surface ?? palette.card),
                     }}
                   >
-                    <Text style={{ color: mediaTab === t ? (palette.onPrimary ?? '#fff') : palette.text, fontWeight: '600', fontSize: 13 }}>
+                    <Text style={{ color: mediaTab === t ? (palette.onPrimary) : palette.text, fontWeight: '600', fontSize: 13 }}>
                       {t}
                       {!mediaLoading ? ` (${tabCount(t)})` : ''}
                     </Text>
@@ -1582,7 +1615,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                           <Image source={{ uri: item.url }} style={{ width: cellSize, height: cellSize }} resizeMode="cover" />
                           {item.kind === 'video' && (
                             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
-                              <KISIcon name="play" size={22} color="#fff" />
+                              <KISIcon name="play" size={22} color={palette.ivory} />
                             </View>
                           )}
                         </Pressable>
@@ -1689,11 +1722,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               onPress={handleLeaveGroup}
               style={({ pressed }) => [
                 styles.dangerBtn,
-                { borderColor: '#DC2626', opacity: pressed ? 0.7 : 1 },
+                { borderColor: palette.danger, opacity: pressed ? 0.7 : 1 },
               ]}
             >
-              <KISIcon name="arrow-left" size={16} color="#DC2626" />
-              <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>Leave group</Text>
+              <KISIcon name="arrow-left" size={16} color={palette.danger} />
+              <Text style={[styles.dangerBtnText, { color: palette.danger }]}>Leave group</Text>
             </Pressable>
 
             {role === 'owner' && (
@@ -1701,11 +1734,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 onPress={handleDeleteGroup}
                 style={({ pressed }) => [
                   styles.dangerBtn,
-                  { borderColor: '#DC2626', backgroundColor: '#DC2626', marginTop: 10, opacity: pressed ? 0.7 : 1 },
+                  { borderColor: palette.danger, backgroundColor: palette.danger, marginTop: 10, opacity: pressed ? 0.7 : 1 },
                 ]}
               >
-                <KISIcon name="trash" size={16} color="#fff" />
-                <Text style={[styles.dangerBtnText, { color: '#fff' }]}>Delete group</Text>
+                <KISIcon name="trash" size={16} color={palette.ivory} />
+                <Text style={[styles.dangerBtnText, { color: palette.ivory }]}>Delete group</Text>
               </Pressable>
             )}
           </View>
@@ -1758,7 +1791,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 onPress={() => setAvatarPreview(null)}
                 style={styles.previewBackBtn}
               >
-                <KISIcon name="arrow-left" size={18} color="#fff" />
+                <KISIcon name="arrow-left" size={18} color={palette.ivory} />
               </Pressable>
             </Pressable>
             {!avatarPreviewFull ? (
@@ -1803,6 +1836,66 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
             ) : null}
           </Animated.View>
         ) : null}
+      </Modal>
+
+      {/* ── Add Member modal ── */}
+      <Modal
+        visible={addMemberModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddMemberModalVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onPress={() => setAddMemberModalVisible(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{ width: '100%', borderRadius: 20, backgroundColor: palette.surface, padding: 24, gap: 16 }}
+          >
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>Add member</Text>
+              <Text style={{ fontSize: 13, color: palette.subtext }}>Enter the user ID or phone number of the person to add.</Text>
+              <TextInput
+                value={addMemberInput}
+                onChangeText={setAddMemberInput}
+                placeholder="User ID or phone number"
+                placeholderTextColor={palette.subtext}
+                style={{
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: palette.divider,
+                  backgroundColor: palette.inputBg ?? palette.bg,
+                  color: palette.text,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 15,
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleAddMemberSubmit}
+              />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <Pressable
+                  onPress={() => setAddMemberModalVisible(false)}
+                  style={({ pressed }) => ({ flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
+                >
+                  <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleAddMemberSubmit}
+                  disabled={addMemberSubmitting || !addMemberInput.trim()}
+                  style={({ pressed }) => ({ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: palette.primary, alignItems: 'center', opacity: (pressed || addMemberSubmitting || !addMemberInput.trim()) ? 0.6 : 1 })}
+                >
+                  <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '700' }}>
+                    {addMemberSubmitting ? 'Adding…' : 'Add'}
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

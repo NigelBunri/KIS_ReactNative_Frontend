@@ -67,9 +67,7 @@ export default function KISButton({
 
   const spinnerColor =
     (variantStyles.text as TextStyle | undefined)?.color || palette.text;
-  const metallicGoldGradient = tone === 'dark'
-    ? [...KIS_ROYAL_GRADIENTS.goldDark]
-    : [...KIS_ROYAL_GRADIENTS.goldLight];
+  const metallicGoldGradient = [...KIS_ROYAL_GRADIENTS.goldDark];
   const shouldUseGoldGradient = variant === 'primary' && !isDisabled;
 
   return (

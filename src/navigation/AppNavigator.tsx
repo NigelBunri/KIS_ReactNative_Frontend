@@ -109,7 +109,7 @@ function AnimatedKISTabBar({
   const isRoyalLightBar = tone === 'light';
   const focusedTextColor = isRoyalLightBar ? p.goldReadable : p.goldLight;
   const unfocusedTextColor = p.subtext;
-  const barBg = isRoyalLightBar ? '#FFFFFF' : (p.bar ?? p.surface);
+  const barBg = isRoyalLightBar ? (p.ivory ?? p.bg) : (p.bar ?? p.surface);
   const selectedGoldGradient = tone === 'dark'
     ? [...KIS_ROYAL_GRADIENTS.goldDark]
     : [...KIS_ROYAL_GRADIENTS.goldLight];
@@ -225,7 +225,7 @@ function AnimatedKISTabBar({
                         },
                       ]}
                     >
-                      <Text style={styles.badgeLabel}>
+                      <Text style={[styles.badgeLabel, { color: p.ivory }]}>
                         {badgeCount > 99 ? '99+' : String(badgeCount)}
                       </Text>
                     </View>
@@ -636,8 +636,8 @@ export function MainTabs() {
   return (
     <View style={{ flex: 1 }}>
       {isOffline && (
-        <View style={{ backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+        <View style={{ backgroundColor: palette.danger, paddingVertical: 6, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '700' }}>
             No internet connection — messages will send when reconnected
           </Text>
         </View>
@@ -866,7 +866,6 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   badgeLabel: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
   },

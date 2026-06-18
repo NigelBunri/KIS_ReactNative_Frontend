@@ -350,8 +350,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       marginBottom: 4,
       marginHorizontal: 24,
     }}>
-      <Ionicons name="lock-closed" size={12} color={palette.subtext ?? '#888'} />
-      <Text style={{ fontSize: 12, color: palette.subtext ?? '#888', textAlign: 'center', flexShrink: 1 }}>
+      <Ionicons name="lock-closed" size={12} color={palette.subtext} />
+      <Text style={{ fontSize: 12, color: palette.subtext, textAlign: 'center', flexShrink: 1 }}>
         Messages and calls are end-to-end encrypted.
       </Text>
     </View>
@@ -478,7 +478,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             width: 44,
             height: 44,
             borderRadius: 22,
-            backgroundColor: palette.surface ?? '#fff',
+            backgroundColor: palette.surface,
             alignItems: 'center',
             justifyContent: 'center',
             shadowColor: '#000',
@@ -491,7 +491,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           <Ionicons
             name="chevron-down"
             size={22}
-            color={palette.primaryStrong ?? palette.primary ?? '#4F46E5'}
+            color={palette.primaryStrong ?? palette.primary}
           />
           {unreadCount > 0 && (
             <View
@@ -502,13 +502,13 @@ export const MessageList: React.FC<MessageListProps> = ({
                 minWidth: 18,
                 height: 18,
                 borderRadius: 9,
-                backgroundColor: palette.primaryStrong ?? '#4F46E5',
+                backgroundColor: palette.primaryStrong,
                 alignItems: 'center',
                 justifyContent: 'center',
                 paddingHorizontal: 4,
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+              <Text style={{ color: palette.ivory, fontSize: 10, fontWeight: '700' }}>
                 {unreadCount > 99 ? '99+' : String(unreadCount)}
               </Text>
             </View>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import useGeolocationData, {
   LocationAttendance,
   LocationEvent,
 } from '@/screens/tabs/partners/hooks/useGeolocationData';
+import { useKISTheme } from '@/theme/useTheme';
 
 type PanelView = 'events' | 'create_event' | 'event_detail' | 'attendance';
 
@@ -30,12 +31,12 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: '#888',
-  active: '#4caf50',
-  closed: '#f39c12',
-  cancelled: '#e74c3c',
-};
+const getStatusColors = (palette: ReturnType<typeof useKISTheme>['palette']): Record<string, string> => ({
+  draft: palette.subtext,
+  active: palette.success,
+  closed: palette.gold,
+  cancelled: palette.danger,
+});
 
 const RECURRENCE_OPTIONS = [
   { key: 'once', label: 'Once' },
@@ -47,6 +48,9 @@ const RECURRENCE_OPTIONS = [
 export default function GeolocationPanel({
   isOpen, panelWidth, panelTranslateX, partnerId, isAdmin, onClose,
 }: Props) {
+  const { palette } = useKISTheme();
+  const styles = useMemo(() => buildStyles(palette), [palette]);
+  const STATUS_COLORS = useMemo(() => getStatusColors(palette), [palette]);
   const [view, setView] = useState<PanelView>('events');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
@@ -240,12 +244,14 @@ export default function GeolocationPanel({
             />
 
             <_DateTimeField
+              styles={styles}
               label="Start Date/Time *"
               value={createForm.start_dt ? new Date(createForm.start_dt) : null}
               onChange={d => setCreateForm(f => ({ ...f, start_dt: d.toISOString() }))}
             />
 
             <_DateTimeField
+              styles={styles}
               label="End Date/Time *"
               value={createForm.end_dt ? new Date(createForm.end_dt) : null}
               onChange={d => setCreateForm(f => ({ ...f, end_dt: d.toISOString() }))}
@@ -394,9 +400,9 @@ export default function GeolocationPanel({
 
             {attendanceSummary && (
               <View style={styles.summaryRow}>
-                <_StatBadge label="Checked In" value={attendanceSummary.total_checked_in} color="#4caf50" />
-                <_StatBadge label="Late" value={attendanceSummary.late_count} color="#f39c12" />
-                <_StatBadge label="Manual" value={attendanceSummary.manual_count} color="#888" />
+                <_StatBadge styles={styles} label="Checked In" value={attendanceSummary.total_checked_in} color="#4caf50" />
+                <_StatBadge styles={styles} label="Late" value={attendanceSummary.late_count} color="#f39c12" />
+                <_StatBadge styles={styles} label="Manual" value={attendanceSummary.manual_count} color="#888" />
               </View>
             )}
 
@@ -440,6 +446,8 @@ export default function GeolocationPanel({
             event={geo.selectedEvent}
             partnerId={partnerId}
             geo={geo}
+            styles={styles}
+            STATUS_COLORS={STATUS_COLORS}
           />
         )}
 
@@ -450,10 +458,11 @@ export default function GeolocationPanel({
 
 // ── Date/time picker field ────────────────────────────────────────────────────
 
-function _DateTimeField({ label, value, onChange }: {
+function _DateTimeField({ label, value, onChange, styles }: {
   label: string;
   value: Date | null;
   onChange: (d: Date) => void;
+  styles: ReturnType<typeof buildStyles>;
 }) {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
@@ -516,10 +525,12 @@ function _DateTimeField({ label, value, onChange }: {
 
 // ── Member event view (check-in UI) ──────────────────────────────────────────
 
-function _MemberEventView({ event, partnerId, geo }: {
+function _MemberEventView({ event, partnerId, geo, styles, STATUS_COLORS }: {
   event: LocationEvent;
   partnerId: string;
   geo: ReturnType<typeof useGeolocationData>;
+  styles: ReturnType<typeof buildStyles>;
+  STATUS_COLORS: Record<string, string>;
 }) {
   const [consentLoaded, setConsentLoaded] = useState(false);
   const [statusLoaded, setStatusLoaded] = useState(false);
@@ -667,7 +678,7 @@ function _MemberEventView({ event, partnerId, geo }: {
 
 // ── Stat badge ────────────────────────────────────────────────────────────────
 
-function _StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
+function _StatBadge({ label, value, color, styles }: { label: string; value: number; color: string; styles: ReturnType<typeof buildStyles> }) {
   return (
     <View style={[styles.statBadge, { borderColor: color + '44' }]}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
@@ -678,15 +689,15 @@ function _StatBadge({ label, value, color }: { label: string; value: number; col
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const buildStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => StyleSheet.create({
   panel: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#141414',
+    backgroundColor: palette.royalInk,
     borderLeftWidth: 1,
-    borderLeftColor: '#2a2a2a',
+    borderLeftColor: palette.border,
     zIndex: 200,
     elevation: 8,
     shadowColor: '#000',
@@ -702,98 +713,98 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: palette.border,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle: { color: '#f0e6c8', fontSize: 18, fontWeight: '700' },
+  headerTitle: { color: palette.ivory, fontSize: 18, fontWeight: '700' },
   backBtn: { paddingRight: 8 },
-  backBtnText: { color: '#c9a84c', fontSize: 14 },
+  backBtnText: { color: palette.gold, fontSize: 14 },
   closeBtn: { padding: 8 },
-  closeBtnText: { color: '#888', fontSize: 18 },
+  closeBtnText: { color: palette.subtext, fontSize: 18 },
   body: { flex: 1 },
   bodyContent: { padding: 20, paddingBottom: 80 },
 
   primaryBtn: {
-    backgroundColor: '#c9a84c',
+    backgroundColor: palette.gold,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 16,
   },
   primaryBtnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: '#1a1a1a', fontSize: 15, fontWeight: '700' },
+  primaryBtnText: { color: palette.royalInk, fontSize: 15, fontWeight: '700' },
 
   centerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  loadingText: { color: '#888', fontSize: 14 },
+  loadingText: { color: palette.subtext, fontSize: 14 },
 
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyTitle: { color: '#f0e6c8', fontSize: 17, fontWeight: '700', marginBottom: 8 },
-  emptyBody: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { color: palette.ivory, fontSize: 17, fontWeight: '700', marginBottom: 8 },
+  emptyBody: { color: palette.subtext, fontSize: 14, textAlign: 'center', lineHeight: 21 },
 
   eventCard: {
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: palette.border,
   },
   eventCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  eventTitle: { color: '#f0e6c8', fontSize: 15, fontWeight: '700', flex: 1 },
-  eventMeta: { color: '#888', fontSize: 12, marginTop: 2 },
+  eventTitle: { color: palette.ivory, fontSize: 15, fontWeight: '700', flex: 1 },
+  eventMeta: { color: palette.subtext, fontSize: 12, marginTop: 2 },
   statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 10, fontWeight: '700' },
   eventActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  actionBtn: { backgroundColor: '#2a2a2a', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12 },
-  actionBtnWarning: { backgroundColor: '#f39c1222' },
-  actionBtnDanger: { backgroundColor: '#e74c3c22' },
-  actionBtnText: { color: '#c9a84c', fontSize: 12, fontWeight: '600' },
+  actionBtn: { backgroundColor: palette.surfaceDark, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12 },
+  actionBtnWarning: { backgroundColor: `${palette.gold}14` },
+  actionBtnDanger: { backgroundColor: `${palette.danger}14` },
+  actionBtnText: { color: palette.gold, fontSize: 12, fontWeight: '600' },
 
-  sectionLabel: { color: '#888', fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 12 },
+  sectionLabel: { color: palette.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 12 },
   input: {
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: palette.border,
     borderRadius: 8,
-    color: '#f0e6c8',
+    color: palette.ivory,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 14,
   },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip: { borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: '#1f1f1f', borderWidth: 1, borderColor: '#333' },
-  chipActive: { backgroundColor: '#c9a84c22', borderColor: '#c9a84c' },
-  chipText: { color: '#888', fontSize: 13 },
-  chipTextActive: { color: '#c9a84c', fontWeight: '700' },
+  chip: { borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+  chipActive: { backgroundColor: `${palette.gold}14`, borderColor: palette.gold },
+  chipText: { color: palette.subtext, fontSize: 13 },
+  chipTextActive: { color: palette.gold, fontWeight: '700' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
-  toggleLabel: { color: '#ccc', fontSize: 14, flex: 1 },
-  toggle: { backgroundColor: '#333', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 16 },
-  toggleOn: { backgroundColor: '#c9a84c33' },
-  toggleText: { color: '#c9a84c', fontSize: 12, fontWeight: '700' },
+  toggleLabel: { color: palette.text, fontSize: 14, flex: 1 },
+  toggle: { backgroundColor: palette.border, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 16 },
+  toggleOn: { backgroundColor: `${palette.gold}20` },
+  toggleText: { color: palette.gold, fontSize: 12, fontWeight: '700' },
 
-  errorText: { color: '#e74c3c', fontSize: 13, marginVertical: 8 },
+  errorText: { color: palette.danger, fontSize: 13, marginVertical: 8 },
 
   eventSummaryCard: {
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: palette.border,
   },
-  eventSummaryTitle: { color: '#f0e6c8', fontSize: 17, fontWeight: '700', marginBottom: 4 },
+  eventSummaryTitle: { color: palette.ivory, fontSize: 17, fontWeight: '700', marginBottom: 4 },
 
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statBadge: { flex: 1, borderWidth: 1, borderRadius: 10, padding: 12, alignItems: 'center' },
   statValue: { fontSize: 22, fontWeight: '800' },
-  statLabel: { color: '#888', fontSize: 11, marginTop: 2 },
+  statLabel: { color: palette.subtext, fontSize: 11, marginTop: 2 },
 
   attendanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
@@ -803,112 +814,112 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#c9a84c22',
+    backgroundColor: `${palette.gold}14`,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  arrivalNumber: { color: '#c9a84c', fontWeight: '800', fontSize: 14 },
+  arrivalNumber: { color: palette.gold, fontWeight: '800', fontSize: 14 },
   attendeeInfo: { flex: 1 },
-  attendeeName: { color: '#f0e6c8', fontSize: 14, fontWeight: '600' },
-  attendeeMeta: { color: '#888', fontSize: 12, marginTop: 2 },
+  attendeeName: { color: palette.ivory, fontSize: 14, fontWeight: '600' },
+  attendeeMeta: { color: palette.subtext, fontSize: 12, marginTop: 2 },
 
   refreshBtn: { marginTop: 16, alignItems: 'center', padding: 12 },
-  refreshBtnText: { color: '#c9a84c', fontSize: 14 },
+  refreshBtnText: { color: palette.gold, fontSize: 14 },
 
   safetyNotice: {
     flexDirection: 'row',
     gap: 12,
-    backgroundColor: '#1a2a1a',
+    backgroundColor: `${palette.success}10`,
     borderRadius: 10,
     padding: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2a3a2a',
+    borderColor: `${palette.success}30`,
   },
   safetyIcon: { fontSize: 20 },
   safetyBody: { flex: 1 },
-  safetyTitle: { color: '#5aaf5a', fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  safetyText: { color: '#888', fontSize: 12, lineHeight: 18 },
+  safetyTitle: { color: palette.success, fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  safetyText: { color: palette.subtext, fontSize: 12, lineHeight: 18 },
 
   consentBox: {
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#c9a84c44',
+    borderColor: `${palette.gold}28`,
   },
-  consentTitle: { color: '#f0e6c8', fontSize: 15, fontWeight: '700', marginBottom: 8 },
-  consentBody: { color: '#888', fontSize: 13, lineHeight: 20, marginBottom: 16 },
+  consentTitle: { color: palette.ivory, fontSize: 15, fontWeight: '700', marginBottom: 8 },
+  consentBody: { color: palette.subtext, fontSize: 13, lineHeight: 20, marginBottom: 16 },
 
   checkedInBox: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   checkedInIcon: { fontSize: 48 },
-  checkedInTitle: { color: '#4caf50', fontSize: 17, fontWeight: '700' },
-  arrivalNumberLarge: { color: '#c9a84c', fontSize: 48, fontWeight: '900' },
-  checkedInMeta: { color: '#888', fontSize: 13 },
-  arrivalMeta: { color: '#555', fontSize: 12 },
+  checkedInTitle: { color: palette.success, fontSize: 17, fontWeight: '700' },
+  arrivalNumberLarge: { color: palette.gold, fontSize: 48, fontWeight: '900' },
+  checkedInMeta: { color: palette.subtext, fontSize: 13 },
+  arrivalMeta: { color: palette.subtext, fontSize: 12 },
 
   warningBox: {
-    backgroundColor: '#f39c1211',
+    backgroundColor: `${palette.gold}10`,
     borderRadius: 10,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f39c1244',
+    borderColor: `${palette.gold}30`,
   },
-  warningText: { color: '#f39c12', fontSize: 13 },
+  warningText: { color: palette.gold, fontSize: 13 },
 
-  checkinGuide: { color: '#888', fontSize: 13, marginBottom: 12, textAlign: 'center' },
+  checkinGuide: { color: palette.subtext, fontSize: 13, marginBottom: 12, textAlign: 'center' },
   checkinBtn: {
-    backgroundColor: '#c9a84c',
+    backgroundColor: palette.gold,
     borderRadius: 12,
     paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 16,
   },
-  checkinBtnText: { color: '#1a1a1a', fontSize: 17, fontWeight: '800' },
+  checkinBtnText: { color: palette.royalInk, fontSize: 17, fontWeight: '800' },
 
   revokeBtn: { alignItems: 'center', paddingVertical: 12 },
-  revokeBtnText: { color: '#e74c3c', fontSize: 13 },
+  revokeBtnText: { color: palette.danger, fontSize: 13 },
 
   dateFieldWrap: { marginBottom: 4 },
   dateBtn: {
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: '#c9a84c44',
+    borderColor: `${palette.gold}28`,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
-  dateBtnText: { color: '#f0e6c8', fontSize: 14 },
-  dateBtnPlaceholder: { color: '#555' },
+  dateBtnText: { color: palette.ivory, fontSize: 14 },
+  dateBtnPlaceholder: { color: palette.subtext },
   timeEditBtn: { alignSelf: 'flex-start', marginTop: 6, paddingVertical: 4 },
-  timeEditBtnText: { color: '#c9a84c', fontSize: 12 },
+  timeEditBtnText: { color: palette.gold, fontSize: 12 },
 
   locationBtn: {
-    backgroundColor: '#1a2a1a',
+    backgroundColor: `${palette.success}10`,
     borderWidth: 1,
-    borderColor: '#2a4a2a',
+    borderColor: `${palette.success}20`,
     borderRadius: 8,
     paddingVertical: 13,
     paddingHorizontal: 14,
     marginBottom: 8,
     alignItems: 'center',
   },
-  locationBtnText: { color: '#5aaf5a', fontSize: 14, fontWeight: '600' },
+  locationBtnText: { color: palette.success, fontSize: 14, fontWeight: '600' },
   coordDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: palette.surface,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#c9a84c33',
+    borderColor: `${palette.gold}20`,
   },
-  coordText: { color: '#c9a84c', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  coordClear: { color: '#888', fontSize: 14 },
-  coordOrLabel: { color: '#444', fontSize: 11, textAlign: 'center', marginVertical: 8 },
+  coordText: { color: palette.gold, fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  coordClear: { color: palette.subtext, fontSize: 14 },
+  coordOrLabel: { color: palette.subtext, fontSize: 11, textAlign: 'center', marginVertical: 8 },
 });

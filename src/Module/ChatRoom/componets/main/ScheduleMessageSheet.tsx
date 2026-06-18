@@ -91,7 +91,7 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.surface ?? palette.background,
+            backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
           },
         ]}
@@ -111,7 +111,7 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
                 style={[styles.optRow, { backgroundColor: palette.card ?? palette.surfaceElevated }]}
                 onPress={() => handleConfirm(date)}
               >
-                <View style={[styles.optIcon, { backgroundColor: (palette.primary ?? '#4F46E5') + '22' }]}>
+                <View style={[styles.optIcon, { backgroundColor: (palette.primary) + '22' }]}>
                   <KISIcon name="calendar" size={18} color={palette.primary} focused />
                 </View>
                 <View style={{ flex: 1 }}>

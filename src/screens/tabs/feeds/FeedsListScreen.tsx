@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -23,6 +24,7 @@ const REACTION_EVENT = 'broadcast.reaction';
 
 export default function FeedsListScreen() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<
       NativeStackNavigationProp<FeedsStackParamList, 'FeedsList'>
@@ -172,7 +174,7 @@ export default function FeedsListScreen() {
       data={items}
       keyExtractor={item => item.id}
       renderItem={renderItem}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 16 }]}
       ListEmptyComponent={listEmpty}
       ListFooterComponent={footer}
       onEndReachedThreshold={0.4}

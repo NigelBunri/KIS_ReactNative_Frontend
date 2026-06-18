@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -81,9 +82,9 @@ export default function RevenueAnalyticsPanel({ channelId }: Props) {
   const total = superThanks + superChat + membershipsEst;
 
   const barSegments = [
-    { label: 'Super Thanks', value: superThanks, color: '#F59E0B' },
-    { label: 'Super Chat', value: superChat, color: '#3B82F6' },
-    { label: 'Memberships', value: membershipsEst, color: '#22C55E' },
+    { label: 'Super Thanks', value: superThanks, color: palette.gold },
+    { label: 'Super Chat', value: superChat, color: palette.primary },
+    { label: 'Memberships', value: membershipsEst, color: palette.success },
   ];
 
   const summaryCards = [
@@ -135,7 +136,7 @@ export default function RevenueAnalyticsPanel({ channelId }: Props) {
         {PERIODS.map(p => {
           const active = period === p.value;
           return (
-            <Text
+            <Pressable
               key={p.value}
               onPress={() => setPeriod(p.value)}
               style={[
@@ -143,12 +144,13 @@ export default function RevenueAnalyticsPanel({ channelId }: Props) {
                 {
                   backgroundColor: active ? palette.primaryStrong : (palette.surfaceElevated ?? palette.surface),
                   borderColor: active ? palette.primaryStrong : palette.border,
-                  color: active ? '#fff' : palette.text,
                 },
               ]}
             >
-              {p.label}
-            </Text>
+              <Text style={[styles.pillText, { color: active ? palette.onPrimary : palette.text }]}>
+                {p.label}
+              </Text>
+            </Pressable>
           );
         })}
       </View>
@@ -218,10 +220,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    fontSize: 12,
-    fontWeight: '700',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
+  pillText: { fontSize: 12, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   summaryCard: {
     flex: 1,

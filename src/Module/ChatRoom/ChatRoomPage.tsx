@@ -28,6 +28,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -586,6 +587,48 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       DeviceEventEmitter.emit('chat.open', chatPayload);
     },
     [onOpenChat],
+  );
+
+  const handleEditThreadSubject = useCallback(
+    (subRoom: SubRoom) => {
+      const doRename = (newTitle: string) => {
+        const trimmed = newTitle.trim();
+        if (!trimmed) return;
+        setSubRooms((prev) =>
+          prev.map((sr) =>
+            sr.conversationId === subRoom.conversationId
+              ? { ...sr, title: trimmed }
+              : sr,
+          ),
+        );
+        socket?.emit('subroom.rename', {
+          subroomId: subRoom.conversationId,
+          title: trimmed,
+        });
+      };
+      if (Platform.OS === 'ios') {
+        Alert.prompt(
+          'Edit thread subject',
+          'Enter a new subject for this thread.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Save', onPress: (val: string | undefined) => doRename(val ?? '') },
+          ],
+          'plain-text',
+          subRoom.title ?? '',
+        );
+      } else {
+        Alert.alert(
+          'Edit thread subject',
+          'Enter a new subject for this thread.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Save', onPress: () => doRename(subRoom.title ?? '') },
+          ],
+        );
+      }
+    },
+    [socket],
   );
 
   const handleReactMessage = useCallback(
@@ -1427,7 +1470,25 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleBlockChat = async () => {
     const convId = conversationId ?? chat?.id;
     if (!convId) return;
-    await Handlers.handleBlockRequest(String(convId));
+
+    // Derive the other participant so the blocked-contacts list stays in sync
+    let blockedUser: { userId: string; displayName: string } | undefined;
+    const participants = (chat as any)?.participants;
+    if (Array.isArray(participants)) {
+      const other = participants.find((p: any) => {
+        const id = typeof p === 'string' ? p : String(p?.user?.id ?? p?.user ?? p?.id ?? '');
+        return id && id !== currentUserId;
+      });
+      if (other) {
+        const uid = typeof other === 'string' ? other : String(other?.user?.id ?? other?.user ?? other?.id ?? '');
+        const name = typeof other === 'string'
+          ? (chat?.name ?? '')
+          : (other?.user?.display_name ?? other?.display_name ?? other?.user?.username ?? chat?.name ?? '');
+        if (uid) blockedUser = { userId: uid, displayName: name };
+      }
+    }
+
+    await Handlers.handleBlockRequest(String(convId), blockedUser);
     setLockOverride(true);
   };
 
@@ -2036,6 +2097,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             setAutoScrollEnabled(false);
           }}
           buildSearchSnippet={buildSearchSnippet}
+          participants={(chat?.participants ?? []).map((p: any) => ({
+            id: String(p.id ?? p.userId ?? p.user_id ?? ''),
+            name: p.name ?? p.display_name ?? p.username ?? '',
+            avatarUrl: p.avatar_url ?? p.avatarUrl,
+          }))}
         />
       )}
       <ImageBackground
@@ -2169,6 +2235,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         onCloseSubRooms={() => setSubRoomsSheetVisible(false)}
         subRooms={subRooms}
         onOpenSubRoom={handleOpenSubRoom}
+        onEditThreadSubject={handleEditThreadSubject}
         starredSheetVisible={starredSheetVisible}
         onCloseStarred={() => setStarredSheetVisible(false)}
         readReceiptsSheetVisible={readReceiptsSheetVisible}
@@ -2193,15 +2260,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onRequestClose={() => setMemberTap(null)}
         >
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={() => setMemberTap(null)}>
-            <Pressable onPress={() => {}} style={{ width: 280, borderRadius: 20, overflow: 'hidden', backgroundColor: palette.card ?? '#fff' }}>
+            <Pressable onPress={() => {}} style={{ width: 280, borderRadius: 20, overflow: 'hidden', backgroundColor: palette.card }}>
               {/* Avatar */}
               <View style={{ alignItems: 'center', paddingTop: 28, paddingBottom: 16, backgroundColor: palette.surface }}>
-                <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: (palette.primary ?? '#4F46E5') + '33', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: `${palette.primary}33`, alignItems: 'center', justifyContent: 'center' }}>
                   {memberTap.avatarUrl ? (
                     <Image source={{ uri: memberTap.avatarUrl }} style={{ width: 72, height: 72 }} resizeMode="cover" />
                   ) : (
-                    <Text style={{ fontSize: 26, fontWeight: '700', color: palette.primary ?? '#4F46E5' }}>
-                      {memberTap.name.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                    <Text style={{ fontSize: 26, fontWeight: '700', color: palette.primary }}>
+                      {(memberTap.name ?? '').trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
                     </Text>
                   )}
                 </View>
@@ -2209,7 +2276,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
               </View>
 
               {/* Action buttons */}
-              <View style={{ flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.divider ?? '#e5e7eb' }}>
+              <View style={{ flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.divider }}>
                 {[
                   { icon: 'chat', label: 'Message', onPress: async () => {
                     if (!memberTap.userId) return;
@@ -2238,7 +2305,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
                   }},
                 ].map(({ icon, label, onPress }) => (
                   <Pressable key={label} onPress={onPress} style={({ pressed }) => ({ flex: 1, alignItems: 'center', paddingVertical: 14, opacity: pressed ? 0.6 : 1 })}>
-                    <KISIcon name={icon} size={22} color={palette.primary ?? '#4F46E5'} />
+                    <KISIcon name={icon} size={22} color={palette.primary} />
                     <Text style={{ fontSize: 10, color: palette.subtext, marginTop: 4 }}>{label}</Text>
                   </Pressable>
                 ))}

@@ -7,11 +7,14 @@ import {
   FlatList,
   Pressable,
   Animated,
+  Alert,
 } from 'react-native';
 import { useRef, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
 import NetworkQualityBars from './NetworkQualityBars';
+import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
   participants: CallParticipant[];
@@ -20,6 +23,7 @@ type Props = {
   localUserId: string;
   onMute?: (userId: string) => void;
   onRemove?: (userId: string) => void;
+  onAddParticipant?: () => void;
   isHost?: boolean;
 };
 
@@ -30,58 +34,102 @@ const ROLE_LABEL: Record<string, string> = {
   audience: 'Audience',
 };
 
-const ROLE_COLOR: Record<string, string> = {
-  host: '#C9A227',
-  'co-host': '#E8C84D',
-  speaker: '#22C55E',
+const buildRoleColor = (p: any): Record<string, string> => ({
+  host: p.primary,
+  'co-host': p.goldMuted ?? p.gold,
+  speaker: p.success,
   audience: 'rgba(255,255,255,0.4)',
-};
+});
 
-export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove }: Props) {
+export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant }: Props) {
+  const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const ROLE_COLOR = buildRoleColor(palette);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // Track mounted state so we can defer unmounting until the slide-out animation finishes.
+  const [mounted, setMounted] = React.useState(visible);
+
   useEffect(() => {
+    if (visible) {
+      setMounted(true);
+    }
     Animated.timing(slideAnim, {
       toValue: visible ? 1 : 0,
       duration: 280,
       useNativeDriver: true,
-    }).start();
+    }).start(({ finished }) => {
+      // Unmount only after slide-out fully completes
+      if (finished && !visible) setMounted(false);
+    });
   }, [visible]);
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
 
   return (
-    <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+    <Animated.View style={[styles.sheet, { backgroundColor: palette.royalInk, borderTopColor: `${palette.gold}33`, transform: [{ translateY }] }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Participants ({participants.length})</Text>
-        <Pressable onPress={onClose} style={styles.closeBtn}>
-          <KISIcon name="close" size={20} color="rgba(255,255,255,0.7)" />
-        </Pressable>
+        <Text style={[styles.title, { color: palette.ivory }]}>Participants ({participants.length})</Text>
+        <View style={styles.headerActions}>
+          {isHost && (
+            <Pressable
+              onPress={() => {
+                if (onAddParticipant) {
+                  onAddParticipant();
+                } else {
+                  Alert.alert('Coming soon', 'Adding participants to an active call is not available yet.');
+                }
+              }}
+              style={styles.closeBtn}
+              accessibilityLabel="Add participant"
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <KISIcon name="user-plus" size={20} color={palette.gold} />
+            </Pressable>
+          )}
+          <Pressable
+            onPress={onClose}
+            style={styles.closeBtn}
+            accessibilityLabel="Close participants list"
+            accessibilityRole="button"
+            hitSlop={8}
+          >
+            <KISIcon name="close" size={20} color={palette.subtext} />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
         data={participants}
         keyExtractor={p => p.userId}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: Math.max(insets.bottom, 12) }]}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+            <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+              No participants
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => {
           const isLocal = item.userId === localUserId;
           return (
             <View style={styles.row}>
               {/* Avatar */}
-              <View style={[styles.avatar, { backgroundColor: '#B8860B' }]}>
-                <Text style={styles.avatarText}>
+              <View style={[styles.avatar, { backgroundColor: palette.gold }]}>
+                <Text style={[styles.avatarText, { color: palette.royalInk }]}>
                   {item.displayName.charAt(0).toUpperCase()}
                 </Text>
               </View>
 
               {/* Info */}
               <View style={styles.info}>
-                <Text style={styles.name} numberOfLines={1}>
+                <Text style={[styles.name, { color: palette.ivory }]} numberOfLines={1}>
                   {isLocal ? `${item.displayName} (You)` : item.displayName}
                 </Text>
-                <Text style={[styles.roleLabel, { color: ROLE_COLOR[item.role] ?? '#fff' }]}>
+                <Text style={[styles.roleLabel, { color: ROLE_COLOR[item.role] ?? palette.ivory }]}>
                   {ROLE_LABEL[item.role] ?? item.role}
                 </Text>
               </View>
@@ -93,12 +141,12 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
                 <KISIcon
                   name={item.isMuted ? 'mic-off' : 'mic'}
                   size={15}
-                  color={item.isMuted ? '#E52B2B' : 'rgba(255,255,255,0.5)'}
+                  color={item.isMuted ? palette.danger : palette.subtext}
                 />
                 <KISIcon
                   name={item.isVideoOff ? 'video-off' : 'video'}
                   size={15}
-                  color={item.isVideoOff ? '#E52B2B' : 'rgba(255,255,255,0.5)'}
+                  color={item.isVideoOff ? palette.danger : palette.subtext}
                 />
               </View>
 
@@ -106,13 +154,25 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
               {isHost && !isLocal && (
                 <View style={styles.actions}>
                   {onMute && (
-                    <Pressable onPress={() => onMute(item.userId)} style={styles.actionBtn}>
-                      <KISIcon name={item.isMuted ? 'mic' : 'mic-off'} size={14} color="rgba(255,255,255,0.6)" />
+                    <Pressable
+                      onPress={() => onMute(item.userId)}
+                      style={styles.actionBtn}
+                      accessibilityLabel={item.isMuted ? `Unmute ${item.displayName}` : `Mute ${item.displayName}`}
+                      accessibilityRole="button"
+                      hitSlop={6}
+                    >
+                      <KISIcon name={item.isMuted ? 'mic' : 'mic-off'} size={16} color={palette.subtext} />
                     </Pressable>
                   )}
                   {onRemove && (
-                    <Pressable onPress={() => onRemove(item.userId)} style={styles.actionBtn}>
-                      <KISIcon name="user-minus" size={14} color="#E52B2B" />
+                    <Pressable
+                      onPress={() => onRemove(item.userId)}
+                      style={styles.actionBtn}
+                      accessibilityLabel={`Remove ${item.displayName}`}
+                      accessibilityRole="button"
+                      hitSlop={6}
+                    >
+                      <KISIcon name="user-minus" size={16} color={palette.danger} />
                     </Pressable>
                   )}
                 </View>
@@ -132,11 +192,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '65%',
-    backgroundColor: '#0D0D22',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(201,162,39,0.2)',
     zIndex: 50,
   },
   header: {
@@ -147,8 +205,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  title: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  closeBtn: { padding: 6 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  title: { fontSize: 16, fontWeight: '700' },
+  closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 12, gap: 4 },
   row: {
     flexDirection: 'row',
@@ -168,16 +227,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  avatarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  avatarText: { fontSize: 15, fontWeight: '800' },
   info: { flex: 1 },
-  name: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  name: { fontSize: 14, fontWeight: '600' },
   roleLabel: { fontSize: 11, fontWeight: '600', marginTop: 2 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   handIcon: { fontSize: 14 },
   actions: { flexDirection: 'row', gap: 6 },
   actionBtn: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 10,
+    borderRadius: 12,
   },
 });

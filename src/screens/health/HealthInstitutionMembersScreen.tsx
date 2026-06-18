@@ -374,7 +374,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
         if (existingMember.source === 'owner_added' || existingMember.source === 'imported') {
           Alert.alert(
             'Members',
-            'This contact is already a member of the institution. If you just changed members, tap "Save Members & Roles" to persist.',
+            'This contact is already a member of the institution. If you just changed members, tap "Save Members, Roles & Settings" to persist.',
           );
           return;
         }
@@ -405,7 +405,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
         });
         Alert.alert(
           'Members',
-          `${contact.name} was linked as an owner-added member. Tap "Save Members & Roles" to persist.`,
+          `${contact.name} was linked as an owner-added member. Tap "Save Members, Roles & Settings" to persist.`,
         );
         return;
       }
@@ -425,7 +425,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
       ]);
 
       appendAuditLog({ action: 'member.added', memberName: contact.name, toRole: finalRole });
-      Alert.alert('Members', `${contact.name} added as ${finalRole}. Tap "Save Members & Roles" to persist.`);
+      Alert.alert('Members', `${contact.name} added as ${finalRole}. Tap "Save Members, Roles & Settings" to persist.`);
     } catch (error: any) {
       Alert.alert('Members', error?.message || 'Unable to add member from selected contact.');
     } finally {
@@ -625,7 +625,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator color={palette.accentPrimary} />
           <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading members...</Text>
@@ -635,7 +635,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -645,7 +645,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
             </View>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 999, padding: spacing.xs }}
+              style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 999, padding: spacing.xs, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
               accessibilityLabel="Close members"
             >
               <KISIcon name="close" size={20} color={palette.text} />
@@ -828,7 +828,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
             </View>
             <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
               <KISButton
-                title={saving ? 'Saving...' : 'Save Members & Roles'}
+                title={saving ? 'Saving...' : 'Save Members, Roles & Settings'}
                 onPress={() => {
                   saveMembers().catch(() => undefined);
                 }}
@@ -840,7 +840,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
         </ScrollView>
 
         {contactsPickerOpen ? (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.background }}>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.bg }}>
             <AddContactsPage
               onClose={() => setContactsPickerOpen(false)}
               onOpenChat={(_chat) => undefined}

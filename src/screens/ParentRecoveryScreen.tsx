@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -27,6 +29,8 @@ export default function ParentRecoveryScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
   const { setAuth, setUser } = useAuth();
+  const responsive = useResponsiveLayout();
+  const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
 
   const [step, setStep] = useState<Step>('identify');
   const [phone, setPhone] = useState('');
@@ -88,10 +92,16 @@ export default function ParentRecoveryScreen() {
         return;
       }
 
-      setStep('done');
-
       const t = res.data?.tokens ?? res.data ?? {};
-      await setAuthTokens({ accessToken: t.access ?? t.access_token, refreshToken: t.refresh ?? t.refresh_token });
+      const accessToken = t.access ?? t.access_token;
+      if (!accessToken) {
+        // Recovery initiated (24-hour delay) — no immediate login token
+        setStep('done');
+        return;
+      }
+
+      setStep('done');
+      await setAuthTokens({ accessToken, refreshToken: t.refresh ?? t.refresh_token ?? null });
       const resolvedUser = res?.data?.user ?? null;
       await setUserData(resolvedUser, res.data);
       setUser?.(resolvedUser);
@@ -114,7 +124,8 @@ export default function ParentRecoveryScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.body, { padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center' }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
           <KISIcon name="warning" size={36} color={palette.primary} />
         </View>
@@ -127,7 +138,7 @@ export default function ParentRecoveryScreen() {
               For security, there is a 24-hour delay before the primary role is transferred.
             </Text>
 
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
               <Text style={[styles.label, { color: palette.subtext }]}>Phone number</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
@@ -142,7 +153,7 @@ export default function ParentRecoveryScreen() {
 
             <Text style={[{ color: palette.subtext, fontWeight: '600', fontSize: 12 }]}>— or —</Text>
 
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
               <Text style={[styles.label, { color: palette.subtext }]}>Email address</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
@@ -157,11 +168,11 @@ export default function ParentRecoveryScreen() {
             </View>
 
             <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: (phone.trim() || email.trim()) && !loading ? 1 : 0.5 }]}
+              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: (phone.trim() || email.trim()) && !loading ? 1 : 0.5, maxWidth: formMaxWidth }]}
               onPress={handleInitiate}
               disabled={loading || (!phone.trim() && !email.trim())}
             >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Send Recovery Code</Text>}
+              {loading ? <ActivityIndicator color={palette.ivory} /> : <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Send Recovery Code</Text>}
             </Pressable>
           </>
         )}
@@ -173,7 +184,7 @@ export default function ParentRecoveryScreen() {
               Check your email for a 6-character recovery code. It expires in 15 minutes and can only be used once.
             </Text>
 
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
               <Text style={[styles.label, { color: palette.subtext }]}>Recovery code</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text, letterSpacing: 4, textAlign: 'center', fontSize: 22, fontWeight: '700' }]}
@@ -188,11 +199,11 @@ export default function ParentRecoveryScreen() {
             </View>
 
             <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: recoveryToken.trim() && !loading ? 1 : 0.5 }]}
+              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: recoveryToken.trim() && !loading ? 1 : 0.5, maxWidth: formMaxWidth }]}
               onPress={handleConfirm}
               disabled={loading || !recoveryToken.trim()}
             >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Recover</Text>}
+              {loading ? <ActivityIndicator color={palette.ivory} /> : <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Verify & Recover</Text>}
             </Pressable>
 
             <Pressable onPress={() => setStep('identify')} style={styles.backLink}>
@@ -207,14 +218,14 @@ export default function ParentRecoveryScreen() {
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               Your recovery is being processed. This device will become your primary device within 24 hours. You are now logged in.
             </Text>
-            <View style={[styles.successBox, { backgroundColor: '#16A34A22', borderColor: '#16A34A' }]}>
-              <KISIcon name="check" size={20} color="#16A34A" />
-              <Text style={{ color: '#16A34A', fontWeight: '700', fontSize: 14 }}>Logged in successfully</Text>
+            <View style={[styles.successBox, { backgroundColor: `${palette.success}22`, borderColor: palette.success, maxWidth: formMaxWidth }]}>
+              <KISIcon name="check" size={20} color={palette.success} />
+              <Text style={{ color: palette.success, fontWeight: '700', fontSize: 14 }}>Logged in successfully</Text>
             </View>
           </>
         )}
 
-        <View style={[styles.securityNote, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+        <View style={[styles.securityNote, { backgroundColor: palette.surface, borderColor: palette.divider, maxWidth: formMaxWidth }]}>
           <KISIcon name="lock" size={14} color={palette.subtext} />
           <Text style={[styles.securityNoteText, { color: palette.subtext }]}>
             For your security, the 24-hour delay gives you time to cancel if this recovery was not initiated by you.
@@ -222,6 +233,7 @@ export default function ParentRecoveryScreen() {
           </Text>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -237,7 +249,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
-  body: { padding: 24, alignItems: 'center', gap: 16 },
+  body: { alignItems: 'center', gap: 16 },
   iconWrap: {
     width: 80,
     height: 80,
@@ -247,8 +259,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: { fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  subtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 22, maxWidth: 320 },
-  inputGroup: { width: '100%', maxWidth: 360, gap: 6 },
+  subtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 22 },
+  inputGroup: { width: '100%', gap: 6 },
   label: { fontSize: 13, fontWeight: '600' },
   input: {
     borderRadius: 12,
@@ -258,12 +270,11 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     width: '100%',
-    maxWidth: 360,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  primaryBtnText: { fontSize: 16, fontWeight: '800' },
   backLink: { paddingVertical: 8 },
   backLinkText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   successBox: {
@@ -273,7 +284,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     padding: 16,
-    maxWidth: 360,
   },
   securityNote: {
     flexDirection: 'row',
@@ -282,7 +292,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     padding: 14,
-    maxWidth: 360,
     marginTop: 8,
   },
   securityNoteText: { flex: 1, fontSize: 12, fontWeight: '500', lineHeight: 18 },

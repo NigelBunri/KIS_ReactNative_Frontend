@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { isAnalyticsEnabled } from '@/services/consentService';
 
 const PENDING_ANALYTICS_KEY = 'KIS_PENDING_ANALYTICS';
 
@@ -79,6 +80,7 @@ export const fetchClinicalAnalyticsReports = (params?: Record<string, any>) =>
   });
 
 export const computeClinicalAnalyticsReports = async (profileId?: string) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.computeClinicalReports, { profile_id: profileId }, {
       errorMessage: 'Unable to refresh analytics reports.',
@@ -96,6 +98,7 @@ export const fetchRiskStratifications = (params?: Record<string, any>) =>
   });
 
 export const computeRiskStratification = async () => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.computeRisk, {}, {
       errorMessage: 'Unable to compute risk stratification.',
@@ -113,6 +116,7 @@ export const fetchOutcomeBenchmarks = (params?: Record<string, any>) =>
   });
 
 export const createOutcomeBenchmark = async (payload: Record<string, any>) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.outcomeBenchmarks, payload, {
       errorMessage: 'Unable to create outcome benchmark.',
@@ -130,6 +134,7 @@ export const fetchPatientSatisfactionScores = (params?: Record<string, any>) =>
   });
 
 export const createPatientSatisfactionScore = async (payload: Record<string, any>) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.patientSatisfaction, payload, {
       errorMessage: 'Unable to record satisfaction score.',
@@ -147,6 +152,7 @@ export const fetchOutreachCampaigns = (params?: Record<string, any>) =>
   });
 
 export const createOutreachCampaign = async (payload: Record<string, any>) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.outreachCampaigns, payload, {
       errorMessage: 'Unable to create outreach campaign.',
@@ -158,6 +164,7 @@ export const createOutreachCampaign = async (payload: Record<string, any>) => {
 };
 
 export const setOutreachCampaignStatus = async (campaignId: string, status: string) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.outreachSetStatus(campaignId), { status }, {
       errorMessage: 'Unable to update campaign status.',
@@ -175,6 +182,7 @@ export const fetchWellnessChallenges = (params?: Record<string, any>) =>
   });
 
 export const createWellnessChallenge = async (payload: Record<string, any>) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.wellnessChallenges, payload, {
       errorMessage: 'Unable to create wellness challenge.',
@@ -192,6 +200,7 @@ export const fetchHabitTrackingEntries = (params?: Record<string, any>) =>
   });
 
 export const createHabitTrackingEntry = async (payload: Record<string, any>) => {
+  if (!isAnalyticsEnabled()) return null;
   try {
     return await postRequest(ROUTES.analytics.habitEntries, payload, {
       errorMessage: 'Unable to log habit entry.',

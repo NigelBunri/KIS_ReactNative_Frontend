@@ -5,19 +5,22 @@ import {
   Alert,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout, type ResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { API_BASE_URL } from '@/network/config';
 import type { RootStackParamList } from '@/navigation/types';
 import type { AdminUser, AdminUsersPagination } from '@/screens/tabs/partners/useAdminUsersPanel';
 
@@ -25,11 +28,14 @@ const TIERS = ['Free', 'Pro', 'Business', 'Business Pro', 'Partner', 'Partner Pr
 
 export default function AdminUserManagementScreen() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<AdminUsersPagination | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -37,8 +43,8 @@ export default function AdminUserManagementScreen() {
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const loadUsers = useCallback(async (opts?: { q?: string; p?: number }) => {
-    setLoading(true);
+  const loadUsers = useCallback(async (opts?: { q?: string; p?: number; refresh?: boolean }) => {
+    if (opts?.refresh) setRefreshing(true); else setLoading(true);
     setError(null);
     const params = new URLSearchParams();
     const q = opts?.q ?? query;
@@ -47,7 +53,7 @@ export default function AdminUserManagementScreen() {
     params.set('page', String(pg));
     params.set('per_page', '20');
 
-    const baseUrl = (ROUTES as any).users?.list ?? `${(ROUTES as any).API_BASE_URL ?? ''}/api/v1/admin/users/`;
+    const baseUrl = (ROUTES as any).users?.list ?? `${API_BASE_URL}/control/admin/users/`;
     const url = `${baseUrl}?${params.toString()}`;
     try {
       const res = await getRequest(url, { errorMessage: 'Failed to load users.' });
@@ -61,6 +67,7 @@ export default function AdminUserManagementScreen() {
       setError(err?.message ?? 'Failed to load users.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [query, page]);
 
@@ -91,7 +98,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${(ROUTES as any).API_BASE_URL ?? ''}/api/v1/admin/users/${user.id}/ban/`;
+              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/ban/`;
               const res = await postRequest(endpoint, { reason: 'Policy violation', permanent: false }, { errorMessage: 'Unable to suspend user.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'suspended' } : u));
@@ -111,7 +118,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${(ROUTES as any).API_BASE_URL ?? ''}/api/v1/admin/users/${user.id}/ban/`;
+              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/ban/`;
               const res = await postRequest(endpoint, { reason: 'Policy violation', permanent: true }, { errorMessage: 'Unable to ban user.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'banned' } : u));
@@ -132,7 +139,7 @@ export default function AdminUserManagementScreen() {
   const handleUnban = useCallback(async (user: AdminUser) => {
     setActionLoading(user.id);
     try {
-      const endpoint = (ROUTES as any).users?.unban?.(user.id) ?? `${(ROUTES as any).API_BASE_URL ?? ''}/api/v1/admin/users/${user.id}/unban/`;
+      const endpoint = (ROUTES as any).users?.unban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/unban/`;
       const res = await postRequest(endpoint, {}, { errorMessage: 'Unable to unban user.' });
       if (res.success) {
         setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'active' } : u));
@@ -156,7 +163,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.setTier?.(user.id) ?? `${(ROUTES as any).API_BASE_URL ?? ''}/api/v1/admin/users/${user.id}/set-tier/`;
+              const endpoint = (ROUTES as any).users?.setTier?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/set-tier/`;
               const res = await postRequest(endpoint, { tier }, { errorMessage: 'Unable to change tier.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, tier } : u));
@@ -175,7 +182,7 @@ export default function AdminUserManagementScreen() {
     );
   }, []);
 
-  const styles = createStyles(palette);
+  const styles = createStyles(palette, responsive);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg }]} edges={['top']}>
@@ -185,7 +192,7 @@ export default function AdminUserManagementScreen() {
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>User Management</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: responsive.minTouchTarget }} />
       </View>
 
       {/* Search */}
@@ -217,12 +224,12 @@ export default function AdminUserManagementScreen() {
           </Text>
           <View style={styles.pageRow}>
             {pagination.page > 1 ? (
-              <Pressable onPress={() => handleLoadPage(pagination.page - 1)}>
+              <Pressable onPress={() => handleLoadPage(pagination.page - 1)} style={styles.pageBtnHit} hitSlop={8}>
                 <Text style={[styles.pageBtn, { color: palette.primaryStrong ?? palette.primary }]}>&#8592; Prev</Text>
               </Pressable>
             ) : null}
             {pagination.page < pagination.total_pages ? (
-              <Pressable onPress={() => handleLoadPage(pagination.page + 1)}>
+              <Pressable onPress={() => handleLoadPage(pagination.page + 1)} style={styles.pageBtnHit} hitSlop={8}>
                 <Text style={[styles.pageBtn, { color: palette.primaryStrong ?? palette.primary }]}>Next &#8594;</Text>
               </Pressable>
             ) : null}
@@ -237,7 +244,7 @@ export default function AdminUserManagementScreen() {
         </View>
       ) : error ? (
         <View style={styles.errorBox}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
           <Pressable onPress={() => loadUsers()} style={[styles.retryBtn, { borderColor: palette.primaryStrong ?? palette.primary }]}>
             <Text style={[styles.retryBtnText, { color: palette.primaryStrong ?? palette.primary }]}>Retry</Text>
           </Pressable>
@@ -258,7 +265,10 @@ export default function AdminUserManagementScreen() {
               onChangeTier={() => handleSetTier(item)}
             />
           )}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => loadUsers({ refresh: true })} tintColor={palette.primaryStrong} colors={[palette.primaryStrong]} />
+          }
           ItemSeparatorComponent={() => (
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: palette.divider, marginLeft: 16 }} />
           )}
@@ -286,9 +296,9 @@ type UserRowProps = {
 
 function UserRow({ user, palette, isActioning, selected, onSelect, onBan, onUnban, onChangeTier }: UserRowProps) {
   const statusColor =
-    user.status === 'active' ? (palette.success ?? '#28a745') :
-    user.status === 'banned' ? (palette.danger ?? '#d9534f') :
-    '#f0ad4e';
+    user.status === 'active' ? (palette.success) :
+    user.status === 'banned' ? (palette.danger) :
+    palette.warning;
 
   return (
     <Pressable
@@ -305,12 +315,12 @@ function UserRow({ user, palette, isActioning, selected, onSelect, onBan, onUnba
           </Text>
           <View style={[userRowStyles.statusDot, { backgroundColor: statusColor }]} />
           {user.is_superuser ? (
-            <View style={[userRowStyles.badge, { backgroundColor: '#9B59B6' }]}>
-              <Text style={userRowStyles.badgeText}>GO</Text>
+            <View style={[userRowStyles.badge, { backgroundColor: palette.primaryStrong }]}>
+              <Text style={[userRowStyles.badgeText, { color: palette.onPrimary }]}>GO</Text>
             </View>
           ) : user.is_staff ? (
-            <View style={[userRowStyles.badge, { backgroundColor: '#2980B9' }]}>
-              <Text style={userRowStyles.badgeText}>Staff</Text>
+            <View style={[userRowStyles.badge, { backgroundColor: palette.primary }]}>
+              <Text style={[userRowStyles.badgeText, { color: palette.onPrimary }]}>Staff</Text>
             </View>
           ) : null}
         </View>
@@ -338,9 +348,9 @@ function UserRow({ user, palette, isActioning, selected, onSelect, onBan, onUnba
             <>
               <ActionButton label="Tier" color={palette.primaryStrong ?? palette.primary} onPress={onChangeTier} />
               {user.status === 'active' ? (
-                <ActionButton label="Ban" color={palette.danger ?? '#d9534f'} onPress={onBan} />
+                <ActionButton label="Ban" color={palette.danger} onPress={onBan} />
               ) : (
-                <ActionButton label="Unban" color={palette.success ?? '#28a745'} onPress={onUnban} />
+                <ActionButton label="Unban" color={palette.success} onPress={onUnban} />
               )}
             </>
           )}
@@ -351,11 +361,12 @@ function UserRow({ user, palette, isActioning, selected, onSelect, onBan, onUnba
 }
 
 function TierPill({ tier }: { tier: string }) {
+  const { palette: tierpPalette } = useKISTheme();
   const color =
-    tier.toLowerCase().includes('partner') ? '#9B59B6' :
-    tier.toLowerCase().includes('business') ? '#2980B9' :
-    tier.toLowerCase() === 'pro' ? '#27AE60' :
-    '#7F8C8D';
+    tier.toLowerCase().includes('partner') ? tierpPalette.primaryStrong :
+    tier.toLowerCase().includes('business') ? tierpPalette.primary :
+    tier.toLowerCase() === 'pro' ? tierpPalette.success :
+    tierpPalette.subtext;
   return (
     <View style={[userRowStyles.tierPill, { backgroundColor: color + '22', borderColor: color }]}>
       <Text style={[userRowStyles.tierText, { color }]}>{tier}</Text>
@@ -381,30 +392,40 @@ const userRowStyles = StyleSheet.create({
   name: { fontSize: 14, fontWeight: '700', flex: 1 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   badge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  badgeText: { fontSize: 10, fontWeight: '900', color: '#fff' },
+  badgeText: { fontSize: 10, fontWeight: '900' },
   email: { fontSize: 11, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   meta: { fontSize: 10 },
   tierPill: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1 },
   tierText: { fontSize: 10, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  actionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+  },
   actionBtnText: { fontWeight: '700', fontSize: 12 },
 });
 
-function createStyles(palette: any) {
+function createStyles(palette: any, responsive: ResponsiveLayout) {
+  const gutter = responsive.pageGutter;
   return StyleSheet.create({
     safeArea: { flex: 1 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
+      paddingHorizontal: gutter,
       paddingVertical: 14,
+      minHeight: responsive.minTouchTarget,
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    backButton: { width: 40, alignItems: 'flex-start' },
-    headerTitle: { fontSize: 17, fontWeight: '700' },
+    backButton: { width: responsive.minTouchTarget, minHeight: responsive.minTouchTarget, alignItems: 'flex-start', justifyContent: 'center' },
+    headerTitle: { fontSize: responsive.bodyFontSize + 2, fontWeight: '700' },
     searchRow: {
       flexDirection: 'row',
       gap: 8,
@@ -417,15 +438,18 @@ function createStyles(palette: any) {
       borderRadius: 8,
       paddingHorizontal: 10,
       paddingVertical: 8,
-      fontSize: 13,
+      minHeight: responsive.minTouchTarget,
+      fontSize: responsive.labelFontSize + 1,
     },
     searchBtn: {
       paddingHorizontal: 14,
       paddingVertical: 8,
+      minHeight: responsive.minTouchTarget,
       borderRadius: 8,
+      alignItems: 'center',
       justifyContent: 'center',
     },
-    searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    searchBtnText: { color: palette.onPrimary, fontWeight: '700', fontSize: responsive.labelFontSize + 1 },
     statsBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -434,15 +458,24 @@ function createStyles(palette: any) {
       paddingVertical: 8,
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    statsText: { fontSize: 11 },
+    statsText: { fontSize: responsive.labelFontSize - 1 },
     pageRow: { flexDirection: 'row', gap: 12 },
-    pageBtn: { fontSize: 12, fontWeight: '700' },
+    pageBtnHit: { minHeight: responsive.minTouchTarget, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+    pageBtn: { fontSize: responsive.labelFontSize, fontWeight: '700' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     errorBox: { padding: 24, alignItems: 'center', gap: 12 },
-    errorText: { fontSize: 14, textAlign: 'center' },
-    retryBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
-    retryBtnText: { fontSize: 13, fontWeight: '700' },
+    errorText: { fontSize: responsive.bodyFontSize - 1, textAlign: 'center' },
+    retryBtn: {
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      minHeight: responsive.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    retryBtnText: { fontSize: responsive.labelFontSize + 1, fontWeight: '700' },
     emptyBox: { padding: 40, alignItems: 'center' },
-    emptyText: { fontSize: 14 },
+    emptyText: { fontSize: responsive.bodyFontSize - 1 },
   });
 }

@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { getRequest } from '@/network/get';
@@ -66,6 +67,7 @@ const EMPTY_CONTACT_NOTE = 'Select a registered contact from your device to invi
 
 export default function EducationProfileManager({ initialProfileId = null }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<BottomTabsProp>();
   const [formState, setFormState] = useState<ProfileFormState>({
     name: '',
@@ -452,7 +454,7 @@ export default function EducationProfileManager({ initialProfileId = null }: Pro
     EDUCATION_PROFILE_TYPE_OPTIONS.find((item) => item.id === formState.profileType)?.label ?? '';
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+    <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View
         style={{
           borderWidth: 2,
@@ -669,7 +671,8 @@ export default function EducationProfileManager({ initialProfileId = null }: Pro
                     borderColor: selected ? palette.primaryStrong : palette.divider,
                     borderRadius: 14,
                     paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    minHeight: 44,
+                    justifyContent: 'center',
                     backgroundColor: selected ? palette.primarySoft : palette.surface,
                   }}
                 >
@@ -745,6 +748,8 @@ export default function EducationProfileManager({ initialProfileId = null }: Pro
                         setShowContactPicker(false);
                       }}
                       style={{
+                        minHeight: 44,
+                        justifyContent: 'center',
                         paddingVertical: 8,
                         borderBottomWidth: 1,
                         borderBottomColor: palette.divider,

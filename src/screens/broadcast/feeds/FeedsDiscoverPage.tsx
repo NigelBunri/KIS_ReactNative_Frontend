@@ -490,7 +490,7 @@ export default function FeedsDiscoverPage({
 
       {/* Filter sheet modal */}
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={styles.filterOverlay} onPress={() => setFilterOpen(false)}>
+        <Pressable style={[styles.filterOverlay, { backgroundColor: palette.backdrop }]} onPress={() => setFilterOpen(false)}>
           <View style={[styles.filterSheet, { backgroundColor: palette.surface }]}>
             <Text style={[styles.filterTitle, { color: palette.text }]}>Sort & Filter</Text>
 
@@ -578,8 +578,8 @@ export default function FeedsDiscoverPage({
               style={({ pressed }) => [
                 styles.categoryPill,
                 {
-                  backgroundColor: active ? '#FFF4B8' : palette.surface,
-                  borderColor: active ? '#C9A24A' : palette.divider,
+                  backgroundColor: active ? (palette.goldHighlight) : palette.surface,
+                  borderColor: active ? (palette.gold) : palette.divider,
                   opacity: pressed ? 0.8 : 1,
                 },
               ]}
@@ -587,13 +587,13 @@ export default function FeedsDiscoverPage({
               <Text
                 style={[
                   styles.categoryLabel,
-                  { color: active ? '#17140F' : palette.text },
+                  { color: active ? (palette.royalInk) : palette.text },
                 ]}
               >
                 {cat.label}
               </Text>
               {cat.id === 'live' && liveItems.length > 0 && (
-                <View style={styles.liveDot} />
+                <View style={[styles.liveDot, { backgroundColor: palette.danger }]} />
               )}
             </Pressable>
           );
@@ -608,21 +608,21 @@ export default function FeedsDiscoverPage({
             style={({ pressed }) => [
               styles.liveBanner,
               {
-                backgroundColor: pressed ? '#FFF0EE' : palette.surface,
-                borderColor: palette.error ?? '#e74c3c',
+                backgroundColor: pressed ? palette.primarySoft : palette.surface,
+                borderColor: palette.danger,
               },
             ]}
           >
-            <View style={styles.livePulse} />
+            <View style={[styles.livePulse, { backgroundColor: palette.danger }]} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.liveBannerText, { color: palette.error ?? '#e74c3c' }]}>
+              <Text style={[styles.liveBannerText, { color: palette.danger }]}>
                 {liveItems.length} live {liveItems.length === 1 ? 'broadcast' : 'broadcasts'} now
               </Text>
               <Text style={[styles.liveBannerSub, { color: palette.subtext }]}>
                 Tap to watch
               </Text>
             </View>
-            <KISIcon name="chevron-right" size={14} color={palette.error ?? '#e74c3c'} />
+            <KISIcon name="chevron-right" size={14} color={palette.danger} />
           </Pressable>
         )}
 
@@ -753,9 +753,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
+    minHeight: 44,
   },
   quickBtnText: {
     fontSize: 12,
@@ -763,7 +764,6 @@ const styles = StyleSheet.create({
   },
   filterOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   filterSheet: {
@@ -844,10 +844,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
     gap: 5,
+    minHeight: 44,
   },
   categoryLabel: {
     fontSize: 13,
@@ -857,7 +858,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#e74c3c',
+    backgroundColor: 'transparent',
   },
   liveBanner: {
     flexDirection: 'row',
@@ -872,7 +873,7 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: '#e74c3c',
+    backgroundColor: 'transparent',
   },
   liveBannerText: {
     fontSize: 13,

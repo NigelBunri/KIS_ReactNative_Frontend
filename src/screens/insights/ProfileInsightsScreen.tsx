@@ -56,7 +56,7 @@ function TopContentList({ items }: TopContentListProps) {
             key={item.id}
             style={{
               borderWidth: 1,
-              borderColor: palette.border,
+              borderColor: palette.divider,
               borderRadius: 12,
               padding: 12,
               marginBottom: 10,
@@ -101,7 +101,7 @@ function NotificationSection({ loading, items, palette }: NotificationSectionPro
             key={item.id}
             style={{
               borderWidth: 1,
-              borderColor: palette.border,
+              borderColor: palette.divider,
               borderRadius: 12,
               padding: 10,
               marginBottom: 8,

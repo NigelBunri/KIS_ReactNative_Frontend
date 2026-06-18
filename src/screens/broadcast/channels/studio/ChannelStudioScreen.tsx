@@ -7,7 +7,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import { isTierAtLeast } from '@/services/tierAccess';
 import { useAuth } from '../../../../../App';
 import ChannelAnalyticsPanel from '@/screens/broadcast/channels/studio/ChannelAnalyticsPanel';
@@ -287,6 +287,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     }
   }, [refreshContent]);
 
+  const handleUpdateContentTags = useCallback(async (contentId: string, tags: string[]) => {
+    if (!contentId) return;
+    await setChannelContentTags(contentId, tags);
+  }, []);
+
   const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'live' | 'settings' = 'dashboard') => {
     const features =
       context === 'create'
@@ -299,7 +304,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         ? CREATOR_PREMIUM_FEATURES.filter(feature => ['embeds', 'promotion', 'paid-content'].includes(feature.key))
         : CREATOR_PREMIUM_FEATURES;
     return (
-      <View style={[styles.premiumPanel, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? 'rgba(231,199,109,0.10)' : '#FFFCF5' }]}>
+      <View style={[styles.premiumPanel, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
         <View style={styles.premiumHeaderRow}>
           <View style={[styles.premiumIcon, { backgroundColor: palette.primarySoft }]}>
             <KISIcon name="star" size={18} color={palette.primaryStrong} />
@@ -351,9 +356,9 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const renderCreateChannelForm = () => (
     <View style={[styles.createCard, { borderColor: palette.border, backgroundColor: palette.surface }]}>
       {lastCreatedHandle ? (
-        <View style={[styles.successBanner, { backgroundColor: tone === 'dark' ? 'rgba(34,197,94,0.15)' : '#F0FDF4', borderColor: tone === 'dark' ? '#166534' : '#BBF7D0' }]}>
-          <KISIcon name="check" size={16} color={tone === 'dark' ? '#4ADE80' : '#16A34A'} />
-          <Text style={[styles.successText, { color: tone === 'dark' ? '#4ADE80' : '#15803D', flex: 1 }]}>
+        <View style={[styles.successBanner, { backgroundColor: `${palette.success}26`, borderColor: palette.success }]}>
+          <KISIcon name="check" size={16} color={palette.success} />
+          <Text style={[styles.successText, { color: palette.success, flex: 1 }]}>
             @{lastCreatedHandle} created! Fill in the form below to add another channel.
           </Text>
           <Pressable onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
@@ -402,7 +407,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         placeholderTextColor={palette.subtext}
         style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.card }]}
       />
-      {channelError ? <Text style={[styles.errorText, { color: palette.error || '#B42318' }]}>{channelError}</Text> : null}
+      {channelError ? <Text style={[styles.errorText, { color: palette.danger }]}>{channelError}</Text> : null}
       <Pressable onPress={handleCreateChannel} disabled={creatingChannel} style={[styles.primaryButton, { backgroundColor: palette.text, opacity: creatingChannel ? 0.72 : 1 }]}> 
         {creatingChannel ? <ActivityIndicator color={palette.surface} /> : <KISIcon name="add" size={17} color={palette.surface} />}
         <Text style={[styles.primaryText, { color: palette.surface }]}>{creatingChannel ? 'Creating...' : 'Create Channel'}</Text>
@@ -428,7 +433,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
       );
     }
-    if (activeTab === 'branding') return <ChannelBrandingEditor channel={selectedChannel} />;
+    if (activeTab === 'branding') return <ChannelBrandingEditor channel={selectedChannel} onUpdated={refresh} />;
     if (activeTab === 'analytics') {
       return (
         <>
@@ -437,7 +442,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </>
       );
     }
-    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} />;
+    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} />;
     if (activeTab === 'moderation') return <ChannelModerationPanel channelId={selectedChannel.id} />;
     if (activeTab === 'create') {
       return (
@@ -526,7 +531,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           subtitle="Creator, ministry, education, and institution media networks are packaged for future annual contracts only."
         />
         <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />
-        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} />
+        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} />
         {loadingContent ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       </>
     );
@@ -535,7 +540,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   return (
     <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}> 
       <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
-        <View style={[styles.logo, { backgroundColor: palette.primarySoft, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}> 
+        <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
           <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
         </View>
         <View style={{ flex: 1 }}>
@@ -551,14 +556,14 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
               style={[
                 styles.headerBroadcastButton,
                 {
-                  backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5',
-                  borderColor: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primary,
+                  backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface,
+                  borderColor: selectedChannel.is_broadcast ? palette.danger : palette.primary,
                   opacity: channelBroadcasting ? 0.72 : 1,
                 },
               ]}
             >
               {channelBroadcasting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
-              <Text style={[styles.broadcastText, { color: selectedChannel.is_broadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>
+              <Text style={[styles.broadcastText, { color: selectedChannel.is_broadcast ? palette.danger : palette.primaryStrong }]}>
                 {compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
               </Text>
             </Pressable>
@@ -571,15 +576,15 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       </View>
       {selectedChannel ? (
         <View style={styles.studioMetrics}>
-          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{contents.length}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Studio items</Text>
           </View>
-          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.is_broadcast ? 'Live' : 'Private'}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Broadcast state</Text>
           </View>
-          <View style={[styles.metricTile, { borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7', backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5' }]}>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.subscriber_count || 0}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Subscribers</Text>
           </View>
@@ -627,9 +632,9 @@ function Placeholder({ title, text }: { title: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
-  shell: { borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 3 },
+  shell: { borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 14, overflow: 'hidden', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  logo: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E6D7B2' },
+  logo: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 0 },
   title: { marginTop: 2, fontSize: 22, lineHeight: 27, fontWeight: '900' },
   subtitle: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '700' },
@@ -673,10 +678,10 @@ const styles = StyleSheet.create({
   input: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontWeight: '700' },
   textarea: { minHeight: 82, textAlignVertical: 'top' },
   errorText: { fontSize: 12, lineHeight: 17, fontWeight: '800' },
-  primaryButton: { alignSelf: 'flex-start', marginTop: 12, minHeight: 38, borderRadius: 8, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  primaryButton: { alignSelf: 'flex-start', marginTop: 12, minHeight: 44, borderRadius: 8, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  headerCreateButton: { minHeight: 38, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  headerBroadcastButton: { minHeight: 38, borderWidth: 1, borderRadius: 8, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFCF5' },
+  headerCreateButton: { minHeight: 44, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  headerBroadcastButton: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
   broadcastText: { fontSize: 11, fontWeight: '900' },
   primaryText: { fontSize: 12, fontWeight: '900' },
   upgradePrompt: { borderWidth: 1, borderRadius: 8, padding: 24, marginBottom: 12, alignItems: 'center', gap: 12 },

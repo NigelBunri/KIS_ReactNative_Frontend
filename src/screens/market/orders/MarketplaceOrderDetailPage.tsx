@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker, {
@@ -52,6 +53,7 @@ const receiptFilePath = (orderId: string) =>
 
 export default function MarketplaceOrderDetailPage() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<MarketplaceOrderDetailNavigation>();
   const route = useRoute<MarketplaceOrderDetailRoute>();
   const { orderId, mode } = route.params;
@@ -272,7 +274,7 @@ export default function MarketplaceOrderDetailPage() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: palette.bg }]}
+      style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}
       contentContainerStyle={styles.scrollContent}
     >
       <View
@@ -332,7 +334,7 @@ export default function MarketplaceOrderDetailPage() {
             styles.sectionValue,
             {
               color: orderPaymentFailed
-                ? palette.error ?? palette.primaryStrong
+                ? palette.danger
                 : orderPaymentPending
                 ? palette.warning ?? palette.primaryStrong
                 : palette.success ?? palette.primaryStrong,

@@ -443,7 +443,7 @@ export function EducationListCard({
           {imageUrl ? (
             <Image
               source={{ uri: imageUrl }}
-              style={[styles.listCardImage, { borderColor: `${palette.divider}99`, backgroundColor: palette.background }]}
+              style={[styles.listCardImage, { borderColor: `${palette.divider}99`, backgroundColor: palette.bg }]}
               resizeMode="cover"
             />
           ) : null}
@@ -761,7 +761,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   button: {
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,

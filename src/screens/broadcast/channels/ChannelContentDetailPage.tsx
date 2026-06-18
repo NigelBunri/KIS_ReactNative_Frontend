@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import Video from 'react-native-video';
+import RNFS from 'react-native-fs';
 import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -24,6 +25,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
 import { postRequest } from '@/network/post';
+import { getRequest } from '@/network/get';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -49,6 +51,8 @@ import {
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
+import AgeGateScreen from '@/screens/broadcast/channels/components/AgeGateScreen';
+import GeoBlockedScreen from '@/screens/broadcast/channels/components/GeoBlockedScreen';
 import { fetchPublicContentLanding } from '@/services/publicGrowthService';
 
 const compactNumber = (value?: number) => {
@@ -92,6 +96,7 @@ function VideoPlayerControls({
   palette: any;
   relatedContent?: { id: string; title: string; thumbnail_url?: string; channel?: { name: string } }[];
 }) {
+  const controlsNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<any>(null);
   const [paused, setPaused]           = useState(false);
   const [buffering, setBuffering]     = useState(true);
@@ -166,7 +171,7 @@ function VideoPlayerControls({
 
   return (
     <Pressable
-      style={[vstyles.wrap, { height: stageHeight, backgroundColor: '#000' }]}
+      style={[vstyles.wrap, { height: stageHeight, backgroundColor: palette.royalInk }]}
       onPress={showControls}
     >
       <Video
@@ -204,7 +209,7 @@ function VideoPlayerControls({
 
       {buffering && (
         <View style={vstyles.bufferWrap} pointerEvents="none">
-          <ActivityIndicator color="#fff" size="large" />
+          <ActivityIndicator color={palette.ivory} size="large" />
         </View>
       )}
 
@@ -214,7 +219,7 @@ function VideoPlayerControls({
         {/* Chapter label */}
         {currentChapter && (
           <View style={vstyles.chapterLabel} pointerEvents="none">
-            <Text style={vstyles.chapterText} numberOfLines={1}>{currentChapter.title}</Text>
+            <Text style={[vstyles.chapterText, { color: palette.ivory }]} numberOfLines={1}>{currentChapter.title}</Text>
           </View>
         )}
 
@@ -224,14 +229,14 @@ function VideoPlayerControls({
           onPress={() => { setPaused(p => !p); showControls(); }}
         >
           <View style={vstyles.centerCircle}>
-            <KISIcon name={paused ? 'play' : 'pause'} size={28} color="#fff" />
+            <KISIcon name={paused ? 'play' : 'pause'} size={28} color={palette.ivory} />
           </View>
         </Pressable>
 
         {/* Bottom controls */}
         <View style={vstyles.bottomRow}>
           {/* Time */}
-          <Text style={vstyles.timeText}>{formatTime(seeking ? seekValue : currentTime)}</Text>
+          <Text style={[vstyles.timeText, { color: palette.ivory }]}>{formatTime(seeking ? seekValue : currentTime)}</Text>
 
           {/* Scrubber */}
           <View style={vstyles.sliderWrap}>
@@ -252,7 +257,7 @@ function VideoPlayerControls({
               maximumValue={Math.max(1, duration)}
               value={seeking ? seekValue : currentTime}
               minimumTrackTintColor={palette.primaryStrong}
-              maximumTrackTintColor="rgba(255,255,255,0.3)"
+              maximumTrackTintColor={palette.divider}
               thumbTintColor={palette.primaryStrong}
               onSlidingStart={() => { setSeeking(true); setSeekValue(currentTime); }}
               onValueChange={v => setSeekValue(v)}
@@ -265,23 +270,23 @@ function VideoPlayerControls({
           </View>
 
           {/* Duration */}
-          <Text style={vstyles.timeText}>{formatTime(duration)}</Text>
+          <Text style={[vstyles.timeText, { color: palette.ivory }]}>{formatTime(duration)}</Text>
 
           {/* Captions */}
           {subtitles.length > 0 && (
             <Pressable onPress={() => setCaptionsOn(c => !c)} style={vstyles.iconBtn} hitSlop={8}>
-              <KISIcon name="audio" size={16} color={captionsOn ? palette.primaryStrong : '#fff'} />
+              <KISIcon name="audio" size={16} color={captionsOn ? palette.primaryStrong : palette.ivory} />
             </Pressable>
           )}
 
           {/* Speed */}
           <Pressable onPress={() => setSpeedModal(true)} style={vstyles.speedBtn} hitSlop={8}>
-            <Text style={vstyles.speedText}>{speed === 1 ? '1×' : `${speed}×`}</Text>
+            <Text style={[vstyles.speedText, { color: palette.ivory }]}>{speed === 1 ? '1×' : `${speed}×`}</Text>
           </Pressable>
 
           {/* Quality */}
           <Pressable onPress={() => setQualityModal(true)} style={vstyles.speedBtn} hitSlop={8}>
-            <KISIcon name="video" size={16} color="#fff" />
+            <KISIcon name="video" size={16} color={palette.ivory} />
           </Pressable>
         </View>
       </Animated.View>
@@ -336,7 +341,7 @@ function VideoPlayerControls({
       {/* End screen overlay */}
       {showEndScreen && (
         <View style={[vstyles.endScreen, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, marginBottom: 16 }}>
+          <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 16, marginBottom: 16 }}>
             Up Next in {countdown}s
           </Text>
           {(relatedContent ?? [])[0] ? (
@@ -348,25 +353,29 @@ function VideoPlayerControls({
                   resizeMode="cover"
                 />
               ) : null}
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, textAlign: 'center' }} numberOfLines={2}>
+              <Text style={{ color: palette.ivory, fontWeight: '800', fontSize: 14, textAlign: 'center' }} numberOfLines={2}>
                 {relatedContent![0].title}
               </Text>
-              <Text style={{ color: '#ccc', fontSize: 12 }}>{relatedContent![0].channel?.name}</Text>
+              <Text style={{ color: palette.divider, fontSize: 12 }}>{relatedContent![0].channel?.name}</Text>
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
             <Pressable
               onPress={() => setShowEndScreen(false)}
-              style={{ borderWidth: 1, borderColor: '#fff', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
+              style={{ borderWidth: 1, borderColor: palette.ivory, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
             >
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Cancel</Text>
+              <Text style={{ color: palette.ivory, fontWeight: '700' }}>Cancel</Text>
             </Pressable>
             {(relatedContent ?? [])[0] ? (
               <Pressable
-                onPress={() => { setShowEndScreen(false); /* TODO: navigate to related */ }}
+                onPress={() => {
+                  const next = (relatedContent ?? [])[0];
+                  if (next) controlsNavigation.navigate('ChannelContentDetail', { contentId: next.id, item: next });
+                  setShowEndScreen(false);
+                }}
                 style={{ backgroundColor: palette.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '900' }}>Watch Now</Text>
+                <Text style={{ color: palette.ivory, fontWeight: '900' }}>Watch Now</Text>
               </Pressable>
             ) : null}
           </View>
@@ -428,8 +437,8 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
       <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
         {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
         <View style={styles.mediaOverlay} />
-        <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>{content.status === 'scheduled' ? 'Scheduled' : 'Live'}</Text></View>
-        <KISIcon name="broadcast" size={46} color="#fff" />
+        <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}><Text style={[styles.liveBadgeText, { color: palette.ivory }]}>{content.status === 'scheduled' ? 'Scheduled' : 'Live'}</Text></View>
+        <KISIcon name="broadcast" size={46} color={palette.ivory} />
       </View>
     );
   }
@@ -453,8 +462,8 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
     <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
       {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
       <View style={styles.mediaOverlay} />
-      {['video', 'short_video'].includes(type) ? <View style={styles.playBubble}><KISIcon name="play" size={30} color="#fff" /></View> : null}
-      {assets.length > 1 ? <View style={styles.galleryCount}><Text style={styles.galleryCountText}>{assets.length} files</Text></View> : null}
+      {['video', 'short_video'].includes(type) ? <View style={styles.playBubble}><KISIcon name="play" size={30} color={palette.ivory} /></View> : null}
+      {assets.length > 1 ? <View style={styles.galleryCount}><Text style={[styles.galleryCountText, { color: palette.ivory }]}>{assets.length} files</Text></View> : null}
     </View>
   );
 }
@@ -469,7 +478,7 @@ const vstyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6,
     paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start',
   },
-  chapterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  chapterText: { fontSize: 11, fontWeight: '700' },
   centerBtn: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   centerCircle: {
     width: 60, height: 60, borderRadius: 30,
@@ -479,10 +488,10 @@ const vstyles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingBottom: 10, gap: 6,
   },
-  timeText: { color: '#fff', fontSize: 11, fontWeight: '700', minWidth: 36, textAlign: 'center' },
+  timeText: { fontSize: 11, fontWeight: '700', minWidth: 36, textAlign: 'center' },
   sliderWrap: { flex: 1, position: 'relative', justifyContent: 'center' },
   chapterMarker: {
-    position: 'absolute', width: 2, height: 8, backgroundColor: '#fff',
+    position: 'absolute', width: 2, height: 8, backgroundColor: 'rgba(255,255,255,0.7)',
     top: '50%', marginTop: -4, zIndex: 1,
   },
   iconBtn: { padding: 4 },
@@ -490,7 +499,7 @@ const vstyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  speedText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  speedText: { fontSize: 11, fontWeight: '900' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   speedPanel: {
     width: 240, borderRadius: 14, borderWidth: 1, overflow: 'hidden', paddingVertical: 8,
@@ -537,6 +546,7 @@ export default function ChannelContentDetailPage() {
   const [tipModal, setTipModal] = useState(false);
   const [tipping, setTipping] = useState(false);
   const [selectedTipAmount, setSelectedTipAmount] = useState<number | null>(null);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
@@ -583,6 +593,12 @@ export default function ChannelContentDetailPage() {
     if (!content?.id) return;
     setCounts(prev => ({ ...prev, reactions: Number(prev.reactions || 0) + 1 }));
     applyCounts(await reactToChannelContent(content.id));
+  }, [applyCounts, content?.id]);
+
+  const handleDislike = useCallback(async () => {
+    if (!content?.id) return;
+    setCounts(prev => ({ ...prev, dislikes: Number(prev.dislikes || 0) + 1 }));
+    applyCounts(await reactToChannelContent(content.id, 'dislike'));
   }, [applyCounts, content?.id]);
 
   const handleSave = useCallback(async () => {
@@ -667,6 +683,25 @@ export default function ChannelContentDetailPage() {
       { text: 'Report', style: 'destructive', onPress: () => { void reportChannelContent(content.id, 'Reported from channel detail'); } },
     ]);
   }, [content?.id]);
+
+  const handleDownload = useCallback(async () => {
+    if (!content?.id) return;
+    try {
+      const res = await getRequest(ROUTES.broadcasts.channelContentDownload(content.id), { errorMessage: 'Download failed.' });
+      const downloadUrl = res?.data?.download_url || res?.download_url;
+      const filename = res?.data?.filename || res?.filename || `${content?.title || 'video'}.mp4`;
+      if (!downloadUrl) { Alert.alert('Unavailable', 'No downloadable video is available for this content.'); return; }
+
+      const dir = `${RNFS.DocumentDirectoryPath}/kis-downloads`;
+      await RNFS.mkdir(dir).catch(() => {});
+      const destPath = `${dir}/${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      Alert.alert('Downloading', `"${content?.title || 'Video'}" is downloading…`);
+      await RNFS.downloadFile({ fromUrl: downloadUrl, toFile: destPath }).promise;
+      Alert.alert('Downloaded', `Saved to Downloads.`);
+    } catch (e: any) {
+      Alert.alert('Download failed', e?.message || 'Please try again.');
+    }
+  }, [content?.id, content?.title]);
 
   const handleEmbed = useCallback(async () => {
     if (!content?.id) return;
@@ -778,25 +813,40 @@ export default function ChannelContentDetailPage() {
     );
   }
 
+  if (content.geo_restricted) {
+    return <GeoBlockedScreen onBack={() => navigation.goBack()} />;
+  }
+
+  const ageRestriction = content.age_restriction;
+  if ((ageRestriction === '13+' || ageRestriction === '18+') && !ageConfirmed) {
+    return (
+      <AgeGateScreen
+        ageRestriction={ageRestriction}
+        onConfirm={() => setAgeConfirmed(true)}
+        onBack={() => navigation.goBack()}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
           <MediaStage content={content} relatedContent={relatedContent as any} />
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color="#fff" /></Pressable>
+          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color={palette.ivory} /></Pressable>
 
           {/* Autoplay Up Next countdown */}
           {autoplayCountdown !== null && relatedContent[0] && (
             <View style={styles.autoplayBanner}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.autoplayLabel}>Up next in {autoplayCountdown}s</Text>
-                <Text style={styles.autoplayTitle} numberOfLines={1}>{relatedContent[0].title || 'Next video'}</Text>
+                <Text style={[styles.autoplayLabel, { color: palette.divider }]}>Up next in {autoplayCountdown}s</Text>
+                <Text style={[styles.autoplayTitle, { color: palette.ivory }]} numberOfLines={1}>{relatedContent[0].title || 'Next video'}</Text>
               </View>
               <Pressable onPress={() => setAutoplayCountdown(null)} style={{ padding: 6 }}>
-                <KISIcon name="close" size={16} color="#fff" />
+                <KISIcon name="close" size={16} color={palette.ivory} />
               </Pressable>
-              <View style={styles.autoplayBar}>
-                <View style={[styles.autoplayProgress, { width: `${((5 - autoplayCountdown) / 5) * 100}%` as any }]} />
+              <View style={[styles.autoplayBar, { backgroundColor: palette.divider }]}>
+                <View style={[styles.autoplayProgress, { width: `${((5 - autoplayCountdown) / 5) * 100}%` as any, backgroundColor: palette.gold }]} />
               </View>
             </View>
           )}
@@ -848,7 +898,7 @@ export default function ChannelContentDetailPage() {
 
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
-            <ActionButton icon="warning" label="Dislike" value="" onPress={() => {}} />
+            <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="call-history" label="Share at time" value="Timestamp" onPress={handleShareAtTimestamp} />
@@ -857,6 +907,7 @@ export default function ChannelContentDetailPage() {
             <ActionButton icon="list" label="Add to playlist" value="Playlists" onPress={handleAddToPlaylist} />
             <ActionButton icon="edit" label="Create Clip" value="Clip it" onPress={() => setClipModalOpen(true)} />
             <ActionButton icon="play" label="Clips" value="My clips" onPress={() => navigation.navigate('ClipsListScreen', { contentId: content.id })} />
+            <ActionButton icon="download" label="Download" value="Offline" onPress={handleDownload} />
             <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />
             <ActionButton icon="heart" label="Super Thanks" value="Tip" onPress={handleSuperThanks} />
             <ActionButton icon="report" label="Report" value="Report" onPress={handleReport} />
@@ -877,12 +928,12 @@ export default function ChannelContentDetailPage() {
                     onPress={() => navigation.navigate('ChannelContentDetail', { contentId: related.id, item: related })}
                     style={[styles.relatedCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
                   >
-                    <View style={styles.relatedThumb}>
+                    <View style={[styles.relatedThumb, { backgroundColor: palette.royalInk }]}>
                       {thumbUrl ? (
                         <Image source={{ uri: thumbUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                       ) : null}
                       <View style={styles.relatedOverlay} />
-                      <KISIcon name="play" size={16} color="#fff" />
+                      <KISIcon name="play" size={16} color={palette.ivory} />
                     </View>
                     <View style={styles.relatedBody}>
                       <Text style={[styles.relatedTitle, { color: palette.text }]} numberOfLines={2}>
@@ -930,7 +981,7 @@ export default function ChannelContentDetailPage() {
             <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
               <Text style={{ color: palette.subtext, fontWeight: '700' }}>No playlists yet.</Text>
               <Pressable onPress={() => { setPlaylistModalOpen(false); navigation.navigate('PlaylistList'); }} style={[styles.modalBtn, { backgroundColor: palette.primaryStrong }]}>
-                <Text style={{ color: '#fff', fontWeight: '900' }}>Create a playlist</Text>
+                <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Create a playlist</Text>
               </Pressable>
             </View>
           ) : (
@@ -985,17 +1036,17 @@ export default function ChannelContentDetailPage() {
               <View style={{ gap: 10 }}>
                 <Pressable
                   onPress={() => !tipping && processTip(selectedTipAmount, 'flutterwave')}
-                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : '#f5a623' }]}
+                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : palette.gold }]}
                   disabled={tipping}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Flutterwave'}</Text>
+                  <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Flutterwave'}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => !tipping && processTip(selectedTipAmount, 'stripe')}
                   style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : palette.primaryStrong }]}
                   disabled={tipping}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Stripe (card)'}</Text>
+                  <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Stripe (card)'}</Text>
                 </Pressable>
               </View>
             )}
@@ -1052,7 +1103,7 @@ export default function ChannelContentDetailPage() {
             </View>
             <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '600' }}>Max 60 seconds per clip.</Text>
             <Pressable onPress={handleCreateClip} style={[styles.modalBtn, { backgroundColor: clipping ? palette.border : palette.primaryStrong }]}>
-              <Text style={{ color: '#fff', fontWeight: '900' }}>{clipping ? 'Creating…' : 'Create clip'}</Text>
+              <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{clipping ? 'Creating…' : 'Create clip'}</Text>
             </Pressable>
           </View>
         </View>
@@ -1079,23 +1130,23 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   stageWrap: { minHeight: 320 },
   autoplayBanner: { position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.82)', borderRadius: 10, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 20 },
-  autoplayLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700' },
-  autoplayTitle: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  autoplayBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)', borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
-  autoplayProgress: { height: 3, backgroundColor: '#f59e0b', borderBottomLeftRadius: 10 },
+  autoplayLabel: { fontSize: 11, fontWeight: '700' },
+  autoplayTitle: { fontWeight: '900', fontSize: 13 },
+  autoplayBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
+  autoplayProgress: { height: 3, borderBottomLeftRadius: 10 },
   mediaStage: { height: 340, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   textStage: { minHeight: 340, paddingHorizontal: 24, paddingTop: 70, justifyContent: 'center' },
   richTextStage: { fontSize: 25, lineHeight: 34, fontWeight: '800' },
   mediaOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
-  backButton: { position: 'absolute', left: 16, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
+  backButton: { position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
   playBubble: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
   largeIconBubble: { width: 94, height: 94, borderRadius: 47, alignItems: 'center', justifyContent: 'center' },
   mediaStageTitle: { marginTop: 18, fontSize: 18, fontWeight: '900' },
   openFileButton: { marginTop: 14, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  liveBadge: { position: 'absolute', top: 78, left: 20, backgroundColor: '#C0262D', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  liveBadgeText: { color: '#fff', fontWeight: '900', fontSize: 11, textTransform: 'uppercase' },
+  liveBadge: { position: 'absolute', top: 78, left: 20, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  liveBadgeText: { fontWeight: '900', fontSize: 11, textTransform: 'uppercase' },
   galleryCount: { position: 'absolute', right: 14, bottom: 14, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  galleryCountText: { color: '#fff', fontWeight: '900', fontSize: 11 },
+  galleryCountText: { fontWeight: '900', fontSize: 11 },
   titleTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   typeBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   dateText: { fontSize: 11, fontWeight: '800' },
@@ -1127,7 +1178,7 @@ const styles = StyleSheet.create({
   assetMeta: { marginTop: 2, fontSize: 11, fontWeight: '700' },
   retryButton: { marginTop: 14, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
   relatedCard: { width: 160, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
-  relatedThumb: { height: 90, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111' },
+  relatedThumb: { height: 90, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   relatedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
   relatedBody: { padding: 8 },
   relatedTitle: { fontSize: 12, fontWeight: '800', lineHeight: 17 },
@@ -1151,7 +1202,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) => Style
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    shadowColor: palette.shadow ?? '#000',
+    shadowColor: palette.shadow ?? palette.royalInk,
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },

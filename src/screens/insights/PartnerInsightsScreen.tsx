@@ -119,7 +119,7 @@ function CampaignsSection({ campaigns, loading, error }: CampaignsSectionProps) 
       {loading ? (
         <Text style={{ color: palette.subtext }}>Loading campaigns…</Text>
       ) : error ? (
-        <Text style={{ color: palette.error }}>{error}</Text>
+        <Text style={{ color: palette.danger }}>{error}</Text>
       ) : campaigns.length ? (
         campaigns.map((item) => (
           <View
@@ -176,7 +176,7 @@ function TopProductsSection({ products, loading, error }: TopProductsSectionProp
       {loading ? (
         <Text style={{ color: palette.subtext }}>Loading products…</Text>
       ) : error ? (
-        <Text style={{ color: palette.error }}>{error}</Text>
+        <Text style={{ color: palette.danger }}>{error}</Text>
       ) : products.length ? (
         products.map((product) => (
           <View

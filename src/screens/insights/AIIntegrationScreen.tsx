@@ -18,6 +18,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,24 +54,25 @@ type QnASession = {
   messages?: { role: string; content: string }[];
 };
 
-type Tab = 'Models' | 'Jobs' | 'QnA Sessions';
-const TABS: Tab[] = ['Models', 'Jobs', 'QnA Sessions'];
+type Tab = 'Models' | 'Jobs' | 'QnA Sessions' | 'Schedules' | 'Pipelines';
+const TABS: Tab[] = ['Models', 'Jobs', 'QnA Sessions', 'Schedules', 'Pipelines'];
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
-const JOB_STATUS_COLORS: Record<string, string> = {
-  pending: '#3B82F6',
-  running: '#F97316',
-  completed: '#10B981',
-  failed: '#EF4444',
-};
+const makeJobStatusColors = (palette: any): Record<string, string> => ({
+  pending: palette.primary,
+  running: palette.gold,
+  completed: palette.success,
+  failed: palette.danger,
+});
 
-const jobStatusColor = (status?: string) =>
-  JOB_STATUS_COLORS[status?.toLowerCase() ?? ''] ?? '#6B7280';
+const jobStatusColor = (status?: string, palette?: any) =>
+  (palette ? makeJobStatusColors(palette) : {})[status?.toLowerCase() ?? ''] ?? palette?.subtext;
 
 // ─── Models Tab ───────────────────────────────────────────────────────────────
 
 function ModelsTab({ palette }: { palette: any }) {
+  const responsive = useResponsiveLayout();
   const [models, setModels] = useState<AIModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,9 +121,9 @@ function ModelsTab({ palette }: { palette: any }) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={load} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -139,7 +141,7 @@ function ModelsTab({ palette }: { palette: any }) {
     <FlatList
       data={models}
       keyExtractor={item => String(item.id)}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, { paddingHorizontal: responsive.pageGutter }]}
       renderItem={({ item }) => {
         const isActive = item.status === 'active';
         return (
@@ -158,12 +160,12 @@ function ModelsTab({ palette }: { palette: any }) {
                 disabled={toggling === item.id}
                 style={[
                   styles.statusToggle,
-                  { backgroundColor: isActive ? '#10B981' : '#9CA3AF' },
+                  { backgroundColor: isActive ? palette.success : palette.divider },
                 ]}
               >
                 {toggling === item.id
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.statusToggleText}>{isActive ? 'Active' : 'Inactive'}</Text>
+                  ? <ActivityIndicator size="small" color={palette.onPrimary} />
+                  : <Text style={[styles.statusToggleText, { color: palette.onPrimary }]}>{isActive ? 'Active' : 'Inactive'}</Text>
                 }
               </Pressable>
             </View>
@@ -227,9 +229,9 @@ function JobsTab({ palette }: { palette: any }) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -250,7 +252,7 @@ function JobsTab({ palette }: { palette: any }) {
           </View>
         }
         renderItem={({ item }) => {
-          const statusColor = jobStatusColor(item.status);
+          const statusColor = jobStatusColor(item.status, palette);
           return (
             <Pressable
               onPress={() => setSelected(item)}
@@ -325,9 +327,9 @@ function JobsTab({ palette }: { palette: any }) {
                   palette={palette}
                 />
                 {selected.error ? (
-                  <View style={[styles.logBox, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
-                    <Text style={[styles.logLabel, { color: '#DC2626' }]}>Error</Text>
-                    <Text style={{ color: '#DC2626', fontSize: 13 }}>{selected.error}</Text>
+                  <View style={[styles.logBox, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]}>
+                    <Text style={[styles.logLabel, { color: palette.danger }]}>Error</Text>
+                    <Text style={{ color: palette.danger, fontSize: 13 }}>{selected.error}</Text>
                   </View>
                 ) : null}
                 {selected.logs ? (
@@ -399,9 +401,9 @@ function QnASessionsTab({ palette }: { palette: any }) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={load} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -453,9 +455,9 @@ function QnASessionsTab({ palette }: { palette: any }) {
       {/* FAB – New Session */}
       <Pressable
         onPress={() => setShowNew(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong }]}
+        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
       >
-        <Text style={styles.fabText}>+ New Session</Text>
+        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ New Session</Text>
       </Pressable>
 
       {/* New Session Modal */}
@@ -493,8 +495,8 @@ function QnASessionsTab({ palette }: { palette: any }) {
               ]}
             >
               {submitting
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.submitBtnText}>Start Session</Text>
+                ? <ActivityIndicator color={palette.onPrimary} />
+                : <Text style={[styles.submitBtnText, { color: palette.onPrimary }]}>Start Session</Text>
               }
             </Pressable>
           </View>
@@ -530,7 +532,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
                   <Text style={[styles.qaText, { color: palette.text }]}>{selected.question ?? '—'}</Text>
                 </View>
                 <View style={[styles.qaBlock, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-                  <Text style={[styles.qaRole, { color: '#10B981' }]}>Answer</Text>
+                  <Text style={[styles.qaRole, { color: palette.success }]}>Answer</Text>
                   <Text style={[styles.qaText, { color: palette.text }]}>{selected.answer ?? '—'}</Text>
                 </View>
                 {selected.messages && selected.messages.length > 0 ? (
@@ -544,7 +546,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
                           { backgroundColor: palette.surface, borderColor: palette.divider },
                         ]}
                       >
-                        <Text style={[styles.qaRole, { color: msg.role === 'user' ? palette.primaryStrong : '#10B981' }]}>
+                        <Text style={[styles.qaRole, { color: msg.role === 'user' ? palette.primaryStrong : palette.success }]}>
                           {msg.role}
                         </Text>
                         <Text style={[styles.qaText, { color: palette.text }]}>{msg.content}</Text>
@@ -556,6 +558,265 @@ function QnASessionsTab({ palette }: { palette: any }) {
             ) : null}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+    </>
+  );
+}
+
+// ─── Schedules Tab ────────────────────────────────────────────────────────────
+
+type AISchedule = {
+  id: string;
+  name?: string;
+  cron?: string;
+  model_id?: string;
+  status?: 'active' | 'inactive' | string;
+  next_run?: string;
+  last_run?: string;
+};
+
+function SchedulesTab({ palette }: { palette: any }) {
+  const [schedules, setSchedules] = useState<AISchedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCron, setNewCron] = useState('');
+  const [newModelId, setNewModelId] = useState('');
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError(null);
+    try {
+      const res = await getRequest(ROUTES.aiIntegration.schedules, { errorMessage: 'Unable to load schedules.' });
+      if (res.success) {
+        setSchedules(res.data?.results ?? res.data ?? []);
+      } else {
+        setError(res.message || 'Unable to load schedules.');
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load schedules.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) { Alert.alert('Validation', 'Name is required.'); return; }
+    if (!newCron.trim()) { Alert.alert('Validation', 'Cron expression is required.'); return; }
+    setSaving(true);
+    try {
+      const res = await postRequest(ROUTES.aiIntegration.schedules, { name: newName.trim(), cron: newCron.trim(), model_id: newModelId.trim() || undefined }, { errorMessage: 'Failed to create schedule.' });
+      if (res.success) {
+        setShowModal(false);
+        setNewName(''); setNewCron(''); setNewModelId('');
+        load();
+      } else {
+        Alert.alert('Error', res.message || 'Failed to create schedule.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to create schedule.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggle = async (item: AISchedule) => {
+    try {
+      await patchRequest(ROUTES.aiIntegration.schedule(item.id), { status: item.status === 'active' ? 'inactive' : 'active' }, { errorMessage: 'Failed to update.' });
+      load(true);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update.');
+    }
+  };
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={palette.primaryStrong} /></View>;
+  }
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: palette.danger }}>{error}</Text>
+        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <FlatList
+        data={schedules}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
+        ListEmptyComponent={<View style={styles.center}><Text style={{ color: palette.subtext }}>No schedules yet.</Text></View>}
+        ListFooterComponent={
+          <Pressable onPress={() => setShowModal(true)} style={[styles.card, { backgroundColor: palette.primaryWeak, borderColor: palette.primaryStrong, alignItems: 'center' }]}>
+            <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 14 }}>+ New Schedule</Text>
+          </Pressable>
+        }
+        renderItem={({ item }) => (
+          <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{item.name ?? item.id}</Text>
+              <Pressable onPress={() => handleToggle(item)} style={[styles.statusToggle, { backgroundColor: item.status === 'active' ? palette.success + '22' : palette.divider }]}>
+                <Text style={[styles.cardChip, { color: item.status === 'active' ? palette.success : palette.subtext }]}>{item.status ?? 'inactive'}</Text>
+              </Pressable>
+            </View>
+            {!!item.cron && <Text style={[styles.cardMeta, { color: palette.subtext }]}>Cron: {item.cron}</Text>}
+            {!!item.next_run && <Text style={[styles.cardMeta, { color: palette.subtext }]}>Next: {item.next_run}</Text>}
+            {!!item.last_run && <Text style={[styles.cardMeta, { color: palette.subtext }]}>Last: {item.last_run}</Text>}
+          </View>
+        )}
+      />
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: palette.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 14 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>New Schedule</Text>
+            <TextInput placeholder="Name" placeholderTextColor={palette.subtext} value={newName} onChangeText={setNewName} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
+            <TextInput placeholder="Cron (e.g. 0 9 * * 1)" placeholderTextColor={palette.subtext} value={newCron} onChangeText={setNewCron} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
+            <TextInput placeholder="Model ID (optional)" placeholderTextColor={palette.subtext} value={newModelId} onChangeText={setNewModelId} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Pressable onPress={() => setShowModal(false)} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.divider, alignItems: 'center' }]}>
+                <Text style={{ color: palette.text, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleCreate} disabled={saving} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.primaryStrong, alignItems: 'center' }]}>
+                <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>{saving ? 'Saving…' : 'Create'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+// ─── Pipelines Tab ────────────────────────────────────────────────────────────
+
+type AIPipeline = {
+  id: string;
+  name?: string;
+  description?: string;
+  steps?: any[];
+  status?: string;
+};
+
+function PipelinesTab({ palette }: { palette: any }) {
+  const [pipelines, setPipelines] = useState<AIPipeline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError(null);
+    try {
+      const res = await getRequest(ROUTES.aiIntegration.pipelines, { errorMessage: 'Unable to load pipelines.' });
+      if (res.success) {
+        setPipelines(res.data?.results ?? res.data ?? []);
+      } else {
+        setError(res.message || 'Unable to load pipelines.');
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load pipelines.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) { Alert.alert('Validation', 'Name is required.'); return; }
+    setSaving(true);
+    try {
+      const res = await postRequest(ROUTES.aiIntegration.pipelines, { name: newName.trim(), description: newDesc.trim() || undefined }, { errorMessage: 'Failed to create pipeline.' });
+      if (res.success) {
+        setShowModal(false);
+        setNewName(''); setNewDesc('');
+        load();
+      } else {
+        Alert.alert('Error', res.message || 'Failed to create pipeline.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to create pipeline.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={palette.primaryStrong} /></View>;
+  }
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: palette.danger }}>{error}</Text>
+        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <FlatList
+        data={pipelines}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
+        ListEmptyComponent={<View style={styles.center}><Text style={{ color: palette.subtext }}>No pipelines yet.</Text></View>}
+        ListFooterComponent={
+          <Pressable onPress={() => setShowModal(true)} style={[styles.card, { backgroundColor: palette.primaryWeak, borderColor: palette.primaryStrong, alignItems: 'center' }]}>
+            <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 14 }}>+ New Pipeline</Text>
+          </Pressable>
+        }
+        renderItem={({ item }) => (
+          <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{item.name ?? item.id}</Text>
+              {!!item.status && (
+                <View style={{ backgroundColor: palette.primaryWeak, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 2 }}>
+                  <Text style={[styles.cardChip, { color: palette.primaryStrong }]}>{item.status}</Text>
+                </View>
+              )}
+            </View>
+            {!!item.description && <Text style={[styles.cardDesc, { color: palette.subtext }]}>{item.description}</Text>}
+            {Array.isArray(item.steps) && (
+              <Text style={[styles.cardMeta, { color: palette.subtext }]}>{item.steps.length} step{item.steps.length !== 1 ? 's' : ''}</Text>
+            )}
+          </View>
+        )}
+      />
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: palette.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 14 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>New Pipeline</Text>
+            <TextInput placeholder="Name" placeholderTextColor={palette.subtext} value={newName} onChangeText={setNewName} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
+            <TextInput placeholder="Description (optional)" placeholderTextColor={palette.subtext} value={newDesc} onChangeText={setNewDesc} multiline numberOfLines={3} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg, height: 80 }} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Pressable onPress={() => setShowModal(false)} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.divider, alignItems: 'center' }]}>
+                <Text style={{ color: palette.text, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleCreate} disabled={saving} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.primaryStrong, alignItems: 'center' }]}>
+                <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>{saving ? 'Saving…' : 'Create'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -617,6 +878,8 @@ export default function AIIntegrationScreen() {
         {activeTab === 'Models' && <ModelsTab palette={palette} />}
         {activeTab === 'Jobs' && <JobsTab palette={palette} />}
         {activeTab === 'QnA Sessions' && <QnASessionsTab palette={palette} />}
+        {activeTab === 'Schedules' && <SchedulesTab palette={palette} />}
+        {activeTab === 'Pipelines' && <PipelinesTab palette={palette} />}
       </View>
     </SafeAreaView>
   );
@@ -662,12 +925,14 @@ const styles = StyleSheet.create({
 
   statusToggle: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 10,
     borderRadius: 20,
     minWidth: 72,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  statusToggleText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  statusToggleText: { fontSize: 12, fontWeight: '700' },
 
   statusBadge: {
     paddingHorizontal: 8,
@@ -693,13 +958,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 28,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 4,
   },
-  fabText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {
@@ -710,7 +974,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalTitle: { fontSize: 18, fontWeight: '800', flex: 1 },
-  modalClose: { paddingLeft: 12 },
+  modalClose: { paddingLeft: 12, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
   modalContent: { padding: 20, gap: 12 },
 
   detailRow: {
@@ -758,5 +1022,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  submitBtnText: { fontWeight: '700', fontSize: 15 },
 });

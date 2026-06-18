@@ -27,7 +27,10 @@ export default function SectionCard({
     <View style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.divider }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
-        <Pressable onPress={onAdd}>
+        <Pressable
+          onPress={onAdd}
+          style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
           <KISIcon name="add" size={20} color={palette.primaryStrong} />
         </Pressable>
       </View>
@@ -49,10 +52,10 @@ export default function SectionCard({
             </View>
 
             <View style={styles.rowActions}>
-              <Pressable onPress={() => onEdit(item)}>
+              <Pressable onPress={() => onEdit(item)} hitSlop={8} style={styles.iconBtn}>
                 <KISIcon name="edit" size={18} color={palette.subtext} />
               </Pressable>
-              <Pressable onPress={() => onDelete(item.id)}>
+              <Pressable onPress={() => onDelete(item.id)} hitSlop={8} style={styles.iconBtn}>
                 <KISIcon name="trash" size={18} color={palette.danger} />
               </Pressable>
             </View>

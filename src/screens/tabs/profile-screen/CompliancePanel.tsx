@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   View,
   Text,
 } from 'react-native';
@@ -37,6 +40,7 @@ type CompliancePanelProps = {
   profileId?: string;
   organizationId?: string;
   refreshKey?: string | number;
+  isStaff?: boolean;
 };
 
 export function CompliancePanel({
@@ -44,6 +48,7 @@ export function CompliancePanel({
   profileId,
   organizationId,
   refreshKey,
+  isStaff = false,
 }: CompliancePanelProps) {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [credentials, setCredentials] = useState<any[]>([]);
@@ -423,6 +428,7 @@ export function CompliancePanel({
   );
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={styles.managementForm}>
       <View style={sectionStyle}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -454,121 +460,140 @@ export function CompliancePanel({
       <View style={sectionStyle}>
         <Text style={{ color: palette.text, fontWeight: '700' }}>Regulatory reports</Text>
         {reports.length ? reports.map(renderReport) : <Text style={{ color: palette.subtext }}>No reports.</Text>}
-        <View style={styles.managementForm}>
-          <KISTextInput
-            label="Report type"
-            value={reportForm.report_type}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, report_type: value }))}
-          />
-          <KISTextInput
-            label="Profile ID"
-            value={reportForm.profile}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, profile: value }))}
-          />
-          <KISTextInput
-            label="Organization ID"
-            value={reportForm.organization}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, organization: value }))}
-          />
-          <KISTextInput
-            label="Period start"
-            value={reportForm.period_start}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, period_start: value }))}
-          />
-          <KISTextInput
-            label="Period end"
-            value={reportForm.period_end}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, period_end: value }))}
-          />
-          <KISTextInput
-            label="Payload (JSON)"
-            value={reportForm.data_payload}
-            onChangeText={(value) => setReportForm((prev) => ({ ...prev, data_payload: value }))}
-            multiline
-            layout={{ multilineMinHeight: 80 }}
-            placeholder='{"summary": "Key metrics"}'
-          />
-          <KISButton
-            title="Create report"
-            onPress={handleCreateReport}
-            disabled={reportSubmitting}
-            right={
-              reportSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
-            }
-          />
-        </View>
+        {isStaff ? (
+          <View style={styles.managementForm}>
+            <KISTextInput
+              label="Report type"
+              value={reportForm.report_type}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, report_type: value }))}
+            />
+            <KISTextInput
+              label="Profile ID"
+              value={reportForm.profile}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, profile: value }))}
+            />
+            <KISTextInput
+              label="Organization ID"
+              value={reportForm.organization}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, organization: value }))}
+            />
+            <KISTextInput
+              label="Period start"
+              value={reportForm.period_start}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, period_start: value }))}
+            />
+            <KISTextInput
+              label="Period end"
+              value={reportForm.period_end}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, period_end: value }))}
+            />
+            <KISTextInput
+              label="Payload (JSON)"
+              value={reportForm.data_payload}
+              onChangeText={(value) => setReportForm((prev) => ({ ...prev, data_payload: value }))}
+              multiline
+              layout={{ multilineMinHeight: 80 }}
+              placeholder='{"summary": "Key metrics"}'
+            />
+            <KISButton
+              title="Create report"
+              onPress={handleCreateReport}
+              disabled={reportSubmitting}
+              right={
+                reportSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
+              }
+            />
+          </View>
+        ) : (
+          <View style={{ padding: 16, alignItems: 'center' }}>
+            <Text style={{ color: palette.subtext, textAlign: 'center', fontSize: 13 }}>
+              Compliance reporting tools are available for institutional accounts. Contact support to request data export or access logs.
+            </Text>
+            <Pressable
+              onPress={() => Alert.alert('Contact Support', 'Email support@kingdomimpact.social for compliance requests.')}
+              style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, minHeight: 44, backgroundColor: palette.primary, borderRadius: 10, justifyContent: 'center', alignItems: 'center' }}
+            >
+              <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>Contact Support</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       <View style={sectionStyle}>
         <Text style={{ color: palette.text, fontWeight: '700' }}>Documents</Text>
         {documents.length ? documents.map(renderDocument) : <Text style={{ color: palette.subtext }}>No documents recorded.</Text>}
-        <View style={styles.managementForm}>
-          <KISTextInput
-            label="Document name"
-            value={documentForm.document_name}
-            onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, document_name: value }))}
-          />
-          <KISTextInput
-            label="Profile ID"
-            value={documentForm.profile}
-            onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, profile: value }))}
-          />
-          <KISTextInput
-            label="Organization ID"
-            value={documentForm.organization}
-            onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, organization: value }))}
-          />
-          <KISTextInput
-            label="File path (device URI)"
-            value={documentForm.file_path}
-            onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, file_path: value }))}
-          />
-          <KISButton
-            title="Record document"
-            onPress={handleCreateDocument}
-            disabled={documentSubmitting}
-            right={
-              documentSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
-            }
-          />
-        </View>
+        {isStaff ? (
+          <View style={styles.managementForm}>
+            <KISTextInput
+              label="Document name"
+              value={documentForm.document_name}
+              onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, document_name: value }))}
+            />
+            <KISTextInput
+              label="Profile ID"
+              value={documentForm.profile}
+              onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, profile: value }))}
+            />
+            <KISTextInput
+              label="Organization ID"
+              value={documentForm.organization}
+              onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, organization: value }))}
+            />
+            <KISTextInput
+              label="File path (device URI)"
+              value={documentForm.file_path}
+              onChangeText={(value) => setDocumentForm((prev) => ({ ...prev, file_path: value }))}
+            />
+            <KISButton
+              title="Record document"
+              onPress={handleCreateDocument}
+              disabled={documentSubmitting}
+              right={
+                documentSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
+              }
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={sectionStyle}>
         <Text style={{ color: palette.text, fontWeight: '700' }}>Data access consents</Text>
         {consents.length ? consents.map(renderConsent) : <Text style={{ color: palette.subtext }}>No consents.</Text>}
-        <View style={styles.managementForm}>
-          <KISTextInput
-            label="Patient ID"
-            value={consentForm.patient}
-            onChangeText={(value) => setConsentForm((prev) => ({ ...prev, patient: value }))}
-          />
-          <KISTextInput
-            label="Granted to"
-            value={consentForm.granted_to}
-            onChangeText={(value) => setConsentForm((prev) => ({ ...prev, granted_to: value }))}
-          />
-          <KISTextInput
-            label="Scope"
-            value={consentForm.scope}
-            onChangeText={(value) => setConsentForm((prev) => ({ ...prev, scope: value }))}
-          />
-          <KISTextInput
-            label="Expires at"
-            value={consentForm.expires_at}
-            onChangeText={(value) => setConsentForm((prev) => ({ ...prev, expires_at: value }))}
-          />
-          <KISButton
-            title="Create consent"
-            variant="secondary"
-            onPress={handleCreateConsent}
-            disabled={consentSubmitting}
-            right={
-              consentSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
-            }
-          />
-        </View>
+        {isStaff ? (
+          <View style={styles.managementForm}>
+            <KISTextInput
+              label="Patient ID"
+              value={consentForm.patient}
+              onChangeText={(value) => setConsentForm((prev) => ({ ...prev, patient: value }))}
+            />
+            <KISTextInput
+              label="Granted to"
+              value={consentForm.granted_to}
+              onChangeText={(value) => setConsentForm((prev) => ({ ...prev, granted_to: value }))}
+            />
+            <KISTextInput
+              label="Scope"
+              value={consentForm.scope}
+              onChangeText={(value) => setConsentForm((prev) => ({ ...prev, scope: value }))}
+            />
+            <KISTextInput
+              label="Expires at"
+              value={consentForm.expires_at}
+              onChangeText={(value) => setConsentForm((prev) => ({ ...prev, expires_at: value }))}
+            />
+            <KISButton
+              title="Create consent"
+              variant="secondary"
+              onPress={handleCreateConsent}
+              disabled={consentSubmitting}
+              right={
+                consentSubmitting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined
+              }
+            />
+          </View>
+        ) : null}
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 }

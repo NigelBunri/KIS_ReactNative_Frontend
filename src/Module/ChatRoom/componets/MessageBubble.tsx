@@ -541,6 +541,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     !!(message as any).attachments?.some((a: any) => a.viewedAt),
   );
 
+  // Top-level view-once (text messages flagged as view-once at message level)
+  const isTopLevelViewOnce = !!(message as any).viewOnce;
+  const [topLevelViewOnceViewed, setTopLevelViewOnceViewed] = useState(false);
+
   const isStarred = !!(message as any).isStarred;
 
   const [videoFullscreenUri, setVideoFullscreenUri] = useState<string | null>(null);
@@ -714,7 +718,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           borderRadius: 999,
           backgroundColor: isOverlay ? 'rgba(0,0,0,0.62)' : (palette.surfaceSoft ?? 'rgba(0,0,0,0.08)'),
           borderWidth: isFailed ? 1 : 0,
-          borderColor: palette.error ?? '#DC2626',
+          borderColor: palette.danger,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
@@ -729,7 +733,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               top: 0,
               bottom: 0,
               width: `${pct}%`,
-              backgroundColor: isOverlay ? 'rgba(255,255,255,0.24)' : `${palette.primary ?? '#C9A227'}33`,
+              backgroundColor: isOverlay ? 'rgba(255,255,255,0.24)' : `${palette.primary}33`,
             }}
           />
         )}
@@ -739,7 +743,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <KISIcon
             name={isDone ? 'check' : 'download'}
             size={14}
-            color={isOverlay ? '#FFFFFF' : isFailed ? (palette.error ?? '#DC2626') : (palette.primary ?? '#C9A227')}
+            color={isOverlay ? '#FFFFFF' : isFailed ? palette.danger : palette.primary}
           />
         )}
         <Text
@@ -747,7 +751,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           style={{
             fontSize: isDownloading ? 12 : 11,
             fontWeight: '800',
-            color: isOverlay ? '#FFFFFF' : isFailed ? (palette.error ?? '#DC2626') : (palette.text ?? '#111'),
+            color: isOverlay ? '#FFFFFF' : isFailed ? palette.danger : palette.text,
           }}
         >
           {label}
@@ -982,7 +986,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       }
     : null;
 
-  const outgoingBubbleColor = palette.outgoingBubble ?? palette.primary ?? '#4F46E5';
+  const outgoingBubbleColor = palette.outgoingBubble ?? palette.primary;
   const parseHex = (hex?: string) => {
     if (!hex || typeof hex !== 'string') return null;
     const cleaned = hex.replace('#', '').trim();
@@ -1022,7 +1026,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const statusColor =
     status === 'read'
-      ? palette.readStatus ?? palette.primary ?? '#34B7F1'
+      ? palette.readStatus ?? palette.primary
       : metaColor;
 
   // Upload progress overlay data (synthetic in-flight bubbles only)
@@ -1245,11 +1249,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               >
                 {(!autoLoadImages && !tappedImageIds.has(downloadKey)) ? (
                   <Pressable
-                    style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface ?? '#E0E0E0' }}
+                    style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface }}
                     onPress={() => setTappedImageIds(prev => new Set([...prev, downloadKey]))}
                   >
                     <Text style={{ fontSize: 22 }}>🖼</Text>
-                    <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>Tap to load</Text>
+                    <Text style={{ fontSize: 11, color: palette.subtext, marginTop: 4 }}>Tap to load</Text>
                   </Pressable>
                 ) : (
                   <Image
@@ -1336,7 +1340,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     ellipsizeMode="tail"
                     style={{
                       fontSize: 11,
-                      color: '#f5f5f5',
+                      color: palette.ivory,
                       marginTop: 2,
                     }}
                   >
@@ -1430,9 +1434,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   Linking.openURL(openableUri).catch((err) => console.warn('open audio error', err));
                 }}
               >
-                <KISIcon name="mic" size={22} color={isOutgoing ? palette.onPrimary ?? '#fff' : palette.primary ?? '#4F46E5'} />
+                <KISIcon name="mic" size={22} color={isOutgoing ? palette.onPrimary : palette.primary} />
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? palette.onPrimary ?? '#fff' : palette.text }}>
+                  <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? palette.onPrimary : palette.text }}>
                     {displayName}
                   </Text>
                   <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 3, color: isOutgoing ? palette.onPrimaryMuted ?? '#e0e0e0' : palette.subtext }}>
@@ -1501,8 +1505,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     fontWeight: '700',
                     textTransform: 'uppercase',
                     color: isOutgoing
-                      ? palette.onPrimary ?? '#fff'
-                      : palette.primary ?? '#4F46E5',
+                      ? palette.onPrimary
+                      : palette.primary,
                   }}
                 >
                   {ext || 'FILE'}
@@ -1519,7 +1523,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     fontSize: 13,
                     fontWeight: '600',
                     color: isOutgoing
-                      ? palette.onPrimary ?? '#fff'
+                      ? palette.onPrimary
                       : palette.text,
                   }}
                 >
@@ -1592,13 +1596,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         }}
       >
         {!isFailed && (
-          <ActivityIndicator size="small" color={palette.primary ?? '#C9A227'} />
+          <ActivityIndicator size="small" color={palette.primary} />
         )}
         <Text
           style={{
             fontSize: 12,
             fontWeight: '600',
-            color: isFailed ? '#DC2626' : (isMe ? outgoingTextColor : (palette.subtext ?? '#888')),
+            color: isFailed ? '#DC2626' : (isMe ? outgoingTextColor : (palette.subtext)),
             flexShrink: 1,
           }}
         >
@@ -1689,11 +1693,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     // outgoingTextColor is '#111111' on light bubbles, '#ffffff' on dark bubbles
     const onLightBubble = isMe && outgoingTextColor === '#111111';
     const urlColor = isMe
-      ? (onLightBubble ? (palette.primary ?? '#1565C0') : 'rgba(255,255,255,0.9)')
-      : (palette.primary ?? '#2196F3');
+      ? (onLightBubble ? (palette.primary) : 'rgba(255,255,255,0.9)')
+      : (palette.primary);
     const inviteColor = isMe
-      ? (onLightBubble ? (palette.primaryStrong ?? palette.primary ?? '#1565C0') : '#fde68a')
-      : (palette.primaryStrong ?? palette.primary ?? '#2196F3');
+      ? (onLightBubble ? (palette.primaryStrong ?? palette.primary) : '#fde68a')
+      : (palette.primaryStrong ?? palette.primary);
     return (
       <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>
         {parts.map((part, i) => {
@@ -1753,7 +1757,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       (message as any).sender_avatar_url ??
       (resolvedSenderId ? participantAvatarMap?.[resolvedSenderId] : undefined);
     const initials = effectiveName.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-    const accentColor = palette.senderNameColor ?? palette.primary ?? '#4F46E5';
+    const accentColor = palette.senderNameColor ?? palette.primary;
 
     const handleTap = () => {
       DeviceEventEmitter.emit('member.tap', { userId: resolvedSenderId, name: effectiveName, avatarUrl: effectiveAvatar });
@@ -1815,7 +1819,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const borderColor = isMe
       ? palette.replyPreviewBorderOnOutgoing ?? '#ffffff55'
       : palette.replyPreviewBorderOnIncoming ??
-        (palette.primary ?? '#4F46E5');
+        (palette.primary);
 
     const bgColor = isMe
       ? palette.replyPreviewBgOnOutgoing ?? '#00000022'
@@ -1850,7 +1854,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             ellipsizeMode="tail"
             style={{
               fontSize: 12,
-              color: isMe ? palette.onPrimary ?? '#fff' : palette.text,
+              color: isMe ? palette.onPrimary : palette.text,
             }}
           >
             {previewText}
@@ -1946,7 +1950,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           alignSelf: 'flex-end',
         }}
       >
-        <Text style={{ color: palette.errorText ?? '#E74C3C', fontSize: 12 }}>
+        <Text style={{ color: palette.danger, fontSize: 12 }}>
           Tap to retry
         </Text>
       </Pressable>
@@ -1974,7 +1978,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <View
             style={{
               maxHeight: '60%',
-              backgroundColor: palette.surface ?? '#fff',
+              backgroundColor: palette.surface,
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               paddingBottom: 16,
@@ -2026,7 +2030,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <View
             style={{
               maxHeight: '55%',
-              backgroundColor: palette.surface ?? '#fff',
+              backgroundColor: palette.surface,
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               paddingBottom: 24,
@@ -2041,7 +2045,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 paddingTop: 12,
                 paddingBottom: 8,
                 borderBottomWidth: 1,
-                borderBottomColor: palette.divider ?? '#00000011',
+                borderBottomColor: palette.divider,
               }}
             >
               {reactionEntries.map(([emoji, users]) => {
@@ -2069,7 +2073,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       <Text
                         style={{
                           fontSize: 12,
-                          color: palette.subtext ?? '#888',
+                          color: palette.subtext,
                         }}
                       >
                         {Array.isArray(users) ? users.length : 0}
@@ -2096,7 +2100,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     paddingHorizontal: 16,
                     paddingVertical: 10,
                     borderBottomWidth: 1,
-                    borderBottomColor: palette.divider ?? '#00000011',
+                    borderBottomColor: palette.divider,
                   }}
                 >
                   <View
@@ -2105,19 +2109,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       height: 36,
                       borderRadius: 18,
                       backgroundColor:
-                        palette.surfaceSoft ?? palette.surface ?? '#eee',
+                        palette.surfaceSoft ?? palette.surface,
                       marginRight: 12,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <KISIcon name="person" size={18} color={palette.subtext ?? '#888'} />
+                    <KISIcon name="person" size={18} color={palette.subtext} />
                   </View>
                   <Text
                     style={{
                       fontSize: 14,
                       fontWeight: isCurrentUser ? '700' : '400',
-                      color: palette.text ?? '#111',
+                      color: palette.text,
                     }}
                   >
                     {displayName}
@@ -2349,7 +2353,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       bottom: 0,
                       width: `${percentage}%`,
                       backgroundColor: isSelected
-                        ? (palette.pollBarSelected ?? (palette.primary ?? '#4F46E5') + '44')
+                        ? (palette.pollBarSelected ?? (palette.primary) + '44')
                         : (palette.pollBarBg ?? '#00000011'),
                       borderRadius: 10,
                     }}
@@ -2371,7 +2375,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     <Ionicons
                       name="checkmark-circle"
                       size={16}
-                      color={palette.primary ?? '#4F46E5'}
+                      color={palette.primary}
                       style={{ marginLeft: 8 }}
                     />
                   )}
@@ -2695,8 +2699,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const isProduct = !!productData || (message as any).kind === 'product';
     if (!isProduct || !productData) return null;
 
-    const priceColor = palette.primary ?? '#2E7D32';
-    const dividerColor = palette.divider ?? '#e0e0e0';
+    const priceColor = palette.primary;
+    const dividerColor = palette.divider;
 
     return (
       <View
@@ -2708,7 +2712,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           overflow: 'hidden',
           backgroundColor: isMe
             ? 'rgba(255,255,255,0.10)'
-            : (palette.surface ?? '#fafafa'),
+            : (palette.surface),
           minWidth: 200,
         }}
       >
@@ -2725,7 +2729,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               width: '100%',
               height: 140,
               borderRadius: 8,
-              backgroundColor: '#D0D0D0',
+              backgroundColor: palette.surface,
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -2740,7 +2744,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             style={{
               fontSize: 15,
               fontWeight: '700',
-              color: isMe ? outgoingTextColor : (palette.text ?? '#000'),
+              color: isMe ? outgoingTextColor : (palette.text),
             }}
             numberOfLines={2}
           >
@@ -2765,7 +2769,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Text
               style={{
                 fontSize: 13,
-                color: isMe ? outgoingMetaColor : (palette.subtext ?? '#666'),
+                color: isMe ? outgoingMetaColor : (palette.subtext),
               }}
               numberOfLines={2}
             >
@@ -2793,7 +2797,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 borderRadius: 10,
                 backgroundColor: isMe
                   ? 'rgba(255,255,255,0.18)'
-                  : (palette.primary ?? '#2E7D32'),
+                  : (palette.primary),
                 opacity: pressed ? 0.7 : 1,
               })}
             >
@@ -2801,7 +2805,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 style={{
                   fontSize: 13,
                   fontWeight: '700',
-                  color: isMe ? outgoingTextColor : (palette.onPrimary ?? '#fff'),
+                  color: isMe ? outgoingTextColor : (palette.onPrimary),
                 }}
               >
                 View
@@ -2823,10 +2827,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (!paymentData) return null;
 
     const statusColors: Record<string, string> = {
-      completed: '#22C55E',
-      pending: '#F59E0B',
-      failed: '#EF4444',
-      cancelled: '#9CA3AF',
+      completed: palette.success,
+      pending: palette.gold,
+      failed: palette.danger,
+      cancelled: palette.subtext,
     };
     const statusLabels: Record<string, string> = {
       completed: 'Completed',
@@ -2834,7 +2838,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       failed: 'Failed',
       cancelled: 'Cancelled',
     };
-    const statusColor = statusColors[paymentData.status] ?? '#9CA3AF';
+    const statusColor = statusColors[paymentData.status] ?? palette.subtext;
     const statusLabel = statusLabels[paymentData.status] ?? paymentData.status;
 
     const currencySymbols: Record<string, string> = {
@@ -2940,29 +2944,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               onPress={() => emitPaymentAction('payment.accept', paymentData.transactionId)}
               style={({ pressed }) => ({
                 flex: 1,
-                backgroundColor: '#22C55E',
+                backgroundColor: palette.success,
                 borderRadius: 10,
                 paddingVertical: 10,
                 alignItems: 'center',
                 opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Accept</Text>
+              <Text style={{ color: palette.ivory, fontWeight: '700', fontSize: 13 }}>Accept</Text>
             </Pressable>
             <Pressable
               onPress={() => emitPaymentAction('payment.decline', paymentData.transactionId)}
               style={({ pressed }) => ({
                 flex: 1,
-                backgroundColor: '#EF444422',
+                backgroundColor: `${palette.danger}22`,
                 borderRadius: 10,
                 paddingVertical: 10,
                 alignItems: 'center',
                 borderWidth: 1,
-                borderColor: '#EF4444',
+                borderColor: palette.danger,
                 opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Decline</Text>
+              <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>Decline</Text>
             </Pressable>
           </View>
         )}
@@ -3238,8 +3242,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     height: 3,
                     width: `${Math.round(progress * 100)}%`,
                     backgroundColor: isMe
-                      ? palette.onPrimary ?? '#fff'
-                      : palette.primary ?? '#4F46E5',
+                      ? palette.onPrimary
+                      : palette.primary,
                   }}
                 />
               </View>
@@ -3361,12 +3365,54 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {renderSenderName()}
         {renderReplyPreview()}
 
-        {!!text && (
+        {/* View-once label on sender side */}
+        {isTopLevelViewOnce && isMe && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+            <KISIcon name="eye" size={12} color={outgoingTextColor === '#111111' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.65)'} />
+            <Text style={{ fontSize: 10, color: outgoingTextColor === '#111111' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.65)', fontWeight: '600' }}>
+              View once
+            </Text>
+          </View>
+        )}
+
+        {/* View-once overlay for incoming view-once text messages */}
+        {isTopLevelViewOnce && !isMe && (
+          topLevelViewOnceViewed ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
+              <KISIcon name="eye-closed" size={16} color={palette.subtext} />
+              <Text style={{ fontSize: 13, color: palette.subtext, fontStyle: 'italic' }}>Opened</Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                setTopLevelViewOnceViewed(true);
+                const msgId = (message as any).serverId ?? (message as any).id;
+                if (msgId) onViewOnce?.(String(msgId));
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                backgroundColor: (palette.primarySoft ?? (palette.primary ? palette.primary + '22' : 'rgba(0,0,0,0.08)')),
+              }}
+            >
+              <KISIcon name="eye" size={18} color={palette.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: palette.primary }}>
+                Tap to view
+              </Text>
+            </Pressable>
+          )
+        )}
+
+        {!!text && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && (
           <View>
             {renderRichText((displayText ?? '') + (isLongText && !expanded ? '…' : ''))}
             {isLongText && (
               <Pressable onPress={() => setExpanded(prev => !prev)} style={{ marginTop: 2 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary ?? '#2196F3') }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? 'rgba(255,255,255,0.75)' : (palette.primary) }}>
                   {expanded ? t('Show less') : t('Read more')}
                 </Text>
               </Pressable>
@@ -3389,22 +3435,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             style={{ marginTop: 4, opacity: translating ? 0.5 : 1 }}
             disabled={translating}
           >
-            <Text style={{ color: palette.subtext ?? '#888', fontSize: 11 }}>
+            <Text style={{ color: palette.subtext, fontSize: 11 }}>
               {translating ? `🌐 ${t('Translating...')}` : `🌐 ${t('Translate')}`}
             </Text>
           </Pressable>
         )}
         {translating && isMe && (
-          <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 4 }}>🌐 {t('Translating...')}</Text>
+          <Text style={{ fontSize: 11, color: palette.subtext, marginTop: 4 }}>🌐 {t('Translating...')}</Text>
         )}
         {translatedText && (
           <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)' }}>
-            <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginBottom: 2 }}>
+            <Text style={{ fontSize: 10, color: palette.subtext, marginBottom: 2 }}>
               🌐 {t('Translation')}
             </Text>
-            <Text style={{ color: isMe ? '#fff' : (palette.text ?? '#000'), fontSize: 14 }}>{translatedText}</Text>
+            <Text style={{ color: isMe ? '#fff' : (palette.text), fontSize: 14 }}>{translatedText}</Text>
             <Pressable onPress={() => setTranslatedText(null)}>
-              <Text style={{ fontSize: 10, color: palette.subtext ?? '#888', marginTop: 2 }}>
+              <Text style={{ fontSize: 10, color: palette.subtext, marginTop: 2 }}>
                 {t('Hide')}
               </Text>
             </Pressable>
@@ -3420,8 +3466,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               borderRadius: 10,
               overflow: 'hidden',
               borderWidth: 1,
-              borderColor: isMe ? 'rgba(255,255,255,0.2)' : (palette.divider ?? '#e0e0e0'),
-              backgroundColor: isMe ? 'rgba(0,0,0,0.08)' : (palette.surface ?? '#f5f5f5'),
+              borderColor: isMe ? 'rgba(255,255,255,0.2)' : (palette.divider),
+              backgroundColor: isMe ? 'rgba(0,0,0,0.08)' : (palette.surface),
             }}
           >
             {linkPreview.image ? (
@@ -3433,15 +3479,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             ) : null}
             <View style={{ padding: 8, gap: 2 }}>
               {linkPreview.site_name ? (
-                <Text style={{ fontSize: 10, color: palette.primary ?? '#2196F3', fontWeight: '700', textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 10, color: palette.primary, fontWeight: '700', textTransform: 'uppercase' }}>
                   {linkPreview.site_name}
                 </Text>
               ) : null}
-              <Text style={{ fontSize: 13, fontWeight: '700', color: isMe ? '#fff' : (palette.text ?? '#000') }} numberOfLines={2}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isMe ? '#fff' : (palette.text) }} numberOfLines={2}>
                 {linkPreview.title}
               </Text>
               {linkPreview.description ? (
-                <Text style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.7)' : (palette.subtext ?? '#666') }} numberOfLines={2}>
+                <Text style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.7)' : (palette.subtext) }} numberOfLines={2}>
                   {linkPreview.description}
                 </Text>
               ) : null}
@@ -3454,20 +3500,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           const onLight = isMe && outgoingTextColor === '#111111';
           const cardBorder = isMe
             ? (onLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)')
-            : (palette.primary ?? '#2196F3');
+            : (palette.primary);
           const cardBg = isMe
             ? (onLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)')
             : (palette.primarySoft ?? (palette.primary ? palette.primary + '18' : '#e8f0fe'));
           const iconColor = isMe
-            ? (onLight ? (palette.primary ?? '#9A6A14') : '#fde68a')
-            : (palette.primary ?? '#2196F3');
+            ? (onLight ? (palette.primary) : '#fde68a')
+            : (palette.primary);
           const labelColor = isMe
             ? (onLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)')
-            : (palette.subtext ?? '#666');
-          const titleColor = isMe ? outgoingTextColor : (palette.text ?? '#000');
+            : (palette.subtext);
+          const titleColor = isMe ? outgoingTextColor : (palette.text);
           const chevronColor = isMe
-            ? (onLight ? (palette.primary ?? '#9A6A14') : 'rgba(255,255,255,0.6)')
-            : (palette.primary ?? '#2196F3');
+            ? (onLight ? (palette.primary) : 'rgba(255,255,255,0.6)')
+            : (palette.primary);
           return (
             <Pressable
               onPress={() => navigation.navigate('InviteJoin', inviteInfo)}

@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -15,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -56,6 +59,7 @@ const getInitials = (name?: string | null) => {
 
 export default function TalentDiscoverScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const [search, setSearch] = useState('');
@@ -134,7 +138,7 @@ export default function TalentDiscoverScreen() {
       <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
         <View style={styles.cardTop}>
           <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
@@ -142,8 +146,8 @@ export default function TalentDiscoverScreen() {
                 {name}
               </Text>
               {item.open_to_work ? (
-                <View style={[styles.openBadge]}>
-                  <Text style={styles.openBadgeText}>Open to Work</Text>
+                <View style={[styles.openBadge, { backgroundColor: palette.successSoft }]}>
+                  <Text style={[styles.openBadgeText, { color: palette.success }]}>Open to Work</Text>
                 </View>
               ) : null}
             </View>
@@ -176,9 +180,9 @@ export default function TalentDiscoverScreen() {
             disabled={isLoading || isPending}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={palette.onPrimary} />
             ) : (
-              <Text style={[styles.actionBtnText, { color: isPending ? palette.subtext : '#fff' }]}>
+              <Text style={[styles.actionBtnText, { color: isPending ? palette.subtext : palette.onPrimary }]}>
                 {isPending ? 'Pending' : 'Connect'}
               </Text>
             )}
@@ -190,6 +194,7 @@ export default function TalentDiscoverScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
@@ -202,7 +207,7 @@ export default function TalentDiscoverScreen() {
         data={profiles}
         keyExtractor={(item) => item.id}
         renderItem={renderProfile}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: responsive.pageGutter, paddingBottom: 32, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} />
         }
@@ -252,6 +257,7 @@ export default function TalentDiscoverScreen() {
           )
         }
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -338,7 +344,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 18,
   },
@@ -354,13 +359,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   openBadge: {
-    backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
   openBadgeText: {
-    color: '#065F46',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -380,7 +383,9 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     paddingVertical: 9,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
   },
   actionBtnText: {

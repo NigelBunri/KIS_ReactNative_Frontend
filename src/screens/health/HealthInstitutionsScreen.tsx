@@ -102,7 +102,7 @@ export default function HealthInstitutionsScreen() {
   }, [loadInstitutions]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
       <InstitutionsListScreen
         institutions={institutions}
         onEdit={handleEdit}

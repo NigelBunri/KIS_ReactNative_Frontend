@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -26,8 +27,8 @@ import { postRequest } from '@/network/post';
 
 type Tip = {
   id: string;
-  username: string;
-  amount: number;
+  user_display_name: string;
+  amount_cents: number;
   message?: string;
   created_at: string;
 };
@@ -50,6 +51,7 @@ export default function SuperThanksSheet({
   contentTitle,
 }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
 
   const [topTips, setTopTips] = useState<Tip[]>([]);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -70,7 +72,7 @@ export default function SuperThanksSheet({
             ? res.data
             : res.data.results ?? [];
           // Sort by amount descending, take top 5
-          raw.sort((a, b) => b.amount - a.amount);
+          raw.sort((a, b) => b.amount_cents - a.amount_cents);
           setTopTips(raw.slice(0, 5));
         }
       })
@@ -86,7 +88,7 @@ export default function SuperThanksSheet({
     try {
       const res = await postRequest(
         ROUTES.broadcasts.contentTips(contentId),
-        { amount: selectedAmount, message: message.trim() || undefined },
+        { amount_cents: Math.round(selectedAmount * 100), currency: 'USD', message: message.trim() || undefined },
         { errorMessage: 'Failed to send Super Thanks' },
       );
       if (res?.success || res?.data) {
@@ -120,8 +122,8 @@ export default function SuperThanksSheet({
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.panel, { backgroundColor: palette.surface }]}>
+        <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.55 }]} onPress={onClose} />
+        <View style={[styles.panel, { backgroundColor: palette.surface, paddingBottom: 28 + insets.bottom }]}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: palette.text }]}>
@@ -138,8 +140,8 @@ export default function SuperThanksSheet({
           >
             {/* Success toast */}
             {successShown && (
-              <View style={[styles.toast, { backgroundColor: '#22C55E' }]}>
-                <Text style={styles.toastText}>Your Super Thanks was sent! ❤️</Text>
+              <View style={[styles.toast, { backgroundColor: palette.success }]}>
+                <Text style={[styles.toastText, { color: palette.onPrimary }]}>Your Super Thanks was sent! ❤️</Text>
               </View>
             )}
 
@@ -154,10 +156,10 @@ export default function SuperThanksSheet({
                 {topTips.map(tip => (
                   <View key={tip.id} style={styles.tipRow}>
                     <Text style={[styles.tipName, { color: palette.text }]}>
-                      {tip.username}
+                      {tip.user_display_name}
                     </Text>
                     <Text style={[styles.tipAmt, { color: palette.gold }]}>
-                      ${tip.amount}
+                      ${(tip.amount_cents / 100).toFixed(2)}
                     </Text>
                   </View>
                 ))}
@@ -183,7 +185,7 @@ export default function SuperThanksSheet({
                   <Text
                     style={[
                       styles.chipText,
-                      { color: selectedAmount === amt ? '#fff' : palette.text },
+                      { color: selectedAmount === amt ? palette.onPrimary : palette.text },
                     ]}
                   >
                     ${amt}
@@ -225,9 +227,9 @@ export default function SuperThanksSheet({
             ]}
           >
             {sending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={palette.ivory} />
             ) : (
-              <Text style={styles.sendBtnText}>Send Thanks ❤</Text>
+              <Text style={[styles.sendBtnText, { color: palette.onPrimary }]}>Send Thanks ❤</Text>
             )}
           </Pressable>
         </View>
@@ -245,13 +247,11 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   panel: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '85%',
-    paddingBottom: 28,
   },
   header: {
     flexDirection: 'row',
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   title: { fontSize: 17, fontWeight: '700', flex: 1, marginRight: 8 },
-  closeTxt: { fontSize: 18, padding: 4 },
+  closeTxt: { fontSize: 18, padding: 4, minWidth: 44, minHeight: 44, textAlign: 'center', lineHeight: 44 },
   body: { paddingHorizontal: 14, paddingBottom: 8, gap: 14 },
   toast: {
     borderRadius: 10,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: 'center',
   },
-  toastText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  toastText: { fontWeight: '700', fontSize: 14 },
   loader: { marginVertical: 12 },
   topTipsBox: {
     borderRadius: 12,
@@ -322,5 +322,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  sendBtnText: { fontWeight: '800', fontSize: 16 },
 });

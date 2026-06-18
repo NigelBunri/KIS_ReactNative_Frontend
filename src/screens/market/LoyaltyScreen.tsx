@@ -141,8 +141,8 @@ export default function LoyaltyScreen() {
     setRedeeming(true);
     try {
       const response = await postRequest(
-        ROUTES.billing.loyalty,
-        { action: 'redeem', points },
+        ROUTES.billing.loyaltyRedeem,
+        { points },
         { errorMessage: 'Unable to spend coins.' },
       );
       if (response?.success) {
@@ -191,7 +191,7 @@ export default function LoyaltyScreen() {
           </View>
         ) : error ? (
           <View style={s.center}>
-            <Text style={[s.errorText, { color: palette.error ?? '#DC2626' }]}>
+            <Text style={[s.errorText, { color: palette.danger }]}>
               {error}
             </Text>
             <Pressable
@@ -221,17 +221,17 @@ export default function LoyaltyScreen() {
                 { backgroundColor: palette.primaryStrong },
               ]}
             >
-              <Text style={s.balanceLabel}>Your Coins</Text>
-              <Text style={s.balanceValue}>
+              <Text style={[s.balanceLabel, { color: palette.ivory }]}>Your Coins</Text>
+              <Text style={[s.balanceValue, { color: palette.onPrimary }]}>
                 {balance.toLocaleString()}
               </Text>
-              <Text style={s.balanceSub}>KIS Coins</Text>
+              <Text style={[s.balanceSub, { color: palette.ivory }]}>KIS Coins</Text>
               {balance > 0 && (
                 <Pressable
-                  style={s.redeemToggleBtn}
+                  style={[s.redeemToggleBtn, { borderColor: palette.ivory }]}
                   onPress={() => setRedeemVisible(prev => !prev)}
                 >
-                  <Text style={s.redeemToggleText}>
+                  <Text style={[s.redeemToggleText, { color: palette.onPrimary }]}>
                     {redeemVisible ? 'Cancel' : 'Spend Coins'}
                   </Text>
                 </Pressable>
@@ -287,9 +287,9 @@ export default function LoyaltyScreen() {
                     disabled={redeeming}
                   >
                     {redeeming ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <ActivityIndicator color={palette.onPrimary} size="small" />
                     ) : (
-                      <Text style={s.redeemBtnText}>Apply</Text>
+                      <Text style={[s.redeemBtnText, { color: palette.onPrimary }]}>Apply</Text>
                     )}
                   </Pressable>
                 </View>
@@ -405,7 +405,7 @@ export default function LoyaltyScreen() {
                         style={[
                           s.activityPts,
                           {
-                            color: isPositive ? '#16A34A' : '#DC2626',
+                            color: isPositive ? (palette.success) : (palette.danger),
                           },
                         ]}
                       >
@@ -482,7 +482,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   balanceLabel: {
-    color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -490,13 +489,11 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   balanceValue: {
-    color: '#fff',
     fontSize: 56,
     fontWeight: '900',
     lineHeight: 64,
   },
   balanceSub: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 16,
     fontWeight: '600',
     marginTop: 4,
@@ -504,12 +501,11 @@ const s = StyleSheet.create({
   redeemToggleBtn: {
     marginTop: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.7)',
     borderRadius: 10,
     paddingHorizontal: 24,
     paddingVertical: 10,
   },
-  redeemToggleText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  redeemToggleText: { fontWeight: '700', fontSize: 14 },
   redeemCard: {
     borderWidth: 1,
     borderRadius: 16,
@@ -532,7 +528,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 80,
   },
-  redeemBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  redeemBtnText: { fontWeight: '700', fontSize: 14 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',

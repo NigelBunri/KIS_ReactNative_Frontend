@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -100,7 +101,7 @@ export default function AudienceDemographicsPanel({ channelId }: Props) {
         {(['30d', '90d'] as DemoPeriod[]).map(p => {
           const active = period === p;
           return (
-            <Text
+            <Pressable
               key={p}
               onPress={() => setPeriod(p)}
               style={[
@@ -108,12 +109,13 @@ export default function AudienceDemographicsPanel({ channelId }: Props) {
                 {
                   backgroundColor: active ? palette.primaryStrong : (palette.surfaceElevated ?? palette.surface),
                   borderColor: active ? palette.primaryStrong : palette.border,
-                  color: active ? '#fff' : palette.text,
                 },
               ]}
             >
-              {p === '30d' ? '30 days' : '90 days'}
-            </Text>
+              <Text style={[styles.pillText, { color: active ? palette.onPrimary : palette.text }]}>
+                {p === '30d' ? '30 days' : '90 days'}
+              </Text>
+            </Pressable>
           );
         })}
       </View>
@@ -192,11 +194,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    fontSize: 12,
-    fontWeight: '700',
+    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
   },
+  pillText: { fontSize: 12, fontWeight: '700' },
   section: { borderWidth: 1, borderRadius: 10, padding: 14, gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
@@ -23,23 +23,29 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
   const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
   const [thumbnailTarget, setThumbnailTarget] = useState<BroadcastChannelContent | null>(null);
 
-  const handleAddTag = useCallback((contentId: string) => {
+  const getTags = useCallback((item: BroadcastChannelContent) => {
+    if (tagsMap[item.id] !== undefined) return tagsMap[item.id];
+    return item.tags || [];
+  }, [tagsMap]);
+
+  const handleAddTag = useCallback((item: BroadcastChannelContent) => {
+    const contentId = item.id;
     const text = (tagInput[contentId] || '').trim().replace(/,+$/, '');
     if (!text) return;
-    const newTags = [...(tagsMap[contentId] || [])];
+    const newTags = [...getTags(item)];
     text.split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
       if (!newTags.includes(t)) newTags.push(t);
     });
     setTagsMap(prev => ({ ...prev, [contentId]: newTags }));
     setTagInput(prev => ({ ...prev, [contentId]: '' }));
     onUpdateTags?.(contentId, newTags);
-  }, [tagInput, tagsMap, onUpdateTags]);
+  }, [tagInput, getTags, onUpdateTags]);
 
-  const handleRemoveTag = useCallback((contentId: string, tag: string) => {
-    const newTags = (tagsMap[contentId] || []).filter(t => t !== tag);
-    setTagsMap(prev => ({ ...prev, [contentId]: newTags }));
-    onUpdateTags?.(contentId, newTags);
-  }, [tagsMap, onUpdateTags]);
+  const handleRemoveTag = useCallback((item: BroadcastChannelContent, tag: string) => {
+    const newTags = getTags(item).filter(t => t !== tag);
+    setTagsMap(prev => ({ ...prev, [item.id]: newTags }));
+    onUpdateTags?.(item.id, newTags);
+  }, [getTags, onUpdateTags]);
 
   const rows = useMemo(() => {
     if (contents.length) return contents;
@@ -57,7 +63,8 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
   }, [contents, legacyFeeds]);
 
   return (
-    <View style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+    <View style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: palette.text }]}>Content manager</Text>
@@ -89,16 +96,16 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                 <Pressable
                   disabled={isBusy}
                   onPress={() => onToggleBroadcast?.(item, !isBroadcast)}
-                  style={[styles.broadcastButton, { borderColor: isBroadcast ? palette.error || '#B42318' : palette.primary, opacity: isBusy ? 0.7 : 1 }]}
+                  style={[styles.broadcastButton, { borderColor: isBroadcast ? palette.danger : palette.primary, opacity: isBusy ? 0.7 : 1 }]}
                 >
                   {isBusy ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
-                  <Text style={[styles.broadcastText, { color: isBroadcast ? palette.error || '#B42318' : palette.primaryStrong }]}>{isBroadcast ? 'Stop' : 'Broadcast'}</Text>
+                  <Text style={[styles.broadcastText, { color: isBroadcast ? palette.danger : palette.primaryStrong }]}>{isBroadcast ? 'Stop' : 'Broadcast'}</Text>
                 </Pressable>
               ) : null}
               <Pressable
                 onPress={() => setExpandedTags(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                hitSlop={8}
-                style={{ padding: 4 }}
+                hitSlop={15}
+                style={styles.chevronButton}
               >
                 <KISIcon name="chevron-down" size={14} color={palette.subtext} />
               </Pressable>
@@ -113,10 +120,10 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                   <Text style={[styles.thumbnailButtonText, { color: palette.subtext }]}>Change thumbnail</Text>
                 </Pressable>
                 <View style={styles.tagsList}>
-                  {(tagsMap[item.id] || []).map(tag => (
+                  {getTags(item).map(tag => (
                     <View key={tag} style={[styles.tagPill, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}>
                       <Text style={[styles.tagText, { color: palette.primaryStrong }]}>{tag}</Text>
-                      <Pressable onPress={() => handleRemoveTag(item.id, tag)} hitSlop={6}>
+                      <Pressable onPress={() => handleRemoveTag(item, tag)} hitSlop={6}>
                         <KISIcon name="close" size={10} color={palette.primaryStrong} />
                       </Pressable>
                     </View>
@@ -127,11 +134,11 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                     placeholderTextColor={palette.subtext}
                     style={[styles.tagInput, { color: palette.text, borderColor: palette.border }]}
                     returnKeyType="done"
-                    onSubmitEditing={() => handleAddTag(item.id)}
+                    onSubmitEditing={() => handleAddTag(item)}
                     onChangeText={text => {
                       setTagInput(prev => ({ ...prev, [item.id]: text }));
                       if (text.endsWith(',')) {
-                        handleAddTag(item.id);
+                        handleAddTag(item);
                       }
                     }}
                   />
@@ -153,11 +160,16 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
           currentThumbnailUrl={thumbnailTarget.thumbnail_url}
           onClose={() => setThumbnailTarget(null)}
           onUpdated={(url) => {
-            setThumbnailTarget(null);
+            // Optimistically update the thumbnail_url in the local tagsMap-adjacent
+            // state so the UI reflects the change immediately without a full refetch.
+            setThumbnailTarget(prev =>
+              prev ? { ...prev, thumbnail_url: url } : null,
+            );
           }}
         />
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -166,15 +178,16 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
   title: { fontSize: 16, fontWeight: '900' },
   subtitle: { marginTop: 3, fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  createButton: { minHeight: 36, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  createButton: { minHeight: 44, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
   createText: { fontSize: 12, fontWeight: '900' },
   row: { borderTopWidth: 1, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
   typeIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  chevronButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   rowTitle: { flex: 1, fontSize: 13, fontWeight: '900' },
   rowMeta: { marginTop: 2, fontSize: 11, fontWeight: '700' },
   liveChip: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, fontSize: 9, fontWeight: '900' },
-  broadcastButton: { minHeight: 34, minWidth: 76, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  broadcastButton: { minHeight: 44, minWidth: 76, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   broadcastText: { fontSize: 11, fontWeight: '900' },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 8, padding: 14 },
   itemBlock: { borderTopWidth: 0 },
@@ -183,6 +196,6 @@ const styles = StyleSheet.create({
   tagPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { fontSize: 11, fontWeight: '700' },
   tagInput: { minWidth: 90, flex: 1, borderBottomWidth: 1, paddingVertical: 4, paddingHorizontal: 6, fontSize: 12, fontWeight: '600' },
-  thumbnailButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: 10 },
+  thumbnailButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, alignSelf: 'flex-start', marginBottom: 10 },
   thumbnailButtonText: { fontSize: 12, fontWeight: '700' },
 });

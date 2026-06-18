@@ -283,7 +283,7 @@ function Chips({
 }
 
 function StatusBadge({ status, palette }: { status: string; palette: any }) {
-  const color = status === 'published' ? (palette.success ?? '#27AE60')
+  const color = status === 'published' ? (palette.success)
     : status === 'draft' ? palette.subtext
     : palette.primary;
   return (
@@ -490,14 +490,14 @@ function MeditationsSection({ palette }: { palette: any }) {
               <View style={styles.cardActions}>
                 <Pressable
                   onPress={() => handlePublish(item)}
-                  style={[styles.actionBtn, { borderColor: item.status === 'published' ? (palette.success ?? '#27AE60') : palette.primary }]}
+                  style={[styles.actionBtn, { borderColor: item.status === 'published' ? (palette.success) : palette.primary }]}
                 >
-                  <Text style={{ color: item.status === 'published' ? (palette.success ?? '#27AE60') : palette.primary, fontSize: 10, fontWeight: '800' }}>
+                  <Text style={{ color: item.status === 'published' ? (palette.success) : palette.primary, fontSize: 10, fontWeight: '800' }}>
                     {item.status === 'published' ? 'Unpublish' : 'Publish'}
                   </Text>
                 </Pressable>
                 <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
-                  <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '800', fontSize: 16 }}>×</Text>
+                  <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
             </View>
@@ -653,14 +653,14 @@ function BooksSection({ palette }: { palette: any }) {
               <View style={styles.cardActions}>
                 <Pressable
                   onPress={() => handlePublish(item)}
-                  style={[styles.actionBtn, { borderColor: item.status === 'published' ? (palette.success ?? '#27AE60') : palette.primary }]}
+                  style={[styles.actionBtn, { borderColor: item.status === 'published' ? (palette.success) : palette.primary }]}
                 >
-                  <Text style={{ color: item.status === 'published' ? (palette.success ?? '#27AE60') : palette.primary, fontSize: 10, fontWeight: '800' }}>
+                  <Text style={{ color: item.status === 'published' ? (palette.success) : palette.primary, fontSize: 10, fontWeight: '800' }}>
                     {item.status === 'published' ? 'Unpublish' : 'Publish'}
                   </Text>
                 </Pressable>
                 <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
-                  <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '800', fontSize: 16 }}>×</Text>
+                  <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
             </View>
@@ -742,8 +742,8 @@ function PrayerRequestsSection({ palette }: { palette: any }) {
               style={[
                 styles.card,
                 {
-                  borderColor: item.answered ? (palette.success ?? '#27AE60') + '66' : palette.divider,
-                  backgroundColor: item.answered ? (palette.success ?? '#27AE60') + '0A' : palette.surface,
+                  borderColor: item.answered ? (palette.success) + '66' : palette.divider,
+                  backgroundColor: item.answered ? (palette.success) + '0A' : palette.surface,
                 },
               ]}
             >
@@ -768,15 +768,15 @@ function PrayerRequestsSection({ palette }: { palette: any }) {
                 style={[
                   styles.prayBtn,
                   {
-                    backgroundColor: item.answered ? (palette.success ?? '#27AE60') + '22' : palette.primary + '22',
-                    borderColor: item.answered ? (palette.success ?? '#27AE60') : palette.primary,
+                    backgroundColor: item.answered ? (palette.success) + '22' : palette.primary + '22',
+                    borderColor: item.answered ? (palette.success) : palette.primary,
                   },
                 ]}
               >
                 {prayingId === item.id ? (
                   <ActivityIndicator size="small" color={palette.primary} />
                 ) : (
-                  <Text style={{ color: item.answered ? (palette.success ?? '#27AE60') : palette.primary, fontSize: 11, fontWeight: '800', textAlign: 'center' }}>
+                  <Text style={{ color: item.answered ? (palette.success) : palette.primary, fontSize: 11, fontWeight: '800', textAlign: 'center' }}>
                     {item.answered ? 'Prayed\nfor ✓' : 'Mark as\nPrayed'}
                   </Text>
                 )}
@@ -920,7 +920,7 @@ function DailyPassagesSection({ palette }: { palette: any }) {
                   ) : null}
                 </View>
                 <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
-                  <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '800', fontSize: 16 }}>×</Text>
+                  <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
             );

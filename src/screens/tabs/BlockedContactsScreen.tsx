@@ -1,6 +1,7 @@
-// GAP 4: Blocked Contacts Management Screen
+// Blocked Contacts Management Screen
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   FlatList,
@@ -8,12 +9,14 @@ import {
   StyleSheet,
   Alert,
   DeviceEventEmitter,
-  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 
 export type BlockedContact = {
   userId: string;
@@ -25,6 +28,13 @@ const BLOCKED_KEY = 'KIS_BLOCKED_CONTACTS';
 
 export async function blockContact(contact: BlockedContact): Promise<void> {
   try {
+    // Sync to backend first (best-effort — don't block local state on network)
+    await postRequest(
+      ROUTES.moderation.userBlocks,
+      { blocked: contact.userId, action: 'block' },
+      { errorMessage: '' },
+    ).catch(() => {});
+
     const raw = await AsyncStorage.getItem(BLOCKED_KEY);
     const list: BlockedContact[] = raw ? JSON.parse(raw) : [];
     if (!list.some((c) => c.userId === contact.userId)) {
@@ -36,6 +46,13 @@ export async function blockContact(contact: BlockedContact): Promise<void> {
 
 export async function unblockContact(userId: string): Promise<void> {
   try {
+    // Sync to backend first (best-effort — don't block local state on network)
+    await postRequest(
+      ROUTES.moderation.userBlocks,
+      { blocked: userId, action: 'unblock' },
+      { errorMessage: '' },
+    ).catch(() => {});
+
     const raw = await AsyncStorage.getItem(BLOCKED_KEY);
     if (!raw) return;
     const list: BlockedContact[] = JSON.parse(raw);
@@ -62,14 +79,19 @@ type Props = {
 export default function BlockedContactsScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const responsive = useResponsiveLayout();
   const [contacts, setContacts] = useState<BlockedContact[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const loadBlocked = useCallback(async () => {
+    setLoading(true);
     try {
       const raw = await AsyncStorage.getItem(BLOCKED_KEY);
       if (raw) setContacts(JSON.parse(raw));
       else setContacts([]);
-    } catch { /* silent */ }
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -103,18 +125,18 @@ export default function BlockedContactsScreen({ onBack }: Props) {
     const date = new Date(item.blockedAt);
     const dateLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
     return (
-      <View style={[localStyles.row, { backgroundColor: palette.card, borderColor: palette.divider ?? '#eee' }]}>
+      <View style={[localStyles.row, { backgroundColor: palette.card, borderColor: palette.divider }]}>
         {/* Avatar placeholder */}
-        <View style={[localStyles.avatar, { backgroundColor: palette.primarySoft ?? palette.surface ?? '#f0f0f0' }]}>
-          <KISIcon name="user" size={22} color={palette.primaryStrong ?? palette.primary ?? '#333'} />
+        <View style={[localStyles.avatar, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
+          <KISIcon name="user" size={22} color={palette.primaryStrong ?? palette.primary} />
         </View>
 
         {/* Name + date */}
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={{ fontWeight: '700', fontSize: 14, color: palette.text ?? '#000' }} numberOfLines={1}>
+          <Text style={{ fontWeight: '700', fontSize: 14, color: palette.text }} numberOfLines={1}>
             {item.displayName || 'Unknown'}
           </Text>
-          <Text style={{ fontSize: 12, color: palette.subtext ?? '#888', marginTop: 2 }}>
+          <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 2 }}>
             Blocked {dateLabel}
           </Text>
         </View>
@@ -126,57 +148,61 @@ export default function BlockedContactsScreen({ onBack }: Props) {
           style={({ pressed }) => [
             localStyles.unblockBtn,
             {
-              backgroundColor: pressed ? '#fecaca' : '#fee2e2',
-              borderColor: '#ef4444',
+              backgroundColor: pressed ? palette.dangerSoft : palette.dangerSoft,
+              borderColor: palette.danger,
             },
           ]}
         >
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#ef4444' }}>Unblock</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: palette.danger }}>Unblock</Text>
         </Pressable>
       </View>
     );
   };
 
   return (
-    <View style={[localStyles.root, { backgroundColor: palette.bg ?? palette.surface ?? '#fff' }]}>
+    <View style={[localStyles.root, { backgroundColor: palette.bg }]}>
       {/* Header */}
       <View
         style={[
           localStyles.header,
           {
             paddingTop: insets.top + 8,
-            borderBottomColor: palette.divider ?? '#eee',
-            backgroundColor: palette.card ?? '#fff',
+            borderBottomColor: palette.divider,
+            backgroundColor: palette.card,
           },
         ]}
       >
         {onBack ? (
           <Pressable onPress={onBack} style={localStyles.backBtn} hitSlop={10}>
-            <KISIcon name="arrow-left" size={22} color={palette.primary ?? '#333'} />
+            <KISIcon name="arrow-left" size={22} color={palette.primary} />
           </Pressable>
         ) : null}
-        <Text style={[localStyles.title, { color: palette.text ?? '#000' }]}>
+        <Text style={[localStyles.title, { color: palette.text }]}>
           Blocked contacts
         </Text>
       </View>
 
-      <FlatList
-        data={contacts}
-        keyExtractor={(item) => item.userId}
-        renderItem={renderItem}
-        contentContainerStyle={{ padding: 16 }}
-        ListEmptyComponent={
-          <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-            <KISIcon name="shield" size={40} color={palette.subtext ?? '#888'} />
-            <Text style={{ color: palette.subtext ?? '#888', marginTop: 12, fontSize: 15 }}>
-              No blocked contacts
-            </Text>
-            <Text style={{ color: palette.subtext ?? '#aaa', marginTop: 4, fontSize: 13, textAlign: 'center', paddingHorizontal: 32 }}>
-              Block a contact from their profile to prevent them from messaging you.
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={contacts}
+          keyExtractor={(item) => item.userId}
+          renderItem={renderItem}
+          contentContainerStyle={{ padding: responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
+          ListEmptyComponent={
+            <View style={{ paddingVertical: responsive.pageGutter * 2, alignItems: 'center' }}>
+              <KISIcon name="shield" size={40} color={palette.subtext} />
+              <Text style={{ color: palette.subtext, marginTop: 12, fontSize: 15 }}>
+                No blocked contacts.
+              </Text>
+              <Text style={{ color: palette.subtext, marginTop: 4, fontSize: 13, textAlign: 'center', paddingHorizontal: 32 }}>
+                Block a contact from their profile to prevent them from messaging you.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -212,5 +238,8 @@ const localStyles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

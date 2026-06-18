@@ -152,7 +152,7 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
           ListEmptyComponent={() => (
             <View style={styles.center}>
               {blockError ? (
-                <Text style={[styles.empty, { color: palette.danger ?? '#dc2626' }]}>{blockError}</Text>
+                <Text style={[styles.empty, { color: palette.danger }]}>{blockError}</Text>
               ) : (
                 <>
                   <Text style={{ fontSize: 36 }}>{SUB_TABS.find((t) => t.key === activeSubTab)?.icon}</Text>

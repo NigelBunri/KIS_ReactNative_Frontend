@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { removeChannelContentReaction } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   Animated,
   ActivityIndicator,
@@ -15,10 +14,11 @@ import {
   View,
   ViewToken,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { getRequest } from '@/network/get';
@@ -61,6 +61,8 @@ type ShortCardProps = {
 
 function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
   const { palette } = useKISTheme();
+  const { minTouchTarget } = useResponsiveLayout();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const liked = Boolean(item.localLiked);
   const likeCount = item.localLikeCount ?? item.engagement_counts?.reactions ?? 0;
@@ -104,47 +106,47 @@ function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress
       {/* Double-tap heart flash */}
       {showHeart && (
         <View style={styles.doubleTapHeart} pointerEvents="none">
-          <KISIcon name="heart" size={80} color="rgba(239,68,68,0.9)" />
+          <KISIcon name="heart" size={80} color={palette.danger} />
         </View>
       )}
 
       <View style={styles.overlay} />
 
-      <View style={styles.infoRow}>
+      <View style={[styles.infoRow, { bottom: Math.max(60, bottomInset + 20) }]}>
         <View style={styles.metaCol}>
           {item.channel?.display_name ? (
             <Pressable
               onPress={() => navigation.navigate('ChannelHome', { channelId: item.channel?.id })}
               style={styles.channelRow}
             >
-              <Text style={styles.channelName}>@{item.channel.handle || item.channel.display_name}</Text>
+              <Text style={[styles.channelName, { color: palette.ivory }]}>@{item.channel.handle || item.channel.display_name}</Text>
               {channelId && (
                 <Pressable
                   onPress={() => onSubscribe(channelId)}
-                  style={[styles.followPill, { borderColor: isSubscribed ? '#22c55e' : '#fff', backgroundColor: isSubscribed ? '#22c55e' : 'transparent' }]}
+                  style={[styles.followPill, { borderColor: isSubscribed ? palette.success : palette.ivory, backgroundColor: isSubscribed ? palette.success : 'transparent', minHeight: minTouchTarget }]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>{isSubscribed ? '✓' : 'Follow'}</Text>
+                  <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 11 }}>{isSubscribed ? '✓' : 'Follow'}</Text>
                 </Pressable>
               )}
             </Pressable>
           ) : null}
-          <Text style={styles.shortTitle} numberOfLines={2}>{item.title || (item as any).text_plain || ''}</Text>
+          <Text style={[styles.shortTitle, { color: palette.ivory }]} numberOfLines={2}>{item.title || (item as any).text_plain || ''}</Text>
         </View>
 
         <View style={styles.actionsCol}>
           <Pressable style={styles.actionBtn} onPress={() => onLike(item.id)}>
-            <KISIcon name="heart" size={26} color={liked ? '#ef4444' : '#fff'} />
-            {likeCount > 0 && <Text style={styles.actionCount}>{likeCount}</Text>}
+            <KISIcon name="heart" size={26} color={liked ? palette.danger : palette.ivory} />
+            {likeCount > 0 && <Text style={[styles.actionCount, { color: palette.ivory }]}>{likeCount}</Text>}
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onDislike(item.id)}>
-            <KISIcon name="warning" size={24} color="#fff" />
+            <KISIcon name="warning" size={24} color={palette.ivory} />
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onCommentPress(item.id)}>
-            <KISIcon name="comment" size={24} color="#fff" />
-            <Text style={styles.actionCount}>{item.engagement_counts?.comments ?? ''}</Text>
+            <KISIcon name="comment" size={24} color={palette.ivory} />
+            <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.engagement_counts?.comments ?? ''}</Text>
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onShare(item)}>
-            <KISIcon name="share" size={24} color="#fff" />
+            <KISIcon name="share" size={24} color={palette.ivory} />
           </Pressable>
         </View>
       </View>
@@ -191,7 +193,7 @@ export default function ShortsScreen() {
 
   const handleDislike = useCallback((id: string) => {
     Vibration.vibrate(15);
-    void removeChannelContentReaction(id);
+    void reactToChannelContent(id, 'dislike');
   }, []);
 
   const handleLike = useCallback((id: string) => {
@@ -245,7 +247,7 @@ export default function ShortsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: '#000' }]}>
+      <View style={[styles.centered, { backgroundColor: palette.royalInk }]}>
         <ActivityIndicator color={palette.primaryStrong} size="large" />
       </View>
     );
@@ -253,28 +255,33 @@ export default function ShortsScreen() {
 
   if (!items.length) {
     return (
-      <SafeAreaView style={[styles.centered, { backgroundColor: '#000' }]} edges={['top']}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: palette.royalInk }]} edges={['top']}>
         <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <KISIcon name="close" size={22} color="#fff" />
+          <KISIcon name="close" size={22} color={palette.ivory} />
         </Pressable>
-        <KISIcon name="play" size={48} color="rgba(255,255,255,0.3)" />
-        <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 12, fontWeight: '700' }}>No shorts yet</Text>
+        <KISIcon name="play" size={48} color={palette.divider} />
+        <Text style={{ color: palette.subtext, marginTop: 12, fontWeight: '700' }}>No shorts yet</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
+    <View style={{ flex: 1, backgroundColor: palette.royalInk }}>
       <SafeAreaView style={styles.header} edges={['top']}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-          <KISIcon name="arrow-left" size={22} color="#fff" />
+          <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </Pressable>
-        <Text style={styles.headerTitle}>Shorts</Text>
+        <Text style={[styles.headerTitle, { color: palette.ivory }]}>Shorts</Text>
       </SafeAreaView>
 
       <FlatList
         data={items}
         keyExtractor={item => item.id}
+        ListEmptyComponent={
+          <View style={[styles.centered, { backgroundColor: palette.royalInk, flex: 1 }]}>
+            <Text style={{ color: palette.subtext, fontWeight: '700' }}>No shorts available.</Text>
+          </View>
+        }
         renderItem={({ item, index }) => (
           <ShortCard
             item={item}
@@ -358,14 +365,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
   },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  headerTitle: { fontSize: 17, fontWeight: '900' },
   closeBtn: { position: 'absolute', top: 56, left: 16, zIndex: 20 },
   card: { width: '100%', overflow: 'hidden' },
   doubleTapHeart: { position: 'absolute', top: '35%', left: '50%', marginLeft: -40, zIndex: 30 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
   infoRow: {
     position: 'absolute',
-    bottom: 60,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -375,12 +381,12 @@ const styles = StyleSheet.create({
   },
   metaCol: { flex: 1 },
   channelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  channelName: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  followPill: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
-  shortTitle: { color: 'rgba(255,255,255,0.88)', fontWeight: '700', fontSize: 13, lineHeight: 18 },
+  channelName: { fontWeight: '900', fontSize: 14 },
+  followPill: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
+  shortTitle: { fontWeight: '700', fontSize: 13, lineHeight: 18 },
   actionsCol: { flexDirection: 'column', alignItems: 'center', gap: 18, paddingBottom: 4 },
-  actionBtn: { alignItems: 'center', gap: 4 },
-  actionCount: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  actionBtn: { alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 44, minHeight: 44 },
+  actionCount: { fontSize: 11, fontWeight: '700' },
   commentsBackdrop: {
     position: 'absolute',
     top: 0,

@@ -72,7 +72,7 @@ export default function FeedPostActionsSheet({
             <Text
               style={{
                 color: action.destructive
-                  ? palette.error ?? '#DC2626'
+                  ? palette.danger
                   : palette.text,
                 fontSize: 14,
               }}

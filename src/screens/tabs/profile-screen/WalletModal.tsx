@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { KISPalette } from '@/theme/constants';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { walletModes } from '../profile/profile.constants';
 import { styles } from '../profile/profile.styles';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
 type WalletModalProps = {
@@ -23,6 +25,7 @@ type WalletModalProps = {
   saving: boolean;
   submitWalletAction?: () => Promise<void>;
   lastWalletPaymentUrl?: string;
+  navigation?: any;
 };
 
 type EarningRule = {
@@ -70,19 +73,18 @@ type Invoice = {
   description?: string;
 };
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  profile:    { bg: '#e0f2fe', text: '#0369a1' },
-  engagement: { bg: '#fef3c7', text: '#92400e' },
-  market:     { bg: '#dcfce7', text: '#166534' },
-  community:  { bg: '#f3e8ff', text: '#6b21a8' },
-  education:  { bg: '#fce7f3', text: '#9d174d' },
-  broadcast:  { bg: '#fff7ed', text: '#9a3412' },
-  partner:    { bg: '#e0e7ff', text: '#3730a3' },
-  health:     { bg: '#fee2e2', text: '#991b1b' },
-};
-
 function getCategoryStyle(category: string, palette: KISPalette) {
-  return CATEGORY_COLORS[category] ?? { bg: palette.primarySoft, text: palette.primaryStrong };
+  const map: Record<string, { bg: string; text: string }> = {
+    profile:    { bg: palette.primarySoft ?? palette.surface, text: palette.primary },
+    engagement: { bg: `${palette.gold}22`, text: palette.gold },
+    market:     { bg: `${palette.success}22`, text: palette.success },
+    community:  { bg: `${palette.primaryStrong}22`, text: palette.primaryStrong },
+    education:  { bg: `${palette.danger}22`, text: palette.danger },
+    broadcast:  { bg: `${palette.gold}18`, text: palette.gold },
+    partner:    { bg: palette.primarySoft ?? palette.surface, text: palette.primary },
+    health:     { bg: `${palette.danger}18`, text: palette.danger },
+  };
+  return map[category] ?? { bg: palette.primarySoft, text: palette.primaryStrong };
 }
 
 function PointsBadge({ points, palette }: { points: number; palette: KISPalette }) {
@@ -96,7 +98,7 @@ function PointsBadge({ points, palette }: { points: number; palette: KISPalette 
         alignSelf: 'flex-start',
       }}
     >
-      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>+{points} pts</Text>
+      <Text style={{ color: palette.onPrimary, fontSize: 11, fontWeight: '900' }}>+{points} pts</Text>
     </View>
   );
 }
@@ -143,16 +145,16 @@ function LoyaltyPanel({ palette }: { palette: KISPalette }) {
           padding: 20,
         }}
       >
-        <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+        <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', opacity: 0.75 }}>
           Your reward points
         </Text>
-        <Text style={{ color: '#fff', fontSize: 48, fontWeight: '900', marginTop: 4, lineHeight: 54 }}>
+        <Text style={{ color: palette.onPrimary, fontSize: 48, fontWeight: '900', marginTop: 4, lineHeight: 54 }}>
           {points.toLocaleString()}
         </Text>
         {data?.tier ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-            <KISIcon name="star" size={14} color="rgba(255,255,255,0.85)" />
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '700' }}>
+            <KISIcon name="star" size={14} color={palette.ivory} />
+            <Text style={{ color: palette.ivory, fontSize: 13, fontWeight: '700' }}>
               {data.tier} tier
             </Text>
           </View>
@@ -165,15 +167,15 @@ function LoyaltyPanel({ palette }: { palette: KISPalette }) {
             flexWrap: 'wrap',
           }}
         >
-          <View style={{ flex: 1, minWidth: 120, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tier upgrade</Text>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 2 }}>{tierUpgradeDiscount}% off</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>current value</Text>
+          <View style={{ flex: 1, minWidth: 120, backgroundColor: palette.primaryWeak, borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: palette.onPrimary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tier upgrade</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 20, fontWeight: '900', marginTop: 2 }}>{tierUpgradeDiscount}% off</Text>
+            <Text style={{ color: palette.ivory, fontSize: 10, marginTop: 2, opacity: 0.75 }}>current value</Text>
           </View>
-          <View style={{ flex: 1, minWidth: 120, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Artist booking</Text>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 2 }}>{artistDiscount}% off</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>current value</Text>
+          <View style={{ flex: 1, minWidth: 120, backgroundColor: palette.primaryWeak, borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: palette.onPrimary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Artist booking</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 20, fontWeight: '900', marginTop: 2 }}>{artistDiscount}% off</Text>
+            <Text style={{ color: palette.ivory, fontSize: 10, marginTop: 2, opacity: 0.75 }}>current value</Text>
           </View>
         </View>
       </View>
@@ -187,14 +189,16 @@ function LoyaltyPanel({ palette }: { palette: KISPalette }) {
             style={{
               flex: 1,
               paddingVertical: 8,
+              minHeight: 44,
               borderRadius: 10,
               alignItems: 'center',
+              justifyContent: 'center',
               backgroundColor: section === s ? palette.primary : palette.surface,
               borderWidth: 1,
               borderColor: section === s ? palette.primary : palette.divider,
             }}
           >
-            <Text style={{ color: section === s ? '#fff' : palette.subtext, fontSize: 12, fontWeight: '700' }}>
+            <Text style={{ color: section === s ? palette.onPrimary : palette.subtext, fontSize: 12, fontWeight: '700' }}>
               {s === 'earn' ? 'How to earn' : s === 'spend' ? 'How to spend' : 'History'}
             </Text>
           </Pressable>
@@ -367,7 +371,7 @@ function LoyaltyPanel({ palette }: { palette: KISPalette }) {
                         : `${ptsNeededForMax - points} pts away from max ${opt.max_discount_percent}% discount`}
                     </Text>
                   ) : (
-                    <Text style={{ color: palette.success ?? '#22c55e', fontSize: 11, fontWeight: '700' }}>
+                    <Text style={{ color: palette.success, fontSize: 11, fontWeight: '700' }}>
                       Maximum discount unlocked!
                     </Text>
                   )}
@@ -464,6 +468,7 @@ function LoyaltyPanel({ palette }: { palette: KISPalette }) {
 function InvoicesPanel({ palette }: { palette: KISPalette }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -499,6 +504,14 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
       data={invoices}
       keyExtractor={(inv) => inv.id}
       scrollEnabled={false}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      ListEmptyComponent={
+        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+          <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+            No transactions yet
+          </Text>
+        </View>
+      }
       renderItem={({ item }) => (
         <View
           style={{
@@ -517,7 +530,7 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
             {item.status && (
               <Text
                 style={{
-                  color: item.status === 'paid' ? '#22c55e' : palette.subtext,
+                  color: item.status === 'paid' ? palette.success : palette.subtext,
                   fontSize: 12,
                   fontWeight: '600',
                   textTransform: 'capitalize',
@@ -543,15 +556,353 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
   );
 }
 
+// ─── Deposit Panel ────────────────────────────────────────────────────────────
+function DepositPanel({ palette }: { palette: KISPalette }) {
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleDeposit = async () => {
+    const parsed = parseFloat(amount);
+    if (!amount || isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid deposit amount.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await postRequest(ROUTES.wallet.deposit, { amount: parsed, currency: 'NGN' }, {
+        errorMessage: 'Deposit failed',
+      });
+      Alert.alert('Deposit submitted', `Your deposit of ₦${parsed.toFixed(2)} has been initiated.`);
+      setAmount('');
+    } catch (err: any) {
+      Alert.alert('Deposit failed', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Deposit funds</Text>
+      <Text style={{ color: palette.subtext, fontSize: 12, lineHeight: 17 }}>
+        Add funds to your KIS wallet in NGN. Funds will be available immediately after processing.
+      </Text>
+      <TextInput
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="Amount (NGN)"
+        placeholderTextColor={palette.subtext}
+        keyboardType="numeric"
+        style={{
+          borderWidth: 1,
+          borderColor: palette.divider,
+          borderRadius: 10,
+          padding: 12,
+          color: palette.text,
+          backgroundColor: palette.surface,
+          fontSize: 15,
+        }}
+      />
+      <Pressable
+        onPress={handleDeposit}
+        disabled={loading}
+        style={{
+          backgroundColor: palette.primary,
+          borderRadius: 10,
+          padding: 14,
+          alignItems: 'center',
+          opacity: loading ? 0.6 : 1,
+        }}
+      >
+        {loading
+          ? <ActivityIndicator color={palette.onPrimary} />
+          : <Text style={{ color: palette.onPrimary, fontWeight: '800', fontSize: 14 }}>Deposit</Text>
+        }
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Transfer Panel ───────────────────────────────────────────────────────────
+function TransferPanel({ palette }: { palette: KISPalette }) {
+  const [toWalletId, setToWalletId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleTransfer = async () => {
+    const parsed = parseFloat(amount);
+    if (!toWalletId.trim()) {
+      Alert.alert('Missing recipient', 'Please enter a recipient wallet ID.');
+      return;
+    }
+    if (!amount || isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid transfer amount.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await postRequest(ROUTES.wallet.transfer, { to_wallet_id: toWalletId.trim(), amount: parsed }, {
+        errorMessage: 'Transfer failed',
+      });
+      Alert.alert('Transfer sent', `₦${parsed.toFixed(2)} has been sent successfully.`);
+      setToWalletId('');
+      setAmount('');
+    } catch (err: any) {
+      Alert.alert('Transfer failed', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Transfer funds</Text>
+      <Text style={{ color: palette.subtext, fontSize: 12, lineHeight: 17 }}>
+        Send funds from your KIS wallet to another wallet using their wallet ID.
+      </Text>
+      <TextInput
+        value={toWalletId}
+        onChangeText={setToWalletId}
+        placeholder="Recipient wallet ID"
+        placeholderTextColor={palette.subtext}
+        autoCapitalize="none"
+        style={{
+          borderWidth: 1,
+          borderColor: palette.divider,
+          borderRadius: 10,
+          padding: 12,
+          color: palette.text,
+          backgroundColor: palette.surface,
+          fontSize: 14,
+        }}
+      />
+      <TextInput
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="Amount (NGN)"
+        placeholderTextColor={palette.subtext}
+        keyboardType="numeric"
+        style={{
+          borderWidth: 1,
+          borderColor: palette.divider,
+          borderRadius: 10,
+          padding: 12,
+          color: palette.text,
+          backgroundColor: palette.surface,
+          fontSize: 15,
+        }}
+      />
+      <Pressable
+        onPress={handleTransfer}
+        disabled={loading}
+        style={{
+          backgroundColor: palette.primary,
+          borderRadius: 10,
+          padding: 14,
+          alignItems: 'center',
+          opacity: loading ? 0.6 : 1,
+        }}
+      >
+        {loading
+          ? <ActivityIndicator color={palette.onPrimary} />
+          : <Text style={{ color: palette.onPrimary, fontWeight: '800', fontSize: 14 }}>Transfer</Text>
+        }
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Convert Panel ────────────────────────────────────────────────────────────
+const CURRENCY_OPTIONS = ['NGN', 'USD', 'GBP', 'EUR', 'GHS', 'KES'];
+
+function ConvertPanel({ palette }: { palette: KISPalette }) {
+  const [amount, setAmount] = useState('');
+  const [fromCurrency, setFromCurrency] = useState('NGN');
+  const [toCurrency, setToCurrency] = useState('USD');
+  const [loading, setLoading] = useState(false);
+
+  const handleConvert = async () => {
+    const parsed = parseFloat(amount);
+    if (!amount || isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid amount to convert.');
+      return;
+    }
+    if (fromCurrency === toCurrency) {
+      Alert.alert('Same currency', 'Please choose different currencies to convert between.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await postRequest(ROUTES.wallet.convert, { amount: parsed, from_currency: fromCurrency, to_currency: toCurrency }, {
+        errorMessage: 'Conversion failed',
+      });
+      Alert.alert('Conversion initiated', `Converting ${parsed.toFixed(2)} ${fromCurrency} → ${toCurrency}. Check your balance shortly.`);
+      setAmount('');
+    } catch (err: any) {
+      Alert.alert('Conversion failed', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Convert currency</Text>
+      <Text style={{ color: palette.subtext, fontSize: 12, lineHeight: 17 }}>
+        Convert between currencies in your KIS wallet at the current exchange rate.
+      </Text>
+      <TextInput
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="Amount"
+        placeholderTextColor={palette.subtext}
+        keyboardType="numeric"
+        style={{
+          borderWidth: 1,
+          borderColor: palette.divider,
+          borderRadius: 10,
+          padding: 12,
+          color: palette.text,
+          backgroundColor: palette.surface,
+          fontSize: 15,
+        }}
+      />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>From</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {CURRENCY_OPTIONS.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setFromCurrency(c)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  backgroundColor: fromCurrency === c ? palette.primary : palette.surface,
+                  borderWidth: 1,
+                  borderColor: fromCurrency === c ? palette.primary : palette.divider,
+                }}
+              >
+                <Text style={{ color: fromCurrency === c ? palette.onPrimary : palette.text, fontSize: 12, fontWeight: '700' }}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>To</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {CURRENCY_OPTIONS.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setToCurrency(c)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  backgroundColor: toCurrency === c ? palette.primaryStrong : palette.surface,
+                  borderWidth: 1,
+                  borderColor: toCurrency === c ? palette.primaryStrong : palette.divider,
+                }}
+              >
+                <Text style={{ color: toCurrency === c ? palette.onPrimary : palette.text, fontSize: 12, fontWeight: '700' }}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+      <Pressable
+        onPress={handleConvert}
+        disabled={loading}
+        style={{
+          backgroundColor: palette.primary,
+          borderRadius: 10,
+          padding: 14,
+          alignItems: 'center',
+          opacity: loading ? 0.6 : 1,
+        }}
+      >
+        {loading
+          ? <ActivityIndicator color={palette.onPrimary} />
+          : <Text style={{ color: palette.onPrimary, fontWeight: '800', fontSize: 14 }}>Convert {fromCurrency} → {toCurrency}</Text>
+        }
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Upgrade Panel ────────────────────────────────────────────────────────────
+function UpgradePanel({ palette, navigation }: { palette: KISPalette; navigation?: any }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setLoading(true);
+    try {
+      const res = await postRequest(ROUTES.wallet.upgrade, {}, {
+        errorMessage: 'Could not initiate upgrade',
+      });
+      if (navigation) {
+        navigation.navigate('SubscriptionManagement');
+      } else {
+        Alert.alert('Upgrade', res?.data?.message ?? 'Upgrade initiated. Visit the subscription screen to complete.');
+      }
+    } catch (err: any) {
+      Alert.alert('Upgrade failed', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Upgrade your tier</Text>
+      <Text style={{ color: palette.subtext, fontSize: 12, lineHeight: 17 }}>
+        Unlock premium features by upgrading your KIS account tier. Higher tiers give you access to advanced analytics, extended storage, and partner tools.
+      </Text>
+      <View
+        style={{
+          backgroundColor: palette.primarySoft,
+          borderRadius: 14,
+          padding: 16,
+          gap: 8,
+        }}
+      >
+        {(['Pro', 'Business', 'Enterprise'] as const).map((tier) => (
+          <View key={tier} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <KISIcon name="checkmark-circle" size={16} color={palette.primaryStrong} />
+            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }}>{tier} tier available</Text>
+          </View>
+        ))}
+      </View>
+      <Pressable
+        onPress={handleUpgrade}
+        disabled={loading}
+        style={{
+          backgroundColor: palette.primary,
+          borderRadius: 10,
+          padding: 14,
+          alignItems: 'center',
+          opacity: loading ? 0.6 : 1,
+        }}
+      >
+        {loading
+          ? <ActivityIndicator color={palette.onPrimary} />
+          : <Text style={{ color: palette.onPrimary, fontWeight: '800', fontSize: 14 }}>View upgrade options</Text>
+        }
+      </Pressable>
+    </View>
+  );
+}
+
 export function WalletModal(props: WalletModalProps) {
   const {
     palette,
     walletForm,
     setWalletForm,
+    navigation,
   } = props;
 
   const mode = String(walletForm.mode || 'history').trim().toLowerCase();
-  const legacyActionMode = ['deposit', 'cash_to_credits', 'transfer'].includes(mode) || mode === `add_${'kisc'}`;
 
   return (
     <View style={{ gap: 12 }}>
@@ -578,45 +929,30 @@ export function WalletModal(props: WalletModalProps) {
       </View>
 
       {mode === 'loyalty' && <LoyaltyPanel palette={palette} />}
-
       {mode === 'invoices' && <InvoicesPanel palette={palette} />}
+      {mode === 'deposit' && <DepositPanel palette={palette} />}
+      {mode === 'transfer' && <TransferPanel palette={palette} />}
+      {mode === 'convert' && <ConvertPanel palette={palette} />}
+      {mode === 'upgrade' && <UpgradePanel palette={palette} navigation={navigation} />}
 
-      {mode !== 'loyalty' && mode !== 'invoices' && (
-        legacyActionMode ? (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: palette.divider,
-              backgroundColor: palette.surface,
-              borderRadius: 12,
-              padding: 12,
-              gap: 6,
-            }}
-          >
-            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>
-              This wallet action is unavailable
-            </Text>
-            <Text style={[styles.subtext, { color: palette.subtext }]}>Locked</Text>
-          </View>
-        ) : (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: palette.divider,
-              backgroundColor: palette.surface,
-              borderRadius: 12,
-              padding: 12,
-              gap: 6,
-            }}
-          >
-            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>
-              Read-only credit center
-            </Text>
-            <Text style={[styles.subtext, { color: palette.subtext }]}>
-              Promotional credits can only subsidize eligible KIS account upgrades when that option is available.
-            </Text>
-          </View>
-        )
+      {!['loyalty', 'invoices', 'deposit', 'transfer', 'convert', 'upgrade'].includes(mode) && (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: palette.divider,
+            backgroundColor: palette.surface,
+            borderRadius: 12,
+            padding: 12,
+            gap: 6,
+          }}
+        >
+          <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>
+            Read-only credit center
+          </Text>
+          <Text style={[styles.subtext, { color: palette.subtext }]}>
+            Promotional credits can only subsidize eligible KIS account upgrades when that option is available.
+          </Text>
+        </View>
       )}
     </View>
   );

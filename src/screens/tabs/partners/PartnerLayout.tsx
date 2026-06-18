@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
 import PartnersLeftRail from '@/components/partners/PartnersLeftRail';
@@ -129,7 +130,7 @@ export default function PartnerLayout({
   onOpenLinks,
   animatePartnerSheet,
   panels,
-  onOpenInsights: _onOpenInsights,
+  onOpenInsights,
   onLaunchOrganizationApp,
   onOpenOrganizationApps,
   isKcanAdmin,
@@ -137,6 +138,7 @@ export default function PartnerLayout({
   onRefreshPartner,
 }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const {
     apps: organizationApps,
     loading: organizationAppsLoading,
@@ -145,7 +147,7 @@ export default function PartnerLayout({
   } = usePartnerOrganizationAppsContext();
   return (
     <View
-      style={[styles.root, { backgroundColor: palette.chrome }]}
+      style={[styles.root, { backgroundColor: palette.chrome, paddingTop: insets.top }]}
       {...rootPanHandlers}
     >
       <LinearGradient
@@ -190,6 +192,7 @@ export default function PartnerLayout({
         onPartnerHeaderPress={onPartnerHeaderPress}
         isKcanAdmin={isKcanAdmin}
         onOpenAdminDashboard={onOpenAdminDashboard}
+        onOpenInsights={onOpenInsights}
         loading={partnersLoading}
         onRefresh={onRefreshPartner}
       />

@@ -25,12 +25,12 @@ export const VoiceLockedActionsRow: React.FC<VoiceLockedActionsRowProps> = ({
         <KISIcon
           name="trash"
           size={18}
-          color={palette.danger ?? '#EF4444'}
+          color={palette.danger}
         />
         <Text
           style={[
             styles.voiceLockedButtonText,
-            { color: palette.danger ?? '#EF4444' },
+            { color: palette.danger },
           ]}
         >
           Delete

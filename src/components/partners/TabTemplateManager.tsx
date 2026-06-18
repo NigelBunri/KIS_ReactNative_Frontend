@@ -524,7 +524,7 @@ function BibleContentEditor({
               ) : null}
             </View>
             <Pressable onPress={() => handleDelete(block)} style={{ padding: 6 }}>
-              <Text style={{ color: palette.danger ?? '#d9534f', fontSize: 16, fontWeight: '800' }}>×</Text>
+              <Text style={{ color: palette.danger, fontSize: 16, fontWeight: '800' }}>×</Text>
             </Pressable>
           </View>
         ))
@@ -670,7 +670,7 @@ function BroadcastTabManager({ tab, appId, partnerId, palette }: {
               </Text>
             </View>
             <Pressable onPress={() => handleDelete(post)} style={{ padding: 6 }}>
-              <Text style={{ color: palette.danger ?? '#d9534f', fontSize: 16, fontWeight: '800' }}>×</Text>
+              <Text style={{ color: palette.danger, fontSize: 16, fontWeight: '800' }}>×</Text>
             </Pressable>
           </View>
         ))
@@ -763,7 +763,7 @@ function DashboardWidgetManager({ tab, appId, partnerId, palette }: {
               <Text style={[styles.tiny, { color: palette.subtext }]}>{w.type.replace(/_/g, ' ')}{w.data_source ? ` · ${w.data_source}` : ''}</Text>
             </View>
             <Pressable onPress={() => handleRemove(w.id)} style={{ padding: 6 }}>
-              <Text style={{ color: palette.danger ?? '#d9534f', fontSize: 16, fontWeight: '800' }}>×</Text>
+              <Text style={{ color: palette.danger, fontSize: 16, fontWeight: '800' }}>×</Text>
             </Pressable>
           </View>
         ))
@@ -868,7 +868,7 @@ function MessagingTabManager({ tab, appId, partnerId, palette }: {
         <View key={i} style={[styles.listRow, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
           <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>#{ch.name ?? ch}</Text>
           <Pressable onPress={() => setChannels(prev => prev.filter((_, idx) => idx !== i))} style={{ padding: 6 }}>
-            <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '800' }}>×</Text>
+            <Text style={{ color: palette.danger, fontWeight: '800' }}>×</Text>
           </Pressable>
         </View>
       ))}
@@ -893,7 +893,7 @@ function MessagingTabManager({ tab, appId, partnerId, palette }: {
         <View key={i} style={[styles.listRow, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
           <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{t}</Text>
           <Pressable onPress={() => setTopics(prev => prev.filter((_, idx) => idx !== i))} style={{ padding: 6 }}>
-            <Text style={{ color: palette.danger ?? '#d9534f', fontWeight: '800' }}>×</Text>
+            <Text style={{ color: palette.danger, fontWeight: '800' }}>×</Text>
           </Pressable>
         </View>
       ))}

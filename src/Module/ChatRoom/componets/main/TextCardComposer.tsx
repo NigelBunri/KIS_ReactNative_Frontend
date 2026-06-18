@@ -125,12 +125,12 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
           <KISIcon
             name="back"
             size={22}
-            color={palette.onPrimary ?? '#fff'}
+            color={palette.onPrimary}
           />
         </Pressable>
         <Text
           style={{
-            color: palette.onPrimary ?? '#fff',
+            color: palette.onPrimary,
             fontSize: 16,
             fontWeight: '600',
           }}

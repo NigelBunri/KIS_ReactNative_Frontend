@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -7,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -32,6 +34,7 @@ type CartsListNavigation = NativeStackNavigationProp<
 
 const CartsListPage = () => {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const navigation = useNavigation<CartsListNavigation>();
   const [cartState, setCartState] = useState(getShopCartState());
@@ -44,7 +47,7 @@ const CartsListPage = () => {
   const [orderPlacedShops, setOrderPlacedShops] = useState<
     Record<string, boolean>
   >({});
-  const [, setOrdersLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -311,7 +314,7 @@ const CartsListPage = () => {
                 color:
                   orderFeedback[cart.shopId]?.type === 'success'
                     ? palette.success
-                    : palette.error || '#E53935',
+                    : palette.danger,
               },
             ]}
           >
@@ -331,7 +334,7 @@ const CartsListPage = () => {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <View
         style={[
           styles.header,
@@ -350,19 +353,24 @@ const CartsListPage = () => {
           Tap a card to review its items.
         </Text>
       </View>
-      {carts.length ? (
+      {ordersLoading && carts.length === 0 ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
+        </View>
+      ) : (
         <FlatList
           data={carts}
           keyExtractor={item => item.shopId}
           renderItem={({ item }) => renderCart(item)}
           contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyText, { color: palette.subtext }]}>
+                No active carts.
+              </Text>
+            </View>
+          }
         />
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: palette.subtext }]}>
-            You have no carts yet.
-          </Text>
-        </View>
       )}
     </View>
   );

@@ -123,11 +123,76 @@ export async function initPushHandlers(navigation?: any) {
       await registerPushToken({ pushToken: fcmToken, apnsToken });
     } catch {}
 
-    // Background message handler — must be registered before the app goes to the
-    // background, so we keep the existing stub (no UI possible in the background).
+    // Background/killed message handler. FCM shows `notification`-keyed messages
+    // automatically via the OS. For data-only messages we persist them to
+    // AsyncStorage so the app can surface them on next foreground resume.
     if (typeof setBackgroundMessageHandler === 'function') {
       setBackgroundMessageHandler(messaging, async (remoteMessage: any) => {
-        if (__DEV__) console.log('[push] background message', remoteMessage?.messageId ?? remoteMessage);
+        try {
+          const data = remoteMessage?.data ?? {};
+          const title: string = data?.title ?? remoteMessage?.notification?.title ?? '';
+          const body: string = data?.body ?? remoteMessage?.notification?.body ?? '';
+          if (!title && !body) return;
+
+          // DND check — same midnight-wrap logic as the foreground handler.
+          try {
+            const dndEnabled = await AsyncStorage.getItem('KIS_DND_ENABLED');
+            if (dndEnabled === 'true') {
+              const dndFrom = (await AsyncStorage.getItem('KIS_DND_FROM')) ?? '22:00';
+              const dndTo = (await AsyncStorage.getItem('KIS_DND_TO')) ?? '08:00';
+              const now = new Date();
+              const [fromH, fromM] = dndFrom.split(':').map(Number);
+              const [toH, toM] = dndTo.split(':').map(Number);
+              const nowMins = now.getHours() * 60 + now.getMinutes();
+              const fromMins = fromH * 60 + fromM;
+              const toMins = toH * 60 + toM;
+              const inQuietWindow =
+                fromMins <= toMins
+                  ? nowMins >= fromMins && nowMins < toMins
+                  : nowMins >= fromMins || nowMins < toMins; // wraps midnight
+              if (inQuietWindow) return;
+            }
+          } catch { /* silent */ }
+
+          // Per-chat sound check — if the conversation is set to 'None', skip storing.
+          const convId: string = data?.conversationId ?? data?.conversation_id ?? '';
+          if (convId) {
+            try {
+              const sound = await AsyncStorage.getItem(`KIS_NOTIF_SOUND_${convId}`);
+              if (sound === 'None') return;
+            } catch { /* silent */ }
+          }
+
+          // Channel notification toggles — check user's per-category preferences
+          try {
+            const channelKey = (() => {
+              if (data.conversation_id || data.conversationId) return 'notif_messages';
+              if (data.broadcast_id || data.channel_id || data.channel_content_id) return 'notif_feed';
+              if (data.appointment_id || data.health_service_session_id) return 'notif_health';
+              if (data.type === 'bible' || data.bible_id) return 'notif_bible';
+              return null;
+            })();
+            if (channelKey) {
+              const enabled = await AsyncStorage.getItem(channelKey);
+              if (enabled === 'false') return;
+            }
+          } catch { /* silent */ }
+
+          const raw = await AsyncStorage.getItem('KIS_BACKGROUND_NOTIFS').catch(() => null);
+          const queue: any[] = raw ? JSON.parse(raw) : [];
+          queue.push({
+            messageId: remoteMessage?.messageId ?? String(Date.now()),
+            title,
+            body,
+            data,
+            receivedAt: new Date().toISOString(),
+          });
+          // Keep at most 20 missed notifications
+          await AsyncStorage.setItem(
+            'KIS_BACKGROUND_NOTIFS',
+            JSON.stringify(queue.slice(-20)),
+          ).catch(() => {});
+        } catch { /* silent */ }
       });
     }
 
@@ -174,6 +239,21 @@ export async function initPushHandlers(navigation?: any) {
             if (sound === 'None') return;
           } catch { /* silent */ }
         }
+
+        // Channel notification toggles — same keys as background handler
+        try {
+          const channelKey = (() => {
+            if (data.conversation_id || data.conversationId) return 'notif_messages';
+            if (data.broadcast_id || data.channel_id || data.channel_content_id) return 'notif_feed';
+            if (data.appointment_id || data.health_service_session_id) return 'notif_health';
+            if (data.type === 'bible' || data.bible_id) return 'notif_bible';
+            return null;
+          })();
+          if (channelKey) {
+            const enabled = await AsyncStorage.getItem(channelKey);
+            if (enabled === 'false') return;
+          }
+        } catch { /* silent */ }
 
         InAppNotificationToastRef.current?.show({ title, body, data }, resolveNav(navigation));
       });

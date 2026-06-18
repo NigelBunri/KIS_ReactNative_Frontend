@@ -233,9 +233,9 @@ export default function AccountCreditsCard({
       >
         <LinearGradient
           colors={[
-            'rgba(255,221,87,0.16)',
-            'rgba(255,255,255,0.02)',
-            'rgba(255,173,51,0.12)',
+            `${palette.gold}29`,
+            `${palette.ivory}05`,
+            `${palette.primary}1F`,
           ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -259,7 +259,7 @@ export default function AccountCreditsCard({
                   height: 114,
                   borderRadius: 57,
                   borderWidth: 2,
-                  borderColor: '#F8D26A66',
+                  borderColor: `${palette.gold}66`,
                   transform: [
                     {
                       scale: pulseAnim.interpolate({
@@ -383,7 +383,10 @@ export default function AccountCreditsCard({
       </View>
 
       <View style={{ marginTop: 10, gap: 8 }}>
-        <TouchableOpacity onPress={() => setShowHistory(prev => !prev)}>
+        <TouchableOpacity
+          onPress={() => setShowHistory(prev => !prev)}
+          style={{ minHeight: 44, justifyContent: 'center' }}
+        >
           <Text style={[styles.title, { color: palette.text, fontSize: 16 }]}>
             Transaction History {showHistory ? '▲' : '▼'}
           </Text>

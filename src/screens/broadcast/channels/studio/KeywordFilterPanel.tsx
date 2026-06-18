@@ -6,6 +6,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -39,11 +42,8 @@ type Props = {
 
 const FILTER_TYPES: FilterType[] = ['block', 'hold', 'flag'];
 
-const FILTER_TYPE_COLOR: Record<FilterType, string> = {
-  block: '#EF4444',
-  hold: '#F59E0B',
-  flag: '#3B82F6',
-};
+const filterTypeColor = (type: FilterType, p: any): string =>
+  ({ block: p.danger, hold: p.gold, flag: p.primary } as Record<FilterType, string>)[type] ?? p.subtext;
 
 const FILTER_TYPE_LABEL: Record<FilterType, string> = {
   block: 'Block',
@@ -188,6 +188,7 @@ export default function KeywordFilterPanel({ channelId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={[styles.container, { backgroundColor: palette.surface }]}>
       {/* Add filter form */}
       <View style={[styles.addForm, { borderColor: palette.border, backgroundColor: palette.card }]}>
@@ -204,9 +205,9 @@ export default function KeywordFilterPanel({ channelId }: Props) {
         <View style={styles.typePicker}>
           {FILTER_TYPES.map(t => {
             const active = filterType === t;
-            const color = FILTER_TYPE_COLOR[t];
+            const color = filterTypeColor(t, palette);
             return (
-              <Text
+              <Pressable
                 key={t}
                 onPress={() => setFilterType(t)}
                 style={[
@@ -214,23 +215,25 @@ export default function KeywordFilterPanel({ channelId }: Props) {
                   {
                     backgroundColor: active ? color : palette.surface,
                     borderColor: active ? color : palette.border,
-                    color: active ? '#fff' : palette.text,
                   },
                 ]}
               >
-                {FILTER_TYPE_LABEL[t]}
-              </Text>
+                <Text style={[styles.typeChipText, { color: active ? palette.onPrimary : palette.text }]}>
+                  {FILTER_TYPE_LABEL[t]}
+                </Text>
+              </Pressable>
             );
           })}
-          <Text
+          <Pressable
             onPress={saving ? undefined : handleAdd}
-            style={[
-              styles.addChip,
-              { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 },
-            ]}
+            style={[styles.addChip, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}
           >
-            {saving ? '...' : 'Add'}
-          </Text>
+            {saving ? (
+              <ActivityIndicator size="small" color={palette.onPrimary} />
+            ) : (
+              <Text style={[styles.addChipText, { color: palette.onPrimary }]}>Add</Text>
+            )}
+          </Pressable>
         </View>
       </View>
 
@@ -242,7 +245,7 @@ export default function KeywordFilterPanel({ channelId }: Props) {
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
           {filters.map(filter => {
-            const color = FILTER_TYPE_COLOR[filter.filter_type] ?? palette.primaryStrong;
+            const color = filterTypeColor(filter.filter_type, palette);
             const busy = patchingId === filter.id || deletingId === filter.id;
             return (
               <View
@@ -256,19 +259,19 @@ export default function KeywordFilterPanel({ channelId }: Props) {
                   {filter.keyword}
                 </Text>
                 {/* Type pill - tappable to cycle */}
-                <View style={[styles.typePill, { backgroundColor: color + '22' }]}>
-                  <Text
-                    onPress={() => {
-                      if (busy) return;
-                      const idx = FILTER_TYPES.indexOf(filter.filter_type);
-                      const next = FILTER_TYPES[(idx + 1) % FILTER_TYPES.length]!;
-                      void handleChangeType(filter, next);
-                    }}
-                    style={[styles.typePillText, { color }]}
-                  >
+                <Pressable
+                  disabled={busy}
+                  onPress={() => {
+                    const idx = FILTER_TYPES.indexOf(filter.filter_type);
+                    const next = FILTER_TYPES[(idx + 1) % FILTER_TYPES.length]!;
+                    void handleChangeType(filter, next);
+                  }}
+                  style={[styles.typePill, { backgroundColor: color + '22', minHeight: 44, justifyContent: 'center' }]}
+                >
+                  <Text style={[styles.typePillText, { color }]}>
                     {FILTER_TYPE_LABEL[filter.filter_type]}
                   </Text>
-                </View>
+                </Pressable>
                 <Switch
                   value={filter.is_active}
                   onValueChange={() => {
@@ -276,23 +279,24 @@ export default function KeywordFilterPanel({ channelId }: Props) {
                     void handleToggleActive(filter);
                   }}
                   trackColor={{ true: palette.primaryStrong }}
-                  thumbColor="#fff"
+                  thumbColor={palette.ivory}
                 />
-                <Text
-                  onPress={() => {
-                    if (busy) return;
-                    handleDelete(filter);
-                  }}
-                  style={[styles.deleteBtn, { color: '#EF4444' }]}
+                <Pressable
+                  disabled={busy}
+                  onPress={() => handleDelete(filter)}
+                  style={styles.deletePressable}
                 >
-                  {deletingId === filter.id ? '...' : 'Delete'}
-                </Text>
+                  <Text style={[styles.deleteBtn, { color: palette.danger }]}>
+                    {deletingId === filter.id ? '...' : 'Delete'}
+                  </Text>
+                </Pressable>
               </View>
             );
           })}
         </ScrollView>
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -324,20 +328,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 12,
-    fontWeight: '700',
+    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
   },
+  typeChipText: { fontSize: 12, fontWeight: '700' },
   addChip: {
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
+    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
   },
+  addChipText: { fontSize: 12, fontWeight: '900' },
   emptyCard: { borderWidth: 1, borderRadius: 10, padding: 20, alignItems: 'center' },
   emptyText: { fontSize: 13, fontWeight: '600' },
   listContent: { gap: 8 },
@@ -352,6 +359,7 @@ const styles = StyleSheet.create({
   keywordText: { fontSize: 13, fontWeight: '700' },
   typePill: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   typePillText: { fontSize: 10, fontWeight: '900' },
+  deletePressable: { minHeight: 44, minWidth: 56, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { fontSize: 12, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

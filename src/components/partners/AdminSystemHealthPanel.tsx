@@ -66,8 +66,8 @@ export default function AdminSystemHealthPanel({
           </View>
         )}
         {!!error && !loading && (
-          <View style={[styles.errorBox, { backgroundColor: (palette.danger ?? '#d9534f') + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-            <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+          <View style={[styles.errorBox, { backgroundColor: (palette.danger) + '22', borderColor: palette.danger }]}>
+            <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
           </View>
         )}
 
@@ -133,8 +133,8 @@ export default function AdminSystemHealthPanel({
 
 function MetricTile({ label, value, palette, warn }: { label: string; value: string; palette: any; warn?: boolean }) {
   return (
-    <View style={[styles.tile, { backgroundColor: warn ? (palette.danger ?? '#e74c3c') + '18' : palette.card ?? palette.surface, borderColor: warn ? palette.danger ?? '#e74c3c' : palette.border }]}>
-      <Text style={[styles.tileValue, { color: warn ? palette.danger ?? '#e74c3c' : palette.text }]}>{value}</Text>
+    <View style={[styles.tile, { backgroundColor: warn ? (palette.danger) + '18' : palette.card ?? palette.surface, borderColor: warn ? palette.danger : palette.border }]}>
+      <Text style={[styles.tileValue, { color: warn ? palette.danger : palette.text }]}>{value}</Text>
       <Text style={[styles.tileLabel, { color: palette.subtext }]}>{label}</Text>
     </View>
   );

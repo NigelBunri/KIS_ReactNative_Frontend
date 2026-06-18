@@ -223,6 +223,7 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const sectionYRef = useRef<Record<string, number>>({});
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
 
   const s = makeStyles(palette);
@@ -277,7 +278,8 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
             <Pressable
               key={sec.id}
               onPress={() => {
-                scrollRef.current?.scrollTo({ y: 0, animated: false });
+                const y = sectionYRef.current[sec.id] ?? 0;
+                scrollRef.current?.scrollTo({ y, animated: true });
               }}
               style={s.tocItem}
             >
@@ -288,7 +290,11 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
 
         {/* Sections */}
         {SECTIONS.map(sec => (
-          <View key={sec.id} style={s.section}>
+          <View
+            key={sec.id}
+            style={s.section}
+            onLayout={e => { sectionYRef.current[sec.id] = e.nativeEvent.layout.y; }}
+          >
             <Text style={[s.sectionTitle, { color: palette.text }]}>{sec.title}</Text>
             {sec.body.map((para, i) => (
               <Text key={i} style={[s.para, { color: palette.subtext }]}>
@@ -340,7 +346,7 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
             <Text
               style={[
                 s.agreeBtnText,
-                { color: hasScrolledToBottom ? '#fff' : palette.subtext },
+                { color: hasScrolledToBottom ? palette.onPrimary : palette.subtext },
               ]}
             >
               I Have Read and Agree

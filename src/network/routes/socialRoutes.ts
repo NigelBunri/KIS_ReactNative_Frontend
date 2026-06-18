@@ -9,11 +9,11 @@ const socialRoutes = {
     metrics: (id: string) => `${API_BASE_URL}/api/v1/contents/${id}/metrics/`,
   },
   events: {
-    list: `${API_BASE_URL}/api/v1/api/events/`,
-    create: `${API_BASE_URL}/api/v1/api/events/`,
-    detail: (id: string) => `${API_BASE_URL}/api/v1/api/events/${id}/`,
-    rsvp: `${API_BASE_URL}/api/v1/api/attendances/`,
-    tickets: `${API_BASE_URL}/api/v1/api/tickets/`,
+    list: `${API_BASE_URL}/api/v1/events/`,
+    create: `${API_BASE_URL}/api/v1/events/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/events/${id}/`,
+    rsvp: `${API_BASE_URL}/api/v1/attendances/`,
+    tickets: `${API_BASE_URL}/api/v1/tickets/`,
   },
   notificationRules: {
     list: `${API_BASE_URL}/api/v1/notification-rules/`,
@@ -62,18 +62,18 @@ const socialRoutes = {
     inviteLink: (id: string) => `${API_BASE_URL}/api/v1/chat-groups/${id}/invite-link/`,
   },
   channels: {
-    getAllChannels: `${API_BASE_URL}/api/v1/channels/`,
-    getChannelById: (id: string) => `${API_BASE_URL}/api/v1/channels/${id}/`,
-    createChannel: `${API_BASE_URL}/api/v1/channels/`,
-    subscribeChannel: (id: string) => `${API_BASE_URL}/api/v1/channels/${id}/subscribe/`,
-    addMembersToChannel: (channelId: string) => `${API_BASE_URL}/api/v1/channels/${channelId}/members/`,
-    getChannelMembers: (channelId: string) => `${API_BASE_URL}/api/v1/channels/${channelId}/members/`,
+    getAllChannels: `${API_BASE_URL}/api/v1/partner-channels/channels/`,
+    getChannelById: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/`,
+    createChannel: `${API_BASE_URL}/api/v1/partner-channels/channels/`,
+    subscribeChannel: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/subscribe/`,
+    addMembersToChannel: (channelId: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${channelId}/members/`,
+    getChannelMembers: (channelId: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${channelId}/members/`,
   },
   subchannels: {
-    getAllSubchannels: `${API_BASE_URL}/subchannels/`,
-    getSubchannelById: (id: string) => `${API_BASE_URL}/subchannels/${id}/`,
-    createSubchannel: `${API_BASE_URL}/subchannels/create/`,
-    getSubchannelMembers: (id: string) => `${API_BASE_URL}/subchannels/${id}/members/`,
+    getAllSubchannels: `${API_BASE_URL}/api/v1/subchannels/`,
+    getSubchannelById: (id: string) => `${API_BASE_URL}/api/v1/subchannels/${id}/`,
+    createSubchannel: `${API_BASE_URL}/api/v1/subchannels/`,
+    getSubchannelMembers: (id: string) => `${API_BASE_URL}/api/v1/subchannels/${id}/members/`,
   },
   statuses: {
     list: `${API_BASE_URL}/api/v1/statuses/`,
@@ -102,11 +102,21 @@ const socialRoutes = {
       `${API_BASE_URL}/api/v1/chats/conversations/${conversationId}/settings/`,
   },
   moderation: {
-    mute: `${NEST_API_BASE_URL}/moderation/mute`,
+    mute: `${NEST_API_BASE_URL}/api/v1/moderation/mute`,
+    block: `${NEST_API_BASE_URL}/api/v1/moderation/block`,
+    report: `${NEST_API_BASE_URL}/api/v1/moderation/report`,
+  },
+  pins: {
+    set: `${NEST_API_BASE_URL}/api/v1/pins/set`,
+    list: `${NEST_API_BASE_URL}/api/v1/pins/list`,
+  },
+  conversations: {
+    broadcast: `${NEST_API_BASE_URL}/api/v1/conversations/broadcast`,
   },
   calls: {
     iceServers: `${API_BASE_URL}/api/v1/calls/ice-servers/`,
-    history: `${API_BASE_URL}/api/v1/calls/history/`,
+    history: `${NEST_API_BASE_URL}/api/v1/calls/history`,
+    missedCount: `${NEST_API_BASE_URL}/api/v1/calls/missed-count`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>

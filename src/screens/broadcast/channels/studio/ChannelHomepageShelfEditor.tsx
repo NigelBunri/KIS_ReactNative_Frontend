@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -128,15 +129,18 @@ function ShelfItemsPanel({
               <Text style={[itemStyles.itemTitle, { color: palette.text, flex: 1 }]} numberOfLines={1}>
                 {item.title ?? item.id}
               </Text>
-              <Text
+              <Pressable
+                hitSlop={10}
+                style={itemStyles.removeTouch}
                 onPress={() => {
                   if (deletingId === item.id) return;
                   void handleRemove(item);
                 }}
-                style={[itemStyles.removeBtn, { color: '#EF4444', opacity: deletingId === item.id ? 0.4 : 1 }]}
               >
-                {deletingId === item.id ? '...' : 'Remove'}
-              </Text>
+                <Text style={[itemStyles.removeBtn, { color: palette.danger, opacity: deletingId === item.id ? 0.4 : 1 }]}>
+                  {deletingId === item.id ? '...' : 'Remove'}
+                </Text>
+              </Pressable>
             </View>
           ))}
           <View style={itemStyles.addRow}>
@@ -147,12 +151,9 @@ function ShelfItemsPanel({
               placeholderTextColor={palette.subtext}
               style={[itemStyles.addInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.card }]}
             />
-            <Text
-              onPress={adding ? undefined : handleAdd}
-              style={[itemStyles.addBtn, { backgroundColor: palette.primaryStrong, opacity: adding ? 0.5 : 1 }]}
-            >
-              {adding ? '...' : 'Add'}
-            </Text>
+            <Pressable disabled={adding} onPress={handleAdd} style={[itemStyles.addBtn, { backgroundColor: palette.primaryStrong, opacity: adding ? 0.5 : 1 }]}>
+              <Text style={[itemStyles.addBtnText, { color: palette.onPrimary }]}>{adding ? '...' : 'Add'}</Text>
+            </Pressable>
           </View>
         </>
       )}
@@ -177,11 +178,12 @@ const itemStyles = StyleSheet.create({
     gap: 8,
   },
   itemTitle: { fontSize: 12, fontWeight: '700' },
+  removeTouch: { minHeight: 44, justifyContent: 'center' },
   removeBtn: { fontSize: 11, fontWeight: '900' },
-  addRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  addRow: { flexDirection: 'row', gap: 8, marginTop: 4, alignItems: 'center' },
   addInput: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -190,13 +192,15 @@ const itemStyles = StyleSheet.create({
     fontWeight: '700',
   },
   addBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+  },
+  addBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
   },
 });
 
@@ -378,43 +382,43 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
 
               {/* Reorder */}
               <View style={styles.reorderBtns}>
-                <Text
+                <Pressable
+                  hitSlop={10}
+                  style={styles.reorderTouch}
                   onPress={() => { if (!busy) void handleReorder(shelf, -1); }}
-                  style={[styles.reorderBtn, { color: idx === 0 ? palette.border : palette.subtext }]}
                 >
-                  ↑
-                </Text>
-                <Text
+                  <Text style={[styles.reorderBtn, { color: idx === 0 ? palette.border : palette.subtext }]}>↑</Text>
+                </Pressable>
+                <Pressable
+                  hitSlop={10}
+                  style={styles.reorderTouch}
                   onPress={() => { if (!busy) void handleReorder(shelf, 1); }}
-                  style={[styles.reorderBtn, { color: idx === shelves.length - 1 ? palette.border : palette.subtext }]}
                 >
-                  ↓
-                </Text>
+                  <Text style={[styles.reorderBtn, { color: idx === shelves.length - 1 ? palette.border : palette.subtext }]}>↓</Text>
+                </Pressable>
               </View>
 
               {/* Active toggle */}
               <Switch
                 value={shelf.is_active}
                 onValueChange={() => { if (!busy) void handleToggleActive(shelf); }}
-                trackColor={{ true: palette.primaryStrong }}
-                thumbColor="#fff"
+                trackColor={{ false: palette.border, true: palette.primaryStrong }}
+                thumbColor={palette.ivory}
               />
 
               {/* Expand items */}
-              <Text
-                onPress={() => setExpandedId(expanded ? null : shelf.id)}
-                style={[styles.manageBtn, { color: palette.primaryStrong }]}
-              >
-                {expanded ? 'Hide' : 'Items'}
-              </Text>
+              <Pressable hitSlop={10} style={styles.smallTouch} onPress={() => setExpandedId(expanded ? null : shelf.id)}>
+                <Text style={[styles.manageBtn, { color: palette.primaryStrong }]}>
+                  {expanded ? 'Hide' : 'Items'}
+                </Text>
+              </Pressable>
 
               {/* Delete */}
-              <Text
-                onPress={() => { if (!busy) handleDelete(shelf); }}
-                style={[styles.deleteBtn, { color: '#EF4444' }]}
-              >
-                {deletingId === shelf.id ? '...' : 'Del'}
-              </Text>
+              <Pressable hitSlop={10} style={styles.smallTouch} onPress={() => { if (!busy) handleDelete(shelf); }}>
+                <Text style={[styles.deleteBtn, { color: palette.danger }]}>
+                  {deletingId === shelf.id ? '...' : 'Del'}
+                </Text>
+              </Pressable>
             </View>
 
             {expanded && <ShelfItemsPanel shelfId={shelf.id} palette={palette} />}
@@ -437,7 +441,7 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
             {SHELF_TYPES.map(t => {
               const active = formType === t;
               return (
-                <Text
+                <Pressable
                   key={t}
                   onPress={() => setFormType(t)}
                   style={[
@@ -445,37 +449,31 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
                     {
                       backgroundColor: active ? palette.primaryStrong : palette.surface,
                       borderColor: active ? palette.primaryStrong : palette.border,
-                      color: active ? '#fff' : palette.text,
                     },
                   ]}
                 >
-                  {t}
-                </Text>
+                  <Text style={[styles.typeChipText, { color: active ? palette.onPrimary : palette.text }]}>{t}</Text>
+                </Pressable>
               );
             })}
           </View>
           <View style={styles.formActions}>
-            <Text
-              onPress={() => setShowForm(false)}
-              style={[styles.cancelBtn, { color: palette.subtext, borderColor: palette.border }]}
-            >
-              Cancel
-            </Text>
-            <Text
-              onPress={saving ? undefined : handleAdd}
+            <Pressable onPress={() => setShowForm(false)} style={[styles.cancelBtn, { borderColor: palette.border }]}>
+              <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              disabled={saving}
+              onPress={handleAdd}
               style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}
             >
-              {saving ? 'Adding...' : 'Add Shelf'}
-            </Text>
+              <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>{saving ? 'Adding...' : 'Add Shelf'}</Text>
+            </Pressable>
           </View>
         </View>
       ) : (
-        <Text
-          onPress={() => setShowForm(true)}
-          style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
-        >
-          + Add Shelf
-        </Text>
+        <Pressable onPress={() => setShowForm(true)} style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>+ Add Shelf</Text>
+        </Pressable>
       )}
     </ScrollView>
   );
@@ -501,7 +499,9 @@ const styles = StyleSheet.create({
   shelfTypePill: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   shelfTypeText: { fontSize: 10, fontWeight: '900' },
   reorderBtns: { flexDirection: 'row', gap: 2 },
+  reorderTouch: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
   reorderBtn: { fontSize: 14, fontWeight: '900', paddingHorizontal: 4 },
+  smallTouch: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
   manageBtn: { fontSize: 11, fontWeight: '900' },
   deleteBtn: { fontSize: 11, fontWeight: '900' },
   formCard: {
@@ -522,44 +522,40 @@ const styles = StyleSheet.create({
   },
   typePicker: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   typeChip: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 11,
-    fontWeight: '700',
-    overflow: 'hidden',
   },
+  typeChipText: { fontSize: 11, fontWeight: '700' },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   saveBtn: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    overflow: 'hidden',
   },
+  saveBtnText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   addBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
   },
+  addBtnText: { fontSize: 13, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

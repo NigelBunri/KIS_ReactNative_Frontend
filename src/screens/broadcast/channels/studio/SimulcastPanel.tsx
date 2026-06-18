@@ -6,6 +6,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,7 +32,7 @@ type SimulcastTarget = {
   status: TargetStatus;
 };
 
-type Platform = 'YouTube' | 'Twitch' | 'Facebook' | 'Instagram' | 'TikTok' | 'Custom';
+type StreamPlatform = 'YouTube' | 'Twitch' | 'Facebook' | 'Instagram' | 'TikTok' | 'Custom';
 
 type Props = {
   streamId: string;
@@ -38,9 +40,9 @@ type Props = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PLATFORMS: Platform[] = ['YouTube', 'Twitch', 'Facebook', 'Instagram', 'TikTok', 'Custom'];
+const PLATFORMS: StreamPlatform[] = ['YouTube', 'Twitch', 'Facebook', 'Instagram', 'TikTok', 'Custom'];
 
-const PLATFORM_SHORT: Record<Platform, string> = {
+const PLATFORM_SHORT: Record<StreamPlatform, string> = {
   YouTube: 'YT',
   Twitch: 'TW',
   Facebook: 'FB',
@@ -49,10 +51,10 @@ const PLATFORM_SHORT: Record<Platform, string> = {
   Custom: '~',
 };
 
-const STATUS_COLOR: Record<TargetStatus, string> = {
-  idle: '#94A3B8',
-  streaming: '#22C55E',
-  error: '#EF4444',
+const statusColor = (status: TargetStatus, palette: any): string => {
+  if (status === 'streaming') return palette.success;
+  if (status === 'error')     return palette.danger;
+  return palette.subtext;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ export default function SimulcastPanel({ streamId }: Props) {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   // Form state
-  const [formPlatform, setFormPlatform] = useState<Platform>('YouTube');
+  const [formPlatform, setFormPlatform] = useState<StreamPlatform>('YouTube');
   const [formLabel, setFormLabel] = useState('');
   const [formRtmp, setFormRtmp] = useState('');
   const [formKey, setFormKey] = useState('');
@@ -170,9 +172,11 @@ export default function SimulcastPanel({ streamId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
     >
       {/* Info note */}
       <View style={[styles.noteRow, { backgroundColor: palette.surfaceElevated ?? palette.card, borderColor: palette.border }]}>
@@ -186,7 +190,7 @@ export default function SimulcastPanel({ streamId }: Props) {
         onPress={() => setShowForm(prev => !prev)}
         style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
       >
-        <Text style={styles.addBtnText}>{showForm ? 'Cancel' : '+ Add Target'}</Text>
+        <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>{showForm ? 'Cancel' : '+ Add Target'}</Text>
       </Pressable>
 
       {/* Add form */}
@@ -211,7 +215,7 @@ export default function SimulcastPanel({ streamId }: Props) {
                     },
                   ]}
                 >
-                  <Text style={[styles.platformPillText, { color: active ? '#fff' : palette.text }]}>
+                  <Text style={[styles.platformPillText, { color: active ? palette.onPrimary : palette.text }]}>
                     {p}
                   </Text>
                 </Pressable>
@@ -257,9 +261,9 @@ export default function SimulcastPanel({ streamId }: Props) {
             style={[styles.submitBtn, { backgroundColor: palette.primaryStrong }]}
           >
             {adding ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={palette.onPrimary} />
             ) : (
-              <Text style={styles.submitBtnText}>Add</Text>
+              <Text style={[styles.submitBtnText, { color: palette.onPrimary }]}>Add</Text>
             )}
           </Pressable>
         </View>
@@ -274,8 +278,8 @@ export default function SimulcastPanel({ streamId }: Props) {
         </View>
       ) : (
         targets.map(target => {
-          const statusColor = STATUS_COLOR[target.status] ?? STATUS_COLOR.idle;
-          const short = PLATFORM_SHORT[target.platform as Platform] ?? target.platform.slice(0, 2).toUpperCase();
+          const targetColor = statusColor(target.status as TargetStatus, palette);
+          const short = PLATFORM_SHORT[target.platform as StreamPlatform] ?? target.platform.slice(0, 2).toUpperCase();
           return (
             <View
               key={target.id}
@@ -290,8 +294,8 @@ export default function SimulcastPanel({ streamId }: Props) {
                 <Text style={[styles.targetLabel, { color: palette.text }]} numberOfLines={1}>
                   {target.label}
                 </Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
-                  <Text style={[styles.statusText, { color: statusColor }]}>
+                <View style={[styles.statusBadge, { backgroundColor: targetColor + '22' }]}>
+                  <Text style={[styles.statusText, { color: targetColor }]}>
                     {target.status.toUpperCase()}
                   </Text>
                 </View>
@@ -304,7 +308,7 @@ export default function SimulcastPanel({ streamId }: Props) {
                 {removingId === target.id ? (
                   <ActivityIndicator size="small" color={palette.subtext} />
                 ) : (
-                  <Text style={[styles.removeBtnText, { color: '#EF4444' }]}>Remove</Text>
+                  <Text style={[styles.removeBtnText, { color: palette.danger }]}>Remove</Text>
                 )}
               </Pressable>
             </View>
@@ -312,6 +316,7 @@ export default function SimulcastPanel({ streamId }: Props) {
         })
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -332,8 +337,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  addBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  addBtnText: { fontWeight: '800', fontSize: 13 },
   formCard: { borderWidth: 1, borderRadius: 10, padding: 14, gap: 8 },
   formTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
   fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
@@ -354,12 +362,12 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     borderRadius: 8,
-    height: 42,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  submitBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  submitBtnText: { fontWeight: '800', fontSize: 14 },
   targetCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -379,7 +387,7 @@ const styles = StyleSheet.create({
   targetLabel: { fontSize: 13, fontWeight: '800', marginBottom: 4 },
   statusBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   statusText: { fontSize: 10, fontWeight: '800' },
-  removeBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  removeBtn: { paddingHorizontal: 8, paddingVertical: 6, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   removeBtnText: { fontSize: 12, fontWeight: '800' },
   emptyState: {
     borderWidth: 1,

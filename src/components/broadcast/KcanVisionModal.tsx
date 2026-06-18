@@ -682,7 +682,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       gap: 10,
     },
     kicker: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 12,
       fontWeight: '900',
       textTransform: 'uppercase',
@@ -703,7 +703,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       maxWidth: 640,
     },
     heroScripture: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '900',
@@ -749,7 +749,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingBottom: 25,
     },
     statementEyebrow: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 11,
       fontWeight: '900',
       textTransform: 'uppercase',
@@ -763,7 +763,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       marginTop: 10,
     },
     statementScripture: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '900',
@@ -851,7 +851,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       overflow: 'hidden',
     },
     cityDeclarationLabel: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 11,
       fontWeight: '900',
       textTransform: 'uppercase',
@@ -865,7 +865,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       marginTop: 8,
     },
     cityDeclarationScripture: {
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '900',
@@ -1041,7 +1041,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     },
     zoomText: {
       minWidth: 54,
-      color: '#FFE8A3',
+      color: palette.goldHighlight,
       textAlign: 'center',
       fontWeight: '900',
     },

@@ -120,6 +120,7 @@ export type KISIconName =
   | 'volume-x'
   // User management
   | 'user-minus'
+  | 'user-plus'
   // Call control icons (previously unregistered — fixed)
   | 'raise-hand'
   | 'flip-camera'
@@ -317,6 +318,7 @@ const ion: IonMap = {
   'volume-x': { filled: 'volume-mute', outline: 'volume-mute-outline' },
   // User management
   'user-minus': { filled: 'person-remove', outline: 'person-remove-outline' },
+  'user-plus': { filled: 'person-add', outline: 'person-add-outline' },
   // Aliases used by callTypeIcon()
   radio: { filled: 'radio', outline: 'radio-outline' },
   // Call controls (previously fell back to 'home')

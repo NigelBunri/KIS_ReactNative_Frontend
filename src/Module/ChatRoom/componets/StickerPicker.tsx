@@ -38,7 +38,7 @@ export const StickerPicker: React.FC<StickerPickerProps> = ({
       >
         <Text
           style={{
-            color: palette.onPrimary ?? '#fff',
+            color: palette.onPrimary,
             fontWeight: '600',
             fontSize: 13,
           }}
@@ -65,7 +65,7 @@ export const StickerPicker: React.FC<StickerPickerProps> = ({
               margin: 6,
               borderRadius: 12,
               overflow: 'hidden',
-              backgroundColor: palette.surface ?? '#222',
+              backgroundColor: palette.surface,
             }}
           >
             <Image

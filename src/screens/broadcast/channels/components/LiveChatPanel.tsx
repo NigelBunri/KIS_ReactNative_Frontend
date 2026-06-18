@@ -74,14 +74,14 @@ export default function LiveChatPanel({
         styles.bubble,
         item.isMine
           ? [styles.bubbleMine, { backgroundColor: palette.primary }]
-          : [styles.bubbleOther, { backgroundColor: 'rgba(0,0,0,0.55)' }],
+          : [styles.bubbleOther, { backgroundColor: palette.royalInk }],
       ]}>
         {!item.isMine && (
-          <Text style={[styles.msgName, { color: palette.primaryStrong ?? '#a78bfa' }]}>
+          <Text style={[styles.msgName, { color: palette.primaryStrong }]}>
             {item.displayName}
           </Text>
         )}
-        <Text style={[styles.msgText, { color: '#fff' }]}>{item.text}</Text>
+        <Text style={[styles.msgText, { color: palette.ivory }]}>{item.text}</Text>
       </View>
     </View>
   ), [palette.primary, palette.primaryStrong]);
@@ -91,16 +91,16 @@ export default function LiveChatPanel({
       {/* Toggle button */}
       <Pressable
         onPress={onToggleCollapse}
-        style={[styles.toggleBtn, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
+        style={[styles.toggleBtn, { backgroundColor: collapsed ? palette.royalInk : palette.card }]}
       >
         <KISIcon
-          name={collapsed ? 'chat' : 'chat'}
+          name="comment"
           size={16}
-          color="#fff"
+          color={collapsed ? palette.primaryStrong : palette.ivory}
         />
         {messages.length > 0 && !collapsed && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>
+          <View style={[styles.countBadge, { backgroundColor: palette.danger }]}>
+            <Text style={[styles.countText, { color: palette.ivory }]}>
               {messages.length > 99 ? '99+' : messages.length}
             </Text>
           </View>
@@ -126,6 +126,13 @@ export default function LiveChatPanel({
           onContentSizeChange={() =>
             listRef.current?.scrollToEnd({ animated: false })
           }
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No messages yet
+              </Text>
+            </View>
+          }
         />
 
         {/* Input row */}
@@ -137,8 +144,8 @@ export default function LiveChatPanel({
               value={draft}
               onChangeText={setDraft}
               placeholder={disabled ? 'Live chat unavailable' : 'Say something…'}
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={[styles.input, { borderColor: 'rgba(255,255,255,0.2)' }]}
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { borderColor: palette.divider, color: palette.ivory }]}
               editable={!disabled && !sending}
               onSubmitEditing={handleSend}
               returnKeyType="send"
@@ -150,10 +157,10 @@ export default function LiveChatPanel({
               disabled={!draft.trim() || sending || disabled}
               style={[
                 styles.sendBtn,
-                { backgroundColor: draft.trim() ? palette.primary : 'rgba(255,255,255,0.15)' },
+                { backgroundColor: draft.trim() ? palette.primary : palette.primaryWeak },
               ]}
             >
-              <KISIcon name="send" size={16} color="#fff" />
+              <KISIcon name="send" size={16} color={palette.ivory} />
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -174,9 +181,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginBottom: 6,
     marginRight: 6,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -184,7 +191,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#E52B2B',
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -192,7 +198,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  countText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  countText: { fontSize: 9, fontWeight: '800' },
   panel: { flex: 1 },
   list: { maxHeight: 260 },
   listContent: { paddingHorizontal: 8, paddingVertical: 4 },
@@ -217,9 +223,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
   },
   input: {
     flex: 1,
@@ -227,14 +230,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 17,
     paddingHorizontal: 12,
-    color: '#fff',
     fontSize: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

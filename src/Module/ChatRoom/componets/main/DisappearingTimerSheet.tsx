@@ -55,7 +55,7 @@ export const DisappearingTimerSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.surface ?? palette.background,
+            backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
           },
         ]}
@@ -78,7 +78,7 @@ export const DisappearingTimerSheet: React.FC<Props> = ({
                 styles.row,
                 isSelected && {
                   backgroundColor:
-                    (palette.primary ?? '#4F46E5') + '18',
+                    (palette.primary) + '18',
                   borderRadius: 14,
                 },
               ]}

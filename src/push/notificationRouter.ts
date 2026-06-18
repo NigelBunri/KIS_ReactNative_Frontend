@@ -133,7 +133,25 @@ export function routeNotification(
       return;
     }
 
-    // Call notifications — calls are handled via socket, navigate to Messages
+    // Connection / friend request notifications — go to the Connections screen.
+    if (type === 'connection_request' || data.connection_id || data.sender_id) {
+      navigation.navigate('Connections');
+      return;
+    }
+
+    // Job application status updates — go to the user's applications list.
+    if (type === 'job_application_update' || data.job_id || data.application_id) {
+      navigation.navigate('MyApplications');
+      return;
+    }
+
+    // Testimony engagement (reach/reactions on a testimony post).
+    if (type === 'testimony_reach' || data.testimony_id) {
+      navigation.navigate('TestimonyHub');
+      return;
+    }
+
+    // Call notifications — no dedicated calls tab exists; navigate to Messages
     // where call history is visible.
     if (data.call_id || data.callId) {
       navigation.navigate('MainTabs', { screen: 'Messages' });

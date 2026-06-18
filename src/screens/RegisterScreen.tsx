@@ -23,10 +23,11 @@ import ROUTES from '@/network';
 import { ensureDeviceId } from '@/security/e2ee';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISText from '@/components/common/KISText';
 import { KIS_TOKENS } from '@/theme/constants';
 
-const createStyles = (tokens: typeof KIS_TOKENS) =>
+const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
     flex: { flex: 1 },
     topBar: {
@@ -50,6 +51,9 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       gap: tokens.spacing.lg,
       flexGrow: 1,
       justifyContent: 'center',
+      width: '100%',
+      maxWidth: contentMaxWidth,
+      alignSelf: 'center',
     },
     headerBlock: {
       gap: tokens.spacing.sm,
@@ -125,7 +129,8 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
 
 export default function RegisterScreen({ navigation }: any) {
   const { palette, tokens, tone } = useKISTheme();
-  const styles = useMemo(() => createStyles(tokens), [tokens]);
+  const responsive = useResponsiveLayout();
+  const styles = useMemo(() => createStyles(tokens, responsive.contentMaxWidth), [tokens, responsive.contentMaxWidth]);
   const inputStyle = useMemo(
     () => ({
       borderColor: palette.inputBorder,
@@ -403,7 +408,7 @@ export default function RegisterScreen({ navigation }: any) {
               ]}
             >
               {termsAgreed && (
-                <KISText preset="helper" style={{ color: '#fff', fontWeight: '900', lineHeight: 14 }}>
+                <KISText preset="helper" style={{ color: palette.onPrimary, fontWeight: '900', lineHeight: 14 }}>
                   ✓
                 </KISText>
               )}

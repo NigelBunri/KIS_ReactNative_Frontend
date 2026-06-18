@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,20 +13,20 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import type { VerificationCase, VerificationSummary, SuspiciousSignal } from '@/screens/tabs/partners/useAdminVerificationPanel';
 
-const ACTIONS: { key: 'dismiss' | 'warn' | 'restrict' | 'takedown' | 'ban'; label: string; color: string }[] = [
-  { key: 'dismiss', label: 'Dismiss', color: '#888' },
-  { key: 'warn', label: 'Warn', color: '#f39c12' },
-  { key: 'restrict', label: 'Restrict', color: '#e67e22' },
-  { key: 'takedown', label: 'Takedown', color: '#e74c3c' },
-  { key: 'ban', label: 'Ban', color: '#c0392b' },
+const getActions = (palette: ReturnType<typeof useKISTheme>['palette']): { key: 'dismiss' | 'warn' | 'restrict' | 'takedown' | 'ban'; label: string; color: string }[] => [
+  { key: 'dismiss', label: 'Dismiss', color: palette.subtext },
+  { key: 'warn', label: 'Warn', color: palette.gold },
+  { key: 'restrict', label: 'Restrict', color: palette.gold },
+  { key: 'takedown', label: 'Takedown', color: palette.danger },
+  { key: 'ban', label: 'Ban', color: palette.danger },
 ];
 
-const SEVERITY_COLOR: Record<string, string> = {
-  LOW: '#4caf50',
-  MEDIUM: '#f39c12',
-  HIGH: '#e74c3c',
-  CRITICAL: '#c0392b',
-};
+const getSeverityColor = (palette: ReturnType<typeof useKISTheme>['palette']): Record<string, string> => ({
+  LOW: palette.success,
+  MEDIUM: palette.gold,
+  HIGH: palette.danger,
+  CRITICAL: palette.danger,
+});
 
 type Props = {
   isOpen: boolean;
@@ -54,6 +54,8 @@ export default function AdminVerificationPanel({
   onTakeAction, onApproveBadge, onRejectCase, onLoadPage, onClose,
 }: Props) {
   const { palette } = useKISTheme();
+  const ACTIONS = useMemo(() => getActions(palette), [palette]);
+  const SEVERITY_COLOR = useMemo(() => getSeverityColor(palette), [palette]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -107,8 +109,8 @@ export default function AdminVerificationPanel({
         </View>
       )}
       {!!error && !loading && (
-        <View style={[styles.errorBox, { backgroundColor: (palette.danger ?? '#d9534f') + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+        <View style={[styles.errorBox, { backgroundColor: (palette.danger) + '22', borderColor: palette.danger }]}>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
         </View>
       )}
 
@@ -168,11 +170,11 @@ export default function AdminVerificationPanel({
                             );
                           }}
                           disabled={actionLoading === item.id}
-                          style={[styles.actionBtn, { borderColor: '#4caf5088', backgroundColor: '#4caf5011' }]}
+                          style={[styles.actionBtn, { borderColor: `${palette.success}55`, backgroundColor: `${palette.success}11` }]}
                         >
                           {actionLoading === item.id
-                            ? <ActivityIndicator size="small" color="#4caf50" />
-                            : <Text style={[styles.actionBtnText, { color: '#4caf50' }]}>Approve</Text>
+                            ? <ActivityIndicator size="small" color={palette.success} />
+                            : <Text style={[styles.actionBtnText, { color: palette.success }]}>Approve</Text>
                           }
                         </Pressable>
                       )}
@@ -180,9 +182,9 @@ export default function AdminVerificationPanel({
                         <Pressable
                           onPress={() => void onRejectCase(item.id)}
                           disabled={actionLoading === item.id}
-                          style={[styles.actionBtn, { borderColor: '#e74c3c88', backgroundColor: '#e74c3c11' }]}
+                          style={[styles.actionBtn, { borderColor: `${palette.danger}55`, backgroundColor: `${palette.danger}11` }]}
                         >
-                          <Text style={[styles.actionBtnText, { color: '#e74c3c' }]}>Reject</Text>
+                          <Text style={[styles.actionBtnText, { color: palette.danger }]}>Reject</Text>
                         </Pressable>
                       )}
                     </View>
@@ -217,8 +219,8 @@ export default function AdminVerificationPanel({
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.signalsScroll}>
             {suspiciousSignals.slice(0, 10).map(sig => (
-              <View key={sig.id} style={[styles.signalCard, { backgroundColor: (palette.danger ?? '#e74c3c') + '14', borderColor: (palette.danger ?? '#e74c3c') + '44' }]}>
-                <Text style={[styles.signalType, { color: palette.danger ?? '#e74c3c' }]}>{sig.signal_type}</Text>
+              <View key={sig.id} style={[styles.signalCard, { backgroundColor: (palette.danger) + '14', borderColor: (palette.danger) + '44' }]}>
+                <Text style={[styles.signalType, { color: palette.danger }]}>{sig.signal_type}</Text>
                 {sig.detail && (
                   <Text style={[styles.signalDetail, { color: palette.subtext }]} numberOfLines={2}>{sig.detail}</Text>
                 )}
@@ -249,7 +251,7 @@ export default function AdminVerificationPanel({
 function StatBadge({ label, value, palette, warn }: { label: string; value: number; palette: any; warn?: boolean }) {
   return (
     <View style={[styles.statBadge, { backgroundColor: palette.card ?? palette.surface, borderColor: palette.border }]}>
-      <Text style={[styles.statValue, { color: warn && value > 0 ? palette.danger ?? '#e74c3c' : palette.text }]}>{value}</Text>
+      <Text style={[styles.statValue, { color: warn && value > 0 ? palette.danger : palette.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: palette.subtext }]}>{label}</Text>
     </View>
   );

@@ -4,7 +4,6 @@ import {
   Alert,
   Linking,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,12 +13,13 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,12 +90,12 @@ const formatPrice = (cents?: number, amount?: number, currency = 'USD') => {
   return `${(c / 100).toLocaleString('en-US', { style: 'currency', currency })}`;
 };
 
-const statusColor = (status?: SubscriptionStatus): { bg: string; text: string; dot: string } => {
+const statusColor = (status?: SubscriptionStatus, palette?: any): { bg: string; text: string; dot: string } => {
   const s = (status || '').toLowerCase();
-  if (s === 'active' || s === 'trialing') return { bg: '#dcfce7', text: '#15803d', dot: '#22c55e' };
-  if (s === 'past_due') return { bg: '#fef3c7', text: '#92400e', dot: '#f59e0b' };
-  if (s === 'cancelled' || s === 'canceled') return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444' };
-  return { bg: '#f3f4f6', text: '#6b7280', dot: '#9ca3af' };
+  if (s === 'active' || s === 'trialing') return { bg: palette.success + '22', text: palette.success, dot: palette.success };
+  if (s === 'past_due') return { bg: palette.warning + '22', text: palette.warning, dot: palette.warning };
+  if (s === 'cancelled' || s === 'canceled') return { bg: palette.danger + '22', text: palette.danger, dot: palette.danger };
+  return { bg: palette.surface, text: palette.subtext, dot: palette.subtext };
 };
 
 // ─── Downgrade Picker Modal ────────────────────────────────────────────────────
@@ -118,6 +118,7 @@ type DowngradeModalProps = {
 
 function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: DowngradeModalProps) {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const handleConfirm = () => {
     if (!selectedTier) {
@@ -132,8 +133,8 @@ function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: D
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={m.overlay} onPress={onClose}>
-        <Pressable style={[m.sheet, { backgroundColor: palette.card }]} onPress={() => {}}>
+      <Pressable style={[m.overlay, { backgroundColor: palette.backdrop }]} onPress={onClose}>
+        <Pressable style={[m.sheet, { backgroundColor: palette.card, paddingBottom: insets.bottom + 20 }]} onPress={() => {}}>
           <View style={[m.handle, { backgroundColor: palette.divider }]} />
           <Text style={[m.sheetTitle, { color: palette.text }]}>Downgrade Plan</Text>
           <Text style={[m.sheetSubtitle, { color: palette.subtext }]}>
@@ -168,7 +169,7 @@ function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: D
             onPress={handleConfirm}
             disabled={!selectedTier}
           >
-            <Text style={m.confirmBtnText}>Confirm Downgrade</Text>
+            <Text style={[m.confirmBtnText, { color: palette.onPrimary }]}>Confirm Downgrade</Text>
           </Pressable>
           <Pressable onPress={onClose} style={m.cancelBtn}>
             <Text style={[m.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
@@ -200,6 +201,7 @@ const CANCEL_REASONS = [
 function CancelModal({ visible, palette, onClose, onConfirm, submitting }: CancelModalProps) {
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState('');
+  const insets = useSafeAreaInsets();
 
   const handleConfirm = () => {
     const reason = selectedReason === 'Other' && customReason.trim()
@@ -214,8 +216,8 @@ function CancelModal({ visible, palette, onClose, onConfirm, submitting }: Cance
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={m.overlay} onPress={onClose}>
-        <Pressable style={[m.sheet, { backgroundColor: palette.card }]} onPress={() => {}}>
+      <Pressable style={[m.overlay, { backgroundColor: palette.backdrop }]} onPress={onClose}>
+        <Pressable style={[m.sheet, { backgroundColor: palette.card, paddingBottom: insets.bottom + 20 }]} onPress={() => {}}>
           <View style={[m.handle, { backgroundColor: palette.divider }]} />
           <Text style={[m.sheetTitle, { color: palette.text }]}>Cancel Subscription</Text>
           <Text style={[m.sheetSubtitle, { color: palette.subtext }]}>
@@ -230,15 +232,15 @@ function CancelModal({ visible, palette, onClose, onConfirm, submitting }: Cance
                 style={[
                   m.tierOption,
                   {
-                    borderColor: selectedReason === reason ? '#ef4444' : palette.divider,
-                    backgroundColor: selectedReason === reason ? '#fee2e2' : palette.surface,
+                    borderColor: selectedReason === reason ? palette.danger : palette.divider,
+                    backgroundColor: selectedReason === reason ? palette.danger + '22' : palette.surface,
                   },
                 ]}
                 onPress={() => setSelectedReason(reason)}
               >
                 <Text style={[m.tierLabel, { color: palette.text }]}>{reason}</Text>
                 {selectedReason === reason ? (
-                  <KISIcon name="checkmark-circle" size={20} color="#ef4444" />
+                  <KISIcon name="checkmark-circle" size={20} color={palette.danger} />
                 ) : (
                   <View style={[m.tierRadio, { borderColor: palette.divider }]} />
                 )}
@@ -259,13 +261,13 @@ function CancelModal({ visible, palette, onClose, onConfirm, submitting }: Cance
           )}
 
           <Pressable
-            style={[m.confirmBtn, { backgroundColor: submitting ? palette.subtext : '#ef4444' }]}
+            style={[m.confirmBtn, { backgroundColor: submitting ? palette.subtext : palette.danger }]}
             onPress={handleConfirm}
             disabled={submitting || !selectedReason}
           >
             {submitting
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={m.confirmBtnText}>Confirm Cancellation</Text>
+              ? <ActivityIndicator color={palette.onPrimary} size="small" />
+              : <Text style={[m.confirmBtnText, { color: palette.onPrimary }]}>Confirm Cancellation</Text>
             }
           </Pressable>
           <Pressable onPress={onClose} style={m.cancelBtn}>
@@ -282,6 +284,7 @@ function CancelModal({ visible, palette, onClose, onConfirm, submitting }: Cance
 export default function SubscriptionManagementScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -440,14 +443,14 @@ export default function SubscriptionManagementScreen() {
   const status = (subscription?.status || '').toLowerCase() as SubscriptionStatus;
   const isActive = status === 'active' || status === 'trialing';
   const isCancelled = status === 'cancelled' || status === 'canceled';
-  const badge = statusColor(subscription?.status);
+  const badge = statusColor(subscription?.status, palette);
   const planName = subscription?.plan_name ?? subscription?.plan ?? subscription?.tier ?? 'Unknown Plan';
   const nextBilling = subscription?.next_billing_date ?? subscription?.current_period_end;
   const features = Array.isArray(subscription?.features) ? subscription.features : [];
   const currentTier = subscription?.tier ?? subscription?.plan;
 
   return (
-    <SafeAreaView style={[ss.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView edges={['top']} style={[ss.root, { backgroundColor: palette.bg }]}>
       {/* Header */}
       <View style={[ss.header, { borderBottomColor: palette.divider }]}>
         <Pressable
@@ -467,14 +470,14 @@ export default function SubscriptionManagementScreen() {
         </View>
       ) : error ? (
         <View style={ss.center}>
-          <Text style={[ss.errorText, { color: palette.error ?? '#DC2626' }]}>{error}</Text>
+          <Text style={[ss.errorText, { color: palette.danger }]}>{error}</Text>
           <Pressable onPress={() => load()} style={[ss.retryBtn, { borderColor: palette.primaryStrong }]}>
             <Text style={[ss.retryText, { color: palette.primaryStrong }]}>Retry</Text>
           </Pressable>
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={ss.content}
+          contentContainerStyle={[ss.content, { padding: responsive.pageGutter, paddingBottom: responsive.pageGutter * 3, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center' }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.primaryStrong} />
           }
@@ -482,24 +485,24 @@ export default function SubscriptionManagementScreen() {
           {/* Plan header card */}
           <View style={[ss.planCard, { backgroundColor: palette.primaryStrong }]}>
             <View style={ss.planCardTop}>
-              <Text style={ss.planName}>{planName}</Text>
-              <View style={[ss.statusPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[ss.planName, { color: palette.onPrimary }]}>{planName}</Text>
+              <View style={[ss.statusPill, { backgroundColor: palette.onPrimary + '33' }]}>
                 <View style={[ss.statusDot, { backgroundColor: badge.dot }]} />
-                <Text style={ss.statusPillText}>{subscription?.status ?? 'unknown'}</Text>
+                <Text style={[ss.statusPillText, { color: palette.onPrimary }]}>{subscription?.status ?? 'unknown'}</Text>
               </View>
             </View>
-            <Text style={ss.planPrice}>
+            <Text style={[ss.planPrice, { color: palette.onPrimary }]}>
               {formatPrice(subscription?.price_cents, subscription?.price, subscription?.currency)}
               {subscription?.billing_cycle ? ` / ${subscription.billing_cycle}` : ''}
             </Text>
             {nextBilling ? (
-              <Text style={ss.planNextBilling}>
+              <Text style={[ss.planNextBilling, { color: palette.onPrimaryMuted }]}>
                 {isCancelled ? 'Access until' : 'Next billing'}: {formatDate(nextBilling)}
               </Text>
             ) : null}
             {subscription?.cancel_at_period_end ? (
-              <View style={ss.cancelNotice}>
-                <Text style={ss.cancelNoticeText}>Cancels at period end</Text>
+              <View style={[ss.cancelNotice, { backgroundColor: palette.danger + '4D' }]}>
+                <Text style={[ss.cancelNoticeText, { color: palette.onPrimary }]}>Cancels at period end</Text>
               </View>
             ) : null}
           </View>
@@ -577,12 +580,12 @@ export default function SubscriptionManagementScreen() {
                 const pct = metric.limit > 0 ? Math.min(metric.used / metric.limit, 1) : 0;
                 const pctInt = Math.round(pct * 100);
                 const isHigh = pct >= 0.8;
-                const barColor = isHigh ? '#ef4444' : palette.primaryStrong;
+                const barColor = isHigh ? palette.danger : palette.primaryStrong;
                 return (
                   <View key={String(idx)} style={{ gap: 4, marginTop: idx > 0 ? 10 : 0 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Text style={[ss.usageLabel, { color: palette.text }]}>{metric.label}</Text>
-                      <Text style={[ss.usageValue, { color: isHigh ? '#ef4444' : palette.subtext }]}>
+                      <Text style={[ss.usageValue, { color: isHigh ? palette.danger : palette.subtext }]}>
                         {metric.used}{metric.unit ? ` ${metric.unit}` : ''} / {metric.limit}{metric.unit ? ` ${metric.unit}` : ''} ({pctInt}%)
                       </Text>
                     </View>
@@ -625,7 +628,7 @@ export default function SubscriptionManagementScreen() {
                     }
                   }}
                 >
-                  <Text style={ss.insightCtaText}>{pricingInsight.cta_label}</Text>
+                  <Text style={[ss.insightCtaText, { color: palette.onPrimary }]}>{pricingInsight.cta_label}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -647,16 +650,16 @@ export default function SubscriptionManagementScreen() {
                 </Pressable>
 
                 <Pressable
-                  style={[ss.cancelBtn]}
+                  style={[ss.cancelBtn, { borderColor: palette.danger }]}
                   onPress={() => setCancelModalVisible(true)}
                   disabled={submitting}
                 >
                   {submitting
-                    ? <ActivityIndicator color="#ef4444" size="small" />
+                    ? <ActivityIndicator color={palette.danger} size="small" />
                     : (
                       <>
-                        <KISIcon name="close-circle" size={18} color="#ef4444" />
-                        <Text style={ss.cancelBtnText}>Cancel Subscription</Text>
+                        <KISIcon name="close-circle" size={18} color={palette.danger} />
+                        <Text style={[ss.cancelBtnText, { color: palette.danger }]}>Cancel Subscription</Text>
                       </>
                     )
                   }
@@ -671,11 +674,11 @@ export default function SubscriptionManagementScreen() {
                 disabled={submitting}
               >
                 {submitting
-                  ? <ActivityIndicator color="#fff" size="small" />
+                  ? <ActivityIndicator color={palette.onPrimary} size="small" />
                   : (
                     <>
-                      <KISIcon name="refresh" size={18} color="#fff" />
-                      <Text style={ss.resumeBtnText}>Resume Subscription</Text>
+                      <KISIcon name="refresh" size={18} color={palette.onPrimary} />
+                      <Text style={[ss.resumeBtnText, { color: palette.onPrimary }]}>Resume Subscription</Text>
                     </>
                   )
                 }
@@ -725,7 +728,7 @@ const ss = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { width: 60 },
+  backBtn: { width: 60, minHeight: 44, justifyContent: 'center' },
   backText: { fontSize: 15, fontWeight: '600' },
   headerTitle: {
     flex: 1,
@@ -754,7 +757,6 @@ const ss = StyleSheet.create({
     flexWrap: 'wrap',
   },
   planName: {
-    color: '#fff',
     fontSize: 22,
     fontWeight: '900',
     flex: 1,
@@ -768,26 +770,23 @@ const ss = StyleSheet.create({
     borderRadius: 20,
   },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusPillText: { color: '#fff', fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  statusPillText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
   planPrice: {
-    color: '#fff',
     fontSize: 32,
     fontWeight: '900',
   },
   planNextBilling: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 13,
     fontWeight: '600',
   },
   cancelNotice: {
     marginTop: 4,
-    backgroundColor: 'rgba(239,68,68,0.3)',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignSelf: 'flex-start',
   },
-  cancelNoticeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  cancelNoticeText: { fontSize: 12, fontWeight: '700' },
 
   // Section
   section: {
@@ -847,11 +846,10 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#ef4444',
     borderRadius: 14,
     paddingVertical: 14,
   },
-  cancelBtnText: { fontSize: 15, fontWeight: '700', color: '#ef4444' },
+  cancelBtnText: { fontSize: 15, fontWeight: '700' },
   resumeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -860,7 +858,7 @@ const ss = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
   },
-  resumeBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  resumeBtnText: { fontSize: 15, fontWeight: '700' },
   noSubNote: {
     borderWidth: 1,
     borderRadius: 14,
@@ -900,7 +898,7 @@ const ss = StyleSheet.create({
     paddingVertical: 10,
     alignSelf: 'flex-start',
   },
-  insightCtaText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  insightCtaText: { fontSize: 13, fontWeight: '800' },
 });
 
 // ─── Modal Styles ─────────────────────────────────────────────────────────────
@@ -908,14 +906,13 @@ const ss = StyleSheet.create({
 const m = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingBottom: 20,
     gap: 8,
   },
   handle: {
@@ -961,7 +958,7 @@ const m = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 6,
   },
-  confirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  cancelBtn: { paddingVertical: 10, alignItems: 'center' },
+  confirmBtnText: { fontSize: 15, fontWeight: '800' },
+  cancelBtn: { paddingVertical: 14, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText: { fontSize: 14, fontWeight: '600' },
 });

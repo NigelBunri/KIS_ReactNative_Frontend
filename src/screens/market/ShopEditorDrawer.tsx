@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
@@ -16,7 +17,7 @@ type ShopEditorDrawerProps = {
   loading?: boolean;
   onChangeField: (changes: Partial<MarketFormState>) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (draft: boolean) => void;
   onDelete?: () => void;
   activeShop?: any | null;
   canDeleteShop?: boolean;
@@ -39,6 +40,7 @@ export default function ShopEditorDrawer({
   onDelete,
   canDeleteShop,
 }: ShopEditorDrawerProps) {
+  const insets = useSafeAreaInsets();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -80,6 +82,7 @@ export default function ShopEditorDrawer({
             width: drawerWidth,
             left: compactDrawer ? 0 : undefined,
             backgroundColor: palette.surface,
+            paddingTop: insets.top,
           },
         ]}
       >
@@ -221,12 +224,12 @@ export default function ShopEditorDrawer({
                   title="Save draft"
                   variant="secondary"
                   size="sm"
-                  onPress={onSave}
+                  onPress={() => onSave(true)}
                   disabled={loading}
                 />
                 <KISButton
                   title={mode === 'edit' ? 'Save changes' : 'Publish shop'}
-                  onPress={onSave}
+                  onPress={() => onSave(false)}
                   disabled={loading}
                   size="sm"
                 />

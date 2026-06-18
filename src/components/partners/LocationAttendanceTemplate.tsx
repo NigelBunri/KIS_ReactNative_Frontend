@@ -125,7 +125,7 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
     setCheckingIn(false);
   }, [selectedEvent, geo]);
 
-  const s = buildStyles(primary, bg, textColor, subColor, cardBg, borderColor, isDark);
+  const s = buildStyles(primary, bg, textColor, subColor, cardBg, borderColor, isDark, brandColors?.accent);
 
   // ── Event list ──
   if (!selectedEvent) {
@@ -276,6 +276,7 @@ function buildStyles(
   cardBg: string,
   borderColor: string,
   isDark: boolean,
+  accent?: string,
 ) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: bg },
@@ -327,18 +328,18 @@ function buildStyles(
       marginBottom: 12,
     },
     btnDisabled: { opacity: 0.5 },
-    btnText: { color: '#1a1a1a', fontSize: 15, fontWeight: '700' },
+    btnText: { color: isDark ? '#1a1a1a' : '#ffffff', fontSize: 15, fontWeight: '700' },
     checkedInBox: { alignItems: 'center', paddingVertical: 32, gap: 8 },
     checkedInIcon: { fontSize: 48 },
-    checkedInTitle: { color: '#4caf50', fontSize: 17, fontWeight: '700' },
+    checkedInTitle: { color: accent ?? '#4caf50', fontSize: 17, fontWeight: '700' },
     arrivalNumber: { fontSize: 52, fontWeight: '900' },
     warningBox: {
-      backgroundColor: isDark ? '#f39c1211' : '#fff8e8',
+      backgroundColor: isDark ? 'rgba(243,156,18,0.07)' : '#fff8e8',
       borderRadius: 10,
       padding: 14,
       marginBottom: 12,
       borderWidth: 1,
-      borderColor: '#f39c1244',
+      borderColor: 'rgba(243,156,18,0.27)',
     },
     warningText: { color: '#f39c12', fontSize: 13 },
     checkinGuide: { color: subColor, fontSize: 13, marginBottom: 12, textAlign: 'center' },

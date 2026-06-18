@@ -254,13 +254,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         palette.surface
       : dmStatusVariant === 'locked' || dmStatusVariant === 'rejected'
       ? palette.pillLockedBg ??
-        palette.errorSoft ??
+        palette.dangerSoft ??
         palette.surface
       : palette.pillInfoBg ?? palette.surface;
 
   const dmTextColor =
     dmStatusVariant === 'locked' || dmStatusVariant === 'rejected'
-      ? palette.errorText ?? palette.onHeader ?? palette.text
+      ? palette.danger ?? palette.text
       : palette.onHeader ?? palette.text;
 
   return (
@@ -331,16 +331,16 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               )}
               {chat?.isPartner && (
                 <View style={{
-                  backgroundColor: palette.primary ?? '#2196F3',
+                  backgroundColor: palette.primary,
                   borderRadius: 10,
                   paddingHorizontal: 5,
                   paddingVertical: 1,
                 }}>
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>✓ PARTNER</Text>
+                  <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '800' }}>✓ PARTNER</Text>
                 </View>
               )}
               {chat?.isVerified && !chat?.isPartner && (
-                <KISIcon name="check" size={14} color={palette.primary ?? '#2196F3'} />
+                <KISIcon name="check" size={14} color={palette.primary} />
               )}
             </View>
             {contextLabel ? (
@@ -553,12 +553,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                     borderRadius: 9,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: palette.error ?? '#FF3B30',
+                    backgroundColor: palette.danger,
                   }}
                 >
                   <Text
                     style={{
-                      color: '#fff',
+                      color: palette.ivory,
                       fontSize: 10,
                       fontWeight: '700',
                     }}

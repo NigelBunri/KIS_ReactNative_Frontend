@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -69,11 +70,13 @@ export default function SeasonsBrowserScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(route.params?.category ?? null);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [reachedOutSeasonIds, setReachedOutSeasonIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const loadData = useCallback(async () => {
+    setLoading(true);
     const params: Record<string, string> = {};
     if (selectedCategory) params.category = selectedCategory;
 
@@ -97,6 +100,7 @@ export default function SeasonsBrowserScreen() {
       );
       setReachedOutSeasonIds(ids);
     }
+    setLoading(false);
   }, [selectedCategory, currentUserId]);
 
   useEffect(() => {
@@ -135,7 +139,7 @@ export default function SeasonsBrowserScreen() {
               </View>
             </View>
             {alreadyReachedOut ? (
-              <View style={[styles.reachedOutChip, { backgroundColor: '#E8F5E9' }]}>
+              <View style={[styles.reachedOutChip, { backgroundColor: palette.successSoft }]}>
                 <Text style={[styles.reachedOutText]}>Reached out ✓</Text>
               </View>
             ) : (
@@ -193,7 +197,7 @@ export default function SeasonsBrowserScreen() {
               : { backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1 },
           ]}
         >
-          <Text style={[styles.filterChipText, { color: selectedCategory === null ? '#fff' : palette.text }]}>All</Text>
+          <Text style={[styles.filterChipText, { color: selectedCategory === null ? (palette.onPrimary) : palette.text }]}>All</Text>
         </Pressable>
         {CATEGORIES.map(cat => (
           <Pressable
@@ -206,28 +210,34 @@ export default function SeasonsBrowserScreen() {
                 : { backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1 },
             ]}
           >
-            <Text style={[styles.filterChipText, { color: selectedCategory === cat ? '#fff' : palette.text }]}>
+            <Text style={[styles.filterChipText, { color: selectedCategory === cat ? (palette.onPrimary) : palette.text }]}>
               {CATEGORY_EMOJI[cat]} {CATEGORY_LABELS[cat]}
             </Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      <FlatList
-        data={seasons}
-        keyExtractor={item => String(item.id)}
-        renderItem={renderSeasonCard}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🕊️</Text>
-            <Text style={[styles.emptyText, { color: palette.subtext }]}>No one has declared this season yet.</Text>
-          </View>
-        }
-      />
+      {loading && seasons.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={seasons}
+          keyExtractor={item => String(item.id)}
+          renderItem={renderSeasonCard}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🕊️</Text>
+              <Text style={[styles.emptyText, { color: palette.subtext }]}>No one has declared this season yet.</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -235,7 +245,7 @@ export default function SeasonsBrowserScreen() {
 function makeStyles(palette: any) {
   return StyleSheet.create({
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-    backBtn: { padding: 4 },
+    backBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 18, fontWeight: '800' },
     headerSubtitle: { fontSize: 13, marginTop: 2 },
     filterBar: { maxHeight: 56 },
@@ -246,14 +256,14 @@ function makeStyles(palette: any) {
     card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 8 },
     cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+    avatarText: { color: palette.onPrimary, fontWeight: '800', fontSize: 18 },
     name: { fontSize: 15, fontWeight: '700' },
     chip: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
     chipText: { fontSize: 12 },
-    reachBtn: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
-    reachBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    reachBtn: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start', minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    reachBtnText: { color: palette.onPrimary, fontWeight: '700', fontSize: 13 },
     reachedOutChip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
-    reachedOutText: { color: '#2E7D32', fontWeight: '700', fontSize: 13 },
+    reachedOutText: { color: palette.success, fontWeight: '700', fontSize: 13 },
     cardTitle: { fontSize: 15, fontWeight: '700' },
     cardSnippet: { fontSize: 13, lineHeight: 18 },
     timeAgo: { fontSize: 12 },

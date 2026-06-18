@@ -1070,7 +1070,7 @@ export default function BroadcastFeedSection({
     const kind = attachment?.kind ?? attachment?.mimeType ?? '';
     const isImage = String(kind).includes('image');
 
-    const watermarkColor = '#22C55E';
+    const watermarkColor = palette.success;
     const subtitle = item.source?.name ?? item.title ?? 'Broadcast';
 
     if (attachmentUrl && isImage) {
@@ -1860,7 +1860,7 @@ export default function BroadcastFeedSection({
                       style={[
                         styles.actionCountText,
                         currentVideoItem.viewer_reaction
-                          ? { color: '#F97316' }
+                          ? { color: palette.gold }
                           : null,
                       ]}
                     >

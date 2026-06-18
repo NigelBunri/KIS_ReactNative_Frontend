@@ -51,13 +51,13 @@ const toneColors = (palette: KISPalette, tone: BadgeTone) => {
     };
   }
   if (tone === 'rejected') {
-    return { bg: 'rgba(220,38,38,0.10)', border: '#DC2626', text: '#DC2626' };
+    return { bg: `${palette.danger}1A`, border: palette.danger, text: palette.danger };
   }
   if (tone === 'pending') {
-    return { bg: 'rgba(217,119,6,0.12)', border: '#D97706', text: '#B45309' };
+    return { bg: `${palette.gold}1F`, border: palette.gold, text: palette.gold };
   }
   if (tone === 'review') {
-    return { bg: 'rgba(37,99,235,0.10)', border: '#2563EB', text: '#2563EB' };
+    return { bg: `${palette.primaryStrong}1A`, border: palette.primaryStrong, text: palette.primaryStrong };
   }
   return {
     bg: palette.surface || 'rgba(148,163,184,0.12)',
@@ -436,9 +436,9 @@ export function VerificationCenterSheet({
             </View>
 
             {pendingCaseId ? (
-              <View style={[styles.providerBox, { backgroundColor: 'rgba(217,119,6,0.08)', borderColor: '#D97706' }]}>
-                <Text style={[styles.blockTitle, { color: '#B45309' }]}>Pending case — add evidence</Text>
-                <Text style={[styles.statusBody, { color: '#92400E' }]}>
+              <View style={[styles.providerBox, { backgroundColor: `${palette.gold}14`, borderColor: palette.gold }]}>
+                <Text style={[styles.blockTitle, { color: palette.gold }]}>Pending case — add evidence</Text>
+                <Text style={[styles.statusBody, { color: palette.gold }]}>
                   You have an open verification case. Submitting here adds evidence to that case instead of starting a new one.
                 </Text>
               </View>

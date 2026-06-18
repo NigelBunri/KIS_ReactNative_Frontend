@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Animated,
   Image,
@@ -343,6 +344,7 @@ export default function ProductEditorDrawer({
   onClose,
   onSave,
 }: ProductEditorDrawerProps) {
+  const insets = useSafeAreaInsets();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -738,7 +740,7 @@ export default function ProductEditorDrawer({
                     {entry.label || 'Untitled attribute'}
                   </Text>
                   <Pressable onPress={() => removeAttributeEntry(entry.id)} style={{ padding: 4 }}>
-                    <KISIcon name="close" size={16} color={palette.error ?? '#E53935'} />
+                    <KISIcon name="close" size={16} color={palette.danger} />
                   </Pressable>
                 </View>
 
@@ -809,7 +811,7 @@ export default function ProductEditorDrawer({
                               }
                               style={{ padding: 2 }}
                             >
-                              <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                              <KISIcon name="close" size={12} color={palette.danger} />
                             </Pressable>
                           </View>
                         ))}
@@ -871,7 +873,7 @@ export default function ProductEditorDrawer({
                   {variant.name || variant.sku || 'Untitled variant'}
                 </Text>
                 <Pressable onPress={() => removeVariantEntry(variant.id)} style={{ padding: 4 }}>
-                  <KISIcon name="close" size={16} color={palette.error ?? '#E53935'} />
+                  <KISIcon name="close" size={16} color={palette.danger} />
                 </Pressable>
               </View>
 
@@ -958,7 +960,7 @@ export default function ProductEditorDrawer({
                           onPress={() => removeVariantOption(variant.id, option.id)}
                           style={{ padding: 4 }}
                         >
-                          <KISIcon name="close" size={14} color={palette.error ?? '#E53935'} />
+                          <KISIcon name="close" size={14} color={palette.danger} />
                         </Pressable>
                       </View>
 
@@ -999,6 +1001,7 @@ export default function ProductEditorDrawer({
             left: compactDrawer ? 0 : undefined,
             transform: [{ translateX: slide }],
             backgroundColor: palette.surface,
+            paddingTop: insets.top,
           },
         ]}
       >
@@ -1223,7 +1226,7 @@ export default function ProductEditorDrawer({
                             padding: 2,
                           }}
                         >
-                          <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                          <KISIcon name="close" size={12} color={palette.danger} />
                         </Pressable>
                       </View>
                     ))}
@@ -1271,7 +1274,7 @@ export default function ProductEditorDrawer({
                             {category.name || 'Category'}
                           </Text>
                           <Pressable onPress={() => handleProductCategorySelect(String(category.id))} style={{ padding: 4 }}>
-                            <KISIcon name="close" size={12} color={palette.error ?? '#E53935'} />
+                            <KISIcon name="close" size={12} color={palette.danger} />
                           </Pressable>
                         </View>
                       ))}

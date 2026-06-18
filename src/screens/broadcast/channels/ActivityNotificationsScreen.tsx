@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { fetchChannelActivity } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -20,6 +21,8 @@ type ActivityItem = {
   event_type: string;
   actor_display?: string;
   target_type?: string;
+  target_id?: string;
+  content_id?: string;
   created_at?: string;
 };
 
@@ -51,6 +54,7 @@ function eventLabel(eventType: string): string {
 
 export default function ActivityNotificationsScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter, minTouchTarget, bodyFontSize, labelFontSize, headerTitleSize } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'ActivityNotifications'>>();
   const { channelId, channelName } = route.params;
@@ -72,11 +76,11 @@ export default function ActivityNotificationsScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>
+        <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.75 }]}>
           Activity{channelName ? ` · ${channelName}` : ''}
         </Text>
       </View>
@@ -95,25 +99,43 @@ export default function ActivityNotificationsScreen() {
           data={items}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 32 }}
-          renderItem={({ item }) => (
-            <View style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
-              <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft }]}>
-                <KISIcon name={eventIcon(item.event_type)} size={16} color={palette.primaryStrong} />
-              </View>
-              <View style={styles.rowInfo}>
-                <Text style={[styles.eventLabel, { color: palette.text }]} numberOfLines={1}>
-                  {eventLabel(item.event_type)}
-                </Text>
-                {item.actor_display ? (
-                  <Text style={[styles.actor, { color: palette.subtext }]} numberOfLines={1}>
-                    {item.actor_display}
-                    {item.target_type ? ` · ${item.target_type}` : ''}
-                  </Text>
-                ) : null}
-                <Text style={[styles.time, { color: palette.subtext }]}>{timeAgo(item.created_at)}</Text>
-              </View>
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No notifications yet
+              </Text>
             </View>
-          )}
+          }
+          renderItem={({ item }) => {
+            const contentId = item.content_id || (item.target_type === 'content' ? item.target_id : null);
+            return (
+              <Pressable
+                style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: pageGutter }]}
+                onPress={() => {
+                  if (contentId) {
+                    navigation.navigate('ChannelContentDetail', { contentId });
+                  }
+                }}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft }]}>
+                  <KISIcon name={eventIcon(item.event_type)} size={16} color={palette.primaryStrong} />
+                </View>
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.eventLabel, { color: palette.text, fontSize: bodyFontSize }]} numberOfLines={1}>
+                    {eventLabel(item.event_type)}
+                  </Text>
+                  {item.actor_display ? (
+                    <Text style={[styles.actor, { color: palette.subtext, fontSize: labelFontSize }]} numberOfLines={1}>
+                      {item.actor_display}
+                      {item.target_type ? ` · ${item.target_type}` : ''}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.time, { color: palette.subtext, fontSize: labelFontSize }]}>{timeAgo(item.created_at)}</Text>
+                </View>
+                {contentId ? <KISIcon name="chevron-right" size={14} color={palette.border} /> : null}
+              </Pressable>
+            );
+          }}
         />
       )}
     </SafeAreaView>

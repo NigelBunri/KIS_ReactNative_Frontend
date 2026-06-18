@@ -113,12 +113,12 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
         onPress={() => setFullscreenItem(item)}
         style={[
           styles.gridItem,
-          { backgroundColor: palette.surfaceSoft ?? palette.surface ?? '#eee' },
+          { backgroundColor: palette.surfaceSoft ?? palette.surface },
         ]}
       >
         {isDocument ? (
           <View style={styles.docThumb}>
-            <KISIcon name="file" size={32} color={palette.primary ?? '#4F46E5'} />
+            <KISIcon name="file" size={32} color={palette.primary} />
             <Text
               numberOfLines={2}
               style={[styles.docName, { color: palette.text }]}
@@ -180,7 +180,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
                   styles.tabBtn,
                   isActive && {
                     borderBottomWidth: 2,
-                    borderBottomColor: palette.primary ?? '#4F46E5',
+                    borderBottomColor: palette.primary,
                   },
                 ]}
               >
@@ -189,8 +189,8 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
                     styles.tabText,
                     {
                       color: isActive
-                        ? palette.primary ?? '#4F46E5'
-                        : palette.subtext ?? '#888',
+                        ? palette.primary
+                        : palette.subtext,
                       fontWeight: isActive ? '700' : '400',
                     },
                   ]}
@@ -206,7 +206,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
         {/* Grid */}
         {filtered.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: palette.subtext ?? '#888' }]}>
+            <Text style={[styles.emptyText, { color: palette.subtext }]}>
               No {activeTab.toLowerCase()} in this conversation.
             </Text>
           </View>
@@ -238,7 +238,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
             </Pressable>
             {fullscreenItem.tab === 'Documents' ? (
               <View style={styles.fullscreenDocCard}>
-                <KISIcon name="file" size={48} color={palette.primary ?? '#4F46E5'} />
+                <KISIcon name="file" size={48} color={palette.primary} />
                 <Text style={[styles.fullscreenDocName, { color: palette.text }]}>
                   {fullscreenItem.originalName ?? 'Document'}
                 </Text>

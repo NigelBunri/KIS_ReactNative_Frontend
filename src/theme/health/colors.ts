@@ -2,6 +2,7 @@ export type HealthThemeColors = {
   gradientStart: string;
   gradientEnd: string;
   background: string;
+  bg: string;
   surface: string;
   chrome: string;
   card: string;
@@ -20,6 +21,7 @@ const darkPalette: HealthThemeColors = {
   gradientStart: '#211331',
   gradientEnd: '#09070D',
   background: '#09070D',
+  bg: '#09070D',
   surface: '#15101F',
   chrome: '#07050B',
   card: '#15101F',
@@ -38,6 +40,7 @@ const lightPalette: HealthThemeColors = {
   gradientStart: '#FFFFFF',
   gradientEnd: '#FFF9EE',
   background: '#FFFFFF',
+  bg: '#FFFFFF',
   surface: '#FFFFFF',
   chrome: 'transparent',
   card: '#FFFFFF',

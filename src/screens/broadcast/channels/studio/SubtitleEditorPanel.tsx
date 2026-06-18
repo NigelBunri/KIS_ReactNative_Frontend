@@ -7,6 +7,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -144,6 +147,7 @@ export default function SubtitleEditorPanel({ contentId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
@@ -173,23 +177,27 @@ export default function SubtitleEditorPanel({ contentId }: Props) {
               {track.label || track.language}
             </Text>
             {track.is_default && (
-              <View style={[styles.defaultBadge, { backgroundColor: '#22C55E22' }]}>
-                <Text style={styles.defaultBadgeText}>DEFAULT</Text>
+              <View style={[styles.defaultBadge, { backgroundColor: `${palette.success}22` }]}>
+                <Text style={[styles.defaultBadgeText, { color: palette.success }]}>DEFAULT</Text>
               </View>
             )}
           </View>
-          <Text
+          <Pressable
             onPress={() => {
               if (deletingId === track.id) return;
               handleDelete(track);
             }}
-            style={[
-              styles.deleteBtn,
-              { color: '#EF4444', opacity: deletingId === track.id ? 0.4 : 1 },
-            ]}
+            style={styles.deleteBtnTouch}
           >
-            {deletingId === track.id ? '...' : 'Remove'}
-          </Text>
+            <Text
+              style={[
+                styles.deleteBtn,
+                { color: palette.danger, opacity: deletingId === track.id ? 0.4 : 1 },
+              ]}
+            >
+              {deletingId === track.id ? '...' : 'Remove'}
+            </Text>
+          </Pressable>
         </View>
       ))}
 
@@ -226,36 +234,39 @@ export default function SubtitleEditorPanel({ contentId }: Props) {
               value={isDefault}
               onValueChange={setIsDefault}
               trackColor={{ true: palette.primaryStrong }}
-              thumbColor="#fff"
+              thumbColor={palette.ivory}
             />
           </View>
           <View style={styles.formActions}>
-            <Text
+            <Pressable
               onPress={() => setShowForm(false)}
-              style={[styles.cancelBtn, { color: palette.subtext, borderColor: palette.border }]}
+              style={[styles.cancelBtn, { borderColor: palette.border }]}
             >
-              Cancel
-            </Text>
-            <Text
+              <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+            <Pressable
               onPress={saving ? undefined : handleAdd}
               style={[
                 styles.addBtn,
                 { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 },
               ]}
             >
-              {saving ? 'Adding...' : 'Add Track'}
-            </Text>
+              <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>
+                {saving ? 'Adding...' : 'Add Track'}
+              </Text>
+            </Pressable>
           </View>
         </View>
       ) : (
-        <Text
+        <Pressable
           onPress={() => setShowForm(true)}
           style={[styles.addTrackBtn, { backgroundColor: palette.primaryStrong }]}
         >
-          + Add Subtitle Track
-        </Text>
+          <Text style={[styles.addTrackBtnText, { color: palette.onPrimary }]}>+ Add Subtitle Track</Text>
+        </Pressable>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -290,7 +301,8 @@ const styles = StyleSheet.create({
   langPillText: { fontSize: 10, fontWeight: '900' },
   trackLabel: { fontSize: 13, fontWeight: '700', flex: 1 },
   defaultBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  defaultBadgeText: { fontSize: 9, fontWeight: '900', color: '#22C55E' },
+  defaultBadgeText: { fontSize: 9, fontWeight: '900' },
+  deleteBtnTouch: { minHeight: 44, minWidth: 56, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { fontSize: 12, fontWeight: '900' },
   formCard: {
     borderWidth: 1,
@@ -312,34 +324,31 @@ const styles = StyleSheet.create({
   toggleLabel: { fontSize: 13, fontWeight: '700' },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   addBtn: {
     flex: 1,
+    minHeight: 44,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  addBtnText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   addTrackBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  addTrackBtnText: { fontSize: 13, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

@@ -529,7 +529,7 @@ export const StickerBackgroundRemovalScreen: React.FC<
             >
               <Text
                 style={{
-                  color: palette.onPrimary ?? '#fff',
+                  color: palette.onPrimary,
                   fontWeight: '600',
                 }}
               >

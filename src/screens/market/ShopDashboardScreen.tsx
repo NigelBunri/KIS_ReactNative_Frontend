@@ -15,6 +15,7 @@ import Slider from '@react-native-community/slider';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import {
   LineChart,
@@ -346,6 +347,7 @@ const ProductCard = ({
   existingBooking?: any;
   onOpenBookingDetails?: (bookingId: string) => void;
 }) => {
+  const responsive = useResponsiveLayout();
   const [activeImage, setActiveImage] = useState('');
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
@@ -425,7 +427,7 @@ const ProductCard = ({
     <View
       style={[
         styles.productCard,
-        { backgroundColor: palette.surface, borderColor: palette.divider },
+        { backgroundColor: palette.surface, borderColor: palette.divider, shadowColor: palette.royalInk },
       ]}
     >
       {landingPublic && shopName && onOpenLanding ? (
@@ -599,6 +601,7 @@ const ProductCard = ({
               },
             ]}
             onPress={() => setRatingModalVisible(true)}
+            hitSlop={6}
           >
             <KISIcon name="add" size={16} color={palette.primaryStrong} />
           </Pressable>
@@ -688,7 +691,7 @@ const ProductCard = ({
         onRequestClose={() => setFullScreenImage(null)}
       >
         <Pressable
-          style={styles.fullscreenOverlay}
+          style={[styles.fullscreenOverlay, { backgroundColor: palette.overlay }]}
           onPress={() => setFullScreenImage(null)}
         >
           {fullScreenImage ? (
@@ -706,9 +709,12 @@ const ProductCard = ({
         animationType="fade"
         onRequestClose={closeRatingSheet}
       >
-        <Pressable style={styles.ratingModalOverlay} onPress={closeRatingSheet}>
+        <Pressable
+          style={[styles.ratingModalOverlay, { backgroundColor: palette.overlay }]}
+          onPress={closeRatingSheet}
+        >
           <View
-            style={[styles.card, { width: '90%', maxWidth: 360, padding: 20 }]}
+            style={[styles.card, { width: '90%', maxWidth: Math.min(480, responsive.contentMaxWidth - 32), padding: 20 }]}
           >
             <Text style={[styles.cardTitle, { marginBottom: 6 }]}>
               {isService ? 'Rate this service' : 'Rate this product'}
@@ -765,6 +771,7 @@ const ProductCard = ({
 
 export default function ShopDashboardScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const initialShop = route.params.shop;
   const [shop, setShop] = useState(initialShop);
   const shopId = shop?.id;
@@ -1621,33 +1628,33 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         id: 'revenue-trend',
         name: 'Revenue trend',
         data,
-        color: '#6366F1',
+        color: palette.primary,
       },
     ];
-  }, [metrics.revenue]);
+  }, [metrics.revenue, palette.primary]);
 
   const breakdownData = useMemo(
     () => [
       { label: 'Orders', value: metrics.orders, color: palette.primaryStrong },
-      { label: 'Bookings', value: metrics.bookings, color: '#EF4444' },
+      { label: 'Bookings', value: metrics.bookings, color: palette.danger },
       {
         label: 'Testimonials',
         value: normalizeNumber(shop?.landing_page?.testimonials?.length ?? 0),
-        color: '#F59E0B',
+        color: palette.warning,
       },
     ],
-    [metrics, palette.primaryStrong, shop],
+    [metrics, palette.primaryStrong, palette.danger, palette.warning, shop],
   );
 
   const distributionData = useMemo(() => {
     const repeat = metrics.repeat;
     const newcomers = Math.max(metrics.orders - repeat, 0);
     return [
-      { label: 'Members', value: safeMembers.length, color: '#10B981' },
-      { label: 'Repeat buyers', value: repeat, color: '#6366F1' },
-      { label: 'New customers', value: newcomers, color: '#F97316' },
+      { label: 'Members', value: safeMembers.length, color: palette.success },
+      { label: 'Repeat buyers', value: repeat, color: palette.primary },
+      { label: 'New customers', value: newcomers, color: palette.warning },
     ];
-  }, [metrics, safeMembers.length]);
+  }, [metrics, safeMembers.length, palette.success, palette.primary, palette.warning]);
 
   const toCategoryLabel = (value: any, fallback: string) => {
     if (!value) return fallback;
@@ -2439,7 +2446,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           Activity feed
         </Text>
         {activityFeed.slice(0, 4).map(item => (
-          <View key={item.id} style={styles.activityItem}>
+          <View key={item.id} style={[styles.activityItem, { borderBottomColor: palette.divider }]}>
             <Text
               style={[styles.cardTitle, { fontSize: 16, color: palette.text }]}
             >
@@ -2465,7 +2472,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           Smart insights
         </Text>
         {insights.map(insight => (
-          <View key={insight.title} style={styles.insightRow}>
+          <View key={insight.title} style={[styles.insightRow, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.statLabel, { color: palette.text }]}>
               {insight.title}
             </Text>
@@ -3120,7 +3127,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             <Pressable
               key={tab.key}
               onPress={() => setActiveTab(tab.key)}
-              style={styles.tabButton}
+              style={[
+                styles.tabButton,
+                { minHeight: responsive.minTouchTarget, justifyContent: 'center' },
+              ]}
+              hitSlop={8}
             >
               <Text
                 style={{
@@ -3155,7 +3166,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: palette.background,
+            backgroundColor: palette.bg,
             zIndex: 999,
           }}
         >
@@ -3315,7 +3326,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 16,
     gap: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -3390,7 +3400,6 @@ const styles = StyleSheet.create({
   },
   fullscreenOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -3414,14 +3423,11 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   ratingModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -3490,13 +3496,11 @@ const styles = StyleSheet.create({
   },
   activityItem: {
     borderBottomWidth: 1,
-    borderBottomColor: '#cccccc33',
     paddingVertical: 10,
   },
   insightRow: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#cccccc22',
   },
   sectionRow: {
     flexDirection: 'row',

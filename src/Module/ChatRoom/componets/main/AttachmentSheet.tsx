@@ -412,7 +412,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       label: 'Share location',
       description: 'Send your current pin',
       icon: 'pin' as const,
-      color: palette.error ?? '#EF4444',
+      color: palette.danger,
       onPress: handleShareLocationPress,
     },
     {
@@ -428,7 +428,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       label: 'Send payment',
       description: 'Transfer money to this contact',
       icon: 'card' as const,
-      color: palette.success ?? '#22C55E',
+      color: palette.success,
       onPress: handleSendPaymentPress,
     },
   ];

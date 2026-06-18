@@ -8,6 +8,7 @@ import type { ApiResult } from '@/network/types';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 import { areMediaTransferJobsReady, flushMediaTransferQueue } from '@/services/mediaTransferQueue';
+import { isOfflineDataEnabled } from '@/services/consentService';
 
 export const OFFLINE_ACTION_QUEUE_UPDATED_EVENT = 'offlineActionQueue.updated';
 
@@ -129,6 +130,9 @@ export const clearCompletedOfflineActionQueueState = async () => {
 export const enqueueOfflineAction = async (
   input: QueueableRequestInput,
 ): Promise<OfflineActionItem> => {
+  if (!isOfflineDataEnabled()) {
+    throw new Error('Offline data storage is disabled by user consent settings.');
+  }
   if (hasFormDataLikeValue(input.body)) {
     throw new Error('Offline queue cannot persist FormData actions yet.');
   }

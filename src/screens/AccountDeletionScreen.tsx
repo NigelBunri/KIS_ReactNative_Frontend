@@ -1,7 +1,10 @@
 // src/screens/AccountDeletionScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,18 +17,22 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { deleteRequest } from '@/network/delete';
-import { API_BASE_URL } from '@/network';
+import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '../../App';
 
 export default function AccountDeletionScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { setAuth } = useAuth();
   const [confirmText, setConfirmText] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const styles = useMemo(() => createStyles(palette), [palette]);
@@ -33,6 +40,10 @@ export default function AccountDeletionScreen() {
   const handleDelete = async () => {
     if (confirmText.trim() !== 'DELETE') {
       Alert.alert('Confirmation required', 'Type DELETE to confirm.');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Password required', 'Enter your current password to confirm deletion.');
       return;
     }
     Alert.alert(
@@ -47,11 +58,13 @@ export default function AccountDeletionScreen() {
             setLoading(true);
             try {
               const deleteRes = await deleteRequest(
-                `${API_BASE_URL}/api/v1/auth/account/`,
-                { errorMessage: 'Unable to delete account.' },
+                ROUTES.auth.accountDelete,
+                { errorMessage: 'Unable to delete account.', body: { password: password.trim() } },
               );
-              if (!deleteRes.success) {
-                throw new Error(deleteRes.message || 'Unable to delete account.');
+              if (deleteRes && (deleteRes as any).success === false) {
+                const msg = (deleteRes as any).message || (deleteRes as any).data?.detail || 'Unable to delete account.';
+                Alert.alert('Delete account', msg);
+                return;
               }
               await AsyncStorage.clear();
               setAuth(false);
@@ -83,7 +96,8 @@ export default function AccountDeletionScreen() {
         <View style={styles.backButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.content, { padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center' }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.warningCard, { backgroundColor: palette.surface, borderColor: palette.danger }]}>
           <KISIcon name="shield" size={28} color={palette.danger} />
           <Text style={[styles.warningTitle, { color: palette.danger }]}>
@@ -130,6 +144,25 @@ export default function AccountDeletionScreen() {
             autoCapitalize="characters"
             autoCorrect={false}
           />
+
+          <Text style={[styles.confirmLabel, { color: palette.subtext, marginTop: 12 }]}>
+            Current password
+          </Text>
+          <View style={[styles.passwordRow, { backgroundColor: palette.surfaceElevated, borderColor: password.trim() ? palette.danger : palette.divider }]}>
+            <TextInput
+              style={[styles.passwordInput, { color: palette.text }]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              placeholderTextColor={palette.subtext}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Pressable onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn}>
+              <Text style={{ color: palette.subtext, fontSize: 16 }}>{showPassword ? '🙈' : '👁'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <Pressable
@@ -137,18 +170,21 @@ export default function AccountDeletionScreen() {
             styles.deleteButton,
             {
               backgroundColor:
-                confirmText === 'DELETE' ? palette.danger : palette.divider,
+                confirmText === 'DELETE' && password.trim() ? palette.danger : palette.divider,
               opacity: loading ? 0.6 : 1,
             },
           ]}
           onPress={handleDelete}
-          disabled={loading || confirmText.trim() !== 'DELETE'}
+          disabled={loading || confirmText.trim() !== 'DELETE' || !password.trim()}
         >
-          <Text style={[styles.deleteButtonText, { color: '#FFFFFF' }]}>
-            {loading ? 'Deleting...' : 'Delete my account'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color={palette.onPrimary} />
+          ) : (
+            <Text style={[styles.deleteButtonText, { color: palette.onPrimary }]}>Delete my account</Text>
+          )}
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -172,13 +208,12 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       fontWeight: '700',
     },
     backButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
     content: {
-      padding: 18,
       gap: 16,
     },
     warningCard: {
@@ -241,5 +276,20 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
     deleteButtonText: {
       fontSize: 16,
       fontWeight: '800',
+    },
+    passwordRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      borderWidth: 1.5,
+      paddingHorizontal: 14,
+    },
+    passwordInput: {
+      flex: 1,
+      fontSize: 15,
+      paddingVertical: 12,
+    },
+    eyeBtn: {
+      padding: 6,
     },
   });

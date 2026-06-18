@@ -1,7 +1,10 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Chat } from './messagesUtils';
 import * as Handlers from './ChatRoomHandlers';
+
+const SOUND_KEY = (convId: string) => `KIS_NOTIF_SOUND_${convId}`;
 
 type Props = {
   palette: any;
@@ -42,6 +45,41 @@ export default function ChatRoomMenu({
   onOpenSetRole,
   onClearChat,
 }: Props) {
+  const [chatSound, setChatSound] = useState<string | null>(null);
+
+  useEffect(() => {
+    const convId = String(conversationId ?? chat?.id ?? '');
+    if (!convId) return;
+    AsyncStorage.getItem(SOUND_KEY(convId)).then(val => setChatSound(val)).catch(() => {});
+  }, [conversationId, chat?.id]);
+
+  const handleSoundPicker = () => {
+    const convId = String(conversationId ?? chat?.id ?? '');
+    if (!convId) return;
+    onCloseMenu();
+    Alert.alert(
+      'Notification sound',
+      'Choose the notification sound for this chat.',
+      [
+        {
+          text: 'Default',
+          onPress: async () => {
+            await AsyncStorage.removeItem(SOUND_KEY(convId));
+            setChatSound(null);
+          },
+        },
+        {
+          text: 'None (mute sound)',
+          onPress: async () => {
+            await AsyncStorage.setItem(SOUND_KEY(convId), 'None');
+            setChatSound('None');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  };
+
   return (
     <View pointerEvents={menuVisible ? 'auto' : 'none'} style={localStyles.menuRoot}>
       {menuVisible && (
@@ -102,6 +140,21 @@ export default function ChatRoomMenu({
             >
               <Text style={{ color: palette.text, fontSize: 14 }}>
                 {isMuted ? 'Unmute notifications' : 'Mute notifications'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleSoundPicker}
+              style={({ pressed }) => [
+                localStyles.menuItem,
+                { backgroundColor: pressed ? palette.surface : 'transparent' },
+              ]}
+            >
+              <Text style={{ color: palette.text, fontSize: 14 }}>
+                Notification sound:{' '}
+                <Text style={{ color: palette.subtext ?? palette.text, fontWeight: '600' }}>
+                  {chatSound === 'None' ? 'None' : 'Default'}
+                </Text>
               </Text>
             </Pressable>
 
@@ -197,7 +250,7 @@ export default function ChatRoomMenu({
                 { backgroundColor: pressed ? palette.surface : 'transparent' },
               ]}
             >
-              <Text style={{ color: '#DC2626', fontSize: 14 }}>
+              <Text style={{ color: palette.danger, fontSize: 14 }}>
                 Clear chat
               </Text>
             </Pressable>

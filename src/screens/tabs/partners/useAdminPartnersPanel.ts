@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 
 export type AdminPartner = {
@@ -77,7 +77,7 @@ export const useAdminPartnersPanel = (width: number) => {
     setActionLoading(partnerId);
     try {
       const url = (ROUTES as any).adminPartners?.detail?.(partnerId) ?? '';
-      const res = await postRequest(url, { is_active: active }, { errorMessage: '' });
+      const res = await patchRequest(url, { is_active: active }, { errorMessage: '' });
       if (res.success) {
         setPartners(prev => prev.map(p => p.id === partnerId ? { ...p, is_active: active } : p));
       }

@@ -206,8 +206,8 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
 
   const handleSync = async (account: BridgeAccount) => {
     const res = await postRequest(
-      ROUTES.bridge.account(account.id),
-      { action: 'sync' },
+      ROUTES.bridge.accountSync(account.id),
+      {},
       { errorMessage: 'Sync failed.' },
     );
     if (!res.success) {
@@ -228,9 +228,9 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -254,11 +254,11 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
               <Text style={[styles.cardTitle, { color: palette.text }]}>{item.platform}</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: item.status === 'connected' ? '#D1FAE5' : '#FEE2E2' },
+                { backgroundColor: item.status === 'connected' ? palette.successSoft : palette.dangerSoft },
               ]}>
                 <Text style={[
                   styles.statusText,
-                  { color: item.status === 'connected' ? '#065F46' : '#991B1B' },
+                  { color: item.status === 'connected' ? palette.success : palette.danger },
                 ]}>
                   {item.status ?? 'unknown'}
                 </Text>
@@ -281,9 +281,9 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
               </Pressable>
               <Pressable
                 onPress={() => handleDisconnect(item)}
-                style={[styles.actionBtn, { borderColor: '#DC2626' }]}
+                style={[styles.actionBtn, { borderColor: palette.danger }]}
               >
-                <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Disconnect</Text>
+                <Text style={[styles.actionBtnText, { color: palette.danger }]}>Disconnect</Text>
               </Pressable>
             </View>
           </View>
@@ -293,9 +293,9 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
       {/* FAB */}
       <Pressable
         onPress={() => setShowModal(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong }]}
+        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
       >
-        <Text style={styles.fabText}>+ Connect Account</Text>
+        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Connect Account</Text>
       </Pressable>
 
       {/* Connect Modal */}
@@ -364,8 +364,8 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
                 style={[mStyles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.6 : 1 }]}
               >
                 {saving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={{ color: '#fff', fontWeight: '700' }}>Connect</Text>}
+                  ? <ActivityIndicator color={palette.onPrimary} size="small" />
+                  : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Connect</Text>}
               </Pressable>
             </View>
           </View>
@@ -509,9 +509,9 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -537,7 +537,7 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
                 value={item.is_active}
                 onValueChange={() => handleToggle(item)}
                 trackColor={{ true: palette.primaryStrong, false: palette.divider }}
-                thumbColor="#fff"
+                thumbColor={palette.ivory}
               />
             </View>
             {item.trigger ? (
@@ -556,9 +556,9 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
             <View style={styles.cardActions}>
               <Pressable
                 onPress={() => handleDelete(item)}
-                style={[styles.actionBtn, { borderColor: '#DC2626' }]}
+                style={[styles.actionBtn, { borderColor: palette.danger }]}
               >
-                <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Delete</Text>
+                <Text style={[styles.actionBtnText, { color: palette.danger }]}>Delete</Text>
               </Pressable>
             </View>
           </View>
@@ -568,9 +568,9 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
       {/* Create button */}
       <Pressable
         onPress={() => setShowModal(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong }]}
+        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
       >
-        <Text style={styles.fabText}>+ Create Automation</Text>
+        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Create Automation</Text>
       </Pressable>
 
       {/* Create Modal */}
@@ -635,8 +635,8 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
                   style={[mStyles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.6 : 1 }]}
                 >
                   {saving
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={{ color: '#fff', fontWeight: '700' }}>Save</Text>}
+                    ? <ActivityIndicator color={palette.onPrimary} size="small" />
+                    : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Save</Text>}
                 </Pressable>
               </View>
             </View>
@@ -691,9 +691,9 @@ function MessagesTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+        <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
         <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -719,11 +719,11 @@ function MessagesTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
             {item.status ? (
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: item.status === 'delivered' ? '#D1FAE5' : '#FEF3C7' },
+                { backgroundColor: item.status === 'delivered' ? palette.successSoft : palette.goldHighlight },
               ]}>
                 <Text style={[
                   styles.statusText,
-                  { color: item.status === 'delivered' ? '#065F46' : '#92400E' },
+                  { color: item.status === 'delivered' ? palette.success : palette.gold },
                 ]}>
                   {item.status}
                 </Text>
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { paddingVertical: 4 },
+  backBtn: { paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
   backText: { fontSize: 15, fontWeight: '600' },
   title: { fontSize: 20, fontWeight: '800', flex: 1 },
   tabBar: {
@@ -849,7 +849,7 @@ const styles = StyleSheet.create({
   cardRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
   cardMeta: { fontSize: 12 },
   cardActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  actionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  actionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   actionBtnText: { fontSize: 13, fontWeight: '600' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: '700' },
@@ -860,13 +860,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
     borderRadius: 30,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 5,
   },
-  fabText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  fabText: { fontSize: 14, fontWeight: '700' },
 });
 
 const mStyles = StyleSheet.create({

@@ -26,7 +26,7 @@ import {
   MaterialTopTabBar,
 } from '@react-navigation/material-top-tabs';
 import { useKISTheme } from '../../theme/useTheme';
-import { KIS_TOKENS } from '../../theme/constants';
+import { KIS_ROYAL_GRADIENTS, KIS_TOKENS } from '../../theme/constants';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
 import { KISIcon } from '@/constants/kisIcons';
@@ -598,6 +598,15 @@ useEffect(() => {
 useEffect(() => {
   const sub = DeviceEventEmitter.addListener('conversation.refresh', async () => {
     await refreshConversations(true);
+  });
+  return () => {
+    sub.remove();
+  };
+}, [refreshConversations]);
+
+useEffect(() => {
+  const sub = DeviceEventEmitter.addListener('profile.updated', () => {
+    void refreshConversations(true);
   });
   return () => {
     sub.remove();
@@ -1623,8 +1632,8 @@ const handleSelectAllChats = useCallback(() => {
           style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
           indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
           labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 11 : responsive.isCompactPhone ? 12 : 14 }}
-          activeTintColor={palette.ivory}
-          inactiveTintColor={palette.goldSoft}
+          activeTintColor={palette.onGold}
+          inactiveTintColor="rgba(255,244,184,0.76)"
         />
       </View>
     );
@@ -1809,14 +1818,10 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
     ],
   } as const;
 
-  const messageTopPanelBg = tone === 'dark' ? '#5E3B0A' : '#6B4334';
-  const messageGoldGradient: readonly string[] = headerGradient ?? (
-    tone === 'dark'
-      ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-      : ['#4B2F2A', '#8A5A12', '#D9A875', '#6B4334']
-  );
+  const messageTopPanelBg = tone === 'dark' ? palette.goldDeep : palette.royalInk;
+  const messageGoldGradient: readonly string[] = headerGradient ?? [...KIS_ROYAL_GRADIENTS.goldDark];
   return (
-    <View style={[styles.wrap, { backgroundColor: tone === 'dark' ? palette.bg : '#FFFFFF' }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <LinearGradient
         colors={messageGoldGradient as string[]}
         start={{ x: 0, y: 0 }}
@@ -1853,20 +1858,20 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     borderRadius: messageHeaderIconSize / 2,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: 'rgba(255,255,255,0.13)',
+                    backgroundColor: 'rgba(23,17,31,0.28)',
                     borderWidth: 1,
                     borderColor: 'rgba(255,244,184,0.30)',
                     opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
                   },
                 ]}
               >
-                <KISIcon name="arrow-left" size={20} color={palette.ivory} />
+                <KISIcon name="arrow-left" size={20} color={palette.onGold} />
               </Pressable>
 
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   style={{
-                    color: palette.ivory,
+                    color: palette.onGold,
                     fontSize: responsive.isWatch ? 15 : 18,
                     fontWeight: '900',
                     letterSpacing: 0.2,
@@ -1877,7 +1882,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 </Text>
                 <Text
                   style={{
-                    color: '#FFF4B8',
+                    color: palette.ivory,
+                    opacity: 0.88,
                     fontSize: responsive.isWatch ? 0 : 11,
                     fontWeight: '800',
                     marginTop: 2,
@@ -1907,14 +1913,14 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                       borderRadius: responsive.isWatch ? 15 : 18,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: 'rgba(255,255,255,0.13)',
+                      backgroundColor: 'rgba(23,17,31,0.28)',
                       borderWidth: 1,
                       borderColor: 'rgba(255,244,184,0.26)',
                       opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
                     },
                   ]}
                 >
-                  <KISIcon name={action.icon as any} size={18} color={palette.ivory} />
+                  <KISIcon name={action.icon as any} size={18} color={palette.onGold} />
                 </Pressable>
               ))}
 
@@ -1928,14 +1934,14 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     borderRadius: 18,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: 'rgba(255,255,255,0.13)',
+                    backgroundColor: 'rgba(23,17,31,0.28)',
                     borderWidth: 1,
                     borderColor: 'rgba(255,244,184,0.26)',
                     opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
                   },
                 ]}
               >
-                <KISIcon name="menu" size={18} color={palette.ivory} />
+                <KISIcon name="menu" size={18} color={palette.onGold} />
               </Pressable>
             </View>
 
@@ -1960,19 +1966,19 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   borderRadius: responsive.isWatch ? 14 : 18,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  backgroundColor: 'rgba(23,17,31,0.28)',
                   borderWidth: 1,
                   borderColor: 'rgba(255,244,184,0.30)',
                 }}
               >
-                <Text style={{ color: palette.ivory, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>
+                <Text style={{ color: palette.onGold, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>
                   {appName ? appName[0].toUpperCase() : 'K'}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   style={{
-                    color: palette.ivory,
+                    color: palette.onGold,
                     fontSize: messageHeaderTitleSize,
                     fontWeight: '900',
                     letterSpacing: 0.3,
@@ -1984,7 +1990,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 {!appName && messageHeaderSubtitleSize > 0 && (
                   <Text
                     style={{
-                      color: '#FFF4B8',
+                      color: palette.ivory,
                       marginTop: 2,
                       fontSize: messageHeaderSubtitleSize,
                       fontWeight: '800',
@@ -2018,14 +2024,14 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                       borderRadius: messageHeaderIconSize / 2,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: 'rgba(255,255,255,0.13)',
+                      backgroundColor: 'rgba(23,17,31,0.28)',
                       borderWidth: 1,
                       borderColor: 'rgba(255,244,184,0.26)',
                       opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
                     },
                   ]}
                 >
-                  <KISIcon name={action.icon as any} size={18} color={palette.ivory} />
+                  <KISIcon name={action.icon as any} size={18} color={palette.onGold} />
                 </Pressable>
               ))}
             </View>
@@ -2286,7 +2292,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       ) : null}
 
       {/* ------------ Top Tabs (animated tab bar) ------------ */}
-      <View style={{ flex: 1, backgroundColor: tone === 'dark' ? palette.bg : '#FFFFFF' }}>
+      <View style={{ flex: 1, backgroundColor: palette.bg }}>
         <Tab.Navigator
           {...({ ref: tabRef } as any)}
           tabBar={(props) => <AnimatedTopBar {...props} />}
@@ -2403,7 +2409,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 transform: [{ rotate: '-18deg' }],
               }}
             />
-            <KISIcon name="add" size={24} color={palette.ivory ?? '#fff'} />
+            <KISIcon name="add" size={24} color={palette.ivory} />
           </Pressable>
         ) : null}
       </View>
@@ -2417,7 +2423,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
         <Pressable
           style={[
             styles.searchOverlayBackdrop,
-            { backgroundColor: avatarPreviewFull ? '#000' : 'rgba(0,0,0,0)' },
+            { backgroundColor: avatarPreviewFull ? palette.royalInk : 'transparent' },
           ]}
           onPress={() => setAvatarPreview(null)}
         />
@@ -2460,6 +2466,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               />
                 <Pressable
                   onPress={() => setAvatarPreview(null)}
+                  hitSlop={10}
                   style={{
                     position: 'absolute',
                     top: 10,
@@ -2467,12 +2474,12 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     width: 34,
                     height: 34,
                     borderRadius: 17,
-                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    backgroundColor: palette.backdrop,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <KISIcon name="arrow-left" size={18} color="#fff" />
+                  <KISIcon name="arrow-left" size={18} color={palette.ivory} />
                 </Pressable>
             </Pressable>
             {!avatarPreviewFull ? (

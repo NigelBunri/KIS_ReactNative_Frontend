@@ -103,9 +103,19 @@ const computeInstitutionInitials = (name: string) => {
   return `${words[0][0] || ''}${words[1][0] || ''}`.toUpperCase();
 };
 
+const buildLandingPreviewPalette = (palette: any, isDark: boolean) => ({
+  ...palette,
+  onPrimary: '#FFFFFF',
+  ivory: isDark ? '#E7C76D' : palette.ivory ?? '#FFF9EE',
+  royalInk: isDark ? '#2B1605' : palette.royalInk ?? '#4B2F2A',
+  danger: isDark ? '#FFB4A8' : palette.danger ?? '#B42318',
+});
+
 export default function InstitutionLandingPreviewScreen({ navigation, route }: Props) {
   const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
+  const previewPalette = useMemo(() => buildLandingPreviewPalette(palette, isDark), [isDark, palette]);
   const borders = getHealthThemeBorders(palette);
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
@@ -130,10 +140,10 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
     [draft?.landingBackgroundImageUrl],
   );
   const landingBackgroundColor = useMemo(
-    () => resolveBackgroundColor(draft?.landingBackgroundColorKey, palette.background),
-    [draft?.landingBackgroundColorKey, palette.background],
+    () => resolveBackgroundColor(draft?.landingBackgroundColorKey, palette.bg),
+    [draft?.landingBackgroundColorKey, palette.bg],
   );
-  const effectiveLandingBackgroundColor = scheme === 'dark' ? 'transparent' : landingBackgroundColor;
+  const effectiveLandingBackgroundColor = isDark ? 'transparent' : landingBackgroundColor;
   const landingLogo = useMemo(
     () => ((draft as any)?.landingLogoUrl ? resolveBackendAssetUrl((draft as any).landingLogoUrl) || (draft as any).landingLogoUrl : ''),
     [draft],
@@ -191,7 +201,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
   };
 
   const renderSection = (section: DynamicLandingSection) => {
-    const props = { data: section.data, palette, typography, spacing };
+    const props = { data: section.data, palette: previewPalette, typography, spacing };
     switch (section.type) {
       case 'hero_banner':
         return (
@@ -226,12 +236,28 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
       case 'contact_information':
         return <ContactSection {...props} />;
       default:
-        return null;
+        return (
+          <View
+            style={{
+              marginVertical: spacing.sm,
+              padding: spacing.md,
+              borderRadius: spacing.md,
+              borderWidth: 1,
+              borderColor: palette.divider,
+              backgroundColor: palette.surface,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ ...typography.caption, color: palette.subtext }}>
+              Section "{section.type}" is not yet supported in preview.
+            </Text>
+          </View>
+        );
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <ImageBackground
           source={landingBackgroundImage ? { uri: landingBackgroundImage } : undefined}
@@ -249,7 +275,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
             <View
               onLayout={(event) => setStickyHeaderHeight(event.nativeEvent.layout.height)}
               style={{
-                backgroundColor: `${palette.background}EE`,
+                backgroundColor: `${palette.bg}EE`,
                 borderBottomWidth: 1,
                 borderBottomColor: palette.divider,
                 paddingHorizontal: spacing.lg,
@@ -284,6 +310,8 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
                 </View>
                 <TouchableOpacity
                   onPress={() => navigation.goBack()}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityLabel="Close preview"
                   style={{
                     ...borders.card,
                     borderWidth: 1,
@@ -303,6 +331,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
                     <TouchableOpacity
                       key={group.id}
                       onPress={() => handlePressTab(group.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                       style={{
                         borderRadius: 999,
                         borderWidth: 1,
@@ -310,6 +339,8 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
                         backgroundColor: active ? `${palette.accentPrimary}22` : palette.card,
                         paddingHorizontal: spacing.md,
                         paddingVertical: spacing.xs,
+                        minHeight: 44,
+                        justifyContent: 'center',
                       }}
                     >
                       <Text style={{ ...typography.label, color: active ? palette.accentPrimary : palette.text }}>
@@ -337,7 +368,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
                         (section.data as any).sectionBackgroundImageUrl
                       : '';
                     const sectionBgColor =
-                      scheme === 'dark' || !!sectionBgImage
+              isDark || !!sectionBgImage
                         ? 'transparent'
                         : resolveBackgroundColor(
                             (section?.data as any)?.sectionBackgroundColorKey,

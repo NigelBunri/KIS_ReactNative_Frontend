@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -130,6 +132,7 @@ export default function DeclareSeasonSheet() {
 
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView
         style={{ backgroundColor: palette.bg }}
         contentContainerStyle={styles.content}
@@ -224,7 +227,7 @@ export default function DeclareSeasonSheet() {
                     styles.radio,
                     {
                       borderColor: selected ? palette.primary : palette.border,
-                      backgroundColor: selected ? palette.primary : 'transparent',
+                      backgroundColor: selected ? palette.primary : palette.bg,
                     },
                   ]}
                 />
@@ -252,6 +255,7 @@ export default function DeclareSeasonSheet() {
           </Pressable>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -275,7 +279,7 @@ function makeStyles(palette: any) {
     visibilitySub: { fontSize: 13, marginTop: 2 },
     radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2 },
     submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-    submitBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    submitBtnText: { color: palette.onPrimary, fontWeight: '800', fontSize: 16 },
     resolveTextBtn: { alignItems: 'center', paddingVertical: 12 },
     resolveTextBtnText: { fontSize: 14, textDecorationLine: 'underline' },
   });

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -14,6 +16,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { RootStackParamList } from '@/navigation/types';
+import { useKISTheme } from '@/theme/useTheme';
 import {
   getHealthThemeBorders,
   getHealthThemeColors,
@@ -373,6 +376,7 @@ export default function InstitutionServicesCatalogScreen({
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const borders = getHealthThemeBorders(palette);
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
@@ -1144,7 +1148,7 @@ export default function InstitutionServicesCatalogScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -1154,6 +1158,7 @@ export default function InstitutionServicesCatalogScreen({
           >
             <TouchableOpacity
               onPress={() => navigation.goBack()}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
                 borderWidth: 1,
                 borderColor: palette.divider,
@@ -1182,7 +1187,7 @@ export default function InstitutionServicesCatalogScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}
@@ -1196,6 +1201,7 @@ export default function InstitutionServicesCatalogScreen({
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             style={{
               borderWidth: 1,
               borderColor: palette.divider,
@@ -1208,11 +1214,13 @@ export default function InstitutionServicesCatalogScreen({
             <KISIcon name="close" size={18} color={palette.text} />
           </TouchableOpacity>
         </View>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{
             padding: spacing.lg,
             paddingBottom: spacing.xl,
           }}
+          keyboardShouldPersistTaps="handled"
         >
           <View
             style={{
@@ -1430,16 +1438,16 @@ export default function InstitutionServicesCatalogScreen({
                   marginTop: spacing.sm,
                   borderRadius: spacing.md,
                   borderWidth: 1,
-                  borderColor: '#D97706',
-                  backgroundColor: '#FEF3C7',
+                  borderColor: kisPalette.gold,
+                  backgroundColor: kisPalette.gold + '22',
                   padding: spacing.sm,
                 }}
               >
-                <Text style={{ ...typography.label, color: '#9A3412' }}>
+                <Text style={{ ...typography.label, color: kisPalette.danger }}>
                   Some health engines are still coming up.
                 </Text>
                 <Text
-                  style={{ ...typography.body, color: '#7C2D12', marginTop: 4 }}
+                  style={{ ...typography.body, color: kisPalette.danger, marginTop: 4 }}
                 >
                   {HEALTH_ENGINE_CONTACT_NOTICE}
                 </Text>
@@ -1515,12 +1523,12 @@ export default function InstitutionServicesCatalogScreen({
                         marginTop: spacing.sm,
                         borderRadius: spacing.sm,
                         borderWidth: 1,
-                        borderColor: '#DC2626',
-                        backgroundColor: '#FEE2E2',
+                        borderColor: kisPalette.danger,
+                        backgroundColor: kisPalette.danger + '15',
                         padding: spacing.sm,
                       }}
                     >
-                      <Text style={{ ...typography.caption, color: '#991B1B' }}>
+                      <Text style={{ ...typography.caption, color: kisPalette.danger }}>
                         Coming up. {HEALTH_ENGINE_CONTACT_NOTICE}
                       </Text>
                     </View>
@@ -1765,6 +1773,7 @@ export default function InstitutionServicesCatalogScreen({
             </View>
           ) : null}
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );

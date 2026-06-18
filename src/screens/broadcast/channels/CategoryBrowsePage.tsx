@@ -12,8 +12,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 
@@ -44,8 +49,30 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onSelectContent }: Props) {
+export default function CategoryBrowsePage(props: Props) {
   const { palette } = useKISTheme();
+  const { pageGutter, cardGap, columns } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'CategoryBrowsePage'>>();
+
+  const categorySlug = props.categorySlug ?? route.params?.categorySlug;
+
+  const handleSelectCategory = useCallback((slug: string, name: string) => {
+    if (props.onSelectCategory) {
+      props.onSelectCategory(slug, name);
+    } else {
+      navigation.navigate('CategoryBrowsePage', { categorySlug: slug, categoryName: name });
+    }
+  }, [props.onSelectCategory, navigation]);
+
+  const handleSelectContent = useCallback((contentId: string) => {
+    if (props.onSelectContent) {
+      props.onSelectContent(contentId);
+    } else {
+      navigation.navigate('ChannelContentDetail', { contentId });
+    }
+  }, [props.onSelectContent, navigation]);
 
   const isGridMode = !categorySlug;
 
@@ -54,7 +81,7 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
 
   // Browse mode state
   const [contents, setContents] = useState<ChannelContent[]>([]);
-  const [categoryName, setCategoryName] = useState<string>('');
+  const [categoryName, setCategoryName] = useState<string>(route.params?.categoryName ?? '');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -126,7 +153,7 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
 
   if (loading && contents.length === 0 && categories.length === 0) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.card }]}>
+      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: insets.top }]}>
         <ActivityIndicator color={palette.primaryStrong} size="large" />
       </View>
     );
@@ -134,7 +161,7 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
 
   if (error) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.card }]}>
+      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: insets.top }]}>
         <Text style={[styles.errorText, { color: palette.subtext }]}>{error}</Text>
       </View>
     );
@@ -144,7 +171,7 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
   if (isGridMode) {
     const renderCategoryTile = ({ item }: { item: Category }) => (
       <Pressable
-        onPress={() => onSelectCategory?.(item.slug, item.name)}
+        onPress={() => handleSelectCategory(item.slug, item.name)}
         style={[styles.categoryTile, { backgroundColor: palette.surface, borderColor: palette.border }]}
       >
         <View style={[styles.categoryIconWrap, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
@@ -165,16 +192,18 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
       </Pressable>
     );
 
+    const numColumns = Math.max(2, columns.dense);
     return (
-      <View style={[styles.container, { backgroundColor: palette.card }]}>
-        <Text style={[styles.pageTitle, { color: palette.text }]}>Browse Categories</Text>
+      <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+        <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>Browse Categories</Text>
         <FlatList
+          key={`category-cols-${numColumns}`}
           data={categories}
           keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
+          numColumns={numColumns}
+          columnWrapperStyle={[styles.columnWrapper, { gap: cardGap, paddingHorizontal: pageGutter }]}
           renderItem={renderCategoryTile}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { gap: cardGap }]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: palette.subtext }]}>No categories available.</Text>
@@ -187,7 +216,7 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
   // Browse mode: content grid with infinite scroll
   const renderContentCard = ({ item }: { item: ChannelContent }) => (
     <Pressable
-      onPress={() => onSelectContent?.(item.id)}
+      onPress={() => handleSelectContent(item.id)}
       style={[styles.contentCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
     >
       {item.thumbnail_url ? (
@@ -211,18 +240,21 @@ export default function CategoryBrowsePage({ categorySlug, onSelectCategory, onS
     </Pressable>
   );
 
+  const numColumns = Math.max(2, columns.dense);
+
   return (
-    <View style={[styles.container, { backgroundColor: palette.card }]}>
+    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
       {categoryName ? (
-        <Text style={[styles.pageTitle, { color: palette.text }]}>{categoryName}</Text>
+        <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>{categoryName}</Text>
       ) : null}
       <FlatList
+        key={`category-content-cols-${numColumns}`}
         data={contents}
         keyExtractor={item => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
+        numColumns={numColumns}
+        columnWrapperStyle={[styles.columnWrapper, { gap: cardGap, paddingHorizontal: pageGutter }]}
         renderItem={renderContentCard}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { gap: cardGap }]}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}

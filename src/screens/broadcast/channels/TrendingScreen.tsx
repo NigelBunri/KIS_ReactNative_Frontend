@@ -12,7 +12,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
+import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 
@@ -31,7 +36,7 @@ type TrendingItem = {
 };
 
 type Props = {
-  onPressContent: (contentId: string) => void;
+  onPressContent?: (contentId: string) => void;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -43,11 +48,9 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'all', label: 'All Time' },
 ];
 
-const RANK_COLORS: Record<number, string> = {
-  1: '#FFD700',
-  2: '#C0C0C0',
-  3: '#CD7F32',
-};
+// Rank medal colors are resolved at render time using palette tokens.
+// Rank 1 → palette.gold, rank 2 → palette.divider (silver-grey), rank 3 → palette.primaryWeak
+// Call getRankMedalColor(rank, palette) instead of indexing this object directly.
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 
@@ -55,6 +58,17 @@ const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 
 export default function TrendingScreen({ onPressContent }: Props) {
   const { palette } = useKISTheme();
+  const { pageGutter, cardGap, minTouchTarget, columns } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const handlePressContent = useCallback((contentId: string) => {
+    if (onPressContent) {
+      onPressContent(contentId);
+    } else {
+      navigation.navigate('ChannelContentDetail', { contentId });
+    }
+  }, [onPressContent, navigation]);
   const [period, setPeriod] = useState<Period>('7d');
   const [items, setItems] = useState<TrendingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +104,7 @@ export default function TrendingScreen({ onPressContent }: Props) {
   };
 
   const renderSkeleton = () => (
-    <View style={styles.grid}>
+    <View style={[styles.grid, { padding: pageGutter, gap: cardGap }]}>
       {SKELETON_KEYS.map(key => (
         <View
           key={key}
@@ -107,10 +121,17 @@ export default function TrendingScreen({ onPressContent }: Props) {
   );
 
   const renderCard = ({ item }: { item: TrendingItem }) => {
-    const rankColor = item.rank ? RANK_COLORS[item.rank] : undefined;
+    const rankColor =
+      item.rank === 1
+        ? palette.gold
+        : item.rank === 2
+        ? palette.divider
+        : item.rank === 3
+        ? palette.primaryWeak
+        : undefined;
     return (
       <Pressable
-        onPress={() => onPressContent(item.id)}
+        onPress={() => handlePressContent(item.id)}
         style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}
       >
         <View style={styles.thumbnailContainer}>
@@ -126,7 +147,7 @@ export default function TrendingScreen({ onPressContent }: Props) {
                 { backgroundColor: rankColor ?? palette.surfaceElevated ?? palette.border },
               ]}
             >
-              <Text style={[styles.rankText, { color: rankColor ? '#000' : palette.text }]}>
+              <Text style={[styles.rankText, { color: rankColor ? palette.royalInk : palette.text }]}>
                 #{item.rank}
               </Text>
             </View>
@@ -154,10 +175,12 @@ export default function TrendingScreen({ onPressContent }: Props) {
     );
   };
 
+  const numColumns = Math.max(2, columns.dense);
+
   return (
-    <View style={[styles.container, { backgroundColor: palette.card }]}>
+    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
       {/* Period selector */}
-      <View style={styles.pillRow}>
+      <View style={[styles.pillRow, { padding: pageGutter, gap: cardGap / 1.5 }]}>
         {PERIODS.map(p => {
           const active = period === p.value;
           return (
@@ -169,10 +192,11 @@ export default function TrendingScreen({ onPressContent }: Props) {
                 {
                   backgroundColor: active ? palette.primaryStrong : palette.surface,
                   borderColor: active ? palette.primaryStrong : palette.border,
+                  minHeight: minTouchTarget,
                 },
               ]}
             >
-              <Text style={[styles.pillText, { color: active ? '#fff' : palette.text }]}>
+              <Text style={[styles.pillText, { color: active ? palette.onPrimary : palette.text }]}>
                 {p.label}
               </Text>
             </Pressable>
@@ -194,13 +218,21 @@ export default function TrendingScreen({ onPressContent }: Props) {
         </View>
       ) : (
         <FlatList
+          key={`trending-cols-${numColumns}`}
           data={items}
           keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
+          numColumns={numColumns}
+          columnWrapperStyle={[styles.columnWrapper, { gap: cardGap, paddingHorizontal: pageGutter }]}
           renderItem={renderCard}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { gap: cardGap }]}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                Nothing trending right now
+              </Text>
+            </View>
+          }
         />
       )}
     </View>

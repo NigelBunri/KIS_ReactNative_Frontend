@@ -6,6 +6,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,12 +42,8 @@ type Props = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<CampaignStatus, string> = {
-  draft: '#94A3B8',
-  active: '#22C55E',
-  paused: '#F59E0B',
-  ended: '#EF4444',
-};
+const campaignStatusColor = (status: CampaignStatus, p: any): string =>
+  ({ draft: p.subtext, active: p.success, paused: p.gold, ended: p.danger } as Record<CampaignStatus, string>)[status] ?? p.subtext;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -144,16 +142,18 @@ export default function AdCampaignPanel({ channelId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
     >
       {/* Header action */}
       <Pressable
         onPress={() => setShowForm(prev => !prev)}
         style={[styles.newBtn, { backgroundColor: palette.primaryStrong }]}
       >
-        <Text style={styles.newBtnText}>{showForm ? 'Cancel' : '+ New Campaign'}</Text>
+        <Text style={[styles.newBtnText, { color: palette.onPrimary }]}>{showForm ? 'Cancel' : '+ New Campaign'}</Text>
       </Pressable>
 
       {/* Creation form */}
@@ -195,7 +195,7 @@ export default function AdCampaignPanel({ channelId }: Props) {
               value={formActive}
               onValueChange={setFormActive}
               trackColor={{ false: palette.border, true: palette.primaryStrong }}
-              thumbColor="#fff"
+              thumbColor={palette.ivory}
             />
           </View>
           <Pressable
@@ -204,9 +204,9 @@ export default function AdCampaignPanel({ channelId }: Props) {
             style={[styles.createBtn, { backgroundColor: palette.primaryStrong }]}
           >
             {creating ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={palette.onPrimary} />
             ) : (
-              <Text style={styles.createBtnText}>Create Campaign</Text>
+              <Text style={[styles.createBtnText, { color: palette.onPrimary }]}>Create Campaign</Text>
             )}
           </Pressable>
         </View>
@@ -229,7 +229,7 @@ export default function AdCampaignPanel({ channelId }: Props) {
             campaign.budget_total > 0
               ? Math.min((campaign.budget_spent / campaign.budget_total) * 100, 100)
               : 0;
-          const statusColor = STATUS_COLOR[campaign.status] ?? '#94A3B8';
+          const statusColor = campaignStatusColor(campaign.status, palette);
           return (
             <View
               key={campaign.id}
@@ -268,6 +268,7 @@ export default function AdCampaignPanel({ channelId }: Props) {
         })
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -283,7 +284,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  newBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  newBtnText: { fontWeight: '800', fontSize: 13 },
   formCard: {
     borderWidth: 1,
     borderRadius: 10,
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  createBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  createBtnText: { fontWeight: '800', fontSize: 14 },
   campaignCard: {
     borderWidth: 1,
     borderRadius: 10,

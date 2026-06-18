@@ -86,7 +86,7 @@ export const VoicePreviewRow: React.FC<VoicePreviewRowProps> = ({
           <KISIcon
             name="trash"
             size={20}
-            color={palette.danger ?? '#EF4444'}
+            color={palette.danger}
           />
         </Pressable>
         <Pressable

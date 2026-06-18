@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Keyboard,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -16,11 +17,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
@@ -254,7 +257,7 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
             onPress={() => { setShowDate(false); setShowTime(true); }}
             style={[dtStyles.iosNext, { backgroundColor: palette.primary }]}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Next: Time</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Next: Time</Text>
           </Pressable>
         </View>
       )}
@@ -264,7 +267,7 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
             onPress={() => { setShowTime(false); onChange(working.current); }}
             style={[dtStyles.iosNext, { backgroundColor: palette.primary }]}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Done</Text>
+            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Done</Text>
           </Pressable>
         </View>
       )}
@@ -300,9 +303,9 @@ type StatusBadgeProps = {
 function StatusBadge({ status, palette }: StatusBadgeProps) {
   const config: Record<EventStatus, { label: string; bg: string; color: string }> = {
     upcoming: { label: 'Upcoming', bg: palette.primary + '22', color: palette.primary },
-    today: { label: 'Today', bg: '#f59e0b22', color: '#f59e0b' },
+    today: { label: 'Today', bg: (palette.gold) + '22', color: palette.gold },
     past: { label: 'Past', bg: palette.subtext + '22', color: palette.subtext },
-    cancelled: { label: 'Cancelled', bg: '#ef444422', color: '#ef4444' },
+    cancelled: { label: 'Cancelled', bg: (palette.danger) + '22', color: palette.danger },
   };
   const { label, bg, color } = config[status];
   return (
@@ -323,6 +326,8 @@ const badgeStyles = StyleSheet.create({
 
 export default function EventsScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const canCreateEvents = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
 
@@ -780,7 +785,7 @@ export default function EventsScreen() {
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.headerRow, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>
@@ -789,8 +794,8 @@ export default function EventsScreen() {
             onPress={openCreate}
             style={[styles.addBtn, { backgroundColor: palette.primary }]}
           >
-            <KISIcon name="add" size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Create</Text>
+            <KISIcon name="add" size={16} color={palette.onPrimary} />
+            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Create</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -859,7 +864,7 @@ export default function EventsScreen() {
           >
             <Text
               style={{
-                color: filter === key ? '#fff' : palette.subtext,
+                color: filter === key ? (palette.onPrimary) : palette.subtext,
                 fontSize: 13,
                 fontWeight: filter === key ? '600' : '400',
               }}
@@ -967,7 +972,7 @@ export default function EventsScreen() {
                         }}
                         style={[styles.rsvpBtn, { backgroundColor: palette.primary, borderColor: palette.primary }]}
                       >
-                        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>RSVP</Text>
+                        <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>RSVP</Text>
                       </Pressable>
                     )
                   ) : (
@@ -979,8 +984,8 @@ export default function EventsScreen() {
           }}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <KISIcon name="calendar" size={40} color={listError ? (palette.danger ?? '#dc2626') : palette.subtext} />
-              <Text style={{ color: listError ? (palette.danger ?? '#dc2626') : palette.subtext, marginTop: 12, textAlign: 'center' }}>
+              <KISIcon name="calendar" size={40} color={listError ? (palette.danger) : palette.subtext} />
+              <Text style={{ color: listError ? (palette.danger) : palette.subtext, marginTop: 12, textAlign: 'center' }}>
                 {listError
                   ? listError
                   : search || filter !== 'all'
@@ -989,7 +994,7 @@ export default function EventsScreen() {
               </Text>
             </View>
           }
-          contentContainerStyle={{ padding: 12, paddingBottom: 40, flexGrow: 1 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center', flexGrow: 1 }}
         />
       )}
 
@@ -1002,7 +1007,7 @@ export default function EventsScreen() {
         animationType="slide"
         onRequestClose={() => { setCreateVisible(false); setFormError(''); }}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
           <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>
               {editingEvent ? 'Edit Event' : 'Create Event'}
@@ -1077,7 +1082,7 @@ export default function EventsScreen() {
               />
 
               {!!formError && (
-                <Text style={{ color: palette.danger ?? '#d9534f', marginBottom: 8 }}>{formError}</Text>
+                <Text style={{ color: palette.danger, marginBottom: 8 }}>{formError}</Text>
               )}
             </ScrollView>
 
@@ -1094,16 +1099,16 @@ export default function EventsScreen() {
                 style={[styles.btnPrimary, { backgroundColor: palette.primary }]}
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={palette.onPrimary} />
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
+                  <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>
                     {editingEvent ? 'Save' : 'Create'}
                   </Text>
                 )}
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ------------------------------------------------------------------ */}
@@ -1115,7 +1120,7 @@ export default function EventsScreen() {
         animationType="slide"
         onRequestClose={() => setDetailVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
           <View
             style={[
               styles.modalCard,
@@ -1352,7 +1357,7 @@ export default function EventsScreen() {
                     }}
                     style={[styles.detailRsvpBtn, { backgroundColor: palette.primary, borderColor: palette.primary }]}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '600' }}>RSVP to this event</Text>
+                    <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>RSVP to this event</Text>
                   </Pressable>
                 )
               )}
@@ -1373,11 +1378,11 @@ export default function EventsScreen() {
                     onPress={() => confirmDelete(detailEvent)}
                     style={[
                       styles.ownerBtn,
-                      { backgroundColor: '#ef444415', borderColor: '#ef4444' },
+                      { backgroundColor: (palette.danger) + '15', borderColor: palette.danger },
                     ]}
                   >
-                    <KISIcon name="trash" size={14} color="#ef4444" />
-                    <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
+                    <KISIcon name="trash" size={14} color={palette.danger} />
+                    <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
                       Delete
                     </Text>
                   </Pressable>
@@ -1397,7 +1402,7 @@ export default function EventsScreen() {
         animationType="slide"
         onRequestClose={() => setReminderModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
           <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
             <View style={[styles.detailHeader, { marginBottom: 12 }]}>
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
@@ -1449,7 +1454,7 @@ export default function EventsScreen() {
         animationType="slide"
         onRequestClose={() => setAttendeeModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
           <View
             style={[
               styles.modalCard,
@@ -1524,6 +1529,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
+    minHeight: 44,
   },
   infoBanner: {
     flexDirection: 'row',
@@ -1557,6 +1563,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
@@ -1576,8 +1584,9 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
+    minHeight: 44,
   },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalCard: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

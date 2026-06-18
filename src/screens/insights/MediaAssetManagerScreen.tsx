@@ -65,13 +65,13 @@ const getAssetKind = (asset: MediaAsset): FilterType => {
   return 'Document';
 };
 
-const KIND_COLORS: Record<FilterType, string> = {
-  All: '#6B7280',
-  Image: '#10B981',
-  Video: '#8B5CF6',
-  Audio: '#F59E0B',
-  Document: '#3B82F6',
-};
+const buildKindColors = (p: any): Record<FilterType, string> => ({
+  All: p.subtext,
+  Image: p.success,
+  Video: p.primaryStrong,
+  Audio: p.gold,
+  Document: p.primary,
+});
 
 const KIND_ICONS: Record<FilterType, string> = {
   All: '■',
@@ -81,12 +81,12 @@ const KIND_ICONS: Record<FilterType, string> = {
   Document: '📄',
 };
 
-const SAFETY_COLORS: Record<string, string> = {
-  safe: '#10B981',
-  unsafe: '#EF4444',
-  pending: '#F59E0B',
-  unknown: '#9CA3AF',
-};
+const buildSafetyColors = (p: any): Record<string, string> => ({
+  safe: p.success,
+  unsafe: p.danger,
+  pending: p.gold,
+  unknown: p.subtext,
+});
 
 // ─── Asset Thumbnail ──────────────────────────────────────────────────────────
 
@@ -99,6 +99,7 @@ function AssetThumbnail({
   size: number;
   palette: any;
 }) {
+  const KIND_COLORS = buildKindColors(palette);
   const kind = getAssetKind(asset);
   const hasImage = kind === 'Image' && (asset.thumbnail_url ?? asset.url);
 
@@ -134,6 +135,8 @@ function AssetThumbnail({
 
 export default function MediaAssetManagerScreen() {
   const { palette } = useKISTheme();
+  const KIND_COLORS = buildKindColors(palette);
+  const SAFETY_COLORS = buildSafetyColors(palette);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -284,9 +287,9 @@ export default function MediaAssetManagerScreen() {
           <Text style={[styles.screenTitle, { color: palette.text }]}>Media Assets</Text>
         </View>
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -327,7 +330,7 @@ export default function MediaAssetManagerScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  { color: active ? '#fff' : palette.subtext },
+                  { color: active ? palette.onPrimary : palette.subtext },
                 ]}
               >
                 {f}
@@ -379,6 +382,13 @@ export default function MediaAssetManagerScreen() {
           data={filtered}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No assets yet
+              </Text>
+            </View>
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={palette.primary} />
           }
@@ -405,7 +415,7 @@ export default function MediaAssetManagerScreen() {
                   hitSlop={8}
                   style={styles.deleteIcon}
                 >
-                  <Text style={{ color: '#EF4444', fontSize: 18 }}>×</Text>
+                  <Text style={{ color: palette.danger, fontSize: 18 }}>×</Text>
                 </Pressable>
               </Pressable>
             );
@@ -417,11 +427,11 @@ export default function MediaAssetManagerScreen() {
       <Pressable
         onPress={handleUpload}
         disabled={uploading}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong }]}
+        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
       >
         {uploading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.fabText}>Upload</Text>
+          ? <ActivityIndicator color={palette.onPrimary} />
+          : <Text style={[styles.fabText, { color: palette.onPrimary }]}>Upload</Text>
         }
       </Pressable>
 
@@ -442,7 +452,7 @@ export default function MediaAssetManagerScreen() {
                 onPress={() => { setSelected(null); if (selected) confirmDelete(selected); }}
                 hitSlop={8}
               >
-                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 15 }}>Delete</Text>
+                <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 15 }}>Delete</Text>
               </Pressable>
               <Pressable onPress={() => setSelected(null)}>
                 <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Done</Text>
@@ -456,7 +466,7 @@ export default function MediaAssetManagerScreen() {
                 {getAssetKind(selected) === 'Image' && (selected.url ?? selected.thumbnail_url) ? (
                   <Image
                     source={{ uri: selected.url ?? selected.thumbnail_url }}
-                    style={styles.previewImage}
+                    style={[styles.previewImage, { backgroundColor: palette.royalInk }]}
                     resizeMode="contain"
                   />
                 ) : (
@@ -494,9 +504,9 @@ export default function MediaAssetManagerScreen() {
                             styles.safetyBadge,
                             {
                               backgroundColor:
-                                (SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? '#9CA3AF') + '22',
+                                (SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? palette.subtext) + '22',
                               borderColor:
-                                SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? '#9CA3AF',
+                                SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? palette.subtext,
                             },
                           ]}
                         >
@@ -504,7 +514,7 @@ export default function MediaAssetManagerScreen() {
                             style={{
                               fontSize: 12,
                               fontWeight: '700',
-                              color: SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? '#9CA3AF',
+                              color: SAFETY_COLORS[safetyScan.status?.toLowerCase() ?? 'unknown'] ?? palette.subtext,
                             }}
                           >
                             {safetyScan.is_safe === true
@@ -613,7 +623,7 @@ const styles = StyleSheet.create({
   },
   listCardName: { fontSize: 14, fontWeight: '600' },
   listCardMeta: { fontSize: 12 },
-  deleteIcon: { padding: 4 },
+  deleteIcon: { padding: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 
   fab: {
     position: 'absolute',
@@ -622,7 +632,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 28,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
@@ -630,7 +639,7 @@ const styles = StyleSheet.create({
     minWidth: 90,
     alignItems: 'center',
   },
-  fabText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {
@@ -647,7 +656,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 220,
     borderRadius: 12,
-    backgroundColor: '#000',
   },
   previewPlaceholder: {
     height: 160,

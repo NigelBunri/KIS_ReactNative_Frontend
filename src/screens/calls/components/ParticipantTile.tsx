@@ -10,6 +10,7 @@ import type { CallParticipant } from '@/services/calls/callTypes';
 import NetworkQualityBars from './NetworkQualityBars';
 import { KISIcon } from '@/constants/kisIcons';
 import { RTCView } from '@/services/calls/webRTCService';
+import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
   participant: CallParticipant;
@@ -29,7 +30,7 @@ function initials(name: string): string {
   return parts.map(p => p[0]?.toUpperCase() ?? '').join('');
 }
 
-const SPEAKING_BORDER = '#22C55E';
+// Avatar background pool — uses palette-adjacent semantic hues; updated at runtime via palette tokens where available.
 const AVATAR_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
 
 export default React.memo(function ParticipantTile({
@@ -44,13 +45,85 @@ export default React.memo(function ParticipantTile({
   isAudioOnly,
   cornerRadius = 16,
 }: Props) {
+  const { palette } = useKISTheme();
   const showVideo = !isAudioOnly && !participant.isVideoOff && participant.stream && RTCView;
   const avatarColor = useMemo(() => {
     const idx = Math.abs(
-      participant.userId.split('').reduce((a, c) => a + c.charCodeAt(0), 0),
+      (participant.userId ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0),
     ) % AVATAR_COLORS.length;
     return AVATAR_COLORS[idx];
   }, [participant.userId]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    tile: {
+      overflow: 'hidden',
+      backgroundColor: palette.royalInk,
+    },
+    avatar: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initials: {
+      color: palette.ivory,
+      fontWeight: '800',
+    },
+    topLeft: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      backgroundColor: palette.overlay,
+      borderRadius: 6,
+      padding: 3,
+    },
+    topRight: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+    },
+    badge: {
+      backgroundColor: palette.overlay,
+      borderRadius: 12,
+      padding: 4,
+    },
+    handBadge: {
+      position: 'absolute',
+      top: 36,
+      right: 8,
+      backgroundColor: palette.overlay,
+      borderRadius: 12,
+      padding: 4,
+    },
+    handEmoji: { fontSize: 16 },
+    nameBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: palette.overlay,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      gap: 6,
+    },
+    nameText: {
+      color: palette.ivory,
+      fontSize: 12,
+      fontWeight: '600',
+      flex: 1,
+    },
+    videoOffBadge: {
+      position: 'absolute',
+      bottom: 32,
+      left: '50%',
+      backgroundColor: palette.overlay,
+      borderRadius: 20,
+      padding: 6,
+      transform: [{ translateX: -13 }],
+    },
+  }), [palette]);
 
   return (
     <Pressable
@@ -63,7 +136,7 @@ export default React.memo(function ParticipantTile({
           height,
           borderRadius: cornerRadius,
           borderWidth: isSpeaker || participant.isSpeaking ? 2.5 : 0,
-          borderColor: SPEAKING_BORDER,
+          borderColor: palette.success,
         },
       ]}
     >
@@ -93,7 +166,7 @@ export default React.memo(function ParticipantTile({
       {isPinned && (
         <View style={styles.topRight}>
           <View style={styles.badge}>
-            <KISIcon name="pin" size={10} color="#fff" />
+            <KISIcon name="pin" size={10} color={palette.ivory} />
           </View>
         </View>
       )}
@@ -112,9 +185,9 @@ export default React.memo(function ParticipantTile({
             {participant.isLocal ? 'You' : participant.displayName}
           </Text>
           {participant.isMuted ? (
-            <KISIcon name="mic-off" size={13} color="#E52B2B" />
+            <KISIcon name="mic-off" size={13} color={palette.danger} />
           ) : (
-            participant.isSpeaking && <KISIcon name="mic" size={13} color={SPEAKING_BORDER} />
+            participant.isSpeaking && <KISIcon name="mic" size={13} color={palette.success} />
           )}
         </View>
       )}
@@ -122,80 +195,9 @@ export default React.memo(function ParticipantTile({
       {/* Video off overlay */}
       {!showVideo && participant.isVideoOff && !isAudioOnly && (
         <View style={styles.videoOffBadge}>
-          <KISIcon name="video-off" size={13} color="rgba(255,255,255,0.6)" />
+          <KISIcon name="video-off" size={13} color={palette.subtext} />
         </View>
       )}
     </Pressable>
   );
-});
-
-const styles = StyleSheet.create({
-  tile: {
-    overflow: 'hidden',
-    backgroundColor: '#1A1A2E',
-  },
-  avatar: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: {
-    color: '#fff',
-    fontWeight: '800',
-  },
-  topLeft: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 6,
-    padding: 3,
-  },
-  topRight: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  badge: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  handBadge: {
-    position: 'absolute',
-    top: 36,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  handEmoji: { fontSize: 16 },
-  nameBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 6,
-  },
-  nameText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  videoOffBadge: {
-    position: 'absolute',
-    bottom: 32,
-    left: '50%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 20,
-    padding: 6,
-    transform: [{ translateX: -13 }],
-  },
 });

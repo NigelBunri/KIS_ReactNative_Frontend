@@ -235,8 +235,8 @@ export default function SplashScreen({
   };
 
   const ringColor =
-    tone === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
-  const electronColor = palette.primary ?? '#6EA8FE';
+    tone === 'dark' ? palette.divider : (palette.divider);
+  const electronColor = palette.primary;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -249,7 +249,7 @@ export default function SplashScreen({
         <Animated.View
           style={[
             styles.blob,
-            { backgroundColor: '#000', left: -40, top: -30, borderRadius: 120 },
+            { backgroundColor: palette.royalInk, left: -40, top: -30, borderRadius: 120 },
             driftAStyle,
           ]}
         />
@@ -257,7 +257,7 @@ export default function SplashScreen({
           style={[
             styles.blob,
             {
-              backgroundColor: '#000',
+              backgroundColor: palette.royalInk,
               right: -30,
               bottom: 60,
               borderRadius: 140,
@@ -269,7 +269,7 @@ export default function SplashScreen({
           style={[
             styles.blob,
             {
-              backgroundColor: '#000',
+              backgroundColor: palette.royalInk,
               left: 50,
               bottom: -20,
               borderRadius: 100,
@@ -281,10 +281,9 @@ export default function SplashScreen({
           style={[
             StyleSheet.absoluteFillObject,
             {
-              backgroundColor:
-                tone === 'dark'
-                  ? 'rgba(0,0,0,0.20)'
-                  : 'rgba(0,0,0,0.08)',
+              // Subtle scrim overlay — palette.royalInk at low opacity gives theme-aware darkening
+              backgroundColor: palette.royalInk,
+              opacity: tone === 'dark' ? 0.20 : 0.06,
             },
           ]}
         />

@@ -24,6 +24,8 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -68,7 +70,7 @@ type Props = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const statusColor = (status: string, palette: any) => {
-  if (status === 'live')    return '#C0262D';
+  if (status === 'live')    return palette.danger;
   if (status === 'ended')   return palette.subtext;
   return palette.primaryStrong;
 };
@@ -93,7 +95,7 @@ function OBSGuide({
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={[styles.guideCard, { borderColor: palette.border, backgroundColor: palette.bg }]}>
+    <View style={[styles.guideCard, { borderColor: palette.border, backgroundColor: palette.card }]}>
       <Pressable
         onPress={() => setOpen(o => !o)}
         style={styles.guideHeader}
@@ -129,7 +131,7 @@ function StepRow({ n, text, palette }: { n: number; text: string; palette: any }
   return (
     <View style={styles.stepRow}>
       <View style={[styles.stepCircle, { backgroundColor: palette.primaryStrong }]}>
-        <Text style={styles.stepNum}>{n}</Text>
+        <Text style={[styles.stepNum, { color: palette.onPrimary }]}>{n}</Text>
       </View>
       <Text style={[styles.stepText, { color: palette.subtext }]}>{text}</Text>
     </View>
@@ -270,7 +272,7 @@ function RecordingsPanel({
   };
 
   return (
-    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.bg }]}>
+    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.card }]}>
       <View style={recStyles.header}>
         <KISIcon name="video" size={15} color={palette.primaryStrong} />
         <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
@@ -311,14 +313,14 @@ function RecordingsPanel({
             <Pressable
               onPress={() => handleDelete(rec)}
               disabled={deletingId === rec.id}
-              style={[recStyles.actionBtn, { borderColor: '#EF444466' }]}
+              style={[recStyles.actionBtn, { borderColor: `${palette.danger}66` }]}
               hitSlop={6}
             >
               {deletingId === rec.id
-                ? <ActivityIndicator size="small" color="#EF4444" />
-                : <KISIcon name="trash" size={14} color="#EF4444" />
+                ? <ActivityIndicator size="small" color={palette.danger} />
+                : <KISIcon name="trash" size={14} color={palette.danger} />
               }
-              <Text style={[recStyles.actionText, { color: '#EF4444' }]}>Delete</Text>
+              <Text style={[recStyles.actionText, { color: palette.danger }]}>Delete</Text>
             </Pressable>
           </View>
         </View>
@@ -570,20 +572,20 @@ function BroadcasterPanel({
           {!isDeviceLive && !isConnecting ? (
             <Pressable
               onPress={handleGoLive}
-              style={[styles.goLiveBtn, { backgroundColor: '#C0262D' }]}
+              style={[styles.goLiveBtn, { backgroundColor: palette.danger }]}
             >
-              <KISIcon name="broadcast" size={16} color="#fff" />
-              <Text style={styles.goLiveBtnText}>Go Live from Device</Text>
+              <KISIcon name="broadcast" size={16} color={palette.onPrimary} />
+              <Text style={[styles.goLiveBtnText, { color: palette.onPrimary }]}>Go Live from Device</Text>
             </Pressable>
           ) : (
             <>
-              <View style={[styles.liveIndicator, { backgroundColor: `#C0262D22` }]}>
+              <View style={[styles.liveIndicator, { backgroundColor: `${palette.danger}22` }]}>
                 {isConnecting ? (
-                  <ActivityIndicator size="small" color="#C0262D" />
+                  <ActivityIndicator size="small" color={palette.danger} />
                 ) : (
-                  <View style={styles.liveDot} />
+                  <View style={[styles.liveDot, { backgroundColor: palette.danger }]} />
                 )}
-                <Text style={styles.liveIndicatorText}>
+                <Text style={[styles.liveIndicatorText, { color: palette.danger }]}>
                   {isConnecting ? 'Connecting…' : 'LIVE from device'}
                 </Text>
               </View>
@@ -592,9 +594,9 @@ function BroadcasterPanel({
                   <KISIcon name="refresh" size={16} color={palette.primaryStrong} />
                 </Pressable>
               )}
-              <Pressable onPress={handleStop} style={[styles.stopBtn, { borderColor: '#EF4444' }]}>
-                <KISIcon name="square" size={14} color="#EF4444" />
-                <Text style={[styles.stopBtnText, { color: '#EF4444' }]}>Stop</Text>
+              <Pressable onPress={handleStop} style={[styles.stopBtn, { borderColor: palette.danger }]}>
+                <KISIcon name="square" size={14} color={palette.danger} />
+                <Text style={[styles.stopBtnText, { color: palette.danger }]}>Stop</Text>
               </Pressable>
             </>
           )}
@@ -622,7 +624,7 @@ function BroadcasterPanel({
       )}
 
       {/* Stream Settings — Latency + DVR */}
-      <View style={[styles.settingsCard, { borderColor: palette.border, backgroundColor: palette.bg }]}>
+      <View style={[styles.settingsCard, { borderColor: palette.border, backgroundColor: palette.card }]}>
         <View style={styles.settingsHeader}>
           <KISIcon name="settings" size={14} color={palette.primaryStrong} />
           <Text style={[styles.settingsTitle, { color: palette.text }]}>Stream Settings</Text>
@@ -646,7 +648,7 @@ function BroadcasterPanel({
                   },
                 ]}
               >
-                <Text style={[styles.settingsPillText, { color: active ? '#fff' : palette.text }]}>
+                <Text style={[styles.settingsPillText, { color: active ? palette.onPrimary : palette.text }]}>
                   {opt.label}
                 </Text>
               </Pressable>
@@ -663,7 +665,7 @@ function BroadcasterPanel({
             value={dvrEnabled}
             onValueChange={val => void handleDvrToggle(val)}
             trackColor={{ true: palette.primaryStrong }}
-            thumbColor="#fff"
+            thumbColor={palette.ivory}
           />
         </View>
         {dvrEnabled && (
@@ -682,7 +684,7 @@ function BroadcasterPanel({
                     },
                   ]}
                 >
-                  <Text style={[styles.settingsPillText, { color: active ? '#fff' : palette.text }]}>
+                  <Text style={[styles.settingsPillText, { color: active ? palette.onPrimary : palette.text }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -772,6 +774,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
   }, [updateStream]);
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}>
       {/* Header */}
       <View style={styles.headerRow}>
@@ -834,7 +837,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
               key={stream.id}
               style={[
                 styles.streamCard,
-                { borderColor: isActive ? palette.primary : palette.border, backgroundColor: palette.bg },
+                { borderColor: isActive ? palette.primary : palette.border, backgroundColor: palette.card },
                 isActive && { borderWidth: 2 },
               ]}
             >
@@ -889,10 +892,10 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                 {stream.status !== 'live' && (
                   <Pressable
                     onPress={() => handleStart(stream)}
-                    style={[styles.actionChip, { borderColor: '#22C55E', backgroundColor: '#22C55E18' }]}
+                    style={[styles.actionChip, { borderColor: palette.success, backgroundColor: `${palette.success}18` }]}
                   >
-                    <KISIcon name="play" size={13} color="#22C55E" />
-                    <Text style={[styles.actionChipText, { color: '#22C55E' }]}>Start</Text>
+                    <KISIcon name="play" size={13} color={palette.success} />
+                    <Text style={[styles.actionChipText, { color: palette.success }]}>Start</Text>
                   </Pressable>
                 )}
 
@@ -904,10 +907,10 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                         { text: 'End', style: 'destructive', onPress: () => endLiveStream(stream.id).then(updateStream) },
                       ])
                     }
-                    style={[styles.actionChip, { borderColor: '#EF4444', backgroundColor: '#EF444418' }]}
+                    style={[styles.actionChip, { borderColor: palette.danger, backgroundColor: `${palette.danger}18` }]}
                   >
-                    <KISIcon name="square" size={13} color="#EF4444" />
-                    <Text style={[styles.actionChipText, { color: '#EF4444' }]}>End</Text>
+                    <KISIcon name="square" size={13} color={palette.danger} />
+                    <Text style={[styles.actionChipText, { color: palette.danger }]}>End</Text>
                   </Pressable>
                 )}
               </View>
@@ -925,7 +928,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
           {ended.map(stream => (
             <View
               key={stream.id}
-              style={[styles.streamCard, { borderColor: palette.border, backgroundColor: palette.bg }]}
+              style={[styles.streamCard, { borderColor: palette.border, backgroundColor: palette.card }]}
             >
               <View style={styles.cardTop}>
                 <View style={{ flex: 1 }}>
@@ -952,6 +955,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         </>
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -991,6 +995,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    minHeight: 44,
     marginTop: 4,
   },
   primaryButtonText: { fontSize: 12, fontWeight: '900' },
@@ -1032,6 +1037,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 7,
+    minHeight: 44,
   },
   actionChipText: { fontSize: 11, fontWeight: '900' },
 
@@ -1051,7 +1057,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  goLiveBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  goLiveBtnText: { fontSize: 13, fontWeight: '900' },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1062,11 +1068,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   liveDot: {
-    width: 8, height: 8, borderRadius: 4, backgroundColor: '#C0262D',
+    width: 8, height: 8, borderRadius: 4,
   },
-  liveIndicatorText: { color: '#C0262D', fontSize: 12, fontWeight: '900' },
+  liveIndicatorText: { fontSize: 12, fontWeight: '900' },
   iconActionBtn: {
-    width: 38, height: 38, borderRadius: 8, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 8, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
   stopBtn: {
@@ -1134,7 +1140,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0, marginTop: 1,
   },
-  stepNum:  { color: '#fff', fontSize: 11, fontWeight: '900' },
+  stepNum:  { fontSize: 11, fontWeight: '900' },
   stepText: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 18 },
 
   guideNote: {

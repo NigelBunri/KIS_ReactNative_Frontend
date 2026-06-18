@@ -1,16 +1,20 @@
 // src/screens/QuickLockScreen.tsx
 // Full-screen PIN entry overlay shown when app resumes after timeout
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validatePIN, clearPIN } from '@/services/QuickLockService';
 import { useAuth } from '../../App';
+import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 async function tryBiometricAuth(): Promise<boolean> {
   try {
@@ -34,6 +38,10 @@ type Props = {
 
 export default function QuickLockScreen({ onDismiss }: Props) {
   const { setAuth } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { palette, tokens } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [pin, setPin] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState('');
@@ -127,9 +135,108 @@ export default function QuickLockScreen({ onDismiss }: Props) {
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => i < pin.length);
 
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: palette.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+    },
+    container: {
+      width: '100%',
+      alignItems: 'center',
+      paddingHorizontal: responsive.pageGutter,
+      gap: tokens.spacing.lg,
+    },
+    title: {
+      fontSize: tokens.typography.h2,
+      fontWeight: tokens.typography.weight.bold,
+      color: palette.text,
+      letterSpacing: 0.3,
+    },
+    subtitle: {
+      fontSize: tokens.typography.body,
+      color: palette.subtext,
+      marginTop: -tokens.spacing.sm,
+    },
+    dotsRow: {
+      flexDirection: 'row',
+      gap: tokens.spacing.md,
+      marginVertical: tokens.spacing.sm,
+    },
+    dot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 2,
+      borderColor: palette.subtext,
+      backgroundColor: 'transparent',
+    },
+    dotFilled: {
+      backgroundColor: palette.text,
+      borderColor: palette.text,
+    },
+    errorText: {
+      color: palette.danger,
+      fontSize: tokens.typography.body,
+      textAlign: 'center',
+      fontWeight: tokens.typography.weight.semibold,
+    },
+    attemptText: {
+      color: palette.subtext,
+      fontSize: tokens.typography.helper,
+      textAlign: 'center',
+    },
+    numPad: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      width: 264,
+      gap: 12,
+      marginTop: tokens.spacing.sm,
+      justifyContent: 'center',
+    },
+    key: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: palette.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keyPressed: {
+      backgroundColor: palette.surfaceElevated,
+    },
+    keyBlank: {
+      width: 80,
+      height: 80,
+    },
+    keyText: {
+      fontSize: 26,
+      fontWeight: tokens.typography.weight.medium,
+      color: palette.text,
+    },
+    keyTextSmall: {
+      fontSize: 22,
+      fontWeight: '400',
+      color: palette.text,
+    },
+    forgotButton: {
+      marginTop: tokens.spacing.md,
+      paddingVertical: tokens.spacing.sm,
+      paddingHorizontal: tokens.spacing.sm,
+    },
+    forgotText: {
+      color: palette.subtext,
+      fontSize: tokens.typography.body,
+      textDecorationLine: 'underline',
+      textAlign: 'center',
+    },
+  }), [palette, tokens, responsive]);
+
   return (
-    <View style={styles.overlay}>
-      <View style={styles.container}>
+    <View style={[styles.overlay, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { maxWidth: responsive.contentMaxWidth }]}>
         <Text style={styles.title}>Enter PIN</Text>
         <Text style={styles.subtitle}>Unlock to continue</Text>
 
@@ -151,7 +258,7 @@ export default function QuickLockScreen({ onDismiss }: Props) {
           </Text>
         ) : null}
 
-        <View style={styles.numPad}>
+        <View style={[styles.numPad, { width: Math.min(windowWidth - 56, 264) }]}>
           {(['1','2','3','4','5','6','7','8','9','','0','del'] as const).map((key, idx) => {
             if (key === '') {
               return <View key={`blank-${idx}`} style={styles.keyBlank} />;
@@ -197,103 +304,3 @@ export default function QuickLockScreen({ onDismiss }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-  },
-  container: {
-    width: '100%',
-    maxWidth: 360,
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#AAAAAA',
-    marginTop: -12,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginVertical: 8,
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#AAAAAA',
-    backgroundColor: 'transparent',
-  },
-  dotFilled: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  errorText: {
-    color: '#FF5252',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  attemptText: {
-    color: '#AAAAAA',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  numPad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 264,
-    gap: 12,
-    marginTop: 8,
-    justifyContent: 'center',
-  },
-  key: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyPressed: {
-    backgroundColor: '#3A3A3C',
-  },
-  keyBlank: {
-    width: 80,
-    height: 80,
-  },
-  keyText: {
-    fontSize: 26,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  keyTextSmall: {
-    fontSize: 22,
-    fontWeight: '400',
-    color: '#FFFFFF',
-  },
-  forgotButton: {
-    marginTop: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  forgotText: {
-    color: '#AAAAAA',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-    textAlign: 'center',
-  },
-});

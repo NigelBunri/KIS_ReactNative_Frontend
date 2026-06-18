@@ -1,5 +1,16 @@
 import { API_BASE_URL, NEST_API_BASE_URL } from '../config';
 
+// NestJS feeds controller lives on the chat/NestJS host at /api/v1/feeds
+const feedsRoutes = {
+  feeds: {
+    list: `${NEST_API_BASE_URL}/api/v1/feeds/`,
+    detail: (id: string) => `${NEST_API_BASE_URL}/api/v1/feeds/${id}/`,
+    react: (id: string) => `${NEST_API_BASE_URL}/api/v1/feeds/${id}/react/`,
+    comment: (id: string) => `${NEST_API_BASE_URL}/api/v1/feeds/${id}/comment/`,
+    broadcastFromChannel: `${NEST_API_BASE_URL}/api/v1/feeds/broadcast-from-channel/`,
+  },
+};
+
 const broadcastRoutes = {
   bible: {
     translations: `${API_BASE_URL}/api/v1/bible/translations/`,
@@ -112,7 +123,7 @@ const broadcastRoutes = {
     enroll: (id: string) =>
       `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
     itemAction: (contentId: string, itemId: string) =>
-      `${API_BASE_URL}/api/v1/bible/courses/${contentId}/lessons/${itemId}/`,
+      `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
     progress: `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
     review: `${API_BASE_URL}/api/v1/bible/peer-reviews/`,
     contentReviews: (id: string) =>
@@ -393,6 +404,7 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/videos/${id}/stream/`,
     lessons: `${API_BASE_URL}/api/v1/broadcasts/lessons/`,
     lessonEnrollments: `${API_BASE_URL}/api/v1/broadcasts/lessons/enrollments/`,
+    creatorStudents: `${API_BASE_URL}/api/v1/broadcasts/creator/students/`,
     lessonEnroll: (lessonId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/lessons/${lessonId}/enroll/`,
     createProfile: `${API_BASE_URL}/api/v1/broadcasts/profiles/create/`,
@@ -593,6 +605,7 @@ const broadcastRoutes = {
     liveStreamQA: (streamId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/qa/`,
     qaSessionQuestions: (sessionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa/${sessionId}/questions/`,
     qaQuestionUpvote: (questionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa-questions/${questionId}/upvote/`,
+    qaQuestionAction: (questionId: string) => `${API_BASE_URL}/api/v1/broadcasts/qa-questions/${questionId}/`,
     watchHistorySettings: `${API_BASE_URL}/api/v1/broadcasts/watch-history/settings/`,
 
     // Trending
@@ -633,6 +646,7 @@ const broadcastRoutes = {
     membershipGift: `${API_BASE_URL}/api/v1/broadcasts/memberships/gift/`,
     membershipGiftRedeem: (token: string) => `${API_BASE_URL}/api/v1/broadcasts/memberships/gift/${token}/redeem/`,
     channelCopyrightClaims: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/copyright-claims/`,
+    channelCopyrightDisputeUrl: (claimId: string) => `${API_BASE_URL}/api/v1/broadcasts/copyright-claims/${claimId}/dispute/`,
     channelDemographics: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/demographics/`,
     channelAdCampaigns: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/ad-campaigns/`,
     contentAdSlots: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/ad-slots/`,
@@ -685,16 +699,16 @@ const broadcastRoutes = {
     // Manual chapters
     contentChapters: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/`,
-    contentChapter: (chapterId: string) =>
-      `${API_BASE_URL}/api/v1/broadcasts/chapters/${chapterId}/`,
+    contentChapter: (contentId: string, chapterId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/${chapterId}/`,
     // End screens
     contentEndScreen: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/end-screen/`,
     // Info cards
     contentCards: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/cards/`,
-    contentCard: (cardId: string) =>
-      `${API_BASE_URL}/api/v1/broadcasts/cards/${cardId}/`,
+    contentCard: (contentId: string, cardId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/cards/${cardId}/`,
     // Membership tier detail (for perks editor)
     membershipTier: (tierId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/membership-tiers/${tierId}/`,
@@ -749,6 +763,7 @@ const broadcastRoutes = {
     productCategoryDetail: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/product-categories/${id}/`,
     productRatings: `${API_BASE_URL}/api/v1/commerce/product-ratings/`,
+    shopLiveDrops: (shopId: string) => `${API_BASE_URL}/api/v1/commerce/shops/${shopId}/live-drops/`,
     serviceBookings: `${API_BASE_URL}/api/v1/commerce/service-bookings/`,
     serviceBookingComplaints: `${API_BASE_URL}/api/v1/commerce/service-booking-complaints/`,
     serviceBookingComplaint: (id: string) =>
@@ -779,12 +794,6 @@ const broadcastRoutes = {
     marketplaceComplaints: `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/`,
     marketplaceComplaint: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/`,
   },
-  feeds: {
-    create: `${NEST_API_BASE_URL}/api/v1/feeds`,
-    broadcast: (id: string) =>
-      `${NEST_API_BASE_URL}/api/v1/feeds/${id}/broadcast`,
-    broadcastFromChannel: `${NEST_API_BASE_URL}/api/v1/feeds/broadcast-from-channel`,
-  },
 };
 
-export default broadcastRoutes;
+export default { ...broadcastRoutes, ...feedsRoutes };

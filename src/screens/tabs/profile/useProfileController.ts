@@ -1,6 +1,6 @@
 // src/screens/tabs/profile/useProfileController.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Linking } from 'react-native';
+import { Alert, Animated, DeviceEventEmitter, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Asset, launchImageLibrary } from 'react-native-image-picker';
@@ -1295,6 +1295,10 @@ export const useProfileController = (opts: {
         return;
       }
 
+      DeviceEventEmitter.emit('profile.updated', {
+        displayName: draftProfile.display_name,
+        avatarUrl: draftProfile.avatar_preview,
+      });
       Alert.alert('Profile', 'Your profile changes were saved.');
     } catch (error: any) {
       Alert.alert(

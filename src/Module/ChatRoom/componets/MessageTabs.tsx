@@ -5,12 +5,15 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Image,
   Animated,
   StyleSheet,
+  DeviceEventEmitter,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -64,6 +67,8 @@ type ChatsTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onEndReached?: () => void;
   onOpenChat?: (chat: Chat) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 
   selectedChat?: Chat[];
   setSelectedChat?: (chats: Chat[]) => void;
@@ -82,10 +87,10 @@ function Badge({ count, palette }: { count: number; palette: any }) {
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#25D366',
+        backgroundColor: palette.success,
       }}
     >
-      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+      <Text style={{ color: palette.ivory, fontSize: 11, fontWeight: '700' }}>
         {count > 99 ? '99+' : count}
       </Text>
     </View>
@@ -111,6 +116,8 @@ export function ChatsTab({
   onScroll,
   onEndReached,
   onOpenChat,
+  onRefresh,
+  refreshing = false,
   selectedChat = [],
   setSelectedChat,
   loading = false,
@@ -126,6 +133,34 @@ export function ChatsTab({
     if (status === 'failed') return '!';
     return '';
   };
+
+  /* ------------------------------------------------------------
+   * BLOCKED CONTACTS — load blocked user IDs from AsyncStorage so
+   * direct chats with blocked users are hidden from the chat list.
+   * The same key ('KIS_BLOCKED_CONTACTS') is used by BlockedContactsScreen.
+   * ------------------------------------------------------------ */
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadBlocked = async () => {
+      try {
+        const raw = await AsyncStorage.getItem('KIS_BLOCKED_CONTACTS');
+        if (raw) {
+          const list: Array<{ userId: string }> = JSON.parse(raw);
+          setBlockedUserIds(new Set(list.map((c) => c.userId)));
+        } else {
+          setBlockedUserIds(new Set());
+        }
+      } catch {
+        // keep previous state on error
+      }
+    };
+    void loadBlocked();
+    const sub = DeviceEventEmitter.addListener('blocked.contacts.refresh', () => {
+      void loadBlocked();
+    });
+    return () => sub.remove();
+  }, []);
 
   /* ------------------------------------------------------------
    * NORMALIZE RAW BACKEND CONVERSATIONS → SAFE Chat objects
@@ -181,6 +216,12 @@ export function ChatsTab({
       const convId = String((c as any).conversationId ?? c.id);
       if (c.isGroup && c.communityId) return false;
       if (communityGroupConversationIds?.has(convId)) return false;
+      // Hide direct chats with blocked users
+      if (!c.isGroup && !c.isGroupChat && blockedUserIds.size > 0) {
+        const ids = participantsToIds(c.participants ?? []);
+        const otherIds = currentUserId ? ids.filter((id) => id !== currentUserId) : ids;
+        if (otherIds.some((id) => blockedUserIds.has(id))) return false;
+      }
       const isCommunityConv =
         c.isCommunityChat ||
         c.kind === 'community' ||
@@ -228,6 +269,8 @@ export function ChatsTab({
     conversationMeta,
     communityByConversationId,
     communityGroupConversationIds,
+    blockedUserIds,
+    currentUserId,
   ]);
 
   /* ------------------------------------------------------------
@@ -444,7 +487,7 @@ export function ChatsTab({
                   width: 12,
                   height: 12,
                   borderRadius: 6,
-                  backgroundColor: '#34C759',
+                  backgroundColor: palette.success,
                   borderWidth: 2,
                   borderColor: palette.card,
                 }}
@@ -498,10 +541,10 @@ export function ChatsTab({
                   paddingHorizontal: 6,
                   paddingVertical: 2,
                   borderRadius: 6,
-                  backgroundColor: palette.error ?? palette.primary,
+                  backgroundColor: palette.danger,
                 }}
               >
-                <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 10 }}>
+                <Text style={{ color: palette.onPrimary, fontSize: 10 }}>
                   Blocked
                 </Text>
               </View>
@@ -678,6 +721,7 @@ export function ChatsTab({
       scrollEventThrottle={16}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} /> : undefined}
       ListHeaderComponent={archivedBanner}
       ListEmptyComponent={
         <View style={[styles.center, { paddingVertical: 60 }]}>
@@ -695,7 +739,7 @@ const SKELETON_COUNT = 8;
 
 function SkeletonRow({ shimmer, palette }: { shimmer: Animated.Value; palette: any }) {
   const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
-  const bg = palette.inputBorder ?? '#e0e0e0';
+  const bg = palette.inputBorder;
   return (
     <Animated.View style={[skeletonStyles.row, { opacity, backgroundColor: palette.card }]}>
       <View style={[skeletonStyles.avatar, { backgroundColor: bg }]} />

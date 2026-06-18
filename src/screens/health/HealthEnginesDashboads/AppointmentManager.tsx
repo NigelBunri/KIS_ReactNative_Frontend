@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -22,6 +24,7 @@ import {
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
 import { getHealthThemeColors } from '@/theme/health/colors';
+import { useKISTheme } from '@/theme/useTheme';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
 
@@ -55,6 +58,7 @@ const toUsdLabel = (value: number) => Number(value || 0).toFixed(3).replace(/\.?
 export default function AppointmentManager({ institutionId, engineKey }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
@@ -241,6 +245,8 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
   }, [slots, types]);
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>
@@ -256,6 +262,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         />
         <TextInput
           placeholder="Duration (minutes)"
+          placeholderTextColor={palette.subtext}
           keyboardType="numeric"
           value={duration}
           onChangeText={setDuration}
@@ -263,6 +270,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         />
         <TextInput
           placeholder="Price (USD)"
+          placeholderTextColor={palette.subtext}
           keyboardType="numeric"
           value={price}
           onChangeText={setPrice}
@@ -270,6 +278,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         />
         <TextInput
           placeholder="Buffer Between Sessions (minutes)"
+          placeholderTextColor={palette.subtext}
           keyboardType="numeric"
           value={buffer}
           onChangeText={setBuffer}
@@ -328,15 +337,21 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
 
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Doctor Schedule</Text>
+        <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: spacing.xs }}>
+          Slots are previewed locally. Publishing slots to the booking engine is coming soon.
+        </Text>
 
-        <TextInput placeholder="Start Hour (24h format)" value={startHour} onChangeText={setStartHour} style={input(palette, spacing)} />
-        <TextInput placeholder="End Hour (24h format)" value={endHour} onChangeText={setEndHour} style={input(palette, spacing)} />
+        <TextInput placeholder="Start Hour (24h format)" placeholderTextColor={palette.subtext} value={startHour} onChangeText={setStartHour} style={input(palette, spacing)} />
+        <TextInput placeholder="End Hour (24h format)" placeholderTextColor={palette.subtext} value={endHour} onChangeText={setEndHour} style={input(palette, spacing)} />
 
-        <KISButton title="Generate Slots" onPress={generateSlots} />
+        <KISButton title="Generate Slots (Preview)" onPress={generateSlots} />
       </View>
 
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Time Slots</Text>
+        {slots.length === 0 ? (
+          <Text style={{ color: palette.subtext }}>No slots generated yet.</Text>
+        ) : null}
         {slots.map((slot) => (
           <TouchableOpacity
             key={slot.id}
@@ -345,7 +360,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
               padding: spacing.sm,
               borderRadius: 10,
               marginVertical: spacing.xs,
-              backgroundColor: slot.available ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)',
+              backgroundColor: slot.available ? kisPalette.successSoft : kisPalette.dangerSoft,
             }}
           >
             <Text style={{ color: palette.text }}>
@@ -361,6 +376,8 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         <Text style={{ color: palette.text }}>Potential Revenue: {toUsdLabel(totalPotentialRevenue)} USD</Text>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

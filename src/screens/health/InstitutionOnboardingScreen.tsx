@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DocumentPicker from 'react-native-document-picker';
 import KISButton from '@/constants/KISButton';
 import { styles as profileStyles } from '@/screens/tabs/profile/profile.styles';
 import { KISIcon } from '@/constants/kisIcons';
@@ -7,6 +9,8 @@ import { institutionSchemaMap, allInstitutionTypes, InstitutionSchema, FieldDefi
 import KISTextInput from '@/constants/KISTextInput';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 const STEP_ORDER = ['identity', 'location', 'contact', 'media', 'compliance'];
 
@@ -15,6 +19,8 @@ const renderField = (
   value: any,
   onChange: (key: string, val: any) => void,
   disabled?: boolean,
+  styles?: any,
+  palette?: any,
 ) => {
   switch (field.type) {
     case 'textarea':
@@ -69,26 +75,48 @@ const renderField = (
           </View>
         </View>
       );
-    case 'file':
+    case 'file': {
+      const fileCount = Array.isArray(value) ? value.length : 0;
       return (
         <TouchableOpacity
           key={field.key}
           style={styles.fileUpload}
-          onPress={() => onChange(field.key, value ? [...value] : [])}
+          onPress={async () => {
+            if (disabled) return;
+            try {
+              const results = await DocumentPicker.pick({
+                type: [DocumentPicker.types.allFiles],
+                allowMultiSelection: !!field.multiple,
+              });
+              onChange(field.key, results);
+            } catch (error: any) {
+              if (DocumentPicker.isCancel?.(error)) return;
+              Alert.alert('Upload failed', error?.message ?? 'Could not select file.');
+            }
+          }}
           disabled={disabled}
         >
-          <KISIcon name="cloud" size={18} color="#fff" />
-          <Text style={styles.fileLabel}>{field.label}</Text>
+          <KISIcon name="cloud" size={18} color={palette.ivory} />
+          <Text style={styles.fileLabel}>
+            {fileCount > 0 ? `${fileCount} file${fileCount > 1 ? 's' : ''} selected` : field.label}
+          </Text>
           <Text style={styles.helperText}>{field.required ? 'Required' : 'Optional'}</Text>
         </TouchableOpacity>
       );
+    }
     case 'map':
       return (
         <View key={field.key} style={styles.mapPreview}>
           <Text style={styles.fieldLabel}>{field.label}</Text>
-          <View style={styles.mapBox}>
+          <TouchableOpacity
+            style={styles.mapBox}
+            disabled={disabled}
+            onPress={() =>
+              Alert.alert('Coming soon', 'Map-based location picking is not available yet. Enter an address instead.')
+            }
+          >
             <Text style={styles.mapText}>{value ? `${value.lat}, ${value.lng}` : 'Tap to pick location'}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       );
     default:
@@ -97,11 +125,20 @@ const renderField = (
 };
 
 export default function InstitutionOnboardingScreen() {
-  const [selectedType, _setSelectedType] = useState(allInstitutionTypes[0]);
+  const insets = useSafeAreaInsets();
+  const { palette } = useKISTheme();
+  const { bodyFontSize, labelFontSize, headerTitleSize, minTouchTarget, pageGutter, cardGap } = useResponsiveLayout();
+  const [selectedType, setSelectedType] = useState(allInstitutionTypes[0]);
   const [currentStep, setCurrentStep] = useState(0);
   const schema = useMemo<InstitutionSchema>(() => institutionSchemaMap[selectedType], [selectedType]);
   const [formState, setFormState] = useState<Record<string, any>>({ type: selectedType });
   const [submitting, setSubmitting] = useState(false);
+
+  const handleSelectType = (type: string) => {
+    setSelectedType(type);
+    setCurrentStep(0);
+    setFormState({ type });
+  };
 
   const sections = schema.sections;
   const activeSection = sections[currentStep];
@@ -124,8 +161,24 @@ export default function InstitutionOnboardingScreen() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await postRequest(ROUTES.healthOps.institutions, formState);
-      Alert.alert('Submitted', 'Institution onboarding submitted successfully.');
+      const res = await postRequest(ROUTES.healthOps.institutions, formState);
+      if (res?.success === false) {
+        throw new Error(res?.message || 'Could not submit onboarding. Please try again.');
+      }
+      Alert.alert(
+        'Submitted',
+        'Institution onboarding submitted successfully. You can now add another institution or close this screen.',
+        [
+          {
+            text: 'Add Another',
+            onPress: () => {
+              setCurrentStep(0);
+              setFormState({ type: selectedType });
+            },
+          },
+          { text: 'Done', style: 'default' },
+        ],
+      );
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not submit onboarding. Please try again.');
     } finally {
@@ -133,9 +186,233 @@ export default function InstitutionOnboardingScreen() {
     }
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.royalInk,
+      padding: pageGutter,
+    },
+    typeSelectorRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: cardGap,
+      gap: 8,
+    },
+    typeChip: {
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      minHeight: minTouchTarget,
+      justifyContent: 'center',
+      backgroundColor: palette.surface,
+    },
+    typeChipActive: {
+      borderColor: palette.gold,
+      backgroundColor: palette.surfaceElevated,
+    },
+    typeChipLabel: {
+      color: palette.text,
+      fontSize: labelFontSize,
+      fontWeight: '600',
+      textTransform: 'capitalize',
+    },
+    banner: {
+      padding: pageGutter,
+      borderRadius: pageGutter,
+      marginBottom: cardGap,
+      backgroundColor: palette.surface,
+    },
+    bannerTitle: {
+      fontSize: headerTitleSize * 0.7,
+      fontWeight: '700',
+      color: palette.ivory,
+    },
+    bannerText: {
+      color: palette.subtext,
+      fontSize: bodyFontSize,
+      marginTop: 4,
+    },
+    bannerRow: {
+      marginTop: 8,
+    },
+    bannerLabel: {
+      color: palette.primary,
+      fontSize: labelFontSize,
+      fontWeight: '600',
+    },
+    bannerDetail: {
+      color: palette.text,
+      fontSize: bodyFontSize,
+    },
+    stepper: {
+      flex: 1,
+      marginBottom: pageGutter,
+    },
+    stepperContent: {
+      paddingBottom: minTouchTarget * 2,
+    },
+    stepperHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: cardGap,
+    },
+    stepperItem: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    stepLabel: {
+      color: palette.subtext,
+      fontSize: labelFontSize,
+      textAlign: 'center',
+    },
+    stepDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: palette.surface,
+      marginTop: 6,
+    },
+    stepDotActive: {
+      backgroundColor: palette.gold,
+    },
+    progressBarContainer: {
+      height: 4,
+      backgroundColor: palette.surface,
+      borderRadius: 2,
+      overflow: 'hidden',
+      marginBottom: cardGap,
+    },
+    progressBar: {
+      height: '100%',
+      backgroundColor: palette.gold,
+    },
+    sectionCard: {
+      backgroundColor: palette.surfaceElevated,
+      borderRadius: 18,
+      padding: pageGutter,
+      marginBottom: cardGap,
+    },
+    sectionTitle: {
+      color: palette.ivory,
+      fontSize: headerTitleSize * 0.65,
+      fontWeight: '700',
+    },
+    sectionHelper: {
+      color: palette.subtext,
+      fontSize: bodyFontSize,
+      marginBottom: cardGap,
+    },
+    fieldLabel: {
+      color: palette.subtext,
+      fontSize: labelFontSize,
+      marginBottom: 6,
+    },
+    selectWrapper: {
+      marginBottom: pageGutter,
+    },
+    selectOption: {
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 12,
+      padding: cardGap,
+      minHeight: minTouchTarget,
+      justifyContent: 'center',
+      marginVertical: 4,
+    },
+    selectOptionActive: {
+      borderColor: palette.gold,
+    },
+    selectLabel: {
+      color: palette.text,
+      fontSize: bodyFontSize,
+    },
+    radioRow: {
+      marginBottom: pageGutter,
+    },
+    radioChoices: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    radioOption: {
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      minHeight: minTouchTarget,
+      justifyContent: 'center',
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    radioOptionActive: {
+      borderColor: palette.gold,
+    },
+    radioLabel: {
+      color: palette.text,
+      fontSize: bodyFontSize,
+    },
+    fileUpload: {
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 12,
+      padding: cardGap,
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: cardGap,
+      backgroundColor: palette.surface,
+    },
+    fileLabel: {
+      color: palette.ivory,
+      fontSize: bodyFontSize,
+      fontWeight: '600',
+    },
+    helperText: {
+      color: palette.subtext,
+      fontSize: labelFontSize,
+    },
+    mapPreview: {
+      marginBottom: pageGutter,
+    },
+    mapBox: {
+      height: 120,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: palette.bg,
+    },
+    mapText: {
+      color: palette.text,
+      fontSize: bodyFontSize,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+  }), [palette, pageGutter, cardGap, minTouchTarget, headerTitleSize, bodyFontSize, labelFontSize]);
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.banner, profileStyles.card]}> 
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+        <View style={styles.typeSelectorRow}>
+          {allInstitutionTypes.map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[styles.typeChip, selectedType === type && styles.typeChipActive]}
+              onPress={() => handleSelectType(type)}
+              accessibilityRole="button"
+              accessibilityLabel={`Select institution type ${type}`}
+            >
+              <Text style={styles.typeChipLabel}>{type.replace(/_/g, ' ')}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      <View style={[styles.banner, profileStyles.card]}>
         <Text style={styles.bannerTitle}>{schema.banner.title}</Text>
         <Text style={styles.bannerText}>{schema.banner.description}</Text>
         <View style={styles.bannerRow}>
@@ -164,7 +441,7 @@ export default function InstitutionOnboardingScreen() {
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>{activeSection.title}</Text>
           {activeSection.description ? <Text style={styles.sectionHelper}>{activeSection.description}</Text> : null}
-          {activeSection.fields.map((field) => renderField(field, formState[field.key], handleFieldChange))}
+          {activeSection.fields.map((field) => renderField(field, formState[field.key], handleFieldChange, false, styles, palette))}
         </View>
       </ScrollView>
 
@@ -179,172 +456,3 @@ export default function InstitutionOnboardingScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0e0f22',
-    padding: 16,
-  },
-  banner: {
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    backgroundColor: '#1c1d33',
-  },
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  bannerText: {
-    color: '#aeb0ce',
-    marginTop: 4,
-  },
-  bannerRow: {
-    marginTop: 8,
-  },
-  bannerLabel: {
-    color: '#6fb5ff',
-    fontWeight: '600',
-  },
-  bannerDetail: {
-    color: '#d3d5ec',
-  },
-  stepper: {
-    flex: 1,
-    marginBottom: 16,
-  },
-  stepperContent: {
-    paddingBottom: 80,
-  },
-  stepperHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  stepperItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepLabel: {
-    color: '#98a0c5',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  stepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#2c2f4a',
-    marginTop: 6,
-  },
-  stepDotActive: {
-    backgroundColor: '#f59f3f',
-  },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: '#1c1f35',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#f59f3f',
-  },
-  sectionCard: {
-    backgroundColor: '#161837',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  sectionHelper: {
-    color: '#9da4c7',
-    marginBottom: 10,
-  },
-  fieldLabel: {
-    color: '#9da4c7',
-    marginBottom: 6,
-  },
-  selectWrapper: {
-    marginBottom: 16,
-  },
-  selectOption: {
-    borderWidth: 1,
-    borderColor: '#2b2e4a',
-    borderRadius: 12,
-    padding: 10,
-    marginVertical: 4,
-  },
-  selectOptionActive: {
-    borderColor: '#f59f3f',
-  },
-  selectLabel: {
-    color: '#fff',
-  },
-  radioRow: {
-    marginBottom: 16,
-  },
-  radioChoices: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  radioOption: {
-    borderWidth: 1,
-    borderColor: '#2b2e4a',
-    borderRadius: 999,
-    padding: 8,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  radioOptionActive: {
-    borderColor: '#f59f3f',
-  },
-  radioLabel: {
-    color: '#fff',
-  },
-  fileUpload: {
-    borderWidth: 1,
-    borderColor: '#2b2e4a',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    backgroundColor: '#1c1f35',
-  },
-  fileLabel: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  helperText: {
-    color: '#9da4c7',
-    fontSize: 10,
-  },
-  mapPreview: {
-    marginBottom: 16,
-  },
-  mapBox: {
-    height: 120,
-    borderWidth: 1,
-    borderColor: '#2b2e4a',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f1325',
-  },
-  mapText: {
-    color: '#fff',
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-});

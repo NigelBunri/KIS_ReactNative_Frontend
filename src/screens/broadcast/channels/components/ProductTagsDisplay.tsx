@@ -21,7 +21,7 @@ import { getRequest } from '@/network/get';
 type ProductTag = {
   id: string;
   timestamp_seconds: number;
-  title: string;
+  product_title: string;
   product_url: string;
   thumbnail_url?: string;
   price_display?: string;
@@ -104,7 +104,7 @@ export default function ProductTagsDisplay({
         onPress={() => onPressProduct(activeTag.product_url)}
         style={[
           styles.card,
-          { backgroundColor: palette.card, borderColor: palette.border },
+          { backgroundColor: palette.card, borderColor: palette.border, shadowColor: palette.shadow ?? palette.royalInk },
         ]}
       >
         {activeTag.thumbnail_url ? (
@@ -114,7 +114,7 @@ export default function ProductTagsDisplay({
         )}
         <View style={styles.info}>
           <Text numberOfLines={2} style={[styles.title, { color: palette.text }]}>
-            {activeTag.title}
+            {activeTag.product_title}
           </Text>
           {activeTag.price_display ? (
             <Text style={[styles.price, { color: palette.primaryStrong }]}>
@@ -145,7 +145,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     maxWidth: 260,
-    shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },

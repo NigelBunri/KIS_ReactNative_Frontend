@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useKISTheme } from '@/theme/useTheme';
 
 export type DocumentScannerSheetProps = {
   visible: boolean;
@@ -29,6 +30,8 @@ export default function DocumentScannerSheet({
   onClose,
   onSend,
 }: DocumentScannerSheetProps) {
+  const { palette } = useKISTheme();
+  const styles = makeStyles(palette);
   const [scannedUri, setScannedUri] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
@@ -201,14 +204,14 @@ export default function DocumentScannerSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (palette: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.38)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: palette.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 20,
@@ -220,18 +223,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 4,
-    backgroundColor: '#d0d0d0',
+    backgroundColor: palette.divider,
     marginBottom: 14,
   },
   title: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111',
+    color: palette.text,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 13,
-    color: '#666',
+    color: palette.subtext,
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 18,
@@ -241,18 +244,18 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: palette.surfaceSoft ?? palette.surface,
   },
   primaryBtn: {
     width: '100%',
-    backgroundColor: '#C9A227',
+    backgroundColor: palette.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 12,
   },
   primaryBtnTxt: {
-    color: '#fff',
+    color: palette.onPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnTxt: {
-    color: '#888',
+    color: palette.subtext,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -274,16 +277,16 @@ const styles = StyleSheet.create({
   },
   halfBtn: {
     flex: 1,
-    backgroundColor: '#C9A227',
+    backgroundColor: palette.primary,
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
   },
   halfBtnAlt: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: palette.primaryStrong,
   },
   halfBtnTxt: {
-    color: '#fff',
+    color: palette.onPrimary,
     fontSize: 14,
     fontWeight: '700',
   },

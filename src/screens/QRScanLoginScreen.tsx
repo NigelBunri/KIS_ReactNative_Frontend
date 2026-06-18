@@ -15,6 +15,7 @@ import { CommonActions, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera } from 'react-native-image-picker';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -40,6 +41,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function QRScanLoginScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<Nav>();
   const { setAuth, setUser } = useAuth();
 
@@ -175,7 +177,7 @@ export default function QRScanLoginScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.body}>
+      <View style={[styles.body, { padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center' }]}>
         {/* Lock icon */}
         <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
           <KISIcon name="lock" size={40} color={palette.primary} />
@@ -196,9 +198,9 @@ export default function QRScanLoginScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={palette.onPrimary} />
               ) : (
-                <Text style={styles.scanBtnText}>Open Camera to Scan QR</Text>
+                <Text style={[styles.scanBtnText, { color: palette.onPrimary }]}>Open Camera to Scan QR</Text>
               )}
             </Pressable>
 
@@ -229,9 +231,9 @@ export default function QRScanLoginScreen() {
               disabled={loading || !token.trim()}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={palette.onPrimary} />
               ) : (
-                <Text style={styles.scanBtnText}>Link this Device</Text>
+                <Text style={[styles.scanBtnText, { color: palette.onPrimary }]}>Link this Device</Text>
               )}
             </Pressable>
 
@@ -265,7 +267,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
-  body: { flex: 1, padding: 24, alignItems: 'center', gap: 16 },
+  body: { flex: 1, alignItems: 'center', gap: 16 },
   iconWrap: {
     width: 90,
     height: 90,
@@ -278,18 +280,16 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 22, maxWidth: 320 },
   scanBtn: {
     width: '100%',
-    maxWidth: 360,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  scanBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  scanBtnText: { fontSize: 16, fontWeight: '800' },
   manualLink: { paddingVertical: 8 },
   manualLinkText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   label: { alignSelf: 'flex-start', fontSize: 13, fontWeight: '600' },
   tokenInput: {
     width: '100%',
-    maxWidth: 360,
     borderRadius: 12,
     borderWidth: 1.5,
     padding: 14,
@@ -304,7 +304,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     padding: 14,
-    maxWidth: 360,
     marginTop: 8,
   },
   securityNoteText: { flex: 1, fontSize: 12, fontWeight: '500', lineHeight: 18 },

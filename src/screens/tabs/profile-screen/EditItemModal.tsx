@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import type { KISPalette } from '@/theme/constants';
@@ -21,6 +21,7 @@ export function EditItemModal(props: EditItemModalProps) {
   const isPortfolioGalleryType = itemType === 'portfolio' || itemType === 'intro_video';
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={{ gap: 12 }}>
       {!isPortfolioGalleryType ? (
         <KISTextInput
@@ -93,5 +94,6 @@ export function EditItemModal(props: EditItemModalProps) {
 
       <KISButton title={saving ? 'Saving...' : 'Save'} onPress={saveItem} disabled={saving} />
     </View>
+    </KeyboardAvoidingView>
   );
 }

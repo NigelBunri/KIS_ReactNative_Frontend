@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import KISButton from '@/constants/KISButton';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { KISPalette } from '@/theme/constants';
 import { marketStyles } from '@/screens/market/market.styles';
@@ -48,6 +49,7 @@ const countItems = (...values: any[]) => {
 };
 
 export function MarketManagementModal(props: MarketManagementModalProps) {
+  const responsive = useResponsiveLayout();
   const {
     palette,
     subtitle,
@@ -151,7 +153,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 20, gap: 16 }}
+      contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -278,7 +280,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                 style={[
                   marketStyles.shopCard,
                   {
-                    backgroundColor: palette.background,
+                    backgroundColor: palette.bg,
                     borderColor: `${palette.primaryStrong}40`,
                     borderWidth: 1.5,
                     width: '100%',
@@ -311,7 +313,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                     >
                       {shop.name}
                     </Text>
-                    <Text style={{ color: 'white', fontSize: 12 }}>
+                    <Text style={{ color: palette.ivory, fontSize: 12 }}>
                       {category}
                     </Text>
                   </View>

@@ -93,10 +93,10 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
             style={StyleSheet.absoluteFillObject}
           />
           <View pointerEvents="none" style={localStyles.goldSheen} />
-          <Text style={{ color: palette.ivory ?? '#fff', fontSize: 12, fontWeight: '800' }}>
+          <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '800' }}>
             Settings
           </Text>
-          <KISIcon name="settings" size={14} color={palette.ivory ?? '#fff'} />
+          <KISIcon name="settings" size={14} color={palette.ivory} />
         </Pressable>
       </View>
 

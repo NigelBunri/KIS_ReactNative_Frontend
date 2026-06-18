@@ -1,8 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -13,7 +15,9 @@ const CANCELLED_BOOKING_STATUSES = new Set(['cancelled', 'canceled', 'rejected',
 
 export default function ProfileRecentActivityScreen() {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const responsive = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -75,16 +79,26 @@ export default function ProfileRecentActivityScreen() {
   );
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ padding: 20, gap: 14 }}>
+    <ScrollView style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View style={{ gap: 6 }}>
-        <Text style={{ color: palette.text, fontSize: 28, fontWeight: '800' }}>Recent activity</Text>
+        <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Recent activity</Text>
         <Text style={{ color: palette.subtext }}>
           Recent profile activity and booking-related actions, using backend profile data where available.
         </Text>
       </View>
 
       {loading ? <ActivityIndicator color={palette.primaryStrong} /> : null}
-      {error ? <Text style={{ color: palette.error || '#E53935' }}>{error}</Text> : null}
+      {error ? (
+        <>
+          <Text style={{ color: palette.danger }}>{error}</Text>
+          <Pressable
+            onPress={() => void loadData()}
+            style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: palette.primary, borderRadius: 8, alignSelf: 'center' }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </>
+      ) : null}
 
       {!loading && !activities.length ? (
         <View style={{ padding: 18, borderWidth: 1, borderColor: palette.divider, borderRadius: 18, backgroundColor: palette.surface }}>

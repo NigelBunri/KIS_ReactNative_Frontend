@@ -137,8 +137,8 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
         if (res?.data?.message === 'too many attempts') {
           Alert.alert('Too many attempts', 'This code is locked. Please request a new one.');
           setCode('');
-        } else if (res?.data?.debug) {
-          // Temporary diagnostic — remove after fixing
+        } else if (__DEV__ && res?.data?.debug) {
+          // Developer diagnostic only — never shown in production builds
           const d = res.data.debug;
           Alert.alert(
             'Debug: user not found',
@@ -171,12 +171,13 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
     }
   }, [phone, purpose, code, getDeviceId, getCountry, setAuth, setUser, setLoad]);
 
-  // Auto-submit when exactly 6 digits are entered
+  // Auto-submit when exactly 6 digits are entered.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (code.length === 6 && !loadingVerify) {
       onVerify();
     }
-  }, [code]); // intentionally omit onVerify to avoid re-triggering on its identity change
+  }, [code]); // onVerify is intentionally omitted: including it would re-trigger on every keystroke due to its identity changing with `code`. The 6-digit gate prevents double-submission.
 
   const onResend = async () => {
     try {

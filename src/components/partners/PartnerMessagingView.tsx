@@ -136,7 +136,7 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
     <View style={[styles.root, { backgroundColor: palette.surface }]}>
       {loadError ? (
         <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: palette.danger ?? '#dc2626', textAlign: 'center' }}>{loadError}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{loadError}</Text>
         </View>
       ) : null}
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>

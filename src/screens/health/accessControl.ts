@@ -32,12 +32,21 @@ const normalizeEmail = (value: unknown): string => String(value || '').trim().to
 
 export const resolveHealthAccessUser = (payload: any): HealthAccessUser => {
   const data = payload?.data ?? payload ?? {};
+  // /users/me/ returns the user object at root level with a nested `profile`.
+  // profile.user is a PrimaryKeyRelatedField → a UUID string, not an object.
+  // Guard: only follow profile.user if it is an object, not a primitive.
+  const profileUser = data?.profile?.user;
   const user =
     data?.user ||
     data?.account ||
-    data?.profile?.user ||
+    (profileUser != null && typeof profileUser === 'object' ? profileUser : null) ||
+    // If root data has an id field, it IS the user (e.g. /users/me/ response).
+    (data?.id != null ? data : null) ||
     data?.profile ||
     data;
+  // profile.user may be the user UUID as a string (PK); capture it as fallback id.
+  const profileUserId =
+    profileUser != null && typeof profileUser !== 'object' ? String(profileUser) : undefined;
   return {
     id:
       user?.id != null
@@ -46,7 +55,7 @@ export const resolveHealthAccessUser = (payload: any): HealthAccessUser => {
         ? String(user.user_id)
         : user?.userId != null
         ? String(user.userId)
-        : undefined,
+        : profileUserId ?? undefined,
     phone:
       String(user?.phone || user?.phone_number || user?.phoneNumber || data?.phone || '')
         .trim() || undefined,
@@ -57,7 +66,10 @@ export const resolveHealthAccessUser = (payload: any): HealthAccessUser => {
 };
 
 const doesMemberMatchUser = (member: any, user: HealthAccessUser): boolean => {
-  const memberUserId = String(member?.userId || member?.user_id || '').trim();
+  const rawMemberUserId = String(member?.userId || member?.user_id || member?.id || '').trim();
+  const memberUserId = rawMemberUserId.toLowerCase().startsWith('user-')
+    ? rawMemberUserId.slice(5)
+    : rawMemberUserId;
   const userId = String(user?.id || '').trim();
   if (memberUserId && userId && memberUserId === userId) return true;
 
@@ -92,6 +104,18 @@ export const getInstitutionRoleForUser = (
   const relationship = String(institution?.relationship || institution?.viewer?.relationship || '').trim().toLowerCase();
   if (relationship === 'owner') return 'owner';
 
+  // Backend explicitly tells us the viewer's role — trust it before doing manual matching.
+  const backendViewerRole = normalizeInstitutionRole(
+    institution?.viewer?.role ||
+      institution?.current_membership?.role ||
+      institution?.currentMembership?.role,
+  );
+  if (backendViewerRole !== 'unassigned') return backendViewerRole;
+
+  // Backend can_manage flag: owner-level access granted by server.
+  if (institution?.viewer?.can_manage === true || institution?.viewer?.canManage === true) return 'owner';
+  if (institution?.can_manage === true || institution?.canManage === true) return 'owner';
+
   const ownerContact = institution?.owner_contact || institution?.ownerContact || {};
   const ownerUserId = String(ownerContact?.userId || ownerContact?.user_id || '').trim();
   if (ownerUserId && userId && ownerUserId === userId) return 'owner';
@@ -104,16 +128,14 @@ export const getInstitutionRoleForUser = (
   const userEmail = normalizeEmail(user.email);
   if (ownerEmail && userEmail && ownerEmail === userEmail) return 'owner';
 
-  const viewerRole = normalizeInstitutionRole(
-    institution?.viewer?.role ||
-      institution?.current_membership?.role ||
-      institution?.currentMembership?.role ||
-      institution?.access?.role ||
+  // Check additional role sources not covered by the early backend check above.
+  const extendedViewerRole = normalizeInstitutionRole(
+    institution?.access?.role ||
       institution?.permissions?.role ||
       institution?.current_user_role ||
       institution?.currentUserRole,
   );
-  if (viewerRole !== 'unassigned') return viewerRole;
+  if (extendedViewerRole !== 'unassigned') return extendedViewerRole;
 
   const members = [
     ...(Array.isArray(institution?.members) ? institution.members : []),

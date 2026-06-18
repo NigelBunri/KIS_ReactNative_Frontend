@@ -10,8 +10,11 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+
+const KIS_EVENT_REMINDERS_KEY = 'KIS_EVENT_REMINDERS';
 
 export type EventDraft = {
   title: string;
@@ -108,6 +111,30 @@ export const EventModal: React.FC<EventModalProps> = ({
       onCreateEvent(event);
     }
 
+    // Schedule local reminder if requested
+    if (reminderMinutes > 0 && startIso) {
+      const reminderAt = new Date(startIso).getTime() - reminderMinutes * 60000;
+      const reminder = { title: title.trim(), startsAt: startIso, reminderAt };
+      AsyncStorage.getItem(KIS_EVENT_REMINDERS_KEY)
+        .then(raw => {
+          const queue: typeof reminder[] = raw ? JSON.parse(raw) : [];
+          queue.push(reminder);
+          return AsyncStorage.setItem(KIS_EVENT_REMINDERS_KEY, JSON.stringify(queue));
+        })
+        .catch(() => {});
+      const delay = reminderAt - Date.now();
+      if (delay > 0) {
+        setTimeout(() => {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              '📅 Event reminder',
+              `"${title.trim()}" starts in ${reminderMinutes < 60 ? `${reminderMinutes} min` : `${reminderMinutes / 60} hr`}.`,
+            );
+          });
+        }, delay);
+      }
+    }
+
     onClose();
 
     setTitle('');
@@ -199,7 +226,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !isValidDate(startDate) && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Enter a valid start date (YYYY-MM-DD).
               </Text>
@@ -216,7 +243,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !isValidTime(startTime) && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Enter a valid start time (HH:MM).
               </Text>
@@ -233,7 +260,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !isValidDate(endDate) && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Enter a valid end date (YYYY-MM-DD).
               </Text>
@@ -250,7 +277,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !isValidTime(endTime) && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Enter a valid end time (HH:MM).
               </Text>
@@ -258,7 +285,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !endAfterStart && startValid && endValid && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 End time must be after start time.
               </Text>
@@ -275,7 +302,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !locationValid && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Location is required.
               </Text>
@@ -296,7 +323,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
             {attempted && !descriptionValid && (
               <Text
-                style={{ color: palette.error ?? '#ff6b6b', marginBottom: 8 }}
+                style={{ color: palette.danger, marginBottom: 8 }}
               >
                 Description is required.
               </Text>

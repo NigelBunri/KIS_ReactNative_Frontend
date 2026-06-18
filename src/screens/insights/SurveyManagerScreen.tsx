@@ -19,6 +19,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +193,7 @@ function CreateSurveyModal({
                 <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{q.type}</Text>
               </View>
               <Pressable onPress={() => removeQuestion(i)} hitSlop={8}>
-                <Text style={{ color: '#EF4444', fontSize: 20 }}>×</Text>
+                <Text style={{ color: palette.danger, fontSize: 20 }}>×</Text>
               </Pressable>
             </View>
           ))}
@@ -221,7 +222,7 @@ function CreateSurveyModal({
                       },
                     ]}
                   >
-                    <Text style={{ color: qType_ === t.value ? '#fff' : palette.subtext, fontSize: 12, fontWeight: '600' }}>
+                    <Text style={{ color: qType_ === t.value ? palette.onPrimary : palette.subtext, fontSize: 12, fontWeight: '600' }}>
                       {t.label}
                     </Text>
                   </Pressable>
@@ -238,7 +239,7 @@ function CreateSurveyModal({
                   onPress={addQuestion}
                   style={[styles.halfBtn, { backgroundColor: palette.primaryStrong }]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Add</Text>
+                  <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Add</Text>
                 </Pressable>
               </View>
             </View>
@@ -438,7 +439,7 @@ function SurveyDetailSheet({
                   <Text style={{ color: palette.primaryStrong, fontSize: 15 }}>Edit</Text>
                 </Pressable>
                 <Pressable onPress={deleteSurvey}>
-                  <Text style={{ color: '#EF4444', fontSize: 15 }}>Delete</Text>
+                  <Text style={{ color: palette.danger, fontSize: 15 }}>Delete</Text>
                 </Pressable>
                 <Pressable onPress={onClose}>
                   <Text style={{ color: palette.subtext, fontSize: 15 }}>Close</Text>
@@ -518,7 +519,7 @@ function SurveyDetailSheet({
                         <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{qType(q)}</Text>
                       </View>
                       <Pressable onPress={() => deleteQuestion(q)} hitSlop={8}>
-                        <Text style={{ color: '#EF4444', fontSize: 20 }}>×</Text>
+                        <Text style={{ color: palette.danger, fontSize: 20 }}>×</Text>
                       </Pressable>
                     </View>
                   ))
@@ -548,7 +549,7 @@ function SurveyDetailSheet({
                             },
                           ]}
                         >
-                          <Text style={{ color: qTypeNew === t.value ? '#fff' : palette.subtext, fontSize: 12, fontWeight: '600' }}>
+                          <Text style={{ color: qTypeNew === t.value ? palette.onPrimary : palette.subtext, fontSize: 12, fontWeight: '600' }}>
                             {t.label}
                           </Text>
                         </Pressable>
@@ -567,8 +568,8 @@ function SurveyDetailSheet({
                         style={[styles.halfBtn, { backgroundColor: palette.primaryStrong }]}
                       >
                         {addingQBusy
-                          ? <ActivityIndicator size="small" color="#fff" />
-                          : <Text style={{ color: '#fff', fontWeight: '700' }}>Add</Text>
+                          ? <ActivityIndicator size="small" color={palette.onPrimary} />
+                          : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Add</Text>
                         }
                       </Pressable>
                     </View>
@@ -625,6 +626,7 @@ function FieldLabel({ label, palette }: { label: string; palette: any }) {
 
 export default function SurveyManagerScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [surveys, setSurveys] = useState<SurveyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -665,16 +667,16 @@ export default function SurveyManagerScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: '#DC2626', textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
           <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
           data={surveys}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingHorizontal: responsive.pageGutter }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={palette.primary} />
           }
@@ -722,9 +724,9 @@ export default function SurveyManagerScreen() {
       {/* FAB – Create */}
       <Pressable
         onPress={() => setShowCreate(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong }]}
+        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
       >
-        <Text style={styles.fabText}>+ Create Survey</Text>
+        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Create Survey</Text>
       </Pressable>
 
       {/* Create Modal */}
@@ -776,13 +778,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 28,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 4,
   },
-  fabText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {

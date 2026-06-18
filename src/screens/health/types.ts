@@ -15,6 +15,7 @@ export type HealthInstitution = {
   id: string;
   name: string;
   type: HealthInstitutionType;
+  institution_type?: HealthInstitutionType;
   employees?: HealthInstitutionMember[];
   members?: HealthInstitutionMember[];
 };

@@ -148,9 +148,10 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
       else setLoading(true);
       try {
         const params = new URLSearchParams();
-        params.set('vertical', 'feeds');
         if (cursor) params.set('cursor', cursor);
-        const url = `${ROUTES.broadcasts.list}?${params.toString()}`;
+        // Use NestJS personalized feeds endpoint; fall back to broadcasts list if route is absent.
+        const feedsListUrl: string = (ROUTES.feeds?.list ?? ROUTES.broadcasts.list) as string;
+        const url = `${feedsListUrl}${params.toString() ? `?${params.toString()}` : ''}`;
         const response = await getRequest(url);
         if (!response?.success) {
           throw new Error(response?.message ?? 'Unable to load broadcasts.');
@@ -183,8 +184,11 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
           }
           return deduped;
         });
-        setNextCursor(payload?.cursor ?? null);
-        setHasMore(Boolean(payload?.cursor));
+        // NestJS feeds controller returns `next_cursor`; Django broadcasts return `cursor`.
+        // Support both field names so either backend works.
+        const cursorValue = payload?.next_cursor ?? payload?.cursor ?? null;
+        setNextCursor(cursorValue);
+        setHasMore(Boolean(cursorValue));
         setError(null);
       } catch (err: any) {
         setError(err?.message ?? 'Unable to load feed.');

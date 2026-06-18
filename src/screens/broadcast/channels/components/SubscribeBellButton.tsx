@@ -132,7 +132,7 @@ export default function SubscribeBellButton({
   const bellColor = notifLevel === 'off'
     ? palette.subtext
     : notifLevel === 'mentions'
-      ? '#F59E0B'
+      ? palette.gold
       : palette.primaryStrong;
 
   return (
@@ -178,7 +178,7 @@ export default function SubscribeBellButton({
             compact && styles.bellCompact,
             {
               borderColor:     palette.border,
-              backgroundColor: notifLevel !== 'off' ? `${bellColor}18` : palette.surface,
+              backgroundColor: notifLevel !== 'off' ? palette.primarySoft ?? palette.primaryWeak : palette.surface,
               opacity:         bellPending ? 0.6 : 1,
             },
           ]}
@@ -208,27 +208,27 @@ const styles = StyleSheet.create({
     gap:           8,
   },
   subscribe: {
-    minHeight:       38,
+    minHeight:       44,
     borderRadius:    8,
     paddingHorizontal: 18,
     alignItems:      'center',
     justifyContent:  'center',
   },
   subscribeCompact: {
-    minHeight:       34,
+    minHeight:       44,
     paddingHorizontal: 13,
   },
   bell: {
-    width:          38,
-    height:         38,
-    borderRadius:   19,
+    width:          44,
+    height:         44,
+    borderRadius:   22,
     borderWidth:    1,
     alignItems:     'center',
     justifyContent: 'center',
   },
   bellCompact: {
-    width:    32,
-    height:   32,
-    borderRadius: 16,
+    width:    44,
+    height:   44,
+    borderRadius: 22,
   },
 });

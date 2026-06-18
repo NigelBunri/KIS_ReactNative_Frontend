@@ -364,7 +364,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                 <KISIcon
                   name="file"
                   size={40}
-                  color={palette.error ?? palette.primary}
+                  color={palette.danger}
                 />
                 <Text
                   style={{
@@ -453,7 +453,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                             fontSize: KIS_TOKENS.typography.tiny,
                             color:
                               (status === 'failed' || status === 'verification_failed')
-                                ? palette.error ?? palette.primary
+                                ? palette.danger
                                 : palette.subtext,
                           }}
                         >
@@ -493,7 +493,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                               height: '100%',
                               backgroundColor:
                                 status === 'failed'
-                                  ? palette.error ?? palette.primary
+                                  ? palette.danger
                                   : palette.primary,
                             }}
                           />
@@ -581,7 +581,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                           fontSize: KIS_TOKENS.typography.tiny,
                           color:
                             status === 'failed'
-                              ? palette.error ?? palette.primary
+                              ? palette.danger
                               : palette.subtext,
                         }}
                       >
@@ -604,7 +604,7 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                             height: '100%',
                             backgroundColor:
                               status === 'failed'
-                                ? palette.error ?? palette.primary
+                                ? palette.danger
                                 : palette.primary,
                           }}
                         />

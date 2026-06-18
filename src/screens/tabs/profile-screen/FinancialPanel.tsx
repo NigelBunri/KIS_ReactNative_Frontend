@@ -62,23 +62,20 @@ export function FinancialPanel({ palette, profileId, organizationId, refreshKey 
         fetchPricingInsights(),
       ]);
 
-      if (!reconciliationsRes.success) {
-        throw new Error(reconciliationsRes.message || 'Unable to load reconciliations.');
+      // Apply each result independently — a single failing endpoint should not
+      // block the rest of the financial panel from rendering.
+      if (reconciliationsRes.success) {
+        setReconciliations(unwrapList(reconciliationsRes.data));
       }
-      if (!claimsRes.success) {
-        throw new Error(claimsRes.message || 'Unable to load claims.');
+      if (claimsRes.success) {
+        setClaims(unwrapList(claimsRes.data));
       }
-      if (!disputesRes.success) {
-        throw new Error(disputesRes.message || 'Unable to load disputes.');
+      if (disputesRes.success) {
+        setDisputes(unwrapList(disputesRes.data));
       }
-      if (!pricingRes.success) {
-        throw new Error(pricingRes.message || 'Unable to load pricing insights.');
+      if (pricingRes.success) {
+        setInsights(pricingRes.data);
       }
-
-      setReconciliations(unwrapList(reconciliationsRes.data));
-      setClaims(unwrapList(claimsRes.data));
-      setDisputes(unwrapList(disputesRes.data));
-      setInsights(pricingRes.data);
     } catch (error: any) {
       Alert.alert('Financial operations', error?.message || 'Unable to load finance data.');
     } finally {

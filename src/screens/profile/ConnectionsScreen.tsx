@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -72,6 +73,7 @@ const getInitials = (name?: string | null) => {
 
 export default function ConnectionsScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const [activeTab, setActiveTab] = useState<TabKey>(route.params?.tab ?? 'mine');
@@ -199,7 +201,7 @@ export default function ConnectionsScreen() {
           <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -251,7 +253,7 @@ export default function ConnectionsScreen() {
           <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -269,9 +271,9 @@ export default function ConnectionsScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={palette.onPrimary} />
             ) : (
-              <Text style={[styles.smallBtnText, { color: '#fff' }]}>Accept</Text>
+              <Text style={[styles.smallBtnText, { color: palette.onPrimary }]}>Accept</Text>
             )}
           </Pressable>
           <Pressable
@@ -297,7 +299,7 @@ export default function ConnectionsScreen() {
           <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -320,9 +322,9 @@ export default function ConnectionsScreen() {
           disabled={isLoading || isPending}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={palette.onPrimary} />
           ) : (
-            <Text style={[styles.smallBtnText, { color: isPending ? palette.subtext : '#fff' }]}>
+            <Text style={[styles.smallBtnText, { color: isPending ? palette.subtext : palette.onPrimary }]}>
               {isPending ? 'Pending' : 'Connect'}
             </Text>
           )}
@@ -344,11 +346,14 @@ export default function ConnectionsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={[styles.backBtn, { width: responsive.minTouchTarget, height: responsive.minTouchTarget }]}
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>Network</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.headerTitleSize }]}>Network</Text>
+        <View style={{ width: responsive.minTouchTarget }} />
       </View>
 
       <View style={[styles.tabBar, { borderBottomColor: palette.divider }]}>
@@ -377,7 +382,7 @@ export default function ConnectionsScreen() {
           data={activeData as any[]}
           keyExtractor={(item) => item.id}
           renderItem={activeRender as any}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => loadTab(activeTab, true)} />
           }
@@ -453,7 +458,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 16,
   },
@@ -471,10 +475,11 @@ const styles = StyleSheet.create({
   },
   smallBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    minHeight: 44,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   smallBtnText: {
     fontSize: 12,

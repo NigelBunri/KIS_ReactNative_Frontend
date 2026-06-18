@@ -42,6 +42,14 @@ const ROUTES: any = {
   ...testimonyRoutes,
 };
 
+// authRoutes owns the current-user profile endpoints while socialRoutes adds
+// discovery and social profile actions. A shallow spread replaces the entire
+// nested object, which previously removed profiles.me/view/update at runtime.
+ROUTES.profiles = {
+  ...((authRoutes as any).profiles || {}),
+  ...((socialRoutes as any).profiles || {}),
+};
+
 // Keep health analytics endpoints and admin analytics endpoints under one key.
 ROUTES.analytics = {
   ...((healthRoutes as any).analytics || {}),

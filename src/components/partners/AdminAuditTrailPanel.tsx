@@ -116,8 +116,8 @@ export default function AdminAuditTrailPanel({
         </View>
       )}
       {!!error && !loading && (
-        <View style={[styles.errorBox, { backgroundColor: (palette.danger ?? '#d9534f') + '22', borderColor: palette.danger ?? '#d9534f' }]}>
-          <Text style={[styles.errorText, { color: palette.danger ?? '#d9534f' }]}>{error}</Text>
+        <View style={[styles.errorBox, { backgroundColor: (palette.danger) + '22', borderColor: palette.danger }]}>
+          <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
         </View>
       )}
 

@@ -369,7 +369,7 @@ const BroadcastProductCard = ({
   };
 
   return (
-    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}>
+    <View style={[styles.productCard, { borderColor: palette.primaryStrong, shadowColor: palette.shadow ?? palette.royalInk }]}>
       {landingPublic && (shopName || shopDescription) && onOpenLanding ? (
         <Pressable
           style={[
@@ -625,7 +625,7 @@ const BroadcastProductCard = ({
           />
           {!isProductInCart ? (
             <KISButton
-              title="Add to cart"
+              title="Buy now"
               size="xs"
               style={styles.actionButton}
               onPress={handleAddToCart}
@@ -659,13 +659,13 @@ const BroadcastProductCard = ({
         </Pressable>
       </Modal>
       <Modal visible={ratingModal} transparent animationType="slide" onRequestClose={() => setRatingModal(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: palette.backdrop ?? 'rgba(0,0,0,0.4)' }}>
           <View style={{ backgroundColor: palette.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 }}>
             <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>Rate this product</Text>
             <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map(n => (
                 <Pressable key={n} onPress={() => setRatingScore(n)}>
-                  <Text style={{ fontSize: 32, color: n <= ratingScore ? '#f59e0b' : palette.divider }}>★</Text>
+                  <Text style={{ fontSize: 32, color: n <= ratingScore ? palette.gold : palette.divider }}>★</Text>
                 </Pressable>
               ))}
             </View>
@@ -675,7 +675,7 @@ const BroadcastProductCard = ({
                 <Text style={{ color: palette.text, fontWeight: '700' }}>Cancel</Text>
               </Pressable>
               <Pressable onPress={submitRating} disabled={submittingRating} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primaryStrong }}>
-                <Text style={{ color: '#fff', fontWeight: '900' }}>{submittingRating ? 'Submitting…' : 'Submit'}</Text>
+                <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{submittingRating ? 'Submitting…' : 'Submit'}</Text>
               </Pressable>
             </View>
           </View>
@@ -785,7 +785,7 @@ const BroadcastServiceCard = ({
   };
 
   return (
-    <View style={[styles.productCard, { borderColor: palette.primaryStrong }]}>
+    <View style={[styles.productCard, { borderColor: palette.primaryStrong, shadowColor: palette.shadow ?? palette.royalInk }]}>
       {landingPublic && (shopName || shopDescription) && onOpenLanding ? (
         <Pressable
           style={[
@@ -1609,7 +1609,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
     gap: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -1809,7 +1808,7 @@ const styles = StyleSheet.create({
   },
   fullscreenOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.85)', // intentional scrim — no palette token for opaque overlay
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -1826,13 +1825,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-  },
-  ratingModalCard: {
-    width: '90%',
-    maxWidth: 360,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
   },
   ratingModalActions: {
     flexDirection: 'row',

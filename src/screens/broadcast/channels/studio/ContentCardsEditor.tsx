@@ -6,6 +6,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,13 +46,8 @@ type Props = {
 
 const CARD_TYPES: CardType[] = ['video', 'channel', 'poll', 'link', 'merchandise'];
 
-const CARD_TYPE_COLOR: Record<CardType, string> = {
-  video: '#3B82F6',
-  channel: '#8B5CF6',
-  poll: '#22C55E',
-  link: '#F59E0B',
-  merchandise: '#EC4899',
-};
+const cardTypeColor = (type: CardType, p: any): string =>
+  ({ video: p.primary, channel: p.primaryStrong, poll: p.success, link: p.gold, merchandise: p.danger } as Record<CardType, string>)[type] ?? p.subtext;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -199,7 +197,7 @@ export default function ContentCardsEditor({ contentId }: Props) {
         onPress: async () => {
           setDeletingId(card.id);
           try {
-            await deleteRequest(ROUTES.broadcasts.contentCard(card.id));
+            await deleteRequest(ROUTES.broadcasts.contentCard(contentId, card.id));
             setCards(prev => prev.filter(c => c.id !== card.id));
           } catch {
             Alert.alert('Error', 'Could not delete card.');
@@ -228,6 +226,7 @@ export default function ContentCardsEditor({ contentId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
@@ -241,7 +240,7 @@ export default function ContentCardsEditor({ contentId }: Props) {
       )}
 
       {cards.map(card => {
-        const color = CARD_TYPE_COLOR[card.card_type] ?? palette.primaryStrong;
+        const color = cardTypeColor(card.card_type, palette);
         return (
           <View
             key={card.id}
@@ -265,15 +264,18 @@ export default function ContentCardsEditor({ contentId }: Props) {
                 <Text style={[styles.cardCta, { color: palette.primaryStrong }]}>{card.cta_text}</Text>
               ) : null}
             </View>
-            <Text
+            <Pressable
+              hitSlop={10}
+              style={styles.deleteTouch}
               onPress={() => {
                 if (deletingId === card.id) return;
                 handleDelete(card);
               }}
-              style={[styles.deleteBtn, { color: '#EF4444', opacity: deletingId === card.id ? 0.4 : 1 }]}
             >
-              {deletingId === card.id ? '...' : 'Delete'}
-            </Text>
+              <Text style={[styles.deleteBtn, { color: palette.danger, opacity: deletingId === card.id ? 0.4 : 1 }]}>
+                {deletingId === card.id ? '...' : 'Delete'}
+              </Text>
+            </Pressable>
           </View>
         );
       })}
@@ -287,9 +289,9 @@ export default function ContentCardsEditor({ contentId }: Props) {
           <View style={styles.typePicker}>
             {CARD_TYPES.map(t => {
               const active = formType === t;
-              const color = CARD_TYPE_COLOR[t];
+              const color = cardTypeColor(t, palette);
               return (
-                <Text
+                <Pressable
                   key={t}
                   onPress={() => setFormType(t)}
                   style={[
@@ -297,12 +299,11 @@ export default function ContentCardsEditor({ contentId }: Props) {
                     {
                       backgroundColor: active ? color : palette.surface,
                       borderColor: active ? color : palette.border,
-                      color: active ? '#fff' : palette.text,
                     },
                   ]}
                 >
-                  {t}
-                </Text>
+                  <Text style={[styles.typeChipText, { color: active ? palette.onPrimary : palette.text }]}>{t}</Text>
+                </Pressable>
               );
             })}
           </View>
@@ -349,29 +350,21 @@ export default function ContentCardsEditor({ contentId }: Props) {
           </View>
 
           <View style={styles.formActions}>
-            <Text
-              onPress={() => { setShowForm(false); resetForm(); }}
-              style={[styles.cancelBtn, { color: palette.subtext, borderColor: palette.border }]}
-            >
-              Cancel
-            </Text>
-            <Text
-              onPress={saving ? undefined : handleAdd}
-              style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}
-            >
-              {saving ? 'Adding...' : 'Add Card'}
-            </Text>
+            <Pressable onPress={() => { setShowForm(false); resetForm(); }} style={[styles.cancelBtn, { borderColor: palette.border }]}>
+              <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+            <Pressable disabled={saving} onPress={handleAdd} style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}>
+              <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>{saving ? 'Adding...' : 'Add Card'}</Text>
+            </Pressable>
           </View>
         </View>
       ) : (
-        <Text
-          onPress={() => setShowForm(true)}
-          style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
-        >
-          + Add Card
-        </Text>
+        <Pressable onPress={() => setShowForm(true)} style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>+ Add Card</Text>
+        </Pressable>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -397,6 +390,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 13, fontWeight: '800' },
   cardTime: { fontSize: 11, fontWeight: '600', marginTop: 2, fontFamily: 'monospace' },
   cardCta: { fontSize: 11, fontWeight: '700', marginTop: 3 },
+  deleteTouch: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { fontSize: 12, fontWeight: '900' },
   formCard: {
     borderWidth: 1,
@@ -407,14 +401,14 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 14, fontWeight: '900' },
   typePicker: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   typeChip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 12,
-    fontWeight: '700',
-    overflow: 'hidden',
   },
+  typeChipText: { fontSize: 12, fontWeight: '700' },
   input: {
     minHeight: 42,
     borderWidth: 1,
@@ -430,34 +424,31 @@ const styles = StyleSheet.create({
   timeLabel: { fontSize: 11, fontWeight: '700' },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   saveBtn: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    overflow: 'hidden',
   },
+  saveBtnText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   addBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
   },
+  addBtnText: { fontSize: 13, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

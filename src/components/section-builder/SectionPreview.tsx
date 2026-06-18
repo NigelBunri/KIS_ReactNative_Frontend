@@ -47,6 +47,14 @@ const renderSection = (section: DynamicLandingSection, palette: any, typography:
   }
 };
 
+const buildPreviewPalette = (palette: any, isDark: boolean) => ({
+  ...palette,
+  onPrimary: '#FFFFFF',
+  ivory: isDark ? '#E7C76D' : palette.ivory ?? '#FFF9EE',
+  royalInk: isDark ? '#2B1605' : palette.royalInk ?? '#4B2F2A',
+  danger: isDark ? '#FFB4A8' : palette.danger ?? '#B42318',
+});
+
 const AnimatedSectionCard = ({
   section,
   index,
@@ -125,7 +133,7 @@ const AnimatedSectionCard = ({
                     <Text style={{ ...typography.label, color: palette.accentPrimary }}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => onDelete?.(section.id)}>
-                    <Text style={{ ...typography.label, color: '#c0392b' }}>Delete</Text>
+                    <Text style={{ ...typography.label, color: palette.danger }}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -143,11 +151,12 @@ const AnimatedSectionCard = ({
 export default function SectionPreview({ sections, palette, typography, spacing, editable, onEdit, onDelete }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
+  const previewPalette = React.useMemo(() => buildPreviewPalette(palette, isDark), [isDark, palette]);
 
   if (!Array.isArray(sections) || sections.length === 0) {
     return (
-      <View style={{ borderRadius: spacing.md, borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface, padding: spacing.md, marginTop: spacing.md }}>
-        <Text style={{ ...typography.body, color: palette.subtext }}>No sections added yet. Use + Add New Section to begin.</Text>
+      <View style={{ borderRadius: spacing.md, borderWidth: 1, borderColor: previewPalette.divider, backgroundColor: previewPalette.surface, padding: spacing.md, marginTop: spacing.md }}>
+        <Text style={{ ...typography.body, color: previewPalette.subtext }}>No sections added yet. Use + Add New Section to begin.</Text>
       </View>
     );
   }
@@ -159,7 +168,7 @@ export default function SectionPreview({ sections, palette, typography, spacing,
           key={section.id}
           section={section}
           index={index}
-          palette={palette}
+          palette={previewPalette}
           typography={typography}
           spacing={spacing}
           editable={editable}

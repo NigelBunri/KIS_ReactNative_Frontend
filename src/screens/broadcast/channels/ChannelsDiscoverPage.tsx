@@ -8,12 +8,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   fetchSocialRecommendationFoundation,
@@ -28,8 +30,6 @@ type Props = {
   searchContext?: string;
 };
 
-const GOLD = '#B98A22';
-const INK = '#17140F';
 
 const initialsFor = (channel: BroadcastChannelSummary) =>
   String(channel.display_name || channel.handle || 'KC')
@@ -63,7 +63,7 @@ function ChannelAvatar({
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: palette.ivory,
         }}
       />
     );
@@ -74,11 +74,11 @@ function ChannelAvatar({
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: tone === 'dark' ? palette.primarySoft : '#F8F2E4',
+        backgroundColor: palette.primarySoft,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#FFFFFF',
+        borderColor: palette.ivory,
       }}
     >
       <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: size * 0.33 }}>
@@ -95,8 +95,8 @@ function StatPill({ label, value }: { label: string; value: string }) {
       style={[
         styles.statPill,
         {
-          backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7',
-          borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7',
+          backgroundColor: palette.primarySoft,
+          borderColor: palette.goldMuted ?? palette.border,
         },
       ]}
     >
@@ -119,6 +119,8 @@ function FeaturedChannelCard({
   const cardWidth = compact
     ? Math.max(200, responsive.width - responsive.pageGutter * 3)
     : 270;
+  const bannerFallbackGradient =
+    tone === 'dark' ? KIS_ROYAL_GRADIENTS.goldDark : KIS_ROYAL_GRADIENTS.goldLight;
 
   return (
     <Pressable
@@ -127,7 +129,7 @@ function FeaturedChannelCard({
         styles.featuredCard,
         {
           backgroundColor: palette.surface,
-          borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+          borderColor: palette.goldMuted ?? palette.border,
           width: cardWidth,
           opacity: pressed ? 0.92 : 1,
         },
@@ -139,7 +141,7 @@ function FeaturedChannelCard({
           <Image source={{ uri: channel.banner_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         ) : (
           <LinearGradient
-            colors={['#1C0F08', '#6D4A18', '#C9A24A']}
+            colors={[...bannerFallbackGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
@@ -147,27 +149,27 @@ function FeaturedChannelCard({
         )}
         {/* Bottom fade */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.55)']}
+          colors={['transparent', palette.overlay]}
           style={[StyleSheet.absoluteFillObject, { top: '40%' }]}
         />
         {/* Live / verified badge top-right */}
         <View style={styles.bannerTopRight}>
           {channel.is_broadcast ? (
-            <View style={styles.livePill}>
-              <View style={styles.liveDot} />
-              <Text style={styles.livePillText}>LIVE</Text>
+            <View style={[styles.livePill, { backgroundColor: palette.danger }]}>
+              <View style={[styles.liveDot, { backgroundColor: palette.ivory }]} />
+              <Text style={[styles.livePillText, { color: palette.ivory }]}>LIVE</Text>
             </View>
           ) : channel.is_verified ? (
-            <View style={[styles.verifiedPill, { backgroundColor: 'rgba(255,255,255,0.92)' }]}>
-              <KISIcon name="check" size={11} color={INK} />
-              <Text style={[styles.verifiedPillText, { color: INK }]}>Verified</Text>
+            <View style={[styles.verifiedPill, { backgroundColor: palette.ivory }]}>
+              <KISIcon name="check" size={11} color={palette.royalInk} />
+              <Text style={[styles.verifiedPillText, { color: palette.royalInk }]}>Verified</Text>
             </View>
           ) : null}
         </View>
         {/* Subscriber count overlay bottom-right */}
-        <View style={styles.bannerSubCount}>
-          <KISIcon name="person" size={11} color="#fff" />
-          <Text style={styles.bannerSubCountText}>
+        <View style={[styles.bannerSubCount, { backgroundColor: palette.overlay }]}>
+          <KISIcon name="person" size={11} color={palette.ivory} />
+          <Text style={[styles.bannerSubCountText, { color: palette.ivory }]}>
             {compactNumber(channel.subscriber_count)}
           </Text>
         </View>
@@ -184,7 +186,7 @@ function FeaturedChannelCard({
             {channel.display_name}
           </Text>
           {channel.is_verified && !channel.is_broadcast ? (
-            <KISIcon name="check" size={14} color={GOLD} />
+            <KISIcon name="check" size={14} color={palette.gold} />
           ) : null}
         </View>
         <Text numberOfLines={1} style={[styles.handleText, { color: palette.subtext }]}>
@@ -200,8 +202,8 @@ function FeaturedChannelCard({
               style={[
                 styles.categoryTag,
                 {
-                  backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7',
-                  color: tone === 'dark' ? palette.primaryStrong : GOLD,
+                  backgroundColor: palette.primarySoft ?? palette.surface,
+                  color: tone === 'dark' ? palette.primaryStrong : palette.gold,
                 },
               ]}
             >
@@ -235,7 +237,7 @@ function ChannelListRow({
         styles.listRow,
         {
           backgroundColor: palette.surface,
-          borderColor: tone === 'dark' ? palette.goldMuted : '#E8DDC7',
+          borderColor: palette.goldMuted ?? palette.border,
           opacity: pressed ? 0.88 : 1,
         },
       ]}
@@ -247,7 +249,7 @@ function ChannelListRow({
             {channel.display_name}
           </Text>
           {channel.is_verified ? (
-            <KISIcon name="check" size={13} color={GOLD} />
+            <KISIcon name="check" size={13} color={palette.gold} />
           ) : null}
         </View>
         <Text numberOfLines={1} style={[styles.handleText, { color: palette.subtext }]}>
@@ -263,8 +265,8 @@ function ChannelListRow({
             style={[
               styles.categoryTag,
               {
-                backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7',
-                color: tone === 'dark' ? palette.primaryStrong : GOLD,
+                backgroundColor: palette.primarySoft ?? palette.surface,
+                color: tone === 'dark' ? palette.primaryStrong : palette.gold,
                 marginTop: 6,
                 alignSelf: 'flex-start',
               },
@@ -278,12 +280,12 @@ function ChannelListRow({
         style={[
           styles.listRowChevron,
           {
-            backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7',
-            borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+            backgroundColor: palette.primarySoft ?? palette.surface,
+            borderColor: palette.goldMuted ?? palette.border,
           },
         ]}
       >
-        <KISIcon name="chevron-right" size={16} color={tone === 'dark' ? palette.primaryStrong : GOLD} />
+        <KISIcon name="chevron-right" size={16} color={tone === 'dark' ? palette.primaryStrong : palette.gold} />
       </View>
     </Pressable>
   );
@@ -303,13 +305,13 @@ function RecommendationChip({
       style={({ pressed }) => [
         styles.recommendationChip,
         {
-          backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFFCF5',
-          borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+          backgroundColor: palette.primarySoft ?? palette.surface,
+          borderColor: palette.goldMuted ?? palette.border,
           opacity: pressed ? 0.76 : 1,
         },
       ]}
     >
-      <Text style={[styles.recommendationKind, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>
+      <Text style={[styles.recommendationKind, { color: tone === 'dark' ? palette.primaryStrong : palette.gold }]}>
         {String(item.kind || '').replace(/_/g, ' ').toUpperCase()}
       </Text>
       <Text numberOfLines={2} style={[styles.recommendationTitle, { color: palette.text }]}>
@@ -321,10 +323,10 @@ function RecommendationChip({
         </Text>
       ) : null}
       <View style={styles.recommendationOpenRow}>
-        <Text style={[styles.recommendationAction, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>
+        <Text style={[styles.recommendationAction, { color: tone === 'dark' ? palette.primaryStrong : palette.gold }]}>
           Open
         </Text>
-        <KISIcon name="arrow-right" size={10} color={tone === 'dark' ? palette.primaryStrong : GOLD} />
+        <KISIcon name="arrow-right" size={10} color={tone === 'dark' ? palette.primaryStrong : palette.gold} />
       </View>
     </Pressable>
   );
@@ -332,6 +334,7 @@ function RecommendationChip({
 
 export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 'all' }: Props) {
   const { palette, tone } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -425,7 +428,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
   const isSafe = recommendations?.controls?.christian_content_safe_ranking;
 
   return (
-    <View style={[styles.container, { marginTop: compact ? 6 : 10 }]}>
+    <View style={[styles.container, { marginTop: compact ? 6 : 10, paddingBottom: insets.bottom + 24 }]}>
 
       {/* ── Hero strip ─────────────────────────────────────────── */}
       <View
@@ -433,19 +436,19 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
           styles.heroStrip,
           {
             backgroundColor: palette.surface,
-            borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+            borderColor: palette.goldMuted ?? palette.border,
           },
         ]}
       >
         <View style={styles.heroLeft}>
           <View style={styles.heroEyebrowRow}>
-            <Text style={[styles.eyebrow, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>
+            <Text style={[styles.eyebrow, { color: tone === 'dark' ? palette.primaryStrong : palette.gold }]}>
               KIS CHANNELS
             </Text>
             {isSafe ? (
-              <View style={[styles.safeBadge, { backgroundColor: tone === 'dark' ? palette.primarySoft : '#FFF8E7' }]}>
-                <KISIcon name="shield" size={11} color={tone === 'dark' ? palette.primaryStrong : GOLD} />
-                <Text style={[styles.safeBadgeText, { color: tone === 'dark' ? palette.primaryStrong : GOLD }]}>
+              <View style={[styles.safeBadge, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
+                <KISIcon name="shield" size={11} color={tone === 'dark' ? palette.primaryStrong : palette.gold} />
+                <Text style={[styles.safeBadgeText, { color: tone === 'dark' ? palette.primaryStrong : palette.gold }]}>
                   Safe
                 </Text>
               </View>
@@ -473,7 +476,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
             styles.recommendationPanel,
             {
               backgroundColor: palette.surface,
-              borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+              borderColor: palette.goldMuted ?? palette.border,
             },
           ]}
         >
@@ -520,7 +523,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
         <View
           style={[
             styles.emptyState,
-            { backgroundColor: palette.surface, borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2' },
+            { backgroundColor: palette.surface, borderColor: palette.goldMuted ?? palette.border },
           ]}
         >
           <KISIcon name="sub-channel" size={28} color={palette.primaryStrong} />
@@ -557,9 +560,9 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
               style={({ pressed }) => [
                 styles.loadMoreBtn,
                 {
-                  borderColor: tone === 'dark' ? palette.goldMuted : '#E6D7B2',
+                  borderColor: palette.goldMuted ?? palette.border,
                   backgroundColor: pressed
-                    ? (tone === 'dark' ? palette.primarySoft : '#FFF8E7')
+                    ? (palette.primarySoft ?? palette.surface)
                     : palette.surface,
                 },
               ]}
@@ -576,7 +579,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
 }
 
 const styles = StyleSheet.create({
-  container: { marginTop: 10, paddingBottom: 24 },
+  container: { marginTop: 10 },
 
   // Hero
   heroStrip: {
@@ -588,10 +591,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
   heroLeft: { flex: 1, gap: 4 },
@@ -658,10 +657,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.09,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
   bannerWrap: { height: 120, overflow: 'visible', position: 'relative' },
@@ -676,13 +671,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#E53E3E',
     borderRadius: 20,
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  livePillText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
+  livePillText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   verifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -699,12 +693,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  bannerSubCountText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  bannerSubCountText: { fontSize: 11, fontWeight: '900' },
   avatarLift: { position: 'absolute', left: 14, bottom: -30 },
   featuredBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 2 },
   featuredNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -736,10 +729,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
   listRowContent: { flex: 1, minWidth: 0 },

@@ -5,7 +5,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -240,7 +239,7 @@ export default function TestimonyHubScreen() {
               onPress={() => navigation.navigate('SeasonsBrowser', {})}
               style={[styles.chip, { backgroundColor: palette.primary }]}
             >
-              <Text style={[styles.chipText, { color: '#fff' }]}>All</Text>
+              <Text style={[styles.chipText, { color: palette.onPrimary }]}>All</Text>
             </Pressable>
             {CATEGORIES.map(cat => (
               <Pressable
@@ -260,7 +259,7 @@ export default function TestimonyHubScreen() {
           onPress={() => navigation.navigate('TestimonyReachInbox')}
           style={[styles.inboxBtn, { backgroundColor: palette.primaryStrong }]}
         >
-          <KISIcon name="bell" size={18} color="#fff" />
+          <KISIcon name="bell" size={18} color={palette.onPrimary} />
           <Text style={styles.inboxBtnText}>Reach-out Inbox</Text>
           {pendingInbox > 0 && (
             <View style={styles.badge}>
@@ -278,13 +277,13 @@ function makeStyles(palette: any) {
     safe: { flex: 1 },
     content: { paddingBottom: 100 },
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-    backBtn: { padding: 4 },
+    backBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     title: { fontSize: 20, fontWeight: '800' },
     subtitle: { fontSize: 13, marginTop: 2 },
     section: { marginTop: 24, paddingHorizontal: 16 },
     sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
     sectionTitle: { fontSize: 16, fontWeight: '700' },
-    outlineBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+    outlineBtn: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     outlineBtnText: { fontSize: 13, fontWeight: '600' },
     promptCard: { borderRadius: 12, borderWidth: 1, padding: 16 },
     promptText: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
@@ -293,7 +292,7 @@ function makeStyles(palette: any) {
     cardEmoji: { fontSize: 24 },
     cardCategoryLabel: { fontSize: 12 },
     cardTitle: { fontSize: 14, fontWeight: '700' },
-    resolveBtn: { borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginTop: 4 },
+    resolveBtn: { borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginTop: 4, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     resolveBtnText: { fontSize: 12, fontWeight: '600' },
     endorseRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
     endorseCount: { fontSize: 13 },
@@ -303,7 +302,7 @@ function makeStyles(palette: any) {
     stickyBar: { borderTopWidth: 1, paddingTop: 16, paddingHorizontal: 16 },
     inboxBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14 },
     inboxBtnText: { color: palette.onPrimary, fontWeight: '700', fontSize: 15 },
-    badge: { backgroundColor: '#E53935', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-    badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    badge: { backgroundColor: palette.danger, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+    badgeText: { color: palette.onPrimary, fontSize: 11, fontWeight: '800' },
   });
 }

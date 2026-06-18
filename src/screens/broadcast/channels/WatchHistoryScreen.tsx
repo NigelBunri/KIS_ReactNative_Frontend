@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import {
@@ -19,6 +21,7 @@ import {
   removeFromWatchHistory,
   fetchWatchHistorySettings,
   updateWatchHistorySettings,
+  fetchChannelContentDetail,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 
 type HistoryEntry = {
@@ -26,6 +29,7 @@ type HistoryEntry = {
   progress_seconds: number;
   completed: boolean;
   last_viewed_at: string;
+  title?: string;
 };
 
 function formatProgress(seconds: number): string {
@@ -46,23 +50,47 @@ function timeAgo(isoString: string): string {
 
 export default function WatchHistoryScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter, minTouchTarget, bodyFontSize, labelFontSize, headerTitleSize } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+      setPage(1);
+      setHasMore(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const [rows, settings] = await Promise.all([
         fetchWatchHistory(),
         fetchWatchHistorySettings(),
       ]);
-      setHistory(rows);
+      // Enrich with content titles (first 20 entries for perf)
+      const enriched = await Promise.all(
+        rows.slice(0, 20).map(async entry => {
+          try {
+            const detail = await fetchChannelContentDetail(entry.content_id);
+            return { ...entry, title: detail?.title || detail?.text_plain_preview || undefined };
+          } catch {
+            return entry;
+          }
+        }),
+      );
+      setHistory([...enriched, ...rows.slice(20)]);
       setIsPaused(settings.is_paused);
+      // fetchWatchHistory returns all rows; no server pagination — disable further loads
+      setHasMore(false);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -115,11 +143,11 @@ export default function WatchHistoryScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
-        <Text style={[styles.title, { color: palette.text }]}>Watch History</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.75 }]}>Watch History</Text>
         <Pressable
           onPress={handleTogglePause}
           disabled={pauseLoading}
@@ -130,8 +158,8 @@ export default function WatchHistoryScreen() {
           </Text>
         </Pressable>
         {history.length > 0 && (
-          <Pressable onPress={handleClearAll} hitSlop={10}>
-            <Text style={[styles.clearBtn, { color: palette.primaryStrong }]}>Clear all</Text>
+          <Pressable onPress={handleClearAll} hitSlop={10} style={{ minHeight: minTouchTarget, justifyContent: 'center' }}>
+            <Text style={[styles.clearBtn, { color: palette.primaryStrong, fontSize: labelFontSize }]}>Clear all</Text>
           </Pressable>
         )}
       </View>
@@ -158,6 +186,22 @@ export default function WatchHistoryScreen() {
           data={history}
           keyExtractor={item => item.content_id}
           contentContainerStyle={{ paddingBottom: 32 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No watch history yet
+              </Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => load(true)}
+              tintColor={palette.primaryStrong}
+            />
+          }
+          onEndReached={() => { if (hasMore) setPage(p => p + 1); }}
+          onEndReachedThreshold={0.3}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => navigation.navigate('ChannelContentDetail', { contentId: item.content_id })}
@@ -167,8 +211,8 @@ export default function WatchHistoryScreen() {
                 <KISIcon name={item.completed ? 'check' : 'play'} size={16} color={palette.primaryStrong} />
               </View>
               <View style={styles.rowInfo}>
-                <Text style={[styles.contentId, { color: palette.text }]} numberOfLines={1}>
-                  Content {item.content_id.slice(0, 8)}…
+                <Text style={[styles.contentId, { color: palette.text, fontSize: bodyFontSize }]} numberOfLines={2}>
+                  {item.title || `Content ${item.content_id.slice(0, 8)}…`}
                 </Text>
                 <View style={styles.rowMeta}>
                   {item.progress_seconds > 0 && !item.completed && (
@@ -251,5 +295,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressFill: { height: 3, borderRadius: 2 },
-  removeBtn: { padding: 4, flexShrink: 0 },
+  removeBtn: { padding: 4, flexShrink: 0, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

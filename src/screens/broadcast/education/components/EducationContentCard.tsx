@@ -123,7 +123,7 @@ export default function EducationContentCard({
         marginRight: 12,
         flexDirection: stackCard ? 'column' : 'row',
         gap: 10,
-        shadowColor: palette.shadow ?? '#000',
+        shadowColor: palette.shadow ?? palette.royalInk,
         shadowOpacity: 0.08,
         shadowRadius: 16,
         shadowOffset: { width: 0, height: 8 },

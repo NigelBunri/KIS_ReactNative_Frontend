@@ -229,7 +229,7 @@ export default function ChatRoomBody({
       {/* GAP 13: activity sub-state label */}
       {activityLabel ? (
         <View style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
-          <Text style={{ fontSize: 12, fontStyle: 'italic', color: palette.subtext ?? '#888' }}>{activityLabel}</Text>
+          <Text style={{ fontSize: 12, fontStyle: 'italic', color: palette.subtext }}>{activityLabel}</Text>
         </View>
       ) : null}
 
@@ -237,9 +237,9 @@ export default function ChatRoomBody({
       {scheduledMessages.length > 0 && (
         <Pressable
           onPress={() => setScheduledModalVisible(true)}
-          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, borderTopWidth: 1, borderTopColor: palette.divider ?? '#e0e0e0' }}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, borderTopWidth: 1, borderTopColor: palette.divider }}
         >
-          <Text style={{ fontSize: 12, color: palette.primary ?? '#4F46E5', fontWeight: '600' }}>
+          <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '600' }}>
             🕐 {scheduledMessages.length} scheduled message{scheduledMessages.length > 1 ? 's' : ''}
           </Text>
         </Pressable>
@@ -305,30 +305,30 @@ export default function ChatRoomBody({
         onRequestClose={() => setScheduledModalVisible(false)}
       >
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }} onPress={() => setScheduledModalVisible(false)}>
-          <View style={{ maxHeight: '55%', backgroundColor: palette.surface ?? '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 }} onStartShouldSetResponder={() => true}>
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: palette.divider ?? '#00000011' }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text ?? '#000' }}>Scheduled messages</Text>
+          <View style={{ maxHeight: '55%', backgroundColor: palette.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 }} onStartShouldSetResponder={() => true}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text }}>Scheduled messages</Text>
             </View>
             <ScrollView>
               {scheduledMessages.map((msg) => (
-                <View key={msg.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: palette.divider ?? '#00000011' }}>
+                <View key={msg.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, color: palette.text ?? '#000' }} numberOfLines={2}>{msg.text}</Text>
-                    <Text style={{ fontSize: 11, color: palette.subtext ?? '#888', marginTop: 3 }}>
+                    <Text style={{ fontSize: 13, color: palette.text }} numberOfLines={2}>{msg.text}</Text>
+                    <Text style={{ fontSize: 11, color: palette.subtext, marginTop: 3 }}>
                       {new Date(msg.scheduledAt).toLocaleString()}
                     </Text>
                   </View>
                   <Pressable
                     onPress={() => { onSendScheduledNow?.(msg.id); }}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: palette.primary ?? '#4F46E5', marginLeft: 8 }}
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: palette.primary, marginLeft: 8 }}
                   >
-                    <Text style={{ fontSize: 12, color: palette.onPrimary ?? '#fff', fontWeight: '600' }}>Send now</Text>
+                    <Text style={{ fontSize: 12, color: palette.onPrimary, fontWeight: '600' }}>Send now</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => { onCancelScheduled?.(msg.id); }}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#DC262611', marginLeft: 6 }}
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: `${palette.danger}11`, marginLeft: 6 }}
                   >
-                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600' }}>Cancel</Text>
+                    <Text style={{ fontSize: 12, color: palette.danger, fontWeight: '600' }}>Cancel</Text>
                   </Pressable>
                 </View>
               ))}

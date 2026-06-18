@@ -912,12 +912,12 @@ export default function FeedScreen<T extends FeedPost>({
                 style={[
                   styles.filterChipNew,
                   {
-                    backgroundColor: isActive ? '#274B8F' : '#F1F3F6',
-                    borderColor: isActive ? 'transparent' : 'rgba(0,0,0,0.06)',
+                    backgroundColor: isActive ? palette.primary : palette.surface,
+                    borderColor: isActive ? 'transparent' : palette.divider,
                   },
                 ]}
               >
-                <Text style={[styles.filterChipTextNew, { color: isActive ? '#fff' : '#4B5563' }]}>
+                <Text style={[styles.filterChipTextNew, { color: isActive ? palette.onPrimary : palette.subtext }]}>
                   {option.label}
                 </Text>
               </Pressable>
@@ -1014,24 +1014,24 @@ export default function FeedScreen<T extends FeedPost>({
           renderItem={({ item }) => {
             if (item.type === 'ad') {
               return (
-                <View style={[styles.card, styles.cardShadow, styles.adCardNew]}>
-                  <Text style={styles.sponsoredLabel}>Sponsored</Text>
+                <View style={[styles.card, styles.cardShadow, styles.adCardNew, { backgroundColor: palette.card }]}>
+                  <Text style={[styles.sponsoredLabel, { color: palette.subtext }]}>Sponsored</Text>
                   <View style={styles.adRow}>
                     <View style={{ flex: 1, paddingRight: 12 }}>
-                      <Text style={styles.adTitleNew}>{adTitle}</Text>
-                      <Text style={styles.adDescNew} numberOfLines={3}>
+                      <Text style={[styles.adTitleNew, { color: palette.text }]}>{adTitle}</Text>
+                      <Text style={[styles.adDescNew, { color: palette.subtext }]} numberOfLines={3}>
                         {adDescription}
                       </Text>
 
                       <Pressable
                         onPress={() => Linking.openURL('https://kis.app').catch(() => {})}
-                        style={({ pressed }) => [styles.adBtn, { opacity: pressed ? 0.9 : 1 }]}
+                        style={({ pressed }) => [styles.adBtn, { opacity: pressed ? 0.9 : 1, backgroundColor: palette.royalInk }]}
                       >
-                        <Text style={styles.adBtnText}>Learn More</Text>
+                        <Text style={[styles.adBtnText, { color: palette.onPrimary }]}>Learn More</Text>
                       </Pressable>
                     </View>
 
-                    <View style={styles.adImageWrap}>
+                    <View style={[styles.adImageWrap, { backgroundColor: palette.surface }]}>
                       <ImagePlaceholder size={88} radius={14} style={{ width: 110, height: 88 }} />
                     </View>
                   </View>
@@ -1084,9 +1084,9 @@ export default function FeedScreen<T extends FeedPost>({
                 style={[
                   styles.card,
                   styles.cardShadow,
+                  { backgroundColor: palette.card },
                   isCommunityFeed
                     ? {
-                        backgroundColor: palette.card,
                         borderColor: palette.primaryStrong,
                         borderRadius: 26,
                         borderWidth: 1,
@@ -1111,16 +1111,14 @@ export default function FeedScreen<T extends FeedPost>({
                     <View
                       style={[
                         styles.avatarBadge,
-                        isCommunityFeed
-                          ? {
-                              backgroundColor: palette.surface,
-                              borderColor: palette.divider,
-                              borderWidth: StyleSheet.hairlineWidth,
-                            }
-                          : null,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.divider,
+                          borderWidth: StyleSheet.hairlineWidth,
+                        },
                       ]}
                     >
-                      <Text style={styles.avatarBadgeText}>❤</Text>
+                      <Text style={[styles.avatarBadgeText, { color: palette.danger }]}>❤</Text>
                     </View>
                   </View>
 
@@ -1133,7 +1131,7 @@ export default function FeedScreen<T extends FeedPost>({
                         <Text
                           style={[
                             styles.authorName,
-                            isCommunityFeed ? { color: palette.text } : null,
+                            { color: palette.text },
                           ]}
                           numberOfLines={1}
                         >
@@ -1141,10 +1139,10 @@ export default function FeedScreen<T extends FeedPost>({
                         </Text>
                         {post.author?.connection_degree != null && (
                           <View style={[styles.degreeBadge, {
-                            backgroundColor: post.author.connection_degree === 1 ? '#16A34A20' : post.author.connection_degree === 2 ? '#2563EB20' : '#6B728020',
+                            backgroundColor: post.author.connection_degree === 1 ? palette.successSoft : post.author.connection_degree === 2 ? palette.primarySoft : palette.surface,
                           }]}>
                             <Text style={[styles.degreeText, {
-                              color: post.author.connection_degree === 1 ? '#16A34A' : post.author.connection_degree === 2 ? '#2563EB' : '#6B7280',
+                              color: post.author.connection_degree === 1 ? palette.success : post.author.connection_degree === 2 ? palette.primary : palette.subtext,
                             }]}>
                               {post.author.connection_degree === 1 ? '1st' : post.author.connection_degree === 2 ? '2nd' : '3rd'}
                             </Text>
@@ -1155,7 +1153,7 @@ export default function FeedScreen<T extends FeedPost>({
                     <Text
                       style={[
                         styles.postTime,
-                        isCommunityFeed ? { color: palette.subtext } : null,
+                        { color: palette.subtext },
                       ]}
                       numberOfLines={1}
                     >
@@ -1174,7 +1172,7 @@ export default function FeedScreen<T extends FeedPost>({
                     <Text
                       style={[
                         styles.moreDots,
-                        isCommunityFeed ? { color: palette.subtext } : null,
+                        { color: palette.subtext },
                       ]}
                     >
                       •••
@@ -1203,7 +1201,7 @@ export default function FeedScreen<T extends FeedPost>({
                     <Pressable
                       style={[
                         styles.mediaWrapNew,
-                        isCommunityFeed ? { backgroundColor: palette.surface } : null,
+                        { backgroundColor: palette.surface },
                       ]}
                       onPress={() =>
                         void openVideoModal({
@@ -1230,7 +1228,7 @@ export default function FeedScreen<T extends FeedPost>({
                     <View
                       style={[
                         styles.mediaWrapNew,
-                        isCommunityFeed ? { backgroundColor: palette.surface } : null,
+                        { backgroundColor: palette.surface },
                       ]}
                     >
                       <PermanentRemoteImage
@@ -1246,13 +1244,13 @@ export default function FeedScreen<T extends FeedPost>({
                 {/* bottom action row like mock (icon + count) */}
                 <View style={styles.actionsRowNew}>
                   <Pressable style={styles.actionItemNew} onPress={() => handleReact(post.id)}>
-                    <Text style={[styles.actionIconNew, likedPostIds[post.id] ? styles.actionIconLiked : null]}>
+                    <Text style={[styles.actionIconNew, { color: palette.subtext }, likedPostIds[post.id] ? { color: palette.danger } : null]}>
                       ❤
                     </Text>
                     <Text
                       style={[
                         styles.actionCountNew,
-                        isCommunityFeed ? { color: palette.subtext } : null,
+                        { color: isCommunityFeed ? palette.subtext : palette.danger },
                       ]}
                     >
                       {formatCompactCount(likeCount)}
@@ -1263,11 +1261,11 @@ export default function FeedScreen<T extends FeedPost>({
                     style={styles.actionItemNew}
                     onPress={() => toggleCommentThread(post.id)}
                   >
-                    <Text style={styles.actionIconNew}>💬</Text>
+                    <Text style={[styles.actionIconNew, { color: palette.subtext }]}>💬</Text>
                     <Text
                       style={[
                         styles.actionCountNew,
-                        isCommunityFeed ? { color: palette.subtext } : null,
+                        { color: isCommunityFeed ? palette.subtext : palette.danger },
                       ]}
                     >
                       {formatCompactCount(commentCount)}
@@ -1275,8 +1273,8 @@ export default function FeedScreen<T extends FeedPost>({
                   </Pressable>
 
                   <Pressable style={styles.actionItemNew} onPress={() => handleShare(post)}>
-                    <Text style={styles.actionIconNew}>↗</Text>
-                    <Text style={styles.actionCountNew}></Text>
+                    <Text style={[styles.actionIconNew, { color: palette.subtext }]}>↗</Text>
+                    <Text style={[styles.actionCountNew, { color: palette.danger }]}></Text>
                   </Pressable>
                 </View>
 
@@ -1317,10 +1315,10 @@ export default function FeedScreen<T extends FeedPost>({
       {/* FAB: colorful circle + plus like mock */}
       <Pressable
         onPress={() => setComposerVisible(true)}
-        style={({ pressed }) => [styles.fabNew, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}
+        style={({ pressed }) => [styles.fabNew, { transform: [{ scale: pressed ? 0.98 : 1 }], backgroundColor: palette.primary }]}
       >
         <View style={styles.fabGradient}>
-          <Text style={styles.fabPlus}>＋</Text>
+          <Text style={[styles.fabPlus, { color: palette.onPrimary }]}>＋</Text>
         </View>
       </Pressable>
 
@@ -1423,12 +1421,12 @@ export default function FeedScreen<T extends FeedPost>({
                 <KISIcon
                   name="heart"
                   size={20}
-                  color={modalPost && likedPostIds[modalPost.id] ? '#F97316' : '#fff'}
+                  color={modalPost && likedPostIds[modalPost.id] ? palette.gold : palette.onPrimary}
                 />
                 <Text
                   style={[
                     styles.actionCountText,
-                    modalPost && likedPostIds[modalPost.id] ? { color: '#F97316' } : null,
+                    modalPost && likedPostIds[modalPost.id] ? { color: palette.gold } : null,
                   ]}
                 >
                   {formatCompactCount(likeCounts[modalPost.id] ?? 0)}
@@ -1558,9 +1556,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Cards (rounded, soft shadow)
+  // Cards (rounded, soft shadow) — backgroundColor applied inline via palette.card
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
@@ -1598,7 +1595,6 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -1612,22 +1608,21 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  avatarBadgeText: { fontSize: 10, color: '#F43F5E', fontWeight: '900' },
+  avatarBadgeText: { fontSize: 10, fontWeight: '900' },
 
-  authorName: { fontSize: 15, fontWeight: '800', color: '#111827' },
-  postTime: { fontSize: 12, fontWeight: '600', color: '#9CA3AF', marginTop: 2 },
+  authorName: { fontSize: 15, fontWeight: '800' },
+  postTime: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   degreeBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 4 },
   degreeText: { fontSize: 10, fontWeight: '800' },
 
   moreBtnNew: { paddingHorizontal: 8, paddingVertical: 6 },
-  moreDots: { fontSize: 18, fontWeight: '800', color: '#9CA3AF' },
+  moreDots: { fontSize: 18, fontWeight: '800' },
 
   // Media like mock
   mediaWrapNew: {
     marginTop: 12,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#EEF2F7',
   },
   mediaNew: {
     width: '100%',
@@ -1657,9 +1652,9 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   actionItemNew: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionIconNew: { fontSize: 18, color: '#6B7280' },
-  actionIconLiked: { color: '#F43F5E' },
-  actionCountNew: { fontSize: 14, fontWeight: '800', color: '#EF4444' },
+  actionIconNew: { fontSize: 18 },
+  actionIconLiked: {},
+  actionCountNew: { fontSize: 14, fontWeight: '800' },
 
   // Ad card like mock
   adCardNew: {
@@ -1668,27 +1663,24 @@ const styles = StyleSheet.create({
   sponsoredLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#9CA3AF',
     marginBottom: 8,
   },
   adRow: { flexDirection: 'row', alignItems: 'center' },
-  adTitleNew: { fontSize: 16, fontWeight: '900', color: '#1F3B77' },
-  adDescNew: { marginTop: 6, fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  adTitleNew: { fontSize: 16, fontWeight: '900' },
+  adDescNew: { marginTop: 6, fontSize: 13, fontWeight: '600' },
   adBtn: {
     marginTop: 10,
     alignSelf: 'flex-start',
-    backgroundColor: '#111827',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
   },
-  adBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  adBtnText: { fontWeight: '800', fontSize: 13 },
   adImageWrap: {
     width: 120,
     height: 92,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1717,9 +1709,8 @@ const styles = StyleSheet.create({
     borderRadius: 33,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF4D7D',
   },
-  fabPlus: { color: '#fff', fontSize: 34, fontWeight: '900', marginTop: -2 },
+  fabPlus: { fontSize: 34, fontWeight: '900', marginTop: -2 },
 
   videoModal: {
     flex: 1,

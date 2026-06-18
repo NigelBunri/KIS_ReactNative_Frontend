@@ -6,6 +6,7 @@
  * When connected to a partner account, management becomes global and multi-admin.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   Alert,
   Image,
@@ -18,10 +19,14 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import { API_BASE_URL } from '@/network/config';
+import ROUTES from '@/network';
+import { Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
@@ -102,12 +107,8 @@ const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
   rejected: 'Rejected',
 };
 
-const VERIFICATION_COLOR: Record<VerificationStatus, string> = {
-  unverified: '#6b7280',
-  pending: '#f59e0b',
-  verified: '#10b981',
-  rejected: '#ef4444',
-};
+const verificationColor = (status: VerificationStatus, p: any): string =>
+  ({ unverified: p.subtext, pending: p.gold, verified: p.success, rejected: p.danger } as Record<VerificationStatus, string>)[status] ?? p.subtext;
 
 function StatBadge({ label, value, icon, color }: { label: string; value: string | number; icon: string; color: string }) {
   const { palette } = useKISTheme();
@@ -141,6 +142,7 @@ function CreateInstitutionSheet({
   onCreate: (inst: Institution) => void;
 }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<{
@@ -390,7 +392,7 @@ function CreateInstitutionSheet({
           <Text style={{ color: palette.subtext, fontWeight: '800', fontSize: 12 }}>{steps[step]}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+        <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', paddingBottom: 120 }}>
           {stepContent[step]?.()}
         </ScrollView>
 
@@ -438,7 +440,7 @@ function CreateInstitutionSheet({
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>
               {saving ? 'Creating…' : step < steps.length - 1 ? 'Next' : 'Create Institution'}
             </Text>
           </Pressable>
@@ -456,6 +458,8 @@ function InstitutionDashboard({
   onClose: () => void;
 }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const dashNavigation = useNavigation<any>();
   const [tab, setTab] = useState<TabId>('overview');
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState<any>(null);
@@ -465,6 +469,10 @@ function InstitutionDashboard({
   const [tabLoading, setTabLoading] = useState(false);
   const [courseForm, setCourseForm] = useState<{ title: string; description: string } | null>(null);
   const [programForm, setProgramForm] = useState<{ title: string; description: string } | null>(null);
+  const [editingInstitution, setEditingInstitution] = useState(false);
+  const [editName, setEditName] = useState(institution.name);
+  const [editDescription, setEditDescription] = useState(institution.description ?? '');
+  const [savingInstitution, setSavingInstitution] = useState(false);
 
   const instType = (institution.institution_type ?? institution.institutionType ?? 'university') as InstitutionType;
   const verStatus = (institution.verification_status ?? institution.verificationStatus ?? 'unverified') as VerificationStatus;
@@ -548,7 +556,7 @@ function InstitutionDashboard({
         <View style={{ position: 'absolute', top: 12, right: 12 }}>
           <View
             style={{
-              backgroundColor: VERIFICATION_COLOR[verStatus] + 'ee',
+              backgroundColor: verificationColor(verStatus, palette) + 'ee',
               borderRadius: 10,
               paddingHorizontal: 10,
               paddingVertical: 5,
@@ -557,8 +565,8 @@ function InstitutionDashboard({
               gap: 5,
             }}
           >
-            <KISIcon name="shield-checkmark-outline" size={12} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>
+            <KISIcon name="shield-checkmark-outline" size={12} color={palette.onPrimary} />
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 11 }}>
               {VERIFICATION_LABEL[verStatus]}
             </Text>
           </View>
@@ -567,10 +575,10 @@ function InstitutionDashboard({
 
       {/* Stats row */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <StatBadge label="Members" value={memberCount >= 1000 ? `${(memberCount / 1000).toFixed(1)}k` : memberCount} icon="people-outline" color="#3b82f6" />
-        <StatBadge label="Courses" value={courseCount} icon="book-outline" color="#10b981" />
-        <StatBadge label="Programs" value={programCount} icon="layers-outline" color="#f59e0b" />
-        <StatBadge label="Enrolled" value={enrollmentCount >= 1000 ? `${(enrollmentCount / 1000).toFixed(1)}k` : enrollmentCount} icon="school-outline" color="#8b5cf6" />
+        <StatBadge label="Members" value={memberCount >= 1000 ? `${(memberCount / 1000).toFixed(1)}k` : memberCount} icon="people-outline" color={palette.info} />
+        <StatBadge label="Courses" value={courseCount} icon="book-outline" color={palette.success} />
+        <StatBadge label="Programs" value={programCount} icon="layers-outline" color={palette.gold} />
+        <StatBadge label="Enrolled" value={enrollmentCount >= 1000 ? `${(enrollmentCount / 1000).toFixed(1)}k` : enrollmentCount} icon="school-outline" color={palette.primaryStrong} />
       </View>
 
       {/* Quick actions */}
@@ -587,12 +595,12 @@ function InstitutionDashboard({
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Quick Actions</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {[
-            { label: 'Add Course', icon: 'add-circle-outline', color: '#10b981' },
-            { label: 'Add Program', icon: 'layers-outline', color: '#3b82f6' },
-            { label: 'Invite Staff', icon: 'person-add-outline', color: '#f59e0b' },
-            { label: 'Live Class', icon: 'videocam-outline', color: '#ef4444' },
-            { label: 'Issue Certificate', icon: 'ribbon-outline', color: '#8b5cf6' },
-            { label: 'Publish Landing', icon: 'globe-outline', color: '#06b6d4' },
+            { label: 'Add Course', icon: 'add-circle-outline', color: palette.success },
+            { label: 'Add Program', icon: 'layers-outline', color: palette.info },
+            { label: 'Invite Staff', icon: 'person-add-outline', color: palette.gold },
+            { label: 'Live Class', icon: 'videocam-outline', color: palette.danger },
+            { label: 'Issue Certificate', icon: 'ribbon-outline', color: palette.primaryStrong },
+            { label: 'Publish Landing', icon: 'globe-outline', color: palette.info },
           ].map((action) => (
             <Pressable
               key={action.label}
@@ -600,9 +608,9 @@ function InstitutionDashboard({
                 if (action.label === 'Add Course') { setTab('courses'); setCourseForm({ title: '', description: '' }); }
                 else if (action.label === 'Add Program') { setTab('programs'); setProgramForm({ title: '', description: '' }); }
                 else if (action.label === 'Invite Staff') setTab('members');
-                else if (action.label === 'Live Class') setTab('courses');
-                else if (action.label === 'Issue Certificate') setTab('analytics');
-                else if (action.label === 'Publish Landing') setTab('settings');
+                else if (action.label === 'Live Class') Alert.alert('Live Class', 'To start a live class, go to the Courses tab and open a scheduled course session. Live streaming will be available soon.');
+                else if (action.label === 'Issue Certificate') Alert.alert('Issue Certificate', 'Certificates are issued automatically when a learner completes all course requirements. You can track this in the Analytics tab.');
+                else if (action.label === 'Publish Landing') { setTab('settings'); Alert.alert('Publish Landing', 'Institution landing page publishing is managed via institution settings. Coming soon.'); }
               }}
               style={{
                 borderWidth: 1.5,
@@ -626,11 +634,26 @@ function InstitutionDashboard({
       {/* Verification CTA */}
       {verStatus === 'unverified' && (
         <Pressable
-          onPress={() => Alert.alert('Verification', 'Start institution verification to get the verified badge and unlock global features.')}
+          onPress={async () => {
+            try {
+              const res = await postRequest(
+                ROUTES.educationInstitutionVerificationStart(institution.id),
+                {},
+                { errorMessage: '' },
+              );
+              if (res?.success === false) {
+                Alert.alert('Error', res?.message || 'Could not start verification. Please try again.');
+              } else {
+                Alert.alert('Verification Started', 'Your institution has been submitted for verification. We will review it shortly.');
+              }
+            } catch {
+              Alert.alert('Error', 'Could not start verification. Please try again.');
+            }
+          }}
           style={{
-            backgroundColor: '#f59e0b15',
+            backgroundColor: palette.gold + '15',
             borderWidth: 1.5,
-            borderColor: '#f59e0b',
+            borderColor: palette.gold,
             borderRadius: 18,
             padding: 14,
             flexDirection: 'row',
@@ -638,21 +661,21 @@ function InstitutionDashboard({
             gap: 12,
           }}
         >
-          <KISIcon name="shield-outline" size={22} color="#f59e0b" />
+          <KISIcon name="shield-outline" size={22} color={palette.gold} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ color: '#f59e0b', fontWeight: '900', fontSize: 15 }}>Get Verified</Text>
-            <Text style={{ color: '#f59e0b', fontWeight: '700', fontSize: 12, opacity: 0.85 }}>
+            <Text style={{ color: palette.gold, fontWeight: '900', fontSize: 15 }}>Get Verified</Text>
+            <Text style={{ color: palette.gold, fontWeight: '700', fontSize: 12, opacity: 0.85 }}>
               Verified institutions get more enrollments and global visibility
             </Text>
           </View>
-          <KISIcon name="chevron-forward-outline" size={16} color="#f59e0b" />
+          <KISIcon name="chevron-forward-outline" size={16} color={palette.gold} />
         </Pressable>
       )}
 
       {/* Partner account CTA */}
       {!isPartnerConnected && (
         <Pressable
-          onPress={() => Alert.alert('Partner Account', 'Connect a partner account to manage your institution globally, enable international enrollment, and access enterprise-level management tools.')}
+          onPress={() => dashNavigation.navigate('MainTabs', { screen: 'Partners' })}
           style={{
             backgroundColor: palette.primarySoft,
             borderWidth: 1.5,
@@ -680,9 +703,9 @@ function InstitutionDashboard({
       {isPartnerConnected && (
         <View
           style={{
-            backgroundColor: '#10b98115',
+            backgroundColor: palette.success + '15',
             borderWidth: 1.5,
-            borderColor: '#10b981',
+            borderColor: palette.success,
             borderRadius: 18,
             padding: 14,
             flexDirection: 'row',
@@ -690,10 +713,10 @@ function InstitutionDashboard({
             gap: 12,
           }}
         >
-          <KISIcon name="checkmark-circle-outline" size={22} color="#10b981" />
+          <KISIcon name="checkmark-circle-outline" size={22} color={palette.success} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 15 }}>Partner Account Connected</Text>
-            <Text style={{ color: '#10b981', fontWeight: '700', fontSize: 12, opacity: 0.85 }}>
+            <Text style={{ color: palette.success, fontWeight: '900', fontSize: 15 }}>Partner Account Connected</Text>
+            <Text style={{ color: palette.success, fontWeight: '700', fontSize: 12, opacity: 0.85 }}>
               Global management enabled
             </Text>
           </View>
@@ -713,14 +736,14 @@ function InstitutionDashboard({
       >
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Platform Features</Text>
         {[
-          { icon: 'book-outline', label: 'Course Builder', desc: 'Create and organize multi-module courses', color: '#10b981' },
-          { icon: 'layers-outline', label: 'Program Management', desc: 'Bundle courses into degree/diploma programs', color: '#3b82f6' },
-          { icon: 'videocam-outline', label: 'Live Classes', desc: 'Schedule and broadcast live sessions', color: '#ef4444' },
-          { icon: 'ribbon-outline', label: 'Certificates', desc: 'Issue verifiable digital certificates', color: '#f59e0b' },
-          { icon: 'people-outline', label: 'Staff & Roles', desc: 'Assign instructors, admins, and TAs', color: '#8b5cf6' },
-          { icon: 'analytics-outline', label: 'Analytics', desc: 'Track enrollment, completion, and revenue', color: '#06b6d4' },
-          { icon: 'card-outline', label: 'USD Payments', desc: 'Collect tuition and fees in USD', color: '#10b981' },
-          { icon: 'globe-outline', label: 'Landing Page', desc: 'Publish a public-facing institution page', color: '#3b82f6' },
+          { icon: 'book-outline', label: 'Course Builder', desc: 'Create and organize multi-module courses', color: palette.success },
+          { icon: 'layers-outline', label: 'Program Management', desc: 'Bundle courses into degree/diploma programs', color: palette.info },
+          { icon: 'videocam-outline', label: 'Live Classes', desc: 'Schedule and broadcast live sessions', color: palette.danger },
+          { icon: 'ribbon-outline', label: 'Certificates', desc: 'Issue verifiable digital certificates', color: palette.gold },
+          { icon: 'people-outline', label: 'Staff & Roles', desc: 'Assign instructors, admins, and TAs', color: palette.primaryStrong },
+          { icon: 'analytics-outline', label: 'Analytics', desc: 'Track enrollment, completion, and revenue', color: palette.info },
+          { icon: 'card-outline', label: 'USD Payments', desc: 'Collect tuition and fees in USD', color: palette.success },
+          { icon: 'globe-outline', label: 'Landing Page', desc: 'Publish a public-facing institution page', color: palette.info },
         ].map((feat) => (
           <View key={feat.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
@@ -787,9 +810,74 @@ function InstitutionDashboard({
     );
   };
 
+  const handleSaveInstitution = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Institution', 'Name is required.');
+      return;
+    }
+    setSavingInstitution(true);
+    try {
+      const res = await patchRequest(
+        ROUTES.broadcasts.educationInstitution(institution.id),
+        { name: editName.trim(), description: editDescription.trim() },
+        { errorMessage: 'Unable to save institution details.' },
+      );
+      if (!res?.success) throw new Error(res?.message || 'Unable to save institution details.');
+      Alert.alert('Institution', 'Details updated.');
+      setEditingInstitution(false);
+    } catch (e: any) {
+      Alert.alert('Institution', e?.message || 'Unable to save institution details.');
+    } finally {
+      setSavingInstitution(false);
+    }
+  };
+
   const renderSettings = () => (
     <View style={{ gap: 12 }}>
-      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Institution info</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Institution info</Text>
+        <Pressable
+          onPress={() => {
+            setEditName(institution.name);
+            setEditDescription(institution.description ?? '');
+            setEditingInstitution(v => !v);
+          }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: palette.divider, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 13 }}>
+            {editingInstitution ? 'Cancel' : 'Edit'}
+          </Text>
+        </Pressable>
+      </View>
+      {editingInstitution ? (
+        <View style={{ gap: 10 }}>
+          <TextInput
+            value={editName}
+            onChangeText={setEditName}
+            placeholder="Institution name"
+            placeholderTextColor={palette.subtext}
+            style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: palette.text, fontSize: 15, backgroundColor: palette.inputBg }}
+          />
+          <TextInput
+            value={editDescription}
+            onChangeText={setEditDescription}
+            placeholder="Description (optional)"
+            placeholderTextColor={palette.subtext}
+            multiline
+            numberOfLines={3}
+            style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: palette.text, fontSize: 14, backgroundColor: palette.inputBg, minHeight: 80 }}
+          />
+          <Pressable
+            onPress={() => void handleSaveInstitution()}
+            disabled={savingInstitution}
+            style={{ backgroundColor: palette.primaryStrong, borderRadius: 12, paddingVertical: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center', opacity: savingInstitution ? 0.6 : 1 }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>
+              {savingInstitution ? 'Saving…' : 'Save changes'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       {[
         { label: 'Name', value: institution.name },
         { label: 'Type', value: institution.institution_type ?? institution.institutionType ?? '—' },
@@ -822,7 +910,7 @@ function InstitutionDashboard({
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Courses ({courses.length})</Text>
         <Pressable
           onPress={() => setCourseForm({ title: '', description: '' })}
-          style={{ backgroundColor: palette.primarySoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: palette.primary }}
+          style={{ backgroundColor: palette.primarySoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: palette.primary, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 13 }}>+ Add Course</Text>
         </Pressable>
@@ -873,7 +961,7 @@ function InstitutionDashboard({
                 }}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
               >
-                <Text style={{ color: '#fff', fontWeight: '900' }}>Create</Text>
+                <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Create</Text>
               </Pressable>
             </View>
           </View>
@@ -888,7 +976,7 @@ function InstitutionDashboard({
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Programs ({programs.length})</Text>
         <Pressable
           onPress={() => setProgramForm({ title: '', description: '' })}
-          style={{ backgroundColor: palette.primarySoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: palette.primary }}
+          style={{ backgroundColor: palette.primarySoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: palette.primary, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 13 }}>+ Add Program</Text>
         </Pressable>
@@ -935,7 +1023,7 @@ function InstitutionDashboard({
                 }}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
               >
-                <Text style={{ color: '#fff', fontWeight: '900' }}>Create</Text>
+                <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Create</Text>
               </Pressable>
             </View>
           </View>
@@ -967,7 +1055,7 @@ function InstitutionDashboard({
                 <Text style={{ color: palette.text, fontWeight: '800' }}>{name}</Text>
                 <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{String(role).replace('_', ' ').toUpperCase()}</Text>
               </View>
-              {m.status && <Text style={{ color: m.status === 'active' ? '#10b981' : palette.subtext, fontSize: 11, fontWeight: '700' }}>{String(m.status).toUpperCase()}</Text>}
+              {m.status && <Text style={{ color: m.status === 'active' ? palette.success : palette.subtext, fontSize: 11, fontWeight: '700' }}>{String(m.status).toUpperCase()}</Text>}
             </View>
           );
         })
@@ -1012,7 +1100,12 @@ function InstitutionDashboard({
           </Text>
         </View>
         <Pressable
-          onPress={() => Alert.alert('Share', 'Share institution page')}
+          onPress={() => {
+            Share.share({
+              message: `Check out ${institution.name} on KIS`,
+              url: institution.website ?? '',
+            }).catch(() => {});
+          }}
           style={{ padding: 6 }}
         >
           <KISIcon name="share-outline" size={20} color={palette.subtext} />
@@ -1052,7 +1145,7 @@ function InstitutionDashboard({
         })}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', paddingBottom: 120 }}>
         {content}
       </ScrollView>
     </SafeAreaView>
@@ -1065,6 +1158,7 @@ type Props = {
 
 export default function EducationInstitutionManagementScreen({ onClose }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -1130,12 +1224,12 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
             gap: 6,
           }}
         >
-          <KISIcon name="add-outline" size={16} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>Create</Text>
+          <KISIcon name="add-outline" size={16} color={palette.onPrimary} />
+          <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 13 }}>Create</Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 14 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', paddingBottom: 120, gap: 14 }} showsVerticalScrollIndicator={false}>
 
         {/* Intro card */}
         <View
@@ -1164,7 +1258,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
               <View
                 key={tag}
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.3)',
+                  backgroundColor: palette.primarySoft,
                   borderRadius: 8,
                   paddingHorizontal: 10,
                   paddingVertical: 4,
@@ -1212,7 +1306,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
                   <View style={{ position: 'absolute', top: 10, right: 10 }}>
                     <View
                       style={{
-                        backgroundColor: VERIFICATION_COLOR[verStatus] + 'ee',
+                        backgroundColor: verificationColor(verStatus, palette) + 'ee',
                         borderRadius: 8,
                         paddingHorizontal: 8,
                         paddingVertical: 4,
@@ -1221,8 +1315,8 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
                         gap: 4,
                       }}
                     >
-                      <KISIcon name="shield-checkmark-outline" size={10} color="#fff" />
-                      <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
+                      <KISIcon name="shield-checkmark-outline" size={10} color={palette.onPrimary} />
+                      <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 10 }}>
                         {VERIFICATION_LABEL[verStatus]}
                       </Text>
                     </View>
@@ -1231,7 +1325,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
                     <View style={{ position: 'absolute', top: 10, left: 10 }}>
                       <View
                         style={{
-                          backgroundColor: '#10b981ee',
+                          backgroundColor: palette.success + 'ee',
                           borderRadius: 8,
                           paddingHorizontal: 8,
                           paddingVertical: 4,
@@ -1240,8 +1334,8 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
                           gap: 4,
                         }}
                       >
-                        <KISIcon name="globe-outline" size={10} color="#fff" />
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>Global</Text>
+                        <KISIcon name="globe-outline" size={10} color={palette.onPrimary} />
+                        <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 10 }}>Global</Text>
                       </View>
                     </View>
                   )}
@@ -1304,7 +1398,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
                 paddingVertical: 12,
               }}
             >
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>Create Institution</Text>
+              <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Create Institution</Text>
             </Pressable>
           </View>
         ) : null}

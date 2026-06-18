@@ -152,11 +152,16 @@ export default function EducationProfileDashboard() {
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Share a review</Text>
         <View style={{ flexDirection: 'row', gap: 6 }}>
           {Array.from({ length: 5 }).map((_, index) => (
-            <Pressable key={`profile-review-star-${index}`} onPress={() => setReviewRating(index + 1)}>
+            <Pressable
+              key={`profile-review-star-${index}`}
+              onPress={() => setReviewRating(index + 1)}
+              hitSlop={8}
+              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+            >
               <KISIcon
                 name="star"
-                size={18}
-                color={index < reviewRating ? '#F59E0B' : palette.divider}
+                size={22}
+                color={index < reviewRating ? palette.gold : palette.divider}
               />
             </Pressable>
           ))}

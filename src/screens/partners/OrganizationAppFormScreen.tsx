@@ -361,7 +361,10 @@ const OrganizationAppFormScreen = () => {
                         borderColor: selected ? palette.primaryStrong : palette.divider,
                         borderRadius: 12,
                         paddingHorizontal: 10,
-                        paddingVertical: 4,
+                        paddingVertical: 10,
+                        minHeight: 44,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         backgroundColor: selected ? palette.primarySoft : palette.surface,
                         opacity: pressed ? 0.7 : 1,
                       },
@@ -413,7 +416,7 @@ const OrganizationAppFormScreen = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderWidth: selected ? 2.5 : 1,
-                      borderColor: selected ? theme.primary : 'rgba(255,255,255,0.18)',
+                      borderColor: selected ? theme.primary : palette.divider,
                     }}
                   >
                     {/* Shimmer line at top */}
@@ -488,6 +491,10 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 12,
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitleWrap: {
     flex: 1,
@@ -516,6 +523,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
   },
 });
 

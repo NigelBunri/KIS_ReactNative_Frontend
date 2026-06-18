@@ -11,6 +11,7 @@ import {
   Text,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 
@@ -20,7 +21,7 @@ export type AudioTrack = {
   id: string;
   url: string;
   label: string;
-  language?: string;
+  language_code?: string;
 };
 
 type Props = {
@@ -37,6 +38,7 @@ export default function AudioTrackSelector({
   currentTrackId,
 }: Props) {
   const { palette } = useKISTheme();
+  const { labelFontSize, minTouchTarget } = useResponsiveLayout();
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
 
   useEffect(() => {
@@ -73,13 +75,15 @@ export default function AudioTrackSelector({
               {
                 backgroundColor: isSelected ? palette.gold : palette.surfaceElevated,
                 borderColor: isSelected ? palette.gold : palette.border,
+                minHeight: minTouchTarget,
+                justifyContent: 'center',
               },
             ]}
           >
             <Text
               style={[
                 styles.pillText,
-                { color: isSelected ? '#fff' : palette.text },
+                { color: isSelected ? palette.onPrimary : palette.text, fontSize: labelFontSize },
               ]}
             >
               {track.label}
@@ -105,9 +109,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 6,
+    alignItems: 'center',
   },
   pillText: {
-    fontSize: 13,
     fontWeight: '600',
   },
 });

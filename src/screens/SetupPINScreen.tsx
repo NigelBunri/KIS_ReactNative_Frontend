@@ -1,11 +1,12 @@
 // src/screens/SetupPINScreen.tsx
 // Two-step PIN creation screen
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,6 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '@/navigation/types';
 import { setPIN } from '@/services/QuickLockService';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 const PIN_LENGTH = 6;
 
@@ -21,6 +24,9 @@ type Step = 'enter' | 'confirm';
 export default function SetupPINScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { width: windowWidth } = useWindowDimensions();
+  const { palette, tokens } = useKISTheme();
+  const responsive = useResponsiveLayout();
 
   const [step, setStep] = useState<Step>('enter');
   const [firstPIN, setFirstPIN] = useState('');
@@ -90,6 +96,113 @@ export default function SetupPINScreen() {
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => i < pin.length);
 
+  const styles = useMemo(() => StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: palette.bg,
+    },
+    header: {
+      paddingHorizontal: responsive.pageGutter,
+      paddingTop: tokens.spacing.sm,
+      paddingBottom: tokens.spacing.xs,
+      alignItems: 'flex-end',
+    },
+    backButton: {
+      paddingVertical: tokens.spacing.sm,
+      paddingHorizontal: tokens.spacing.xs,
+    },
+    backText: {
+      color: palette.subtext,
+      fontSize: tokens.typography.body,
+    },
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: responsive.pageGutter,
+      gap: tokens.spacing.lg,
+      marginTop: -40,
+    },
+    title: {
+      fontSize: tokens.typography.h2,
+      fontWeight: tokens.typography.weight.bold,
+      color: palette.text,
+      textAlign: 'center',
+      letterSpacing: 0.3,
+    },
+    subtitle: {
+      fontSize: tokens.typography.body,
+      color: palette.subtext,
+      textAlign: 'center',
+      marginTop: -tokens.spacing.sm,
+    },
+    dotsRow: {
+      flexDirection: 'row',
+      gap: tokens.spacing.md,
+      marginVertical: tokens.spacing.sm,
+    },
+    dot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 2,
+      borderColor: palette.subtext,
+      backgroundColor: 'transparent',
+    },
+    dotFilled: {
+      backgroundColor: palette.text,
+      borderColor: palette.text,
+    },
+    errorText: {
+      color: palette.danger,
+      fontSize: tokens.typography.body,
+      textAlign: 'center',
+      fontWeight: tokens.typography.weight.semibold,
+    },
+    retryButton: {
+      paddingVertical: tokens.spacing.sm,
+      paddingHorizontal: tokens.spacing.sm,
+    },
+    retryText: {
+      color: palette.subtext,
+      fontSize: tokens.typography.body,
+      textDecorationLine: 'underline',
+    },
+    numPad: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      width: 264,
+      gap: 12,
+      marginTop: tokens.spacing.sm,
+      justifyContent: 'center',
+    },
+    key: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: palette.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keyPressed: {
+      backgroundColor: palette.surfaceElevated,
+    },
+    keyBlank: {
+      width: 80,
+      height: 80,
+    },
+    keyText: {
+      fontSize: 26,
+      fontWeight: tokens.typography.weight.medium,
+      color: palette.text,
+    },
+    keyTextSmall: {
+      fontSize: 22,
+      fontWeight: '400',
+      color: palette.text,
+    },
+  }), [palette, tokens, responsive]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -123,7 +236,7 @@ export default function SetupPINScreen() {
           </Pressable>
         ) : null}
 
-        <View style={styles.numPad}>
+        <View style={[styles.numPad, { width: Math.min(windowWidth - 56, 264) }]}>
           {(['1','2','3','4','5','6','7','8','9','','0','del'] as const).map((key, idx) => {
             if (key === '') {
               return <View key={`blank-${idx}`} style={styles.keyBlank} />;
@@ -156,110 +269,3 @@ export default function SetupPINScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 4,
-    alignItems: 'flex-end',
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  backText: {
-    color: '#AAAAAA',
-    fontSize: 16,
-  },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 20,
-    marginTop: -40,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#AAAAAA',
-    textAlign: 'center',
-    marginTop: -12,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginVertical: 8,
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#AAAAAA',
-    backgroundColor: 'transparent',
-  },
-  dotFilled: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  errorText: {
-    color: '#FF5252',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  retryText: {
-    color: '#AAAAAA',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
-  numPad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 264,
-    gap: 12,
-    marginTop: 8,
-    justifyContent: 'center',
-  },
-  key: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyPressed: {
-    backgroundColor: '#3A3A3C',
-  },
-  keyBlank: {
-    width: 80,
-    height: 80,
-  },
-  keyText: {
-    fontSize: 26,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  keyTextSmall: {
-    fontSize: 22,
-    fontWeight: '400',
-    color: '#FFFFFF',
-  },
-});

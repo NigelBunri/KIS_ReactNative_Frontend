@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -14,6 +15,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import type { KISPalette } from '@/theme/constants';
+import { useResponsiveLayout } from '@/theme/responsive';
 import Video from 'react-native-video';
 import { popularLanguages } from '../profile/profile.constants';
 import type { ItemType } from '../profile/profile.types';
@@ -113,12 +115,13 @@ export function EditProfileModal(props: EditProfileModalProps) {
     onDeleteGalleryItem,
     deletingGalleryItemId = null,
   } = props;
+  const responsive = useResponsiveLayout();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightboxVisible, setLightboxVisible] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const lightboxTranslateY = useRef(new Animated.Value(0)).current;
   const touchStartX = useRef(0);
-  const screenWidth = Dimensions.get('window').width;
+  const screenWidth = responsive.width;
   const galleryWidth = Math.max(screenWidth - 72, 260);
   const galleryScrollRef = useRef<ScrollView | null>(null);
 
@@ -220,6 +223,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
   };
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={{ gap: 12 }}>
       <View
         style={{
@@ -231,7 +235,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
           overflow: 'hidden',
         }}
       >
-        <Text style={[styles.title, { color: palette.text, fontSize: 16 }]}>Live Profile Preview</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: responsive.bodyFontSize + 1 }]}>Live Profile Preview</Text>
         <Text style={[styles.subtext, { color: palette.subtext }]}>
           Your cover appears below your profile image, just like the public profile.
         </Text>
@@ -278,10 +282,10 @@ export function EditProfileModal(props: EditProfileModalProps) {
               )}
             </View>
             <View style={{ flex: 1, paddingBottom: 8, position: 'absolute', left: 100, right: 16, bottom: 16, justifyContent: 'center' }}>
-              <Text style={[styles.title, { color: "white", fontSize: 17 }]}>
+              <Text style={[styles.title, { color: palette.ivory, fontSize: responsive.headerTitleSize * 0.65 }]}>
                 {draftProfile?.display_name || 'Your name'}
               </Text>
-              <Text style={[styles.subtext, { color: "white" }]} numberOfLines={2}>
+              <Text style={[styles.subtext, { color: palette.ivory }]} numberOfLines={2}>
                 {draftProfile?.headline || 'Add a headline that tells people what you do.'}
               </Text>
             </View>
@@ -400,7 +404,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
           gap: 10,
         }}
       >
-        <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>Languages</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: responsive.bodyFontSize }]}>Languages</Text>
         <Text style={[styles.subtext, { color: palette.subtext }]}>
           Choose up to 6 popular languages for profile discoverability.
         </Text>
@@ -420,7 +424,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
                   },
                 ]}
               >
-                <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontSize: 12, fontWeight: '700' }}>
+                <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
                   {language}
                 </Text>
               </Pressable>
@@ -440,7 +444,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>Portfolio Slideshow</Text>
+          <Text style={[styles.title, { color: palette.text, fontSize: responsive.bodyFontSize }]}>Portfolio Slideshow</Text>
           <Pressable
             onPress={() => onAddGalleryMedia?.()}
             disabled={addingGalleryMedia}
@@ -454,7 +458,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
               },
             ]}
           >
-            <Text style={{ color: palette.primaryStrong, fontSize: 12, fontWeight: '700' }}>
+            <Text style={{ color: palette.primaryStrong, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
               {addingGalleryMedia ? 'Adding...' : 'Add media'}
             </Text>
           </Pressable>
@@ -531,12 +535,12 @@ export function EditProfileModal(props: EditProfileModalProps) {
                             top: 10,
                             right: 10,
                             borderRadius: 999,
-                            backgroundColor: '#00000077',
+                            backgroundColor: `${palette.royalInk}78`,
                             paddingHorizontal: 8,
                             paddingVertical: 4,
                           }}
                         >
-                          <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>VIDEO</Text>
+                          <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize - 1, fontWeight: '700' }}>VIDEO</Text>
                         </View>
                       </>
                     ) : (
@@ -551,12 +555,12 @@ export function EditProfileModal(props: EditProfileModalProps) {
                           top: 10,
                           left: 10,
                           borderRadius: 999,
-                          backgroundColor: '#00000088',
+                          backgroundColor: `${palette.royalInk}87`,
                           paddingHorizontal: 10,
                           paddingVertical: 6,
                         }}
                       >
-                        <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
+                        <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize - 1, fontWeight: '700' }}>
                           {deletingGalleryItemId === item.itemId ? '...' : 'Delete'}
                         </Text>
                       </Pressable>
@@ -568,12 +572,12 @@ export function EditProfileModal(props: EditProfileModalProps) {
                         right: 10,
                         bottom: 10,
                         borderRadius: 10,
-                        backgroundColor: '#00000088',
+                        backgroundColor: `${palette.royalInk}87`,
                         paddingHorizontal: 10,
                         paddingVertical: 8,
                       }}
                     >
-                      <Text style={{ color: '#FFFFFF', fontWeight: '700' }} numberOfLines={1}>
+                      <Text style={{ color: palette.ivory, fontWeight: '700' }} numberOfLines={1}>
                         {item.title || item.section || 'Gallery item'}
                       </Text>
                     </View>
@@ -603,7 +607,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
       </View>
 
       <View style={{ gap: 10 }}>
-        <Text style={[styles.title, { color: palette.text, fontSize: 16 }]}>Edit Profile Content</Text>
+        <Text style={[styles.title, { color: palette.text, fontSize: responsive.bodyFontSize + 1 }]}>Edit Profile Content</Text>
         <Text style={[styles.subtext, { color: palette.subtext }]}>
           Experience, education, projects, skills, portfolio, case studies, and more live here.
         </Text>
@@ -625,7 +629,8 @@ export function EditProfileModal(props: EditProfileModalProps) {
       />
 
       <Modal visible={lightboxVisible} animationType="fade" transparent onRequestClose={closeLightbox}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' }} {...lightboxResponder.panHandlers}>
+        {/* Full-screen media viewer intentionally stays near-dark in both themes (matches platform photo-viewer convention) */}
+        <View style={{ flex: 1, backgroundColor: `${palette.royalInk}F5` }} {...lightboxResponder.panHandlers}>
           <Animated.View style={{ flex: 1, transform: [{ translateY: lightboxTranslateY }] }}>
             {gallery[lightboxIndex]?.kind === 'video' ? (
               <Video
@@ -677,7 +682,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
               justifyContent: 'space-between',
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+            <Text style={{ color: palette.ivory, fontSize: responsive.bodyFontSize, fontWeight: '700', flex: 1 }} numberOfLines={1}>
               {gallery[lightboxIndex]?.title || gallery[lightboxIndex]?.section || 'Gallery preview'}
             </Text>
             {gallery[lightboxIndex]?.deletable && gallery[lightboxIndex]?.itemId ? (
@@ -686,16 +691,16 @@ export function EditProfileModal(props: EditProfileModalProps) {
                 disabled={deletingGalleryItemId === gallery[lightboxIndex]?.itemId}
                 style={{
                   borderRadius: 999,
-                  backgroundColor: '#FFFFFF22',
+                  backgroundColor: `${palette.ivory}21`,
                   minWidth: 56,
-                  height: 36,
+                  height: responsive.minTouchTarget,
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: 8,
                   paddingHorizontal: 10,
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
                   {deletingGalleryItemId === gallery[lightboxIndex]?.itemId ? '...' : 'Delete'}
                 </Text>
               </Pressable>
@@ -704,14 +709,14 @@ export function EditProfileModal(props: EditProfileModalProps) {
               onPress={closeLightbox}
               style={{
                 borderRadius: 999,
-                backgroundColor: '#FFFFFF22',
-                width: 36,
-                height: 36,
+                backgroundColor: `${palette.ivory}21`,
+                width: responsive.minTouchTarget,
+                height: responsive.minTouchTarget,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <KISIcon name="close" size={20} color="#FFFFFF" />
+              <KISIcon name="close" size={20} color={palette.ivory} />
             </Pressable>
           </View>
 
@@ -724,15 +729,16 @@ export function EditProfileModal(props: EditProfileModalProps) {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#FFFFFFCC', fontSize: 12 }}>
+            <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize, opacity: 0.8 }}>
               {gallery.length > 0 ? `${lightboxIndex + 1} / ${gallery.length}` : ''}
             </Text>
-            <Text style={{ color: '#FFFFFF99', fontSize: 11, marginTop: 4 }}>
+            <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize - 1, marginTop: 4, opacity: 0.6 }}>
               Pull down to close. Tap left/right to move.
             </Text>
           </View>
         </View>
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }

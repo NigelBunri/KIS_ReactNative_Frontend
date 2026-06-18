@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,18 +37,11 @@ type Props = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CLAIM_TYPE_COLOR: Record<ClaimType, string> = {
-  AUDIO: '#8B5CF6',
-  VIDEO: '#EF4444',
-  MANUAL: '#F59E0B',
-};
+const claimTypeColor = (type: ClaimType, p: any): string =>
+  ({ AUDIO: p.primaryStrong, VIDEO: p.danger, MANUAL: p.gold } as Record<ClaimType, string>)[type] ?? p.subtext;
 
-const STATUS_COLOR: Record<ClaimStatus, string> = {
-  pending: '#F59E0B',
-  matched: '#EF4444',
-  disputed: '#3B82F6',
-  resolved: '#22C55E',
-};
+const statusColor = (status: ClaimStatus, p: any): string =>
+  ({ pending: p.gold, matched: p.danger, disputed: p.primary, resolved: p.success } as Record<ClaimStatus, string>)[status] ?? p.subtext;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +51,8 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [disputingId, setDisputingId] = useState<string | null>(null);
+  const [disputeFormId, setDisputeFormId] = useState<string | null>(null);
+  const [disputeReason, setDisputeReason] = useState('');
 
   const fetchClaims = useCallback(async () => {
     if (!channelId) return;
@@ -84,29 +80,32 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
     void fetchClaims();
   }, [fetchClaims]);
 
-  const handleDispute = (claim: CopyrightClaim) => {
-    Alert.prompt(
-      'Dispute Claim',
-      `Provide a reason to dispute the "${claim.content_title ?? 'content'}" claim:`,
-      async (reason: string) => {
-        if (!reason?.trim()) return;
-        setDisputingId(claim.id);
-        try {
-          await postRequest(
-            `${ROUTES.broadcasts.channelCopyrightClaims(channelId)}${claim.id}/dispute/`,
-            { reason: reason.trim() },
-            { errorMessage: 'Could not submit dispute.' },
-          );
-          await fetchClaims();
-        } catch {
-          Alert.alert('Error', 'Could not submit dispute. Please try again.');
-        } finally {
-          setDisputingId(null);
-        }
-      },
-      'plain-text',
-    );
+  const openDisputeForm = (claim: CopyrightClaim) => {
+    setDisputeFormId(claim.id);
+    setDisputeReason('');
   };
+
+  const submitDispute = useCallback(async (claim: CopyrightClaim) => {
+    if (!disputeReason.trim()) {
+      Alert.alert('Reason required', 'Enter a reason to dispute this claim.');
+      return;
+    }
+    setDisputingId(claim.id);
+    try {
+      await postRequest(
+        ROUTES.broadcasts.channelCopyrightDisputeUrl(claim.id),
+        { reason: disputeReason.trim() },
+        { errorMessage: 'Could not submit dispute.' },
+      );
+      setDisputeFormId(null);
+      setDisputeReason('');
+      await fetchClaims();
+    } catch {
+      Alert.alert('Error', 'Could not submit dispute. Please try again.');
+    } finally {
+      setDisputingId(null);
+    }
+  }, [channelId, disputeReason, fetchClaims]);
 
   if (loading) {
     return (
@@ -154,11 +153,11 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
                 <View
                   style={[
                     styles.badge,
-                    { backgroundColor: CLAIM_TYPE_COLOR[claim.claim_type] + '22' },
+                    { backgroundColor: claimTypeColor(claim.claim_type, palette) + '22' },
                   ]}
                 >
                   <Text
-                    style={[styles.badgeText, { color: CLAIM_TYPE_COLOR[claim.claim_type] }]}
+                    style={[styles.badgeText, { color: claimTypeColor(claim.claim_type, palette) }]}
                   >
                     {claim.claim_type}
                   </Text>
@@ -166,23 +165,21 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
                 <View
                   style={[
                     styles.badge,
-                    { backgroundColor: STATUS_COLOR[claim.status] + '22' },
+                    { backgroundColor: statusColor(claim.status, palette) + '22' },
                   ]}
                 >
                   <Text
-                    style={[styles.badgeText, { color: STATUS_COLOR[claim.status] }]}
+                    style={[styles.badgeText, { color: statusColor(claim.status, palette) }]}
                   >
                     {claim.status.toUpperCase()}
                   </Text>
                 </View>
               </View>
             </View>
-            {(claim.status === 'matched' || claim.status === 'pending') && (
-              <Text
-                onPress={() => {
-                  if (disputingId === claim.id) return;
-                  handleDispute(claim);
-                }}
+            {(claim.status === 'matched' || claim.status === 'pending') && disputeFormId !== claim.id && (
+              <Pressable
+                disabled={disputingId === claim.id}
+                onPress={() => openDisputeForm(claim)}
                 style={[
                   styles.disputeBtn,
                   {
@@ -191,8 +188,39 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
                   },
                 ]}
               >
-                {disputingId === claim.id ? 'Submitting...' : 'Dispute'}
-              </Text>
+                <Text style={[styles.disputeBtnText, { color: palette.onPrimary }]}>
+                  {disputingId === claim.id ? 'Submitting...' : 'Dispute'}
+                </Text>
+              </Pressable>
+            )}
+            {disputeFormId === claim.id && (
+              <View style={styles.disputeForm}>
+                <TextInput
+                  value={disputeReason}
+                  onChangeText={setDisputeReason}
+                  placeholder="Reason for dispute"
+                  placeholderTextColor={palette.subtext}
+                  multiline
+                  style={[styles.disputeInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
+                />
+                <View style={styles.disputeFormActions}>
+                  <Pressable
+                    onPress={() => { setDisputeFormId(null); setDisputeReason(''); }}
+                    style={[styles.cancelBtn, { borderColor: palette.border }]}
+                  >
+                    <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={disputingId === claim.id}
+                    onPress={() => submitDispute(claim)}
+                    style={[styles.disputeBtn, styles.disputeSubmitBtn, { backgroundColor: palette.primaryStrong, opacity: disputingId === claim.id ? 0.5 : 1 }]}
+                  >
+                    <Text style={[styles.disputeBtnText, { color: palette.onPrimary }]}>
+                      {disputingId === claim.id ? 'Submitting...' : 'Submit dispute'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
             )}
           </View>
         ))
@@ -220,14 +248,35 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: '800' },
   disputeBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    overflow: 'hidden',
   },
+  disputeBtnText: { fontSize: 12, fontWeight: '800' },
+  disputeForm: { gap: 8 },
+  disputeInput: {
+    minHeight: 60,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlignVertical: 'top',
+  },
+  disputeFormActions: { flexDirection: 'row', gap: 8 },
+  disputeSubmitBtn: { flex: 1 },
+  cancelBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+  },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   emptyState: {
     borderWidth: 1,
     borderRadius: 10,

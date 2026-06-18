@@ -95,7 +95,7 @@ export const LocationPickerSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.surface ?? palette.background,
+            backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
           },
         ]}
@@ -128,7 +128,7 @@ export const LocationPickerSheet: React.FC<Props> = ({
                   resizeMode="cover"
                 />
                 <View style={{ position: 'absolute', bottom: 6, left: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ color: '#fff', fontSize: 11 }}>
+                  <Text style={{ color: palette.ivory, fontSize: 11 }}>
                     {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
                   </Text>
                 </View>
@@ -180,13 +180,13 @@ export const LocationPickerSheet: React.FC<Props> = ({
             <KISIcon
               name="send"
               size={18}
-              color={location ? (palette.onPrimary ?? '#fff') : palette.subtext}
+              color={location ? palette.onPrimary : palette.subtext}
               focused
             />
             <Text
               style={[
                 styles.sendText,
-                { color: location ? (palette.onPrimary ?? '#fff') : palette.subtext },
+                { color: location ? (palette.onPrimary) : palette.subtext },
               ]}
             >
               Send Location

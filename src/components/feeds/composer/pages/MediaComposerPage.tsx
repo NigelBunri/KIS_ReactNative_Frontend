@@ -15,6 +15,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import Video from 'react-native-video';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { ComposerType, RichComposerState } from '../types';
 import { makeAttachment } from '../attachments';
@@ -39,6 +40,7 @@ export function MediaComposerPage({
   setVideoThumbUri: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
 
   const pickImage = useCallback(async () => {
     const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
@@ -132,7 +134,7 @@ export function MediaComposerPage({
   const subtext = palette.subtext;
 
   return (
-    <View style={[styles.page, { backgroundColor: palette.bg ?? '#F2F4F7' }]}>
+    <View style={[styles.page, { backgroundColor: palette.bg }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -160,8 +162,8 @@ export function MediaComposerPage({
             onPress={pickVideoThumbnail}
             style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
           >
-            <View style={[styles.iconChip, { backgroundColor: '#7C5CFA' }]}>
-              <Ionicons name="add" size={18} color="#FFFFFF" />
+            <View style={[styles.iconChip, { backgroundColor: palette.primary }]}>
+              <Ionicons name="add" size={18} color={palette.onPrimary} />
             </View>
             <Text style={[styles.bigButtonText, { color: text }]}>Add video thumbnail</Text>
           </Pressable>
@@ -195,9 +197,9 @@ export function MediaComposerPage({
 
             {/* Thumbnail preview card */}
             {videoThumbUri ? (
-              <View style={styles.thumbRow}>
+              <View style={[styles.thumbRow, { maxWidth: responsive.contentMaxWidth }]}>
                 <View style={[styles.thumbCard, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}>
-                  <Image source={{ uri: videoThumbUri }} style={styles.thumbImage} resizeMode="cover" />
+                  <Image source={{ uri: videoThumbUri }} style={[styles.thumbImage, { backgroundColor: palette.surface }]} resizeMode="cover" />
                   <View style={styles.thumbMeta}>
                     <Text style={[styles.thumbTitle, { color: text }]}>Thumbnail</Text>
                     <Text style={[styles.thumbSub, { color: subtext }]}>Will be used as poster</Text>
@@ -332,7 +334,6 @@ const styles = StyleSheet.create({
   // Thumbnail preview row
   thumbRow: {
     width: '100%',
-    maxWidth: 360,
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -357,7 +358,6 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 14,
-    backgroundColor: '#EEE',
   },
   thumbMeta: {
     flex: 1,

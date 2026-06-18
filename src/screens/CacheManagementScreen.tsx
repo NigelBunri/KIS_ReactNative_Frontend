@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import {
   clearPermanentMediaDomain,
   formatPermanentMediaBytes,
@@ -17,6 +18,7 @@ import { getOfflineActionQueue } from '@/services/offlineActionQueue';
 export default function CacheManagementScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
   const [rows, setRows] = useState<PermanentMediaDomainUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export default function CacheManagementScreen() {
           <ActivityIndicator color={palette.primaryStrong ?? palette.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+        <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
           <View
             style={{
               borderWidth: 1,
@@ -109,6 +111,8 @@ export default function CacheManagementScreen() {
                 borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 8,
+                minHeight: 44,
+                justifyContent: 'center',
               }}
             >
               <Text style={{ color: palette.primary, fontWeight: '900' }}>Clear completed transfers</Text>
@@ -139,14 +143,14 @@ export default function CacheManagementScreen() {
                 disabled={row.bytes <= 0 || clearing === row.domain}
                 style={{
                   borderWidth: 1,
-                  borderColor: row.bytes > 0 ? palette.error ?? '#EF4444' : palette.divider,
+                  borderColor: row.bytes > 0 ? palette.danger : palette.divider,
                   borderRadius: 10,
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   opacity: row.bytes > 0 ? 1 : 0.45,
                 }}
               >
-                <Text style={{ color: row.bytes > 0 ? palette.error ?? '#EF4444' : palette.subtext, fontWeight: '900' }}>
+                <Text style={{ color: row.bytes > 0 ? palette.danger : palette.subtext, fontWeight: '900' }}>
                   {clearing === row.domain ? 'Clearing' : 'Clear'}
                 </Text>
               </Pressable>

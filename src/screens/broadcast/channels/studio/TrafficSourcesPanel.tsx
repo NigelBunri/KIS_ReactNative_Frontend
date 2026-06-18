@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -114,7 +115,7 @@ export default function TrafficSourcesPanel({ channelId }: Props) {
         {PERIODS.map(p => {
           const active = period === p.value;
           return (
-            <Text
+            <Pressable
               key={p.value}
               onPress={() => setPeriod(p.value)}
               style={[
@@ -122,12 +123,13 @@ export default function TrafficSourcesPanel({ channelId }: Props) {
                 {
                   backgroundColor: active ? palette.primaryStrong : (palette.surfaceElevated ?? palette.surface),
                   borderColor: active ? palette.primaryStrong : palette.border,
-                  color: active ? '#fff' : palette.text,
                 },
               ]}
             >
-              {p.label}
-            </Text>
+              <Text style={[styles.pillText, { color: active ? palette.onPrimary : palette.text }]}>
+                {p.label}
+              </Text>
+            </Pressable>
           );
         })}
       </View>
@@ -193,10 +195,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    fontSize: 12,
-    fontWeight: '700',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
+  pillText: { fontSize: 12, fontWeight: '700' },
   chartSection: { borderWidth: 1, borderRadius: 10, padding: 14, gap: 12 },
   chartTitle: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
   barRow: { gap: 8 },

@@ -1,25 +1,27 @@
 // src/screens/calls/components/CallControls.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   Pressable,
   ScrollView,
   StyleSheet,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallSession } from '@/services/calls/callTypes';
 import { REACTION_EMOJIS, isGroupCall, hasVideo } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
+import { useKISTheme } from '@/theme/useTheme';
 
-// Per-call-type accent colours — each type feels distinct yet royal
-const ACCENT: Record<string, string> = {
-  voice: '#C9A227',        // classic gold
-  video: '#8B5CF6',        // violet
-  'voice-group': '#3B82F6', // sapphire
-  'video-group': '#06B6D4', // cyan
-  broadcast: '#EC4899',    // rose
-};
+// Per-call-type accent builder — all values resolved from palette tokens.
+// voice-group → palette.info (sky blue), broadcast → palette.danger (vivid red).
+const buildAccent = (p: any): Record<string, string> => ({
+  voice: p.primary,
+  video: p.primaryStrong,
+  'voice-group': p.info,
+  'video-group': p.info,
+  broadcast: p.danger,
+});
 
 type ControlAction =
   | 'mute'
@@ -62,13 +64,16 @@ export default function CallControls({
   onToggleReactionPicker,
   unreadChat,
 }: Props) {
+  const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const ACCENT = buildAccent(palette);
   const isGroup = isGroupCall(session.callType);
   const withVideo = hasVideo(session.callType);
   const isBroadcast = session.callType === 'broadcast';
   const localParticipant = session.participants.find(p => p.isLocal);
   const isAudienceOnly = isBroadcast && localParticipant?.role === 'audience';
   const handRaised = !!session.raisedHands.includes(session.localUserId);
-  const accent = ACCENT[session.callType] ?? '#C9A227';
+  const accent = ACCENT[session.callType] ?? palette.primary;
 
   const allButtons: ControlBtn[] = [
     {
@@ -103,7 +108,7 @@ export default function CallControls({
       icon: 'raise-hand',
       label: handRaised ? 'Lower' : 'Hand',
       active: handRaised,
-      overrideAccent: '#F59E0B',
+      overrideAccent: palette.gold,
       hidden: !isGroup,
     },
     {
@@ -136,12 +141,117 @@ export default function CallControls({
       icon: 'screen-share',
       label: session.isScreenSharing ? 'Sharing' : 'Share',
       active: session.isScreenSharing,
-      overrideAccent: '#22C55E',
+      overrideAccent: palette.success,
       hidden: isBroadcast && isAudienceOnly,
     },
   ];
 
   const buttons = allButtons.filter(b => !b.hidden);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: `${palette.royalInk}F7`,
+      paddingBottom: Math.max(insets.bottom, 12),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: 'rgba(255,255,255,0.08)',
+    },
+    accentPip: {
+      width: 44,
+      height: 3,
+      borderRadius: 3,
+      alignSelf: 'center',
+      marginTop: 10,
+      marginBottom: 4,
+      opacity: 0.85,
+    },
+    reactionTray: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      paddingHorizontal: 16,
+      paddingBottom: 10,
+      gap: 8,
+    },
+    reactionBtn: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    reactionEmoji: { fontSize: 28 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 4,
+    },
+    scroll: { flex: 1 },
+    scrollContent: {
+      flexDirection: 'row',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      gap: 10,
+      alignItems: 'center',
+    },
+    btn: {
+      width: 65,
+      height: 72,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      borderWidth: 1,
+    },
+    btnPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
+    iconWrap: { position: 'relative' },
+    btnLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      textAlign: 'center',
+      letterSpacing: 0.15,
+    },
+    btnLabelActive: { fontWeight: '800' },
+    badge: {
+      position: 'absolute',
+      top: -5,
+      right: -8,
+      backgroundColor: palette.danger,
+      borderRadius: 10,
+      minWidth: 17,
+      height: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: palette.royalInk,
+    },
+    badgeTxt: { color: palette.ivory, fontSize: 9, fontWeight: '900' },
+    divider: {
+      width: StyleSheet.hairlineWidth,
+      height: 52,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+    },
+    endBtn: {
+      backgroundColor: palette.danger,
+      borderRadius: 22,
+      width: 65,
+      height: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginHorizontal: 12,
+      shadowColor: palette.danger,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.6,
+      shadowRadius: 12,
+      elevation: 14,
+    },
+    endLabel: { color: palette.ivory, fontSize: 11, fontWeight: '900', letterSpacing: 0.2 },
+  }), [palette, insets.bottom]);
 
   return (
     <View style={styles.container}>
@@ -179,6 +289,8 @@ export default function CallControls({
               onPress={() =>
                 btn.id === 'reactions' ? onToggleReactionPicker() : onAction(btn.id)
               }
+              palette={palette}
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -188,10 +300,13 @@ export default function CallControls({
         {/* End call — always pinned to the right, never scrolled away */}
         <Pressable
           onPress={() => onAction('end')}
+          accessibilityLabel="End call"
+          accessibilityRole="button"
+          hitSlop={10}
           style={({ pressed }) => [styles.endBtn, pressed && { opacity: 0.82, transform: [{ scale: 0.95 }] }]}
           android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: false, radius: 32 }}
         >
-          <KISIcon name="phone-off" size={26} color="#fff" />
+          <KISIcon name="phone-off" size={26} color={palette.ivory} />
           <Text style={styles.endLabel}>End</Text>
         </Pressable>
       </View>
@@ -203,10 +318,14 @@ function CallButton({
   btn,
   accent,
   onPress,
+  palette,
+  styles,
 }: {
   btn: ControlBtn;
   accent: string;
   onPress: () => void;
+  palette: any;
+  styles: any;
 }) {
   const isActive = !!btn.active;
   const isDanger = !!btn.danger && !isActive;
@@ -214,21 +333,24 @@ function CallButton({
   const bgColor = isActive
     ? accent
     : isDanger
-    ? 'rgba(220,38,38,0.16)'
+    ? `${palette.danger}29`
     : 'rgba(255,255,255,0.08)';
 
   const borderColor = isActive
     ? accent + 'AA'
     : isDanger
-    ? 'rgba(220,38,38,0.3)'
+    ? `${palette.danger}4D`
     : 'rgba(255,255,255,0.08)';
 
-  const iconColor = isActive ? '#080814' : isDanger ? '#F87171' : 'rgba(255,255,255,0.88)';
-  const labelColor = isActive ? '#080814' : isDanger ? '#F87171' : 'rgba(255,255,255,0.65)';
+  const iconColor = isActive ? palette.royalInk : isDanger ? palette.danger : 'rgba(255,255,255,0.88)';
+  const labelColor = isActive ? palette.royalInk : isDanger ? palette.danger : 'rgba(255,255,255,0.65)';
 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityLabel={btn.label}
+      accessibilityRole="button"
+      hitSlop={10}
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: bgColor, borderColor },
@@ -249,108 +371,3 @@ function CallButton({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'rgba(8,8,20,0.97)',
-    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  accentPip: {
-    width: 44,
-    height: 3,
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-    opacity: 0.85,
-  },
-  reactionTray: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  reactionBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  reactionEmoji: { fontSize: 28 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  scroll: { flex: 1 },
-  scrollContent: {
-    flexDirection: 'row',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 10,
-    alignItems: 'center',
-  },
-  btn: {
-    width: 65,
-    height: 72,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderWidth: 1,
-  },
-  btnPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
-  iconWrap: { position: 'relative' },
-  btnLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.15,
-  },
-  btnLabelActive: { fontWeight: '800' },
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -8,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    minWidth: 17,
-    height: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#080814',
-  },
-  badgeTxt: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  divider: {
-    width: StyleSheet.hairlineWidth,
-    height: 52,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  endBtn: {
-    backgroundColor: '#DC2626',
-    borderRadius: 22,
-    width: 65,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginHorizontal: 12,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 14,
-  },
-  endLabel: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.2 },
-});

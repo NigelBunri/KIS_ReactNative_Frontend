@@ -1,8 +1,10 @@
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -86,13 +88,15 @@ const DASHBOARDS: { title: string; screen: DashboardScreenKey; description: stri
 export default function AdminToolsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
 
   const openDashboard = (screen: DashboardScreenKey) => {
     navigation.navigate(screen);
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16 }} style={{ backgroundColor: palette.bg }}>
+    <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, paddingTop: insets.top + responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} style={{ backgroundColor: palette.bg }}>
       <Text style={{ fontSize: 28, fontWeight: '900', color: palette.text }}>Developer tools</Text>
       <Text style={{ color: palette.subtext, marginBottom: 16 }}>
         Jump into backend-specific dashboards. Each view pulls from the corresponding app’s analytics

@@ -119,7 +119,7 @@ export default function AddToPlaylistSheet({ item, visible, onClose }: Props) {
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={[styles.backdrop, { backgroundColor: palette.backdrop }]} onPress={onClose} />
 
         <Animated.View
           style={[
@@ -337,7 +337,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.48)',
   },
   sheet: {
     borderTopLeftRadius: 24,

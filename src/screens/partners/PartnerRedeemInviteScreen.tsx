@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -21,6 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PartnerRedeemInvite'>;
 
 export default function PartnerRedeemInviteScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const [code, setCode] = useState(route.params?.code ?? '');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -63,13 +65,21 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: palette.background }]}
+      style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim }]}>
+      <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk }]}>
         <Pressable
           onPress={() => navigation.goBack()}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, alignSelf: 'flex-start', marginBottom: 12 })}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.6 : 1,
+            alignSelf: 'flex-start',
+            marginBottom: 12,
+            minHeight: 44,
+            minWidth: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+          })}
         >
           <Text style={{ color: palette.primary, fontSize: 16 }}>‹ Back</Text>
         </Pressable>
@@ -114,9 +124,9 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
               ]}
             >
               {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={palette.onPrimary} />
               ) : (
-                <Text style={[styles.btnText, { color: palette.buttonText ?? '#fff' }]}>
+                <Text style={[styles.btnText, { color: palette.onPrimary }]}>
                   Redeem Code
                 </Text>
               )}
@@ -124,8 +134,8 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
           </>
         ) : (
           <>
-            <Text style={styles.successIcon}>✓</Text>
-            <Text style={[styles.successText, { color: palette.success ?? '#22c55e' }]}>
+            <Text style={[styles.successIcon, { color: palette.success }]}>✓</Text>
+            <Text style={[styles.successText, { color: palette.success }]}>
               {message}
             </Text>
             <Pressable
@@ -135,7 +145,7 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
                 { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1, marginTop: 8 },
               ]}
             >
-              <Text style={[styles.btnText, { color: palette.buttonText ?? '#fff' }]}>
+              <Text style={[styles.btnText, { color: palette.onPrimary }]}>
                 Continue
               </Text>
             </Pressable>
@@ -158,7 +168,6 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     borderRadius: 16,
     padding: 28,
-    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -203,7 +212,6 @@ const styles = StyleSheet.create({
   },
   successIcon: {
     fontSize: 48,
-    color: '#22c55e',
     textAlign: 'center',
     marginBottom: 8,
   },

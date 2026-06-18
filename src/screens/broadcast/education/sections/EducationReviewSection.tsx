@@ -12,14 +12,14 @@ type Props = {
   onRefresh: () => void;
 };
 
-const renderStars = (value: number) => {
+const renderStars = (value: number, palette: any) => {
   const filled = Math.round(value);
   return Array.from({ length: 5 }).map((_, index) => (
     <KISIcon
       key={`star-${index}`}
       name="star"
       size={14}
-      color={index < filled ? '#F59E0B' : '#CBD5F5'}
+      color={index < filled ? palette.gold : palette.border}
     />
   ));
 };
@@ -49,7 +49,7 @@ export default function EducationReviewSection({ reviews, averageRating, loading
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {renderStars(averageRating)}
+        {renderStars(averageRating, palette)}
         <Text style={{ color: palette.subtext, fontWeight: '900' }}>{averageRating.toFixed(1)}</Text>
       </View>
 

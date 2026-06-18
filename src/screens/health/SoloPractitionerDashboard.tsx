@@ -27,6 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useKISTheme } from '@/theme/useTheme';
 
 type Specialty =
   | 'general_practice'
@@ -139,11 +140,8 @@ const DEFAULT_SERVICES: ServiceType[] = [
   },
 ];
 
-const STATUS_COLOR = {
-  online: '#10b981',
-  busy: '#f59e0b',
-  offline: '#6b7280',
-};
+const soloStatusColor = (status: string, p: any): string =>
+  ({ online: p.success, busy: p.gold, offline: p.subtext } as Record<string, string>)[status] ?? p.subtext;
 
 const STATUS_LABEL = {
   online: 'Available',
@@ -151,13 +149,8 @@ const STATUS_LABEL = {
   offline: 'Offline',
 };
 
-const APPT_STATUS_COLOR: Record<AppointmentStatus, string> = {
-  pending: '#f59e0b',
-  confirmed: '#3b82f6',
-  in_progress: '#10b981',
-  completed: '#6b7280',
-  cancelled: '#ef4444',
-};
+const apptStatusColor = (status: AppointmentStatus, p: any): string =>
+  ({ pending: p.gold, confirmed: p.primary, in_progress: p.success, completed: p.subtext, cancelled: p.danger } as Record<AppointmentStatus, string>)[status] ?? p.subtext;
 
 function PulseDot({ color }: { color: string }) {
   const anim = useRef(new Animated.Value(1)).current;
@@ -233,6 +226,7 @@ type Props = {
 export default function SoloPractitionerDashboard({ onClose }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
+  const { palette: kisPalette } = useKISTheme();
   const sp = HEALTH_THEME_SPACING;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -318,19 +312,25 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
   const setAvailability = useCallback(async (status: 'online' | 'busy' | 'offline') => {
     setProfile((prev) => ({ ...prev, availabilityStatus: status }));
+    if (!profile.id) {
+      // No backend profile id resolved yet (practitioner profile bootstrap
+      // pending) — avoid PATCHing the collection endpoint, which does not
+      // accept partial updates and would silently no-op.
+      return;
+    }
     try {
       await queueableJsonRequest({
         domain: 'Healthcare',
         kind: 'healthcare.availability_status',
         method: 'PATCH',
-        url: ROUTES.core.profiles,
-        body: { availability_status: status },
+        url: ROUTES.healthcare.profile(profile.id),
+        body: { metadata: { availability_status: status } },
         dedupeKey: 'healthcare:availability-status',
         replaceExisting: true,
         errorMessage: '',
       });
     } catch (_) {}
-  }, []);
+  }, [profile.id]);
 
   const startVideoSession = useCallback(async (appointmentId?: string) => {
     try {
@@ -378,21 +378,28 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
     const updated = { ...profile, ...profileDraft };
     setProfile(updated as PractitionerProfile);
     setEditingProfile(false);
+    if (!updated.id) {
+      Alert.alert('Profile', 'Profile saved on this device. Sign in to sync to your account once a practitioner profile is provisioned.');
+      return;
+    }
     try {
       await patchRequest(
-        ROUTES.core.profiles,
+        ROUTES.healthcare.profile(updated.id),
         {
-          display_name: updated.displayName,
-          specialty: updated.specialty,
-          credentials: updated.credentials,
-          bio: updated.bio,
-          license_number: updated.licenseNumber,
+          metadata: {
+            display_name: updated.displayName,
+            specialty: updated.specialty,
+            credentials: updated.credentials,
+            bio: updated.bio,
+            license_number: updated.licenseNumber,
+            services: updated.services,
+          },
         },
         { errorMessage: '' },
       );
       Alert.alert('Profile', 'Profile saved successfully.');
     } catch (_) {
-      Alert.alert('Profile', 'Profile saved locally. Sync when online.');
+      Alert.alert('Profile', 'Profile saved on this device. We could not reach the server — changes will sync when back online.');
     }
   }, [profile, profileDraft]);
 
@@ -429,8 +436,8 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             </Text>
           </View>
           <View style={{ alignItems: 'center', gap: 6 }}>
-            <PulseDot color={STATUS_COLOR[profile.availabilityStatus]} />
-            <Text style={{ color: STATUS_COLOR[profile.availabilityStatus], fontWeight: '800', fontSize: 12 }}>
+            <PulseDot color={soloStatusColor(profile.availabilityStatus, kisPalette)} />
+            <Text style={{ color: soloStatusColor(profile.availabilityStatus, kisPalette), fontWeight: '800', fontSize: 12 }}>
               {STATUS_LABEL[profile.availabilityStatus]}
             </Text>
           </View>
@@ -445,14 +452,16 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               style={{
                 flex: 1,
                 borderWidth: 1.5,
-                borderColor: profile.availabilityStatus === s ? STATUS_COLOR[s] : palette.divider,
-                backgroundColor: profile.availabilityStatus === s ? STATUS_COLOR[s] + '22' : palette.card,
+                borderColor: profile.availabilityStatus === s ? soloStatusColor(s, kisPalette) : palette.divider,
+                backgroundColor: profile.availabilityStatus === s ? soloStatusColor(s, kisPalette) + '22' : palette.card,
                 borderRadius: 10,
                 paddingVertical: 8,
+                minHeight: 44,
                 alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              <Text style={{ color: STATUS_COLOR[s], fontWeight: '900', fontSize: 12 }}>
+              <Text style={{ color: soloStatusColor(s, kisPalette), fontWeight: '900', fontSize: 12 }}>
                 {STATUS_LABEL[s]}
               </Text>
             </Pressable>
@@ -466,19 +475,19 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           label="Today's Queue"
           value={String(todayAppts.length)}
           icon="calendar-outline"
-          color="#3b82f6"
+          color={kisPalette.info}
         />
         <StatCard
           label="Total Consults"
           value={String(profile.totalConsultations ?? 0)}
           icon="people-outline"
-          color="#10b981"
+          color={kisPalette.success}
         />
         <StatCard
           label="Rating"
           value={profile.rating ? profile.rating.toFixed(1) : '—'}
           icon="star-outline"
-          color="#f59e0b"
+          color={kisPalette.gold}
         />
       </View>
 
@@ -499,49 +508,58 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             onPress={() => startVideoSession()}
             style={{
               flex: 1,
-              backgroundColor: '#3b82f6' + '22',
+              backgroundColor: kisPalette.info + '22',
               borderWidth: 1.5,
-              borderColor: '#3b82f6',
+              borderColor: kisPalette.info,
               borderRadius: 14,
               padding: 14,
               alignItems: 'center',
               gap: 8,
             }}
           >
-            <KISIcon name="videocam-outline" size={24} color="#3b82f6" />
-            <Text style={{ color: '#3b82f6', fontWeight: '900', fontSize: 13 }}>Video Consult</Text>
+            <KISIcon name="videocam-outline" size={24} color={kisPalette.info} />
+            <Text style={{ color: kisPalette.info, fontWeight: '900', fontSize: 13 }}>Video Consult</Text>
           </Pressable>
           <Pressable
             onPress={() => startChatSession()}
             style={{
               flex: 1,
-              backgroundColor: '#10b981' + '22',
+              backgroundColor: kisPalette.success + '22',
               borderWidth: 1.5,
-              borderColor: '#10b981',
+              borderColor: kisPalette.success,
               borderRadius: 14,
               padding: 14,
               alignItems: 'center',
               gap: 8,
             }}
           >
-            <KISIcon name="chatbubble-outline" size={24} color="#10b981" />
-            <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 13 }}>Chat Consult</Text>
+            <KISIcon name="chatbubble-outline" size={24} color={kisPalette.success} />
+            <Text style={{ color: kisPalette.success, fontWeight: '900', fontSize: 13 }}>Chat Consult</Text>
           </Pressable>
           <Pressable
-            onPress={() => Alert.alert('Clinical Session', 'Starting clinical session...')}
+            onPress={() => {
+              if (profile.id) {
+                navigation.navigate('ClinicalCommandCenter', {
+                  institutionId: profile.id,
+                  institutionName: profile.displayName || undefined,
+                });
+              } else {
+                (navigation as any).navigate('Broadcast');
+              }
+            }}
             style={{
               flex: 1,
-              backgroundColor: '#8b5cf6' + '22',
+              backgroundColor: kisPalette.primaryStrong + '22',
               borderWidth: 1.5,
-              borderColor: '#8b5cf6',
+              borderColor: kisPalette.primaryStrong,
               borderRadius: 14,
               padding: 14,
               alignItems: 'center',
               gap: 8,
             }}
           >
-            <KISIcon name="medical-outline" size={24} color="#8b5cf6" />
-            <Text style={{ color: '#8b5cf6', fontWeight: '900', fontSize: 13 }}>Clinical</Text>
+            <KISIcon name="medical-outline" size={24} color={kisPalette.primaryStrong} />
+            <Text style={{ color: kisPalette.primaryStrong, fontWeight: '900', fontSize: 13 }}>Clinical</Text>
           </Pressable>
         </View>
       </View>
@@ -576,7 +594,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                   width: 10,
                   height: 10,
                   borderRadius: 5,
-                  backgroundColor: APPT_STATUS_COLOR[a.status],
+                  backgroundColor: apptStatusColor(a.status, kisPalette),
                 }}
               />
               <View style={{ flex: 1, gap: 2 }}>
@@ -589,13 +607,13 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               <Pressable
                 onPress={() => startVideoSession(a.id)}
                 style={{
-                  backgroundColor: '#3b82f6',
+                  backgroundColor: kisPalette.info,
                   borderRadius: 8,
                   paddingHorizontal: 10,
                   paddingVertical: 6,
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>Join</Text>
+                <Text style={{ color: kisPalette.onPrimary, fontWeight: '900', fontSize: 11 }}>Join</Text>
               </Pressable>
             </View>
           ))}
@@ -615,11 +633,11 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
       >
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>E-Consultation Features</Text>
         {[
-          { icon: 'videocam-outline', label: 'Secure Video Calls', desc: 'HIPAA-compliant video sessions', color: '#3b82f6' },
-          { icon: 'document-text-outline', label: 'E-Prescriptions', desc: 'Write and send digital prescriptions', color: '#10b981' },
-          { icon: 'flask-outline', label: 'Lab Order Requests', desc: 'Order diagnostic tests remotely', color: '#f59e0b' },
-          { icon: 'share-outline', label: 'Referral Network', desc: 'Refer patients to specialists', color: '#8b5cf6' },
-          { icon: 'shield-checkmark-outline', label: 'HIPAA Compliant', desc: 'All sessions are encrypted and audited', color: '#ef4444' },
+          { icon: 'videocam-outline', label: 'Secure Video Calls', desc: 'HIPAA-compliant video sessions', color: kisPalette.info },
+          { icon: 'document-text-outline', label: 'E-Prescriptions', desc: 'Write and send digital prescriptions', color: kisPalette.success },
+          { icon: 'flask-outline', label: 'Lab Order Requests', desc: 'Order diagnostic tests remotely', color: kisPalette.gold },
+          { icon: 'share-outline', label: 'Referral Network', desc: 'Refer patients to specialists', color: kisPalette.primaryStrong },
+          { icon: 'shield-checkmark-outline', label: 'HIPAA Compliant', desc: 'All sessions are encrypted and audited', color: kisPalette.error },
         ].map((feat) => (
           <View key={feat.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
@@ -669,13 +687,13 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           <Pressable
             onPress={() => setAvailability('online')}
             style={{
-              backgroundColor: '#10b981',
+              backgroundColor: kisPalette.success,
               borderRadius: 12,
               paddingHorizontal: 20,
               paddingVertical: 10,
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '900' }}>Go Online</Text>
+            <Text style={{ color: kisPalette.onPrimary, fontWeight: '900' }}>Go Online</Text>
           </Pressable>
         </View>
       ) : (
@@ -687,7 +705,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               borderRadius: 18,
               padding: 14,
               borderWidth: 1,
-              borderColor: APPT_STATUS_COLOR[a.status] + '55',
+              borderColor: apptStatusColor(a.status, kisPalette) + '55',
               gap: 10,
             }}
           >
@@ -698,13 +716,13 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               </View>
               <View
                 style={{
-                  backgroundColor: APPT_STATUS_COLOR[a.status] + '22',
+                  backgroundColor: apptStatusColor(a.status, kisPalette) + '22',
                   borderRadius: 8,
                   paddingHorizontal: 10,
                   paddingVertical: 4,
                 }}
               >
-                <Text style={{ color: APPT_STATUS_COLOR[a.status], fontWeight: '900', fontSize: 11 }}>
+                <Text style={{ color: apptStatusColor(a.status, kisPalette), fontWeight: '900', fontSize: 11 }}>
                   {a.status.replace(/_/g, ' ').toUpperCase()}
                 </Text>
               </View>
@@ -731,25 +749,25 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                   onPress={() => startVideoSession(a.id)}
                   style={{
                     flex: 1,
-                    backgroundColor: '#3b82f6',
+                    backgroundColor: kisPalette.info,
                     borderRadius: 10,
                     paddingVertical: 10,
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>Start Video</Text>
+                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900' }}>Start Video</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => startChatSession(a.id)}
                   style={{
                     flex: 1,
-                    backgroundColor: '#10b981',
+                    backgroundColor: kisPalette.success,
                     borderRadius: 10,
                     paddingVertical: 10,
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>Start Chat</Text>
+                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900' }}>Start Chat</Text>
                 </Pressable>
               </View>
             )}
@@ -865,7 +883,16 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                     borderWidth: 1,
                     borderColor: isToday ? palette.primary : palette.divider,
                   }}
-                  onPress={() => Alert.alert(day, `Manage ${day} availability`)}
+                  onPress={() => {
+                    if (profile.id) {
+                      navigation.navigate('AvailabilityManagement', {
+                        institutionId: profile.id,
+                        institutionType: 'clinic',
+                      });
+                    } else {
+                      Alert.alert('Save profile first', 'Please save your practitioner profile before managing availability.');
+                    }
+                  }}
                 >
                   <Text
                     style={{
@@ -881,7 +908,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                       width: 8,
                       height: 8,
                       borderRadius: 4,
-                      backgroundColor: hasSlots ? '#10b981' : palette.divider,
+                      backgroundColor: hasSlots ? kisPalette.success : palette.divider,
                     }}
                   />
                 </Pressable>
@@ -912,19 +939,39 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                   key={slot}
                   style={{
                     borderWidth: 1.5,
-                    borderColor: isBooked ? '#ef4444' : '#10b981',
-                    backgroundColor: isBooked ? '#ef444415' : '#10b98115',
+                    borderColor: isBooked ? kisPalette.error : kisPalette.success,
+                    backgroundColor: isBooked ? kisPalette.error + '15' : kisPalette.success + '15',
                     borderRadius: 10,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
                   }}
-                  onPress={() =>
-                    Alert.alert(slot, isBooked ? 'This slot is booked.' : 'This slot is available.')
-                  }
+                  onPress={() => {
+                    const slotInfo = isBooked ? 'This slot is booked.' : 'This slot is available.';
+                    Alert.alert(
+                      slot,
+                      slotInfo,
+                      isBooked
+                        ? [
+                            {
+                              text: 'View Booking',
+                              onPress: () => {
+                                const booked = todayAppts.find(
+                                  (a) => a.scheduledAt && new Date(a.scheduledAt).getHours() === parseInt(slot),
+                                );
+                                if (booked) {
+                                  Alert.alert(booked.patientName, `${booked.serviceType}\n${booked.scheduledAt}`);
+                                }
+                              },
+                            },
+                            { text: 'Close', style: 'cancel' },
+                          ]
+                        : [{ text: 'OK', style: 'cancel' }],
+                    );
+                  }}
                 >
                   <Text
                     style={{
-                      color: isBooked ? '#ef4444' : '#10b981',
+                      color: isBooked ? kisPalette.error : kisPalette.success,
                       fontWeight: '800',
                       fontSize: 13,
                     }}
@@ -977,15 +1024,15 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             }
           }}
           style={{
-            backgroundColor: editingProfile ? '#10b981' : palette.cardAccent,
+            backgroundColor: editingProfile ? kisPalette.success : palette.cardAccent,
             borderRadius: 10,
             paddingHorizontal: 14,
             paddingVertical: 8,
             borderWidth: 1,
-            borderColor: editingProfile ? '#10b981' : palette.primary,
+            borderColor: editingProfile ? kisPalette.success : palette.primary,
           }}
         >
-          <Text style={{ color: editingProfile ? '#fff' : palette.accentPrimary, fontWeight: '900' }}>
+          <Text style={{ color: editingProfile ? kisPalette.onPrimary : palette.accentPrimary, fontWeight: '900' }}>
             {editingProfile ? 'Save' : 'Edit'}
           </Text>
         </Pressable>
@@ -1079,7 +1126,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
       {/* Partner account CTA */}
       <Pressable
-        onPress={() => Alert.alert('Partner Account', 'Connect a partner account to manage your practice globally and access premium features.')}
+        onPress={() => (navigation as any).navigate('MainTabs', { screen: 'Partners' })}
         style={{
           backgroundColor: palette.cardAccent,
           borderRadius: 20,
@@ -1101,7 +1148,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             justifyContent: 'center',
           }}
         >
-          <KISIcon name="globe-outline" size={22} color="#fff" />
+          <KISIcon name="globe-outline" size={22} color={kisPalette.onPrimary} />
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={{ color: palette.accentPrimary, fontWeight: '900', fontSize: 15 }}>Connect Partner Account</Text>
@@ -1137,17 +1184,27 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
       durationMin: Number(serviceDraft.durationMin) || 30,
       priceUSD: Number(serviceDraft.priceUSD) || 0,
     };
-    if (editingService) {
-      setProfile(prev => ({ ...prev, services: prev.services.map(s => s.key === editingService.key ? newService : s) }));
-    } else {
-      setProfile(prev => ({ ...prev, services: [...prev.services, newService] }));
-    }
+    const nextServices = editingService
+      ? profile.services.map(s => (s.key === editingService.key ? newService : s))
+      : [...profile.services, newService];
+    setProfile(prev => ({ ...prev, services: nextServices }));
     setServiceDraft({});
     setEditingService(null);
+    if (profile.id) {
+      patchRequest(
+        ROUTES.healthcare.profile(profile.id),
+        { metadata: { services: nextServices } },
+        { errorMessage: '' },
+      ).catch(() => {
+        Alert.alert('Services', 'Service saved on this device. Changes will sync when back online.');
+      });
+    } else {
+      Alert.alert('Services', 'Service saved on this device. Sign in to sync changes to your account.');
+    }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <Modal visible={!!serviceEditorVisible} transparent animationType="slide" onRequestClose={() => { setServiceDraft({}); setEditingService(null); }}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <View style={{ backgroundColor: palette.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 }}>
@@ -1175,7 +1232,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                 <Text style={{ color: palette.text, fontWeight: '700' }}>Cancel</Text>
               </Pressable>
               <Pressable onPress={saveService} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}>
-                <Text style={{ color: '#fff', fontWeight: '900' }}>Save</Text>
+                <Text style={{ color: kisPalette.onPrimary, fontWeight: '900' }}>Save</Text>
               </Pressable>
             </View>
           </View>
@@ -1194,15 +1251,20 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         }}
       >
         {onClose && (
-          <Pressable onPress={onClose} style={{ padding: 4 }}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={{ padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityLabel="Close solo practitioner dashboard"
+          >
             <KISIcon name="close-outline" size={22} color={palette.subtext} />
           </Pressable>
         )}
         <View style={{ flex: 1 }}>
           <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Solo Practitioner</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <PulseDot color={STATUS_COLOR[profile.availabilityStatus]} />
-            <Text style={{ color: STATUS_COLOR[profile.availabilityStatus], fontWeight: '700', fontSize: 12 }}>
+            <PulseDot color={soloStatusColor(profile.availabilityStatus, kisPalette)} />
+            <Text style={{ color: soloStatusColor(profile.availabilityStatus, kisPalette), fontWeight: '700', fontSize: 12 }}>
               {STATUS_LABEL[profile.availabilityStatus]}
             </Text>
           </View>
@@ -1249,12 +1311,12 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                     width: 18,
                     height: 18,
                     borderRadius: 9,
-                    backgroundColor: '#ef4444',
+                    backgroundColor: kisPalette.error,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>{todayAppts.length}</Text>
+                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900', fontSize: 10 }}>{todayAppts.length}</Text>
                 </View>
               )}
             </Pressable>

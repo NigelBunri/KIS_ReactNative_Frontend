@@ -78,7 +78,7 @@ export const WallpaperPickerSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.surface ?? palette.background,
+            backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
           },
         ]}
@@ -96,7 +96,7 @@ export const WallpaperPickerSheet: React.FC<Props> = ({
             const isSelected = opt.id === currentId;
             const bgColor =
               opt.isDefault
-                ? palette.background
+                ? palette.bg
                 : opt.colors[0] ?? palette.surface;
 
             return (

@@ -33,8 +33,8 @@ export default function BroadcastSearchRow({
         style={[
           styles.searchWrap,
           {
-            backgroundColor: palette.surface,
-            borderColor: filterActive ? palette.primary : palette.border,
+            backgroundColor: 'rgba(23,17,31,0.26)',
+            borderColor: filterActive ? 'rgba(255,244,184,0.44)' : 'rgba(255,244,184,0.24)',
             shadowColor: palette.shadow ?? '#000',
             paddingHorizontal: compact ? 7 : 10,
             paddingVertical: compact ? 5 : 7,
@@ -46,10 +46,10 @@ export default function BroadcastSearchRow({
           <View
             style={[
               styles.searchIcon,
-              { backgroundColor: palette.primarySoft },
+              { backgroundColor: 'rgba(255,244,184,0.16)' },
             ]}
           >
-            <KISIcon name="search" size={16} color={palette.subtext} />
+            <KISIcon name="search" size={16} color={palette.onGold} />
           </View>
           <KISTextInput
             containerStyle={styles.inputContainer}
@@ -61,10 +61,10 @@ export default function BroadcastSearchRow({
               paddingHorizontal: 0,
               paddingVertical: 0,
               wrapStyle: styles.inputWrap,
-              inputStyle: styles.inputText,
+              inputStyle: { ...styles.inputText, color: palette.onGold },
             }}
             placeholder={searchPlaceholder}
-            placeholderTextColor={palette.subtext}
+            placeholderTextColor="rgba(255,244,184,0.78)"
             value={searchValue}
             onChangeText={onSearchChange}
           />
@@ -75,23 +75,23 @@ export default function BroadcastSearchRow({
             styles.filterBtn,
             {
               borderColor: filterActive
-                ? palette.primaryStrong
-                : palette.border,
+                ? 'rgba(255,244,184,0.48)'
+                : 'rgba(255,244,184,0.26)',
               backgroundColor: filterActive
-                ? palette.primaryStrong
-                : 'transparent',
+                ? 'rgba(255,244,184,0.20)'
+                : 'rgba(23,17,31,0.14)',
             },
           ]}
         >
           <KISIcon
             name="filter"
             size={16}
-            color={filterActive ? palette.onPrimary : palette.subtext}
+            color={filterActive ? palette.onGold : palette.onGold}
           />
           {responsive.isWatch ? null : (
             <Text
               style={{
-                color: filterActive ? palette.onPrimary : palette.text,
+                color: palette.onGold,
                 fontWeight: '800',
                 fontSize: responsive.labelFontSize,
               }}

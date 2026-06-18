@@ -40,17 +40,17 @@ function formatBitrate(bps: number): string {
   return `${bps} bps`;
 }
 
-function healthColor(stats: StreamHealthStats): string {
-  if (!stats.isConnected)          return '#6B7280'; // grey
-  if (stats.bitrateBps < 200_000)  return '#EF4444'; // red
-  if (stats.roundTripTimeMs > 300) return '#F59E0B'; // amber
-  if (stats.packetsLost > 50)      return '#F59E0B'; // amber
-  return '#22C55E';                                   // green
+function healthColor(stats: StreamHealthStats, palette: any): string {
+  if (!stats.isConnected)          return palette.subtext;  // grey
+  if (stats.bitrateBps < 200_000)  return palette.danger;   // red
+  if (stats.roundTripTimeMs > 300) return palette.warning ?? palette.gold; // amber
+  if (stats.packetsLost > 50)      return palette.warning ?? palette.gold; // amber
+  return palette.success;                                    // green
 }
 
 export default function StreamHealthBar({ stats, viewerCount, startedAt, palette }: Props) {
   const duration = useLiveDuration(startedAt);
-  const color    = healthColor(stats);
+  const color    = healthColor(stats, palette);
 
   // Pulse the status dot
   const pulse = useRef(new Animated.Value(1)).current;
@@ -81,7 +81,7 @@ export default function StreamHealthBar({ stats, viewerCount, startedAt, palette
         </Text>
       </View>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: palette.border }]} />
 
       {/* Bitrate */}
       <StatCell icon="wifi" label={formatBitrate(stats.bitrateBps)} palette={palette} />
@@ -108,7 +108,7 @@ export default function StreamHealthBar({ stats, viewerCount, startedAt, palette
         />
       )}
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: palette.border }]} />
 
       {/* Viewer count */}
       <View style={styles.statCell}>
@@ -132,10 +132,11 @@ export default function StreamHealthBar({ stats, viewerCount, startedAt, palette
 function StatCell({
   icon, label, palette, warn = false,
 }: { icon: string; label: string; palette: any; warn?: boolean }) {
+  const warnColor = palette.warning ?? palette.gold;
   return (
     <View style={styles.statCell}>
-      <KISIcon name={icon} size={12} color={warn ? '#F59E0B' : palette.subtext} />
-      <Text style={[styles.statText, { color: warn ? '#F59E0B' : palette.text }]}>
+      <KISIcon name={icon} size={12} color={warn ? warnColor : palette.subtext} />
+      <Text style={[styles.statText, { color: warn ? warnColor : palette.text }]}>
         {label}
       </Text>
     </View>
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
   statusGroup: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dot:         { width: 8, height: 8, borderRadius: 4 },
   label:       { fontSize: 11, fontWeight: '900' },
-  divider:     { width: StyleSheet.hairlineWidth, height: 16, backgroundColor: 'rgba(0,0,0,0.12)' },
+  divider:     { width: StyleSheet.hairlineWidth, height: 16 },
   statCell:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText:    { fontSize: 11, fontWeight: '700' },
 });

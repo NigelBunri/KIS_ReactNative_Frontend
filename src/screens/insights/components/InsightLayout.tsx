@@ -1,6 +1,8 @@
 import React from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import type { InsightPayload, TimeRange } from '@/api/insights/types';
 import {
   BarChart,
@@ -36,15 +38,17 @@ export default function InsightLayout({
   footer,
 }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const { bodyFontSize, labelFontSize, headerTitleSize, pageGutter } = useResponsiveLayout();
   const displayEmpty = !loading && !error && !data;
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top + 12 }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={palette.primary} />}
     >
-      <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+      <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize }]}>{title}</Text>
       {subtitle ? (
-        <Text style={[styles.subtitle, { color: palette.subtext }]}>{subtitle}</Text>
+        <Text style={[styles.subtitle, { color: palette.subtext, fontSize: bodyFontSize }]}>{subtitle}</Text>
       ) : null}
       <TimeRangeSelector value={timeRange} onChange={onTimeRangeChange} />
       {loading && !data ? (
@@ -54,8 +58,13 @@ export default function InsightLayout({
       ) : null}
       {error ? (
         <View style={styles.errorWrap}>
-          <Text style={{ color: palette.error }}>{error}</Text>
-          <Text style={{ color: palette.subtext }}>Pull to retry.</Text>
+          <Text style={{ color: palette.danger }}>{error}</Text>
+          <Pressable
+            onPress={onRefresh}
+            style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: palette.primary, borderRadius: 8, alignSelf: 'center' }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
+          </Pressable>
         </View>
       ) : null}
       {displayEmpty ? (
@@ -66,19 +75,19 @@ export default function InsightLayout({
       {data?.kpis?.length ? <KpiGrid items={data.kpis} /> : null}
       {data?.series?.length ? (
         <View style={styles.chartWrap}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Trend</Text>
+          <Text style={[styles.sectionTitle, { color: palette.text, fontSize: labelFontSize + 2 }]}>Trend</Text>
           <LineChart series={data.series} />
         </View>
       ) : null}
       {data?.breakdown?.length ? (
         <View style={styles.chartWrap}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Breakdown</Text>
+          <Text style={[styles.sectionTitle, { color: palette.text, fontSize: labelFontSize + 2 }]}>Breakdown</Text>
           <BarChart data={data.breakdown} />
         </View>
       ) : null}
       {data?.distribution?.length ? (
         <View style={styles.chartWrap}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Distribution</Text>
+          <Text style={[styles.sectionTitle, { color: palette.text, fontSize: labelFontSize + 2 }]}>Distribution</Text>
           <DonutChart data={data.distribution} />
         </View>
       ) : null}
@@ -91,20 +100,16 @@ export default function InsightLayout({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingTop: 12,
   },
   title: {
-    fontSize: 28,
     fontWeight: '900',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
     fontWeight: '500',
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 16,
     fontWeight: '700',
     marginBottom: 8,
   },

@@ -3,10 +3,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
+import { useKISTheme } from '@/theme/useTheme';
 
 const BACK_ONLINE_VISIBLE_MS = 2000;
 
 export default function OfflineBanner() {
+  const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const [isOffline, setIsOffline] = useState(false);
   const [showBackOnline, setShowBackOnline] = useState(false);
@@ -53,7 +55,7 @@ export default function OfflineBanner() {
 
   if (!isVisible) return null;
 
-  const backgroundColor = showBackOnline ? '#2E7D32' : '#B71C1C';
+  const backgroundColor = showBackOnline ? palette.success : palette.danger;
   const message = showBackOnline ? 'Back online' : 'No internet connection';
 
   return (
@@ -67,7 +69,7 @@ export default function OfflineBanner() {
       accessibilityLabel={message}
     >
       <View style={styles.inner}>
-        <Text style={styles.text}>{message}</Text>
+        <Text style={[styles.text, { color: palette.ivory }]}>{message}</Text>
       </View>
     </Animated.View>
   );
@@ -87,7 +89,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.2,

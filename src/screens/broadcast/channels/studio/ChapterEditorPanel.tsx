@@ -6,6 +6,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -181,7 +184,7 @@ export default function ChapterEditorPanel({ contentId }: Props) {
         onPress: async () => {
           setDeletingId(chapter.id);
           try {
-            await deleteRequest(ROUTES.broadcasts.contentChapter(chapter.id));
+            await deleteRequest(ROUTES.broadcasts.contentChapter(contentId, chapter.id));
             setChapters(prev => prev.filter(c => c.id !== chapter.id));
           } catch {
             Alert.alert('Error', 'Could not delete chapter.');
@@ -226,9 +229,11 @@ export default function ChapterEditorPanel({ contentId }: Props) {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: palette.surface }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
     >
       {/* Manual chapters */}
       <Text style={[styles.sectionHeading, { color: palette.text }]}>Manual Chapters</Text>
@@ -255,15 +260,18 @@ export default function ChapterEditorPanel({ contentId }: Props) {
               {secondsToHMS(chapter.start_seconds)}
             </Text>
           </View>
-          <Text
+          <Pressable
+            hitSlop={10}
+            style={styles.deleteTouch}
             onPress={() => {
               if (deletingId === chapter.id) return;
               handleDelete(chapter);
             }}
-            style={[styles.deleteBtn, { color: '#EF4444', opacity: deletingId === chapter.id ? 0.4 : 1 }]}
           >
-            {deletingId === chapter.id ? '...' : 'Delete'}
-          </Text>
+            <Text style={[styles.deleteBtn, { color: palette.danger, opacity: deletingId === chapter.id ? 0.4 : 1 }]}>
+              {deletingId === chapter.id ? '...' : 'Delete'}
+            </Text>
+          </Pressable>
         </View>
       ))}
 
@@ -283,27 +291,18 @@ export default function ChapterEditorPanel({ contentId }: Props) {
             <HMSInput value={newStartHMS} onChange={setNewStartHMS} palette={palette} />
           </View>
           <View style={styles.formActions}>
-            <Text
-              onPress={() => setShowForm(false)}
-              style={[styles.cancelBtn, { color: palette.subtext, borderColor: palette.border }]}
-            >
-              Cancel
-            </Text>
-            <Text
-              onPress={saving ? undefined : handleAdd}
-              style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}
-            >
-              {saving ? 'Adding...' : 'Add Chapter'}
-            </Text>
+            <Pressable onPress={() => setShowForm(false)} style={[styles.cancelBtn, { borderColor: palette.border }]}>
+              <Text style={[styles.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+            <Pressable disabled={saving} onPress={handleAdd} style={[styles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.5 : 1 }]}>
+              <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>{saving ? 'Adding...' : 'Add Chapter'}</Text>
+            </Pressable>
           </View>
         </View>
       ) : (
-        <Text
-          onPress={() => setShowForm(true)}
-          style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}
-        >
-          + Add Chapter
-        </Text>
+        <Pressable onPress={() => setShowForm(true)} style={[styles.addBtn, { backgroundColor: palette.primaryStrong }]}>
+          <Text style={[styles.addBtnText, { color: palette.onPrimary }]}>+ Add Chapter</Text>
+        </Pressable>
       )}
 
       {/* Auto-suggested chapters */}
@@ -326,23 +325,24 @@ export default function ChapterEditorPanel({ contentId }: Props) {
                   {auto.status ? `  · ${auto.status}` : ''}
                 </Text>
               </View>
-              <Text
+              <Pressable
+                hitSlop={10}
+                style={[styles.importBtn, { borderColor: palette.primaryStrong, opacity: importingId === auto.id ? 0.4 : 1 }]}
                 onPress={() => {
                   if (importingId === auto.id) return;
                   void handleImport(auto);
                 }}
-                style={[
-                  styles.importBtn,
-                  { borderColor: palette.primaryStrong, color: palette.primaryStrong, opacity: importingId === auto.id ? 0.4 : 1 },
-                ]}
               >
-                {importingId === auto.id ? '...' : 'Import'}
-              </Text>
+                <Text style={[styles.importBtnText, { color: palette.primaryStrong }]}>
+                  {importingId === auto.id ? '...' : 'Import'}
+                </Text>
+              </Pressable>
             </View>
           ))}
         </>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -382,16 +382,17 @@ const styles = StyleSheet.create({
   indexText: { fontSize: 11, fontWeight: '900' },
   chapterTitle: { fontSize: 13, fontWeight: '800' },
   chapterTime: { fontSize: 11, fontWeight: '600', marginTop: 2, fontFamily: 'monospace' },
+  deleteTouch: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { fontSize: 12, fontWeight: '900' },
   importBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 11,
-    fontWeight: '900',
-    overflow: 'hidden',
   },
+  importBtnText: { fontSize: 11, fontWeight: '900' },
   formCard: {
     borderWidth: 1,
     borderRadius: 10,
@@ -412,34 +413,31 @@ const styles = StyleSheet.create({
   hmsLabel: { fontSize: 12, fontWeight: '700', minWidth: 60 },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    overflow: 'hidden',
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '900' },
   saveBtn: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    overflow: 'hidden',
   },
+  saveBtnText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   addBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    overflow: 'hidden',
   },
+  addBtnText: { fontSize: 13, fontWeight: '900' },
   errorText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

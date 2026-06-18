@@ -49,13 +49,13 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
           contentContainerStyle={{ padding: spacing.xs }}
         >
           {titleExpanded ? (
-            <Text style={{ ...typography.h2, color: '#fff' }}>{title}</Text>
+            <Text style={{ ...typography.h2, color: palette.onPrimary }}>{title}</Text>
           ) : (
-            <Text style={{ ...typography.h2, color: '#fff' }}>{titlePreview.text}</Text>
+            <Text style={{ ...typography.h2, color: palette.onPrimary }}>{titlePreview.text}</Text>
           )}
           {titlePreview.truncated ? (
             <TouchableOpacity onPress={() => setTitleExpanded((prev) => !prev)} style={{ marginTop: 2 }}>
-              <Text style={{ ...typography.caption, color: '#fff' }}>{titleExpanded ? 'less' : '.. and more'}</Text>
+              <Text style={{ ...typography.caption, color: palette.onPrimary }}>{titleExpanded ? 'less' : '.. and more'}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -68,7 +68,7 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
           )}
           {subtitlePreview.truncated ? (
             <TouchableOpacity onPress={() => setSubtitleExpanded((prev) => !prev)} style={{ marginTop: 2 }}>
-              <Text style={{ ...typography.caption, color: '#fff' }}>{subtitleExpanded ? 'less' : '.. and more'}</Text>
+              <Text style={{ ...typography.caption, color: palette.onPrimary }}>{subtitleExpanded ? 'less' : '.. and more'}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -80,14 +80,14 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
               marginBottom: spacing.xs,
               alignSelf: 'flex-start',
               borderRadius: 999,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: palette.ivory,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.xs,
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.5)',
             }}
           >
-            <Text style={{ ...typography.label, color: '#111827' }}>{data?.ctaText || 'Book Now'}</Text>
+            <Text style={{ ...typography.label, color: palette.royalInk }}>{data?.ctaText || 'Book Now'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </LinearGradient>

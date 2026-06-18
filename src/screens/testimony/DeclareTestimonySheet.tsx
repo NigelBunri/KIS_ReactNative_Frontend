@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -111,6 +113,7 @@ export default function DeclareTestimonySheet() {
 
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView
         style={{ backgroundColor: palette.bg }}
         contentContainerStyle={styles.content}
@@ -187,7 +190,7 @@ export default function DeclareTestimonySheet() {
             value={openToContact}
             onValueChange={setOpenToContact}
             trackColor={{ false: palette.divider, true: palette.primary }}
-            thumbColor="#fff"
+            thumbColor={palette.ivory}
           />
         </View>
 
@@ -204,6 +207,7 @@ export default function DeclareTestimonySheet() {
           </Text>
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -225,6 +229,6 @@ function makeStyles(palette: any) {
     contactLabel: { fontSize: 15, fontWeight: '700' },
     contactSub: { fontSize: 13, marginTop: 2 },
     submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-    submitBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    submitBtnText: { color: palette.onPrimary, fontWeight: '800', fontSize: 16 },
   });
 }

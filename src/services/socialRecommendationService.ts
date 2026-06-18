@@ -1,5 +1,6 @@
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { isPersonalizationEnabled } from '@/services/consentService';
 
 export type RecommendationItem = {
   kind: string;
@@ -38,6 +39,7 @@ export type SocialRecommendationFoundation = {
 export const fetchSocialRecommendationFoundation = async (
   limit = 8,
 ): Promise<SocialRecommendationFoundation | null> => {
+  if (!isPersonalizationEnabled()) return null;
   const url = `${ROUTES.recommendations.foundation}?limit=${Math.max(1, Math.min(Number(limit) || 8, 20))}`;
   const response = await getRequest(url, {
     forceNetwork: true,

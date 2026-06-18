@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -15,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -59,6 +62,7 @@ type Job = {
 
 export default function JobsBoardScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<Nav>();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<JobType>('all');
@@ -105,10 +109,10 @@ export default function JobsBoardScreen() {
                   `${ROUTES.partners.apply(job.partner_id)}`,
                   { job_post: job.id },
                 );
+                Alert.alert('Application submitted', 'Your application has been sent successfully.');
               } else {
-                await postRequest(ROUTES.jobs.board, { job_post: job.id });
+                Alert.alert('Coming soon', 'Direct applications for non-partner job listings are not yet supported.');
               }
-              Alert.alert('Application submitted', 'Your application has been sent successfully.');
             } catch (e: any) {
               Alert.alert('Application failed', e?.message ?? 'Please try again.');
             }
@@ -149,7 +153,7 @@ export default function JobsBoardScreen() {
           ) : null}
           {item.is_remote ? (
             <View style={[styles.badge, { backgroundColor: palette.primary }]}>
-              <Text style={styles.badgeText}>Remote</Text>
+              <Text style={[styles.badgeText, { color: palette.onPrimary }]}>Remote</Text>
             </View>
           ) : null}
         </View>
@@ -174,7 +178,7 @@ export default function JobsBoardScreen() {
           style={[styles.applyBtn, { backgroundColor: palette.primary }]}
           onPress={() => handleApply(item)}
         >
-          <Text style={styles.applyBtnText}>Apply</Text>
+          <Text style={[styles.applyBtnText, { color: palette.onPrimary }]}>Apply</Text>
         </Pressable>
       </View>
     );
@@ -187,11 +191,15 @@ export default function JobsBoardScreen() {
       borderRadius: 20,
       marginRight: 8,
       borderWidth: 1,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
@@ -216,7 +224,7 @@ export default function JobsBoardScreen() {
         data={jobs}
         keyExtractor={(item) => item.id}
         renderItem={renderJob}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: responsive.pageGutter, paddingBottom: 32, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => fetchJobs(true)} />
         }
@@ -241,7 +249,7 @@ export default function JobsBoardScreen() {
                     ]}
                     onPress={() => setActiveFilter(item.key)}
                   >
-                    <Text style={{ color: active ? '#fff' : palette.text, fontSize: 13, fontWeight: '600' }}>
+                    <Text style={{ color: active ? palette.onPrimary : palette.text, fontSize: 13, fontWeight: '600' }}>
                       {item.label}
                     </Text>
                   </Pressable>
@@ -268,10 +276,14 @@ export default function JobsBoardScreen() {
             <View style={styles.emptyState}>
               <KISIcon name="search" size={40} color={palette.subtext} />
               <Text style={[styles.emptyText, { color: palette.subtext }]}>No jobs found</Text>
+              <Text style={[styles.emptyText, { color: palette.subtext, fontSize: 13, fontWeight: '400' }]}>
+                Check back soon or adjust your filters
+              </Text>
             </View>
           )
         }
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -353,7 +365,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   badgeText: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -380,11 +391,12 @@ const styles = StyleSheet.create({
   applyBtn: {
     borderRadius: 10,
     paddingVertical: 10,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 4,
   },
   applyBtnText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },

@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,7 @@ export default function OrgAppLaunchScreen() {
   const navigation = useNavigation<NavigationProps>();
   const { params } = useRoute<RouteProps>();
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const { partnerId, appId } = params;
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +54,7 @@ export default function OrgAppLaunchScreen() {
 
   if (error) {
     return (
-      <View style={[styles.center, { backgroundColor: palette.surface }]}>
+      <View style={[styles.center, { paddingTop: insets.top, backgroundColor: palette.surface }]}>
         <Text style={{ fontSize: 36 }}>⚠️</Text>
         <Text style={[styles.msg, { color: palette.danger }]}>{error}</Text>
       </View>
@@ -60,7 +62,7 @@ export default function OrgAppLaunchScreen() {
   }
 
   return (
-    <View style={[styles.center, { backgroundColor: palette.surface }]}>
+    <View style={[styles.center, { paddingTop: insets.top, backgroundColor: palette.surface }]}>
       <ActivityIndicator size="large" color={palette.primary} />
       <Text style={[styles.msg, { color: palette.subtext }]}>Opening app…</Text>
     </View>

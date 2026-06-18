@@ -10,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { patchRequest } from '@/network/patch';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
 type Props = {
@@ -37,6 +39,7 @@ export default function ThumbnailPickerSheet({
   onUpdated,
 }: Props) {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<Asset | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -55,15 +58,27 @@ export default function ThumbnailPickerSheet({
     if (!asset?.uri) return;
     setSaving(true);
     try {
-      const form = new FormData();
+      // Step 1: upload the raw image bytes to get a hosted URL.
+      const uploadForm = new FormData();
       const name = asset.fileName ?? `thumbnail_${Date.now()}.jpg`;
       const type = asset.type ?? guessMime(asset.uri);
-      form.append('thumbnail', { uri: asset.uri, name, type } as any);
+      uploadForm.append('attachment', { uri: asset.uri, name, type } as any);
 
-      const url = ROUTES.broadcasts.channelContentDetail?.(contentId);
-      if (!url) throw new Error('No content detail route');
+      const uploadRes = await postRequest(ROUTES.broadcasts.profileAttachment, uploadForm, {
+        errorMessage: 'Failed to upload thumbnail image.',
+      });
 
-      const res = await patchRequest(url, form, {
+      const uploadedUrl: string = uploadRes?.data?.attachment?.url ?? '';
+      if (!uploadRes.success || !uploadedUrl) {
+        Alert.alert('Error', uploadRes.message ?? 'Failed to upload thumbnail image.');
+        return;
+      }
+
+      // Step 2: point the content's thumbnail_url at the uploaded image.
+      const detailUrl = ROUTES.broadcasts.channelContentDetail?.(contentId);
+      if (!detailUrl) throw new Error('No content detail route');
+
+      const res = await patchRequest(detailUrl, { thumbnail_url: uploadedUrl }, {
         errorMessage: 'Failed to update thumbnail.',
       });
 
@@ -73,10 +88,12 @@ export default function ThumbnailPickerSheet({
       }
 
       const newUrl: string =
-        res.data?.thumbnail_url ?? asset.uri ?? '';
+        res.data?.thumbnail_url ?? uploadedUrl;
       onUpdated?.(newUrl);
       setPicked(null);
       onClose();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to update thumbnail.');
     } finally {
       setSaving(false);
     }
@@ -97,14 +114,14 @@ export default function ThumbnailPickerSheet({
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <Pressable style={styles.backdrop} onPress={handleClose} />
-      <View style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <View style={styles.handle} />
+      <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.6 }]} onPress={handleClose} />
+      <View style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.border, paddingBottom: 32 + insets.bottom }]}>
+        <View style={[styles.handle, { backgroundColor: palette.border }]} />
 
         <Text style={[styles.title, { color: palette.text }]}>Change thumbnail</Text>
 
         {/* 16:9 preview */}
-        <View style={[styles.previewBox, { backgroundColor: palette.royalInk ?? '#0d0d1a', borderColor: palette.border }]}>
+        <View style={[styles.previewBox, { backgroundColor: palette.royalInk, borderColor: palette.border }]}>
           {previewUri ? (
             <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="cover" />
           ) : (
@@ -146,7 +163,6 @@ export default function ThumbnailPickerSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   sheet: {
     borderTopLeftRadius: 20,
@@ -155,7 +171,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderRightWidth: 1,
     paddingHorizontal: 20,
-    paddingBottom: 32,
     paddingTop: 12,
   },
   handle: {
@@ -163,7 +178,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(128,128,128,0.4)',
     marginBottom: 16,
   },
   title: {
@@ -213,6 +227,8 @@ const styles = StyleSheet.create({
   cancelButton: {
     paddingVertical: 10,
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   cancelText: {
     fontSize: 13,

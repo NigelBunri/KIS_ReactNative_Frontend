@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -21,6 +23,9 @@ import {
   microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
+import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
+import ROUTES from '@/network';
 import { getHealthThemeColors } from '@/theme/health/colors';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
 import { HEALTH_THEME_TYPOGRAPHY } from '@/theme/health/typography';
@@ -81,6 +86,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [enabled, setEnabled] = useState(true);
+  const [enabledConfigItemId, setEnabledConfigItemId] = useState<string | null>(null);
   const [defaultValidity, setDefaultValidity] = useState('30');
   const [allowControlled, setAllowControlled] = useState(false);
   const [maxRefills, setMaxRefills] = useState('2');
@@ -106,6 +112,22 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
 
   const [currentItems, setCurrentItems] = useState<PrescriptionItem[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+
+  const toggleEngine = useCallback(async () => {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      const payload = { item_kind: 'engine_config', name: 'is_active', value_text: next ? 'true' : 'false', status: 'active' };
+      if (!enabledConfigItemId) {
+        const res = await createInstitutionEngineManagedItem(institutionId, engineKey, payload);
+        if (res?.data?.id) setEnabledConfigItemId(String(res.data.id));
+      } else {
+        await updateInstitutionEngineManagedItem(institutionId, engineKey, enabledConfigItemId, payload);
+      }
+    } catch {
+      // non-critical
+    }
+  }, [enabledConfigItemId, enabled, engineKey, institutionId]);
 
   const loadDrugs = useCallback(async () => {
     if (!institutionId || !engineKey) return;
@@ -145,7 +167,14 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
 
   useEffect(() => {
     loadDrugs().catch(() => undefined);
-  }, [loadDrugs]);
+    fetchInstitutionEngineManagedItems(institutionId, engineKey, { itemKind: 'engine_config', rootOnly: true, includeInactive: false })
+      .then((res: any) => {
+        const rows = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const cfg = rows.find((r: any) => r?.name === 'is_active');
+        if (cfg) { setEnabledConfigItemId(String(cfg.id)); setEnabled(String(cfg.value_text) !== 'false'); }
+      })
+      .catch(() => {});
+  }, [engineKey, institutionId, loadDrugs]);
 
   const resetDrugForm = useCallback(() => {
     setEditingDrugId(null);
@@ -258,10 +287,28 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
     setRefills('0');
   }, [allowControlled, dosage, duration, frequency, maxRefills, refills, selectedDrug]);
 
-  const generatePrescription = useCallback(() => {
+  const generatePrescription = useCallback(async () => {
     if (!patientName.trim() || currentItems.length === 0) {
       Alert.alert('Prescription', 'Enter patient name and add at least one drug item.');
       return;
+    }
+    // Submit the prescription through the pharmacy fulfillment session endpoint
+    // which is the correct backend workflow for prescription fulfilment.
+    // A local entry is appended immediately for UI feedback regardless of outcome.
+    try {
+      await postRequest(ROUTES.healthOps.pharmacySessionStart, {
+        patient_name: patientName.trim(),
+        items: currentItems.map((item) => ({
+          drug_id: item.drug.id,
+          drug_name: item.drug.name,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          refills: item.refills,
+        })),
+      });
+    } catch {
+      // Backend submission is best-effort; local entry is always added
     }
     const next: Prescription = {
       id: Date.now().toString(),
@@ -281,8 +328,15 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
     setPrescriptions((prev) => prev.map((item) => (item.id === id ? { ...item, expanded: !item.expanded } : item)));
   }, []);
 
-  const updateStatus = useCallback((id: string, statusValue: Prescription['status']) => {
+  const updateStatus = useCallback(async (id: string, statusValue: Prescription['status']) => {
+    // Optimistic local update
     setPrescriptions((prev) => prev.map((item) => (item.id === id ? { ...item, status: statusValue } : item)));
+    // Sync status change to backend via pharmacy session step endpoint
+    try {
+      await patchRequest(ROUTES.healthOps.pharmacySession(id), { status: statusValue });
+    } catch {
+      // Best-effort; local state already reflects the change
+    }
   }, []);
 
   const totalValue = useMemo(
@@ -295,11 +349,13 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
   const dispensedCount = prescriptions.filter((item) => item.status === 'dispensed').length;
 
   return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <ScrollView style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Engine Configuration</Text>
 
-        <KISButton title={enabled ? 'Disable Engine' : 'Enable Engine'} onPress={() => setEnabled((prev) => !prev)} variant="outline" />
+        <KISButton title={enabled ? 'Disable Engine' : 'Enable Engine'} onPress={() => { toggleEngine().catch(() => undefined); }} variant="outline" />
         <TextInput
           placeholder="Default Validity (days)"
           keyboardType="numeric"
@@ -391,7 +447,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
           </>
         ) : null}
 
-        <KISButton title="Generate Prescription" onPress={generatePrescription} />
+        <KISButton title="Generate Prescription" onPress={() => { generatePrescription().catch(() => undefined); }} />
       </View>
 
       <View style={card(palette, spacing)}>
@@ -413,8 +469,8 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
                 ))
               : null}
 
-            <KISButton title="Mark Dispensed" onPress={() => updateStatus(row.id, 'dispensed')} variant="outline" />
-            <KISButton title="Mark Expired" onPress={() => updateStatus(row.id, 'expired')} variant="outline" />
+            <KISButton title="Mark Dispensed" onPress={() => { updateStatus(row.id, 'dispensed').catch(() => undefined); }} variant="outline" />
+            <KISButton title="Mark Expired" onPress={() => { updateStatus(row.id, 'expired').catch(() => undefined); }} variant="outline" />
           </View>
         ))}
       </View>
@@ -428,6 +484,8 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         <Text style={{ color: palette.text }}>Total Drug Value: {toUsdLabel(totalValue)} USD</Text>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

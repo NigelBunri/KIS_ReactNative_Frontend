@@ -114,6 +114,10 @@ export const visibilityDescriptions: Record<string, string> = {
 
 export const walletModes = [
   { value: 'history', label: 'Credit history' },
+  { value: 'deposit', label: 'Deposit' },
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'convert', label: 'Convert' },
+  { value: 'upgrade', label: 'Upgrade' },
 ];
 
 export const paymentProviders = [

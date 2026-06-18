@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -27,6 +28,7 @@ type Tier = {
 
 export default function MembershipScreen() {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Membership'>>();
   const { channelId, channelName } = route.params;
@@ -145,7 +147,14 @@ export default function MembershipScreen() {
         <FlatList
           data={tiers}
           keyExtractor={t => t.id}
-          contentContainerStyle={{ padding: 16, gap: 16 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', gap: 16 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No memberships yet
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <View style={[styles.card, { backgroundColor: palette.card, borderColor: item.is_joined ? palette.primary : palette.divider }]}>
               <View style={styles.cardHeader}>
@@ -187,9 +196,9 @@ export default function MembershipScreen() {
                 ]}
               >
                 {joining === item.id ? (
-                  <ActivityIndicator color={item.is_joined ? palette.text : '#fff'} size="small" />
+                  <ActivityIndicator color={item.is_joined ? palette.text : palette.ivory} size="small" />
                 ) : (
-                  <Text style={{ color: item.is_joined ? palette.text : '#fff', fontWeight: '900' }}>
+                  <Text style={{ color: item.is_joined ? palette.text : palette.ivory, fontWeight: '900' }}>
                     {item.is_joined ? 'Joined ✓' : 'Join'}
                   </Text>
                 )}
@@ -220,8 +229,8 @@ export default function MembershipScreen() {
               onPress={() => pendingTier && confirmJoin(pendingTier, 'flutterwave')}
             >
               <View style={styles.providerRow}>
-                <View style={[styles.providerIcon, { backgroundColor: '#F5A623' }]}>
-                  <Text style={styles.providerIconText}>FW</Text>
+                <View style={[styles.providerIcon, { backgroundColor: palette.gold }]}>
+                  <Text style={[styles.providerIconText, { color: palette.royalInk }]}>FW</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.providerName, { color: palette.text }]}>Flutterwave</Text>
@@ -238,8 +247,8 @@ export default function MembershipScreen() {
               onPress={() => pendingTier && confirmJoin(pendingTier, 'stripe')}
             >
               <View style={styles.providerRow}>
-                <View style={[styles.providerIcon, { backgroundColor: '#635BFF' }]}>
-                  <Text style={styles.providerIconText}>S</Text>
+                <View style={[styles.providerIcon, { backgroundColor: palette.primaryStrong }]}>
+                  <Text style={[styles.providerIconText, { color: palette.onPrimary }]}>S</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.providerName, { color: palette.text }]}>Stripe</Text>
@@ -267,7 +276,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
     paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12,
   },
-  backBtn: { padding: 2 },
+  backBtn: { padding: 2, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 18, fontWeight: '900' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, fontWeight: '700' },
@@ -302,7 +311,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
-  providerIconText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  providerIconText: { fontWeight: '900', fontSize: 13 },
   providerName: { fontSize: 15, fontWeight: '800' },
   providerDesc: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   cancelBtn: { alignItems: 'center', paddingVertical: 12 },

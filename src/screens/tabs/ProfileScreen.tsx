@@ -19,6 +19,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import {
@@ -82,6 +83,7 @@ import {
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
 import { useAgeMode } from '@/theme/ageModeContext';
+import { useThemeMode, type KISThemeMode } from '@/theme/themeModeContext';
 import {
   isPINEnabled,
   getLockTimeout,
@@ -215,6 +217,7 @@ const DEFAULT_MARKET_FORM: MarketFormState = {
 const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactProfile = responsive.isWatch || responsive.isCompactPhone;
@@ -224,6 +227,7 @@ export default function ProfileScreen() {
     [palette, tone],
   );
   const { language, languages, setLanguage } = useLanguage();
+  const { themeMode, setThemeMode } = useThemeMode();
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
   const { setAuth, setPhone, callingCode } = useAuth();
   const c = useProfileController({
@@ -590,6 +594,14 @@ export default function ProfileScreen() {
     const [enabled, timeout] = await Promise.all([isPINEnabled(), getLockTimeout()]);
     setPinEnabled(enabled);
     setLockTimeoutMinutes(timeout);
+    // Restore lock_timeout_minutes from backend for cross-device consistency
+    getRequest(ROUTES.profilePreferences.me, { errorMessage: '' })
+      .then(res => {
+        if (res?.success && res.data?.lock_timeout_minutes != null) {
+          setLockTimeoutMinutes(res.data.lock_timeout_minutes);
+        }
+      })
+      .catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -1984,7 +1996,7 @@ export default function ProfileScreen() {
     }
   }, [educationModuleForm, c, resetEducationModuleForm]);
 
-  const handleMarketFormSave = useCallback(async () => {
+  const handleMarketFormSave = useCallback(async (draft: boolean) => {
     const name = marketForm.name.trim();
     if (!name) {
       Alert.alert('Market profile', 'Provide a shop name.');
@@ -1994,15 +2006,16 @@ export default function ProfileScreen() {
       1,
       Number.parseInt(marketForm.employeeSlots, 10) || 1,
     );
-    if (!marketForm.id && !marketForm.featuredImageFile) {
+    if (!draft && !marketForm.id && !marketForm.featuredImageFile) {
       Alert.alert('Market profile', 'Upload a shop image before publishing.');
       return;
     }
+    const effectiveStatus = draft ? 'draft' : (marketForm.status === 'draft' ? 'active' : marketForm.status);
     const formData = new FormData();
     formData.append('name', name);
     formData.append('description', marketForm.description.trim());
     formData.append('employee_slots', String(employeeSlotCount));
-    formData.append('status', marketForm.status);
+    formData.append('status', effectiveStatus);
     if (marketForm.featuredImageFile) {
       formData.append('image_file', marketForm.featuredImageFile as any);
     }
@@ -2344,13 +2357,13 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           {
             gap: responsive.cardGap,
-            paddingBottom: compactProfile ? 32 : 44,
+            paddingBottom: (compactProfile ? 32 : 44) + insets.bottom,
           },
         ]}
       >
@@ -2422,12 +2435,8 @@ export default function ProfileScreen() {
                 style={[
                   styles.card,
                   {
-                    backgroundColor: dashboardTheme.isDark
-                      ? 'rgba(13, 20, 36, 0.94)'
-                      : 'rgba(255,255,255,0.98)',
-                    borderColor: dashboardTheme.isDark
-                      ? 'rgba(255,255,255,0.08)'
-                      : 'rgba(230,222,247,0.95)',
+                    backgroundColor: palette.surfaceElevated,
+                    borderColor: palette.borderMuted,
                     borderWidth: 1,
                     borderRadius: compactProfile ? 18 : 24,
                     shadowColor: palette.shadow,
@@ -2450,7 +2459,11 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
                 <Text
-                  style={{ fontSize: 14, lineHeight: 21, color: palette.text }}
+                  style={{
+                    fontSize: responsive.bodyFontSize,
+                    lineHeight: responsive.bodyFontSize * 1.5,
+                    color: palette.text,
+                  }}
                 >
                   {c.profile.profile?.bio ||
                     'Add a short bio that explains your work.'}
@@ -2467,12 +2480,12 @@ export default function ProfileScreen() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: palette.text }}>
+                    <Text style={{ fontSize: responsive.bodyFontSize, fontWeight: '600', color: palette.text }}>
                       Open to Work
                     </Text>
                     {openToWork ? (
-                      <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
-                        <Text style={{ color: '#065F46', fontSize: 11, fontWeight: '700' }}>Active</Text>
+                      <View style={{ backgroundColor: palette.successSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                        <Text style={{ color: palette.success, fontSize: responsive.labelFontSize, fontWeight: '700' }}>Active</Text>
                       </View>
                     ) : null}
                   </View>
@@ -2693,7 +2706,7 @@ export default function ProfileScreen() {
                 </Text>
               ) : appointmentsError ? (
                 <Text
-                  style={{ color: palette.error || '#E53935', marginTop: -4 }}
+                  style={{ color: palette.danger, marginTop: -4 }}
                 >
                   {appointmentsError}
                 </Text>
@@ -2716,7 +2729,7 @@ export default function ProfileScreen() {
                 />
               ) : marketplaceOrdersError ? (
                 <Text
-                  style={{ color: palette.error || '#E53935', marginTop: -4 }}
+                  style={{ color: palette.danger, marginTop: -4 }}
                 >
                   {marketplaceOrdersError}
                 </Text>
@@ -2832,6 +2845,7 @@ export default function ProfileScreen() {
               />
             </View>
 
+            {/* ── Appearance ─────────────────────────────────────────────── */}
             <View
               style={{
                 marginHorizontal: 18,
@@ -2844,7 +2858,86 @@ export default function ProfileScreen() {
             >
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: responsive.labelFontSize,
+                  fontWeight: '700',
+                  color: palette.subtext,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  paddingHorizontal: 16,
+                  paddingTop: 14,
+                  paddingBottom: 8,
+                }}
+              >
+                Appearance
+              </Text>
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                  paddingBottom: 14,
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: responsive.labelFontSize, color: palette.subtext, marginBottom: 4 }}>
+                  App theme
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {(
+                    [
+                      { key: 'system', label: 'System' },
+                      { key: 'light', label: 'Light' },
+                      { key: 'dark', label: 'Dark' },
+                    ] as { key: KISThemeMode; label: string }[]
+                  ).map(option => {
+                    const active = themeMode === option.key;
+                    return (
+                      <Pressable
+                        key={option.key}
+                        onPress={() => setThemeMode(option.key)}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: responsive.minTouchTarget,
+                          paddingVertical: 10,
+                          borderRadius: 12,
+                          borderWidth: 1.5,
+                          borderColor: active ? palette.primaryStrong : palette.divider,
+                          backgroundColor: active
+                            ? palette.primarySoft ?? palette.primary + '18'
+                            : pressed
+                            ? palette.surfaceElevated
+                            : palette.bg,
+                        })}
+                      >
+                        <Text
+                          style={{
+                            fontSize: responsive.labelFontSize,
+                            fontWeight: active ? '800' : '500',
+                            color: active ? palette.primaryStrong : palette.subtext,
+                          }}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={{
+                marginHorizontal: 18,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                backgroundColor: palette.surface,
+                overflow: 'hidden',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: responsive.labelFontSize,
                   fontWeight: '700',
                   color: palette.subtext,
                   textTransform: 'uppercase',
@@ -2860,6 +2953,11 @@ export default function ProfileScreen() {
                 {
                   label: 'Privacy & Compliance',
                   route: 'ComplianceSettings' as const,
+                  danger: false,
+                },
+                {
+                  label: 'Notification Settings',
+                  route: 'NotificationSettings' as const,
                   danger: false,
                 },
                 {
@@ -2894,7 +2992,7 @@ export default function ProfileScreen() {
                 >
                   <Text
                     style={{
-                      fontSize: 15,
+                      fontSize: responsive.bodyFontSize,
                       fontWeight: '600',
                       color: item.danger ? palette.danger : palette.text,
                     }}
@@ -2953,10 +3051,10 @@ export default function ProfileScreen() {
                 })}
               >
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
+                  <Text style={{ fontSize: responsive.bodyFontSize, fontWeight: '600', color: palette.text }}>
                     Quick Lock (PIN)
                   </Text>
-                  <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 2 }}>
+                  <Text style={{ fontSize: responsive.labelFontSize, color: palette.subtext, marginTop: 2 }}>
                     {pinEnabled ? 'Enabled — tap to change or disable' : 'Set a 6-digit PIN to lock the app'}
                   </Text>
                 </View>
@@ -2981,6 +3079,7 @@ export default function ProfileScreen() {
                       onPress: async () => {
                         await setLockTimeout(opt.value);
                         setLockTimeoutMinutes(opt.value);
+                        patchRequest(ROUTES.profilePreferences.me, { lock_timeout_minutes: opt.value }).catch(() => null);
                       },
                     })).concat([{ text: 'Cancel', onPress: () => undefined, style: 'cancel' } as any]),
                   );
@@ -2997,10 +3096,10 @@ export default function ProfileScreen() {
                 })}
               >
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
+                  <Text style={{ fontSize: responsive.bodyFontSize, fontWeight: '600', color: palette.text }}>
                     Lock Timeout
                   </Text>
-                  <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 2 }}>
+                  <Text style={{ fontSize: responsive.labelFontSize, color: palette.subtext, marginTop: 2 }}>
                     {lockTimeoutMinutes === 0
                       ? 'Never auto-lock'
                       : `Auto-lock after ${lockTimeoutMinutes} min${lockTimeoutMinutes === 1 ? '' : 's'} in background`}

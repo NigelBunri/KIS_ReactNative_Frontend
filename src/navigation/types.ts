@@ -209,6 +209,9 @@ export type RootStackParamList = {
   SubscriptionsScreen: undefined;
   LibraryScreen: undefined;
   ClipsListScreen: { contentId: string };
+  TrendingScreen: undefined;
+  CategoryBrowsePage: { categorySlug?: string; categoryName?: string };
+  BroadcastSearchScreen: { query?: string } | undefined;
   ActivityNotifications: { channelId: string; channelName?: string };
   ChannelMembersScreen: { channelId: string; channelName?: string };
   Membership: { channelId: string; channelName?: string };
@@ -223,6 +226,7 @@ export type RootStackParamList = {
   DeclareTestimonySheet: { editId?: string };
   ReachOutSheet: { seasonId: string; seasonTitle: string; seasonCategory: string };
   TestimonyReachInbox: undefined;
+  NotificationSettings: undefined;
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

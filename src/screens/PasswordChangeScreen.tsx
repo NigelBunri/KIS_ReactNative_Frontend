@@ -1,7 +1,10 @@
 // src/screens/PasswordChangeScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,13 +15,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
-import { API_BASE_URL } from '@/network';
+import ROUTES from '@/network';
 
 export default function PasswordChangeScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,7 +32,7 @@ export default function PasswordChangeScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const styles = useMemo(() => createStyles(palette), [palette]);
+  const styles = useMemo(() => createStyles(palette, responsive.contentMaxWidth), [palette, responsive.contentMaxWidth]);
 
   const handleSubmit = async () => {
     if (!currentPassword.trim()) {
@@ -46,7 +51,7 @@ export default function PasswordChangeScreen() {
     setLoading(true);
     try {
       const res = await postRequest(
-        `${API_BASE_URL}/api/v1/auth/password/change/`,
+        ROUTES.auth.passwordChange,
         { current_password: currentPassword, new_password: newPassword },
         { errorMessage: 'Unable to change password.' },
       );
@@ -130,6 +135,7 @@ export default function PasswordChangeScreen() {
         <View style={styles.backButton} />
       </View>
 
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
           <PasswordField
@@ -166,16 +172,19 @@ export default function PasswordChangeScreen() {
           onPress={handleSubmit}
           disabled={loading}
         >
-          <Text style={styles.submitButtonText}>
-            {loading ? 'Updating...' : 'Update Password'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color={palette.onPrimary} />
+          ) : (
+            <Text style={styles.submitButtonText}>Update Password</Text>
+          )}
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const createStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
+const createStyles = (palette: ReturnType<typeof useKISTheme>['palette'], contentMaxWidth: number) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -193,14 +202,17 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       fontWeight: '700',
     },
     backButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
     content: {
       padding: 18,
       gap: 16,
+      width: '100%',
+      maxWidth: contentMaxWidth,
+      alignSelf: 'center',
     },
     card: {
       borderRadius: 20,
@@ -238,7 +250,7 @@ const createStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       alignItems: 'center',
     },
     submitButtonText: {
-      color: '#FFFFFF',
+      color: palette.onPrimary,
       fontSize: 16,
       fontWeight: '800',
     },

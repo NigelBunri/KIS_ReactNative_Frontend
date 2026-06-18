@@ -13,10 +13,11 @@ import {
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -73,6 +74,7 @@ const formatCountdown = (secs: number) => {
 export default function DeviceManagementScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const responsive = useResponsiveLayout();
 
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,8 +218,13 @@ export default function DeviceManagementScreen() {
         onPress: async () => {
           setRevokingId(device.id);
           try {
-            await deleteRequest(ROUTES.auth.revokeDevice(device.id), { errorMessage: 'Unable to remove device.' });
-            await loadDevices();
+            const res = await deleteRequest(ROUTES.auth.revokeDevice(device.id), { errorMessage: 'Unable to remove device.' });
+            if (res && (res as any).success === false) {
+              const msg = (res as any).message || (res as any).data?.detail || 'Unable to remove device.';
+              Alert.alert('Failed', msg);
+            } else {
+              await loadDevices();
+            }
           } catch (err: any) {
             Alert.alert('Failed', err?.message ?? 'Unable to remove device.');
           } finally {
@@ -240,7 +247,11 @@ export default function DeviceManagementScreen() {
           onPress: async () => {
             try {
               const res = await deleteRequest(ROUTES.auth.revokeAllSecondary, { errorMessage: 'Unable to revoke devices.' });
-              const count = (res as any)?.revoked_count ?? 0;
+              if (res && res.success === false) {
+                Alert.alert('Failed', res.message || (res as any)?.data?.detail || 'Unable to revoke devices.');
+                return;
+              }
+              const count = (res as any)?.data?.revoked_count ?? (res as any)?.revoked_count ?? 0;
               Alert.alert('Done', `${count} device${count === 1 ? '' : 's'} logged out.`);
               await loadDevices();
             } catch (err: any) {
@@ -315,11 +326,11 @@ export default function DeviceManagementScreen() {
           <View style={styles.deviceNameRow}>
             {item.is_parent && (
               <View style={[styles.badge, { backgroundColor: palette.primary }]}>
-                <Text style={styles.badgeText}>PRIMARY</Text>
+                <Text style={[styles.badgeText, { color: palette.onPrimary }]}>PRIMARY</Text>
               </View>
             )}
             {item.is_current && !item.is_parent && (
-              <View style={[styles.badge, { backgroundColor: palette.primarySoft ?? '#EEF2FF' }]}>
+              <View style={[styles.badge, { backgroundColor: palette.primarySoft }]}>
                 <Text style={[styles.badgeText, { color: palette.primary }]}>THIS DEVICE</Text>
               </View>
             )}
@@ -342,7 +353,7 @@ export default function DeviceManagementScreen() {
                 maxLength={100}
               />
               <Pressable style={[styles.smallBtn, { backgroundColor: palette.primary }]} onPress={() => handleRename(item)}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Save</Text>
+                <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 12 }}>Save</Text>
               </Pressable>
               <Pressable style={[styles.smallBtn, { backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1 }]} onPress={() => setRenamingId(null)}>
                 <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}>Cancel</Text>
@@ -388,14 +399,14 @@ export default function DeviceManagementScreen() {
           {/* Revoke (non-current devices, or parent revoking secondary) */}
           {!item.is_current && (
             <Pressable
-              style={[styles.smallBtn, { borderColor: '#EF4444', borderWidth: 1.5 }]}
+              style={[styles.smallBtn, { borderColor: palette.danger, borderWidth: 1.5 }]}
               onPress={() => handleRevoke(item)}
               disabled={isRevoking}
             >
               {isRevoking ? (
-                <ActivityIndicator size="small" color="#EF4444" />
+                <ActivityIndicator size="small" color={palette.danger} />
               ) : (
-                <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Remove</Text>
+                <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>Remove</Text>
               )}
             </Pressable>
           )}
@@ -415,14 +426,14 @@ export default function DeviceManagementScreen() {
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Manage Devices</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       <FlatList
         data={devices}
         keyExtractor={item => String(item.id)}
         renderItem={renderDevice}
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: responsive.pageGutter, gap: 12, paddingBottom: responsive.pageGutter * 2, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadDevices(); }} tintColor={palette.primary} />
         }
@@ -442,23 +453,23 @@ export default function DeviceManagementScreen() {
                 </Text>
 
                 {qrLoading ? (
-                  <View style={styles.qrPlaceholder}>
+                  <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
                     <ActivityIndicator color={palette.primary} size="large" />
                   </View>
                 ) : qrData ? (
                   <>
-                    <View style={[styles.qrWrap, { backgroundColor: '#fff' }]}>
+                    <View style={[styles.qrWrap, { backgroundColor: palette.ivory }]}>
                       {/* QR code content is never displayed as text — only as a visual QR */}
                       <QRCode
                         value={qrData.qr_payload}
                         size={200}
-                        backgroundColor="#fff"
-                        color="#000"
+                        backgroundColor={palette.ivory}
+                        color={palette.royalInk}
                       />
                     </View>
                     <View style={styles.countdownRow}>
-                      <KISIcon name="bell" size={12} color={countdown < 300 ? '#EF4444' : palette.subtext} />
-                      <Text style={[styles.countdownText, { color: countdown < 300 ? '#EF4444' : palette.subtext }]}>
+                      <KISIcon name="bell" size={12} color={countdown < 300 ? palette.danger : palette.subtext} />
+                      <Text style={[styles.countdownText, { color: countdown < 300 ? palette.danger : palette.subtext }]}>
                         Expires in {formatCountdown(countdown)}
                       </Text>
                       <Pressable onPress={loadQR} style={styles.refreshQRBtn}>
@@ -475,7 +486,7 @@ export default function DeviceManagementScreen() {
                     </View>
                   </>
                 ) : (
-                  <View style={styles.qrPlaceholder}>
+                  <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
                     <Text style={{ color: palette.subtext, fontWeight: '600' }}>QR code unavailable</Text>
                     <Pressable onPress={loadQR}>
                       <Text style={{ color: palette.primary, fontWeight: '700', marginTop: 8 }}>Retry</Text>
@@ -488,11 +499,11 @@ export default function DeviceManagementScreen() {
             {/* ── Revoke all secondary button ────────────────────────── */}
             {isParent && hasSecondary && (
               <Pressable
-                style={[styles.revokeAllBtn, { borderColor: '#EF4444' }]}
+                style={[styles.revokeAllBtn, { borderColor: palette.danger }]}
                 onPress={handleRevokeAll}
               >
-                <KISIcon name="warning" size={16} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>
+                <KISIcon name="warning" size={16} color={palette.danger} />
+                <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 14 }}>
                   Log out all secondary devices
                 </Text>
               </Pressable>
@@ -521,7 +532,7 @@ export default function DeviceManagementScreen() {
             </View>
           ) : error ? (
             <View style={styles.centered}>
-              <Text style={{ color: '#EF4444', fontWeight: '600', textAlign: 'center' }}>{error}</Text>
+              <Text style={{ color: palette.danger, fontWeight: '600', textAlign: 'center' }}>{error}</Text>
               <Pressable onPress={() => { setLoading(true); void loadDevices(); }}>
                 <Text style={{ color: palette.primary, fontWeight: '700', marginTop: 12 }}>Retry</Text>
               </Pressable>
@@ -548,7 +559,7 @@ const createStyles = () =>
       paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 17, fontWeight: '700' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
 
@@ -575,7 +586,6 @@ const createStyles = () =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 16,
-      backgroundColor: '#F5F5F5',
     },
     countdownRow: {
       flexDirection: 'row',
@@ -638,14 +648,14 @@ const createStyles = () =>
       paddingHorizontal: 6,
       paddingVertical: 2,
     },
-    badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+    badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
     deviceName: { fontSize: 15, fontWeight: '700' },
     deviceMeta: { fontSize: 12, fontWeight: '500' },
 
     actionCol: { alignItems: 'flex-end', gap: 8, justifyContent: 'center' },
     iconBtn: {
-      width: 32,
-      height: 32,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },

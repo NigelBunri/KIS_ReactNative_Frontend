@@ -109,7 +109,7 @@ const QuickEmojiButton: React.FC<QuickEmojiButtonProps> = ({
           : 'transparent',
         borderWidth: isSelected ? 2 : 0,
         borderColor: isSelected
-          ? (palette.primary ?? '#4F46E5')
+          ? (palette.primary)
           : 'transparent',
       }}
     >
@@ -449,7 +449,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                 marginHorizontal: 16,
                 marginBottom: 10,
                 flexDirection: 'row',
-                backgroundColor: palette.surface ?? '#fff',
+                backgroundColor: palette.surface,
                 borderRadius: 40,
                 paddingHorizontal: 8,
                 paddingVertical: 4,
@@ -500,7 +500,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             >
               {/* Drag handle */}
               <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
-                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.divider ?? '#ddd' }} />
+                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.divider }} />
               </View>
 
               <ScrollView
@@ -513,7 +513,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                     return (
                       <View
                         key={item.key}
-                        style={{ height: 1, backgroundColor: palette.divider ?? '#f0f0f0', marginHorizontal: 16, marginVertical: 4 }}
+                        style={{ height: 1, backgroundColor: palette.divider, marginHorizontal: 16, marginVertical: 4 }}
                       />
                     );
                   }
@@ -526,7 +526,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                         alignItems: 'center',
                         paddingHorizontal: 20,
                         paddingVertical: 15,
-                        backgroundColor: pressed ? (palette.surfaceElevated ?? '#f5f5f5') : 'transparent',
+                        backgroundColor: pressed ? (palette.surfaceElevated) : 'transparent',
                       })}
                     >
                       <View
@@ -545,14 +545,14 @@ export const InteractiveMessageRow: React.FC<Props> = ({
                         <Ionicons
                           name={item.icon}
                           size={18}
-                          color={item.destructive ? '#DC2626' : (palette.text ?? '#111')}
+                          color={item.destructive ? '#DC2626' : (palette.text)}
                         />
                       </View>
                       <Text
                         style={{
                           fontSize: 16,
                           fontWeight: '500',
-                          color: item.destructive ? '#DC2626' : (palette.text ?? '#111'),
+                          color: item.destructive ? '#DC2626' : (palette.text),
                           flex: 1,
                         }}
                       >

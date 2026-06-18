@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -63,7 +64,7 @@ function ChannelRow({ channel, onPress, onToggle }: {
         ]}
         hitSlop={8}
       >
-        <Text style={{ color: channel.is_subscribed ? palette.subtext : '#fff', fontWeight: '900', fontSize: 12 }}>
+        <Text style={{ color: channel.is_subscribed ? palette.subtext : palette.onPrimary, fontWeight: '900', fontSize: 12 }}>
           {channel.is_subscribed ? 'Subscribed' : 'Subscribe'}
         </Text>
       </Pressable>
@@ -73,6 +74,7 @@ function ChannelRow({ channel, onPress, onToggle }: {
 
 export default function SubscriptionsScreen() {
   const { palette } = useKISTheme();
+  const { pageGutter } = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [channels, setChannels] = useState<BroadcastChannelSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,8 +101,8 @@ export default function SubscriptionsScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+      <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <KISIcon name="people" size={18} color={palette.primaryStrong} />
@@ -118,10 +120,10 @@ export default function SubscriptionsScreen() {
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No subscriptions yet</Text>
           <Text style={[styles.emptyHint, { color: palette.subtext }]}>Channels you subscribe to will appear here</Text>
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() => (navigation as any).navigate('MainTabs', { screen: 'Broadcast', params: { focusTab: 'channels' } })}
             style={[styles.browseBtn, { backgroundColor: palette.primaryStrong }]}
           >
-            <Text style={{ color: '#fff', fontWeight: '900' }}>Browse channels</Text>
+            <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Browse channels</Text>
           </Pressable>
         </View>
       ) : (
@@ -132,6 +134,13 @@ export default function SubscriptionsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={palette.primaryStrong} />
           }
           contentContainerStyle={{ paddingBottom: 40 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
+                No subscriptions yet
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <ChannelRow
               channel={item}
@@ -147,7 +156,7 @@ export default function SubscriptionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1 },
   headerTitle: { fontSize: 18, fontWeight: '900', flex: 1 },
   headerCount: { fontSize: 14, fontWeight: '700' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
@@ -161,5 +170,5 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { fontSize: 14, fontWeight: '900' },
   handle: { marginTop: 2, fontSize: 12, fontWeight: '600' },
-  subBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  subBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
 });

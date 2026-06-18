@@ -55,7 +55,10 @@ export type BroadcastChannelContent = {
   stats?: Record<string, any>;
   engagement_counts?: Record<string, number>;
   metadata?: Record<string, any>;
+  tags?: string[];
   scheduled_at?: string | null;
+  age_restriction?: 'none' | '13+' | '18+';
+  geo_restricted?: boolean;
   created_at?: string;
   updated_at?: string;
 };

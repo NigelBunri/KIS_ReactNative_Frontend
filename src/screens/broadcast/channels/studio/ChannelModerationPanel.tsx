@@ -58,8 +58,8 @@ export default function ChannelModerationPanel({ channelId }: Props) {
           <Text style={[styles.recordMeta, { color: palette.subtext }]}>{record.target_type} · {record.reason || 'No reason supplied'}</Text>
           <View style={styles.actions}>
             {ACTIONS.map(action => (
-              <Pressable key={action.id} disabled={busyId === record.id} onPress={() => act(record.id, action.id)} style={[styles.actionButton, { backgroundColor: action.id === 'remove' ? '#fff1f2' : palette.card, borderColor: palette.border }]}>
-                <Text style={[styles.actionText, { color: action.id === 'remove' ? '#be123c' : palette.text }]}>{action.label}</Text>
+              <Pressable key={action.id} disabled={busyId === record.id} onPress={() => act(record.id, action.id)} style={[styles.actionButton, { backgroundColor: action.id === 'remove' ? palette.dangerSoft : palette.card, borderColor: palette.border }]}>
+                <Text style={[styles.actionText, { color: action.id === 'remove' ? palette.danger : palette.text }]}>{action.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   recordTitle: { fontSize: 13, fontWeight: '900' },
   recordMeta: { marginTop: 3, fontSize: 11, lineHeight: 16, fontWeight: '700' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  actionButton: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  actionButton: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10 },
   actionText: { fontSize: 11, fontWeight: '900' },
   empty: { borderWidth: 1, borderRadius: 8, padding: 12 },
   emptyTitle: { fontSize: 13, fontWeight: '900' },

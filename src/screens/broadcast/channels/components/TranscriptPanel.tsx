@@ -7,16 +7,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Clipboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -39,8 +37,8 @@ type LanguageOption = {
 
 type TranscriptData = {
   status: 'pending' | 'processing' | 'ready' | 'failed' | 'none';
-  text?: string;
-  language?: string;
+  text_plain?: string;
+  language_code?: string;
   languages?: LanguageOption[];
 };
 
@@ -68,14 +66,14 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
     setStatus('loading');
     try {
       const url = lang
-        ? `${ROUTES.broadcasts.contentTranscript(contentId)}?language=${lang}`
+        ? `${ROUTES.broadcasts.contentTranscript(contentId)}?lang=${lang}`
         : ROUTES.broadcasts.contentTranscript(contentId);
-      const res = await getRequest(url);
-      if (res?.data) {
+      const res = await getRequest(url, { errorMessage: '' });
+      if (res?.success && res?.data) {
         const data: TranscriptData = res.data;
         if (data.status === 'ready') {
           setStatus('ready');
-          setTranscriptText(data.text ?? '');
+          setTranscriptText(data.text_plain ?? '');
         } else if (data.status === 'processing' || data.status === 'pending') {
           setStatus(data.status);
         } else if (data.status === 'failed') {
@@ -86,11 +84,12 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
         }
         if (data.languages && data.languages.length > 0) {
           setLanguages(data.languages);
-          if (!selectedLang && data.language) {
-            setSelectedLang(data.language);
+          if (!selectedLang && data.language_code) {
+            setSelectedLang(data.language_code);
           }
         }
       } else {
+        // 404 / no transcript yet for this language
         setStatus('idle');
       }
     } catch {
@@ -112,7 +111,7 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
     try {
       const res = await postRequest(
         ROUTES.broadcasts.contentTranscript(contentId),
-        { source: 'auto' },
+        { source: 'auto', language_code: selectedLang || 'en' },
         { errorMessage: 'Failed to start transcript generation' },
       );
       if (res?.success || res?.data) {
@@ -132,6 +131,7 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
   const handleCopy = useCallback(() => {
     if (transcriptText) {
       Clipboard.setString(transcriptText);
+      Alert.alert('Copied', 'Transcript copied to clipboard.');
     }
   }, [transcriptText]);
 
@@ -168,9 +168,9 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
               style={[styles.actionBtn, { backgroundColor: palette.gold }]}
             >
               {generating ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={palette.ivory} />
               ) : (
-                <Text style={styles.actionBtnText}>Generate Transcript</Text>
+                <Text style={[styles.actionBtnText, { color: palette.onPrimary }]}>Generate Transcript</Text>
               )}
             </Pressable>
           </View>
@@ -211,9 +211,9 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
               style={[styles.actionBtn, { backgroundColor: palette.gold }]}
             >
               {generating ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={palette.ivory} />
               ) : (
-                <Text style={styles.actionBtnText}>Try Again</Text>
+                <Text style={[styles.actionBtnText, { color: palette.onPrimary }]}>Try Again</Text>
               )}
             </Pressable>
           </View>
@@ -234,7 +234,7 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.55 }]} onPress={onClose} />
         <View style={[styles.panel, { backgroundColor: palette.surface }]}>
           {/* Header */}
           <View style={styles.panelHeader}>
@@ -277,7 +277,7 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
                   <Text
                     style={[
                       styles.langPillText,
-                      { color: selectedLang === lang.code ? '#fff' : palette.text },
+                      { color: selectedLang === lang.code ? palette.onPrimary : palette.text },
                     ]}
                   >
                     {lang.label}
@@ -304,7 +304,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   panel: {
     borderTopLeftRadius: 20,
@@ -321,9 +320,9 @@ const styles = StyleSheet.create({
   },
   panelTitle: { fontSize: 17, fontWeight: '700' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  copyBtn: { padding: 4 },
+  copyBtn: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   copyText: { fontSize: 14, fontWeight: '700' },
-  closeTxt: { fontSize: 18, padding: 4 },
+  closeTxt: { fontSize: 18, padding: 4, minWidth: 44, minHeight: 44, textAlign: 'center', lineHeight: 44 },
   langRow: {
     paddingHorizontal: 12,
     paddingBottom: 10,
@@ -356,7 +355,7 @@ const styles = StyleSheet.create({
     minWidth: 160,
     alignItems: 'center',
   },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  actionBtnText: { fontWeight: '700', fontSize: 14 },
   transcriptScroll: { flex: 1 },
   transcriptContent: {
     padding: 16,

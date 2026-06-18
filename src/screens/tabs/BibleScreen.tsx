@@ -1,6 +1,7 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, PanResponder, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useResponsiveLayout } from '../../theme/responsive';
@@ -44,13 +45,12 @@ export default function BibleScreen() {
       setBibleRefreshing(false);
     }
   }, [reloadBible]);
-  const { palette, tone } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactBible = responsive.isWatch || responsive.isCompactPhone;
   const tinyBible = responsive.isWatch;
-  const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const metallicGoldGradient = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
   const headerScrollY = useRef(new Animated.Value(0)).current;
@@ -223,6 +223,7 @@ export default function BibleScreen() {
         return <PrayerPanel />;
       case 'reading-planner':
         return <BiblePlansPanel />;
+      case 'discipleship':
       case 'lessons':
         return <BibleLessonsPanel />;
       case 'books':
@@ -237,7 +238,7 @@ export default function BibleScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingHorizontal: responsive.pageGutter }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingHorizontal: responsive.pageGutter, paddingTop: insets.top }]}>
       <Animated.View
         {...topAreaPanResponder.panHandlers}
         style={[styles.topChrome, topChromeAnimatedStyle]}
@@ -272,7 +273,7 @@ export default function BibleScreen() {
               {
                 backgroundColor: palette.surface,
                 borderColor: palette.goldLight,
-                shadowColor: palette.shadow ?? '#000',
+                shadowColor: palette.shadow,
               },
             ]}
           >
@@ -292,10 +293,10 @@ export default function BibleScreen() {
                 style={styles.streakBadge}
               >
                 <View pointerEvents="none" style={styles.goldSheen} />
-                <Text style={{ color: '#FFFBF2', fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
+                <Text style={{ color: palette.ivory, fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
                   {spiritualGrowthSummary?.journey?.streak ?? 0}
                 </Text>
-                <Text style={{ color: '#FFFBF2', fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
+                <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
                   DAY
                 </Text>
               </LinearGradient>
@@ -416,7 +417,7 @@ export default function BibleScreen() {
             style={styles.contentScroll}
             contentContainerStyle={[
               styles.content,
-              { gap: responsive.cardGap, paddingBottom: compactBible ? 28 : 40 },
+              { gap: responsive.cardGap, paddingBottom: (compactBible ? 28 : 40) + insets.bottom },
             ]}
             showsVerticalScrollIndicator={false}
             onScroll={handleContentScroll}
@@ -445,6 +446,7 @@ export default function BibleScreen() {
               height: compactBible ? 48 : 58,
               borderRadius: compactBible ? 24 : 29,
               right: responsive.pageGutter,
+              shadowColor: palette.shadow,
             },
           ]}
         >
@@ -492,7 +494,6 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 14,

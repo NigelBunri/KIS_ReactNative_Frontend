@@ -73,7 +73,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
         <Text
           style={{
             fontSize: 12,
-            color: palette.textSecondary ?? '#888',
+            color: palette.subtext,
           }}
         >
           Pick a background for styled text
@@ -101,7 +101,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
                 alignItems: 'center',
                 marginVertical: 6,
               }}
-              android_ripple={{ color: '#ccc', borderless: true }}
+              android_ripple={{ color: palette.divider, borderless: true }}
             >
               <View
                 style={{
@@ -113,8 +113,8 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
                   backgroundColor: avatar.bgColor,
                   borderWidth: isSelected ? 2 : 1,
                   borderColor: isSelected
-                    ? palette.primary ?? '#1976D2'
-                    : palette.divider ?? '#ccc',
+                    ? palette.primary
+                    : palette.divider,
                 }}
               >
                 <Text
@@ -133,8 +133,8 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
                   marginTop: 4,
                   fontSize: 10,
                   color: isSelected
-                    ? palette.primary ?? '#1976D2'
-                    : palette.textSecondary ?? '#777',
+                    ? palette.primary
+                    : palette.subtext,
                 }}
               >
                 {avatar.label}

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -398,12 +400,18 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     [currentInstitution, currentUser, resolvedInstitution],
   );
   const canOpenMembers = useMemo(
-    () => ['owner', 'admin', 'manager'].includes(String(actorRole).toLowerCase()),
-    [actorRole],
+    () => Boolean(resolvedInstitutionId) && (
+      ['owner', 'admin', 'manager'].includes(String(actorRole).toLowerCase()) ||
+      !resolvedInstitution
+    ),
+    [actorRole, resolvedInstitution, resolvedInstitutionId],
   );
   const canOpenServiceCatalog = useMemo(
-    () => ['owner', 'admin', 'manager', 'analyst'].includes(String(actorRole).toLowerCase()),
-    [actorRole],
+    () => Boolean(resolvedInstitutionId) && (
+      ['owner', 'admin', 'manager', 'analyst'].includes(String(actorRole).toLowerCase()) ||
+      !resolvedInstitution
+    ),
+    [actorRole, resolvedInstitution, resolvedInstitutionId],
   );
 
   const handleSave = useCallback(async () => {
@@ -529,7 +537,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{
@@ -554,8 +562,9 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: responsive.pageGutter,
@@ -565,6 +574,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
             width: '100%',
             maxWidth: responsive.contentMaxWidth,
           }}
+          keyboardShouldPersistTaps="handled"
         >
           <View
             style={[
@@ -586,6 +596,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
               onPress={() => navigation.goBack()}
               style={[styles.closeButton, { borderColor: palette.divider }]}
               accessibilityLabel="Close manage institution"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <KISIcon name="close" size={20} color={palette.text} />
             </TouchableOpacity>
@@ -616,6 +627,8 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
                 paddingVertical: HEALTH_THEME_SPACING.sm,
                 paddingHorizontal: HEALTH_THEME_SPACING.md,
                 marginTop: HEALTH_THEME_SPACING.sm,
+                minHeight: 44,
+                justifyContent: 'center',
               }}
             >
               <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.accentPrimary }}>
@@ -681,6 +694,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
             </View>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );
