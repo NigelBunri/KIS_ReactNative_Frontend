@@ -183,9 +183,9 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
         dedupeKey: `market:subscribe-product:${productId}`,
         errorMessage: 'Unable to subscribe.',
       });
-      if (res?.success === false) return { ok: false };
+      if (res?.success === false) return { ok: false, message: res.message };
       await reloadAll();
-      return { ok: true };
+      return { ok: true, message: '' };
     },
     [reloadAll],
   );
@@ -272,9 +272,9 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
       const res = await postRequest(MARKET_SHOPS_ENDPOINT, form, {
         errorMessage: 'Unable to create shop.',
       });
-      if (res?.success === false) return { ok: false };
+      if (res?.success === false) return { ok: false, message: res.message };
       await reloadAll();
-      return { ok: true };
+      return { ok: true, message: '' };
     },
     [reloadAll],
   );

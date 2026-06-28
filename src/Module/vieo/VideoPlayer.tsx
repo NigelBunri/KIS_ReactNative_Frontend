@@ -18,9 +18,12 @@ import VideoControls from './components/VideoControls';
 import { useVideoPlayer } from './hooks/useVideoPlayer';
 import { normalizeVideoUrl } from './utils';
 import type { ChannelContentChapter } from '@/screens/broadcast/channels/api/channels.types';
+import type { MediaHeaders } from '@/network';
 
 export type VideoPlayerProps = {
   sourceUrl: string;
+  sourceHeaders?: MediaHeaders;
+  sourceType?: string;
   poster?: string;
   autoPlay?: boolean;
   loop?: boolean;
@@ -41,6 +44,8 @@ export type VideoPlayerProps = {
 
 export default function VideoPlayer({
   sourceUrl,
+  sourceHeaders,
+  sourceType,
   poster,
   autoPlay = false,
   loop = false,
@@ -60,6 +65,34 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const { palette } = useKISTheme();
   const safeUrl = useMemo(() => normalizeVideoUrl(sourceUrl), [sourceUrl]);
+  const videoSource = useMemo(() => {
+    if (!safeUrl) return undefined;
+    const headers =
+      sourceHeaders && Object.keys(sourceHeaders).length > 0
+        ? sourceHeaders
+        : undefined;
+    const type = sourceType?.trim() || undefined;
+    return {
+      uri: safeUrl,
+      ...(headers ? { headers } : {}),
+      ...(type ? { type } : {}),
+    };
+  }, [safeUrl, sourceHeaders, sourceType]);
+
+  useEffect(() => {
+    if (!videoSource) return;
+    console.log(
+      '[VideoPlayer] source built',
+      JSON.stringify({
+        uri: (videoSource as any).uri,
+        type: (videoSource as any).type ?? null,
+        hasHeaders: Boolean((videoSource as any).headers),
+        autoPlay,
+        loop,
+        muted,
+      }),
+    );
+  }, [videoSource, autoPlay, loop, muted]);
   const [showPoster, setShowPoster] = useState(true);
 
   const leftSeekAnim = useRef(new Animated.Value(0)).current;
@@ -87,7 +120,20 @@ export default function VideoPlayer({
   }, [muted, actions]);
 
   useEffect(() => {
+    console.log('[VideoPlayer] playing →', state.playing);
+  }, [state.playing]);
+
+  useEffect(() => {
+    if (state.isBuffering) {
+      console.log('[VideoPlayer] buffering started');
+    } else if (!state.loading) {
+      console.log('[VideoPlayer] buffering ended');
+    }
+  }, [state.isBuffering, state.loading]);
+
+  useEffect(() => {
     if (state.error) {
+      console.warn('[VideoPlayer] error propagated to parent', state.error);
       onError?.(state.error);
     }
   }, [onError, state.error]);
@@ -150,7 +196,7 @@ export default function VideoPlayer({
     <View style={[styles.container, containerStyle]}>
       <Video
         ref={videoRef}
-        source={{ uri: safeUrl }}
+        source={videoSource}
         style={[styles.video, videoStyle]}
         poster={poster}
         posterResizeMode="cover"
@@ -182,7 +228,12 @@ export default function VideoPlayer({
         }}
         onBuffer={handlers.onBuffer}
         onError={(err) => {
-          console.error('[KISVideo] onError prop', err);
+          console.warn('[KISVideo] playback error', {
+            sourceUrl: safeUrl,
+            hasHeaders: Boolean(videoSource?.headers),
+            sourceType: (videoSource as any)?.type ?? null,
+            error: err,
+          });
           handlers.onError(err);
         }}
         onEnd={() => {

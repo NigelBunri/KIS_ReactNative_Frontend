@@ -72,6 +72,13 @@ import { useSocket } from '../../../SocketProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import ChatCallBanner, { type ActiveCallInfo } from './componets/ChatCallBanner';
+import type { CallHistoryEntry } from './componets/CallHistoryRow';
+import {
+  loadConversationCallHistory,
+  saveConversationCallHistory,
+} from '@/services/calls/callHistoryStorage';
+import type { CallType } from '@/services/calls/callTypes';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { loadMessages } from './Storage/chatStorage';
 
@@ -228,7 +235,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const { authToken, currentUserId: authCurrentUserId, currentUserName } =
     useChatAuth(chat);
-  const { typingByConversation, typingDisplayNames, presenceByUser, socket, isNetworkOnline, startCall, currentUserId: socketCurrentUserId } = useSocket();
+  const { typingByConversation, typingDisplayNames, presenceByUser, socket, isNetworkOnline, startCall, answerCall, activeCall, dismissCallUi, joinExistingCall, currentUserId: socketCurrentUserId } = useSocket();
   const currentUserId = authCurrentUserId || String(socketCurrentUserId ?? '');
 
   /* ------------------------------------------------------------------------ */
@@ -270,6 +277,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     votePoll,
     retryMessage,
     markMessagesRead,
+    markAllMessagesRead,
     requestHistoryBatch,
     mapServerMessage,
     replaceMessages,
@@ -564,6 +572,114 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [lockOverride, setLockOverride] = useState<boolean | null>(null);
   const [muteOverride, setMuteOverride] = useState<boolean | null>(null);
   const [requestStateOverride, setRequestStateOverride] = useState<string | null>(null);
+
+  // Active call in this conversation (fetched on open + updated via socket events)
+  const [roomActiveCall, setRoomActiveCall] = useState<ActiveCallInfo | null>(null);
+  // Call history for this conversation (shown inline as timeline rows)
+  const [callHistory, setCallHistory] = useState<CallHistoryEntry[]>([]);
+
+  // ── Fetch call data for this conversation ────────────────────────────────
+  const currentConvId = conversationId ?? chat?.conversationId ?? chat?.id;
+
+  const fetchCallData = useCallback(async () => {
+    if (!currentConvId) return;
+    const userId = String(currentUserId ?? '');
+    const convId = String(currentConvId);
+
+    // Show local cache immediately.
+    if (userId) {
+      const cached = await loadConversationCallHistory(userId, convId);
+      if (cached.length) setCallHistory(cached as CallHistoryEntry[]);
+    }
+
+    try {
+      const [activeRes, historyRes] = await Promise.all([
+        getRequest(ROUTES.calls.active(String(currentConvId))),
+        getRequest(ROUTES.calls.forConversation(String(currentConvId), 50)),
+      ]);
+      if (activeRes?.data?.call) {
+        setRoomActiveCall(activeRes.data.call as ActiveCallInfo);
+      } else {
+        setRoomActiveCall(null);
+      }
+      // Accept both { calls: [...] } and a bare array.
+      const serverHistory: CallHistoryEntry[] | null =
+        Array.isArray(historyRes?.data?.calls)
+          ? (historyRes.data.calls as CallHistoryEntry[])
+          : Array.isArray(historyRes?.data)
+          ? (historyRes.data as CallHistoryEntry[])
+          : null;
+
+      if (serverHistory) {
+        setCallHistory(serverHistory);
+        if (userId) await saveConversationCallHistory(userId, convId, serverHistory as any);
+      }
+    } catch {/* non-fatal */}
+  }, [currentConvId, currentUserId]);
+
+  useEffect(() => { void fetchCallData(); }, [fetchCallData]);
+
+  // Refresh call data on socket call events for this conversation.
+  useEffect(() => {
+    const subs = [DeviceEventEmitter.addListener('calls.refresh', fetchCallData)];
+    if (socket) {
+      const myConvId = String(currentConvId ?? '');
+
+      const onCallOffer = (payload: any) => {
+        if (String(payload?.conversationId ?? '') !== myConvId) return;
+        setRoomActiveCall({
+          callId: String(payload?.callId ?? ''),
+          conversationId: myConvId,
+          callType: (payload?.callType ?? 'voice') as CallType,
+          startedAt: payload?.startedAt ?? new Date().toISOString(),
+          // Use server-reported count; default to 1 (initiator).
+          participantCount: Number(payload?.participantCount ?? 1),
+          title: payload?.title ?? null,
+        });
+      };
+
+      // call.end: the entire call is over — clear the banner and refresh history.
+      const onCallEnd = (payload: any) => {
+        const sameCall =
+          (payload?.callId && String(payload.callId) === String(roomActiveCall?.callId ?? '')) ||
+          (payload?.conversationId && String(payload.conversationId) === myConvId);
+        if (sameCall) {
+          setRoomActiveCall(null);
+          fetchCallData();
+        }
+      };
+
+      // call.participant.joined: someone new joined — bump the count on the banner.
+      const onParticipantJoined = (payload: any) => {
+        if (String(payload?.conversationId ?? '') !== myConvId) return;
+        setRoomActiveCall((prev) =>
+          prev ? { ...prev, participantCount: (prev.participantCount ?? 1) + 1 } : prev,
+        );
+      };
+
+      // call.participant.left: someone left — decrement count, minimum 0.
+      const onParticipantLeft = (payload: any) => {
+        if (String(payload?.conversationId ?? '') !== myConvId) return;
+        setRoomActiveCall((prev) =>
+          prev ? { ...prev, participantCount: Math.max(0, (prev.participantCount ?? 1) - 1) } : prev,
+        );
+      };
+
+      socket.on('call.offer',             onCallOffer);
+      socket.on('call.end',               onCallEnd);
+      socket.on('call.participant.joined', onParticipantJoined);
+      socket.on('call.participant.left',  onParticipantLeft);
+      return () => {
+        subs.forEach(s => s.remove());
+        socket.off('call.offer',             onCallOffer);
+        socket.off('call.end',               onCallEnd);
+        socket.off('call.participant.joined', onParticipantJoined);
+        socket.off('call.participant.left',  onParticipantLeft);
+      };
+    }
+    return () => subs.forEach(s => s.remove());
+  }, [socket, currentConvId, roomActiveCall?.callId, fetchCallData]);
+
   const [groupAction, setGroupAction] = useState<'add' | 'remove' | 'role' | null>(null);
   const [groupUserIdInput, setGroupUserIdInput] = useState('');
   const [groupRoleInput, setGroupRoleInput] = useState('member');
@@ -1105,13 +1221,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   // HTTP mark-read — guarantees Django persists the read state even if socket receipts are lost.
   // Fires once per conversation open; deduplicated by ref so re-renders don't repeat the call.
+  // After the server confirms, we also bulk-update the local AsyncStorage cache so message
+  // ticks survive a restart without the user having to scroll through messages again.
   const markedReadRef = useRef<string | null>(null);
   useEffect(() => {
     const convId = conversationId ?? chat?.id;
     if (!convId || markedReadRef.current === String(convId)) return;
     markedReadRef.current = String(convId);
-    postRequest(ROUTES.chat.markRead(String(convId)), {}).catch(() => {});
-  }, [conversationId, chat?.id]);
+    postRequest(ROUTES.chat.markRead(String(convId)), {})
+      .then(() => markAllMessagesRead())
+      .catch(() => {
+        // Still update local cache even if the HTTP call fails — the socket
+        // receipts already told the server, so local and server are in sync.
+        void markAllMessagesRead();
+      });
+  }, [conversationId, chat?.id, markAllMessagesRead]);
 
   useEffect(() => {
     initialUnreadJumpRef.current = null;
@@ -1929,6 +2053,47 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     onOpenInfo?.({ chat, currentUserId });
   }, [chat, currentUserId, onOpenInfo]);
 
+  // Join or return to an active call in this conversation.
+  const handleJoinRoomCall = useCallback(async () => {
+    const convId = String(currentConvId ?? '');
+    if (!convId) return;
+
+    // 1. Already in this call and just minimised it → restore the UI
+    if (activeCall?.conversationId === convId &&
+        activeCall?.state !== 'ended' && activeCall?.state !== 'missed') {
+      DeviceEventEmitter.emit('call.restore');
+      return;
+    }
+
+    const callInfo = roomActiveCall;
+    if (!callInfo) return;
+
+    // 2. Join the already-active call by answering it (not creating a new one).
+    //    joinExistingCall emits call.answer against the existing callId so the
+    //    backend routes us into the current session.
+    if (joinExistingCall) {
+      await joinExistingCall({
+        callId: callInfo.callId,
+        conversationId: convId,
+        callType: callInfo.callType,
+        title: callInfo.title ?? chat?.name ?? 'Call',
+      });
+    }
+  }, [activeCall, roomActiveCall, currentConvId, joinExistingCall, chat?.name]);
+
+  // Callback from a finished call row.
+  const handleCallHistoryCallback = useCallback(async (entry: CallHistoryEntry) => {
+    if (!startCall || !currentConvId) return;
+    await startCall({
+      conversationId: String(currentConvId),
+      title: chat?.name ?? 'Call',
+      callType: entry.callType,
+      inviteeUserIds: (chat?.participants ?? [])
+        .map((p: any) => String(p.userId ?? p.id ?? ''))
+        .filter((id: string) => id && id !== currentUserId),
+    });
+  }, [startCall, currentConvId, chat, currentUserId]);
+
   const handleStartCall = useCallback(
     async (media: 'voice' | 'video' | 'broadcast') => {
       if (!chat || !startCall) {
@@ -2043,6 +2208,20 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           isConnecting={!isNetworkOnline || !socket?.connected}
         />
         </View>
+      )}
+
+      {/* ── Active call banner ── */}
+      {!selectionMode && roomActiveCall && (
+        <ChatCallBanner
+          call={roomActiveCall}
+          isLocal={
+            activeCall?.conversationId === String(currentConvId ?? '') &&
+            activeCall?.state !== 'ended' &&
+            activeCall?.state !== 'missed'
+          }
+          onJoin={handleJoinRoomCall}
+          onReturn={() => DeviceEventEmitter.emit('call.restore')}
+        />
       )}
 
       {!selectionMode && (
@@ -2179,6 +2358,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onUpdateMessage={handleUpdateMessage}
           typingUsers={typingUserObjects}
           canSend={canSend}
+          callHistory={callHistory}
+          onCallHistoryCallback={handleCallHistoryCallback}
           onLoadOlder={() => {
             const oldest = messages[0];
             if (!oldest?.createdAt) return;

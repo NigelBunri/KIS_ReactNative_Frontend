@@ -86,6 +86,7 @@ const AttachmentPreview: React.FC<{
   ).toLowerCase();
 
   if (preview.isVideo && url.startsWith('http')) {
+    const feedThumb = feed?.thumbnail_url ?? feed?.thumb_url ?? null;
     return (
       <>
         <RemoveAttachment
@@ -97,8 +98,9 @@ const AttachmentPreview: React.FC<{
         <BroadcastFeedVideoPreview
           attachment={attachment}
           palette={palette}
-          videoStyle={{ borderRadius: 18, backgroundColor: palette.bar }}
-          containerStyle={{ width: '100%', height: 200, borderRadius: 18 }}
+          containerStyle={{ width: '100%', borderRadius: 18 }}
+          videoStyle={{ backgroundColor: palette.bar }}
+          posterOverride={feedThumb}
         />
       </>
     );

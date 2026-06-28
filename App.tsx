@@ -23,6 +23,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  DeviceEventEmitter,
   FlatList,
   Modal,
   Platform,
@@ -34,15 +35,17 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   RESULTS,
   openSettings,
   type PermissionStatus,
 } from 'react-native-permissions';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
+import { flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { loadConsentPreferences } from '@/services/consentService';
 
 import SplashScreen from './src/screens/SplashScreen';
@@ -91,6 +94,7 @@ import OrganizationAppScreen from './src/screens/partners/OrganizationAppScreen'
 import OrganizationAppFormScreen from './src/screens/partners/OrganizationAppFormScreen';
 import OrgAppLaunchScreen from './src/screens/partners/OrgAppLaunchScreen';
 import InviteJoinScreen from './src/screens/invite/InviteJoinScreen';
+import CallJoinScreen from './src/screens/calls/CallJoinScreen';
 import PartnerRedeemInviteScreen from './src/screens/partners/PartnerRedeemInviteScreen';
 import HealthInstitutionDetailScreen from './src/screens/health/HealthInstitutionDetailScreen';
 import HealthInstitutionManagementScreen from './src/screens/health/HealthInstitutionManagementScreen';
@@ -119,7 +123,7 @@ import { initPushHandlers } from './src/push/notifications';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
-import { getAccessToken } from './src/security/authStorage';
+import { getAccessToken, AUTH_SESSION_EXPIRED_EVENT } from './src/security/authStorage';
 import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
@@ -149,6 +153,7 @@ import ProfileNotificationsScreen from '@/screens/profile/ProfileNotificationsSc
 import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificationDetailScreen';
 import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
+import BlockedContactsScreen from '@/screens/tabs/BlockedContactsScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
 import CacheManagementScreen from '@/screens/CacheManagementScreen';
@@ -165,6 +170,7 @@ import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
 import { AgeModeProvider, useAgeMode } from '@/theme/ageModeContext';
 import { ThemeModeProvider, useThemeMode } from '@/theme/themeModeContext';
+import { KIS_COLORS } from '@/theme/constants';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
 import WalletScreen from '@/screens/WalletScreen';
@@ -188,6 +194,97 @@ import OfflineBanner from '@/components/OfflineBanner';
 import SyncQueueBanner from '@/components/SyncQueueBanner';
 import LinkedDevicesScreen from '@/screens/LinkedDevicesScreen';
 import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
+
+// ── Family ──
+import FamilyHubScreen from '@/screens/family/FamilyHubScreen';
+import FamilySetupScreen from '@/screens/family/FamilySetupScreen';
+import FamilyCalendarScreen from '@/screens/family/FamilyCalendarScreen';
+import FamilyAlbumScreen from '@/screens/family/FamilyAlbumScreen';
+import FamilyTreeScreen from '@/screens/family/FamilyTreeScreen';
+import FamilyMembersScreen from '@/screens/family/MembersScreen';
+import FamilyMilestonesScreen from '@/screens/family/MilestonesScreen';
+import FamilyTimeCapsuleScreen from '@/screens/family/TimeCapsuleScreen';
+import FamilyNoticeBoardScreen from '@/screens/family/FamilyNoticeBoardScreen';
+import FamilyPrayerScreen from '@/screens/family/FamilyPrayerScreen';
+import GriefSupportScreen from '@/screens/family/GriefSupportScreen';
+import ParentalControlsScreen from '@/screens/family/ParentalControlsScreen';
+import FamilySOSScreen from '@/screens/family/SOSScreen';
+
+// ── Church ──
+import ChurchScreen from '@/screens/church/ChurchScreen';
+import GiveNowScreen from '@/screens/church/giving/GiveNowScreen';
+import ChurchGivingScreen from '@/screens/church/giving/GivingDashboardScreen';
+import TitheStatementScreen from '@/screens/church/giving/TitheStatementScreen';
+import PrayerWallScreen from '@/screens/church/prayer/PrayerWallScreen';
+import NewPrayerRequestScreen from '@/screens/church/prayer/NewPrayerRequestScreen';
+import FastingTrackerScreen from '@/screens/church/prayer/FastingTrackerScreen';
+import SmallGroupsScreen from '@/screens/church/groups/SmallGroupsScreen';
+import SmallGroupDetailScreen from '@/screens/church/groups/SmallGroupDetailScreen';
+import ChurchAttendanceScreen from '@/screens/church/membership/AttendanceScreen';
+import MemberDirectoryScreen from '@/screens/church/membership/MemberDirectoryScreen';
+import MinistryScreen from '@/screens/church/ministry/MinistryScreen';
+import EvangelismScreen from '@/screens/church/outreach/EvangelismScreen';
+import DiscipleshipScreen from '@/screens/church/discipleship/DiscipleshipScreen';
+import SpiritualGiftsScreen from '@/screens/church/discipleship/SpiritualGiftsScreen';
+import SetListScreen from '@/screens/church/worship/SetListScreen';
+import SongLibraryScreen from '@/screens/church/worship/SongLibraryScreen';
+
+// ── Government ──
+import GovernmentHubScreen from '@/screens/government/GovernmentHubScreen';
+import PetitionsScreen from '@/screens/government/PetitionsScreen';
+import PetitionDetailScreen from '@/screens/government/PetitionDetailScreen';
+import CreatePetitionScreen from '@/screens/government/CreatePetitionScreen';
+import CivicPollsScreen from '@/screens/government/CivicPollsScreen';
+import LegalAidScreen from '@/screens/government/LegalAidScreen';
+import LegalTemplatesScreen from '@/screens/government/LegalTemplatesScreen';
+import DiasporaScreen from '@/screens/government/DiasporaScreen';
+import NGOToolsScreen from '@/screens/government/NGOToolsScreen';
+import ComplianceTrackerScreen from '@/screens/government/ComplianceTrackerScreen';
+import BoardGovernanceScreen from '@/screens/government/BoardGovernanceScreen';
+import WhistleblowerScreen from '@/screens/government/WhistleblowerScreen';
+
+// ── Business ──
+import BusinessHubScreen from '@/screens/business/BusinessHubScreen';
+import CrowdfundScreen from '@/screens/business/CrowdfundScreen';
+import CrowdfundDetailScreen from '@/screens/business/CrowdfundDetailScreen';
+import CreateCampaignScreen from '@/screens/business/CreateCampaignScreen';
+import SavingsGroupsScreen from '@/screens/business/SavingsGroupsScreen';
+import SavingsGroupDetailScreen from '@/screens/business/SavingsGroupDetailScreen';
+import MentorshipScreen from '@/screens/business/MentorshipScreen';
+import CoWorkingScreen from '@/screens/business/CoWorkingScreen';
+import KingdomCertificationScreen from '@/screens/business/KingdomCertificationScreen';
+import ImpactReportScreen from '@/screens/business/ImpactReportScreen';
+import BusinessJobDetailScreen from '@/screens/business/JobDetailScreen';
+
+// ── Health sub-screens ──
+import TelemedicineScreen from '@/screens/health/telemedicine/TelemedicineScreen';
+import DoctorDirectoryScreen from '@/screens/health/telemedicine/DoctorDirectoryScreen';
+import ConsultDetailScreen from '@/screens/health/telemedicine/ConsultDetailScreen';
+import EmergencyScreen from '@/screens/health/emergency/EmergencyScreen';
+import HealthGoalsScreen from '@/screens/health/goals/HealthGoalsScreen';
+import PregnancyTrackerScreen from '@/screens/health/maternal/PregnancyTrackerScreen';
+import BabyMilestonesScreen from '@/screens/health/maternal/BabyMilestonesScreen';
+import MedicationsScreen from '@/screens/health/medications/MedicationsScreen';
+import MentalHealthScreen from '@/screens/health/mental/MentalHealthScreen';
+import MoodJournalScreen from '@/screens/health/mental/MoodJournalScreen';
+import CrisisResourcesScreen from '@/screens/health/mental/CrisisResourcesScreen';
+import AddictionRecoveryScreen from '@/screens/health/recovery/AddictionRecoveryScreen';
+import SobrietyTrackerScreen from '@/screens/health/recovery/SobrietyTrackerScreen';
+import SymptomCheckerScreen from '@/screens/health/symptoms/SymptomCheckerScreen';
+
+// ── Broadcast education & media extended ──
+import AssignmentsScreen from '@/screens/broadcast/education/AssignmentsScreen';
+import StudentProgressScreen from '@/screens/broadcast/education/StudentProgressScreen';
+import BadgesScreen from '@/screens/broadcast/education/BadgesScreen';
+import CertificateScreen from '@/screens/broadcast/education/CertificateScreen';
+import LiveClassroomScreen from '@/screens/broadcast/education/LiveClassroomScreen';
+import ScholarshipsScreen from '@/screens/broadcast/education/ScholarshipsScreen';
+import CreatorAnalyticsScreen from '@/screens/broadcast/media_extended/CreatorAnalyticsScreen';
+import KingdomNewsScreen from '@/screens/broadcast/media_extended/KingdomNewsScreen';
+import KingdomMusicScreen from '@/screens/broadcast/media_extended/KingdomMusicScreen';
+import EbooksScreen from '@/screens/broadcast/media_extended/EbooksScreen';
+import PodcastsScreen from '@/screens/broadcast/media_extended/PodcastsScreen';
+import PPVEventsScreen from '@/screens/broadcast/media_extended/PPVEventsScreen';
 
 type AuthCtx = {
   isAuth: boolean;
@@ -220,11 +317,32 @@ function AppContent() {
   const { language, languageVersion } = useLanguage();
   const { ageVersion } = useAgeMode();
   const { themeMode } = useThemeMode();
+  const insets = useSafeAreaInsets();
   const sysScheme = useColorScheme();
   const scheme = themeMode === 'system' ? sysScheme : themeMode;
+  // Start null so the gold gradient never flashes before navigation is ready.
+  // syncActiveRoute fires via onReady/onStateChange and sets the real value.
+  const [activeRouteName, setActiveRouteName] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
 
   const navigationRef = useRef<any>(null);
+
+  const syncActiveRoute = useCallback(() => {
+    const routeName = navigationRef.current?.getCurrentRoute?.()?.name;
+    if (typeof routeName === 'string' && routeName.length > 0) {
+      setActiveRouteName(routeName);
+    }
+  }, []);
+
+  const usesGoldStatusBar = activeRouteName === 'Messages' || activeRouteName === 'Broadcast';
+  const statusBarBackground = usesGoldStatusBar
+    ? KIS_COLORS.brand.gold
+    : scheme === 'dark'
+      ? KIS_COLORS.dark.chrome
+      : KIS_COLORS.light.bg;
+  const statusBarStyle = usesGoldStatusBar || scheme !== 'dark'
+    ? 'dark-content'
+    : 'light-content';
 
   const [isAuth, setAuth] = useState(false);
   const [load, setLoad] = useState(false);
@@ -253,7 +371,16 @@ function AppContent() {
     startOfflineActionQueue();
     startMediaTransferQueue();
     void loadConsentPreferences();
+
+    // Flush chat/mutation queue on reconnect regardless of which screen is active
+    const netInfoUnsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        void flushPendingMutations();
+      }
+    });
+
     return () => {
+      netInfoUnsubscribe();
       stopMediaTransferQueue();
       stopOfflineActionQueue();
     };
@@ -527,6 +654,14 @@ function AppContent() {
     })();
   }, [load, syncLocationCountry, checkAuth]);
 
+  // Immediately re-check auth (→ navigate to Login) whenever clearAuthSession fires
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AUTH_SESSION_EXPIRED_EVENT, () => {
+      void checkAuth();
+    });
+    return () => sub.remove();
+  }, [checkAuth]);
+
   useEffect(() => {
     if (!locationReady) return;
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -538,6 +673,8 @@ function AppContent() {
 
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
+        // Re-validate session whenever user returns to app — catches expired tokens
+        void checkAuth();
         syncLocationCountry(false);
         startInterval();
         // Drain data-only background notifications stored while killed/backgrounded
@@ -665,6 +802,9 @@ function AppContent() {
 
         if (!active) return;
 
+        const nestToken = finalToken || apnsToken;
+        const nestPlatform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
+
         if (Platform.OS === 'ios' && apnsToken) {
           await postRequest(ROUTES.notifications.deviceTokenRegister, {
             device_id: deviceId || 'unknown-device',
@@ -683,6 +823,15 @@ function AppContent() {
             apns_token: apnsToken || '',
             metadata: { source: 'auth-bootstrap' },
           });
+        }
+
+        // Also register with the NestJS backend which handles call push notifications
+        if (nestToken) {
+          postRequest(ROUTES.nestNotifications.deviceTokenRegister, {
+            token: nestToken,
+            platform: nestPlatform,
+            deviceId: deviceId || undefined,
+          }).catch(() => {/* non-fatal */});
         }
       } catch (e: any) {
         console.log('[push-token] register failed:', e?.message);
@@ -846,27 +995,51 @@ function AppContent() {
   return (
     <AuthContext.Provider value={ctx}>
       <SocketProvider>
-        <View style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#09070D' : '#FFFFFF' }}>
+        <View style={{ flex: 1, backgroundColor: statusBarBackground }}>
           <StatusBar
-            translucent={false}
-            backgroundColor={scheme === 'dark' ? '#09070D' : '#FFFFFF'}
-            barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+            animated
+            translucent
+            backgroundColor="transparent"
+            barStyle={statusBarStyle}
           />
+          {usesGoldStatusBar ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={[KIS_COLORS.brand.gold, KIS_COLORS.brand.goldDeep]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[appStyles.statusBarBackdrop, { height: Math.max(insets.top, StatusBar.currentHeight ?? 0) }]}
+            />
+          ) : (
+            <View
+              pointerEvents="none"
+              style={[
+                appStyles.statusBarBackdrop,
+                {
+                  height: Math.max(insets.top, StatusBar.currentHeight ?? 0),
+                  backgroundColor: statusBarBackground,
+                },
+              ]}
+            />
+          )}
           <OfflineBanner />
           <SyncQueueBanner />
           <NavigationContainer
             ref={navigationRef}
+            onReady={syncActiveRoute}
+            onStateChange={syncActiveRoute}
             key={`nav-${languageVersion}`}
             theme={scheme === 'dark'
               ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: 'transparent' } }
               : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
             }
             linking={{
-              prefixes: ['kis://', 'https://kis.app'],
+              prefixes: ['kis://', 'https://kis.app', 'kisapp://'],
               config: {
                 screens: {
                   OrgAppLaunch: 'org-app/:partnerId/:appId',
                   InviteJoin: 'join/:type/:token',
+                  CallJoin: 'call/join/:token',
                   PartnerRedeemInvite: 'join/partner/:code',
                   BroadcastDetail: 'broadcasts/:id',
                   ChannelHome: 'channels/:channelId',
@@ -974,6 +1147,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="InviteJoin"
                       component={InviteJoinScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="CallJoin"
+                      component={CallJoinScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
@@ -1185,6 +1363,14 @@ function AppContent() {
                       component={AccountDeletionScreen}
                     />
                     <RootStack.Screen
+                      name="BlockedContacts"
+                      options={{ headerShown: false }}
+                    >
+                      {({ navigation }) => (
+                        <BlockedContactsScreen onBack={() => navigation.goBack()} />
+                      )}
+                    </RootStack.Screen>
+                    <RootStack.Screen
                       name="InvoiceList"
                       component={InvoiceListScreen}
                       options={{ presentation: 'modal' }}
@@ -1324,6 +1510,98 @@ function AppContent() {
                     <RootStack.Screen name="TestimonyReachInbox" component={TestimonyReachInboxScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="LinkedDevices" component={LinkedDevicesScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+
+                    {/* ── Family ── */}
+                    <RootStack.Screen name="FamilyHub" component={FamilyHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilySetup" component={FamilySetupScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyCalendar" component={FamilyCalendarScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyAlbum" component={FamilyAlbumScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyTree" component={FamilyTreeScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyMembers" component={FamilyMembersScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyMilestones" component={FamilyMilestonesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyTimeCapsules" component={FamilyTimeCapsuleScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyNoticeBoard" component={FamilyNoticeBoardScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyPrayer" component={FamilyPrayerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="GriefSupport" component={GriefSupportScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ParentalControls" component={ParentalControlsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilySOS" component={FamilySOSScreen} options={{ headerShown: false }} />
+
+                    {/* ── Church ── */}
+                    <RootStack.Screen name="ChurchHome" component={ChurchScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="GiveNow" component={GiveNowScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchGiving" component={ChurchGivingScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="TitheStatement" component={TitheStatementScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PrayerWall" component={PrayerWallScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NewPrayerRequest" component={NewPrayerRequestScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FastingTracker" component={FastingTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SmallGroups" component={SmallGroupsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SmallGroupDetail" component={SmallGroupDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchAttendance" component={ChurchAttendanceScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MemberDirectory" component={MemberDirectoryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MinistryDepartments" component={MinistryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EvangelismTracker" component={EvangelismScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DiscipleshipJourney" component={DiscipleshipScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SpiritualGifts" component={SpiritualGiftsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SetLists" component={SetListScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SongLibrary" component={SongLibraryScreen} options={{ headerShown: false }} />
+
+                    {/* ── Government ── */}
+                    <RootStack.Screen name="GovernmentHub" component={GovernmentHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Petitions" component={PetitionsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PetitionDetail" component={PetitionDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreatePetition" component={CreatePetitionScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CivicPolls" component={CivicPollsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LegalAid" component={LegalAidScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LegalTemplates" component={LegalTemplatesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DiasporaCommunities" component={DiasporaScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NGOTools" component={NGOToolsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ComplianceTracker" component={ComplianceTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BoardGovernance" component={BoardGovernanceScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="WhistleblowerReport" component={WhistleblowerScreen} options={{ headerShown: false }} />
+
+                    {/* ── Business ── */}
+                    <RootStack.Screen name="BusinessHub" component={BusinessHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Crowdfunding" component={CrowdfundScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CrowdfundDetail" component={CrowdfundDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreateCampaign" component={CreateCampaignScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SavingsGroups" component={SavingsGroupsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SavingsGroupDetail" component={SavingsGroupDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BusinessMentorship" component={MentorshipScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CoWorkingSpaces" component={CoWorkingScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomCertification" component={KingdomCertificationScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BusinessImpactReport" component={ImpactReportScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="JobDetail" component={BusinessJobDetailScreen} options={{ headerShown: false }} />
+                    {/* JobApplications → consolidated into MyApplications */}
+
+                    {/* ── Health sub-screens ── */}
+                    <RootStack.Screen name="TelemedicineHub" component={TelemedicineScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DoctorDirectory" component={DoctorDirectoryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ConsultDetail" component={ConsultDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EmergencyHub" component={EmergencyScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="HealthGoals" component={HealthGoalsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PregnancyTrackerScreen" component={PregnancyTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BabyMilestones" component={BabyMilestonesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Medications" component={MedicationsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MentalHealthHub" component={MentalHealthScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MoodJournal" component={MoodJournalScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CrisisResources" component={CrisisResourcesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="AddictionRecovery" component={AddictionRecoveryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SobrietyTracker" component={SobrietyTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SymptomChecker" component={SymptomCheckerScreen} options={{ headerShown: false }} />
+
+                    {/* ── Broadcast education & media extended ── */}
+                    <RootStack.Screen name="AssignmentsScreen" component={AssignmentsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="StudentProgress" component={StudentProgressScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DigitalBadges" component={BadgesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EducationCertificate" component={CertificateScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LiveClassroom" component={LiveClassroomScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Scholarships" component={ScholarshipsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreatorAnalytics" component={CreatorAnalyticsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomNews" component={KingdomNewsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomMusic" component={KingdomMusicScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Ebooks" component={EbooksScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Podcasts" component={PodcastsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PPVEvents" component={PPVEventsScreen} options={{ headerShown: false }} />
                   </>
                 ) : (
                   <>
@@ -1404,6 +1682,16 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const appStyles = StyleSheet.create({
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 0,
+  },
+});
 
 const locationStyles = StyleSheet.create({
   root: {

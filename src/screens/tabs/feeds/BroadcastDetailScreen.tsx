@@ -5,6 +5,7 @@ import {
   Animated,
   DeviceEventEmitter,
   Image,
+  Modal,
   PanResponder,
   Pressable,
   Share,
@@ -145,14 +146,20 @@ export default function BroadcastDetailScreen() {
 
   const normalizedChannelContentId = getChannelContentId(broadcastItem);
 
+  // Only auto-redirect to ChannelContentDetail when the user arrived here
+  // for a single item (deep link / direct open). When swiping through a list
+  // (routeItems.length > 1), stay in the swipe-feed view — redirecting on every
+  // swipe was the bug that opened the "details page" mid-feed.
+  const isSwipeFeedMode = routeItems.length > 1;
   useEffect(() => {
     if (!normalizedChannelContentId || !broadcastItem) return;
+    if (isSwipeFeedMode) return;
     navigation.replace('ChannelContentDetail', {
       contentId: normalizedChannelContentId,
       item: broadcastItem,
       channel: broadcastItem.channel || broadcastItem.source || null,
     });
-  }, [broadcastItem, navigation, normalizedChannelContentId]);
+  }, [broadcastItem, isSwipeFeedMode, navigation, normalizedChannelContentId]);
 
   // Fetch broadcast by ID when navigated via deep link / push notification (no item param)
   const deepLinkId = route.params?.id;
@@ -550,6 +557,51 @@ export default function BroadcastDetailScreen() {
       .filter(Boolean);
   }, [attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [imageModalUri, setImageModalUri] = useState<string | null>(null);
+
+  const openImageModal = useCallback((uri?: string | null) => {
+    if (!uri) return;
+    setImageModalUri(uri);
+    setImageModalVisible(true);
+  }, []);
+
+  // Opens the canonical detail page for the current item when the user taps the
+  // title or source name in the top bar.
+  // • Channel content  → ChannelContentDetail
+  // • Channel source   → ChannelHome (by handle or id)
+  // • Anything else    → goBack (nothing deeper to show)
+  const handleOpenDetails = useCallback(() => {
+    if (!broadcastItem) return;
+    if (normalizedChannelContentId) {
+      navigation.navigate('ChannelContentDetail', {
+        contentId: normalizedChannelContentId,
+        item: broadcastItem,
+        channel: broadcastItem.channel || broadcastItem.source || null,
+      } as any);
+      return;
+    }
+    const channelHandle =
+      broadcastItem?.channel?.handle ??
+      broadcastItem?.source?.handle ??
+      broadcastItem?.metadata?.channel_handle ??
+      null;
+    const channelId =
+      broadcastItem?.channel?.id ??
+      broadcastItem?.source?.id ??
+      broadcastItem?.metadata?.channel_id ??
+      null;
+    if (channelHandle || channelId) {
+      navigation.navigate('ChannelHome', {
+        channelId: String(channelHandle ?? channelId),
+      } as any);
+    }
+  }, [broadcastItem, navigation, normalizedChannelContentId]);
+
+  const closeImageModal = useCallback(() => {
+    setImageModalVisible(false);
+    setImageModalUri(null);
+  }, []);
 
   useEffect(() => {
     setActiveAttachmentIndex(0);
@@ -762,17 +814,26 @@ export default function BroadcastDetailScreen() {
           {showCarousel ? (
             activeAttachmentIsVideo && activeAttachment ? (
               <BroadcastFeedVideoPreview
+                // Remount when the active item/attachment changes so the next
+                // video restarts and autoplays after a swipe.
+                key={`${broadcastId}:${activeAttachmentIndex}`}
                 attachment={activeAttachment}
                 palette={palette as any}
                 containerStyle={styles.fullMedia}
                 videoStyle={styles.fullMedia}
+                autoPlay={activeAttachmentIsVideo}
               />
             ) : attachmentUrl ? (
-              <Image
-                source={{ uri: attachmentUrl }}
-                style={[styles.fullMedia, { backgroundColor: palette.royalInk }]}
-                resizeMode="cover"
-              />
+              <Pressable
+                style={styles.fullMedia}
+                onPress={() => openImageModal(attachmentUrl)}
+              >
+                <Image
+                  source={{ uri: attachmentUrl }}
+                  style={[styles.fullMedia, { backgroundColor: palette.royalInk }]}
+                  resizeMode="cover"
+                />
+              </Pressable>
             ) : (
               <View style={[styles.textOnlyVisual, { backgroundColor: palette.royalInk }]} />
             )
@@ -803,14 +864,22 @@ export default function BroadcastDetailScreen() {
           >
             <KISIcon name="arrow-left" size={22} color={palette.ivory} />
           </Pressable>
-          <View style={styles.titleBlock}>
+          <Pressable
+            style={styles.titleBlock}
+            onPress={handleOpenDetails}
+            hitSlop={8}
+            accessibilityLabel={`Open details for ${title}`}
+          >
             <Text style={[styles.heading, { color: palette.ivory }]} numberOfLines={1}>
               {title}
             </Text>
             <Text style={[styles.sourceName, { color: palette.ivory }]} numberOfLines={1}>
               {sourceName}
+              {(normalizedChannelContentId || broadcastItem?.channel?.id || broadcastItem?.source?.id) ? (
+                <Text style={{ color: `${palette.ivory}99`, fontSize: 11 }}> ›</Text>
+              ) : null}
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {showControls ? (
@@ -921,6 +990,34 @@ export default function BroadcastDetailScreen() {
           </View>
         </View>
       ) : null}
+
+      <Modal
+        visible={imageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeImageModal}
+      >
+        <View style={styles.imageModalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeImageModal}
+          />
+          {imageModalUri ? (
+            <Image
+              source={{ uri: imageModalUri }}
+              style={styles.imageModalImage}
+              resizeMode="contain"
+            />
+          ) : null}
+          <Pressable
+            onPress={closeImageModal}
+            hitSlop={12}
+            style={[styles.imageModalClose, { top: insets.top + 12 }]}
+          >
+            <KISIcon name="close" size={26} color={palette.ivory} />
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1121,5 +1218,25 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageModalClose: {
+    position: 'absolute',
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });

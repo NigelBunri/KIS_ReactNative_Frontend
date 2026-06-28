@@ -20,7 +20,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
-import { API_BASE_URL } from '@/network/config';
+
 import type { RootStackParamList } from '@/navigation/types';
 import type { AdminUser, AdminUsersPagination } from '@/screens/tabs/partners/useAdminUsersPanel';
 
@@ -53,7 +53,7 @@ export default function AdminUserManagementScreen() {
     params.set('page', String(pg));
     params.set('per_page', '20');
 
-    const baseUrl = (ROUTES as any).users?.list ?? `${API_BASE_URL}/control/admin/users/`;
+    const baseUrl = ROUTES.adminUsers.list;
     const url = `${baseUrl}?${params.toString()}`;
     try {
       const res = await getRequest(url, { errorMessage: 'Failed to load users.' });
@@ -98,7 +98,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/ban/`;
+              const endpoint = ROUTES.adminUsers.ban(user.id);
               const res = await postRequest(endpoint, { reason: 'Policy violation', permanent: false }, { errorMessage: 'Unable to suspend user.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'suspended' } : u));
@@ -118,7 +118,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.ban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/ban/`;
+              const endpoint = ROUTES.adminUsers.ban(user.id);
               const res = await postRequest(endpoint, { reason: 'Policy violation', permanent: true }, { errorMessage: 'Unable to ban user.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'banned' } : u));
@@ -139,7 +139,7 @@ export default function AdminUserManagementScreen() {
   const handleUnban = useCallback(async (user: AdminUser) => {
     setActionLoading(user.id);
     try {
-      const endpoint = (ROUTES as any).users?.unban?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/unban/`;
+      const endpoint = ROUTES.adminUsers.unban(user.id);
       const res = await postRequest(endpoint, {}, { errorMessage: 'Unable to unban user.' });
       if (res.success) {
         setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'active' } : u));
@@ -163,7 +163,7 @@ export default function AdminUserManagementScreen() {
           onPress: async () => {
             setActionLoading(user.id);
             try {
-              const endpoint = (ROUTES as any).users?.setTier?.(user.id) ?? `${API_BASE_URL}/control/admin/users/${user.id}/set-tier/`;
+              const endpoint = ROUTES.adminUsers.setTier(user.id);
               const res = await postRequest(endpoint, { tier }, { errorMessage: 'Unable to change tier.' });
               if (res.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, tier } : u));

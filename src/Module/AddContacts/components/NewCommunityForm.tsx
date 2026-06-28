@@ -173,17 +173,29 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
   };
 
   return (
-    <View style={{ marginTop: 16 }}>
-      <Text
-        style={{
-          color: palette.text,
-          fontSize: 16,
-          fontWeight: '600',
-          marginBottom: 12,
-        }}
-      >
-        Create a new community
-      </Text>
+    <View style={{ marginTop: 4 }}>
+      <View style={{
+        backgroundColor: palette.card,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: palette.inputBorder,
+      }}>
+        <Text
+          style={{
+            color: palette.text,
+            fontSize: 20,
+            fontWeight: '800',
+            marginBottom: 4,
+          }}
+        >
+          Create a community
+        </Text>
+        <Text style={{ color: palette.subtext, fontSize: 13, lineHeight: 18 }}>
+          Build a space for your audience to connect, share and grow together.
+        </Text>
+      </View>
 
       {/* Community avatar */}
       <View style={{ alignItems: 'center', marginBottom: 20 }}>

@@ -1,5 +1,6 @@
 import { normalizeVideoUrl } from '@/Module/vieo/utils';
-import { API_BASE_URL, MEDIA_FALLBACK_API_BASE_URL } from '@/network/config';
+import { resolveBackendAssetUrl } from '@/network';
+import { API_BASE_URL, NEST_API_BASE_URL } from '@/network/config';
 
 export type BroadcastFeedVideoSourceKind =
   | 'stream_url'
@@ -15,6 +16,7 @@ export type BroadcastFeedVideoSource = {
   host: string | null;
   isLoopbackHost: boolean;
   isHttp: boolean;
+  needsAuthHeaders: boolean;
 };
 
 export const describeBroadcastFeedVideoSource = (
@@ -48,18 +50,79 @@ const KIND_PRIORITY: Record<BroadcastFeedVideoSourceKind, number> = {
   uri: 5,
 };
 
+const BACKEND_HOSTS = new Set(
+  [API_BASE_URL, NEST_API_BASE_URL]
+    .map((base) => {
+      try {
+        return new URL(base).host.toLowerCase();
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as string[],
+);
+
+const mediaTypeForUrl = (value: string | null | undefined) => {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    const pathname = parsed.pathname.toLowerCase();
+    if (pathname.endsWith('.m3u8')) return 'm3u8';
+    if (pathname.endsWith('.mpd')) return 'mpd';
+    if (pathname.endsWith('.mov')) return 'mov';
+    if (pathname.endsWith('.webm')) return 'webm';
+    if (pathname.endsWith('.mp4') || pathname.includes('.mp4/')) return 'mp4';
+  } catch {
+    const lower = value.toLowerCase();
+    if (lower.includes('.m3u8')) return 'm3u8';
+    if (lower.includes('.mpd')) return 'mpd';
+    if (lower.includes('.mov')) return 'mov';
+    if (lower.includes('.webm')) return 'webm';
+    if (lower.includes('.mp4')) return 'mp4';
+  }
+  return null;
+};
+
+export const getBroadcastFeedVideoSourceType = (
+  attachment: any,
+  source: BroadcastFeedVideoSource | null | undefined,
+) => {
+  const mime = String(
+    attachment?.mime_type ??
+      attachment?.mimeType ??
+      attachment?.content_type ??
+      attachment?.contentType ??
+      '',
+  ).toLowerCase();
+  if (mime.includes('mpegurl') || mime.includes('m3u8')) return 'm3u8';
+  if (mime.includes('dash') || mime.includes('mpd')) return 'mpd';
+  if (mime.includes('quicktime')) return 'mov';
+  if (mime.includes('webm')) return 'webm';
+  if (mime.includes('mp4')) return 'mp4';
+  return mediaTypeForUrl(source?.url);
+};
+
 const parseVideoUrl = (value: string) => {
-  const resolved = rewriteLoopbackUrl(value) ?? value;
+  const resolved = resolveBackendAssetUrl(value) ?? value;
   const normalized = normalizeVideoUrl(resolved);
   if (!normalized) return null;
   try {
     const parsed = new URL(normalized);
+    // Hermes URL parser may append a trailing slash to file paths — strip it.
+    if (parsed.pathname !== '/' && parsed.pathname.endsWith('/')) {
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    }
+    const cleanUrl = parsed.toString();
     const host = parsed.hostname?.toLowerCase?.() ?? null;
+    // Only send auth headers for API endpoints, not direct media file paths.
+    // Django middleware can reject auth headers on /media/ URLs (causing -11850 in AVFoundation).
+    const isApiPath = parsed.pathname.startsWith('/api/');
     return {
-      url: normalized,
+      url: cleanUrl,
       host,
       isLoopbackHost: host ? LOOPBACK_HOSTS.has(host) : false,
       isHttp: parsed.protocol.toLowerCase() === 'http:',
+      needsAuthHeaders: BACKEND_HOSTS.has(parsed.host.toLowerCase()) && isApiPath,
     };
   } catch {
     return null;
@@ -69,8 +132,10 @@ const parseVideoUrl = (value: string) => {
 export const getBroadcastFeedVideoSources = (attachment: any): BroadcastFeedVideoSource[] => {
   const seen = new Set<string>();
   const sources: BroadcastFeedVideoSource[] = [];
+  const rawCandidates: Record<string, string | null> = {};
   for (const key of SOURCE_KEYS) {
     const raw = attachment?.[key];
+    rawCandidates[key] = typeof raw === 'string' ? raw : null;
     if (!raw || typeof raw !== 'string') continue;
     const parsed = parseVideoUrl(raw);
     if (!parsed || seen.has(parsed.url)) continue;
@@ -81,14 +146,32 @@ export const getBroadcastFeedVideoSources = (attachment: any): BroadcastFeedVide
       host: parsed.host,
       isLoopbackHost: parsed.isLoopbackHost,
       isHttp: parsed.isHttp,
+      needsAuthHeaders: parsed.needsAuthHeaders,
     });
   }
-  return [...sources].sort((left, right) => {
+  const sorted = [...sources].sort((left, right) => {
     const leftRisk = (left.isLoopbackHost ? 100 : 0) + (left.isHttp ? 10 : 0);
     const rightRisk = (right.isLoopbackHost ? 100 : 0) + (right.isHttp ? 10 : 0);
     if (leftRisk !== rightRisk) return leftRisk - rightRisk;
     return (KIND_PRIORITY[left.kind] ?? 99) - (KIND_PRIORITY[right.kind] ?? 99);
   });
+  console.log(
+    '[BroadcastFeed:sources] resolved',
+    JSON.stringify({
+      attachmentId: attachment?.video_id ?? attachment?.id ?? null,
+      mediaType: attachment?.media_type ?? null,
+      mimeType: attachment?.mime_type ?? null,
+      rawCandidates,
+      resolved: sorted.map((s) => ({
+        kind: s.kind,
+        url: s.url,
+        host: s.host,
+        risk: getBroadcastFeedVideoRiskNote(s) ?? 'none',
+        needsAuthHeaders: s.needsAuthHeaders,
+      })),
+    }),
+  );
+  return sorted;
 };
 
 export const getBroadcastFeedVideoPosterUrl = (attachment: any): string | null => {
@@ -103,25 +186,8 @@ export const getBroadcastFeedVideoPosterUrl = (attachment: any): string | null =
     attachment?.previewUrl ??
     null;
   if (!candidate || typeof candidate !== 'string') return null;
-  return normalizeVideoUrl(rewriteLoopbackUrl(candidate) ?? candidate);
-};
-
-const rewriteLoopbackUrl = (value: string) => {
-  const normalized = normalizeVideoUrl(value);
-  if (!normalized) return null;
-  try {
-    const parsed = new URL(normalized);
-    if (!parsed.hostname || !LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
-      return normalized;
-    }
-    const base = new URL(MEDIA_FALLBACK_API_BASE_URL || API_BASE_URL);
-    parsed.protocol = base.protocol;
-    parsed.hostname = base.hostname;
-    parsed.port = base.port;
-    return parsed.toString();
-  } catch {
-    return normalized;
-  }
+  const resolved = resolveBackendAssetUrl(candidate) ?? candidate;
+  return normalizeVideoUrl(resolved);
 };
 
 export const getBroadcastFeedVideoSourceLabel = (source: BroadcastFeedVideoSource | null | undefined) => {

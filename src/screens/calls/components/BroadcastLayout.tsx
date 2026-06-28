@@ -1,11 +1,11 @@
 // src/screens/calls/components/BroadcastLayout.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
+  LayoutChangeEvent,
 } from 'react-native';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
@@ -16,44 +16,67 @@ type Props = {
   participants: CallParticipant[];
   viewerCount: number;
   isRecording: boolean;
-  availableHeight: number;
   activeSpeakerId?: string | null;
   liveStartedAt?: string | null;
   onPressParticipant?: (userId: string) => void;
+  // kept for backwards-compat but ignored; layout uses onLayout
+  availableHeight?: number;
 };
 
-const CO_HOST_H = 90;
-const AUDIENCE_STRIP_H = 56;
+const TOP_BAR_H   = 44;   // LIVE indicator bar
+const CO_HOST_H   = 96;   // on-stage horizontal strip
+const HANDS_H     = 56;   // raised-hands strip
+const AUDIENCE_H  = 36;   // audience count bar
 
 export default function BroadcastLayout({
   participants,
   viewerCount,
   isRecording,
-  availableHeight,
   activeSpeakerId,
   liveStartedAt,
   onPressParticipant,
 }: Props) {
   const { palette } = useKISTheme();
-  const { width: screenW } = useWindowDimensions();
   const styles = useBroadcastStyles(palette);
 
-  const hosts = participants.filter(p => p.role === 'host' || p.role === 'co-host');
+  const [containerW, setContainerW] = useState(0);
+  const [containerH, setContainerH] = useState(0);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0)  setContainerW(Math.floor(width));
+    if (height > 0) setContainerH(Math.floor(height));
+  }, []);
+
+  const hosts    = participants.filter(p => p.role === 'host' || p.role === 'co-host');
   const speakers = participants.filter(p => p.role === 'speaker');
   const audience = participants.filter(p => p.role === 'audience');
+  const raisedHands = audience.filter(a => a.handRaised);
 
   const primaryHost = hosts.find(h => h.role === 'host') ?? hosts[0] ?? null;
-  const coHosts = hosts.filter(h => h !== primaryHost);
+  const coHosts     = hosts.filter(h => h !== primaryHost);
+  const onStage     = [...coHosts, ...speakers];
 
-  const mainH = availableHeight - (speakers.length ? CO_HOST_H : 0) - AUDIENCE_STRIP_H - 120;
+  // Main host tile height = total container minus every section below it.
+  const mainH = Math.max(
+    80,
+    containerH
+      - TOP_BAR_H
+      - (onStage.length > 0 ? CO_HOST_H : 0)
+      - (raisedHands.length > 0 ? HANDS_H : 0)
+      - AUDIENCE_H,
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.royalInk }]}>
-      {/* LIVE indicator */}
+    <View
+      style={[styles.container, { backgroundColor: palette.royalInk }]}
+      onLayout={onLayout}
+    >
+      {/* LIVE / viewer / timer bar */}
       <View style={styles.topBar}>
         <View style={[styles.liveChip, { borderColor: palette.danger }]}>
-          <View style={[styles.liveDot, { backgroundColor: palette.ivory }]} />
-          <Text style={[styles.liveText, { color: palette.ivory }]}>LIVE</Text>
+          <View style={[styles.dot, { backgroundColor: palette.ivory }]} />
+          <Text style={[styles.chipText, { color: palette.ivory }]}>LIVE</Text>
         </View>
         <Text style={styles.viewerCount}>👁 {viewerCount.toLocaleString()}</Text>
         {liveStartedAt && (
@@ -66,53 +89,60 @@ export default function BroadcastLayout({
           />
         )}
         {isRecording && (
-          <View style={styles.recChip}>
-            <View style={[styles.liveDot, { backgroundColor: palette.danger }]} />
-            <Text style={[styles.liveText, { color: palette.danger }]}>REC</Text>
+          <View style={[styles.recChip, { borderColor: `${palette.danger}66` }]}>
+            <View style={[styles.dot, { backgroundColor: palette.danger }]} />
+            <Text style={[styles.chipText, { color: palette.danger }]}>REC</Text>
           </View>
         )}
       </View>
 
-      {/* Primary host — big */}
-      {primaryHost && (
+      {/* Primary host — fills remaining height */}
+      {primaryHost && containerW > 0 && (
         <ParticipantTile
           participant={primaryHost}
-          width={screenW}
-          height={Math.max(160, mainH)}
+          width={containerW}
+          height={mainH}
           isSpeaker={primaryHost.userId === activeSpeakerId}
           cornerRadius={0}
           showName
         />
       )}
 
-      {/* Co-hosts / invited speakers */}
-      {(coHosts.length + speakers.length) > 0 && (
-        <View style={[styles.coHostsSection, { backgroundColor: palette.royalInk }]}>
-          <Text style={styles.coHostLabel}>On stage</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.coHostRow}>
-            {[...coHosts, ...speakers].map(p => (
+      {/* On-stage co-hosts + speakers */}
+      {onStage.length > 0 && (
+        <View style={[styles.stageSection, { backgroundColor: palette.royalInk, height: CO_HOST_H }]}>
+          <Text style={styles.sectionLabel}>On stage</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stageRow}
+          >
+            {onStage.map(p => (
               <ParticipantTile
                 key={p.userId}
                 participant={p}
-                width={CO_HOST_H * 0.75}
-                height={CO_HOST_H - 8}
+                width={Math.round(CO_HOST_H * 0.72)}
+                height={CO_HOST_H - 16}
                 isSpeaker={p.userId === activeSpeakerId}
                 cornerRadius={12}
                 showName
+                onPress={() => onPressParticipant?.(p.userId)}
               />
             ))}
           </ScrollView>
         </View>
       )}
 
-      {/* Audience raised-hand strip */}
-      {audience.filter(a => a.handRaised).length > 0 && (
-        <View style={styles.handsSection}>
-          <Text style={styles.coHostLabel}>✋ Raised hands</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.coHostRow}>
-            {audience.filter(a => a.handRaised).map(p => (
-              <View key={p.userId} style={styles.audienceChip}>
-                <Text style={[styles.audienceText, { color: palette.gold }]} numberOfLines={1}>{p.displayName}</Text>
+      {/* Raised-hand strip */}
+      {raisedHands.length > 0 && (
+        <View style={[styles.handsSection, { height: HANDS_H }]}>
+          <Text style={styles.sectionLabel}>✋ Raised hands</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageRow}>
+            {raisedHands.map(p => (
+              <View key={p.userId} style={[styles.handChip, { borderColor: `${palette.gold}66`, backgroundColor: `${palette.gold}33` }]}>
+                <Text style={[styles.handChipText, { color: palette.gold }]} numberOfLines={1}>
+                  {p.displayName}
+                </Text>
               </View>
             ))}
           </ScrollView>
@@ -120,13 +150,13 @@ export default function BroadcastLayout({
       )}
 
       {/* Audience count */}
-      {audience.length > 0 && (
-        <View style={styles.audienceCountBar}>
-          <Text style={styles.audienceCountText}>
-            {audience.length.toLocaleString()} audience members
-          </Text>
-        </View>
-      )}
+      <View style={[styles.audienceBar, { height: AUDIENCE_H }]}>
+        <Text style={[styles.audienceText, { color: palette.subtext }]}>
+          {audience.length > 0
+            ? `${audience.length.toLocaleString()} audience member${audience.length !== 1 ? 's' : ''}`
+            : 'No audience yet'}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -139,7 +169,7 @@ function useBroadcastStyles(palette: any) {
       alignItems: 'center',
       gap: 10,
       paddingHorizontal: 14,
-      paddingVertical: 8,
+      height: TOP_BAR_H,
       backgroundColor: `${palette.royalInk}CC`,
       position: 'absolute',
       top: 0,
@@ -157,17 +187,6 @@ function useBroadcastStyles(palette: any) {
       paddingVertical: 4,
       borderWidth: 1,
     },
-    liveDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-    },
-    liveText: {
-      fontWeight: '800',
-      fontSize: 11,
-      letterSpacing: 0.5,
-    },
-    viewerCount: { fontSize: 13, fontWeight: '600', color: palette.ivory },
     recChip: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -177,26 +196,36 @@ function useBroadcastStyles(palette: any) {
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderWidth: 1,
-      borderColor: `${palette.danger}66`,
     },
-    coHostsSection: { paddingVertical: 6, paddingHorizontal: 10 },
-    coHostLabel: { fontSize: 11, fontWeight: '600', marginBottom: 6, letterSpacing: 0.4, color: palette.subtext },
-    coHostRow: { gap: 8, paddingBottom: 2 },
-    handsSection: { backgroundColor: `${palette.gold}1A`, paddingVertical: 6, paddingHorizontal: 10 },
-    audienceChip: {
-      backgroundColor: `${palette.gold}33`,
+    dot: { width: 7, height: 7, borderRadius: 4 },
+    chipText: { fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+    viewerCount: { fontSize: 13, fontWeight: '600', color: palette.ivory },
+    stageSection: { paddingHorizontal: 10, paddingVertical: 6 },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      color: palette.subtext,
+      marginBottom: 4,
+    },
+    stageRow: { gap: 8, paddingBottom: 2, alignItems: 'center' },
+    handsSection: {
+      backgroundColor: `${palette.gold}1A`,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    handChip: {
       borderRadius: 16,
       paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingVertical: 5,
       borderWidth: 1,
-      borderColor: `${palette.gold}66`,
     },
-    audienceText: { fontSize: 12, fontWeight: '600' },
-    audienceCountBar: {
+    handChipText: { fontSize: 12, fontWeight: '600' },
+    audienceBar: {
       paddingHorizontal: 14,
-      paddingVertical: 8,
+      justifyContent: 'center',
       backgroundColor: `${palette.royalInk}80`,
     },
-    audienceCountText: { fontSize: 12, color: palette.subtext },
+    audienceText: { fontSize: 12 },
   }), [palette]);
 }

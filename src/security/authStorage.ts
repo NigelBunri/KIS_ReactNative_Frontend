@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EncryptedStorage from 'react-native-encrypted-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { Buffer } from 'buffer';
 import { clearCacheByKey } from '@/network/cache';
+
+export const AUTH_SESSION_EXPIRED_EVENT = 'auth.session.expired';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -150,4 +153,5 @@ export const clearAuthSession = async (): Promise<void> => {
     clearAuthTokens(),
     clearCacheByKey('AUTH_CACHE', 'USER_KEY'),
   ]);
+  DeviceEventEmitter.emit(AUTH_SESSION_EXPIRED_EVENT);
 };

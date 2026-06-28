@@ -14,7 +14,10 @@ export type CallState =
   | 'active'
   | 'reconnecting'
   | 'ended'
-  | 'missed';
+  | 'missed'
+  | 'lobby'             // pre-join preview (group/broadcast)
+  | 'knocking'          // waiting to be admitted
+  | 'waiting-for-host'; // joined scheduled call before host arrived
 
 export type CallRole = 'host' | 'co-host' | 'speaker' | 'audience';
 
@@ -97,6 +100,110 @@ export type CallSession = {
 
   /** DTLS-SRTP fingerprint for the call — populated once the first peer reaches connected state. */
   dtlsFingerprint?: string;
+
+  // Standalone / scheduled call fields
+  isStandalone?: boolean;
+  scheduledFor?: string | null;
+  inviteToken?: string | null;
+  inviteLink?: string | null;
+
+  // Knock / waiting room (host sees this)
+  knockingUsers?: KnockingUser[];
+
+  // Adaptive network state
+  isAudioOnly?: boolean;
+  isNoiseCancellationOn?: boolean;
+
+  // Recording
+  recordingState?: 'idle' | 'recording' | 'stopped';
+
+  // Live captions
+  captionsEnabled?: boolean;
+  captions?: Caption[];
+
+  // Virtual background
+  virtualBgEnabled?: boolean;
+  virtualBgUri?: string | null;
+
+  // In-call polls
+  polls?: InCallPoll[];
+
+  // Q&A mode
+  qaEnabled?: boolean;
+  qaQueue?: QAQuestion[];
+
+  // Breakout rooms
+  breakoutRooms?: BreakoutRoom[];
+  myBreakoutRoomId?: string | null;
+
+  // RTMP streaming
+  rtmpActive?: boolean;
+  rtmpUrl?: string | null;
+
+  // Whiteboard
+  whiteboardEnabled?: boolean;
+  whiteboardStrokes?: WhiteboardStroke[];
+};
+
+export type WhiteboardPoint = { x: number; y: number };
+export type WhiteboardStroke = {
+  id: string;
+  userId: string;
+  points: WhiteboardPoint[];
+  color: string;
+  width: number;
+};
+
+export type Caption = {
+  id: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  sentAt: string;
+};
+
+export type InCallPollOption = { text: string; votes: number };
+export type InCallPoll = {
+  pollId: string;
+  question: string;
+  options: string[];
+  votes: Record<string, string>; // userId → chosen option
+  createdBy: string;
+  createdAt: string;
+  closed: boolean;
+  myVote?: string;
+};
+
+export type QAQuestion = {
+  questionId: string;
+  text: string;
+  userId: string | null;
+  displayName: string;
+  submittedAt: string;
+  answered: boolean;
+};
+
+export type BreakoutRoom = {
+  roomId: string;
+  name: string;
+  userIds: string[];
+};
+
+export type KnockingUser = {
+  userId: string;
+  displayName: string;
+  knockedAt: string;
+};
+
+export type ScheduledCallItem = {
+  callId: string;
+  conversationId: string;
+  callType: CallType;
+  title: string | null;
+  scheduledFor: string | null;
+  isStandalone: boolean;
+  inviteToken: string | null;
+  participantCount: number;
 };
 
 export type CallHistoryItem = {
@@ -104,7 +211,11 @@ export type CallHistoryItem = {
   conversationId: string;
   callId: string;
   createdBy: string;
-  status: 'ended' | 'missed' | 'active' | 'ringing' | 'busy' | 'declined';
+  status: 'ongoing' | 'completed' | 'cancelled' | 'missed' | 'active' | 'ringing' | 'pending' | 'busy' | 'declined' | 'ended';
+  rawStatus?: string;
+  userStatus?: string;
+  title?: string | null;
+  isStandalone?: boolean;
   callType?: CallType;
   media?: 'voice' | 'video';
   duration?: number;

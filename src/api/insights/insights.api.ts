@@ -87,15 +87,10 @@ export const fetchDashboardInsights = async (
   target: string,
   timeframe: TimeRange = '7d',
 ): Promise<InsightPayload> => {
-  try {
-    const res = await getRequest(ROUTES.analytics.dashboards, {
-      params: { target, timeframe },
-    });
-    return normalizeInsights(res?.data ?? res ?? {});
-  } catch (err) {
-    console.warn('[insights] dashboard fetch failed', err);
-    return normalizeInsights({});
-  }
+  const res = await getRequest(ROUTES.analytics.dashboards, {
+    params: { target, timeframe },
+  });
+  return normalizeInsights(res?.data ?? res ?? {});
 };
 
 export type NotificationSummaryItem = {

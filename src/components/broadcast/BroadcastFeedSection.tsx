@@ -127,7 +127,10 @@ const resolveVideoAttachment = (item: BroadcastFeedItem) => {
     const sources = getBroadcastFeedVideoSources(attachment);
     const primarySource = sources[0];
     if (!primarySource?.url) continue;
-    const thumb = getBroadcastFeedVideoPosterUrl(attachment);
+    const thumb =
+      getBroadcastFeedVideoPosterUrl(attachment) ??
+      resolveBackendAssetUrl((item as any).thumbnail_url ?? null) ??
+      null;
 
     return {
       id: String(attachment?.id ?? `${item.id}-att0`),

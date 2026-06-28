@@ -39,9 +39,30 @@ import type {
 import { isGroupCall, hasVideo } from '@/services/calls/callTypes';
 import { webRTCService, webRTCAvailable } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
+import {
+  callKeepAvailable,
+  setupCallKit,
+  teardownCallKit,
+  displayIncomingCall,
+  startOutgoingCall,
+  reportCallAnswered,
+  reportCallEnded,
+  setMuted as callKitSetMuted,
+} from '@/services/calls/callKitService';
+import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
+import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
+import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
+
+// Use SFU when a group call grows beyond this threshold.
+// Below it, P2P is used (lower latency, no server media).
+const SFU_THRESHOLD = 4;
 
 import ActiveCallScreen from '@/screens/calls/ActiveCallScreen';
 import IncomingCallScreen from '@/screens/calls/IncomingCallScreen';
+import LobbyScreen from '@/screens/calls/LobbyScreen';
+import WaitingForHostScreen from '@/screens/calls/WaitingForHostScreen';
+import CallMiniBadge from '@/components/calls/CallMiniBadge';
+import type { VirtualBgOption } from '@/screens/calls/components/VirtualBackgroundSheet';
 
 /* ============================================================================
  * CONTEXT TYPE
@@ -60,8 +81,40 @@ type SocketContextValue = {
   startCall?: (args: StartCallArgs) => Promise<boolean>;
   answerCall?: () => Promise<void>;
   rejectCall?: (reason?: string) => Promise<void>;
+  /** Leave without ending the call for other participants. */
+  leaveCall?: () => Promise<void>;
+  /** Join an already-active call started by someone else. */
+  joinExistingCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
+  /** End the call for ALL participants (host action). */
+  endCallForAll?: () => Promise<void>;
+  /** @deprecated use leaveCall or endCallForAll */
   endCall?: (reason?: string) => Promise<void>;
   dismissCallUi?: () => void;
+  knockOnCall?: () => void;
+  admitKnocker?: (userId: string) => void;
+  denyKnocker?: (userId: string) => void;
+  promoteParticipant?: (userId: string, role: string) => void;
+  toggleNoiseCancellation?: () => void;
+  toggleCaptions?: () => void;
+  sendCaption?: (text: string) => void;
+  selectVirtualBg?: (opt: VirtualBgOption) => void;
+  toggleRecording?: () => void;
+  createPoll?: (question: string, options: string[]) => void;
+  votePoll?: (pollId: string, option: string) => void;
+  closePoll?: (pollId: string) => void;
+  submitQuestion?: (text: string, anonymous: boolean) => void;
+  dismissQuestion?: (questionId: string) => void;
+  markAnswered?: (questionId: string) => void;
+  createBreakoutRooms?: (rooms: { name: string; userIds: string[] }[]) => void;
+  returnToMainRoom?: () => void;
+  closeBreakoutRooms?: () => void;
+  startRtmp?: (url: string) => void;
+  stopRtmp?: () => void;
+  wbStroke?: (stroke: any) => void;
+  wbUndo?: (strokeId: string) => void;
+  wbClear?: () => void;
+  /** Fetch or generate an invite link for the current call (all call types). */
+  getCallInviteLink?: () => Promise<string | null>;
 };
 
 type StartCallArgs = {
@@ -70,6 +123,7 @@ type StartCallArgs = {
   callType?: CallType;
   media?: 'voice' | 'video';
   inviteeUserIds?: string[];
+  inviteToken?: string;
 };
 
 /* ============================================================================
@@ -155,6 +209,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [typingDisplayNames, setTypingDisplayNames] = useState<Record<string, string>>({});
   const [presenceByUser, setPresenceByUser] = useState<Record<string, { isOnline: boolean; at: number }>>({});
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+  const [callMinimised, setCallMinimised] = useState(false);
+
+  // Listen for 'call.restore' from anywhere in the app (e.g. chat room banner)
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('call.restore', () => {
+      setCallMinimised(false);
+    });
+    return () => sub.remove();
+  }, []);
   const [socketIdentityVersion, setSocketIdentityVersion] = useState(0);
 
   const socketRef = useRef<Socket | null>(null);
@@ -164,6 +227,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const currentUserIdRef = useRef<string | null>(null);
   const persistCallEndRef = useRef<((session: CallSession | null, state: 'ended' | 'missed') => void) | null>(null);
   const lastSocketRecoveryKickRef = useRef(0);
+  const lastSocketConnectErrorLogRef = useRef(0);
+  // Concurrency guards
+  const _startingCallRef = useRef(false);
+  const _answeringRef    = useRef(false);
+  const _leavingRef      = useRef(false);
+  const _sfuJoiningRef   = useRef(false);
+  // Tracks peers we've already sent a WebRTC offer to for the current call.
+  // The backend may deliver call.answer twice (conv-room broadcast + targeted
+  // user-room emit to the creator), and creating a second offer on a peer that
+  // is already in have-local-offer state causes WebRTC glare. Deduplicate here.
+  const _offeredPeersRef = useRef<Set<string>>(new Set());
+  // Active reaction timeout IDs — cancelled when the call ends to prevent stale setState
+  const reactionTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Tracks whether the in-call chat sheet is open so unread count isn't incremented unnecessarily
+  const callChatOpenRef = useRef(false);
+  // SFU: accumulate audio+video tracks per remote peer into one MediaStream so a
+  // late-arriving track doesn't overwrite (and drop) the earlier one.
+  const sfuPeerStreamsRef = useRef<Map<string, any>>(new Map());
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
@@ -306,31 +387,137 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onIceRestartNeeded: (peerId, offer) => {
         const session = activeCallRef.current;
         if (!session || !socketRef.current) return;
+        // offer is an RTCSessionDescription object — extract the SDP string
+        const sdpString = typeof offer === 'string' ? offer : (offer?.sdp ?? offer);
         socketRef.current.emit('call.sdp.offer', {
           callId: session.callId,
           conversationId: session.conversationId,
           targetUserId: peerId,
-          sdp: offer,
+          sdp: sdpString,
           iceRestart: true,
         });
+      },
+      onAudioOnlyChanged: (on: boolean) => {
+        setActiveCall(prev => prev ? { ...prev, isAudioOnly: on } : prev);
       },
     });
   }, []);
 
   const startWebRTCOffer = useCallback(async (peerId: string) => {
     if (!webRTCAvailable) return;
+    // Guard against duplicate call.answer deliveries creating a second offer on
+    // a peer already mid-negotiation (WebRTC glare).
+    if (_offeredPeersRef.current.has(peerId)) return;
+    _offeredPeersRef.current.add(peerId);
     const offer = await webRTCService.createOffer(peerId);
     const session = activeCallRef.current;
     if (!offer || !session || !socketRef.current) return;
+    // Backend CallSdpDto validates sdp as @IsString() — send only the SDP string,
+    // not the full RTCSessionDescription object.
+    const sdpString = typeof offer === 'string' ? offer : (offer?.sdp ?? offer);
     socketRef.current.emit('call.sdp.offer', {
       callId: session.callId,
       conversationId: session.conversationId,
       targetUserId: peerId,
-      sdp: offer,
+      sdp: sdpString,
+      sdpType: 'offer',
     });
   }, []);
 
   /* ─── startCall ─────────────────────────────────────────────────────────── */
+
+  /**
+   * joinExistingCall — enter a call that was started by someone else and is
+   * already active. Unlike startCall (which emits call.offer and creates a new
+   * session), this emits call.answer against the existing callId so the backend
+   * routes us into the current session.
+   */
+  const joinExistingCall = useCallback(async (info: {
+    callId: string;
+    conversationId: string;
+    callType: CallType;
+    title: string;
+  }): Promise<boolean> => {
+    const s = socketRef.current;
+    const myUserId = currentUserIdRef.current;
+    if (!s || !myUserId) {
+      Alert.alert('Join unavailable', 'Connection not ready yet.');
+      return false;
+    }
+    if (_answeringRef.current) return false;
+    _answeringRef.current = true;
+
+    const granted = await requestCallPermissions(info.callType);
+    if (!granted) { _answeringRef.current = false; return false; }
+
+    const needsVideo = hasVideo(info.callType);
+    await fetchAndApplyIceServers();
+    audioRouteManager.start(needsVideo ? 'video' : 'voice');
+    await webRTCService.startLocalStream(needsVideo);
+    _offeredPeersRef.current.clear();
+    setupWebRTC(info.callType);
+
+    const localParticipant = makeParticipant({
+      userId: myUserId,
+      displayName: 'You',
+      isLocal: true,
+      isMuted: false,
+      isVideoOff: !needsVideo,
+      stream: webRTCService.getLocalStream(),
+      role: 'audience',
+    });
+
+    const session: CallSession = {
+      callId: info.callId,
+      conversationId: info.conversationId,
+      callType: info.callType,
+      title: safeDisplayName(info.title, 'Call'),
+      state: 'connecting',
+      participants: [localParticipant],
+      localUserId: myUserId,
+      initiatedBy: null,      // we don't know the initiator here; not needed
+      startedAt: new Date().toISOString(),
+      isMuted: false,
+      isVideoEnabled: needsVideo,
+      isSpeakerOn: needsVideo,
+      isFrontCamera: true,
+      isScreenSharing: false,
+      layout: isGroupCall(info.callType) ? 'speaker' : 'gallery',
+      pinnedUserId: null,
+      activeSpeakerId: null,
+      isControlsVisible: true,
+      chatMessages: [],
+      raisedHands: [],
+      reactions: [],
+      networkQuality: 4,
+      unreadChatCount: 0,
+      viewerCount: 0,
+      isRecording: false,
+      knockingUsers: [],
+      isAudioOnly: false,
+      isNoiseCancellationOn: true,
+    };
+
+    setCallMinimised(false);
+    setActiveCall(session);
+    reportCallAnswered(info.callId);
+
+    s.emit('call.answer', {
+      conversationId: info.conversationId,
+      callId: info.callId,
+      callType: info.callType,
+      media: needsVideo ? 'video' : 'voice',
+    });
+
+    _answeringRef.current = false;
+    DeviceEventEmitter.emit('calls.refresh');
+    return true;
+  }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
+
+  const clearReactionTimeouts = useCallback(() => {
+    reactionTimeoutsRef.current.forEach(t => clearTimeout(t));
+    reactionTimeoutsRef.current = [];
+  }, []);
 
   const startCall = useCallback(async (args: StartCallArgs): Promise<boolean> => {
     const s = socketRef.current;
@@ -338,10 +525,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       Alert.alert('Call unavailable', 'Connection not ready yet.');
       return false;
     }
+    // Guard: prevent double-tap or programmatic double-start
+    if (_startingCallRef.current) return false;
+    if (activeCallRef.current && activeCallRef.current.state !== 'ended' && activeCallRef.current.state !== 'missed') {
+      Alert.alert('Already in a call', 'End the current call before starting a new one.');
+      return false;
+    }
+    _startingCallRef.current = true;
 
     const callType = resolveCallType(args);
     const granted = await requestCallPermissions(callType);
-    if (!granted) return false;
+    if (!granted) { _startingCallRef.current = false; return false; }
 
     const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const localUserId = currentUserIdRef.current;
@@ -352,6 +546,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await fetchAndApplyIceServers();
     audioRouteManager.start(needsVideo ? 'video' : 'voice');
     await webRTCService.startLocalStream(needsVideo);
+    _offeredPeersRef.current.clear();
     setupWebRTC(callType);
 
     const localParticipant = makeParticipant({
@@ -390,9 +585,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unreadChatCount: 0,
       viewerCount: 0,
       isRecording: false,
+      isStandalone: args.conversationId.startsWith('standalone:'),
+      inviteToken: args.inviteToken ?? null,
+      inviteLink: args.inviteToken
+        ? `kisapp://call/join/${args.inviteToken}`
+        : null,
+      knockingUsers: [],
+      isAudioOnly: false,
+      isNoiseCancellationOn: true,
     };
 
+    setCallMinimised(false);
     setActiveCall(session);
+
+    // Register outgoing call with the OS call system
+    startOutgoingCall({ callUUID: callId, callerName: safeDisplayName(args.title, 'Call'), callType });
 
     s.emit('call.offer', {
       callId,
@@ -404,6 +611,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdBy: localUserId,
       startedAt: session.startedAt,
     }, (ack?: any) => {
+      _startingCallRef.current = false;
       if (!ack?.ok) {
         setActiveCall(null);
         webRTCService.closeAll();
@@ -411,6 +619,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         Alert.alert('Call failed', ack?.error ?? 'Unable to start the call.');
       }
     });
+
+    // Release lock after a safety timeout in case the server never ACKs
+    setTimeout(() => { _startingCallRef.current = false; }, 8000);
 
     DeviceEventEmitter.emit('calls.refresh');
     return true;
@@ -422,9 +633,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const session = activeCallRef.current;
     const s = socketRef.current;
     if (!session || !s) return;
+    if (_answeringRef.current) return; // CallKit + in-app both fired
+    _answeringRef.current = true;
 
     const granted = await requestCallPermissions(session.callType);
-    if (!granted) return;
+    if (!granted) { _answeringRef.current = false; return; }
 
     const needsVideo = hasVideo(session.callType);
     // Fetch TURN credentials + configure audio session BEFORE getUserMedia.
@@ -432,6 +645,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await fetchAndApplyIceServers();
     audioRouteManager.start(needsVideo ? 'video' : 'voice');
     await webRTCService.startLocalStream(needsVideo);
+    _offeredPeersRef.current.clear();
     setupWebRTC(session.callType);
 
     const localParticipant = makeParticipant({
@@ -450,6 +664,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       participants: [...prev.participants.filter(p => !p.isLocal), localParticipant],
     } : prev);
 
+    reportCallAnswered(session.callId);
+
     s.emit('call.answer', {
       conversationId: session.conversationId,
       callId: session.callId,
@@ -462,6 +678,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // WebRTC signaling glare (both peers in "have-local-offer" state simultaneously)
     // which crashes the native WebRTC layer, especially on Android.
 
+    _answeringRef.current = false;
     DeviceEventEmitter.emit('calls.refresh');
   }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
 
@@ -481,9 +698,40 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       title: endedSession.title,
       localUserId: endedSession.localUserId,
     };
-    // Save locally
+    // Write to the unified callHistoryStorage (correct key: KIS_CALL_HISTORY_BY_USER_V1:{uid}).
+    // This is what CallsTab and ChatRoomPage both read from, so a single write keeps
+    // both in sync and survives app reload without a server round-trip.
+    if (endedSession.localUserId) {
+      const uid = endedSession.localUserId;
+      const cid = endedSession.conversationId ?? '';
+      const convItem = {
+        callId: endedSession.callId,
+        conversationId: cid,
+        callType: endedSession.callType,
+        status: resolvedState === 'missed' ? 'missed' : 'completed',
+        startedAt: entry.startedAt,
+        endedAt,
+        duration: Math.round(entry.durationMs / 1000),
+        createdBy: endedSession.initiatedBy ?? uid,
+        title: endedSession.title,
+        participantCount: endedSession.participants.length,
+      };
+      if (cid) {
+        // Merges into both the per-conversation key AND the global key atomically.
+        loadConversationCallHistory(uid, cid)
+          .then((existing) => saveConversationCallHistory(uid, cid, [convItem as any, ...existing]))
+          .catch(() => {});
+      } else {
+        // Standalone call — no conversationId, write to global key only.
+        import('@/services/calls/callHistoryStorage').then(({ loadCallHistory: load, saveCallHistory: save }) =>
+          load(uid).then((existing) => save(uid, [convItem as any, ...existing]))
+        ).catch(() => {});
+      }
+    }
+    // Also keep kis.call_history (legacy key) for CallHistoryScreen backward compat.
     AsyncStorage.getItem('kis.call_history').then(raw => {
-      const history: any[] = raw ? JSON.parse(raw) : [];
+      let history: any[] = [];
+      if (raw) { try { history = JSON.parse(raw); } catch { history = []; } }
       history.unshift(entry);
       AsyncStorage.setItem('kis.call_history', JSON.stringify(history.slice(0, 100)));
     }).catch(() => {});
@@ -528,10 +776,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     webRTCService.closeAll();
+    // Tear down SFU resources too — if the call had escalated to the SFU, leaving
+    // them open leaks mediasoup transports/producers/consumers on the client.
+    if (sfuService.isJoined) sfuService.close();
+    sfuPeerStreamsRef.current.clear();
     audioRouteManager.stop();
 
     const resolvedState = reason === 'missed' || reason === 'rejected' || reason === 'busy' ? 'missed' : 'ended';
     persistCallEnd(session, resolvedState);
+    reportCallEnded(session?.callId ?? '', resolvedState === 'missed' ? 'rejected' : 'ended');
 
     setActiveCall(prev => prev ? {
       ...prev,
@@ -544,6 +797,88 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [persistCallEnd]);
 
   const rejectCall = useCallback(async (reason = 'rejected') => endCall(reason), [endCall]);
+
+  /**
+   * leaveCall — this participant exits without ending the session for others.
+   * Emits call.leave (new event) so the server only removes this user.
+   * The call continues for remaining participants.
+   */
+  const leaveCall = useCallback(async () => {
+    if (_leavingRef.current) return; // prevent double-leave
+    const session = activeCallRef.current;
+    if (!session || session.state === 'ended' || session.state === 'missed') return;
+    _leavingRef.current = true;
+
+    const s = socketRef.current;
+    if (session && s) {
+      s.emit('call.leave', {
+        conversationId: session.conversationId,
+        callId: session.callId,
+      });
+    }
+
+    clearReactionTimeouts();
+    webRTCService.closeAll();
+    if (sfuService.isJoined) sfuService.close();
+    sfuPeerStreamsRef.current.clear();
+    audioRouteManager.stop();
+    persistCallEnd(session, 'ended');
+    reportCallEnded(session?.callId ?? '', 'ended');
+
+    setActiveCall(prev => prev ? {
+      ...prev,
+      state: 'ended',
+      reason: 'left',
+      endedAt: new Date().toISOString(),
+    } : prev);
+
+    _leavingRef.current = false;
+    _startingCallRef.current = false;
+    _answeringRef.current = false;
+    _sfuJoiningRef.current = false;
+    DeviceEventEmitter.emit('calls.refresh');
+  }, [persistCallEnd, clearReactionTimeouts]);
+
+  /**
+   * endCallForAll — host ends the session for every participant.
+   * Emits call.end so the backend broadcasts call.end to the entire conv room.
+   */
+  const endCallForAll = useCallback(async () => {
+    if (_leavingRef.current) return;
+    const session = activeCallRef.current;
+    if (!session || session.state === 'ended' || session.state === 'missed') return;
+    _leavingRef.current = true;
+
+    const s = socketRef.current;
+    if (session && s) {
+      s.emit('call.end', {
+        conversationId: session.conversationId,
+        callId: session.callId,
+        reason: 'ended_by_host',
+      });
+    }
+
+    clearReactionTimeouts();
+    webRTCService.closeAll();
+    if (sfuService.isJoined) sfuService.close();
+    sfuPeerStreamsRef.current.clear();
+    audioRouteManager.stop();
+    persistCallEnd(session, 'ended');
+    reportCallEnded(session?.callId ?? '', 'ended');
+
+    setActiveCall(prev => prev ? {
+      ...prev,
+      state: 'ended',
+      reason: 'ended_by_host',
+      endedAt: new Date().toISOString(),
+    } : prev);
+
+    _leavingRef.current = false;
+    _startingCallRef.current = false;
+    _answeringRef.current = false;
+    _sfuJoiningRef.current = false;
+    DeviceEventEmitter.emit('calls.refresh');
+  }, [persistCallEnd, clearReactionTimeouts]);
 
   const dismissCallUi = useCallback(() => {
     setActiveCall(prev =>
@@ -558,6 +893,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!prev) return prev;
       const next = !prev.isMuted;
       webRTCService.setMuted(next);
+      if (sfuService.isJoined) sfuService.setTrackEnabled('audio', !next);
       return {
         ...prev,
         isMuted: next,
@@ -573,6 +909,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!prev) return prev;
       const next = !prev.isVideoEnabled;
       webRTCService.setVideoEnabled(next);
+      if (sfuService.isJoined) sfuService.setTrackEnabled('video', next);
       return {
         ...prev,
         isVideoEnabled: next,
@@ -634,11 +971,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const reactions = [...prev.reactions, reaction];
       return { ...prev, reactions };
     });
-    setTimeout(() => {
+    const t = setTimeout(() => {
+      reactionTimeoutsRef.current = reactionTimeoutsRef.current.filter(x => x !== t);
       setActiveCall(prev =>
         prev ? { ...prev, reactions: prev.reactions.filter(r => r.id !== reaction.id) } : prev,
       );
     }, 3000);
+    reactionTimeoutsRef.current.push(t);
   }, []);
 
   const sendChat = useCallback((text: string) => {
@@ -674,6 +1013,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!session || !socketRef.current) return;
     socketRef.current.emit('call.participant.mute', {
       callId: session.callId,
+      conversationId: session.conversationId,
       targetUserId: userId,
     });
   }, []);
@@ -683,8 +1023,335 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!session || !socketRef.current) return;
     socketRef.current.emit('call.participant.remove', {
       callId: session.callId,
+      conversationId: session.conversationId,
       targetUserId: userId,
     });
+  }, []);
+
+  const inviteToCall = useCallback((userIds: string[]) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.invite', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      inviteeUserIds: userIds,
+    });
+  }, []);
+
+  /**
+   * Generate (or fetch cached) an invite link for the current call.
+   * Works for all call types — not just standalone calls.
+   * Stores the result on the active session so subsequent taps are instant.
+   */
+  const getCallInviteLink = useCallback(async (): Promise<string | null> => {
+    const session = activeCallRef.current;
+    if (!session) return null;
+    // Already have one — return immediately.
+    if (session.inviteLink) return session.inviteLink;
+    if (session.inviteToken) {
+      const link = `kis://call/join/${session.inviteToken}`;
+      setActiveCall(prev => prev ? { ...prev, inviteLink: link } : prev);
+      return link;
+    }
+    try {
+      const res = await postRequest(ROUTES.calls.inviteLink, {
+        conversation_id: session.conversationId,
+        call_id: session.callId,
+      }, { errorMessage: '' });
+      if (res?.success && res.data?.inviteLink) {
+        const { inviteLink, inviteToken } = res.data;
+        setActiveCall(prev => prev ? { ...prev, inviteLink, inviteToken } : prev);
+        return inviteLink as string;
+      }
+    } catch {}
+    return null;
+  }, []);
+
+  const knockOnCall = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    const myUserId = currentUserIdRef.current;
+    socketRef.current.emit('call.knock', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      displayName: myUserId ?? 'Guest',
+    });
+    setActiveCall(prev => prev ? { ...prev, state: 'knocking' } : prev);
+  }, []);
+
+  const admitKnocker = useCallback((userId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.knock.admit', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      targetUserId: userId,
+    });
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        knockingUsers: (prev.knockingUsers ?? []).filter(u => u.userId !== userId),
+      };
+    });
+  }, []);
+
+  const denyKnocker = useCallback((userId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.knock.deny', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      targetUserId: userId,
+    });
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        knockingUsers: (prev.knockingUsers ?? []).filter(u => u.userId !== userId),
+      };
+    });
+  }, []);
+
+  const promoteParticipant = useCallback((userId: string, role: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.promote', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      targetUserId: userId,
+      role,
+    });
+  }, []);
+
+  const toggleNoiseCancellation = useCallback(() => {
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      const next = !(prev.isNoiseCancellationOn !== false);
+      webRTCService.setNoiseCancellation(next);
+      return { ...prev, isNoiseCancellationOn: next };
+    });
+  }, []);
+
+  const toggleCaptions = useCallback(() => {
+    setActiveCall(prev => prev ? { ...prev, captionsEnabled: !prev.captionsEnabled, captions: prev.captions ?? [] } : prev);
+  }, []);
+
+  const sendCaption = useCallback((text: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.caption', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      text,
+    });
+  }, []);
+
+  const selectVirtualBg = useCallback((_opt: VirtualBgOption) => {
+    setActiveCall(prev => prev ? { ...prev, virtualBgEnabled: _opt.mode !== 'none', virtualBgUri: _opt.uri ?? null } : prev);
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    const isRecording = session.recordingState === 'recording';
+    socketRef.current.emit(isRecording ? 'call.recording.stop' : 'call.recording.start', {
+      callId: session.callId, conversationId: session.conversationId,
+    });
+  }, []);
+
+  const createPoll = useCallback((question: string, options: string[]) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.poll.create', {
+      callId: session.callId, conversationId: session.conversationId, question, options,
+    });
+  }, []);
+
+  const votePoll = useCallback((pollId: string, option: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.poll.vote', {
+      callId: session.callId, conversationId: session.conversationId, pollId, option,
+    });
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        polls: (prev.polls ?? []).map(p =>
+          p.pollId === pollId ? { ...p, votes: { ...p.votes, [prev.localUserId]: option }, myVote: option } : p,
+        ),
+      };
+    });
+  }, []);
+
+  const closePoll = useCallback((pollId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.poll.close', {
+      callId: session.callId, conversationId: session.conversationId, pollId,
+    });
+  }, []);
+
+  const submitQuestion = useCallback((text: string, anonymous: boolean) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.question.submit', {
+      callId: session.callId, conversationId: session.conversationId, text, anonymous,
+    });
+  }, []);
+
+  const dismissQuestion = useCallback((questionId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.question.dismiss', {
+      callId: session.callId, conversationId: session.conversationId, questionId,
+    });
+  }, []);
+
+  const markAnswered = useCallback((questionId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.question.answered', {
+      callId: session.callId, conversationId: session.conversationId, questionId,
+    });
+  }, []);
+
+  const createBreakoutRooms = useCallback((rooms: { name: string; userIds: string[] }[]) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.breakout.create', {
+      callId: session.callId, conversationId: session.conversationId, rooms,
+    });
+  }, []);
+
+  const returnToMainRoom = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.breakout.return', {
+      callId: session.callId, conversationId: session.conversationId,
+    });
+    setActiveCall(prev => prev ? { ...prev, myBreakoutRoomId: null } : prev);
+  }, []);
+
+  const closeBreakoutRooms = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.breakout.close', {
+      callId: session.callId, conversationId: session.conversationId,
+    });
+    setActiveCall(prev => prev ? { ...prev, breakoutRooms: [], myBreakoutRoomId: null } : prev);
+  }, []);
+
+  const toggleScreenShare = useCallback(async () => {
+    const session = activeCallRef.current;
+    const s = socketRef.current;
+    if (!session || !s) return;
+    // Actually capture the screen (or fall back to camera) and replace the video
+    // sender track in every peer connection. callServiceToggleScreenShare also
+    // emits call.screen_share with the correct { conversationId, enabled } shape,
+    // so we must NOT emit it again here (that would double-signal and could leave
+    // the remote state inconsistent with the actual track that was swapped).
+    const peerIds = session.participants.filter(p => !p.isLocal).map(p => p.userId);
+    let next: boolean;
+    try {
+      next = await callServiceToggleScreenShare(session.conversationId, s, peerIds);
+    } catch (e) {
+      console.warn('[SocketProvider] toggleScreenShare failed', e);
+      return;
+    }
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        isScreenSharing: next,
+        participants: prev.participants.map(p =>
+          p.isLocal ? { ...p, isScreenSharing: next } : p,
+        ),
+      };
+    });
+  }, []);
+
+  const startRtmp = useCallback((rtmpUrl: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.rtmp.start', {
+      callId: session.callId, conversationId: session.conversationId, rtmpUrl,
+    });
+  }, []);
+
+  const stopRtmp = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.rtmp.stop', {
+      callId: session.callId, conversationId: session.conversationId,
+    });
+  }, []);
+
+  const wbStroke = useCallback((stroke: any) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.wb.stroke', {
+      callId: session.callId, conversationId: session.conversationId, stroke,
+    });
+    setActiveCall(prev => prev ? {
+      ...prev,
+      whiteboardStrokes: [...(prev.whiteboardStrokes ?? []), stroke],
+    } : prev);
+  }, []);
+
+  const wbUndo = useCallback((strokeId: string) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.wb.undo', {
+      callId: session.callId, conversationId: session.conversationId, strokeId,
+    });
+    setActiveCall(prev => prev ? {
+      ...prev,
+      whiteboardStrokes: (prev.whiteboardStrokes ?? []).filter(s => s.id !== strokeId),
+    } : prev);
+  }, []);
+
+  const wbClear = useCallback(() => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.wb.clear', {
+      callId: session.callId, conversationId: session.conversationId,
+    });
+    setActiveCall(prev => prev ? { ...prev, whiteboardStrokes: [] } : prev);
+  }, []);
+
+  const wbCursor = useCallback((x: number, y: number) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.wb.cursor', {
+      callId: session.callId, conversationId: session.conversationId, x, y,
+    });
+  }, []);
+
+  /* ─── CallKit setup ─────────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!callKeepAvailable) return;
+    setupCallKit({
+      onAnswerCall: (callUUID) => {
+        // User answered from lock screen — trigger the in-app answer flow
+        const session = activeCallRef.current;
+        if (session && session.callId === callUUID) void answerCall();
+      },
+      onEndCall: (callUUID) => {
+        const session = activeCallRef.current;
+        if (session && session.callId === callUUID) void leaveCall();
+      },
+      onToggleMute: (muted) => {
+        webRTCService.setMuted(muted);
+        setActiveCall(prev => prev ? { ...prev, isMuted: muted } : prev);
+        callKitSetMuted(activeCallRef.current?.callId ?? '', muted);
+      },
+      onToggleHold: () => { /* hold not implemented */ },
+    });
+    return () => teardownCallKit();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ─── Socket connection ──────────────────────────────────────────────────── */
@@ -779,7 +1446,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (__DEV__) console.log('[WS] disconnect', reason);
       });
       s.on('connect_error', (err: any) => {
-        console.warn('[WS] connect_error', err?.message);
+        const now = Date.now();
+        if (now - lastSocketConnectErrorLogRef.current > 30000) {
+          lastSocketConnectErrorLogRef.current = now;
+          console.warn('[WS] connect_error', err?.message, {
+            url: CHAT_WS_URL,
+            path: CHAT_WS_PATH,
+          });
+        }
         if (!mountedRef.current) return;
         setIsConnected(false);
       });
@@ -891,12 +1565,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           role: 'host',
         });
 
+        // Group and broadcast calls go through the lobby first for camera/mic preview.
+        // 1:1 voice/video go straight to the incoming ring screen.
+        const useLobby = isGroupCall(callType);
+
         const session: CallSession = {
           callId,
           conversationId,
           callType,
           title: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
-          state: 'incoming',
+          state: useLobby ? 'lobby' : 'incoming',
           participants: [callerParticipant],
           localUserId: myUserId ?? '',
           initiatedBy: fromUserId,
@@ -917,38 +1595,135 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           unreadChatCount: 0,
           viewerCount: payload?.viewerCount ?? 0,
           isRecording: false,
+          knockingUsers: [],
+          isAudioOnly: false,
+          isNoiseCancellationOn: true,
         };
+
+        // Capture waiting-for-host state BEFORE overwriting it with setActiveCall.
+        // activeCallRef.current is still the previous session here since the ref
+        // is only synced via a useEffect (asynchronous). After setActiveCall the
+        // ref would point to the new session, making the check always false.
+        const wasWaiting = activeCallRef.current?.state === 'waiting-for-host' &&
+          activeCallRef.current?.conversationId === conversationId;
 
         // IncomingCallScreen's useEffect handles ringtone — do NOT start it here
         // to avoid a double-start that crashes InCallManager on Android.
         setActiveCall(session);
         DeviceEventEmitter.emit('calls.refresh');
+
+        // If local user was waiting for this host, auto-answer immediately.
+        if (wasWaiting) {
+          void answerCall();
+          return;
+        }
+
+        // Show OS lock-screen call UI (CallKit on iOS, ConnectionService on Android)
+        displayIncomingCall({
+          callUUID: callId,
+          callerName: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
+          callType: callType,
+        });
       });
 
-      // Remote answered
+      // Remote answered — broadcast by backend to the entire conv room.
+      //
+      // IMPORTANT: Only the call INITIATOR should react with a state transition
+      // and WebRTC setup. All other participants (still on LobbyScreen /
+      // IncomingCallScreen) must individually choose to join. They receive
+      // call.answer only to update their participant count, not to auto-join.
       s.on('call.answer', (payload: any) => {
         const callId = String(payload?.callId ?? '');
         if (!callId) return;
-        audioRouteManager.stopRingtone();
-        setActiveCall(prev => {
-          if (!prev || prev.callId !== callId) return prev;
-          return { ...prev, state: 'active', startedAt: prev.startedAt ?? new Date().toISOString() };
-        });
-        // Initiate WebRTC offer to the answering user
-        const responderId = payload?.userId ? String(payload.userId) : null;
-        if (responderId && webRTCAvailable) {
-          startWebRTCOffer(responderId);
-          // Add participant entry
+
+        const myUserId = currentUserIdRef.current ?? resolvedUserId;
+        // The backend broadcasts call.answer with the responder identified by
+        // `fromUserId` (and `acceptedBy`). Older payloads used `userId`. Read all
+        // three so the caller can reliably create the WebRTC offer to the joiner.
+        const responderId = payload?.fromUserId
+          ? String(payload.fromUserId)
+          : payload?.acceptedBy
+            ? String(payload.acceptedBy)
+            : payload?.userId
+              ? String(payload.userId)
+              : null;
+
+        // Don't process our own answer echo
+        if (responderId && responderId === myUserId) return;
+
+        const session = activeCallRef.current;
+        if (!session || session.callId !== callId) return;
+
+        const isInitiator = session.initiatedBy === myUserId;
+
+        if (isInitiator) {
+          // ── Caller side ──────────────────────────────────────────────────────
+          // Someone answered. Stop the ringback, transition to active, and
+          // create the WebRTC peer offer to the person who just joined.
+          audioRouteManager.stopRingback();
           setActiveCall(prev => {
             if (!prev || prev.callId !== callId) return prev;
-            const exists = prev.participants.some(p => p.userId === responderId);
-            if (exists) return prev;
             return {
               ...prev,
-              participants: [...prev.participants, makeParticipant({ userId: responderId, displayName: safeDisplayName(payload?.displayName, 'Participant'), role: 'audience' })],
+              state: 'active',
+              startedAt: prev.startedAt ?? new Date().toISOString(),
             };
           });
+          if (responderId && webRTCAvailable) {
+            startWebRTCOffer(responderId);
+            setActiveCall(prev => {
+              if (!prev || prev.callId !== callId) return prev;
+              const exists = prev.participants.some(p => p.userId === responderId);
+              if (exists) return prev;
+              return {
+                ...prev,
+                participants: [
+                  ...prev.participants,
+                  makeParticipant({
+                    userId: responderId,
+                    displayName: safeDisplayName(payload?.displayName, 'Participant'),
+                    role: 'audience',
+                  }),
+                ],
+              };
+            });
+          }
+        } else if (
+          session.state === 'active' ||
+          session.state === 'connecting' ||
+          session.state === 'reconnecting'
+        ) {
+          // ── Already-active participant side ───────────────────────────────────
+          // We are already in the call. We MUST create a WebRTC peer offer to the
+          // new joiner just like the initiator does — this is required for the
+          // P2P mesh. Without this, the new participant can only reach the
+          // initiator but not anyone else already in the call.
+          if (responderId) {
+            if (webRTCAvailable) {
+              startWebRTCOffer(responderId);
+            }
+            setActiveCall(prev => {
+              if (!prev || prev.callId !== callId) return prev;
+              const exists = prev.participants.some(p => p.userId === responderId);
+              if (exists) return prev;
+              return {
+                ...prev,
+                participants: [
+                  ...prev.participants,
+                  makeParticipant({
+                    userId: responderId,
+                    displayName: safeDisplayName(payload?.displayName, 'Participant'),
+                    role: 'audience',
+                  }),
+                ],
+              };
+            });
+          }
         }
+        // else: still on LobbyScreen / IncomingCallScreen — do nothing.
+        // The participant list will be updated via call.participant.joined which
+        // arrives separately, and the lobby count refreshes from that.
+
         DeviceEventEmitter.emit('calls.refresh');
       });
 
@@ -957,14 +1732,44 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const fromUserId = String(payload?.fromUserId ?? '');
         const sdp = payload?.sdp;
         if (!fromUserId || !sdp) return;
+
+        // Group-mesh fix: when we JOIN a call that already has participants, the
+        // existing members each send us an SDP offer. They are NOT announced to us
+        // via call.participant.joined (that only fires for members who join AFTER us),
+        // and the backend sends no participant snapshot on initial join. If we don't
+        // register them here, onRemoteTrack() drops their media stream (it only
+        // updates participants already in the list), so their audio/video never
+        // renders. Ensure every peer that offers to us has a participant tile.
+        const myUserId = currentUserIdRef.current ?? resolvedUserId;
+        if (fromUserId !== myUserId) {
+          setActiveCall(prev => {
+            if (!prev) return prev;
+            if (prev.participants.some(p => p.userId === fromUserId)) return prev;
+            return {
+              ...prev,
+              participants: [
+                ...prev.participants,
+                makeParticipant({
+                  userId: fromUserId,
+                  displayName: safeDisplayName(payload?.displayName, 'Participant'),
+                  role: 'audience',
+                }),
+              ],
+            };
+          });
+        }
+
         const answer = await webRTCService.handleOffer(fromUserId, sdp);
         if (answer && socketRef.current) {
           const session = activeCallRef.current;
+          // Backend CallSdpDto validates sdp as @IsString() — extract SDP string
+          const answerSdpString = typeof answer === 'string' ? answer : (answer?.sdp ?? answer);
           socketRef.current.emit('call.sdp.answer', {
             callId: session?.callId,
             conversationId: session?.conversationId,
             targetUserId: fromUserId,
-            sdp: answer,
+            sdp: answerSdpString,
+            sdpType: 'answer',
           });
         }
       });
@@ -981,8 +1786,32 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       s.on('call.ice.candidate', async (payload: any) => {
         const fromUserId = String(payload?.fromUserId ?? '');
         const candidate = payload?.candidate;
+        const payloadCallId = payload?.callId ? String(payload.callId) : null;
         if (!fromUserId || !candidate) return;
+        // Drop candidates that arrived after we already ended this call
+        const cur = activeCallRef.current;
+        if (!cur || cur.state === 'ended' || cur.state === 'missed') return;
+        if (payloadCallId && cur.callId !== payloadCallId) return;
         await webRTCService.addIceCandidate(fromUserId, candidate);
+      });
+
+      // ICE restart request from remote peer
+      s.on('call.ice.restart', async (payload: any) => {
+        const fromUserId = String(payload?.fromUserId ?? '');
+        if (!fromUserId || !webRTCAvailable) return;
+        // Create a new offer with iceRestart:true to re-negotiate ICE with this peer
+        const offer = await webRTCService.createOffer(fromUserId);
+        const session = activeCallRef.current;
+        if (!offer || !session || !socketRef.current) return;
+        const sdpString = typeof offer === 'string' ? offer : (offer?.sdp ?? offer);
+        socketRef.current.emit('call.sdp.offer', {
+          callId: session.callId,
+          conversationId: session.conversationId,
+          targetUserId: fromUserId,
+          sdp: sdpString,
+          sdpType: 'offer',
+          iceRestart: true,
+        });
       });
 
       // Legacy ICE state (backwards compat)
@@ -1005,7 +1834,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!callId) return;
         webRTCService.closePeer(String(payload?.fromUserId ?? ''));
         audioRouteManager.stopRingtone();
-        const resolvedState = reason === 'missed' || reason === 'busy' || reason === 'rejected' ? 'missed' : 'ended';
+        // 'cancelled' / 'ended_by_host' arriving while we never answered = missed call for us.
+        const weNeverAnswered = activeCallRef.current?.state === 'incoming' ||
+          activeCallRef.current?.state === 'lobby' ||
+          activeCallRef.current?.state === 'dialing' ||
+          activeCallRef.current?.state === 'connecting';
+        const resolvedState =
+          reason === 'missed' || reason === 'busy' || reason === 'rejected' ||
+          reason === 'cancelled' || (reason === 'ended_by_host' && weNeverAnswered)
+            ? 'missed'
+            : 'ended';
         const sessionSnapshot = activeCallRef.current;
         if (sessionSnapshot && sessionSnapshot.callId === callId) {
           persistCallEndRef.current?.(sessionSnapshot, resolvedState);
@@ -1023,10 +1861,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       // Participant joined group call
-      s.on('call.participant.joined', (payload: any) => {
+      s.on('call.participant.joined', async (payload: any) => {
         const callId = String(payload?.callId ?? '');
         const userId = String(payload?.userId ?? '');
         if (!callId || !userId) return;
+
+        // Add the new participant to the list for everyone (including lobby
+        // participants who haven't joined yet — this updates their count display).
+        // Do NOT change the local call state here; each user must click to join.
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           if (prev.participants.some(p => p.userId === userId)) return prev;
@@ -1039,6 +1881,79 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             })],
           };
         });
+
+        // SFU threshold check — only upgrade to SFU if WE are already active in the call.
+        // If we're still in lobby/incoming/knocking state we don't have a local stream yet.
+        const session = activeCallRef.current;
+        const weAreActive = session?.state === 'active' ||
+                            session?.state === 'connecting' ||
+                            session?.state === 'reconnecting';
+        if (
+          weAreActive &&
+          sfuAvailable &&
+          session &&
+          session.callId === callId &&
+          !sfuService.isJoined &&
+          !_sfuJoiningRef.current &&
+          session.participants.length >= SFU_THRESHOLD &&
+          isGroupCall(session.callType)
+        ) {
+          _sfuJoiningRef.current = true;
+          try {
+            const localStream = webRTCService.getLocalStream();
+            // Close existing P2P connections before joining SFU — but KEEP the
+            // local stream alive (closeAll() would stop its tracks, leaving the
+            // SFU to produce dead tracks and silence/blank the local participant).
+            webRTCService.closePeersOnly();
+            await sfuService.join(
+              s,
+              session.callId,
+              session.conversationId,
+              localStream,
+              (peerId, track, _kind) => {
+                // A peer produces audio AND video as SEPARATE producers, so this
+                // callback fires once per kind. Accumulate tracks per peer into a
+                // single MediaStream — otherwise the second track to arrive
+                // overwrites the first and the participant loses either audio or
+                // video. Prefer a real RNW MediaStream (so RTCView.streamURL works);
+                // fall back to a lightweight multi-track stub when unavailable.
+                const existing = sfuPeerStreamsRef.current.get(peerId);
+                let stream: any = existing;
+                if (stream && typeof stream.addTrack === 'function') {
+                  try { stream.addTrack(track); } catch {}
+                } else if (stream && Array.isArray(stream._tracks)) {
+                  stream._tracks.push(track);
+                } else {
+                  // Build a fresh stream for this peer
+                  let RNW: any = null;
+                  try { RNW = require('react-native-webrtc'); } catch {}
+                  if (RNW?.MediaStream) {
+                    stream = new RNW.MediaStream();
+                    try { stream.addTrack(track); } catch {}
+                  } else {
+                    const tracks: any[] = [track];
+                    stream = { _tracks: tracks, getTracks: () => tracks, toURL: () => peerId };
+                  }
+                  sfuPeerStreamsRef.current.set(peerId, stream);
+                }
+                setActiveCall(prev2 => {
+                  if (!prev2) return prev2;
+                  return {
+                    ...prev2,
+                    participants: prev2.participants.map(p =>
+                      p.userId === peerId ? { ...p, stream } : p,
+                    ),
+                  };
+                });
+              },
+              session.localUserId,
+            );
+          } catch (e) {
+            console.warn('[SFU] join failed, staying on P2P', e);
+          } finally {
+            _sfuJoiningRef.current = false;
+          }
+        }
       });
 
       // Participant left group call
@@ -1047,9 +1962,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const userId = String(payload?.userId ?? '');
         if (!callId || !userId) return;
         webRTCService.closePeer(userId);
+        // Allow re-offering to this peer if they rejoin the same call.
+        _offeredPeersRef.current.delete(userId);
+        // Drop any accumulated SFU MediaStream for the departing peer.
+        sfuPeerStreamsRef.current.delete(userId);
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
-          return { ...prev, participants: prev.participants.filter(p => p.userId !== userId) };
+          // If the leaving user was the active speaker, promote the next speaking participant
+          const nextSpeaker =
+            prev.activeSpeakerId === userId
+              ? (prev.participants.find(p => p.userId !== userId && !p.isLocal && p.isSpeaking)?.userId ?? null)
+              : prev.activeSpeakerId;
+          return {
+            ...prev,
+            participants: prev.participants.filter(p => p.userId !== userId),
+            activeSpeakerId: nextSpeaker,
+          };
         });
       });
 
@@ -1093,11 +2021,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (!prev || prev.callId !== callId) return prev;
           return { ...prev, reactions: [...prev.reactions, reaction] };
         });
-        setTimeout(() => {
+        const rt = setTimeout(() => {
+          reactionTimeoutsRef.current = reactionTimeoutsRef.current.filter(x => x !== rt);
           setActiveCall(prev =>
             prev ? { ...prev, reactions: prev.reactions.filter(r => r.id !== reaction.id) } : prev,
           );
         }, 3000);
+        reactionTimeoutsRef.current.push(rt);
       });
 
       // In-call chat
@@ -1113,17 +2043,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
+          // Only increment unread count when the chat sheet is NOT already open
+          const delta = callChatOpenRef.current ? 0 : 1;
           return {
             ...prev,
             chatMessages: [...prev.chatMessages, msg],
-            unreadChatCount: prev.unreadChatCount + 1,
+            unreadChatCount: prev.unreadChatCount + delta,
           };
         });
       });
 
       // Participant muted by host
       s.on('call.participant.muted', (payload: any) => {
-        const userId = String(payload?.targetUserId ?? '');
+        // Backend emits userId (not targetUserId) in the broadcast payload
+        const userId = String(payload?.userId ?? payload?.targetUserId ?? '');
         if (!userId) return;
         setActiveCall(prev => {
           if (!prev) return prev;
@@ -1135,7 +2068,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ),
           };
         });
-        if (payload?.targetUserId === currentUserIdRef.current) {
+        // Backend broadcasts the muted user's id as `userId`. When that's us,
+        // actually disable the local mic track — not just the UI flag — so the
+        // host's mute genuinely stops our audio from transmitting.
+        if (userId === currentUserIdRef.current) {
           webRTCService.setMuted(true);
         }
       });
@@ -1143,10 +2079,300 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Viewer count (broadcast)
       s.on('call.viewer.count', (payload: any) => {
         const callId = String(payload?.callId ?? '');
-        const count = Number(payload?.count ?? 0);
+        // Backend emits viewerCount (not count)
+        const count = Number(payload?.viewerCount ?? payload?.count ?? 0);
         setActiveCall(prev =>
           prev && prev.callId === callId ? { ...prev, viewerCount: count } : prev,
         );
+      });
+
+      // Knock request received (host sees this)
+      s.on('call.knock.request', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const userId = String(payload?.userId ?? '');
+        const displayName = safeDisplayName(payload?.displayName, 'Guest');
+        const knockedAt = payload?.knockedAt ?? new Date().toISOString();
+        if (!callId || !userId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const existing = (prev.knockingUsers ?? []).some(u => u.userId === userId);
+          if (existing) return prev;
+          return {
+            ...prev,
+            knockingUsers: [...(prev.knockingUsers ?? []), { userId, displayName, knockedAt }],
+          };
+        });
+      });
+
+      // Host admitted us — transition from knocking → connecting
+      s.on('call.knock.admitted', async (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        // Re-trigger the answer flow now that we are admitted
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return { ...prev, state: 'connecting' };
+        });
+        // Kick off the answer
+        const session = activeCallRef.current;
+        if (session) {
+          const granted = await requestCallPermissions(session.callType);
+          if (!granted) return;
+          const needsVideo = hasVideo(session.callType);
+          await fetchAndApplyIceServers();
+          audioRouteManager.start(needsVideo ? 'video' : 'voice');
+          await webRTCService.startLocalStream(needsVideo);
+          _offeredPeersRef.current.clear();
+          setupWebRTC(session.callType);
+          s.emit('call.answer', {
+            conversationId: session.conversationId,
+            callId: session.callId,
+            callType: session.callType,
+            media: needsVideo ? 'video' : 'voice',
+          });
+        }
+      });
+
+      // Host started a scheduled call — waiting participants auto-answer
+      s.on('call.host.joined', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        const session = activeCallRef.current;
+        if (!session || session.callId !== callId) return;
+        if (session.state === 'waiting-for-host') {
+          // The call.offer event already arrived (backend emits both together).
+          // If answerCall hasn't been triggered yet by the call.offer handler,
+          // trigger it now as a fallback.
+          void answerCall();
+        }
+      });
+
+      // Host denied us
+      s.on('call.knock.denied', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return { ...prev, state: 'ended', reason: 'denied' };
+        });
+      });
+
+      // Role promotion (co-host, speaker, audience)
+      s.on('call.role.changed', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const userId = String(payload?.userId ?? '');
+        const role = payload?.role as string;
+        if (!callId || !userId || !role) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return {
+            ...prev,
+            participants: prev.participants.map(p =>
+              p.userId === userId ? { ...p, role: role as any } : p,
+            ),
+          };
+        });
+      });
+
+      // Screen share state broadcast from remote participant
+      s.on('call.screen_share', (payload: any) => {
+        const userId = String(payload?.userId ?? '');
+        const enabled = !!payload?.enabled;
+        if (!userId) return;
+        setActiveCall(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            participants: prev.participants.map(p =>
+              p.userId === userId ? { ...p, isScreenSharing: enabled } : p,
+            ),
+          };
+        });
+      });
+
+      // Recording state changed
+      s.on('call.recording.changed', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const recordingState = payload?.recordingState;
+        if (!callId || !recordingState) return;
+        setActiveCall(prev => prev && prev.callId === callId ? { ...prev, recordingState, isRecording: recordingState === 'recording' } : prev);
+      });
+
+      // Live caption received from another participant
+      s.on('call.caption', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        const caption = {
+          id: `cap_${Date.now()}`,
+          userId: String(payload?.userId ?? ''),
+          displayName: safeDisplayName(payload?.displayName, 'Participant'),
+          text: String(payload?.text ?? ''),
+          sentAt: payload?.sentAt ?? new Date().toISOString(),
+        };
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const captions = [...(prev.captions ?? []).slice(-9), caption]; // keep last 10
+          return { ...prev, captions };
+        });
+      });
+
+      // In-call poll events
+      s.on('call.poll.create', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const existing = (prev.polls ?? []).some(p => p.pollId === payload.pollId);
+          if (existing) return prev;
+          return { ...prev, polls: [...(prev.polls ?? []), { ...payload, votes: {}, myVote: undefined }] };
+        });
+      });
+      s.on('call.poll.vote', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return {
+            ...prev,
+            polls: (prev.polls ?? []).map(p =>
+              p.pollId === payload.pollId ? { ...p, votes: { ...p.votes, [payload.userId]: payload.option } } : p,
+            ),
+          };
+        });
+      });
+      s.on('call.poll.close', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return { ...prev, polls: (prev.polls ?? []).map(p => p.pollId === payload.pollId ? { ...p, closed: true } : p) };
+        });
+      });
+
+      // Q&A events
+      s.on('call.qa.updated', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const action = payload?.action;
+        const q = payload?.question;
+        if (!callId || !q) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const queue = prev.qaQueue ?? [];
+          if (action === 'add') return { ...prev, qaQueue: [...queue, q] };
+          if (action === 'answered') return { ...prev, qaQueue: queue.map(item => item.questionId === q.questionId ? { ...item, answered: true } : item) };
+          if (action === 'dismiss') return { ...prev, qaQueue: queue.filter(item => item.questionId !== q.questionId) };
+          return prev;
+        });
+      });
+
+      // Breakout room events
+      s.on('call.breakout.updated', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          if (payload.action === 'created') return { ...prev, breakoutRooms: payload.breakoutRooms ?? [] };
+          if (payload.action === 'closed') return { ...prev, breakoutRooms: [], myBreakoutRoomId: null };
+          return prev;
+        });
+      });
+      s.on('call.breakout.assign', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => prev && prev.callId === callId ? { ...prev, myBreakoutRoomId: payload.roomId } : prev);
+      });
+      s.on('call.breakout.return', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return {
+            ...prev,
+            breakoutRooms: (prev.breakoutRooms ?? []).map(r => ({
+              ...r,
+              userIds: r.userIds.filter(id => id !== payload.userId),
+            })),
+          };
+        });
+      });
+
+      // RTMP streaming state
+      s.on('call.rtmp.changed', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev =>
+          prev && prev.callId === callId
+            ? { ...prev, rtmpActive: !!payload.rtmpActive, rtmpUrl: payload.rtmpUrl ?? prev.rtmpUrl }
+            : prev,
+        );
+      });
+
+      // Whiteboard cursor relay
+      s.on('call.wb.cursor', (payload: any) => {
+        const userId = String(payload?.userId ?? '');
+        if (!userId || userId === currentUserIdRef.current) return;
+        // Forward as a lightweight DeviceEventEmitter so InCallWhiteboardSheet can listen
+        // without needing cursor positions in the main CallSession state tree.
+        DeviceEventEmitter.emit('call.wb.cursor', {
+          userId,
+          x: payload?.x ?? 0,
+          y: payload?.y ?? 0,
+        });
+      });
+
+      // Whiteboard events
+      s.on('call.wb.stroke', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const stroke = payload?.stroke;
+        if (!callId || !stroke) return;
+        // Ignore strokes we drew ourselves (we optimistically applied them)
+        const myUserId = currentUserIdRef.current;
+        if (stroke.userId === myUserId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const already = (prev.whiteboardStrokes ?? []).some(s => s.id === stroke.id);
+          if (already) return prev;
+          return { ...prev, whiteboardStrokes: [...(prev.whiteboardStrokes ?? []), stroke] };
+        });
+      });
+      s.on('call.wb.undo', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const strokeId = payload?.strokeId;
+        if (!callId || !strokeId) return;
+        setActiveCall(prev =>
+          prev && prev.callId === callId
+            ? { ...prev, whiteboardStrokes: (prev.whiteboardStrokes ?? []).filter(s => s.id !== strokeId) }
+            : prev,
+        );
+      });
+      s.on('call.wb.clear', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev =>
+          prev && prev.callId === callId ? { ...prev, whiteboardStrokes: [] } : prev,
+        );
+      });
+
+      // call.sync response
+      s.on('call.participants.snapshot', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const participants = Array.isArray(payload?.participants) ? payload.participants : [];
+        if (!callId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          const remoteParticipants = participants
+            .filter((p: any) => p.userId !== prev.localUserId)
+            .map((p: any) => makeParticipant({
+              userId: String(p.userId),
+              displayName: safeDisplayName(p.displayName, 'Participant'),
+              role: p.role ?? 'audience',
+            }));
+          const local = prev.participants.find(p => p.isLocal);
+          return {
+            ...prev,
+            participants: local ? [local, ...remoteParticipants] : remoteParticipants,
+          };
+        });
       });
     };
 
@@ -1211,7 +2437,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsNetworkOnline(online);
       if (!online) return;
       const s = socketRef.current;
-      if (!s || !s.connected) requestSocketRecovery(reason);
+      if (!s) requestSocketRecovery(reason);
     };
     void check('watchdog.initial');
     const interval = setInterval(() => {
@@ -1326,15 +2552,49 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     startCall,
     answerCall,
     rejectCall,
+    leaveCall,
+    endCallForAll,
     endCall,
     dismissCallUi,
-  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, endCall, dismissCallUi]);
+    knockOnCall,
+    admitKnocker,
+    denyKnocker,
+    promoteParticipant,
+    toggleNoiseCancellation,
+    toggleCaptions,
+    sendCaption,
+    selectVirtualBg,
+    toggleRecording,
+    createPoll,
+    votePoll,
+    closePoll,
+    submitQuestion,
+    dismissQuestion,
+    markAnswered,
+    createBreakoutRooms,
+    returnToMainRoom,
+    closeBreakoutRooms,
+    startRtmp,
+    stopRtmp,
+    wbStroke,
+    wbUndo,
+    wbClear,
+    joinExistingCall,
+    getCallInviteLink,
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 
   const isIncoming = activeCall?.state === 'incoming';
+  const isLobby = activeCall?.state === 'lobby';
+  const isWaitingForHost = activeCall?.state === 'waiting-for-host';
   const isActiveOrConnecting =
-    activeCall && activeCall.state !== 'incoming' && activeCall.state !== null;
+    activeCall &&
+    activeCall.state !== 'incoming' &&
+    activeCall.state !== 'lobby' &&
+    activeCall.state !== 'waiting-for-host' &&
+    activeCall.state !== null;
+  const isEnded = activeCall?.state === 'ended' || activeCall?.state === 'missed';
 
   return (
     <SocketContext.Provider value={value}>
@@ -1344,17 +2604,76 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       {isIncoming && activeCall && (
         <IncomingCallScreen
           session={activeCall}
-          onAnswer={() => { audioRouteManager.stopRingtone(); void answerCall(); }}
+          onAnswer={(opts) => {
+            audioRouteManager.stopRingtone();
+            if (opts?.videoOff) webRTCService.setVideoEnabled(false);
+            void answerCall();
+          }}
           onDecline={() => { audioRouteManager.stopRingtone(); void rejectCall('rejected'); }}
         />
       )}
 
+      {/* Waiting for host — joined scheduled call before host arrived */}
+      {isWaitingForHost && activeCall && (
+        <WaitingForHostScreen
+          visible
+          callTitle={activeCall.title}
+          onLeave={() => void leaveCall()}
+        />
+      )}
+
+      {/* Pre-join lobby — shown for group/broadcast calls before entering */}
+      {isLobby && activeCall && (
+        <LobbyScreen
+          visible
+          callType={activeCall.callType}
+          title={activeCall.title}
+          participantCount={activeCall.participants.filter(p => !p.isLocal).length}
+          onJoin={async (opts) => {
+            // Apply camera/mic preferences then answer
+            if (!opts.withMic) webRTCService.setMuted(true);
+            if (!opts.withVideo) webRTCService.setVideoEnabled(false);
+            void answerCall();
+          }}
+          onDecline={() => void rejectCall('declined')}
+        />
+      )}
+
+      {/* Mini badge — shown when call is minimised */}
+      {isActiveOrConnecting && callMinimised && !isEnded && (
+        <CallMiniBadge onRestore={() => setCallMinimised(false)} />
+      )}
+
       {/* Active / dialing / ended call — full-screen call UI */}
-      {isActiveOrConnecting && activeCall && !isIncoming && (
+      {isActiveOrConnecting && activeCall && !isIncoming && (!callMinimised || isEnded) && (
         <ActiveCallScreen
           session={activeCall}
           actions={{
-            onEnd: () => void endCall(),
+            onEnd: () => {
+              const session = activeCallRef.current;
+              const localP = session?.participants.find(p => p.isLocal);
+              const isHost = localP?.role === 'host';
+              const otherJoined = session?.participants.filter(p => !p.isLocal).length ?? 0;
+              const callIsLive = session?.state === 'active' || session?.state === 'reconnecting';
+
+              if (isHost && otherJoined > 0 && callIsLive) {
+                // Host with others already in the call — give the choice to leave vs end for all.
+                Alert.alert(
+                  'Leave or end call?',
+                  '',
+                  [
+                    { text: 'Leave call', onPress: () => void leaveCall() },
+                    { text: 'End for everyone', style: 'destructive', onPress: () => void endCallForAll() },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                );
+              } else {
+                // Nobody has joined yet (still dialing/connecting) OR we are not the host.
+                // Use endCallForAll so call.end is broadcast to every callee and their
+                // IncomingCallScreen / ring-tone is dismissed immediately.
+                void endCallForAll();
+              }
+            },
             onDismiss: () => void dismissCallUi(),
             onToggleMute: toggleMute,
             onToggleVideo: toggleVideo,
@@ -1367,6 +2686,60 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             onSetLayout: setLayout,
             onMuteParticipant: muteParticipant,
             onRemoveParticipant: removeParticipant,
+            onToggleScreenShare: () => void toggleScreenShare(),
+            onAddParticipant: () => {
+              if (Platform.OS === 'ios') {
+                Alert.prompt(
+                  'Add to Call',
+                  'Enter the username or user ID to invite:',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Invite',
+                      onPress: (value?: string) => {
+                        const uid = (value ?? '').trim();
+                        if (uid) inviteToCall([uid]);
+                      },
+                    },
+                  ],
+                  'plain-text',
+                );
+              } else {
+                DeviceEventEmitter.emit('call.add_participant.request', { inviteToCall });
+              }
+            },
+            onMinimize: () => setCallMinimised(true),
+            onChatOpenChange: (open: boolean) => {
+              callChatOpenRef.current = open;
+              if (open) {
+                // Reset unread count when the user opens the chat sheet
+                setActiveCall(prev => prev ? { ...prev, unreadChatCount: 0 } : prev);
+              }
+            },
+            onToggleNoiseCancellation: toggleNoiseCancellation,
+            onAdmitKnocker: (uid: string) => admitKnocker(uid),
+            onDenyKnocker: (uid: string) => denyKnocker(uid),
+            onPromoteParticipant: (uid: string, role: string) => promoteParticipant(uid, role),
+            onToggleCaptions: toggleCaptions,
+            onSendCaption: sendCaption,
+            onSelectVirtualBg: selectVirtualBg,
+            onToggleRecording: toggleRecording,
+            onCreatePoll: createPoll,
+            onVotePoll: votePoll,
+            onClosePoll: closePoll,
+            onSubmitQuestion: submitQuestion,
+            onDismissQuestion: dismissQuestion,
+            onMarkAnswered: markAnswered,
+            onCreateBreakoutRooms: createBreakoutRooms,
+            onReturnToMainRoom: returnToMainRoom,
+            onCloseBreakoutRooms: closeBreakoutRooms,
+            onStartRtmp: startRtmp,
+            onStopRtmp: stopRtmp,
+            onWbStroke: wbStroke,
+            onWbUndo: wbUndo,
+            onWbClear: wbClear,
+            onWbCursor: wbCursor,
+            onGetInviteLink: getCallInviteLink,
           }}
         />
       )}

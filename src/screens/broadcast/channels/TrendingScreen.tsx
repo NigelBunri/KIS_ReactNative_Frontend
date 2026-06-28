@@ -208,7 +208,13 @@ export default function TrendingScreen({ onPressContent }: Props) {
         renderSkeleton()
       ) : error ? (
         <View style={styles.centerState}>
-          <Text style={[styles.emptyText, { color: palette.subtext }]}>{error}</Text>
+          <Text style={[styles.emptyText, { color: palette.danger }]}>{error}</Text>
+          <Pressable
+            onPress={() => fetchTrending(period)}
+            style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 14 }}>Retry</Text>
+          </Pressable>
         </View>
       ) : items.length === 0 ? (
         <View style={styles.centerState}>

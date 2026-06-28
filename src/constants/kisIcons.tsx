@@ -129,6 +129,17 @@ export type KISIconName =
   | 'grid'
   | 'screen-share'
   | 'broadcast'
+  // ── Call screen icons added by the calls feature ──────────────────────────
+  | 'captions'          // live captions toggle (calls)
+  | 'bar-chart'         // in-call polls
+  | 'help-circle'       // Q&A mode
+  | 'stop-circle'       // recording stop / RTMP
+  | 'edit-2'            // whiteboard
+  | 'corner-up-left'    // undo (whiteboard)
+  | 'eraser'            // eraser tool (whiteboard)
+  | 'arrow-down-left'   // incoming / missed call direction arrow
+  | 'arrow-up-right'    // outgoing call direction arrow
+  | 'refresh-cw'        // refresh (calls tab, call controls)
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -509,6 +520,128 @@ export const KISIcon: React.FC<KISIconProps> = ({
     return (
       <MaterialCommunityIcons
         name="broadcast"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  // ── Call feature icons ────────────────────────────────────────────────────
+
+  if (name === 'captions') {
+    // Closed captions / live subtitles
+    return (
+      <MaterialCommunityIcons
+        name="closed-caption"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'bar-chart') {
+    // In-call polls
+    return (
+      <Ionicons
+        name={focused ? 'bar-chart' : 'bar-chart-outline'}
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'help-circle') {
+    // Q&A mode
+    return (
+      <Ionicons
+        name={focused ? 'help-circle' : 'help-circle-outline'}
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'stop-circle') {
+    // Recording stop / RTMP go-live
+    return (
+      <Ionicons
+        name={focused ? 'stop-circle' : 'stop-circle-outline'}
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'edit-2') {
+    // Whiteboard / pencil edit
+    return (
+      <Feather
+        name="edit-2"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'corner-up-left') {
+    // Undo arrow (whiteboard)
+    return (
+      <Feather
+        name="corner-up-left"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'eraser') {
+    // Eraser tool (whiteboard)
+    return (
+      <MaterialCommunityIcons
+        name="eraser"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'arrow-down-left') {
+    // Incoming / missed call direction arrow in call history
+    return (
+      <Feather
+        name="arrow-down-left"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'arrow-up-right') {
+    // Outgoing call direction arrow in call history
+    return (
+      <Feather
+        name="arrow-up-right"
+        size={resolvedSize}
+        color={iconColor}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'refresh-cw') {
+    // Circular refresh (calls tab, call sync)
+    return (
+      <Feather
+        name="refresh-cw"
         size={resolvedSize}
         color={iconColor}
         style={style}

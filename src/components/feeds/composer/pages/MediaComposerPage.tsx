@@ -3,7 +3,6 @@ import React, { useCallback, useMemo } from 'react';
 import {
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -135,127 +134,118 @@ export function MediaComposerPage({
 
   return (
     <View style={[styles.page, { backgroundColor: palette.bg }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      {/* Main pick button */}
+      <Pressable
+        onPress={() => {
+          if (type === 'image') pickImage();
+          else if (isVideo) pickVideo();
+          else if (type === 'audio') pickDocument('audio');
+          else pickDocument('document');
+        }}
+        style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
       >
-        {/* Main pick button */}
-        <Pressable
-          onPress={() => {
-            if (type === 'image') pickImage();
-            else if (isVideo) pickVideo();
-            else if (type === 'audio') pickDocument('audio');
-            else pickDocument('document');
-          }}
-          style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
-        >
-          <View style={[styles.iconChip, { backgroundColor: pickIcon.bg }]}>
-            <Ionicons name={pickIcon.name} size={18} color="#FFFFFF" />
-          </View>
-          <Text style={[styles.bigButtonText, { color: text }]}>{pickLabel}</Text>
-        </Pressable>
+        <View style={[styles.iconChip, { backgroundColor: pickIcon.bg }]}>
+          <Ionicons name={pickIcon.name} size={18} color="#FFFFFF" />
+        </View>
+        <Text style={[styles.bigButtonText, { color: text }]}>{pickLabel}</Text>
+      </Pressable>
 
-        {/* Thumbnail button (for video/short_video) */}
-        {isVideo && (
+      {/* Thumbnail picker button — visible at all times for video, above preview */}
+      {isVideo && (
+        videoThumbUri ? (
+          <View style={[styles.thumbRow, { maxWidth: responsive.contentMaxWidth }]}>
+            <View style={[styles.thumbCard, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}>
+              <Image source={{ uri: videoThumbUri }} style={[styles.thumbImage, { backgroundColor: palette.surface }]} resizeMode="cover" />
+              <View style={styles.thumbMeta}>
+                <Text style={[styles.thumbTitle, { color: text }]}>Thumbnail</Text>
+                <Text style={[styles.thumbSub, { color: subtext }]}>Used as cover image</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={pickVideoThumbnail}
+              style={[styles.thumbClear, { borderColor: palette.primary, backgroundColor: palette.card ?? '#FFFFFF' }]}
+            >
+              <Ionicons name="image-outline" size={18} color={palette.primary} />
+            </Pressable>
+            <Pressable
+              onPress={() => setVideoThumbUri(null)}
+              style={[styles.thumbClear, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF', marginLeft: 6 }]}
+            >
+              <Ionicons name="close" size={18} color={text} />
+            </Pressable>
+          </View>
+        ) : (
           <Pressable
             onPress={pickVideoThumbnail}
-            style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
+            style={[styles.bigButton, { borderColor: palette.primary, backgroundColor: palette.card ?? '#FFFFFF' }]}
           >
             <View style={[styles.iconChip, { backgroundColor: palette.primary }]}>
-              <Ionicons name="add" size={18} color={palette.onPrimary} />
+              <Ionicons name="image-outline" size={18} color={palette.onPrimary} />
             </View>
-            <Text style={[styles.bigButtonText, { color: text }]}>Add video thumbnail</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bigButtonText, { color: text, fontSize: 15 }]}>Pick thumbnail image</Text>
+              <Text style={{ color: subtext, fontSize: 12, marginTop: 2 }}>Choose a cover photo from your device</Text>
+            </View>
           </Pressable>
-        )}
+        )
+      )}
 
-        {/* PREVIEW AREA */}
-        {isImage && selectedUri ? (
-          <View style={styles.previewWrap}>
-            <Image
+      {/* PREVIEW AREA */}
+      {isImage && selectedUri ? (
+        <View style={styles.previewWrap}>
+          <Image
+            source={{ uri: selectedUri }}
+            style={[styles.previewSquare, { borderColor: border }]}
+            resizeMode="cover"
+          />
+        </View>
+      ) : null}
+
+      {isVideo && selectedUri ? (
+        <View style={styles.previewWrap}>
+          <View style={[styles.videoFrame, { borderColor: border }]}>
+            <Video
               source={{ uri: selectedUri }}
-              style={[styles.previewSquare, { borderColor: border }]}
+              style={styles.video}
               resizeMode="cover"
+              controls
+              paused
+              poster={videoThumbUri ?? undefined}
+              posterResizeMode="cover"
             />
           </View>
-        ) : null}
+        </View>
+      ) : null}
 
-        {isVideo && selectedUri ? (
-          <View style={styles.previewWrap}>
-            {/* Main video preview */}
-            <View style={[styles.videoFrame, { borderColor: border }]}>
-              <Video
-                source={{ uri: selectedUri }}
-                style={styles.video}
-                resizeMode="cover"
-                controls
-                paused
-                poster={videoThumbUri ?? undefined}
-                posterResizeMode="cover"
-              />
-            </View>
+      {/* For non-image/video attachments, show selected file name */}
+      {!isImage && !isVideo && attachments.length ? (
+        <Text style={[styles.helperText, { color: subtext }]}>Selected: {selectedName}</Text>
+      ) : null}
 
-            {/* Thumbnail preview card */}
-            {videoThumbUri ? (
-              <View style={[styles.thumbRow, { maxWidth: responsive.contentMaxWidth }]}>
-                <View style={[styles.thumbCard, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}>
-                  <Image source={{ uri: videoThumbUri }} style={[styles.thumbImage, { backgroundColor: palette.surface }]} resizeMode="cover" />
-                  <View style={styles.thumbMeta}>
-                    <Text style={[styles.thumbTitle, { color: text }]}>Thumbnail</Text>
-                    <Text style={[styles.thumbSub, { color: subtext }]}>Will be used as poster</Text>
-                  </View>
-                </View>
-
-                <Pressable
-                  onPress={() => setVideoThumbUri(null)}
-                  style={[styles.thumbClear, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
-                >
-                  <Ionicons name="close" size={18} color={text} />
-                </Pressable>
-              </View>
-            ) : (
-              <Text style={[styles.helperText, { color: subtext, marginTop: 10 }]}>
-                No thumbnail selected (optional)
-              </Text>
-            )}
-          </View>
-        ) : null}
-
-        {/* For non-image/video attachments, show selected file name */}
-        {!isImage && !isVideo && attachments.length ? (
-          <Text style={[styles.helperText, { color: subtext }]}>Selected: {selectedName}</Text>
-        ) : null}
-
-        {/* Caption input */}
-        <TextInput
-          placeholder="Add a caption (optional)"
-          placeholderTextColor={subtext}
-          value={rich.text}
-          onChangeText={(t) => setRich((p) => ({ ...p, text: t }))}
-          multiline
-          style={[
-            styles.captionInput,
-            {
-              color: text,
-              borderColor: border,
-              backgroundColor: palette.card ?? '#FFFFFF',
-            },
-          ]}
-        />
-      </ScrollView>
+      {/* Caption input */}
+      <TextInput
+        placeholder="Add a caption (optional)"
+        placeholderTextColor={subtext}
+        value={rich.text}
+        onChangeText={(t) => setRich((p) => ({ ...p, text: t }))}
+        multiline
+        style={[
+          styles.captionInput,
+          {
+            color: text,
+            borderColor: border,
+            backgroundColor: palette.card ?? '#FFFFFF',
+          },
+        ]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
-    flex: 1, // important: prevents the page from stretching in height
-    paddingVertical: 8,
-  },
-  scrollContent: {
     gap: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 18,
+    paddingVertical: 8,
   },
 
   bigButton: {

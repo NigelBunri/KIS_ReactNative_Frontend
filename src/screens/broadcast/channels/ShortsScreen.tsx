@@ -139,7 +139,7 @@ function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress
             {likeCount > 0 && <Text style={[styles.actionCount, { color: palette.ivory }]}>{likeCount}</Text>}
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onDislike(item.id)}>
-            <KISIcon name="warning" size={24} color={palette.ivory} />
+            <KISIcon name="close" size={24} color={palette.ivory} />
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={() => onCommentPress(item.id)}>
             <KISIcon name="comment" size={24} color={palette.ivory} />

@@ -6,6 +6,86 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+
+  // ── Partners gold header (top of the centre column) ──────────────────────
+  partnerGoldHeader: {
+    borderBottomLeftRadius: 0,   // left edge flush with left rail
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  partnerHeaderSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#FFF4B8',
+    opacity: 0.45,
+  },
+  partnerHeaderHalo: {
+    position: 'absolute',
+    top: -30,
+    right: -20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#C9A24A',
+    opacity: 0.14,
+  },
+  partnerHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  partnerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  partnerHeaderIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(23,17,31,0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,244,184,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  partnerHeaderEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  partnerHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.1,
+  },
+  partnerHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  partnerHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rootGradient: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -79,9 +159,10 @@ const styles = StyleSheet.create({
   // LEFT RAIL
   leftRail: {
     flexDirection: 'column',
-    paddingVertical: 12,
+    paddingBottom: 12,
     alignItems: 'center',
     borderRightWidth: 1,
+    // paddingTop is applied inline with topInset so the rail fills to y=0
   },
   addPartnerButton: {
     width: 48,

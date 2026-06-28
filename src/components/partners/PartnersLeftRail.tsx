@@ -15,6 +15,9 @@ type Props = {
   onSelectPartner: (id: string) => void;
   onAddPartnerPress: () => void;
   loading?: boolean;
+  /** Safe-area top inset passed from parent so the rail background can fill
+   *  all the way to y=0 while content still clears the status bar. */
+  topInset?: number;
 };
 
 export default function PartnersLeftRail({
@@ -23,6 +26,7 @@ export default function PartnersLeftRail({
   onSelectPartner,
   onAddPartnerPress,
   loading = false,
+  topInset = 0,
 }: Props) {
   const { palette, isDark, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -55,6 +59,9 @@ export default function PartnersLeftRail({
         styles.leftRail,
         {
           width: railWidth,
+          // paddingTop uses the safe-area inset so the rail background fills all
+          // the way to y=0 (no gap at the top) while content clears the notch.
+          paddingTop: topInset + 8,
           backgroundColor: isDark ? 'rgba(10,9,14,0.92)' : '#FFFFFF',
           borderRightColor: palette.divider,
           opacity: entrance,

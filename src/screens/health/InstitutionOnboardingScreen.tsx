@@ -111,11 +111,41 @@ const renderField = (
           <TouchableOpacity
             style={styles.mapBox}
             disabled={disabled}
-            onPress={() =>
-              Alert.alert('Coming soon', 'Map-based location picking is not available yet. Enter an address instead.')
-            }
+            onPress={() => {
+              try {
+                const Geolocation = require('react-native-geolocation-service').default;
+                Geolocation.getCurrentPosition(
+                  (pos: { coords: { latitude: number; longitude: number } }) => {
+                    onChange(field.key, { lat: pos.coords.latitude, lng: pos.coords.longitude });
+                  },
+                  () => {
+                    Alert.alert(
+                      'Enter Coordinates',
+                      'Could not detect location. Enter lat,lng manually (e.g. 6.5244,3.3792):',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'OK',
+                          onPress: (text?: string) => {
+                            const parts = (text ?? '').split(',').map(s => parseFloat(s.trim()));
+                            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                              onChange(field.key, { lat: parts[0], lng: parts[1] });
+                            }
+                          },
+                        },
+                      ],
+                      // @ts-ignore — Alert.prompt on iOS only
+                      'plain-text',
+                    );
+                  },
+                  { enableHighAccuracy: true, timeout: 10000 },
+                );
+              } catch {
+                Alert.alert('Location unavailable', 'Enter the address in the text fields above.');
+              }
+            }}
           >
-            <Text style={styles.mapText}>{value ? `${value.lat}, ${value.lng}` : 'Tap to pick location'}</Text>
+            <Text style={styles.mapText}>{value ? `${value.lat?.toFixed(5)}, ${value.lng?.toFixed(5)}` : 'Tap to use current location'}</Text>
           </TouchableOpacity>
         </View>
       );

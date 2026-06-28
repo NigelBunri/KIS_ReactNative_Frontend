@@ -23,6 +23,8 @@ import {
   microToUsd,
   updateInstitutionEngineManagedItem,
 } from '@/services/healthOpsEngineManagerService';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
 import { getHealthThemeColors } from '@/theme/health/colors';
 import { useKISTheme } from '@/theme/useTheme';
 import { HEALTH_THEME_SPACING } from '@/theme/health/spacing';
@@ -234,6 +236,26 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
     setSlots(generated);
   }, [endHour, startHour, types]);
 
+  const [publishing, setPublishing] = useState(false);
+  const publishSlots = useCallback(async () => {
+    const availableSlots = slots.filter(s => s.available);
+    if (!availableSlots.length) {
+      Alert.alert('No slots', 'Generate and enable at least one slot before publishing.');
+      return;
+    }
+    setPublishing(true);
+    try {
+      await postRequest(ROUTES.healthDashboard.availability(institutionId), {
+        slots: availableSlots.map(s => ({ time: s.time, available: true })),
+      });
+      Alert.alert('Published', `${availableSlots.length} slot${availableSlots.length !== 1 ? 's' : ''} published to the booking engine.`);
+    } catch {
+      Alert.alert('Error', 'Failed to publish slots. Please try again.');
+    } finally {
+      setPublishing(false);
+    }
+  }, [slots, institutionId]);
+
   const toggleSlot = useCallback((id: string) => {
     LayoutAnimation.easeInEaseOut();
     setSlots((prev) => prev.map((slot) => (slot.id === id ? { ...slot, available: !slot.available } : slot)));
@@ -338,13 +360,22 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Doctor Schedule</Text>
         <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: spacing.xs }}>
-          Slots are previewed locally. Publishing slots to the booking engine is coming soon.
+          Generate slots from your schedule, toggle individual slots, then publish to activate booking.
         </Text>
 
         <TextInput placeholder="Start Hour (24h format)" placeholderTextColor={palette.subtext} value={startHour} onChangeText={setStartHour} style={input(palette, spacing)} />
         <TextInput placeholder="End Hour (24h format)" placeholderTextColor={palette.subtext} value={endHour} onChangeText={setEndHour} style={input(palette, spacing)} />
 
         <KISButton title="Generate Slots (Preview)" onPress={generateSlots} />
+        {slots.length > 0 && (
+          <KISButton
+            title={publishing ? 'Publishing…' : 'Publish Slots to Booking Engine'}
+            variant="primary"
+            disabled={publishing}
+            style={{ marginTop: spacing.sm }}
+            onPress={publishSlots}
+          />
+        )}
       </View>
 
       <View style={card(palette, spacing)}>

@@ -14,6 +14,8 @@ import type { MutableRefObject } from 'react';
 import { AppState, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
+import { getRequest } from '@/network/get';
+import ROUTES from '@/network';
 
 import {
   SendOverNetworkResult,
@@ -24,6 +26,8 @@ import {
   bulkUpdateMessages,
   clearMessages,
   filterLocallyDeletedMessages,
+  getChatHistorySyncState,
+  setChatHistorySyncState,
   rememberLocallyDeletedMessageIds,
   removeMessage,
 } from '../Storage/chatStorage';
@@ -213,6 +217,23 @@ export function useChatMessaging({
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  /* -----------------------------------------------------------------------
+   * LIVE PARTICIPANTS REF
+   * Keeps a mutable, always-current copy of the conversation's participants
+   * so that when a new member is added, the very next outgoing message is
+   * already encrypted for them — without waiting for a full re-render of
+   * the parent component that owns the `chat` prop.
+   * -------------------------------------------------------------------- */
+  const freshParticipantsRef = useRef<any[]>(
+    Array.isArray(chat?.participants) ? chat.participants : [],
+  );
+  // Sync whenever the parent prop is refreshed (e.g. after navigation re-opens the chat).
+  useEffect(() => {
+    if (Array.isArray(chat?.participants)) {
+      freshParticipantsRef.current = chat.participants;
+    }
+  }, [chat?.participants]);
 
   /* ---------------------------------------------------------------------
    * SEND IMPLEMENTATION REF
@@ -512,8 +533,24 @@ export function useChatMessaging({
           // recipient envelopes, this device must only decrypt its own envelope.
           // Falling back to another ciphertext consumes/reads the wrong session
           // counter and causes MessageCounterError on history replay.
-          if (recipients.length > 0 && !recipientCipher) return;
           if (isOwnCurrentDeviceMessage && !recipientCipher) return;
+          if (recipients.length > 0 && !recipientCipher) {
+            // No envelope for this user/device — the message was encrypted
+            // before this user joined the group (forward secrecy). Show a clear
+            // informational placeholder (WhatsApp-style) so the user isn't
+            // confused by an indefinite lock icon.
+            const PRE_JOIN_TEXT = '🔒 This message was sent before you joined the group.';
+            const alreadyPatched = messagesRef.current.find(
+              (m) => (m.serverId === messageId || m.id === messageId) &&
+                typeof m.text === 'string' && m.text === PRE_JOIN_TEXT,
+            );
+            if (!alreadyPatched) {
+              const patch = { text: PRE_JOIN_TEXT };
+              await saveDecryptedMessage(String(currentUserId), mapped, patch);
+              await patchDecryptedMessage(messageId, patch);
+            }
+            return;
+          }
 
           const ciphertext = recipientCipher?.ciphertext ?? mapped.ciphertext;
           const type = recipientCipher?.type ?? encMeta?.type ?? 1;
@@ -848,6 +885,26 @@ export function useChatMessaging({
       const attachments = mapAttachments(rawAttachments);
       const media = rawMedia ? { ...rawMedia, attachments } : attachments.length ? { attachments } : undefined;
 
+      const rawVoice = serverMsg.voice ?? serverMsg.voice_note ?? serverMsg.voiceNote ?? null;
+      const voice = rawVoice && typeof rawVoice === 'object'
+        ? {
+            uri: rawVoice.uri ?? rawVoice.url ?? '',
+            url: rawVoice.url ?? rawVoice.uri ?? '',
+            durationMs: rawVoice.durationMs ?? rawVoice.duration_ms ?? 0,
+          } as any
+        : undefined;
+
+      const rawSticker = serverMsg.sticker ?? null;
+      const sticker = rawSticker && typeof rawSticker === 'object'
+        ? {
+            id: String(rawSticker.id ?? ''),
+            uri: rawSticker.uri ?? rawSticker.url ?? '',
+            text: rawSticker.text ?? undefined,
+            width: rawSticker.width ?? undefined,
+            height: rawSticker.height ?? undefined,
+          }
+        : undefined;
+
       const rawCiphertext = serverMsg.ciphertext ?? undefined;
       const hasEncryptedMeta = !!(serverMsg.encryptionMeta ?? serverMsg.encryption_meta);
       const rawText = serverMsg.text ?? serverMsg.previewText ?? serverMsg.preview_text ?? '';
@@ -862,6 +919,44 @@ export function useChatMessaging({
       // decrypted versions.
       const rawId = serverMsg.id ?? serverMsg._id;
       const idStr = rawId != null ? String(rawId) : '';
+      const rawReadBy = Array.isArray(serverMsg.readBy)
+        ? serverMsg.readBy
+        : Array.isArray(serverMsg.read_by)
+        ? serverMsg.read_by
+        : [];
+      const readBy = rawReadBy.map((entry: any) => {
+        const atMs = Number(entry?.atMs ?? entry?.at_ms ?? 0);
+        return {
+          ...entry,
+          userId: String(entry?.userId ?? entry?.user_id ?? ''),
+          readAt:
+            entry?.readAt ??
+            entry?.read_at ??
+            entry?.at ??
+            (atMs > 0 ? new Date(atMs).toISOString() : new Date().toISOString()),
+        };
+      });
+      const deliveredTo = Array.isArray(serverMsg.deliveredTo)
+        ? serverMsg.deliveredTo
+        : Array.isArray(serverMsg.delivered_to)
+        ? serverMsg.delivered_to
+        : [];
+      const fromMe = senderId !== '' && senderId === String(currentUserId);
+      const currentUserRead = readBy.some(
+        (entry: any) => String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+      );
+      const recipientRead = readBy.some(
+        (entry: any) => String(entry?.userId ?? entry?.user_id ?? '') !== senderId,
+      );
+      const recipientDelivered = deliveredTo.some(
+        (entry: any) => String(entry?.userId ?? entry?.user_id ?? '') !== senderId,
+      );
+      const derivedStatus: MessageStatus =
+        (fromMe ? recipientRead : currentUserRead) || serverMsg.status === 'read'
+          ? 'read'
+          : (fromMe && recipientDelivered) || serverMsg.status === 'delivered'
+          ? 'delivered'
+          : 'sent';
 
       return {
         id: idStr,
@@ -880,14 +975,9 @@ export function useChatMessaging({
         attachments,
         media,
         replyToId: serverMsg.replyToId ?? null,
-        status: (
-          serverMsg.status === 'read' ? 'read' :
-          serverMsg.status === 'delivered' ? 'delivered' :
-          serverMsg.status === 'sent' ? 'sent' :
-          'sent'
-        ) as MessageStatus,
+        status: derivedStatus,
         roomId: String(storageRoomId),
-        fromMe: senderId !== '' && senderId === String(currentUserId),
+        fromMe,
         reactions: normalizeReactions(serverMsg.reactions),
         ciphertext: rawCiphertext,
         encryptionMeta: serverMsg.encryptionMeta ?? serverMsg.encryption_meta ?? undefined,
@@ -897,10 +987,42 @@ export function useChatMessaging({
         encryptionVersion: serverMsg.encryptionVersion ?? undefined,
         encryptionKeyVersion: serverMsg.encryptionKeyVersion ?? undefined,
         styledText: styledText ?? undefined,
+        voice,
+        sticker,
         contacts,
         poll,
         event,
-      };
+        isDeleted: !!(serverMsg.isDeleted ?? serverMsg.is_deleted),
+        isEdited: !!(serverMsg.isEdited ?? serverMsg.is_edited ?? serverMsg.edited_at),
+        isPinned: !!(serverMsg.isPinned ?? serverMsg.is_pinned),
+        isStarred: !!(serverMsg.isStarred ?? serverMsg.is_starred),
+        disappearAfterSeconds: serverMsg.disappearAfterSeconds ?? serverMsg.disappear_after_seconds ?? null,
+        noForward: !!(serverMsg.noForward ?? serverMsg.no_forward),
+        mentionedUserIds: Array.isArray(serverMsg.mentionedUserIds)
+          ? serverMsg.mentionedUserIds.map(String)
+          : Array.isArray(serverMsg.mentioned_user_ids)
+          ? serverMsg.mentioned_user_ids.map(String)
+          : undefined,
+        readBy,
+        deliveredTo,
+        readReceiptPending: currentUserRead ? false : undefined,
+        locallyReadAt: currentUserRead
+          ? String(
+              readBy.find((entry: any) =>
+                String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+              )?.readAt ??
+              readBy.find((entry: any) =>
+                String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+              )?.atMs ??
+              readBy.find((entry: any) =>
+                String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+              )?.at ??
+              new Date().toISOString(),
+            )
+          : undefined,
+        linkPreview: serverMsg.linkPreview ?? serverMsg.link_preview ?? undefined,
+        callEvent: serverMsg.callEvent ?? serverMsg.call_event ?? undefined,
+      } as ChatMessage & { senderAvatar?: string };
     },
     [storageRoomId, currentUserId, normalizeReactions, conversationId],
   );
@@ -935,17 +1057,19 @@ export function useChatMessaging({
         replaceMessagesRef.current(updated);
       });
 
-      // Mark conversation as read when joining — send a receipt for the last
-      // message from another user so the server updates unread counts.
+      // Emit read receipts for every unread received message so the sender's
+      // tick turns blue and the server unread count drops to zero.
+      // (Previously only the last message got a receipt, leaving earlier ones
+      // permanently shown as delivered on the sender's screen.)
       const msgs = messagesRef.current;
-      if (msgs.length > 0) {
-        const lastMsg = msgs[msgs.length - 1];
-        if (lastMsg?.serverId && lastMsg.senderId !== currentUserId) {
-          emitReceiptRef.current(String(convId), lastMsg.serverId, 'read');
-        }
+      const unreadReceived = msgs.filter(
+        (m) => !m.fromMe && m.serverId && m.status !== 'read',
+      );
+      for (const m of unreadReceived) {
+        emitReceiptRef.current(String(convId), m.serverId!, 'read');
       }
     },
-    [socket, isConnected, currentUserId],
+    [socket, isConnected],
   );
 
   const leaveConversation = useCallback(
@@ -1002,9 +1126,9 @@ export function useChatMessaging({
 
   const requestHistoryBatch = useCallback(
     (input: { before?: string; limit?: number }) =>
-      new Promise<any[]>((resolve) => {
+      new Promise<any[]>((resolve, reject) => {
         if (!socket || !(isConnected || socket.connected) || !conversationId) {
-          resolve([]);
+          reject(new Error('History unavailable while offline'));
           return;
         }
         socket.timeout(15000).emit(
@@ -1015,7 +1139,10 @@ export function useChatMessaging({
             before: input.before,
           },
           (err: any, ack?: any) => {
-            if (err || !ack?.ok) return resolve([]);
+            if (err || !ack?.ok) {
+              reject(new Error(ack?.error?.message ?? 'History request failed'));
+              return;
+            }
             const items = Array.isArray(ack?.data?.messages) ? ack.data.messages : [];
             resolve(items);
           },
@@ -1028,36 +1155,74 @@ export function useChatMessaging({
     if (historyLoadRef.current) return;
     historyLoadRef.current = true;
 
+    const roomId = String(storageRoomId);
+    const pageSize = 500;
     try {
-      let before: string | undefined;
-      let rounds = 0;
-      let all: ChatMessage[] = [];
-      // Cap at 5 rounds (500 messages) — enough history for most conversations
-      // without hammering a slow network with 4000-message fetches on first open.
-      while (rounds < 5) {
-        const items = await requestHistoryBatch({ before, limit: 100 });
-        if (!items.length) break;
-        const mapped = items.map((m: any) => mapServerMessage(m));
-        all = [...mapped, ...all];
+      const syncState = await getChatHistorySyncState(roomId, currentUserId);
+      if (syncState.olderHistoryComplete) return;
+
+      const existingServerDates = messagesRef.current
+        .filter((message) => message.serverId && !message.isLocalOnly)
+        .map((message) => message.createdAt)
+        .filter((value): value is string =>
+          typeof value === 'string' && !Number.isNaN(Date.parse(value)),
+        )
+        .sort((left, right) => Date.parse(left) - Date.parse(right));
+
+      let before = existingServerDates[0];
+      let page = 0;
+      while (true) {
+        const items = await requestHistoryBatch({ before, limit: pageSize });
+        if (!items.length) {
+          await setChatHistorySyncState(
+            roomId,
+            {
+              olderHistoryComplete: true,
+              oldestServerCreatedAt: before,
+              completedAt: new Date().toISOString(),
+            },
+            currentUserId,
+          );
+          break;
+        }
+
+        let mapped = items.map((message: any) => mapServerMessage(message));
+        mapped = await filterLocallyDeletedMessages(roomId, mapped, currentUserId);
+        if (mapped.length) {
+          // Persist every page immediately. A network interruption therefore
+          // resumes from the oldest durable page instead of starting over.
+          await replaceMessages(mapped);
+          mapped.forEach((message: ChatMessage) => {
+            void decryptChatMessage(message);
+          });
+        }
+
         const oldest = items[0]?.createdAt ?? items[0]?.created_at;
         if (!oldest || oldest === before) break;
-        before = oldest;
-        rounds += 1;
+        before = String(oldest);
+        page += 1;
+
+        if (items.length < pageSize) {
+          await setChatHistorySyncState(
+            roomId,
+            {
+              olderHistoryComplete: true,
+              oldestServerCreatedAt: before,
+              completedAt: new Date().toISOString(),
+            },
+            currentUserId,
+          );
+          break;
+        }
+
+        // Yield periodically so long histories do not monopolize the JS thread.
+        if (page % 4 === 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
       }
-      if (all.length) {
-        all = await filterLocallyDeletedMessages(
-          String(storageRoomId),
-          all,
-          currentUserId,
-        );
-      }
-      if (all.length) {
-        // Await so messagesRef is current before decryption patches run.
-        await replaceMessages(all);
-        all.forEach((message: ChatMessage) => {
-          void decryptChatMessage(message);
-        });
-      }
+    } catch {
+      // Offline/timeouts are expected. Successfully stored pages remain and
+      // the next reconnect resumes from the oldest persisted message.
     } finally {
       historyLoadRef.current = false;
     }
@@ -1107,16 +1272,32 @@ export function useChatMessaging({
     requestHistory({ limit: 50 });
   }, [conversationId, requestHistory]);
 
+  // Loose conversationId match: accepts messages whose stored conversationId or
+  // roomId equals either the current conversationId or storageRoomId. This
+  // prevents the strict-equality bug that left messages in new DMs (which start
+  // with a local ID before getting a server UUID) permanently unread in cache.
+  const msgBelongsToConv = useCallback(
+    (m: ChatMessage): boolean => {
+      const msgConvId = m.conversationId ?? m.roomId ?? '';
+      if (!msgConvId) return true; // no stored ID → assume same conversation
+      return (
+        msgConvId === conversationId ||
+        msgConvId === String(storageRoomId)
+      );
+    },
+    [conversationId, storageRoomId],
+  );
+
   const markMessagesRead = useCallback(
     async (messageIds: string[]) => {
-      if (!socket || !conversationId || !messageIds.length) return;
+      if (!conversationId || !messageIds.length) return;
       const roomId = String(storageRoomId);
       const idSet = new Set(messageIds.map((id) => String(id)));
       const unread = messagesRef.current.filter((m) => {
         const msgId = (m as any).serverId ?? m.id ?? (m as any).clientId;
         return (
           !m.fromMe &&
-          m.conversationId === conversationId &&
+          msgBelongsToConv(m) &&
           m.status !== 'read' &&
           msgId != null &&
           idSet.has(String(msgId))
@@ -1127,30 +1308,86 @@ export function useChatMessaging({
 
       for (const msg of unread) {
         if (!msg.serverId) continue;
-        emitReceiptRef.current(conversationId, msg.serverId, 'read');
+        emitReceiptRef.current(String(conversationId), msg.serverId, 'read');
       }
 
       const updated = await bulkUpdateMessages(roomId, (m) => {
         const msgId = (m as any).serverId ?? m.id ?? (m as any).clientId;
         if (
           m.fromMe ||
-          m.conversationId !== conversationId ||
+          !msgBelongsToConv(m) ||
           m.status === 'read' ||
           msgId == null ||
           !idSet.has(String(msgId))
         ) {
           return m;
         }
-        return { ...m, status: 'read' };
+        const readAt = new Date().toISOString();
+        const existingReadBy = Array.isArray((m as any).readBy) ? (m as any).readBy : [];
+        const readBy = existingReadBy.some(
+          (entry: any) => String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+        )
+          ? existingReadBy
+          : [...existingReadBy, { userId: String(currentUserId), readAt }];
+        return { ...m, status: 'read', readBy, locallyReadAt: readAt, readReceiptPending: !!m.serverId };
       }, currentUserId);
-      replaceMessages(updated);
+      await replaceMessages(updated);
       DeviceEventEmitter.emit('conversation.read', {
         conversationId,
         readCount: unread.length,
       });
     },
-    [socket, conversationId, storageRoomId, replaceMessages, currentUserId],
+    [conversationId, storageRoomId, replaceMessages, currentUserId, msgBelongsToConv],
   );
+
+  // Bulk-marks ALL unread received messages as read — used when the conversation
+  // is opened and after the HTTP mark-read call confirms server persistence.
+  const markAllMessagesRead = useCallback(
+    async () => {
+      if (!conversationId) return;
+      const roomId = String(storageRoomId);
+
+      // Emit socket receipts for every unread received message with a serverId.
+      const toMark = messagesRef.current.filter(
+        (m) =>
+          !m.fromMe &&
+          m.serverId &&
+          (m.status !== 'read' || m.readReceiptPending) &&
+          msgBelongsToConv(m),
+      );
+      for (const msg of toMark) {
+        emitReceiptRef.current(String(conversationId), msg.serverId!, 'read');
+      }
+
+      // Update local AsyncStorage cache so a restart still shows the correct status.
+      const updated = await bulkUpdateMessages(roomId, (m) => {
+        if (m.fromMe || m.status === 'read' || !msgBelongsToConv(m)) return m;
+        const readAt = new Date().toISOString();
+        const existingReadBy = Array.isArray((m as any).readBy) ? (m as any).readBy : [];
+        const readBy = existingReadBy.some(
+          (entry: any) => String(entry?.userId ?? entry?.user_id ?? '') === String(currentUserId),
+        )
+          ? existingReadBy
+          : [...existingReadBy, { userId: String(currentUserId), readAt }];
+        return { ...m, status: 'read', readBy, locallyReadAt: readAt, readReceiptPending: !!m.serverId };
+      }, currentUserId);
+      await replaceMessages(updated);
+
+      if (toMark.length > 0) {
+        DeviceEventEmitter.emit('conversation.read', {
+          conversationId,
+          readCount: toMark.length,
+        });
+      }
+    },
+    [conversationId, storageRoomId, replaceMessages, currentUserId, msgBelongsToConv],
+  );
+
+  useEffect(() => {
+    if (!isLoading && conversationId) {
+      void markAllMessagesRead();
+    }
+  }, [conversationId, isLoading, markAllMessagesRead]);
 
   useEffect(() => {
     if (!socket || !(isConnected || socket.connected) || !conversationId)
@@ -1162,6 +1399,7 @@ export function useChatMessaging({
     // This ensures mergeMessages can find the existing cached messages (with
     // delivered/read statuses) and won't downgrade them to 'sent'.
     if (!isLoading) {
+      void markAllMessagesRead();
       syncHistory();
       if (!hasInitialLoadRef.current) {
         hasInitialLoadRef.current = true;
@@ -1184,6 +1422,7 @@ export function useChatMessaging({
     storageRoomId,
     syncHistory,
     loadFullHistory,
+    markAllMessagesRead,
   ]);
 
   /* ---------------------------------------------------------------------
@@ -1336,7 +1575,10 @@ export function useChatMessaging({
       let payloadToSend: any;
       const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
       if (E2EE_ENABLED && chat && !isPublicRoom) {
-        const recipientIds = resolveE2EERecipientIds(chat as any, String(currentUserId));
+        // Use freshParticipantsRef so newly added members are included
+        // immediately without waiting for a parent re-render.
+        const chatWithFreshParticipants = { ...chat, participants: freshParticipantsRef.current };
+        const recipientIds = resolveE2EERecipientIds(chatWithFreshParticipants as any, String(currentUserId));
         // Only encrypt when there is at least one recipient OTHER than the sender.
         // If the participants list hasn't loaded yet or this is a public open room,
         // the resolved list contains only the sender — encrypting in that case would
@@ -1952,9 +2194,21 @@ export function useChatMessaging({
       if (__DEV__) console.log('[WS] conversation.created', payload);
       DeviceEventEmitter.emit('conversation.refresh');
     };
-    const onConversationUpdated = (payload: any) => {
+    const onConversationUpdated = async (payload: any) => {
       if (__DEV__) console.log('[WS] conversation.updated', payload);
       DeviceEventEmitter.emit('conversation.refresh');
+      // If the updated conversation is the one currently open, refresh the
+      // participants list so the next outgoing message includes any new members.
+      const updatedConvId = payload?.conversationId ?? payload?.id;
+      const currentConvId = conversationIdRef.current;
+      if (!updatedConvId || !currentConvId || String(updatedConvId) !== String(currentConvId)) return;
+      try {
+        const res = await getRequest(ROUTES.chat.conversationDetail(String(currentConvId)));
+        const freshList = res?.data?.participants ?? res?.participants ?? null;
+        if (Array.isArray(freshList)) freshParticipantsRef.current = freshList;
+      } catch {
+        // Non-fatal — participants will refresh on next chat open
+      }
     };
     const onConversationLastMessage = (payload: any) => {
       if (__DEV__) console.log('[WS] conversation.last_message', payload);
@@ -1971,6 +2225,27 @@ export function useChatMessaging({
       socket.off('conversation.last_message', onConversationLastMessage);
     };
   }, [socket]);
+
+  // Listen for the local event emitted by ChatInfoPage when a member is added.
+  // Refetches participants from Django so the next outgoing message is
+  // encrypted for the new member right away.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      'conversation.participants_changed',
+      async ({ conversationId: changedId }: { conversationId: string }) => {
+        const currentConvId = conversationIdRef.current;
+        if (!changedId || !currentConvId || String(changedId) !== String(currentConvId)) return;
+        try {
+          const res = await getRequest(ROUTES.chat.conversationDetail(String(currentConvId)));
+          const freshList = res?.data?.participants ?? res?.participants ?? null;
+          if (Array.isArray(freshList)) freshParticipantsRef.current = freshList;
+        } catch {
+          // Non-fatal
+        }
+      },
+    );
+    return () => sub.remove();
+  }, []);
 
   /* ---------------------------------------------------------------------
    * DISAPPEARING MESSAGES — delete when timer fires
@@ -2092,6 +2367,7 @@ export function useChatMessaging({
       }
     },
     markMessagesRead,
+    markAllMessagesRead,
     socket,
     isSocketConnected: isConnected,
     requestHistoryBatch,

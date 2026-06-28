@@ -43,6 +43,7 @@ const socialRoutes = {
     postPin: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/pin/`,
     postUnpin: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/unpin/`,
     postDelete: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/delete/`,
+    postUpdate: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/edit/`,
     postBroadcast: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/broadcast/`,
   },
   groups: {
@@ -113,10 +114,19 @@ const socialRoutes = {
   conversations: {
     broadcast: `${NEST_API_BASE_URL}/api/v1/conversations/broadcast`,
   },
+  nestNotifications: {
+    deviceTokenRegister: `${NEST_API_BASE_URL}/api/v1/notifications/tokens/register`,
+  },
   calls: {
-    iceServers: `${API_BASE_URL}/api/v1/calls/ice-servers/`,
+    iceServers: `${NEST_API_BASE_URL}/api/v1/calls/ice-servers`,
     history: `${NEST_API_BASE_URL}/api/v1/calls/history`,
     missedCount: `${NEST_API_BASE_URL}/api/v1/calls/missed-count`,
+    standalone: `${NEST_API_BASE_URL}/api/v1/calls/standalone`,
+    scheduled: `${NEST_API_BASE_URL}/api/v1/calls/scheduled`,
+    inviteLink: `${NEST_API_BASE_URL}/api/v1/calls/invite-link`,
+    joinByToken: (token: string) => `${NEST_API_BASE_URL}/api/v1/calls/join/${token}`,
+    active: (conversationId: string) => `${NEST_API_BASE_URL}/api/v1/calls/active?conversationId=${encodeURIComponent(conversationId)}`,
+    forConversation: (conversationId: string, limit = 30) => `${NEST_API_BASE_URL}/api/v1/calls/conversation?conversationId=${encodeURIComponent(conversationId)}&limit=${limit}`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>

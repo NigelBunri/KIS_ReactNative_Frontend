@@ -54,6 +54,7 @@ import {
   type OfflineCacheMeta,
 } from '@/storage/offlineStructuredCache';
 import FeedComposerSheet from './composer/FeedComposerSheet';
+import FeedEditSheet from './FeedEditSheet';
 import { logFeedEvent, type FeedType } from '@/network/personalization';
 import { getAccessToken } from '@/security/authStorage';
 import { useNavigation } from '@react-navigation/native';
@@ -123,6 +124,7 @@ type FeedScreenProps<T extends FeedPost> = {
   commentsListEndpoint?: (postId: string) => string;
   commentCreateEndpoint?: (postId: string) => string;
   deleteEndpoint: (postId: string) => string;
+  editEndpoint?: (postId: string) => string;
   broadcastEndpoint: (postId: string) => string;
   commentChatContext: (post: T) => Record<string, any>;
   chatHeaderLabel: (post: T) => string;
@@ -290,6 +292,7 @@ export default function FeedScreen<T extends FeedPost>({
   commentsListEndpoint,
   commentCreateEndpoint,
   deleteEndpoint,
+  editEndpoint,
   broadcastEndpoint,
   commentChatContext,
   chatHeaderLabel: _chatHeaderLabel,
@@ -311,6 +314,8 @@ export default function FeedScreen<T extends FeedPost>({
 
   const [actionsVisible, setActionsVisible] = useState(false);
   const [activePost, setActivePost] = useState<T | null>(null);
+  const [editVisible, setEditVisible] = useState(false);
+  const [editPost, setEditPost] = useState<T | null>(null);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
 
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -798,6 +803,12 @@ export default function FeedScreen<T extends FeedPost>({
       fallback;
     Clipboard.setString(permalink);
     Alert.alert('Link copied', 'Post link saved to clipboard.');
+  }, []);
+
+  const handleEditUpdated = useCallback((updated: Partial<T>) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+    );
   }, []);
 
   const handleDelete = useCallback(
@@ -1454,12 +1465,25 @@ export default function FeedScreen<T extends FeedPost>({
         actions={[
           { key: 'share', label: 'Share', onPress: () => activePost && handleShare(activePost) },
           { key: 'copy-link', label: 'Copy link', onPress: () => activePost && copyPostLink(activePost) },
+          ...(editEndpoint
+            ? [{ key: 'edit', label: 'Edit post', onPress: () => { if (activePost) { setEditPost(activePost); setEditVisible(true); } } }]
+            : []),
           { key: 'broadcast', label: 'Broadcast', onPress: () => activePost && handleBroadcast(activePost.id) },
           { key: 'report', label: 'Report', onPress: () => activePost && handleReport(activePost.id) },
           { key: 'block', label: 'Block user', onPress: () => activePost && handleBlockUser(activePost.author?.id) },
           { key: 'delete', label: 'Delete post', destructive: true, onPress: () => activePost && handleDelete(activePost.id) },
         ].filter((action) => action.key !== 'delete' || activePost?.id)}
       />
+
+      {editEndpoint && (
+        <FeedEditSheet
+          visible={editVisible}
+          post={editPost}
+          editEndpoint={editEndpoint}
+          onClose={() => { setEditVisible(false); setEditPost(null); }}
+          onUpdated={(updated) => handleEditUpdated(updated as Partial<T>)}
+        />
+      )}
 
     </View>
   );

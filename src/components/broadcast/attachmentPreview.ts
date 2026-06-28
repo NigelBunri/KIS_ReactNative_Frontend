@@ -64,6 +64,8 @@ export const getAttachmentPreviewInfo = (attachment: AttachmentSource): Attachme
   const thumbCandidate = pickFirst(source, [
     'thumbUrl',
     'thumb_url',
+    'thumbnail_url',
+    'thumbnailUrl',
     'thumbnail',
     'thumb',
     'preview_url',

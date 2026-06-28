@@ -48,6 +48,12 @@ type Props = {
   searchContext?: string;
   code?: string | null;
   onTrendingSeeAll?: () => void;
+  // Controlled filter props — passed from BroadcastScreen via the filter panel
+  activeCategory?: FeedCategory;
+  onCategoryChange?: (cat: FeedCategory) => void;
+  filterSort?: 'new' | 'top' | 'oldest';
+  filterDatePreset?: 'today' | 'week' | 'month' | 'all';
+  filterDuration?: 'short' | 'medium' | 'long' | 'any';
 };
 
 export default function FeedsDiscoverPage({
@@ -55,17 +61,28 @@ export default function FeedsDiscoverPage({
   searchContext = '',
   code = null,
   onTrendingSeeAll,
+  activeCategory: activeCategoryProp,
+  onCategoryChange,
+  filterSort: filterSortProp,
+  filterDatePreset: filterDatePresetProp,
+  filterDuration: filterDurationProp,
 }: Props) {
   const { palette } = useKISTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<FeedCategory>('for_you');
+  // Use controlled props when provided, else fall back to local state
+  const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
+  const activeCategory = activeCategoryProp ?? activeCategoryLocal;
+  const setActiveCategory = (cat: FeedCategory) => {
+    setActiveCategoryLocal(cat);
+    onCategoryChange?.(cat);
+  };
   const [playlistSheetItem, setPlaylistSheetItem] = useState<BroadcastFeedItem | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterSort, setFilterSort] = useState<'new' | 'top' | 'oldest'>('new');
-  const [filterDatePreset, setFilterDatePreset] = useState<'today' | 'week' | 'month' | 'all'>('all');
-  const [filterDuration, setFilterDuration] = useState<'short' | 'medium' | 'long' | 'any'>('any');
+  // Filter state — controlled from parent when props are provided
+  const filterSort = filterSortProp ?? 'new';
+  const filterDatePreset = filterDatePresetProp ?? 'all';
+  const filterDuration = filterDurationProp ?? 'any';
   const [playlistCount, setPlaylistCount] = useState(
     () => getPlaylistsState().playlists.length,
   );
@@ -448,159 +465,72 @@ export default function FeedsDiscoverPage({
       }}
       scrollEventThrottle={16}
     >
-      {/* Quick-access rows */}
-      <View style={styles.quickAccessRow}>
-        <Pressable
-          onPress={() => navigation.navigate('PlaylistList')}
-          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+      {/* Active-filter chip strip — shows which filters are active so the user
+          can see at a glance without opening the filter panel */}
+      {(activeCategory !== 'for_you' || filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 4, gap: 6, paddingBottom: 4 }}
+          style={{ flexShrink: 0, marginBottom: 4 }}
         >
-          <KISIcon name="list" size={14} color={palette.primaryStrong} />
-          <Text style={[styles.quickBtnText, { color: palette.text }]}>Playlists</Text>
-          {playlistCount > 0 && (
-            <View style={[styles.playlistsBadge, { backgroundColor: palette.primaryStrong }]}>
-              <Text style={[styles.playlistsBadgeText, { color: palette.surface }]}>{playlistCount}</Text>
+          {activeCategory !== 'for_you' && (
+            <View style={[styles.activeChip, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}>
+              <Text style={[styles.activeChipText, { color: palette.primaryStrong }]}>
+                {CATEGORIES.find(c => c.id === activeCategory)?.label ?? activeCategory}
+              </Text>
             </View>
           )}
-        </Pressable>
-
-        <Pressable
-          onPress={() => navigation.navigate('WatchHistory')}
-          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-        >
-          <KISIcon name="play" size={14} color={palette.primaryStrong} />
-          <Text style={[styles.quickBtnText, { color: palette.text }]}>History</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => navigation.navigate('ShortsScreen')}
-          style={[styles.quickBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-        >
-          <KISIcon name="play" size={14} color={palette.primaryStrong} />
-          <Text style={[styles.quickBtnText, { color: palette.text }]}>Shorts</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setFilterOpen(true)}
-          style={[styles.quickBtn, { backgroundColor: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primarySoft : palette.surface, borderColor: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.border }]}
-        >
-          <KISIcon name="filter" size={14} color={(filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.subtext} />
-          <Text style={[styles.quickBtnText, { color: (filterSort !== 'new' || filterDatePreset !== 'all' || filterDuration !== 'any') ? palette.primaryStrong : palette.text }]}>Filter</Text>
-        </Pressable>
-      </View>
-
-      {/* Filter sheet modal */}
-      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={[styles.filterOverlay, { backgroundColor: palette.backdrop }]} onPress={() => setFilterOpen(false)}>
-          <View style={[styles.filterSheet, { backgroundColor: palette.surface }]}>
-            <Text style={[styles.filterTitle, { color: palette.text }]}>Sort & Filter</Text>
-
-            <Text style={[styles.filterLabel, { color: palette.subtext }]}>Sort by</Text>
-            <View style={styles.filterPills}>
-              {(['new', 'top', 'oldest'] as const).map(opt => (
-                <Pressable
-                  key={opt}
-                  onPress={() => setFilterSort(opt)}
-                  style={[styles.filterPill, { backgroundColor: filterSort === opt ? palette.primaryStrong : palette.bg, borderColor: filterSort === opt ? palette.primaryStrong : palette.border }]}
-                >
-                  <Text style={[styles.filterPillText, { color: filterSort === opt ? palette.surface : palette.text }]}>
-                    {opt === 'new' ? 'Newest' : opt === 'top' ? 'Top' : 'Oldest'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={[styles.filterLabel, { color: palette.subtext, marginTop: 16 }]}>Date range</Text>
-            <View style={styles.filterPills}>
-              {([
-                { id: 'today', label: 'Today' },
-                { id: 'week', label: 'This week' },
-                { id: 'month', label: 'This month' },
-                { id: 'all', label: 'All time' },
-              ] as const).map(opt => (
-                <Pressable
-                  key={opt.id}
-                  onPress={() => setFilterDatePreset(opt.id)}
-                  style={[styles.filterPill, { backgroundColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.bg, borderColor: filterDatePreset === opt.id ? palette.primaryStrong : palette.border }]}
-                >
-                  <Text style={[styles.filterPillText, { color: filterDatePreset === opt.id ? palette.surface : palette.text }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={[styles.filterLabel, { color: palette.subtext, marginTop: 16 }]}>Duration</Text>
-            <View style={styles.filterPills}>
-              {([
-                { id: 'short', label: 'Short (<4m)' },
-                { id: 'medium', label: 'Medium (4-20m)' },
-                { id: 'long', label: 'Long (>20m)' },
-                { id: 'any', label: 'Any' },
-              ] as const).map(opt => (
-                <Pressable
-                  key={opt.id}
-                  onPress={() => setFilterDuration(opt.id)}
-                  style={[styles.filterPill, { backgroundColor: filterDuration === opt.id ? palette.primaryStrong : palette.bg, borderColor: filterDuration === opt.id ? palette.primaryStrong : palette.border }]}
-                >
-                  <Text style={[styles.filterPillText, { color: filterDuration === opt.id ? palette.surface : palette.text }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable
-              onPress={() => setFilterOpen(false)}
-              style={[styles.filterPill, { marginTop: 20, alignSelf: 'center', backgroundColor: palette.text, borderColor: palette.text }]}
-            >
-              <Text style={[styles.filterPillText, { color: palette.surface }]}>Apply</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Category filter tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRow}
-        style={{ flexShrink: 0 }}
-      >
-        {CATEGORIES.map(cat => {
-          const active = !showTrendingOnly && activeCategory === cat.id;
-          return (
-            <Pressable
-              key={cat.id}
-              onPress={() => {
-                setShowTrendingOnly(false);
-                setActiveCategory(cat.id);
-              }}
-              style={({ pressed }) => [
-                styles.categoryPill,
-                {
-                  backgroundColor: active ? (palette.goldHighlight) : palette.surface,
-                  borderColor: active ? (palette.gold) : palette.divider,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryLabel,
-                  { color: active ? (palette.royalInk) : palette.text },
-                ]}
-              >
-                {cat.label}
+          {filterSort !== 'new' && (
+            <View style={[styles.activeChip, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}>
+              <Text style={[styles.activeChipText, { color: palette.primaryStrong }]}>
+                {filterSort === 'top' ? 'Top' : 'Oldest'}
               </Text>
-              {cat.id === 'live' && liveItems.length > 0 && (
-                <View style={[styles.liveDot, { backgroundColor: palette.danger }]} />
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+            </View>
+          )}
+          {filterDatePreset !== 'all' && (
+            <View style={[styles.activeChip, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}>
+              <Text style={[styles.activeChipText, { color: palette.primaryStrong }]}>
+                {filterDatePreset === 'today' ? 'Today' : filterDatePreset === 'week' ? 'This week' : 'This month'}
+              </Text>
+            </View>
+          )}
+          {filterDuration !== 'any' && (
+            <View style={[styles.activeChip, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}>
+              <Text style={[styles.activeChipText, { color: palette.primaryStrong }]}>
+                {filterDuration === 'short' ? 'Short' : filterDuration === 'medium' ? 'Medium' : 'Long'}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       <View style={{ paddingHorizontal: 12, gap: 12 }}>
+        {/* Feed settings row — quick access to blocked users management */}
+        <Pressable
+          onPress={() => navigation.navigate('BlockedContacts')}
+          style={({ pressed }) => [
+            styles.blockedRow,
+            {
+              backgroundColor: pressed ? palette.primarySoft : palette.surface,
+              borderColor: palette.divider,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.blockedRowIcon,
+              { borderColor: palette.divider, backgroundColor: palette.card },
+            ]}
+          >
+            <KISIcon name="shield" size={16} color={palette.primaryStrong} />
+          </View>
+          <Text style={[styles.blockedRowText, { color: palette.text }]}>
+            Manage blocked users
+          </Text>
+          <KISIcon name="chevron-right" size={14} color={palette.subtext} />
+        </Pressable>
+
         {/* Live items banner */}
         {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
           <Pressable
@@ -760,6 +690,39 @@ const styles = StyleSheet.create({
   },
   quickBtnText: {
     fontSize: 12,
+    fontWeight: '700',
+  },
+  activeChip: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  blockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 44,
+  },
+  blockedRowIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  blockedRowText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  activeChipText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   filterOverlay: {

@@ -128,6 +128,14 @@ export default function GlobalSearchScreen() {
           });
           break;
 
+        case 'verification':
+          // Navigate to the target's profile which shows their verification badge
+          navigation.navigate('ViewProfile', {
+            userId: id,
+            displayName: String(meta.display_name ?? meta.name ?? result.title ?? ''),
+          });
+          break;
+
         default:
           // Graceful fallback: if the result has a conversation, open it as chat
           if (meta.conversationId || meta.conversation_id) {

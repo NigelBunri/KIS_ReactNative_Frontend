@@ -104,6 +104,23 @@
   <key>NSFaceIDUsageDescription</key>
   <string>KIS uses Face ID to securely authenticate you.</string>
 
+  <!-- Background execution modes -->
+  <!-- voip     → CallKit native call screen + PushKit wakeup for incoming calls -->
+  <!-- audio    → react-native-incall-manager / WebRTC audio while backgrounded  -->
+  <!-- fetch    → periodic sync while backgrounded                                -->
+  <!-- remote-notification → silent FCM push to wake the app                     -->
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>voip</string>
+    <string>audio</string>
+    <string>fetch</string>
+    <string>remote-notification</string>
+  </array>
+
+  <!-- PushKit / CallKit: required description (App Store review) -->
+  <key>NSUserNotificationUsageDescription</key>
+  <string>KIS uses notifications to alert you of incoming calls and messages.</string>
+
   <!-- React Native -->
   <key>RCTNewArchEnabled</key>
   <true/>

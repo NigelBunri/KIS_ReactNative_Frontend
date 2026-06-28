@@ -27,6 +27,7 @@ import {
 } from '@react-navigation/material-top-tabs';
 import { useKISTheme } from '../../theme/useTheme';
 import { KIS_ROYAL_GRADIENTS, KIS_TOKENS } from '../../theme/constants';
+import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
 import { KISIcon } from '@/constants/kisIcons';
@@ -1819,7 +1820,16 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   } as const;
 
   const messageTopPanelBg = tone === 'dark' ? palette.goldDeep : palette.royalInk;
-  const messageGoldGradient: readonly string[] = headerGradient ?? [...KIS_ROYAL_GRADIENTS.goldDark];
+
+  // goldHeader starts with bright gold so the transparent status bar shows the
+  // app's gold theme, not a dark void. The diagonal direction keeps the luxury
+  // depth effect in the visible header below the status bar.
+  const messageGoldGradient: readonly string[] = headerGradient ?? [...KIS_ROYAL_GRADIENTS.goldHeader];
+
+  // Gold header → always use dark icons for readability (push/pop so other
+  // screens' bar styles are unaffected when navigating away).
+  useStatusBarStyle(tone, 'dark-content');
+
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <LinearGradient

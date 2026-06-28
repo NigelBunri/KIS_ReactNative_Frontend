@@ -94,7 +94,7 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
 
   const prependItem = useCallback((incoming: BroadcastItem) => {
     setItems(prev => {
-      if (prev.some(item => item.id === incoming.id)) return prev;
+      if (prev.some(item => String(item.id) === String(incoming.id))) return prev;
       return [incoming, ...prev];
     });
   }, []);
@@ -178,8 +178,8 @@ export const useBroadcastFeed = (): UseBroadcastFeedResult => {
           const seen = new Set<string>();
           const deduped: BroadcastItem[] = [];
           for (const item of merged) {
-            if (seen.has(item.id)) continue;
-            seen.add(item.id);
+            if (seen.has(String(item.id))) continue;
+            seen.add(String(item.id));
             deduped.push(item);
           }
           return deduped;

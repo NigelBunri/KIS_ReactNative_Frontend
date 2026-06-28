@@ -72,35 +72,44 @@ export default function SeasonsBrowserScreen() {
   const [reachedOutSeasonIds, setReachedOutSeasonIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     const params: Record<string, string> = {};
     if (selectedCategory) params.category = selectedCategory;
 
-    const [seasonsRes, reachRes] = await Promise.allSettled([
-      getRequest(ROUTES.testimony.seasons, { params }),
-      getRequest(ROUTES.testimony.reach),
-    ]);
+    try {
+      const [seasonsRes, reachRes] = await Promise.allSettled([
+        getRequest(ROUTES.testimony.seasons, { params }),
+        getRequest(ROUTES.testimony.reach),
+      ]);
 
-    if (seasonsRes.status === 'fulfilled' && seasonsRes.value?.success) {
-      const data = seasonsRes.value.data;
-      const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-      setSeasons(list.filter((s: any) => s?.is_active !== false));
+      if (seasonsRes.status === 'fulfilled' && seasonsRes.value?.success) {
+        const data = seasonsRes.value.data;
+        const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        setSeasons(list.filter((s: any) => s?.is_active !== false));
+      } else if (seasonsRes.status === 'rejected') {
+        setLoadError('Unable to load testimony seasons. Check your connection and try again.');
+      }
+      if (reachRes.status === 'fulfilled' && reachRes.value?.success) {
+        const data = reachRes.value.data;
+        const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        const ids = new Set<string>(
+          list
+            .filter((r: any) => String(r?.from_user?.id) === currentUserId)
+            .map((r: any) => String(r?.season?.id ?? r?.season_id ?? '')),
+        );
+        setReachedOutSeasonIds(ids);
+      }
+    } catch {
+      setLoadError('Unable to load testimony seasons. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    if (reachRes.status === 'fulfilled' && reachRes.value?.success) {
-      const data = reachRes.value.data;
-      const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-      const ids = new Set<string>(
-        list
-          .filter((r: any) => String(r?.from_user?.id) === currentUserId)
-          .map((r: any) => String(r?.season?.id ?? r?.season_id ?? '')),
-      );
-      setReachedOutSeasonIds(ids);
-    }
-    setLoading(false);
   }, [selectedCategory, currentUserId]);
 
   useEffect(() => {
@@ -220,6 +229,17 @@ export default function SeasonsBrowserScreen() {
       {loading && seasons.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={palette.primary} />
+        </View>
+      ) : loadError ? (
+        <View style={[styles.emptyState, { flex: 1 }]}>
+          <Text style={{ fontSize: 32 }}>⚠️</Text>
+          <Text style={[styles.emptyText, { color: palette.danger }]}>{loadError}</Text>
+          <Pressable
+            onPress={() => void loadData()}
+            style={{ marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

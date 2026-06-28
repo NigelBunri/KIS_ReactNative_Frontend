@@ -9,11 +9,13 @@ import React, {
 import {
   Alert,
   Animated,
+  DeviceEventEmitter,
   Easing,
   Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableWithoutFeedback,
   View,
   useWindowDimensions,
@@ -37,6 +39,16 @@ import ParticipantsSheet from './components/ParticipantsSheet';
 import CallTimer from './components/CallTimer';
 import NetworkQualityBars from './components/NetworkQualityBars';
 import NetworkQualityBanner from './components/NetworkQualityBanner';
+import WaitingRoomPanel from './components/WaitingRoomPanel';
+import InviteLinkCard from './components/InviteLinkCard';
+import CaptionOverlay from './components/CaptionOverlay';
+import InCallPollSheet from './components/InCallPollSheet';
+import InCallQASheet from './components/InCallQASheet';
+import BreakoutRoomsSheet from './components/BreakoutRoomsSheet';
+import VirtualBackgroundSheet, { type VirtualBgOption, VirtualBgPreview } from './components/VirtualBackgroundSheet';
+import { useVirtualBg } from '@/services/calls/virtualBgService';
+import RtmpSheet from './components/RtmpSheet';
+import InCallWhiteboardSheet from './components/InCallWhiteboardSheet';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 
@@ -44,6 +56,7 @@ const CONTROLS_HIDE_AFTER = 4000;
 
 type CallActions = {
   onEnd: () => void;
+  onMinimize?: () => void;
   onDismiss?: () => void;
   onToggleMute: () => void;
   onToggleVideo: () => void;
@@ -58,6 +71,32 @@ type CallActions = {
   onRemoveParticipant?: (userId: string) => void;
   onToggleScreenShare?: () => void;
   onAddParticipant?: () => void;
+  onToggleNoiseCancellation?: () => void;
+  onChatOpenChange?: (open: boolean) => void;
+  onAdmitKnocker?: (userId: string) => void;
+  onDenyKnocker?: (userId: string) => void;
+  onPromoteParticipant?: (userId: string, role: string) => void;
+  onToggleCaptions?: () => void;
+  onSendCaption?: (text: string) => void;
+  onSelectVirtualBg?: (opt: VirtualBgOption) => void;
+  onToggleRecording?: () => void;
+  onCreatePoll?: (question: string, options: string[]) => void;
+  onVotePoll?: (pollId: string, option: string) => void;
+  onClosePoll?: (pollId: string) => void;
+  onSubmitQuestion?: (text: string, anonymous: boolean) => void;
+  onDismissQuestion?: (questionId: string) => void;
+  onMarkAnswered?: (questionId: string) => void;
+  onCreateBreakoutRooms?: (rooms: { name: string; userIds: string[] }[]) => void;
+  onReturnToMainRoom?: () => void;
+  onCloseBreakoutRooms?: () => void;
+  onStartRtmp?: (url: string) => void;
+  onStopRtmp?: () => void;
+  onWbStroke?: (stroke: any) => void;
+  onWbUndo?: (strokeId: string) => void;
+  onWbClear?: () => void;
+  onWbCursor?: (x: number, y: number) => void;
+  /** Fetch/generate invite link for the current call — works for all call types. */
+  onGetInviteLink?: () => Promise<string | null>;
 };
 
 type Props = {
@@ -74,6 +113,27 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const [showChat, setShowChat] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showInviteLink, setShowInviteLink] = useState(false);
+  const [fetchingInviteLink, setFetchingInviteLink] = useState(false);
+  const [resolvedInviteLink, setResolvedInviteLink] = useState<string | null>(null);
+  const [showPolls, setShowPolls] = useState(false);
+  const [showQA, setShowQA] = useState(false);
+  const [showBreakout, setShowBreakout] = useState(false);
+  const [showVirtualBg, setShowVirtualBg] = useState(false);
+  const [showRtmp, setShowRtmp] = useState(false);
+  const [showWhiteboard, setShowWhiteboard] = useState(false);
+  const [captionSending, setCaptionSending] = useState(false);
+  // Keep captionSending in sync with captionsEnabled — if captions get toggled off externally, stop sending
+  useEffect(() => {
+    if (!session?.captionsEnabled) setCaptionSending(false);
+  }, [session?.captionsEnabled]);
+  const [virtualBg, setVirtualBg] = useState<VirtualBgOption>({ id: 'none', mode: 'none', label: 'None' });
+  // Self-preview ref for virtual background capture
+  const selfPreviewRef = useRef<any>(null);
+  const { frameUri, setConfig: setVbConfig } = useVirtualBg(selfPreviewRef);
+  const [addParticipantInput, setAddParticipantInput] = useState('');
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const addParticipantCb = useRef<((userIds: string[]) => void) | null>(null);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -90,6 +150,17 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     selfPanY.flattenOffset();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // only on mount
+
+  // Android: listen for add-participant request emitted from SocketProvider
+  useEffect(() => {
+    if (Platform.OS === 'ios') return;
+    const sub = DeviceEventEmitter.addListener('call.add_participant.request', ({ inviteToCall }: { inviteToCall: (ids: string[]) => void }) => {
+      addParticipantCb.current = inviteToCall;
+      setAddParticipantInput('');
+      setShowAddParticipant(true);
+    });
+    return () => sub.remove();
+  }, []);
   const selfPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -187,10 +258,13 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       case 'flip': actions.onFlipCamera(); break;
       case 'end': actions.onEnd(); break;
       case 'raise-hand': actions.onRaiseHand(); break;
-      case 'chat':
-        setShowChat(v => !v);
+      case 'chat': {
+        const next = !showChat;
+        setShowChat(next);
         setShowParticipants(false);
+        actions.onChatOpenChange?.(next);
         break;
+      }
       case 'participants':
         setShowParticipants(v => !v);
         setShowChat(false);
@@ -210,6 +284,52 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             [{ text: 'OK' }],
           );
         }
+        break;
+      case 'noise-cancel':
+        actions.onToggleNoiseCancellation?.();
+        break;
+      case 'invite-link':
+        if (resolvedInviteLink || session?.inviteLink) {
+          setShowInviteLink(true);
+        } else if (actions.onGetInviteLink && !fetchingInviteLink) {
+          setFetchingInviteLink(true);
+          actions.onGetInviteLink().then((link) => {
+            setFetchingInviteLink(false);
+            if (link) { setResolvedInviteLink(link); setShowInviteLink(true); }
+            else Alert.alert('Invite link', 'Could not generate an invite link. Please try again.');
+          }).catch(() => {
+            setFetchingInviteLink(false);
+            Alert.alert('Invite link', 'Could not generate an invite link. Please try again.');
+          });
+        }
+        break;
+      case 'captions': {
+        const turningOn = !session?.captionsEnabled;
+        actions.onToggleCaptions?.();
+        // Only keep captionSending on when captions are being turned on
+        setCaptionSending(turningOn);
+        break;
+      }
+      case 'virtual-bg':
+        setShowVirtualBg(true);
+        break;
+      case 'record':
+        actions.onToggleRecording?.();
+        break;
+      case 'polls':
+        setShowPolls(v => !v);
+        break;
+      case 'qa':
+        setShowQA(v => !v);
+        break;
+      case 'breakout':
+        setShowBreakout(v => !v);
+        break;
+      case 'rtmp':
+        setShowRtmp(true);
+        break;
+      case 'whiteboard':
+        setShowWhiteboard(true);
         break;
     }
   }, [actions, session?.layout, revealControls]);
@@ -437,6 +557,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 selfPanX={selfPanX}
                 selfPanY={selfPanY}
                 selfPan={selfPan}
+                selfPreviewRef={selfPreviewRef}
+                virtualBgFrameUri={frameUri}
+                virtualBgOption={virtualBg}
                 styles={styles}
                 palette={palette}
               />
@@ -450,7 +573,6 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 pinnedUserId={session.pinnedUserId}
                 activeSpeakerId={session.activeSpeakerId}
                 isAudioOnly={!withVideo}
-                availableHeight={screenH}
                 onPinParticipant={actions.onPinParticipant}
               />
             )}
@@ -461,7 +583,6 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 participants={session.participants}
                 viewerCount={session.viewerCount ?? 0}
                 isRecording={session.isRecording ?? false}
-                availableHeight={screenH}
                 activeSpeakerId={session.activeSpeakerId}
                 liveStartedAt={session.liveStartedAt}
                 onPressParticipant={uid => actions.onPinParticipant(uid)}
@@ -475,7 +596,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         </TouchableWithoutFeedback>
 
         {/* ── Network Quality Banner ── */}
-        <NetworkQualityBanner quality={session.networkQuality} />
+        <NetworkQualityBanner quality={session.networkQuality} isAudioOnly={session.isAudioOnly} />
 
         {/* ── TOP HUD ── */}
         <Animated.View
@@ -483,6 +604,17 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           pointerEvents="box-none"
         >
           <View style={styles.topLeft}>
+            {actions.onMinimize && (
+              <Pressable
+                onPress={actions.onMinimize}
+                hitSlop={14}
+                accessibilityLabel="Minimise call"
+                accessibilityRole="button"
+                style={{ marginBottom: 2 }}
+              >
+                <KISIcon name="chevron-down" size={22} color={palette.ivory} />
+              </Pressable>
+            )}
             <Text style={styles.callTitle} numberOfLines={1}>{session.title}</Text>
             {isActive && (
               <CallTimer
@@ -521,6 +653,15 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           </View>
         </Animated.View>
 
+        {/* ── Waiting room (host sees knocking users) ── */}
+        {isHostOrCoHost && (session.knockingUsers?.length ?? 0) > 0 && (
+          <WaitingRoomPanel
+            knockingUsers={session.knockingUsers ?? []}
+            onAdmit={uid => actions.onAdmitKnocker?.(uid)}
+            onDeny={uid => actions.onDenyKnocker?.(uid)}
+          />
+        )}
+
         {/* ── BOTTOM: Controls ── */}
         <Animated.View style={{ opacity: controlsOpacity }}>
           <CallControls
@@ -530,6 +671,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             showReactionPicker={showReactionPicker}
             onToggleReactionPicker={() => setShowReactionPicker(v => !v)}
             unreadChat={session.unreadChatCount}
+            hasInviteLink={true}
           />
         </Animated.View>
 
@@ -550,9 +692,133 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           onMute={isHostOrCoHost ? actions.onMuteParticipant : undefined}
           onRemove={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
           onAddParticipant={isHostOrCoHost ? actions.onAddParticipant : undefined}
+          onPromote={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
         />
 
       </View>
+
+      {/* Invite link sheet */}
+      <InviteLinkCard
+        visible={showInviteLink}
+        inviteLink={resolvedInviteLink ?? session.inviteLink ?? `kis://call/join/${session.inviteToken ?? ''}`}
+        callTitle={session.title}
+        onClose={() => setShowInviteLink(false)}
+      />
+
+      {/* Caption overlay */}
+      {session.captionsEnabled && (
+        <CaptionOverlay
+          captions={session.captions ?? []}
+          isSending={captionSending}
+          onCaption={text => actions.onSendCaption?.(text)}
+          onToggleSend={() => setCaptionSending(v => !v)}
+        />
+      )}
+
+      {/* Polls sheet */}
+      <InCallPollSheet
+        visible={showPolls}
+        onClose={() => setShowPolls(false)}
+        polls={session.polls ?? []}
+        isHost={isHostOrCoHost}
+        localUserId={session.localUserId}
+        onCreatePoll={(q, opts) => actions.onCreatePoll?.(q, opts)}
+        onVote={(pollId, opt) => actions.onVotePoll?.(pollId, opt)}
+        onClosePoll={pollId => actions.onClosePoll?.(pollId)}
+      />
+
+      {/* Q&A sheet */}
+      <InCallQASheet
+        visible={showQA}
+        onClose={() => setShowQA(false)}
+        qaQueue={session.qaQueue ?? []}
+        isHost={isHostOrCoHost}
+        onSubmitQuestion={(text, anon) => actions.onSubmitQuestion?.(text, anon)}
+        onDismiss={id => actions.onDismissQuestion?.(id)}
+        onMarkAnswered={id => actions.onMarkAnswered?.(id)}
+      />
+
+      {/* Breakout rooms sheet */}
+      <BreakoutRoomsSheet
+        visible={showBreakout}
+        onClose={() => setShowBreakout(false)}
+        isHost={isHostOrCoHost}
+        participants={session.participants}
+        breakoutRooms={session.breakoutRooms ?? []}
+        myBreakoutRoomId={session.myBreakoutRoomId ?? null}
+        onCreateRooms={rooms => actions.onCreateBreakoutRooms?.(rooms)}
+        onReturnToMain={() => actions.onReturnToMainRoom?.()}
+        onCloseRooms={() => actions.onCloseBreakoutRooms?.()}
+      />
+
+      {/* Virtual background sheet */}
+      <VirtualBackgroundSheet
+        visible={showVirtualBg}
+        onClose={() => setShowVirtualBg(false)}
+        current={virtualBg}
+        nativeProcessorAvailable={false}
+        onSelect={opt => {
+          setVirtualBg(opt);
+          setVbConfig({ mode: opt.mode, blurRadius: opt.blurRadius, imageUri: opt.uri });
+          actions.onSelectVirtualBg?.(opt);
+        }}
+      />
+
+      {/* RTMP sheet (broadcast hosts only) */}
+      <RtmpSheet
+        visible={showRtmp}
+        onClose={() => setShowRtmp(false)}
+        rtmpActive={!!session.rtmpActive}
+        rtmpUrl={session.rtmpUrl ?? null}
+        onStart={url => actions.onStartRtmp?.(url)}
+        onStop={() => actions.onStopRtmp?.()}
+      />
+
+      {/* Whiteboard */}
+      <InCallWhiteboardSheet
+        visible={showWhiteboard}
+        onClose={() => setShowWhiteboard(false)}
+        strokes={session.whiteboardStrokes ?? []}
+        localUserId={session.localUserId}
+        isHost={isHostOrCoHost}
+        onStroke={stroke => actions.onWbStroke?.(stroke)}
+        onUndo={id => actions.onWbUndo?.(id)}
+        onClear={() => actions.onWbClear?.()}
+        onCursor={(x, y) => actions.onWbCursor?.(x, y)}
+      />
+
+      {/* Android: Add-participant input modal */}
+      <Modal visible={showAddParticipant} transparent animationType="fade" onRequestClose={() => setShowAddParticipant(false)}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 }}>
+          <View style={{ backgroundColor: '#1B1428', borderRadius: 16, padding: 20, width: '100%' }}>
+            <Text style={{ color: '#FFF4B8', fontSize: 16, fontWeight: '700', marginBottom: 12 }}>Add to Call</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: '#D9A875', borderRadius: 10, padding: 12, color: '#F7F1E3', fontSize: 15, marginBottom: 16 }}
+              placeholder="Enter username or user ID"
+              placeholderTextColor="#8A6557"
+              value={addParticipantInput}
+              onChangeText={setAddParticipantInput}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => setShowAddParticipant(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#D9A875' }}>
+                <Text style={{ color: '#D9A875', fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const uid = addParticipantInput.trim();
+                  if (uid && addParticipantCb.current) addParticipantCb.current([uid]);
+                  setShowAddParticipant(false);
+                }}
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: '#9A6A14' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Invite</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </Modal>
   );
 }
@@ -617,7 +883,7 @@ function SpeakingWave({ palette }: { palette: any }) {
 
 // ── Video 1:1 Layout ─────────────────────────────────────────────────────────
 
-function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan, styles, palette }: {
+function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan, selfPreviewRef, virtualBgFrameUri, virtualBgOption, styles, palette }: {
   session: CallSession;
   remoteParticipants: any[];
   isConnecting: boolean;
@@ -625,6 +891,9 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   selfPanX: Animated.Value;
   selfPanY: Animated.Value;
   selfPan: any;
+  selfPreviewRef?: React.RefObject<any>;
+  virtualBgFrameUri?: string | null;
+  virtualBgOption?: VirtualBgOption;
   styles: any;
   palette: any;
 }) {
@@ -672,19 +941,31 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
       {/* Self preview — draggable corner tile */}
       {localStream && RTCView && (
         <Animated.View
+          ref={selfPreviewRef}
           style={[
             styles.selfPreview,
             { left: selfPanX, top: selfPanY },
           ]}
           {...selfPan.panHandlers}
         >
-          <RTCView
-            streamURL={localStream.toURL()}
-            style={StyleSheet.absoluteFill}
-            objectFit="cover"
-            mirror
-            zOrder={2}
-          />
+          {/* Show processed virtual-bg frame, or raw stream */}
+          {virtualBgOption && virtualBgOption.mode !== 'none' && virtualBgFrameUri ? (
+            <VirtualBgPreview
+              frameUri={virtualBgFrameUri}
+              option={virtualBgOption}
+              width={92}
+              height={132}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : (
+            <RTCView
+              streamURL={localStream.toURL()}
+              style={StyleSheet.absoluteFill}
+              objectFit="cover"
+              mirror
+              zOrder={2}
+            />
+          )}
           {session.isMuted && (
             <View style={styles.selfMutedBadge}>
               <KISIcon name="mic-off" size={11} color={palette.danger} />

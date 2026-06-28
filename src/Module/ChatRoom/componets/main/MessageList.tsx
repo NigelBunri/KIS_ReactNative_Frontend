@@ -3,14 +3,13 @@ import React, {
   useCallback,
   useState,
   useEffect,
+  useMemo,
 } from 'react';
 import {
   View,
   Text,
   FlatList,
-  Image,
   Pressable,
-  Linking,
   Animated,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -20,6 +19,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { chatRoomStyles as styles } from '@/Module/ChatRoom/chatRoomStyles';
 import { ChatMessage } from '../../chatTypes';
 import { InteractiveMessageRow } from '../InteractiveMessageRow';
+import CallHistoryRow from '../CallHistoryRow';
+import type { CallHistoryEntry } from '../CallHistoryRow';
+
+type TimelineItem =
+  | { type: 'message'; message: ChatMessage; createdAt: string }
+  | { type: 'call'; call: CallHistoryEntry; createdAt: string };
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -68,6 +73,8 @@ type MessageListProps = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   isE2EE?: boolean;
+  callHistory?: CallHistoryEntry[];
+  onCallHistoryCallback?: (entry: CallHistoryEntry) => void;
 };
 
 
@@ -104,8 +111,53 @@ export const MessageList: React.FC<MessageListProps> = ({
   participantMap,
   participantAvatarMap,
   isE2EE = false,
+  callHistory = [],
+  onCallHistoryCallback,
 }) => {
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlatList<TimelineItem>>(null);
+  const timelineItems = useMemo<TimelineItem[]>(() => {
+    // Separate call_event messages from regular messages so they render as call rows.
+    const regularMessages: TimelineItem[] = [];
+    const inlineCallItems: TimelineItem[] = [];
+
+    for (const message of messages) {
+      if (message.kind === 'call_event' && message.callEvent) {
+        const ce = message.callEvent;
+        inlineCallItems.push({
+          type: 'call',
+          call: {
+            callId: ce.callId,
+            conversationId: message.conversationId ?? '',
+            callType: ce.callType ?? 'voice',
+            status: ce.status ?? 'completed',
+            startedAt: message.createdAt,
+            endedAt: message.createdAt,
+            duration: ce.duration ?? null,
+            participantCount: ce.participantCount,
+            createdBy: ce.initiatedBy ?? message.senderId ?? '',
+          } as CallHistoryEntry,
+          createdAt: message.createdAt,
+        });
+      } else {
+        regularMessages.push({ type: 'message', message, createdAt: message.createdAt });
+      }
+    }
+
+    // callHistory prop holds entries fetched from the server separately; merge and
+    // deduplicate by callId so a call never appears twice.
+    const seenCallIds = new Set(inlineCallItems.map((i) => (i as any).call.callId));
+    const legacyCallItems: TimelineItem[] = callHistory
+      .filter((c) => !seenCallIds.has(c.callId))
+      .map((call) => ({ type: 'call', call, createdAt: call.startedAt }));
+
+    return [...regularMessages, ...inlineCallItems, ...legacyCallItems].sort((a, b) => {
+      const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      const aKey = a.type === 'message' ? a.message.id : a.call.callId;
+      const bKey = b.type === 'message' ? b.message.id : b.call.callId;
+      return String(aKey).localeCompare(String(bKey));
+    });
+  }, [messages, callHistory]);
 
   const [highlightedMessageId, setHighlightedMessageId] = useState<
     string | null
@@ -127,17 +179,13 @@ export const MessageList: React.FC<MessageListProps> = ({
     minimumViewTime: 150,
   });
   const onViewableItemsChangedRef = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: ChatMessage }> }) => {
+    ({ viewableItems }: { viewableItems: Array<{ item: TimelineItem }> }) => {
       if (!onVisibleMessageIds) return;
       const ids = viewableItems
         .map((entry) => {
-          const item: any = entry.item;
-          return (
-            item?.serverId ??
-            item?.id ??
-            item?.clientId ??
-            null
-          );
+          if (entry.item.type !== 'message') return null;
+          const item = entry.item.message;
+          return item.serverId ?? item.id ?? item.clientId ?? null;
         })
         .filter(Boolean)
         .map((id) => String(id));
@@ -184,13 +232,14 @@ export const MessageList: React.FC<MessageListProps> = ({
     onViewableItemsChangedRef.current = ({
       viewableItems,
     }: {
-      viewableItems: Array<{ item: ChatMessage }>;
+      viewableItems: Array<{ item: TimelineItem }>;
     }) => {
       if (!onVisibleMessageIds) return;
       const ids = viewableItems
         .map((entry) => {
-          const item: any = entry.item;
-          return item?.serverId ?? item?.id ?? item?.clientId ?? null;
+          if (entry.item.type !== 'message') return null;
+          const item = entry.item.message;
+          return item.serverId ?? item.id ?? item.clientId ?? null;
         })
         .filter(Boolean)
         .map((id) => String(id));
@@ -239,12 +288,15 @@ export const MessageList: React.FC<MessageListProps> = ({
   const scrollToMessage = useCallback(
     (messageId: string) => {
       if (!listRef.current) return;
-      const index = messages.findIndex(
-        (m) =>
+      const index = timelineItems.findIndex((entry) => {
+        if (entry.type !== 'message') return false;
+        const m = entry.message;
+        return (
           m.id === messageId ||
-          (m as any).serverId === messageId ||
-          (m as any).clientId === messageId,
-      );
+          m.serverId === messageId ||
+          m.clientId === messageId
+        );
+      });
       if (index < 0) return;
 
       try {
@@ -271,7 +323,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         }, 800);
       }
     },
-    [messages],
+    [timelineItems],
   );
 
   const highlightMessage = useCallback((messageId: string) => {
@@ -361,8 +413,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     <View style={{ flex: 1 }}>
       <FlatList
         ref={listRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
+        data={timelineItems}
+        keyExtractor={(item) =>
+          item.type === 'message' ? `message:${item.message.id}` : `call:${item.call.callId}`
+        }
         style={styles.messagesList}
         contentContainerStyle={styles.messagesListContent}
         ListHeaderComponent={E2EEBanner}
@@ -381,10 +435,48 @@ export const MessageList: React.FC<MessageListProps> = ({
             animated: true,
           });
         }}
-        renderItem={({ item, index }) => {
-          const previous = messages[index - 1];
-          const next = messages[index + 1];
-          const showTimestampHeader = shouldShowTimestampHeader(previous, item);
+        renderItem={({ item: timelineItem, index }) => {
+          const previousTimelineItem = timelineItems[index - 1];
+          const showTimestampHeader = shouldShowTimestampHeader(
+            previousTimelineItem?.createdAt,
+            timelineItem.createdAt,
+          );
+
+          if (timelineItem.type === 'call') {
+            return (
+              <View>
+                {showTimestampHeader && (
+                  <View style={styles.timestampHeaderContainer}>
+                    <Text
+                      style={[
+                        styles.timestampHeaderText,
+                        {
+                          backgroundColor: palette.timestampBg ?? '#00000033',
+                          color: palette.onTimestamp ?? '#fff',
+                        },
+                      ]}
+                    >
+                      {formatDayLabel(timelineItem.createdAt)}
+                    </Text>
+                  </View>
+                )}
+                <CallHistoryRow
+                  entry={timelineItem.call}
+                  currentUserId={String(currentUserId ?? '')}
+                  onCallBack={onCallHistoryCallback}
+                />
+              </View>
+            );
+          }
+
+          const item = timelineItem.message;
+          const previous = previousTimelineItem?.type === 'message'
+            ? previousTimelineItem.message
+            : undefined;
+          const nextTimelineItem = timelineItems[index + 1];
+          const next = nextTimelineItem?.type === 'message'
+            ? nextTimelineItem.message
+            : undefined;
 
           const prevSender = previous?.senderId;
           const nextSender = next?.senderId;
@@ -407,7 +499,6 @@ export const MessageList: React.FC<MessageListProps> = ({
             (item as any).serverId === highlightedMessageId;
           const isSelected = selectedMessageIds.includes(item.id);
 
-          const attachments = (item as any).attachments ?? [];
 
           return (
             <View>
@@ -520,12 +611,12 @@ export const MessageList: React.FC<MessageListProps> = ({
 };
 
 const shouldShowTimestampHeader = (
-  prev: ChatMessage | undefined,
-  current: ChatMessage,
+  previousCreatedAt: string | undefined,
+  currentCreatedAt: string,
 ) => {
-  if (!prev) return true;
-  const prevDate = new Date(prev.createdAt);
-  const currDate = new Date(current.createdAt);
+  if (!previousCreatedAt) return true;
+  const prevDate = new Date(previousCreatedAt);
+  const currDate = new Date(currentCreatedAt);
 
   const prevDay = prevDate.toDateString();
   const currDay = currDate.toDateString();

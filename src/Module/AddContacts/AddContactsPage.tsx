@@ -858,7 +858,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
         </View>
 
         {/* Page 2: forms (add contact / group / community / channel / member select) */}
-        <View style={{ width: SCREEN_WIDTH }}>
+        <View style={{ width: SCREEN_WIDTH, flex: 1, backgroundColor: palette.bg }}>
           {/* Member selection: full FlatList to virtualize potentially large contact lists */}
           {(mode === 'selectGroupMembers' || mode === 'selectCommunityMembers') ? (
             <MemberSelectionList
@@ -871,11 +871,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             />
           ) : (
           <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: palette.bg }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
-              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16 }]}
+              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg }]}
               contentContainerStyle={{ paddingBottom: responsive.isWatch ? 20 : 32 }}
               keyboardShouldPersistTaps="handled"
             >

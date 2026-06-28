@@ -1,19 +1,60 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ─── Network ─────────────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- ─── Location ─────────────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- ─── Media / Camera / Microphone ─────────────────────────────────────── -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- ─── Contacts ─────────────────────────────────────────────────────────── -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+
+    <!-- ─── Notifications ────────────────────────────────────────────────────── -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Wake device for incoming call even on lock screen -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+
+    <!-- ─── Telephony / VoIP (react-native-callkeep ConnectionService) ──────── -->
+    <!-- READ_PHONE_STATE: required to read current call state                   -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- CALL_PHONE: required to initiate calls via ConnectionService            -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- MANAGE_OWN_CALLS: required to register a self-managed ConnectionService -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <!-- READ_PHONE_NUMBERS: used by callkeep to identify the local caller       -->
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+    <!-- USE_SIP: enables VoIP audio routing                                     -->
+    <uses-permission android:name="android.permission.USE_SIP" />
+
+    <!-- ─── Foreground services ──────────────────────────────────────────────── -->
+    <!-- FOREGROUND_SERVICE: general foreground service permission               -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- FOREGROUND_SERVICE_PHONE_CALL: Android 14+ for phone-call FG service   -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <!-- FOREGROUND_SERVICE_MICROPHONE: Android 14+ for mic in FG service       -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- FOREGROUND_SERVICE_CAMERA: Android 14+ for camera in FG service        -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <!-- ─── Boot (restore registered phone accounts after device reboot) ─────── -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
       android:name=".MainApplication"
@@ -24,6 +65,8 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+
+      <!-- ─── Main activity ──────────────────────────────────────────────────── -->
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
@@ -31,17 +74,22 @@
         android:launchMode="singleTask"
         android:screenOrientation="portrait"
         android:windowSoftInputMode="adjustResize"
+        android:showOnLockScreen="true"
+        android:turnScreenOn="true"
         android:exported="true">
+        <!-- Launcher -->
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Deep link: kis:// -->
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="kis" />
         </intent-filter>
+        <!-- Universal link: https://kis.app -->
         <intent-filter android:autoVerify="true">
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
@@ -49,5 +97,57 @@
             <data android:scheme="https" android:host="kis.app" />
         </intent-filter>
       </activity>
+
+      <!-- ─── react-native-callkeep: ConnectionService ──────────────────────── -->
+      <!-- Handles self-managed VoIP calls via the Android Telecom framework.    -->
+      <!-- Android shows a system call UI and routes audio through the framework.-->
+      <service
+        android:name="io.wazo.callkeep.VoiceConnectionService"
+        android:label="@string/app_name"
+        android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+        android:foregroundServiceType="phoneCall|microphone|camera"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.telecom.ConnectionService" />
+        </intent-filter>
+      </service>
+
+      <!-- react-native-callkeep: background receiver (handles missed calls, reboot) -->
+      <receiver
+        android:name="io.wazo.callkeep.RNCallKeepBackgroundMessagingService"
+        android:exported="false" />
+
+      <!-- Boot completed receiver: re-registers phone account after device reboot -->
+      <receiver
+        android:name="io.wazo.callkeep.RNCallKeepProviderReceiver"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+            <action android:name="android.intent.action.USER_UNLOCKED" />
+        </intent-filter>
+      </receiver>
+
+      <!-- ─── Firebase Cloud Messaging ──────────────────────────────────────── -->
+      <!-- Receives push notifications (incoming call alerts) when app is killed.-->
+      <!-- @react-native-firebase/messaging auto-registers via auto-linking,     -->
+      <!-- but the explicit declaration ensures Android resolves it correctly.   -->
+      <service
+        android:name="com.google.firebase.messaging.FirebaseMessagingService"
+        android:exported="false">
+        <intent-filter android:priority="-500">
+            <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent-filter>
+      </service>
+
+      <!-- ─── react-native-incall-manager ───────────────────────────────────── -->
+      <!-- Manages audio session routing during calls (speaker / earpiece).      -->
+      <receiver
+        android:name="com.zxcpoiu.incallmanager.InCallManagerBroadcastReceiver"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+        </intent-filter>
+      </receiver>
+
     </application>
 </manifest>

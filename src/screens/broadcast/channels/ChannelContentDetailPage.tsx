@@ -547,6 +547,7 @@ export default function ChannelContentDetailPage() {
   const [tipping, setTipping] = useState(false);
   const [selectedTipAmount, setSelectedTipAmount] = useState<number | null>(null);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [commentsModalVisible, setCommentsModalVisible] = useState(false);
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
@@ -899,7 +900,7 @@ export default function ChannelContentDetailPage() {
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
             <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} />
-            <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })} />
+            <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => setCommentsModalVisible(true)} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="call-history" label="Share at time" value="Timestamp" onPress={handleShareAtTimestamp} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
@@ -914,7 +915,27 @@ export default function ChannelContentDetailPage() {
           </View>
         </View>
 
-        <ChannelCommentsPanel contentId={content.id} onCountChange={count => setCounts(prev => ({ ...prev, comments: count }))} />
+        <Modal
+          visible={commentsModalVisible}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setCommentsModalVisible(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
+              <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: palette.text }}>Comments</Text>
+              <Pressable onPress={() => setCommentsModalVisible(false)} hitSlop={10}>
+                <KISIcon name="close" size={20} color={palette.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32 }}>
+              <ChannelCommentsPanel
+                contentId={content.id}
+                onCountChange={count => setCounts(prev => ({ ...prev, comments: count }))}
+              />
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         {relatedContent.length > 0 && (
           <View style={[styles.assetsBlock, { paddingHorizontal: responsive.pageGutter }]}>

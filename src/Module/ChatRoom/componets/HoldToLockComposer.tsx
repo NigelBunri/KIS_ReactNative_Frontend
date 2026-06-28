@@ -18,6 +18,7 @@ import AudioRecorderPlayer, {
   PlayBackType,
 } from 'react-native-audio-recorder-player';
 import { KISIcon } from '@/constants/kisIcons';
+import RNFS from 'react-native-fs';
 
 const audioRecorderPlayer = new AudioRecorderPlayer();
 audioRecorderPlayer.setSubscriptionDuration(0.09);
@@ -213,7 +214,8 @@ export const HoldToLockComposer: React.FC<Props> = ({
     startRecordingAnimations();
 
     try {
-      const uri = await audioRecorderPlayer.startRecorder();
+      const recordingPath = `${RNFS.CachesDirectoryPath}/kis-voice-${Date.now()}.m4a`;
+      const uri = await audioRecorderPlayer.startRecorder(`file://${recordingPath}`);
       if (cancelledRef.current) {
         // Finger was released before the recorder initialised
         try { await audioRecorderPlayer.stopRecorder(); } catch {}

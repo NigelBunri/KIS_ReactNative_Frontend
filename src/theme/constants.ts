@@ -38,34 +38,36 @@ export const KIS_COLORS = {
   // Base swatches per tone (kept compatible with existing keys)
   dark: {
     orange: '#9A6A14',
-    bg: '#09070D',
-    card: '#15101F',
-    text: '#F7F1E3',
-    subtext: '#C8BFD6',
-    inputBg: '#1B1428',
+    // Near-black with the faintest warm undertone — less purple than before,
+    // so content areas feel calm rather than atmospheric.
+    bg: '#0A090F',
+    card: '#111117',            // neutral dark, not purple-tinted
+    text: '#F0EBE1',            // softer cream — readable but less glaring
+    subtext: '#9E9AA8',         // neutral grey-purple, not lavender
+    inputBg: '#16141C',
     inputBorder: '#8A5A12',
-    divider: '#5E3B0A',
+    divider: '#242230',         // very subtle cool-dark divider, not amber
 
-    // New
-    chrome: '#07050B',          // outer app chrome/background
-    bar: '#120C1C',             // bars/strips like tab bar
-    shadow: 'rgba(0,0,0,0.92)', // iOS shadowColor fallback
+    chrome: '#07060C',
+    bar: '#0E0C14',
+    shadow: 'rgba(0,0,0,0.88)',
   },
 
   light: {
     orange: '#7A4B3E',
-    bg: '#FFFFFF',
-    card: '#FFFDF8',
-    text: '#4B2F2A',
-    subtext: '#8A6557',
-    inputBg: '#FFFDF8',
-    inputBorder: '#D9A875',
-    divider: '#E7C7A1',
+    // Soft warm neutral instead of stark white — easier on the eyes.
+    bg: '#F8F6F3',
+    card: '#F2EFE9',            // neutral warm cream, less yellow than before
+    text: '#2A2420',            // dark neutral brown, less red
+    subtext: '#706A64',         // neutral grey-brown, not warm-saturated
+    inputBg: '#F8F6F3',
+    inputBorder: '#C9A87A',     // slightly softened gold border
+    divider: '#DDD8D0',         // neutral warm grey, not amber
 
-    // Reference-inspired light mode: cream pages, coffee-brown controls, tan-gold accents.
-    chrome: '#F2D8B8',
-    bar: '#FFFFFF',
-    shadow: 'rgba(90,55,45,0.24)',
+    // Less orange chrome — warm neutral that doesn't compete with the gold headers.
+    chrome: '#EDE8E0',
+    bar: '#F8F6F3',
+    shadow: 'rgba(60,45,35,0.18)',
   },
 
   states: {
@@ -79,6 +81,9 @@ export const KIS_COLORS = {
 export const KIS_ROYAL_GRADIENTS = {
   goldLight: ['#FFF7C8', '#E6C66B', '#B9852E', '#70450D'],
   goldDark: ['#3F2506', '#6F4515', '#9A6A14', '#5E3B0A'],
+  // For screen headers that bleed behind the transparent status bar: gold at
+  // the top so the status bar area shows the app's gold theme, not a dark void.
+  goldHeader: ['#C9A24A', '#9A6A14', '#6F4515', '#3F2506'] as const,
   goldPressed: ['#6B4212', '#9A6A14', '#D6B15E', '#5E3B0A'],
   purpleLight: ['#EEE4FA', '#6E35B7', '#2A0F45'],
   purpleDark: ['#2A0F45', '#4B1D78', '#09070D'],
@@ -210,8 +215,8 @@ export const createPalette = (tone: KISTone): KISPalette => {
   const c = KIS_COLORS;
   const base = tone === 'dark' ? c.dark : c.light;
 
-  // sensible elevated default when not provided by swatches
-  const elevated = tone === 'dark' ? '#3c3847ff' : '#F4DDBD';
+  // Elevated surface — neutral, not purple-saturated in dark mode
+  const elevated = tone === 'dark' ? '#1C1A22' : '#EDE9E2';
 
   // KIS brand colors — same hex in both themes for fills and accents
   const coffeePrimary = '#7A4B3E';
@@ -309,9 +314,9 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
   return {
     // Core surfaces
-    bg: tone === 'dark' ? base.bg : '#FFFFFF',
+    bg: base.bg,
     surface: base.card,
-    surfaceElevated: tone === 'dark' ? elevated : '#FFF9EE',
+    surfaceElevated: elevated,
     overlay:
       tone === 'dark'
         ? 'rgba(0,0,0,0.5)'
@@ -359,9 +364,9 @@ export const createPalette = (tone: KISTone): KISPalette => {
     ivory: c.brand.ivory,
     parchment: c.brand.parchment,
     royalInk: c.brand.royalInk,
-    royalSurface: tone === 'dark' ? '#120C1C' : '#FFFFFF',
-    royalSurfaceAlt: tone === 'dark' ? '#1B1428' : lightRoyalCream,
-    royalPanel: tone === 'dark' ? '#211331' : lightRoyalPurple,
+    royalSurface: tone === 'dark' ? '#0F0D16' : '#F8F6F3',
+    royalSurfaceAlt: tone === 'dark' ? '#161320' : lightRoyalCream,
+    royalPanel: tone === 'dark' ? '#1A1226' : lightRoyalPurple,
     royalPanelText: tone === 'dark' ? c.brand.goldHighlight : '#FFFFFF',
     royalPanelSubtext: tone === 'dark' ? c.brand.goldSoft : '#F8F1E3',
     // goldReadable: tan-gold text on dark bg (9.5:1 contrast) — same color family as light theme

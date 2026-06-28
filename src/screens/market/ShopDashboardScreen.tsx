@@ -3054,6 +3054,28 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     }
   };
 
+  if (!shopId) {
+    return (
+      <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <KISIcon name="storefront-outline" size={64} color={palette.subtext} />
+          <Text style={{ fontSize: 22, fontWeight: '800', color: palette.text, marginTop: 16, textAlign: 'center' }}>
+            No Shop Found
+          </Text>
+          <Text style={{ fontSize: 15, color: palette.subtext, marginTop: 8, textAlign: 'center', lineHeight: 22 }}>
+            You don't have a shop yet. Create one from the Market section in your Profile to start selling.
+          </Text>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, backgroundColor: palette.primary }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 15 }}>Go Back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]}>
       <ScrollView contentContainerStyle={styles.scroll}>

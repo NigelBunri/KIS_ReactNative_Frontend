@@ -36,6 +36,7 @@ export default function PartnerFeedScreen({ partner, onBack }: PartnerFeedScreen
       reactEndpoint={(postId) => ROUTES.partners.postReact(postId)}
       commentRoomEndpoint={(postId) => ROUTES.partners.postCommentRoom(postId)}
       deleteEndpoint={(postId) => ROUTES.partners.postDelete(postId)}
+      editEndpoint={(postId) => ROUTES.partners.postUpdate(postId)}
       broadcastEndpoint={(postId) => ROUTES.partners.postBroadcast(postId)}
       feedType="partner"
       commentChatContext={() => ({

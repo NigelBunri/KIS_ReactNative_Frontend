@@ -9,6 +9,7 @@ import {
   refreshAccessToken,
 } from '@/security/tokenRefresh';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
+import { formatApiError } from '../formatApiError';
 
 const MAX_PATCH_RETRIES = 2;
 
@@ -108,10 +109,10 @@ export const patchRequest = async (
       return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
     }
 
-    const msg =
-      (responseData && (responseData.message || responseData.detail)) ||
-      options.errorMessage ||
-      'Request failed.';
+    const msg = formatApiError(
+      responseData,
+      options.errorMessage || 'Request failed.',
+    );
     return { success: false, message: msg, status: response.status, data: responseData };
   } catch (error: any) {
     return { success: false, message: error?.message || options.errorMessage || 'An error occurred.' };

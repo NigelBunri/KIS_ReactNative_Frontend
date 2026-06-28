@@ -1,10 +1,12 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, DeviceEventEmitter, PanResponder, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, DeviceEventEmitter, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
+import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
+import { KIS_ROYAL_GRADIENTS } from '../../theme/constants';
 import { useBibleData } from './bible/useBibleData';
 import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
@@ -17,7 +19,6 @@ import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
 import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
 import { KISIcon } from '../../constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
-import { MainTabPageHeader } from '@/components/common/MainTabScaffold';
 import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/ConsumerSpiritualRevenuePreviewCard';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 
@@ -46,11 +47,15 @@ export default function BibleScreen() {
     }
   }, [reloadBible]);
   const insets = useSafeAreaInsets();
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  // Gold header always needs dark icons (same as Broadcast + Messages)
+  useStatusBarStyle(tone, 'dark-content');
   const responsive = useResponsiveLayout();
   const compactBible = responsive.isWatch || responsive.isCompactPhone;
   const tinyBible = responsive.isWatch;
   const metallicGoldGradient = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
+  // The same gold header gradient used across Messages and Broadcast screens
+  const bibleGoldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
   const headerScrollY = useRef(new Animated.Value(0)).current;
@@ -237,132 +242,182 @@ export default function BibleScreen() {
     }
   };
 
-  return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingHorizontal: responsive.pageGutter, paddingTop: insets.top }]}>
-      <Animated.View
-        {...topAreaPanResponder.panHandlers}
-        style={[styles.topChrome, topChromeAnimatedStyle]}
-      >
-        <View
-          style={styles.topChromeMeasure}
-          onLayout={(event) => {
-            const nextHeight = event.nativeEvent.layout.height;
-            if (nextHeight > 0 && Math.abs(nextHeight - topChromeHeight) > 1) {
-              setTopChromeHeight(nextHeight);
-            }
-          }}
-        >
-          <MainTabPageHeader
-            eyebrow="Spiritual growth"
-            title="Bible"
-            subtitle="Read Scripture, follow daily passages, pray, learn, and keep your personal reading plans in one calm place."
-            secondaryAction={
-              activeTab === 'read' && openReadFilters
-                ? {
-                    label: 'Filters',
-                    icon: 'filter',
-                    onPress: openReadFilters,
-                  }
-                : undefined
-            }
-          />
+  const streak = spiritualGrowthSummary?.journey?.streak ?? 0;
 
-          <View
-            style={[
-              styles.growthCard,
-              {
-                backgroundColor: palette.surface,
-                borderColor: palette.goldLight,
-                shadowColor: palette.shadow,
-              },
-            ]}
-          >
-            <View style={styles.growthHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.growthTitle, { color: palette.text }]}>
-                  Spiritual journey
-                </Text>
-                <Text style={[styles.growthSubtitle, { color: palette.subtext }]}>
-                  Scripture, prayer, notes, plans, and safe discipleship in one flow.
-                </Text>
-              </View>
-              <LinearGradient
-                colors={metallicGoldGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.streakBadge}
-              >
-                <View pointerEvents="none" style={styles.goldSheen} />
-                <Text style={{ color: palette.ivory, fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
-                  {spiritualGrowthSummary?.journey?.streak ?? 0}
-                </Text>
-                <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
-                  DAY
-                </Text>
-              </LinearGradient>
+  return (
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          GOLD GRADIENT HEADER — same visual language as Messages + Broadcast
+          but tailored for Scripture / spiritual growth.
+          Curved bottom edge, luxury sheen, collapsing inner content.
+          ══════════════════════════════════════════════════════════════════════ */}
+      <LinearGradient
+        colors={bibleGoldGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.goldHeader}
+      >
+        {/* Luxury shimmer across the very top */}
+        <View style={styles.headerSheen} pointerEvents="none" />
+        {/* Soft radial halo in the top-right corner for depth */}
+        <View style={styles.headerHalo} />
+
+        {/* ── Always-visible header bar ─────────────────────────────────── */}
+        <View style={[styles.headerBar, { paddingTop: insets.top + (compactBible ? 10 : 16) }]}>
+          {/* Left: icon + eyebrow + title */}
+          <View style={styles.headerTitleGroup}>
+            <View style={styles.headerIconCircle}>
+              <Text style={{ fontSize: compactBible ? 18 : 22 }}>✝</Text>
             </View>
-            <View style={styles.growthStats}>
-              {[
-                { label: 'Notes', value: growthCounts.notes ?? 0 },
-                { label: 'Highlights', value: growthCounts.highlights ?? 0 },
-                { label: 'Plans', value: growthCounts.active_reading_plans ?? 0 },
-                { label: 'Missed', value: growthCounts.missed_reading_events ?? 0 },
-              ].map(item => (
-                <View
-                  key={item.label}
-                  style={[
-                    styles.growthStat,
-                    { backgroundColor: palette.card, borderColor: palette.goldLight },
-                  ]}
-                >
-                  <Text style={[styles.growthStatValue, { color: palette.text }]}>
-                    {item.value > 99 ? '99+' : item.value}
-                  </Text>
-                  <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>
-                    {item.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <View style={styles.growthSignals}>
-              {[
-                growthReadiness.family_safe_journey ? 'Family-safe' : 'Safety ready',
-                growthReadiness.low_bandwidth_ready ? 'Low-bandwidth' : 'Online-first',
-                growthReadiness.licensed_translations_ready ? 'Licensed text' : 'License review',
-                growthReadiness.study_courses_ready ? 'Study ready' : 'Study setup',
-              ].map(label => (
-                <View key={label} style={[styles.growthSignal, { borderColor: palette.goldLight }]}>
-                  <Text style={[styles.growthSignalText, { color: palette.text }]}>
-                    {label}
-                  </Text>
-                </View>
-              ))}
+            <View>
+              <Text style={[styles.headerEyebrow, { color: 'rgba(255,244,184,0.72)' }]}>
+                Spiritual growth
+              </Text>
+              <Text style={[styles.headerTitle, { color: palette.onGold, fontSize: compactBible ? 22 : 28 }]}>
+                Bible
+              </Text>
             </View>
           </View>
-          <ConsumerSpiritualRevenuePreviewCard
-            palette={palette}
-            kind="bible_home"
-            title="Bible and family growth preview"
-            subtitle="Consumer Plus and Family Plus are visible here for planning only; current Bible, prayer, meditation, and reading features stay available."
-          />
-          <NotificationRetentionPreviewCard
-            palette={palette}
-            kind="bible"
-            title="Spiritual reminder preview"
-            subtitle="Smarter reading, prayer, meditation, and family devotional reminders are preview-only."
-          />
-        </View>
-      </Animated.View>
 
-      <View
-        {...topAreaPanResponder.panHandlers}
-        style={[
-          styles.stickyTabsOuter,
-          { backgroundColor: palette.bg, paddingBottom: compactBible ? 0 : 2 },
-        ]}
-      >
-        <View style={[styles.tabsWrapper, { paddingVertical: compactBible ? 5 : 8 }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabRow, { gap: compactBible ? 6 : 8 }]}>
+          {/* Right: filter + settings only (streak is shown inside the collapsing section) */}
+          <View style={styles.headerActions}>
+            {/* Filter — only on Read tab */}
+            {activeTab === 'read' && openReadFilters ? (
+              <Pressable
+                onPress={openReadFilters}
+                style={[styles.headerIconBtn, { backgroundColor: 'rgba(23,17,31,0.28)', borderColor: 'rgba(255,244,184,0.30)' }]}
+                hitSlop={6}
+                accessibilityLabel="Filters"
+              >
+                <KISIcon name="filter" size={17} color={palette.onGold} />
+              </Pressable>
+            ) : null}
+
+            {/* Settings shortcut */}
+            <Pressable
+              onPress={() => setActiveTab('settings')}
+              style={[styles.headerIconBtn, {
+                backgroundColor: activeTab === 'settings' ? 'rgba(255,244,184,0.22)' : 'rgba(23,17,31,0.28)',
+                borderColor: 'rgba(255,244,184,0.30)',
+              }]}
+              hitSlop={6}
+              accessibilityLabel="Settings"
+            >
+              <KISIcon name="settings" size={17} color={palette.onGold} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* ── Collapsing section: subtitle + spiritual journey stats ────── */}
+        <Animated.View
+          {...topAreaPanResponder.panHandlers}
+          style={[styles.topChrome, topChromeAnimatedStyle]}
+        >
+          <View
+            style={styles.topChromeMeasure}
+            onLayout={(event) => {
+              const nextHeight = event.nativeEvent.layout.height;
+              if (nextHeight > 0 && Math.abs(nextHeight - topChromeHeight) > 1) {
+                setTopChromeHeight(nextHeight);
+              }
+            }}
+          >
+            {/* Brief subtitle */}
+            <Text style={[styles.headerSubtitle, { color: 'rgba(255,244,184,0.78)', paddingHorizontal: responsive.pageGutter }]}>
+              Read Scripture, pray, meditate, and track your spiritual reading journey.
+            </Text>
+
+            {/* Spiritual journey stats card */}
+            <View style={[styles.growthCard, { backgroundColor: 'rgba(23,17,31,0.35)', borderColor: 'rgba(255,244,184,0.22)', marginHorizontal: responsive.pageGutter }]}>
+              <View style={styles.growthHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.growthTitle, { color: palette.onGold }]}>
+                    Your journey
+                  </Text>
+                  <Text style={[styles.growthSubtitle, { color: 'rgba(255,244,184,0.68)' }]}>
+                    Scripture, prayer, notes, plans, and discipleship in one flow.
+                  </Text>
+                </View>
+                {/* Streak badge — visible in the collapsing section */}
+                <LinearGradient
+                  colors={metallicGoldGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.streakBadge}
+                >
+                  <View pointerEvents="none" style={styles.goldSheen} />
+                  <Text style={{ color: palette.ivory, fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
+                    {streak}
+                  </Text>
+                  <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
+                    DAY
+                  </Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.growthStats}>
+                {[
+                  { label: 'Notes', value: growthCounts.notes ?? 0, icon: '📝' },
+                  { label: 'Highlights', value: growthCounts.highlights ?? 0, icon: '✨' },
+                  { label: 'Plans', value: growthCounts.active_reading_plans ?? 0, icon: '📅' },
+                  { label: 'Missed', value: growthCounts.missed_reading_events ?? 0, icon: '⚠️' },
+                ].map(item => (
+                  <View
+                    key={item.label}
+                    style={[styles.growthStat, { backgroundColor: 'rgba(255,244,184,0.10)', borderColor: 'rgba(255,244,184,0.18)' }]}
+                  >
+                    <Text style={{ fontSize: 16, marginBottom: 2 }}>{item.icon}</Text>
+                    <Text style={[styles.growthStatValue, { color: palette.onGold }]}>
+                      {item.value > 99 ? '99+' : item.value}
+                    </Text>
+                    <Text style={[styles.growthStatLabel, { color: 'rgba(255,244,184,0.65)' }]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              {/* Readiness signals */}
+              <View style={styles.growthSignals}>
+                {[
+                  growthReadiness.family_safe_journey ? 'Family-safe ✓' : 'Safety pending',
+                  growthReadiness.low_bandwidth_ready ? 'Offline-ready ✓' : 'Online-first',
+                  growthReadiness.licensed_translations_ready ? 'Licensed ✓' : 'License review',
+                  growthReadiness.study_courses_ready ? 'Study-ready ✓' : 'Study setup',
+                ].map(label => (
+                  <View key={label} style={[styles.growthSignal, { borderColor: 'rgba(255,244,184,0.28)', backgroundColor: 'rgba(255,244,184,0.08)' }]}>
+                    <Text style={[styles.growthSignalText, { color: 'rgba(255,244,184,0.75)' }]}>
+                      {label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <ConsumerSpiritualRevenuePreviewCard
+              palette={palette}
+              kind="bible_home"
+              title="Bible and family growth preview"
+              subtitle="Consumer Plus and Family Plus are visible here for planning only; current Bible, prayer, meditation, and reading features stay available."
+            />
+            <NotificationRetentionPreviewCard
+              palette={palette}
+              kind="bible"
+              title="Spiritual reminder preview"
+              subtitle="Smarter reading, prayer, meditation, and family devotional reminders are preview-only."
+            />
+          </View>
+        </Animated.View>
+
+        {/* ── Tab bar — inside the gradient so it's part of the gold header ── */}
+        <View
+          {...topAreaPanResponder.panHandlers}
+          style={[styles.stickyTabsOuter, { paddingHorizontal: responsive.pageGutter }]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.tabRow, { gap: compactBible ? 6 : 8, paddingVertical: compactBible ? 8 : 10 }]}
+          >
             {tabs.map((tab) => {
               const isActive = tab.key === activeTab;
               return (
@@ -372,8 +427,8 @@ export default function BibleScreen() {
                   style={[
                     styles.tabChip,
                     {
-                      backgroundColor: isActive ? palette.goldDeep : palette.surface,
-                      borderColor: isActive ? palette.goldLight : palette.divider,
+                      backgroundColor: isActive ? 'rgba(255,244,184,0.22)' : 'rgba(23,17,31,0.30)',
+                      borderColor: isActive ? 'rgba(255,244,184,0.60)' : 'rgba(255,244,184,0.18)',
                       paddingHorizontal: compactBible ? 10 : 14,
                       paddingVertical: compactBible ? 7 : 8,
                       minHeight: tinyBible ? 30 : 34,
@@ -393,11 +448,11 @@ export default function BibleScreen() {
                     <KISIcon
                       name={tab.icon as any}
                       size={14}
-                      color={isActive ? palette.ivory : palette.subtext}
+                      color={isActive ? palette.ivory : 'rgba(255,244,184,0.65)'}
                     />
                     <Text
                       numberOfLines={1}
-                      style={{ color: isActive ? palette.ivory : palette.text, fontWeight: '800' }}
+                      style={{ color: isActive ? palette.ivory : 'rgba(255,244,184,0.80)', fontWeight: '800', fontSize: compactBible ? 11 : 13 }}
                     >
                       {tabLabelForDevice(tab.label, tab.key)}
                     </Text>
@@ -407,9 +462,10 @@ export default function BibleScreen() {
             })}
           </ScrollView>
         </View>
-      </View>
+      </LinearGradient>
 
-      <View style={styles.contentWrap}>
+      {/* ══ Content area ═══════════════════════════════════════════════════ */}
+      <View style={[styles.contentWrap, { marginTop: compactBible ? 8 : 12 }]}>
         {activeTab === 'read' ? (
           <View style={styles.readContent}>{renderTab()}</View>
         ) : (
@@ -433,74 +489,109 @@ export default function BibleScreen() {
           </Animated.ScrollView>
         )}
       </View>
-
-      {activeTab === 'read' && openReadFilters ? (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={openReadFilters}
-          style={[
-            styles.floatingFilter,
-            {
-              backgroundColor: palette.goldDeep,
-              width: compactBible ? 48 : 58,
-              height: compactBible ? 48 : 58,
-              borderRadius: compactBible ? 24 : 29,
-              right: responsive.pageGutter,
-              shadowColor: palette.shadow,
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={metallicGoldGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View pointerEvents="none" style={styles.goldSheen} />
-          <KISIcon name="filter" size={22} color={palette.ivory} />
-        </TouchableOpacity>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, paddingVertical: 16 },
+  // ── Root ───────────────────────────────────────────────────────────────────
+  wrap: { flex: 1 },
+
+  // ── Gold gradient header (the full top panel) ──────────────────────────────
+  goldHeader: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  headerSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#FFF4B8',
+    opacity: 0.45,
+  },
+  headerHalo: {
+    position: 'absolute',
+    top: -40,
+    right: -20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#C9A24A',
+    opacity: 0.14,
+  },
+
+  // ── Header bar row ─────────────────────────────────────────────────────────
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  headerTitleGroup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(23,17,31,0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,244,184,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  headerTitle: { fontWeight: '900', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 13, fontWeight: '600', lineHeight: 19, marginTop: 4, marginBottom: 10 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Streak badge (inside the collapsing section) ───────────────────────────
+  streakBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+
+  // ── Collapsing top chrome ──────────────────────────────────────────────────
   topChrome: { overflow: 'hidden' },
-  topChromeMeasure: { paddingBottom: 2 },
-  stickyTabsOuter: { zIndex: 10, paddingTop: 2, paddingBottom: 2 },
-  tabsWrapper: { paddingVertical: 8 },
-  tabRow: { gap: 8, paddingVertical: 4, alignItems: 'center' },
+  topChromeMeasure: { paddingBottom: 6 },
+
+  // ── Tab row (inside gradient) ──────────────────────────────────────────────
+  stickyTabsOuter: { paddingBottom: 12 },
+  tabRow: { alignItems: 'center' },
   tabChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
     borderRadius: 999,
     borderWidth: 1.5,
-    minHeight: 36,
+    minHeight: 34,
     justifyContent: 'center',
     overflow: 'hidden',
   },
   tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // ── Content area ───────────────────────────────────────────────────────────
   contentWrap: { flex: 1, minHeight: 0 },
   readContent: { flex: 1, minHeight: 0 },
   contentScroll: { flex: 1 },
   content: { paddingVertical: 16, gap: 16, paddingBottom: 40 },
-  floatingFilter: {
-    position: 'absolute',
-    right: 22,
-    bottom: 24,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOpacity: 0.22,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 14,
-    elevation: 8,
-    zIndex: 20,
-    overflow: 'hidden',
-  },
   growthCard: {
     borderWidth: 1.5,
     borderRadius: 20,
@@ -529,14 +620,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 17,
     marginTop: 2,
-  },
-  streakBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
   goldSheen: {
     ...StyleSheet.absoluteFillObject,

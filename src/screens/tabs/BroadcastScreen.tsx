@@ -4,15 +4,22 @@ import {
   PanResponder,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type {
@@ -117,7 +124,8 @@ export default function BroadcastScreen() {
   const insets = useSafeAreaInsets();
   const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
-  const broadcastGoldGradient = [...KIS_ROYAL_GRADIENTS.goldDark];
+  // goldHeader: gold-first so the transparent status bar shows gold, not dark.
+  const broadcastGoldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
@@ -133,6 +141,75 @@ export default function BroadcastScreen() {
   const [filterVisible, setFilterVisible] = useState(false);
   const [visionVisible, setVisionVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ── Scroll-driven animation ───────────────────────────────────────────────
+  // scrollY drives collapsing the Vision + Testimony banners as the user scrolls.
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: e => { scrollY.value = e.contentOffset.y; },
+  });
+  // (collapseDistance and fullHeaderHeight removed — animation uses fixed ANIM_END constant)
+
+  // ── Animated styles ───────────────────────────────────────────────────────
+  // ANIM_END = scroll distance at which the animation completes.
+  // This matches the approximate natural height of the vision + testimony
+  // content so animations finish just as those elements scroll off screen.
+  const ANIM_END = 160;
+
+  // Our Vision button fades + scales down as it scrolls toward the top.
+  const visionAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [20, ANIM_END * 0.7], [1, 0], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(scrollY.value, [20, ANIM_END * 0.7], [1, 0.88], Extrapolation.CLAMP) },
+      { translateY: interpolate(scrollY.value, [20, ANIM_END * 0.7], [0, -10], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  // Testimony banner — staggered ~10% after vision so they don't move in unison.
+  const testimonyAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [40, ANIM_END * 0.8], [1, 0], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(scrollY.value, [40, ANIM_END * 0.8], [1, 0.88], Extrapolation.CLAMP) },
+      { translateY: interpolate(scrollY.value, [40, ANIM_END * 0.8], [0, -8], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  // Mini testimony pill — appears in the search row as the banner scrolls off.
+  // Mini pills — WRAPPER animates from width:0 → 40 so the search bar is
+  // truly full-width when pills are hidden and shrinks in exact sync as they appear.
+  // marginLeft starts at 0 (no gap when pill invisible) and grows to 6 with the width.
+  const miniTestimonyWrapStyle = useAnimatedStyle(() => ({
+    width: interpolate(scrollY.value, [ANIM_END * 0.45, ANIM_END], [0, 40], Extrapolation.CLAMP),
+    marginLeft: interpolate(scrollY.value, [ANIM_END * 0.45, ANIM_END], [0, 6], Extrapolation.CLAMP),
+    overflow: 'hidden' as const,
+  }));
+  const miniVisionWrapStyle = useAnimatedStyle(() => ({
+    width: interpolate(scrollY.value, [ANIM_END * 0.55, ANIM_END], [0, 40], Extrapolation.CLAMP),
+    marginLeft: interpolate(scrollY.value, [ANIM_END * 0.55, ANIM_END], [0, 6], Extrapolation.CLAMP),
+    overflow: 'hidden' as const,
+  }));
+
+  // PILL CONTENT — opacity + scale for the pill itself (separate from the wrapper).
+  const miniTestimonyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [ANIM_END * 0.5, ANIM_END], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(scrollY.value, [ANIM_END * 0.5, ANIM_END], [0.5, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+  // Mini vision pill — staggered slightly after testimony.
+  const miniVisionStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [ANIM_END * 0.6, ANIM_END], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(scrollY.value, [ANIM_END * 0.6, ANIM_END], [0.5, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+  // The top section (header bar + vision button) collapses to 0 height as the
+  // user scrolls, leaving only the sticky tabs + search visible inside the gradient.
+  const innerCollapseStyle = useAnimatedStyle(() => ({
+    maxHeight: interpolate(scrollY.value, [0, ANIM_END], [999, 0], Extrapolation.CLAMP),
+    overflow: 'hidden' as const,
+  }));
+
   const [cartState, setCartState] = useState<ShopCartState>(getShopCartState());
   const [selectedFilters, setSelectedFilters] = useState<
     Record<BroadcastMainTabId, string>
@@ -146,6 +223,30 @@ export default function BroadcastScreen() {
   const handleFilterSelect = (optionKey: string) => {
     setSelectedFilters(prev => ({ ...prev, [activeMainTab]: optionKey }));
   };
+
+  // ── Feed-specific filter state (lifted so the filter panel can own them) ──
+  type FeedCategory = 'for_you' | 'following' | 'trending' | 'live' | 'channels' | 'community' | 'market' | 'education';
+  const [feedCategory, setFeedCategory] = useState<FeedCategory>('for_you');
+  const [feedSort, setFeedSort] = useState<'new' | 'top' | 'oldest'>('new');
+  const [feedDatePreset, setFeedDatePreset] = useState<'today' | 'week' | 'month' | 'all'>('all');
+  const [feedDuration, setFeedDuration] = useState<'short' | 'medium' | 'long' | 'any'>('any');
+
+  const feedFiltersActive =
+    feedCategory !== 'for_you' ||
+    feedSort !== 'new' ||
+    feedDatePreset !== 'all' ||
+    feedDuration !== 'any';
+
+  const FEED_CATEGORIES: Array<{ id: FeedCategory; label: string }> = [
+    { id: 'for_you', label: 'For You' },
+    { id: 'following', label: 'Following' },
+    { id: 'trending', label: 'Trending' },
+    { id: 'live', label: 'Live' },
+    { id: 'channels', label: 'Channels' },
+    { id: 'community', label: 'Community' },
+    { id: 'market', label: 'Market' },
+    { id: 'education', label: 'Education' },
+  ];
 
   const switchMainTabByDirection = useCallback(
     (direction: 'next' | 'previous') => {
@@ -252,6 +353,9 @@ export default function BroadcastScreen() {
     }, [activeMainTab]),
   );
 
+  // Gold header → dark icons for readability, managed via push/pop.
+  useStatusBarStyle(tone, 'dark-content');
+
   const totalCartItems = useMemo(
     () =>
       Object.values(cartState.carts).reduce(
@@ -272,10 +376,28 @@ export default function BroadcastScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: compactBroadcast ? 92 : 120 }}
+
+      {/*
+       * ONE gradient — everything (header bar, vision, tabs, search) lives
+       * inside a single LinearGradient with the curved bottom border.
+       * stickyHeaderIndices={[0]} makes this entire gradient sticky.
+       * As the user scrolls, the TOP portion (header bar + vision) collapses
+       * via maxHeight animation, leaving only tabs + search visible — all
+       * still inside the same curved gradient. No second header seam.
+       *
+       *  0  ← STICKY gradient:
+       *         collapsing top (header bar + vision)
+       *         always-visible bottom (tabs + search + mini pills)
+       *  1  ← Testimony banner (scrolls away)
+       *  2  ← Tab content
+       */}
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={1}
+        stickyHeaderIndices={[0]}
         keyboardShouldPersistTaps="handled"
-        style={{ backgroundColor: palette.bg }}
+        style={{ flex: 1, backgroundColor: palette.bg }}
+        contentContainerStyle={{ paddingBottom: compactBroadcast ? 92 : 120 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -285,6 +407,12 @@ export default function BroadcastScreen() {
           />
         }
       >
+
+        {/* ═══ 0 — STICKY: single unified gradient header ════════════════════
+            One LinearGradient owns both the collapsing top section (header
+            bar + vision) and the always-visible bottom section (tabs +
+            search). The curved bottom border belongs to this one element so
+            there is never a visual seam between two separate headers.        */}
         <LinearGradient
           colors={broadcastGoldGradient}
           start={{ x: 0, y: 0 }}
@@ -294,39 +422,71 @@ export default function BroadcastScreen() {
           <View style={styles.headerHalo} />
           <View style={styles.headerSheen} pointerEvents="none" />
 
-          <View style={[styles.headerInner, { paddingHorizontal: responsive.pageGutter, paddingTop: insets.top + (compactBroadcast ? 12 : 18), paddingBottom: compactBroadcast ? 16 : 24 }]}>
-            <View style={styles.headerSection}>
-              <BroadcastHeaderBar
-                title="Broadcast"
-                tierLabel="Business Pro"
-                onCreate={handleCreate}
-                onSearch={handleOpenSearch}
-              />
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setVisionVisible(true)}
-                hitSlop={10}
-                style={[styles.visionButton, { paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 9 : 12, borderRadius: compactBroadcast ? 16 : 20 }]}
-              >
-                <View style={styles.visionIcon}>
-                  <KISIcon name="sparkles" size={15} color={palette.onGold} />
+          {/* ── TOP: collapses via maxHeight as user scrolls ─────────────── */}
+          <Animated.View style={innerCollapseStyle}>
+            <Animated.View style={visionAnimStyle}>
+              <View style={{
+                paddingHorizontal: responsive.pageGutter,
+                paddingTop: insets.top + (compactBroadcast ? 12 : 18),
+              }}>
+                {/* Header bar */}
+                <View style={styles.headerSection}>
+                  <BroadcastHeaderBar
+                    title="Broadcast"
+                    tierLabel="Business Pro"
+                    onCreate={handleCreate}
+                    onSearch={handleOpenSearch}
+                  />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.visionButtonTitle}>Our Vision</Text>
-                  <Text style={styles.visionButtonText} numberOfLines={2}>
-                    {compactBroadcast ? 'KCAN purpose and direction.' : 'Discover why KCAN exists and where Kingdom Impact Social is going.'}
-                  </Text>
+
+                {/* Our Vision button */}
+                <View style={styles.headerSection}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setVisionVisible(true)}
+                    hitSlop={10}
+                    style={[styles.visionButton, {
+                      paddingHorizontal: compactBroadcast ? 10 : 14,
+                      paddingVertical: compactBroadcast ? 9 : 12,
+                      borderRadius: compactBroadcast ? 16 : 20,
+                    }]}
+                  >
+                    <View style={styles.visionIcon}>
+                      <KISIcon name="sparkles" size={15} color={palette.onGold} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.visionButtonTitle}>Our Vision</Text>
+                      <Text style={styles.visionButtonText} numberOfLines={2}>
+                        {compactBroadcast
+                          ? 'KCAN purpose and direction.'
+                          : 'Discover why KCAN exists and where Kingdom Impact Social is going.'}
+                      </Text>
+                    </View>
+                    <KISIcon name="chevron-right" size={18} color={palette.onGold} />
+                  </Pressable>
                 </View>
-                <KISIcon name="chevron-right" size={18} color={palette.onGold} />
-              </Pressable>
-            </View>
-            <View style={styles.headerSection}>
-              <BroadcastMainTabs
-                value={activeMainTab}
-                onChange={setActiveMainTab}
-              />
-            </View>
-            <View style={styles.headerSection}>
+              </View>
+            </Animated.View>
+          </Animated.View>
+
+          {/* ── BOTTOM: always visible — tabs + search + mini pills ───────── */}
+          <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 8, paddingBottom: 6 }}>
+            <BroadcastMainTabs
+              value={activeMainTab}
+              onChange={tab => { setActiveMainTab(tab); setFilterVisible(false); }}
+            />
+          </View>
+
+          {/* Search row — no gap here; each pill wrapper carries its own animated marginLeft
+              so the search bar is full-width when pills are hidden and shrinks in sync
+              as they slide in.                                                          */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: responsive.pageGutter,
+            paddingBottom: showFilterPanel ? 6 : 16,
+          }}>
+            <View style={{ flex: 1 }}>
               <BroadcastSearchRow
                 searchPlaceholder={SEARCH_PLACEHOLDERS[activeMainTab]}
                 searchValue={currentSearchTerm}
@@ -338,76 +498,135 @@ export default function BroadcastScreen() {
                 filterActive={filterVisible}
               />
             </View>
-            {showFilterPanel ? (
-              <View style={[styles.headerSection, styles.filterPanel, { padding: compactBroadcast ? 6 : 8 }]}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-                  keyboardShouldPersistTaps="handled"
+
+            {/* Mini Testimony pill — wrapper expands from 0 → 40px pushing search bar left */}
+            <Animated.View style={miniTestimonyWrapStyle}>
+              <Animated.View style={miniTestimonyStyle}>
+                <Pressable
+                  onPress={() => (navigation as any).navigate('TestimonyHub')}
+                  style={[styles.miniPill, { backgroundColor: palette.primaryStrong }]}
+                  accessibilityLabel="Testimony Network"
+                  hitSlop={8}
                 >
+                  <Text style={{ fontSize: compactBroadcast ? 14 : 16 }}>🤝</Text>
+                </Pressable>
+              </Animated.View>
+            </Animated.View>
+
+            {/* Mini Vision pill — staggered, same expanding wrapper */}
+            <Animated.View style={miniVisionWrapStyle}>
+              <Animated.View style={miniVisionStyle}>
+                <Pressable
+                  onPress={() => setVisionVisible(true)}
+                  style={[styles.miniPill, {
+                    backgroundColor: `${palette.royalInk}70`,
+                    borderColor: palette.goldBorder,
+                    borderWidth: 1,
+                  }]}
+                  accessibilityLabel="Our Vision"
+                  hitSlop={8}
+                >
+                  <KISIcon name="sparkles" size={compactBroadcast ? 14 : 16} color={palette.onGold} />
+                </Pressable>
+              </Animated.View>
+            </Animated.View>
+          </View>
+
+          {/* Filter panel */}
+          {showFilterPanel && (
+            <View style={[styles.filterPanel, {
+              marginHorizontal: responsive.pageGutter,
+              marginBottom: 12,
+              padding: compactBroadcast ? 8 : 10,
+            }]}>
+              {activeMainTab === 'feeds' ? (
+                <Animated.ScrollView showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled" style={{ maxHeight: 300 }}>
+                  <Text style={styles.filterSectionLabel}>Quick access</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingBottom: 12 }}>
+                    {([{ label: 'Playlists', icon: 'list' as const, route: 'PlaylistList' }, { label: 'History', icon: 'play' as const, route: 'WatchHistory' }, { label: 'Shorts', icon: 'play' as const, route: 'ShortsScreen' }]).map(item => (
+                      <Pressable key={item.label} onPress={() => { setFilterVisible(false); (navigation as any).navigate(item.route); }}
+                        style={[styles.filterOption, { paddingHorizontal: 12, paddingVertical: 8, borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
+                        <KISIcon name={item.icon} size={14} color={palette.primaryStrong} />
+                        <Text style={[styles.filterOptionLabel, { color: palette.text }]}>{item.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.filterSectionLabel}>Category</Text>
+                  <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingBottom: 12 }}>
+                    {FEED_CATEGORIES.map(cat => { const a = feedCategory === cat.id; return (
+                      <Pressable key={cat.id} onPress={() => setFeedCategory(cat.id)}
+                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
+                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{cat.label}</Text>
+                      </Pressable>
+                    ); })}
+                  </Animated.ScrollView>
+                  <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Sort by</Text>
+                  <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 12 }}>
+                    {([{ id: 'new' as const, label: 'Newest' }, { id: 'top' as const, label: 'Top' }, { id: 'oldest' as const, label: 'Oldest' }]).map(opt => { const a = feedSort === opt.id; return (
+                      <Pressable key={opt.id} onPress={() => setFeedSort(opt.id)}
+                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
+                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
+                      </Pressable>
+                    ); })}
+                  </View>
+                  <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Date range</Text>
+                  <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 12 }}>
+                    {([{ id: 'today' as const, label: 'Today' }, { id: 'week' as const, label: 'This week' }, { id: 'month' as const, label: 'This month' }, { id: 'all' as const, label: 'All time' }]).map(opt => { const a = feedDatePreset === opt.id; return (
+                      <Pressable key={opt.id} onPress={() => setFeedDatePreset(opt.id)}
+                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
+                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
+                      </Pressable>
+                    ); })}
+                  </View>
+                  <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Duration</Text>
+                  <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 8 }}>
+                    {([{ id: 'short' as const, label: 'Short (<4m)' }, { id: 'medium' as const, label: 'Medium (4–20m)' }, { id: 'long' as const, label: 'Long (>20m)' }, { id: 'any' as const, label: 'Any length' }]).map(opt => { const a = feedDuration === opt.id; return (
+                      <Pressable key={opt.id} onPress={() => setFeedDuration(opt.id)}
+                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
+                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
+                      </Pressable>
+                    ); })}
+                  </View>
+                  {feedFiltersActive && (
+                    <Pressable onPress={() => { setFeedCategory('for_you'); setFeedSort('new'); setFeedDatePreset('all'); setFeedDuration('any'); }}
+                      style={{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 4 }}>
+                      <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' }}>Reset all filters</Text>
+                    </Pressable>
+                  )}
+                </Animated.ScrollView>
+              ) : (
+                <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingRight: 4 }} keyboardShouldPersistTaps="handled">
                   {FILTER_OPTIONS[activeMainTab].map(option => (
-                    <Pressable
-                      key={option.key}
-                      onPress={() => handleFilterSelect(option.key)}
-                      style={[
-                        styles.filterOption,
-                        {
-                          minWidth: compactBroadcast ? 96 : 120,
-                          paddingHorizontal: compactBroadcast ? 10 : 14,
-                          paddingVertical: compactBroadcast ? 8 : 10,
-                          marginRight: 0,
-                          marginBottom: 0,
-                          borderColor:
-                            option.key === currentFilter
-                              ? palette.primary
-                              : palette.divider,
-                          backgroundColor:
-                            option.key === currentFilter
-                              ? palette.primaryStrong
-                              : palette.surface,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterOptionLabel,
-                          {
-                            color:
-                              option.key === currentFilter
-                                ? palette.onPrimary
-                                : palette.text,
-                          },
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.filterOptionDescription,
-                          { color: option.key === currentFilter ? palette.onPrimary : palette.subtext },
-                        ]}
-                      >
-                        {compactBroadcast ? '' : option.description}
-                      </Text>
+                    <Pressable key={option.key} onPress={() => handleFilterSelect(option.key)}
+                      style={[styles.filterOption, { minWidth: compactBroadcast ? 96 : 120, paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 8 : 10, marginRight: 0, marginBottom: 0, borderColor: option.key === currentFilter ? palette.primary : palette.divider, backgroundColor: option.key === currentFilter ? palette.primaryStrong : palette.surface }]}>
+                      <Text style={[styles.filterOptionLabel, { color: option.key === currentFilter ? palette.onPrimary : palette.text }]}>{option.label}</Text>
+                      <Text style={[styles.filterOptionDescription, { color: option.key === currentFilter ? palette.onPrimary : palette.subtext }]}>{compactBroadcast ? '' : option.description}</Text>
                     </Pressable>
                   ))}
-                </ScrollView>
-              </View>
-            ) : null}
-          </View>
+                </Animated.ScrollView>
+              )}
+            </View>
+          )}
         </LinearGradient>
-        <Pressable
-          onPress={() => (navigation as any).navigate('TestimonyHub')}
-          style={[testimonyBannerStyle, { backgroundColor: palette.primaryStrong }]}
-        >
-          <Text style={{ fontSize: 20 }}>🤝</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
-            <Text style={{ color: palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
-          </View>
-          <KISIcon name="arrow-left" size={16} color={palette.onPrimary} style={{ transform: [{ rotate: '180deg' }] }} />
-        </Pressable>
+
+        {/* ═══ 1 — TESTIMONY BANNER (scrolls away) ═══════════════════════════ */}
+        <Animated.View style={[testimonyAnimStyle, { marginTop: 12 }]}>
+          <Pressable
+            onPress={() => (navigation as any).navigate('TestimonyHub')}
+            style={[styles.testimonyBanner, { backgroundColor: palette.primaryStrong }]}
+          >
+            <Text style={{ fontSize: 20 }}>🤝</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
+              <Text style={{ color: palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
+            </View>
+            <KISIcon name="arrow-left" size={16} color={palette.onPrimary} style={{ transform: [{ rotate: '180deg' }] }} />
+          </Pressable>
+        </Animated.View>
+
+        {/* ═══ 2 — TAB CONTENT ════════════════════════════════════════════════ */}
         <View
           style={{ paddingHorizontal: responsive.pageGutter }}
           {...tabSwipeResponder.panHandlers}
@@ -416,89 +635,86 @@ export default function BroadcastScreen() {
             <BroadcastFeedsPage
               searchTerm={currentSearchTerm}
               searchContext={currentFilter}
-              onTrendingSeeAll={() => {
-                handleFilterSelect('trending');
-                setFilterVisible(false);
-              }}
+              onTrendingSeeAll={() => { setFeedCategory('trending'); setFilterVisible(false); }}
+              activeCategory={feedCategory}
+              onCategoryChange={cat => { setFeedCategory(cat as FeedCategory); setFilterVisible(false); }}
+              filterSort={feedSort}
+              filterDatePreset={feedDatePreset}
+              filterDuration={feedDuration}
             />
           )}
-          {activeMainTab === 'channels' && (
-            <ChannelsDiscoverPage
-              searchTerm={currentSearchTerm}
-              searchContext={currentFilter}
-            />
-          )}
-          {activeMainTab === 'education' && (
-            <BroadcastEducationPage
-              searchTerm={currentSearchTerm}
-              searchContext={currentFilter}
-            />
-          )}
-          {activeMainTab === 'market' && (
-            <BroadcastMarketPage
-              searchTerm={currentSearchTerm}
-              searchContext={currentFilter}
-            />
-          )}
-          {activeMainTab === 'healthcare' && (
-            <BroadcastHealthcarePage
-              searchTerm={currentSearchTerm}
-              searchContext={currentFilter}
-            />
-          )}
+          {activeMainTab === 'channels' && <ChannelsDiscoverPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
+          {activeMainTab === 'education' && <BroadcastEducationPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
+          {activeMainTab === 'market' && <BroadcastMarketPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
+          {activeMainTab === 'healthcare' && <BroadcastHealthcarePage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
         </View>
-      </ScrollView>
-      {activeMainTab === 'market' ? (
+
+      </Animated.ScrollView>
+
+      {/* Cart FAB (market tab only) */}
+      {activeMainTab === 'market' && (
         <View pointerEvents="box-none" style={styles.cartOverlay}>
           <Pressable
             onPress={openCartList}
-            style={[
-              styles.cartButton,
-              {
-                backgroundColor: palette.primarySoft,
-                borderColor: palette.primary,
-                width: compactBroadcast ? 48 : 56,
-                height: compactBroadcast ? 48 : 56,
-                shadowColor: palette.shadow,
-              },
-            ]}
+            style={[styles.cartButton, {
+              backgroundColor: palette.primarySoft,
+              borderColor: palette.primary,
+              width: compactBroadcast ? 48 : 56,
+              height: compactBroadcast ? 48 : 56,
+              shadowColor: palette.shadow,
+            }]}
           >
             <KISIcon name="cart" size={22} color={palette.primaryStrong} />
-            {totalCartItems > 0 ? (
-              <View
-                style={[
-                  styles.cartBadge,
-                  { backgroundColor: palette.primaryStrong },
-                ]}
-              >
+            {totalCartItems > 0 && (
+              <View style={[styles.cartBadge, { backgroundColor: palette.primaryStrong }]}>
                 <Text style={{ color: palette.surface, fontWeight: '800', fontSize: 11 }}>
                   {totalCartItems}
                 </Text>
               </View>
-            ) : null}
+            )}
           </Pressable>
         </View>
-      ) : null}
-      <KcanVisionModal
-        visible={visionVisible}
-        onClose={() => setVisionVisible(false)}
-      />
+      )}
+
+      <KcanVisionModal visible={visionVisible} onClose={() => setVisionVisible(false)} />
     </View>
   );
 }
 
-const testimonyBannerStyle: any = {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 12,
-  borderRadius: 16,
-  padding: 16,
-  marginHorizontal: 16,
-  marginVertical: 8,
-};
-
 const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
   StyleSheet.create({
+    // ── Sticky tabs + search section (child #2, pinned by stickyHeaderIndices)
+    stickySection: {
+      // Shadow so content visually slides under it when sticky
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 8,
+    },
+    // ── Testimony banner (full-size, scrollable) ───────────────────────────
+    testimonyBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 16,
+      marginBottom: 12,
+    },
+    // ── Mini pills (appear in search row when collapsed) ────────────────────
+    miniPillWrap: {
+      // Overflow hidden so during scale-in the pill doesn't bleed outside bounds
+      overflow: 'hidden',
+    },
+    miniPill: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // ── Header container ───────────────────────────────────────────────────
     headerContainer: {
       paddingHorizontal: 0,
       paddingTop: 0,
@@ -591,10 +807,20 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
     },
+    filterSectionLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginBottom: 8,
+      color: palette.subtext,
+    },
     filterOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
       borderWidth: 1.5,
       borderRadius: 999,
-      minWidth: 100,
       paddingHorizontal: 16,
       paddingVertical: 10,
       marginRight: 8,

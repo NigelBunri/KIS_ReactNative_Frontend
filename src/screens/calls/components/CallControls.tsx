@@ -34,7 +34,17 @@ type ControlAction =
   | 'raise-hand'
   | 'reactions'
   | 'layout'
-  | 'screen-share';
+  | 'screen-share'
+  | 'noise-cancel'
+  | 'invite-link'
+  | 'captions'
+  | 'virtual-bg'
+  | 'record'
+  | 'polls'
+  | 'qa'
+  | 'breakout'
+  | 'rtmp'
+  | 'whiteboard';
 
 type Props = {
   session: CallSession;
@@ -43,6 +53,7 @@ type Props = {
   showReactionPicker: boolean;
   onToggleReactionPicker: () => void;
   unreadChat: number;
+  hasInviteLink?: boolean;
 };
 
 type ControlBtn = {
@@ -63,6 +74,7 @@ export default function CallControls({
   showReactionPicker,
   onToggleReactionPicker,
   unreadChat,
+  hasInviteLink = false,
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
@@ -72,6 +84,7 @@ export default function CallControls({
   const isBroadcast = session.callType === 'broadcast';
   const localParticipant = session.participants.find(p => p.isLocal);
   const isAudienceOnly = isBroadcast && localParticipant?.role === 'audience';
+  const isHostOrCoHost = localParticipant?.role === 'host' || localParticipant?.role === 'co-host';
   const handRaised = !!session.raisedHands.includes(session.localUserId);
   const accent = ACCENT[session.callType] ?? palette.primary;
 
@@ -143,6 +156,80 @@ export default function CallControls({
       active: session.isScreenSharing,
       overrideAccent: palette.success,
       hidden: isBroadcast && isAudienceOnly,
+    },
+    {
+      id: 'noise-cancel',
+      icon: 'mic',
+      label: session.isNoiseCancellationOn !== false ? 'Noise off' : 'Noise on',
+      active: session.isNoiseCancellationOn !== false,
+      overrideAccent: palette.info,
+    },
+    {
+      id: 'invite-link',
+      icon: 'link',
+      label: 'Invite',
+      hidden: !hasInviteLink,
+      overrideAccent: palette.gold,
+    },
+    {
+      id: 'captions',
+      icon: 'captions',
+      label: session.captionsEnabled ? 'Captions on' : 'Captions',
+      active: !!session.captionsEnabled,
+      overrideAccent: palette.info,
+    },
+    {
+      id: 'virtual-bg',
+      icon: 'image',
+      label: 'Background',
+      active: !!session.virtualBgEnabled,
+      hidden: !withVideo || isAudienceOnly,
+    },
+    {
+      id: 'polls',
+      icon: 'bar-chart',
+      label: 'Polls',
+      badge: (session.polls ?? []).filter(p => !p.closed).length,
+      hidden: !isGroup,
+    },
+    {
+      id: 'qa',
+      icon: 'help-circle',
+      label: 'Q&A',
+      badge: (session.qaQueue ?? []).filter(q => !q.answered).length,
+      hidden: !isGroup,
+    },
+    {
+      id: 'breakout',
+      icon: 'grid',
+      label: 'Breakout',
+      active: (session.breakoutRooms ?? []).length > 0,
+      hidden: !isGroup || (!isHostOrCoHost && (session.breakoutRooms ?? []).length === 0),
+      overrideAccent: palette.primaryStrong,
+    },
+    {
+      id: 'record',
+      icon: 'stop-circle',
+      label: session.recordingState === 'recording' ? 'Stop rec' : 'Record',
+      active: session.recordingState === 'recording',
+      danger: session.recordingState === 'recording',
+      hidden: !(isBroadcast && isHostOrCoHost),
+    },
+    {
+      id: 'rtmp',
+      icon: 'radio',
+      label: session.rtmpActive ? 'Live' : 'Stream',
+      active: !!session.rtmpActive,
+      danger: !!session.rtmpActive,
+      hidden: !(isBroadcast && isHostOrCoHost),
+    },
+    {
+      id: 'whiteboard',
+      icon: 'edit-2',
+      label: session.whiteboardEnabled ? 'Board on' : 'Board',
+      active: !!session.whiteboardEnabled,
+      overrideAccent: '#A78BFA',
+      hidden: !isGroup,
     },
   ];
 

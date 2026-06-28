@@ -49,7 +49,8 @@ export type MessageKind =
   | 'poll'
   | 'event'
   | 'location'
-  | 'attachment';
+  | 'attachment'
+  | 'call_event';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -193,6 +194,8 @@ export type ReadByEntry = {
   userId: string;
   displayName?: string;
   readAt: string;
+  atMs?: number;
+  deviceId?: string;
 };
 
 /* ============================================================================
@@ -288,6 +291,10 @@ export type ChatMessage = {
 
   voice?: {
     uri: string;
+    url?: string;
+    localUri?: string;
+    localPath?: string;
+    name?: string;
     durationMs: number;
   };
 
@@ -347,6 +354,15 @@ export type ChatMessage = {
   /** Per-user read receipts (group chats) */
   readBy?: ReadByEntry[];
 
+  /** Per-user delivery receipts returned by the messaging service. */
+  deliveredTo?: Array<{ userId: string; deviceId?: string; atMs?: number }>;
+
+  /** Device-local read timestamp, persisted immediately even while offline. */
+  locallyReadAt?: string;
+
+  /** Durable outbox marker; replay this receipt after reconnect until the server confirms it. */
+  readReceiptPending?: boolean;
+
   /** Link preview fetched by server */
   linkPreview?: {
     title?: string;
@@ -364,6 +380,16 @@ export type ChatMessage = {
 
   /** Edit history entries (previous text snapshots) */
   editHistory?: Array<{ editedAt: string; previousText?: string }>;
+
+  /** Populated when kind === 'call_event'. Inline call history row in chat. */
+  callEvent?: {
+    callId: string;
+    callType: string;
+    status: 'completed' | 'missed' | 'cancelled';
+    duration?: number | null;
+    participantCount?: number;
+    initiatedBy?: string;
+  };
 };
 
 /* ============================================================================

@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
-import Video from 'react-native-video';
+import Video, { type VideoRef } from 'react-native-video';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
 
 import Pdf from 'react-native-pdf';
-import AudioRecorderPlayer, {
-  PlayBackType,
-} from 'react-native-audio-recorder-player';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KISIcon } from '@/constants/kisIcons';
 import { ChatMessage } from '../chatTypes';
@@ -22,9 +19,9 @@ import { useLanguage, useTranslation } from '@/languages';
 import { getAccessToken } from '@/security/authStorage';
 import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFileScheme } from '../chatMediaStorage';
 import { normalizeChatDisplayText } from '../safeChatText';
+import { API_BASE_URL, resolveBackendAssetUrl } from '@/network';
 
-// Use a shared player instance for all bubbles
-const audioPlayer = new AudioRecorderPlayer();
+const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
 /**
  * Shape coming from the backend, e.g.
@@ -183,31 +180,6 @@ const formatTimeFromMs = (ms: number) => {
   return `${mm}:${ss}`;
 };
 
-const formatFileSize = (bytes: number | undefined) => {
-  if (!bytes || bytes <= 0) return '';
-  const kb = bytes / 1024;
-  if (kb < 1024) {
-    return `${kb.toFixed(1)} KB`;
-  }
-  const mb = kb / 1024;
-  if (mb < 1024) {
-    return `${mb.toFixed(1)} MB`;
-  }
-  const gb = mb / 1024;
-  return `${gb.toFixed(1)} GB`;
-};
-
-const getAttachmentIconName = (att: AttachmentMeta): string => {
-  const mime = att.mimeType ?? '';
-  const kind = att.kind;
-
-  if (kind === 'image' || mime.startsWith('image/')) return 'image';
-  if (kind === 'video' || mime.startsWith('video/')) return 'video';
-  if (kind === 'audio' || mime.startsWith('audio/')) return 'audio';
-  if (kind === 'document') return 'file';
-  return 'file';
-};
-
 const renderStatusIcon = (
   status?: ChatMessage['status'] | string,
   color?: string,
@@ -245,7 +217,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isSelected = false,
   isFirstInGroup = true,
   isLastInGroup = true,
-  onStar,
+  onStar: _onStar,
   onShowReadReceipts,
   onViewOnce,
   mentionMap,
@@ -471,7 +443,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     !text &&
     !styled &&
     !sticker &&
-    !hasAttachments &&
     !contacts &&
     !poll &&
     !eventData;
@@ -514,7 +485,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
+  const [playbackPositionMs, setPlaybackPositionMs] = useState(0);
+  const [playbackDurationMs, setPlaybackDurationMs] = useState(0);
+  const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
+  const [voiceBuffering, setVoiceBuffering] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
+  const voiceVideoRef = useRef<VideoRef | null>(null);
+  const playbackOwnerRef = useRef(
+    String((message as any).serverId ?? (message as any).id ?? `voice-${Date.now()}`),
+  );
   const SPEED_CYCLE: Array<0.5 | 1 | 1.5 | 2> = [1, 1.5, 2, 0.5];
 
   // Disappearing messages countdown
@@ -534,12 +513,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, [disappearAfterSeconds, sentAt]);
-
-  // View-once: track if the user has viewed it
-  const isViewOnce = !!(message as any).attachments?.some((a: any) => a.viewOnce);
-  const [viewOnceViewed, setViewOnceViewed] = useState(
-    !!(message as any).attachments?.some((a: any) => a.viewedAt),
-  );
 
   // Top-level view-once (text messages flagged as view-once at message level)
   const isTopLevelViewOnce = !!(message as any).viewOnce;
@@ -631,7 +604,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [message, onUpdateMessage]);
 
   const downloadFile = async (attId: string, url: string, filename: string) => {
-    if (!url) return;
+    const resolvedUrl = resolveBackendAssetUrl(url) ?? url;
+    if (!resolvedUrl) return;
     setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'downloading' } }));
     try {
       let RNBlobUtil: any = null;
@@ -651,8 +625,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         const headers: Record<string, string> = {};
         if (token) headers.Authorization = `Bearer ${token}`;
         if (deviceId) headers['X-Device-Id'] = deviceId;
+        const requestHeaders = resolvedUrl.startsWith(API_BASE_URL) ? headers : {};
         const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: safeName, path: destPath } })
-          .fetch('GET', url, headers);
+          .fetch('GET', resolvedUrl, requestHeaders);
         task.progress((received: number, total: number) => {
           if (total > 0) {
             setDownloadState(prev => ({ ...prev, [attId]: { progress: Math.max(0, Math.min(1, received / total)), status: 'downloading' } }));
@@ -671,7 +646,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       } else {
         setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
       }
-    } catch {
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[MessageBubble] download failed', error instanceof Error ? error.message : String(error));
+      }
       setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
     }
   };
@@ -860,62 +838,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     string | null
   >(null);
 
-  const stopPlayback = async () => {
-    try {
-      await audioPlayer.stopPlayer();
-      audioPlayer.removePlayBackListener();
-    } catch {
-      // ignore
-    }
+  const stopPlayback = (reset = false) => {
     setIsPlaying(false);
-    setProgress(0);
-  };
-
-  const startPlayback = async () => {
-    if (!voice) return;
-    try {
-      setIsPlaying(true);
+    setVoiceBuffering(false);
+    if (reset) {
+      voiceVideoRef.current?.seek(0);
       setProgress(0);
-
-      await audioPlayer.startPlayer(voice.uri);
-      try { await (audioPlayer as any).setPlaybackSpeed?.(playbackSpeed); } catch { /* not all versions support it */ }
-
-      audioPlayer.addPlayBackListener((e: PlayBackType) => {
-        const pos = e.currentPosition ?? 0;
-        const dur =
-          e.duration ??
-          (voice.durationMs !== undefined ? voice.durationMs : 1);
-
-        const ratio = Math.min(1, pos / dur);
-        setProgress(ratio);
-
-        if (pos >= dur) {
-          stopPlayback();
-        }
-        return;
-      });
-    } catch (err) {
-      console.warn('start playback error', err);
-      setIsPlaying(false);
-      setProgress(0);
+      setPlaybackPositionMs(0);
     }
   };
 
-  const handleCycleSpeed = async () => {
+  const handleCycleSpeed = () => {
     const currentIdx = SPEED_CYCLE.indexOf(playbackSpeed);
     const nextSpeed = SPEED_CYCLE[(currentIdx + 1) % SPEED_CYCLE.length];
     setPlaybackSpeed(nextSpeed);
-    if (isPlaying) {
-      try { await (audioPlayer as any).setPlaybackSpeed?.(nextSpeed); } catch { /* silent */ }
-    }
   };
 
-  const handleTogglePlay = async () => {
+  const handleTogglePlay = () => {
     if (!voice) return;
     if (isPlaying) {
-      await stopPlayback();
+      stopPlayback(false);
     } else {
-      await startPlayback();
+      setVoicePlaybackError(null);
+      setVoiceBuffering(true);
+      DeviceEventEmitter.emit(CHAT_VOICE_PLAYBACK_EVENT, playbackOwnerRef.current);
+      setIsPlaying(true);
     }
   };
 
@@ -928,13 +875,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      CHAT_VOICE_PLAYBACK_EVENT,
+      (ownerId: string) => {
+        if (ownerId !== playbackOwnerRef.current) {
+          stopPlayback(true);
+        }
+      },
+    );
     return () => {
-      try {
-        audioPlayer.stopPlayer();
-        audioPlayer.removePlayBackListener();
-      } catch {
-        // ignore
-      }
+      subscription.remove();
     };
   }, []);
 
@@ -3193,7 +3143,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
    * 2) Voice-only bubble
    * ──────────────────────────────────────── */
   if (isVoiceOnly && voice) {
-    const durationLabel = formatTimeFromMs(voice.durationMs);
+    const durationLabel = formatTimeFromMs(
+      isPlaying ? playbackPositionMs : playbackDurationMs || voice.durationMs,
+    );
+    const totalDurationLabel = formatTimeFromMs(playbackDurationMs || voice.durationMs);
+    const voiceRemoteUrl = resolveBackendAssetUrl((voice as any).url ?? voice.uri) ?? String((voice as any).url ?? voice.uri ?? '');
+    const voicePlaybackUri = (voice as any).localUri ??
+      ((voice as any).localPath ? fileUriForPath((voice as any).localPath) : undefined) ??
+      voiceRemoteUrl;
+    const voicePlaybackSource = {
+      uri: voicePlaybackUri,
+      ...(voicePlaybackUri.startsWith(API_BASE_URL) && Object.keys(mediaHeaders).length
+        ? { headers: mediaHeaders }
+        : {}),
+    };
 
     return (
       <View
@@ -3214,6 +3177,45 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {renderSenderName()}
           {renderReplyPreview()}
 
+          <Video
+            ref={voiceVideoRef}
+            source={voicePlaybackSource}
+            paused={!isPlaying}
+            rate={playbackSpeed}
+            volume={1}
+            muted={false}
+            controls={false}
+            audioOutput="speaker"
+            ignoreSilentSwitch="ignore"
+            mixWithOthers="duck"
+            playInBackground={false}
+            playWhenInactive={false}
+            progressUpdateInterval={100}
+            onLoadStart={() => {
+              if (isPlaying) setVoiceBuffering(true);
+            }}
+            onLoad={({ duration }) => {
+              const durationMs = Math.max(0, Number(duration || 0) * 1000);
+              if (durationMs > 0) setPlaybackDurationMs(durationMs);
+              setVoiceBuffering(false);
+            }}
+            onBuffer={({ isBuffering }) => setVoiceBuffering(isBuffering)}
+            onProgress={({ currentTime }) => {
+              const positionMs = Math.max(0, Number(currentTime || 0) * 1000);
+              const durationMs = playbackDurationMs || voice.durationMs || 0;
+              setVoiceBuffering(false);
+              setPlaybackPositionMs(positionMs);
+              setProgress(durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0);
+            }}
+            onEnd={() => stopPlayback(true)}
+            onError={(error) => {
+              if (__DEV__) console.warn('[MessageBubble] voice media error', error);
+              setVoicePlaybackError('Unable to play this voice message. Try downloading it again.');
+              stopPlayback(false);
+            }}
+            style={styles.hiddenVoicePlayer}
+          />
+
           <Pressable
             onPress={handleTogglePlay}
             style={{
@@ -3221,11 +3223,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               alignItems: 'center',
             }}
           >
-            <KISIcon
-              name={isPlaying ? 'pause' : 'play'}
-              size={20}
-              color={palette.primary}
-            />
+            {voiceBuffering ? (
+              <ActivityIndicator size="small" color={palette.primary} />
+            ) : (
+              <KISIcon
+                name={isPlaying ? 'pause' : 'play'}
+                size={20}
+                color={palette.primary}
+              />
+            )}
 
             <View style={{ flex: 1, marginHorizontal: 8 }}>
               {/* progress track */}
@@ -3256,18 +3262,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   color: metaColor,
                 }}
               >
-                {durationLabel}
-                {isPlaying ? '  (Playing)' : ''}
+                {durationLabel}{isPlaying && totalDurationLabel ? ` / ${totalDurationLabel}` : ''}
               </Text>
             </View>
           </Pressable>
 
           {!(voice as any).localPath && !(voice as any).localUri && renderDownloadControl(
             String((message as any).serverId ?? messageId ?? voice.uri ?? 'voice'),
-            String((voice as any).url ?? voice.uri ?? ''),
+            voiceRemoteUrl,
             String((voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
             'inline',
           )}
+
+          {voicePlaybackError ? (
+            <Text style={{ marginTop: 6, fontSize: 11, color: palette.danger }}>
+              {voicePlaybackError}
+            </Text>
+          ) : null}
 
           {/* Speed control + Transcription */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 12 }}>

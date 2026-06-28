@@ -73,17 +73,28 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
   }, []);
 
   const togglePlay = useCallback(() => {
-    setState((prev) => ({ ...prev, playing: !prev.playing }));
+    setState((prev) => {
+      console.log('[KISVideo] togglePlay →', prev.playing ? 'paused' : 'playing');
+      return { ...prev, playing: !prev.playing };
+    });
   }, []);
 
-  const play = useCallback(() => setPlaying(true), [setPlaying]);
-  const pause = useCallback(() => setPlaying(false), [setPlaying]);
+  const play = useCallback(() => {
+    console.log('[KISVideo] play');
+    setPlaying(true);
+  }, [setPlaying]);
+
+  const pause = useCallback(() => {
+    console.log('[KISVideo] pause');
+    setPlaying(false);
+  }, [setPlaying]);
 
   const progressRef = useRef(0);
   const durationRef = useRef(0);
 
   const seekTo = useCallback(
     (seconds: number) => {
+      console.log('[KISVideo] seekTo', seconds.toFixed(2), 's');
       videoRef.current?.seek(seconds);
       progressRef.current = seconds;
       setState((prev) => ({ ...prev, progress: seconds }));
@@ -93,15 +104,18 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
 
   const seekForward10 = useCallback(() => {
     const target = Math.min(progressRef.current + 10, durationRef.current);
+    console.log('[KISVideo] seekForward10 →', target.toFixed(2), 's');
     seekTo(target);
   }, [seekTo]);
 
   const seekBackward10 = useCallback(() => {
     const target = Math.max(progressRef.current - 10, 0);
+    console.log('[KISVideo] seekBackward10 →', target.toFixed(2), 's');
     seekTo(target);
   }, [seekTo]);
 
   const setMuted = useCallback((value: boolean) => {
+    console.log('[KISVideo] setMuted', value);
     setState((prev) => ({ ...prev, muted: value }));
   }, []);
 
@@ -158,13 +172,9 @@ export const useVideoPlayer = (config: UseVideoPlayerConfig = {}) => {
   }, []);
 
   const onError = useCallback((error: any) => {
-    if (__DEV__) {
-      try {
-        console.error('[KISVideo] onError', JSON.stringify(error));
-      } catch {
-        console.error('[KISVideo] onError', error);
-      }
-    } else {
+    try {
+      console.error('[KISVideo] onError', JSON.stringify(error));
+    } catch {
       console.error('[KISVideo] onError', error);
     }
     const messagePayload =

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
 
@@ -35,6 +36,12 @@ const registerPushToken = async (payload: {
         JSON.stringify({ pushToken, apnsToken: payload.apnsToken || '', timestamp: Date.now() }),
       ).catch(() => {});
     }
+
+    // Also register with NestJS chat service (uses different field names)
+    postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: pushToken, platform: platform || 'android', deviceId: deviceId },
+    ).catch(() => { /* Non-fatal — chat push degrades gracefully */ });
   } catch {
     await AsyncStorage.setItem(
       PENDING_PUSH_TOKEN_KEY,

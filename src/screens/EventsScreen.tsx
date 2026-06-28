@@ -1214,7 +1214,7 @@ export default function EventsScreen() {
                   <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 6 }}>
                     {detailEvent!.ticket_count} ticket{detailEvent!.ticket_count !== 1 ? 's' : ''} available
                   </Text>
-                  {detailEvent && isOwner(detailEvent) && (
+                  {detailEvent && isOwner(detailEvent) ? (
                     <Pressable
                       onPress={() =>
                         Alert.alert(
@@ -1230,7 +1230,40 @@ export default function EventsScreen() {
                         Manage Tickets
                       </Text>
                     </Pressable>
-                  )}
+                  ) : detailEvent ? (
+                    <Pressable
+                      onPress={() => {
+                        Alert.alert(
+                          'Buy Tickets',
+                          `Purchase tickets for "${detailEvent.title}"?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Buy Ticket',
+                              onPress: async () => {
+                                try {
+                                  const res = await postRequest(ROUTES.events.tickets, { event: detailEvent.id, quantity: 1 });
+                                  if (res?.success || res?.id || res?.data?.id) {
+                                    Alert.alert('Ticket Purchased', 'Your ticket has been confirmed. Check your email for details.');
+                                  } else {
+                                    Alert.alert('Error', res?.message ?? 'Could not purchase ticket. Please try again.');
+                                  }
+                                } catch {
+                                  Alert.alert('Error', 'Ticket purchase failed. Please try again.');
+                                }
+                              },
+                            },
+                          ],
+                        );
+                      }}
+                      style={[styles.manageTicketsBtn, { borderColor: palette.success, backgroundColor: palette.successSoft }]}
+                    >
+                      <KISIcon name="card" size={14} color={palette.success} />
+                      <Text style={{ color: palette.success, fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
+                        Buy Ticket
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               )}
 

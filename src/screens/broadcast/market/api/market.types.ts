@@ -5,6 +5,7 @@ export type MarketShop = {
   description?: string;
   image_url?: string | null;
   employee_slots?: number;
+  status?: 'draft' | 'active' | 'paused';
   owner?: string;
   verified?: boolean;
   is_verified?: boolean;

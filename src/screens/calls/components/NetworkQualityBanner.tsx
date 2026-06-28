@@ -5,15 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NetworkQuality } from '@/services/calls/callTypes';
 import { useKISTheme } from '@/theme/useTheme';
 
-type Props = { quality: NetworkQuality };
+type Props = { quality: NetworkQuality; isAudioOnly?: boolean };
 
-export default function NetworkQualityBanner({ quality }: Props) {
+export default function NetworkQualityBanner({ quality, isAudioOnly = false }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
-  const show = quality === 1 || quality === 2;
+  const show = quality === 1 || quality === 2 || isAudioOnly;
 
-  // Keep the banner mounted while fading out so the animation can complete.
   const [mounted, setMounted] = useState(show);
 
   useEffect(() => {
@@ -31,10 +30,23 @@ export default function NetworkQualityBanner({ quality }: Props) {
 
   if (!mounted) return null;
 
-  const msg = quality === 1 ? '⚠️ Very poor connection' : '📶 Weak signal';
-  const bg = quality === 1 ? `${palette.danger}E6` : `${palette.gold}E6`;
-  // On danger (red) use white text; on gold use royalInk for sufficient contrast.
-  const textColor = quality === 1 ? palette.onPrimary : palette.royalInk;
+  let msg: string;
+  let bg: string;
+  let textColor: string;
+
+  if (isAudioOnly) {
+    msg = '📵 Switched to audio-only (very poor connection)';
+    bg = `${palette.danger}E6`;
+    textColor = palette.onPrimary ?? '#fff';
+  } else if (quality === 1) {
+    msg = '⚠️ Very poor connection';
+    bg = `${palette.danger}E6`;
+    textColor = palette.onPrimary ?? '#fff';
+  } else {
+    msg = '📶 Weak signal';
+    bg = `${palette.gold}E6`;
+    textColor = palette.royalInk;
+  }
 
   return (
     <Animated.View style={[styles.banner, { backgroundColor: bg, opacity, paddingTop: insets.top + 8 }]}>

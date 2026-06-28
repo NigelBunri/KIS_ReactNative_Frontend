@@ -121,17 +121,29 @@ export const NewChannelForm: React.FC<NewChannelFormProps> = ({
   };
 
   return (
-    <View style={{ marginTop: 16 }}>
-      <Text
-        style={{
-          color: palette.text,
-          fontSize: 18,
-          fontWeight: '700',
-          marginBottom: 12,
-        }}
-      >
-        Create a new channel
-      </Text>
+    <View style={{ marginTop: 4 }}>
+      <View style={{
+        backgroundColor: palette.card,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: palette.inputBorder,
+      }}>
+        <Text
+          style={{
+            color: palette.text,
+            fontSize: 20,
+            fontWeight: '800',
+            marginBottom: 4,
+          }}
+        >
+          Create a channel
+        </Text>
+        <Text style={{ color: palette.subtext, fontSize: 13, lineHeight: 18 }}>
+          Publish updates, announcements and content to your followers.
+        </Text>
+      </View>
 
       {/* Channel avatar */}
       <View style={{ alignItems: 'center', marginBottom: 20 }}>

@@ -66,6 +66,7 @@ export type RootStackParamList = {
   OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
   OrgAppLaunch: { partnerId: string; appId: string };
   InviteJoin: { type: 'group' | 'community'; token: string };
+  CallJoin: { token: string };
   PartnerRedeemInvite: { code?: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
   HealthInstitutionDetail: {
@@ -181,6 +182,7 @@ export type RootStackParamList = {
     returnBroadcastProfileKey?: BroadcastProfileKey;
   };
   AccountDeletion: undefined;
+  BlockedContacts: undefined;
   PasswordChange: undefined;
   ComplianceSettings: undefined;
   CacheManagement: undefined;
@@ -227,6 +229,97 @@ export type RootStackParamList = {
   ReachOutSheet: { seasonId: string; seasonTitle: string; seasonCategory: string };
   TestimonyReachInbox: undefined;
   NotificationSettings: undefined;
+  // Church & Faith
+  ChurchHome: undefined;
+  ChurchGiving: undefined;
+  GiveNow: undefined;
+  ChurchPledge: undefined;
+  TitheStatement: undefined;
+  MemberDirectory: undefined;
+  MemberProfile: { memberId: string };
+  ChurchAttendance: undefined;
+  SmallGroups: undefined;
+  SmallGroupDetail: { groupId: string };
+  DiscipleshipJourney: undefined;
+  SpiritualGifts: undefined;
+  PrayerWall: undefined;
+  NewPrayerRequest: undefined;
+  FastingTracker: undefined;
+  SetLists: undefined;
+  SongLibrary: undefined;
+  MinistryDepartments: undefined;
+  EvangelismTracker: undefined;
+  // Family
+  FamilyHub: undefined;
+  FamilySetup: undefined;
+  FamilyMembers: undefined;
+  ParentalControls: { memberId: string };
+  FamilyCalendar: undefined;
+  FamilyNoticeBoard: undefined;
+  FamilyAlbum: undefined;
+  FamilyMilestones: undefined;
+  FamilyTimeCapsules: undefined;
+  FamilyPrayer: undefined;
+  MemorialPage: { memorialId: string };
+  GriefSupport: undefined;
+  FamilyTree: { familyId: string };
+  FamilySOS: undefined;
+  // Government
+  GovernmentHub: undefined;
+  Petitions: undefined;
+  PetitionDetail: { petitionId: string };
+  CreatePetition: undefined;
+  CivicPolls: undefined;
+  LegalAid: undefined;
+  LegalTemplates: undefined;
+  DiasporaCommunities: undefined;
+  NGOTools: undefined;
+  ComplianceTracker: undefined;
+  WhistleblowerReport: undefined;
+  BoardGovernance: undefined;
+  // Education
+  LiveClassroom: { classroomId: string };
+  AssignmentsScreen: { classroomId: string };
+  StudentProgress: undefined;
+  Scholarships: undefined;
+  DigitalBadges: undefined;
+  EducationCertificate: undefined;
+  // Media
+  Podcasts: undefined;
+  PodcastEpisodeScreen: { episodeId: string };
+  KingdomMusic: undefined;
+  MusicPlaylists: undefined;
+  Ebooks: undefined;
+  PPVEvents: undefined;
+  KingdomNews: undefined;
+  CreatorAnalytics: undefined;
+  // Business
+  BusinessHub: undefined;
+  JobDetail: { jobId: string };
+  Crowdfunding: undefined;
+  CrowdfundDetail: { campaignId: string };
+  CreateCampaign: undefined;
+  SavingsGroups: undefined;
+  SavingsGroupDetail: { groupId: string };
+  BusinessMentorship: undefined;
+  CoWorkingSpaces: undefined;
+  KingdomCertification: undefined;
+  BusinessImpactReport: undefined;
+  // Health Extended
+  TelemedicineHub: undefined;
+  DoctorDirectory: { mode?: 'instant' | 'book' | 'browse' } | undefined;
+  ConsultDetail: { consultId?: string; doctorId?: string; doctorName?: string };
+  MentalHealthHub: undefined;
+  MoodJournal: undefined;
+  CrisisResources: undefined;
+  AddictionRecovery: undefined;
+  SobrietyTracker: undefined;
+  PregnancyTrackerScreen: undefined;
+  BabyMilestones: undefined;
+  EmergencyHub: undefined;
+  Medications: undefined;
+  HealthGoals: undefined;
+  SymptomChecker: undefined;
 };
 
 export type BroadcastTabId = 'feeds' | 'education' | 'market' | 'health';

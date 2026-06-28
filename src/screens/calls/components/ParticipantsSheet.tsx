@@ -24,6 +24,7 @@ type Props = {
   onMute?: (userId: string) => void;
   onRemove?: (userId: string) => void;
   onAddParticipant?: () => void;
+  onPromote?: (userId: string, role: string) => void;
   isHost?: boolean;
 };
 
@@ -41,7 +42,7 @@ const buildRoleColor = (p: any): Record<string, string> => ({
   audience: 'rgba(255,255,255,0.4)',
 });
 
-export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant }: Props) {
+export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant, onPromote }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const ROLE_COLOR = buildRoleColor(palette);
@@ -162,6 +163,25 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
                       hitSlop={6}
                     >
                       <KISIcon name={item.isMuted ? 'mic' : 'mic-off'} size={16} color={palette.subtext} />
+                    </Pressable>
+                  )}
+                  {onPromote && item.role !== 'co-host' && (
+                    <Pressable
+                      onPress={() => Alert.alert(
+                        `Change role for ${item.displayName}`,
+                        'Choose a new role:',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Co-host', onPress: () => onPromote(item.userId, 'co-host') },
+                          { text: 'Speaker', onPress: () => onPromote(item.userId, 'speaker') },
+                          { text: 'Audience', onPress: () => onPromote(item.userId, 'audience') },
+                        ],
+                      )}
+                      style={styles.actionBtn}
+                      accessibilityLabel={`Change role for ${item.displayName}`}
+                      hitSlop={6}
+                    >
+                      <KISIcon name="star" size={16} color={palette.gold} />
                     </Pressable>
                   )}
                   {onRemove && (

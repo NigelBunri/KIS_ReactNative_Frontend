@@ -2,9 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- Universal links -->
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:kis.app</string>
     </array>
+
+    <!-- VoIP push via PushKit — wakes the app even when killed to show
+         the native CallKit incoming call UI on the lock screen.
+         Requires this capability to be enabled in your Apple Developer
+         portal provisioning profile AND in Xcode → Signing & Capabilities
+         → + Capability → Push Notifications + Voice over IP.            -->
+    <key>com.apple.developer.pushkit.unrestricted-voip</key>
+    <true/>
+
+    <!-- Push Notifications capability (for FCM / APNs) -->
+    <key>aps-environment</key>
+    <string>development</string>
 </dict>
 </plist>

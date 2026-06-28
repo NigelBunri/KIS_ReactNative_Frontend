@@ -416,6 +416,11 @@ export default function MarketStudioSection({
     if (res?.success) {
       resetShopForm();
       loadMarket();
+    } else {
+      Alert.alert(
+        isEditingShop ? 'Unable to update shop' : 'Unable to create shop',
+        res?.message || 'Check the shop details and try again.',
+      );
     }
   }, [shopForm, isEditingShop, editingShopId, canCreateShop, loadMarket, shopImage]);
 

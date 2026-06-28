@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import type { BroadcastItem } from '@/types/broadcast';
@@ -42,16 +43,18 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
   const richTextValue = getFeedRichTextValue(item);
   const plainText = getFeedPlainText(item);
 
+  const rawAttachments = (item.attachments ?? []).filter(Boolean);
   const normalizedAttachments = dedupeAttachmentPreviews(
-    (item.attachments ?? [])
-      .filter(Boolean)
-      .map(att => getAttachmentPreviewInfo(att)),
-  ).map(att => ({
+    rawAttachments.map(att => getAttachmentPreviewInfo(att)),
+  ).map((att, i) => ({
     url: att.url,
+    previewUri: att.previewUri,
     label: att.label,
+    isVideo: att.isVideo,
+    raw: rawAttachments[i] ?? null,
   }));
 
-  const attachments = normalizedAttachments.filter(att => att.url);
+  const attachments = normalizedAttachments.filter(att => att.url || att.previewUri);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
   useEffect(() => {
@@ -132,18 +135,36 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
 
       {attachments.length > 0 ? (
         attachments.length === 1 ? (
-          <Image
-            source={{ uri: attachments[0].url! }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.slideshowWrap}>
+          attachments[0].isVideo && attachments[0].raw ? (
+            <BroadcastFeedVideoPreview
+              attachment={attachments[0].raw}
+              palette={palette}
+              containerStyle={styles.image}
+              posterOverride={attachments[0].previewUri ?? undefined}
+            />
+          ) : (
             <Image
-              source={{ uri: attachments[activeAttachmentIndex].url! }}
-              style={styles.slideshowImage}
+              source={{ uri: attachments[0].previewUri ?? attachments[0].url! }}
+              style={styles.image}
               resizeMode="cover"
             />
+          )
+        ) : (
+          <View style={styles.slideshowWrap}>
+            {attachments[activeAttachmentIndex].isVideo && attachments[activeAttachmentIndex].raw ? (
+              <BroadcastFeedVideoPreview
+                attachment={attachments[activeAttachmentIndex].raw}
+                palette={palette}
+                containerStyle={styles.slideshowImage}
+                posterOverride={attachments[activeAttachmentIndex].previewUri ?? undefined}
+              />
+            ) : (
+              <Image
+                source={{ uri: attachments[activeAttachmentIndex].previewUri ?? attachments[activeAttachmentIndex].url! }}
+                style={styles.slideshowImage}
+                resizeMode="cover"
+              />
+            )}
             <Pressable
               style={[styles.navButton, styles.navLeft]}
               onPress={handlePrevAttachment}

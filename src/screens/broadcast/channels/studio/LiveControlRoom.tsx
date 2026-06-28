@@ -207,11 +207,8 @@ function RecordingsPanel({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const endpoint =
-        (ROUTES.broadcasting?.recordings as string | undefined) ??
-        `${(ROUTES as any).liveStreamings?.recordings ?? ''}/api/v1/broadcasts/recordings/`;
       const res = await getRequest(
-        `${endpoint}?stream=${streamId}`,
+        ROUTES.broadcasts.recordings(streamId),
         { errorMessage: '' },
       );
       const list: Recording[] = Array.isArray(res?.data)
@@ -248,10 +245,7 @@ function RecordingsPanel({
           onPress: async () => {
             setDeletingId(recording.id);
             try {
-              const endpoint =
-                (ROUTES.broadcasting?.recordings as string | undefined) ??
-                '/api/v1/broadcasts/recordings/';
-              await deleteRequest(`${endpoint}${recording.id}/`);
+              await deleteRequest(ROUTES.broadcasts.recordingDetail(recording.id));
               setRecordings(prev => prev.filter(r => r.id !== recording.id));
             } catch {
               Alert.alert('Delete failed', 'Unable to delete recording. Please try again.');

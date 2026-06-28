@@ -6,6 +6,8 @@ import { webRTCService } from './webRTCService';
 
 /** Tracks the original camera video track so we can restore it after screen share. */
 let _originalVideoTrack: any = null;
+/** The active screen-capture track, so toggle-off can stop ONLY it (not the camera). */
+let _screenTrack: any = null;
 /** Whether screen share is currently active (per-session guard). */
 const _screenShareState: Record<string, boolean> = {};
 
@@ -16,13 +18,13 @@ const _screenShareState: Record<string, boolean> = {};
  *   1. Tries `mediaDevices.getDisplayMedia` (react-native-webrtc ≥ 106 + OS support).
  *   2. Falls back to front camera capture if getDisplayMedia is unavailable.
  *   3. Replaces the video sender track in all active peer connections.
- *   4. Emits `call.screen_share` with `{ sessionId, sharing: true }` via the socket.
+ *   4. Emits `call.screen_share` with `{ conversationId, enabled: true }` via the socket.
  *   5. Returns the new isScreenSharing value (true).
  *
  * On second call (sharing on → off):
  *   1. Stops the screen capture track.
  *   2. Restores the original camera track.
- *   3. Emits `call.screen_share` with `{ sessionId, sharing: false }`.
+ *   3. Emits `call.screen_share` with `{ conversationId, enabled: false }`.
  *   4. Returns false.
  *
  * @param sessionId     The active call session ID.
@@ -41,12 +43,14 @@ export async function toggleScreenShare(
     // ── TOGGLE OFF ──────────────────────────────────────────────────────────
     const localStream = webRTCService.getLocalStream();
 
-    // Stop current (screen) video track
-    if (localStream) {
-      const videoTracks: any[] = localStream.getVideoTracks?.() ?? [];
-      videoTracks.forEach((t: any) => {
-        try { t.stop(); } catch { /* ignore */ }
-      });
+    // Stop ONLY the screen-capture track. Previously this stopped EVERY video
+    // track on the local stream — which includes the camera track (it is never
+    // removed from the local stream during screen share). That killed the camera
+    // permanently, so restoring _originalVideoTrack below put a dead track back
+    // on the senders and the local participant went black after un-sharing.
+    if (_screenTrack) {
+      try { _screenTrack.stop(); } catch { /* ignore */ }
+      _screenTrack = null;
     }
 
     // Restore original camera track across all peer connections
@@ -65,7 +69,7 @@ export async function toggleScreenShare(
       _originalVideoTrack = null;
     }
 
-    socket?.emit('call.screen_share', { sessionId, sharing: false });
+    socket?.emit('call.screen_share', { conversationId: sessionId, enabled: false });
     _screenShareState[sessionId] = false;
     return false;
   }
@@ -110,6 +114,8 @@ export async function toggleScreenShare(
       if (screenStream) {
         const screenVideoTrack = screenStream.getVideoTracks?.()?.[0];
         if (screenVideoTrack) {
+          // Remember the screen track so toggle-off can stop exactly this one.
+          _screenTrack = screenVideoTrack;
           const peerConns = (webRTCService as any).peers as Map<string, any>;
           peerConns?.forEach((pc: any) => {
             try {
@@ -127,7 +133,7 @@ export async function toggleScreenShare(
     return false;
   }
 
-  socket?.emit('call.screen_share', { sessionId, sharing: true });
+  socket?.emit('call.screen_share', { conversationId: sessionId, enabled: true });
   _screenShareState[sessionId] = true;
   return true;
 }

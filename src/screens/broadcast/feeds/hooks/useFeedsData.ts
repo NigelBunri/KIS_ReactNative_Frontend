@@ -210,7 +210,15 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       const normalizedResults = (page.results ?? []).map(item =>
         normalizeFeedItem(item),
       );
-      const visibleResults = normalizedResults.filter(item => !isHealthcareFeedItem(item));
+      const nonHealthcareResults = normalizedResults.filter(item => !isHealthcareFeedItem(item));
+      // Dedup by string-normalized id so the same item can't appear twice
+      const seen = new Set<string>();
+      const visibleResults = nonHealthcareResults.filter(item => {
+        const key = String(item.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (visibleResults.length === 0 && itemsRef.current.length > 0) {
         nextUrlRef.current = page.next ?? null;
         return;
@@ -247,7 +255,7 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     }
 
     setItems(prev => {
-      const have = new Set(prev.map(x => x.id));
+      const have = new Set(prev.map(x => String(x.id)));
       const merged = [...prev];
       const normalizedResults = (page.results ?? []).map(item =>
         normalizeFeedItem(item),
@@ -256,7 +264,10 @@ export default function useFeedsData({ q = '', code = null }: Params) {
         item => !isHealthcareFeedItem(item),
       );
       for (const it of nonHealthcareResults) {
-        if (!have.has(it.id)) merged.push(it);
+        if (!have.has(String(it.id))) {
+          have.add(String(it.id));
+          merged.push(it);
+        }
       }
       if (!mountedRef.current) return prev;
       itemsRef.current = merged;

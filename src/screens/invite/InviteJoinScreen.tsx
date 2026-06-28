@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { KISIcon } from '@/constants/kisIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -124,7 +125,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
         {status === 'success' && (
           <>
-            <Text style={[styles.icon, { color: palette.success }]}>✓</Text>
+            <KISIcon name="checkmark-circle" size={64} color={palette.success} />
             <Text style={[styles.title, { color: palette.text }]}>Welcome!</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               {message}{groupName ? `\n${displayName}` : ''}
@@ -145,7 +146,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
         {status === 'error' && (
           <>
-            <Text style={[styles.errorIcon, { color: palette.danger }]}>✕</Text>
+            <KISIcon name="close" size={64} color={palette.danger} />
             <Text style={[styles.title, { color: palette.text }]}>Unable to join</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>{message}</Text>
             <Pressable

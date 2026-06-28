@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
+import type { CallHistoryEntry } from './componets/CallHistoryRow';
 import { MessageComposer } from './componets/main/MessageComposer';
 import type { ChatMessage, LocationMessage } from './chatTypes';
 import type { Chat } from './messagesUtils';
@@ -78,6 +78,9 @@ type Props = {
   // calculate the correct offset. Defaults to 0; ChatRoomPage should pass
   // its measured header height.
   keyboardOffset?: number;
+  // Call history to render inline in the message stream
+  callHistory?: import('./componets/CallHistoryRow').CallHistoryEntry[];
+  onCallHistoryCallback?: (entry: import('./componets/CallHistoryRow').CallHistoryEntry) => void;
 
   // GAP 12: announcement mode (admin-only posting)
   announcementMode?: boolean;
@@ -159,8 +162,9 @@ export default function ChatRoomBody({
   scheduledMessages = [],
   onSendScheduledNow,
   onCancelScheduled,
-  conversationId,
   onLinkPreviewChange,
+  callHistory = [],
+  onCallHistoryCallback,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -222,9 +226,13 @@ export default function ChatRoomBody({
         mentionMap={mentionMap}
         participantMap={participantMap}
         participantAvatarMap={participantAvatarMap}
+        callHistory={callHistory}
+        onCallHistoryCallback={onCallHistoryCallback}
       />
 
       <TypingIndicator typingUsers={typingUsers} palette={palette} />
+
+      {/* Call records are merged chronologically into MessageList. */}
 
       {/* GAP 13: activity sub-state label */}
       {activityLabel ? (

@@ -354,18 +354,17 @@ export const shareChannelContent = async (contentId: string, completed = true) =
 };
 
 export const recordChannelContentView = async (contentId: string, payload: Record<string, any> = {}) => {
-  const response = await queueableJsonRequest({
-    domain: 'Broadcast',
-    kind: 'channel.content_view',
-    method: 'POST',
-    url: channelContentViewEndpoint(contentId),
-    body: payload,
-    dedupeKey: `channel:content-view:${contentId}`,
-    replaceExisting: true,
-    errorMessage: 'Unable to record view.',
-  });
-  if (response?.success) emitMainTabBadgeRefresh('channel_content_viewed');
-  return response?.success ? response.data : null;
+  try {
+    const response = await postRequest(
+      channelContentViewEndpoint(contentId),
+      payload,
+      { errorMessage: 'Unable to record view.' },
+    );
+    if (response?.success) emitMainTabBadgeRefresh('channel_content_viewed');
+    return response?.success ? response.data : null;
+  } catch {
+    return null;
+  }
 };
 
 

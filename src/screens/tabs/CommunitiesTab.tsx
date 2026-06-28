@@ -24,6 +24,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import { enqueueMutation } from '@/services/pendingMutationsQueue';
 import { KISIcon } from '@/constants/kisIcons';
@@ -84,7 +85,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [communitiesPage, setCommunitiesPage] = useState(1);
-  const [communitiesHasMore, setCommunitiesHasMore] = useState(true);
+  const [communitiesHasMore, setCommunitiesHasMore] = useState(false);
   const [selected, setSelected] = useState<Community | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -127,12 +128,11 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         : Array.isArray(res)
         ? res
         : [];
-      const hasNext = res?.data?.next != null || res?.next != null;
-      if (list.length < 20 || !hasNext) {
-        setCommunitiesHasMore(false);
-      } else {
-        setCommunitiesHasMore(true);
-      }
+      const meta = res?.data?.meta || res?.meta;
+      const hasNext = meta
+        ? meta.current < meta.total_pages
+        : res?.data?.next != null || res?.next != null;
+      setCommunitiesHasMore(hasNext);
       if (page === 1) {
         setCommunities(list as Community[]);
       } else {
@@ -467,9 +467,44 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   }, [selected, groupName, selectedMemberIds, currentUserId]);
 
   const openGroupChat = useCallback(
-    (group: Group) => {
+    async (group: Group) => {
       if (!group?.conversation_id) {
-        Alert.alert('Coming soon', 'This group does not have a chat room yet.');
+        Alert.alert(
+          'Create Chat Room',
+          `"${group.name}" doesn't have a chat room yet. Create one now?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Create Chat',
+              onPress: async () => {
+                try {
+                  const res = await patchRequest(
+                    ROUTES.groups.detail(group.id),
+                    { create_conversation: true },
+                  );
+                  const updatedGroup: Group = res?.data ?? res;
+                  const convId = updatedGroup?.conversation_id;
+                  if (convId && onOpenChat) {
+                    setGroups(prev => prev.map(g => g.id === group.id ? { ...g, conversation_id: convId } : g));
+                    onOpenChat({
+                      id: String(convId),
+                      conversationId: String(convId),
+                      name: group.name,
+                      kind: 'group',
+                      isGroup: true,
+                      isGroupChat: true,
+                      groupId: group.id,
+                    });
+                  } else {
+                    Alert.alert('Error', 'Chat room could not be created. Please try again.');
+                  }
+                } catch {
+                  Alert.alert('Error', 'Failed to create chat room.');
+                }
+              },
+            },
+          ],
+        );
         return;
       }
       if (!onOpenChat) return;
@@ -483,7 +518,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         groupId: group.id,
       });
     },
-    [onOpenChat],
+    [onOpenChat, setGroups],
   );
 
   useEffect(() => {

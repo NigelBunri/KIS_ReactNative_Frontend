@@ -424,6 +424,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
       if (res?.success !== false) {
         setAddMemberInput('');
         setAddMemberModalVisible(false);
+        // Notify useChatMessaging to refresh its participants ref so the very
+        // next outgoing message is encrypted for the new member.
+        if (conversationId) {
+          DeviceEventEmitter.emit('conversation.participants_changed', { conversationId });
+        }
         // Refresh member list
         if (groupId) {
           const fresh = await getRequest(ROUTES.groups.members(groupId), {});

@@ -7,7 +7,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import KISButton from '@/constants/KISButton';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { VerificationBadgeRow } from '@/components/verification';
@@ -234,38 +236,69 @@ export const ProfileHeroCard = ({
 
   return (
     <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard'), { borderRadius: 0, minHeight: (compact ? 284 : 308) + topInset }]}>
-      <View
-        style={[
-          dashboardStyles.heroBackdrop,
-          { backgroundColor: isDark ? `${palette.royalInk}80` : palette.royalInk },
-        ]}
-      >
+      <View style={dashboardStyles.heroBackdrop}>
         {coverUrl ? (
+          /* ── Cover image path — image fills the backdrop, gold-warm tinted scrim ── */
           <>
-          <View style={{backgroundColor: `${palette.royalInk}75`, height: '100%', width: '100%', zIndex: 9}} />
-          <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
+            <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
+            {/* Warm gold-dark gradient scrim: transparent top → deep warm bottom
+                so text/avatar remain legible without losing the cover photo */}
+            <LinearGradient
+              colors={['transparent', 'rgba(48,28,4,0.55)', 'rgba(18,10,0,0.80)']}
+              locations={[0, 0.55, 1]}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {/* Thin top edge — aligns with the other golden screens */}
+            <View style={dashboardStyles.heroGoldSheen} pointerEvents="none" />
           </>
-        ) : null}
-        <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: dashboardTheme.hero.haloPrimary }]} />
-        <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: dashboardTheme.hero.haloSecondary }]} />
-        <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: dashboardTheme.hero.haloAccent }]} />
-        <View style={[dashboardStyles.heroArcLarge, { borderColor: dashboardTheme.hero.ring }]} />
-        <View style={[dashboardStyles.heroArcSmall, { borderColor: dashboardTheme.hero.border }]} />
-        <View style={[dashboardStyles.heroScrim, { backgroundColor: dashboardTheme.hero.scrim }]} />
+        ) : (
+          /* ── No cover — gold gradient IS the background ─────────────────────── */
+          <>
+            <LinearGradient
+              colors={[...KIS_ROYAL_GRADIENTS.goldHeader]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {/* Luxury glows in gold tones for depth */}
+            <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: '#C9A24A', opacity: 0.40 }]} />
+            <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: '#6F4515', opacity: 0.35 }]} />
+            <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: '#9A6A14', opacity: 0.30 }]} />
+            <View style={[dashboardStyles.heroArcLarge, { borderColor: 'rgba(255,244,184,0.15)' }]} />
+            <View style={[dashboardStyles.heroArcSmall, { borderColor: 'rgba(255,244,184,0.10)' }]} />
+            {/* Bottom fade so avatar/text row has a readable dark base */}
+            <LinearGradient
+              colors={['transparent', 'rgba(18,10,0,0.60)']}
+              locations={[0.3, 1]}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {/* Luxury shimmer line at very top */}
+            <View style={dashboardStyles.heroGoldSheen} pointerEvents="none" />
+          </>
+        )}
       </View>
 
       <View style={[dashboardStyles.heroActionsRail, { top: 16 + topInset }]}>
-        <View style={[dashboardStyles.heroTopChip, getProfileDashboardCardStyle(dashboardTheme, 'heroOverlay')]}>
-          <Text style={[dashboardTheme.sectionHeader.eyebrow, { color: palette.text }]}>
-            Profile Dashboard
+        {/* Eyebrow chip — gold-tinted glass */}
+        <View style={[dashboardStyles.heroTopChip, {
+          backgroundColor: 'rgba(23,17,31,0.32)',
+          borderColor: 'rgba(255,244,184,0.30)',
+          borderWidth: 1,
+        }]}>
+          <Text style={{ color: 'rgba(255,244,184,0.82)', fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' }}>
+            Profile
           </Text>
         </View>
+        {/* Action icons — gold-on-dark, matching Messages/Broadcast/Bible/Partners */}
         <View style={dashboardStyles.heroActionMain}>
           <Pressable
             onPress={onNotificationsPress}
-            style={[dashboardStyles.heroIconButton, { backgroundColor: dashboardTheme.hero.iconRailBg, borderColor: dashboardTheme.hero.border }]}
+            style={[dashboardStyles.heroIconButton, {
+              backgroundColor: 'rgba(23,17,31,0.32)',
+              borderColor: 'rgba(255,244,184,0.30)',
+            }]}
           >
-            <KISIcon name="bell" size={20} color={dashboardTheme.hero.iconColor} />
+            <KISIcon name="bell" size={20} color="rgba(255,244,184,0.92)" />
             {notificationCount ? (
               <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
                 <Text style={[dashboardStyles.heroNotificationText, { color: palette.onPrimary }]}>{notificationCount}</Text>
@@ -274,12 +307,14 @@ export const ProfileHeroCard = ({
           </Pressable>
           <Pressable
             onPress={onSettingsPress}
-            style={[dashboardStyles.heroIconButton, { backgroundColor: dashboardTheme.hero.iconRailBg, borderColor: dashboardTheme.hero.border }]}
+            style={[dashboardStyles.heroIconButton, {
+              backgroundColor: 'rgba(23,17,31,0.32)',
+              borderColor: 'rgba(255,244,184,0.30)',
+            }]}
           >
-            <KISIcon name="settings" size={20} color={dashboardTheme.hero.iconColor} />
+            <KISIcon name="settings" size={20} color="rgba(255,244,184,0.92)" />
           </Pressable>
         </View>
-        
       </View>
 
       <View style={[dashboardStyles.heroContent, { paddingTop: (compact ? 78 : 88) + topInset, paddingBottom: 16 + bottomOverlap }]}>
@@ -869,6 +904,18 @@ const dashboardStyles = StyleSheet.create({
   heroBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+  },
+  // 2px luxury shimmer line at the very top — shared visual language with
+  // Messages, Broadcast, Bible, and Partners gold headers.
+  heroGoldSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#FFF4B8',
+    opacity: 0.50,
+    zIndex: 10,
   },
   heroCoverImage: {
     ...StyleSheet.absoluteFillObject,

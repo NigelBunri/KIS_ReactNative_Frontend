@@ -228,13 +228,17 @@ export default function WatchHistoryScreen() {
                   </Text>
                 </View>
                 {item.progress_seconds > 0 && !item.completed && (
-                  <View style={[styles.progressBar, { backgroundColor: palette.border }]}>
+                  <View style={[styles.progressBar, { backgroundColor: palette.border, flexDirection: 'row' }]}>
                     <View
                       style={[
                         styles.progressFill,
-                        { backgroundColor: palette.primaryStrong, width: `${Math.min(100, (item.progress_seconds / 3600) * 100)}%` as any },
+                        {
+                          backgroundColor: palette.primaryStrong,
+                          flex: Math.min(100, (item.progress_seconds / 3600) * 100),
+                        },
                       ]}
                     />
+                    <View style={{ flex: 100 - Math.min(100, (item.progress_seconds / 3600) * 100) }} />
                   </View>
                 )}
               </View>

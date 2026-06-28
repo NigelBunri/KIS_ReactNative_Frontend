@@ -144,6 +144,35 @@ export const mapBackendToChatMessage = (
     : [];
   const attachments = mapAttachments(rawAttachments);
   const media = rawMedia ? { ...rawMedia, attachments } : attachments.length ? { attachments } : undefined;
+  const rawVoice = payload.voice && typeof payload.voice === 'object' ? payload.voice : undefined;
+  const voiceAttachment = attachments.find((attachment: any) => {
+    const kind = String(attachment?.kind || '').toLowerCase();
+    const mime = String(attachment?.mimeType || '').toLowerCase();
+    return kind === 'voice' || kind === 'audio' || mime.startsWith('audio/');
+  });
+  const voiceUri =
+    voiceAttachment?.downloadUrl ??
+    voiceAttachment?.displayUrl ??
+    voiceAttachment?.url ??
+    rawVoice?.url ??
+    rawVoice?.uri;
+  const rawDurationMs =
+    rawVoice?.durationMs ??
+    rawVoice?.duration_ms ??
+    voiceAttachment?.durationMs ??
+    (typeof voiceAttachment?.durationSeconds === 'number'
+      ? voiceAttachment.durationSeconds * 1000
+      : undefined);
+  const voice = voiceUri
+    ? {
+        uri: String(voiceUri),
+        url: String(voiceUri),
+        localUri: voiceAttachment?.localUri,
+        localPath: voiceAttachment?.localPath,
+        name: voiceAttachment?.originalName,
+        durationMs: Math.max(0, Number(rawDurationMs || 0)),
+      }
+    : undefined;
 
   return {
     id: String(payload.id ?? payload._id ?? payload.clientId ?? ''),
@@ -173,5 +202,6 @@ export const mapBackendToChatMessage = (
     contacts,
     poll,
     event,
+    voice,
   };
 };

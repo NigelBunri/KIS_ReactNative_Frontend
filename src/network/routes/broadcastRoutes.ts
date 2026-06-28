@@ -120,7 +120,7 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/bible/courses/${id}/certificate/`,
     certificateShare: (token: string) =>
       `${API_BASE_URL}/api/v1/bible/credentials/share/${token}/`,
-    enroll: (id: string) =>
+    enroll: (_id: string) =>
       `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
     itemAction: (contentId: string, itemId: string) =>
       `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
@@ -263,6 +263,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/posts/${id}/react/`,
     postDelete: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/posts/${id}/delete/`,
+    postUpdate: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/posts/${id}/edit/`,
     postBroadcast: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/posts/${id}/broadcast/`,
     deactivate: (id: string) =>
@@ -331,6 +333,10 @@ const broadcastRoutes = {
     // Live chat for a specific stream
     liveStreamChat: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/chat/`,
+    recordings: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/recordings/`,
+    recordingDetail: (recordingId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/recordings/${recordingId}/`,
     // Per-channel notification preference (notify on live / new content)
     channelNotificationPreference: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/notification-preference/`,
@@ -584,7 +590,7 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/health/services/${encodeURIComponent(
         serviceId,
       )}/`,
-    upload: `${API_BASE_URL}/api/v1/broadcasts/upload/`,
+    upload: `${API_BASE_URL}/api/v1/broadcasts/videos/upload/`,
     channelContentChapters: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/`,
     channelContentChapterDetail: (contentId: string, chapterId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/chapters/${chapterId}/`,
     channelCommentReport: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/report/`,

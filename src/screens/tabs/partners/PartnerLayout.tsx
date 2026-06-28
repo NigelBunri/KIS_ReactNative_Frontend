@@ -9,6 +9,7 @@ import PartnersMessagesPane from '@/components/partners/PartnersMessagesPane';
 import PartnerSheet from '@/components/partners/PartnerSheet';
 import PartnerPanels from './PartnerPanels';
 import { useKISTheme } from '@/theme/useTheme';
+import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import PartnerAppLaunchBar from '@/components/partners/PartnerAppLaunchBar';
 import { usePartnerOrganizationAppsContext } from '@/context/partners/PartnerOrganizationAppsContext';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
@@ -137,7 +138,9 @@ export default function PartnerLayout({
   onOpenAdminDashboard,
   onRefreshPartner,
 }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  // Gold header → dark icons (same as Messages + Broadcast + Bible)
+  useStatusBarStyle(tone, 'dark-content');
   const insets = useSafeAreaInsets();
   const {
     apps: organizationApps,
@@ -146,8 +149,11 @@ export default function PartnerLayout({
     reload: reloadOrganizationApps,
   } = usePartnerOrganizationAppsContext();
   return (
+    // Root no longer has paddingTop — the left rail fills all the way to y=0
+    // (behind the status bar) while the centre column handles its own top inset
+    // via the gold header's paddingTop.
     <View
-      style={[styles.root, { backgroundColor: palette.chrome, paddingTop: insets.top }]}
+      style={[styles.root, { backgroundColor: palette.chrome }]}
       {...rootPanHandlers}
     >
       <LinearGradient
@@ -156,24 +162,20 @@ export default function PartnerLayout({
         end={{ x: 1, y: 1 }}
         style={styles.rootGradient}
       />
-      <View
-        style={[styles.rootGlowTop, { backgroundColor: palette.primaryStrong }]}
-      />
-      <View
-        style={[
-          styles.rootGlowBottom,
-          { backgroundColor: palette.secondary ?? palette.primaryStrong },
-        ]}
-      />
+      <View style={[styles.rootGlowTop, { backgroundColor: palette.primaryStrong }]} />
+      <View style={[styles.rootGlowBottom, { backgroundColor: palette.secondary ?? palette.primaryStrong }]} />
 
+      {/* ── Left rail — extends from the very top of the screen (y=0) ─────── */}
       <PartnersLeftRail
         partners={partners}
         selectedPartnerId={selectedPartnerId}
         onSelectPartner={setSelectedPartnerId}
         onAddPartnerPress={onAddPartnerPress}
         loading={partnersLoading}
+        topInset={insets.top}
       />
 
+      {/* ── Centre pane — golden header lives inside the scrollable content ── */}
       <PartnersCenterPane
         selectedPartner={selectedPartner}
         isReadOnly={selectedPartner?.member_role === 'readonly'}
@@ -195,6 +197,7 @@ export default function PartnerLayout({
         onOpenInsights={onOpenInsights}
         loading={partnersLoading}
         onRefresh={onRefreshPartner}
+        topInset={insets.top}
       />
 
       {!isMessagesExpanded ? (

@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import { useResponsiveLayout } from '@/theme/responsive';
 import {
   useFocusEffect,
@@ -219,6 +220,7 @@ const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { palette, tone } = useKISTheme();
+  useStatusBarStyle(tone);   // light-content on dark bg, dark-content on light bg
   const responsive = useResponsiveLayout();
   const compactProfile = responsive.isWatch || responsive.isCompactPhone;
   const tinyProfile = responsive.isWatch;
@@ -1824,6 +1826,7 @@ export default function ProfileScreen() {
     ],
     [
       c.openCreatePartner,
+      c.profile?.profile?.connection_count,
       canCreatePartner,
       openManagementPanel,
       openShopEditorForCreate,
@@ -2032,7 +2035,11 @@ export default function ProfileScreen() {
             errorMessage: 'Unable to create shop.',
           });
       if (!response?.success) {
-        throw new Error(response?.message || 'Unable to save shop.');
+        Alert.alert(
+          'Unable to save shop',
+          response?.message || 'Check the shop details and try again.',
+        );
+        return;
       }
       await loadCommerceShops();
       Alert.alert(
@@ -2041,7 +2048,7 @@ export default function ProfileScreen() {
       );
       resetMarketForm();
       closeShopEditor();
-    } catch (error: any) {
+    } catch {
       // Queue the JSON-serialisable fields for retry when connectivity returns.
       // FormData (with binary images) cannot be queued — text fields are queued
       // instead so the backend is updated once reconnected. A new image upload
@@ -2357,7 +2364,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,

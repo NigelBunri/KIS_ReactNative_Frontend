@@ -124,6 +124,8 @@ export default function MarketShopsPage({ ownerId = null, canUseMarket = false, 
     if (r.ok) {
       reset();
       await reloadAll();
+    } else {
+      Alert.alert('Unable to create shop', r.message || 'Check the shop details and try again.');
     }
   };
 

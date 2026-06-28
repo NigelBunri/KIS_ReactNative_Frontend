@@ -403,8 +403,8 @@ const styles = StyleSheet.create({
   bubble1: { top: -30, left: -60, opacity: 0.36 },
   bubble2: { bottom: -35, right: -65, opacity: 0.25 },
   bubble3: { top: -5, right: -10, opacity: 0.2 },
-  title: { fontSize: 32, fontWeight: '800', textAlign: 'center' },
-  subtitle: { marginTop: 12, fontSize: 15, lineHeight: 24, textAlign: 'center', maxWidth: 520 },
+  title: { fontWeight: '800', textAlign: 'center' },
+  subtitle: { marginTop: 12, textAlign: 'center', maxWidth: 520 },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -419,8 +419,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
   },
-  statLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statValue: { fontSize: 18, fontWeight: '700', marginTop: 4 },
+  statLabel: { textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontWeight: '700', marginTop: 4 },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginVertical: 4,
   },
-  tagText: { fontSize: 12, letterSpacing: 0.2 },
+  tagText: { letterSpacing: 0.2 },
   featureGrid: {
     width: '100%',
     marginTop: 24,
@@ -447,9 +447,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
   },
-  featureTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 10 },
-  featureSubtitle: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 4 },
+  featureTitle: { fontWeight: '700', textAlign: 'center', marginTop: 10 },
+  featureSubtitle: { textAlign: 'center', marginTop: 4 },
   buttons: { width: '100%', marginTop: 18 },
-  legal: { textAlign: 'center', marginTop: 20, fontSize: 12 },
+  legal: { textAlign: 'center', marginTop: 20 },
   link: { fontWeight: '700' },
 });

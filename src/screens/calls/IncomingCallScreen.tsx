@@ -1,6 +1,7 @@
 // src/screens/calls/IncomingCallScreen.tsx
 import React, { useEffect, useRef } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -32,7 +33,7 @@ const buildAccent = (p: any): Record<string, string> => ({
 
 type Props = {
   session: CallSession | null;
-  onAnswer: () => void;
+  onAnswer: (opts?: { videoOff?: boolean }) => void;
   onDecline: () => void;
 };
 
@@ -177,6 +178,37 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
             </Text>
           </View>
 
+          {/* ── Snooze / more options row ── */}
+          <View style={styles.snoozeRow}>
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  'Remind me',
+                  'We\'ll notify you again in:',
+                  [
+                    { text: '1 minute',  onPress: () => setTimeout(() => Vibration.vibrate(VIBRATE_PATTERN, true), 60_000) },
+                    { text: '5 minutes', onPress: () => setTimeout(() => Vibration.vibrate(VIBRATE_PATTERN, true), 300_000) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                )
+              }
+              style={[styles.snoozeBtn, { backgroundColor: `${palette.text}14` }]}
+              hitSlop={8}
+            >
+              <Text style={[styles.snoozeText, { color: `${palette.text}80` }]}>Remind me</Text>
+            </Pressable>
+
+            {isVideo && (
+              <Pressable
+                onPress={() => onAnswer({ videoOff: true })}
+                style={[styles.snoozeBtn, { backgroundColor: `${palette.text}14` }]}
+                hitSlop={8}
+              >
+                <Text style={[styles.snoozeText, { color: `${palette.text}80` }]}>Answer (no cam)</Text>
+              </Pressable>
+            )}
+          </View>
+
           {/* ── Answer / Decline ── */}
           <View style={styles.actionsSection}>
             <CallActionButton
@@ -194,7 +226,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
               color={palette.success}
               iconColor={palette.card}
               labelColor={`${palette.text}99`}
-              onPress={onAnswer}
+              onPress={() => onAnswer()}
               accessibilityLabel="Accept call"
             />
           </View>
@@ -318,6 +350,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
+
+  // Snooze row
+  snoozeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  snoozeBtn: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  snoozeText: { fontSize: 12, fontWeight: '600' },
 
   // Actions
   actionsSection: {

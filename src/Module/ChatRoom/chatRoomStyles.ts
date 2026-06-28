@@ -339,6 +339,13 @@ export const chatRoomStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  hiddenVoicePlayer: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+
   /* Voice preview row */
 
   voicePreviewWave: {

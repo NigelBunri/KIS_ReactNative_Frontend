@@ -610,7 +610,22 @@ function InstitutionDashboard({
                 else if (action.label === 'Invite Staff') setTab('members');
                 else if (action.label === 'Live Class') Alert.alert('Live Class', 'To start a live class, go to the Courses tab and open a scheduled course session. Live streaming will be available soon.');
                 else if (action.label === 'Issue Certificate') Alert.alert('Issue Certificate', 'Certificates are issued automatically when a learner completes all course requirements. You can track this in the Analytics tab.');
-                else if (action.label === 'Publish Landing') { setTab('settings'); Alert.alert('Publish Landing', 'Institution landing page publishing is managed via institution settings. Coming soon.'); }
+                else if (action.label === 'Publish Landing') {
+                  patchRequest(
+                    ROUTES.broadcasts.educationInstitution(institution.id),
+                    { is_landing_published: true },
+                  ).then(res => {
+                    if (res?.success) {
+                      Alert.alert('Published', 'Your institution landing page is now live.');
+                    } else {
+                      setTab('settings');
+                      Alert.alert('Publish Landing', res?.message ?? 'Update landing page settings in the Settings tab.');
+                    }
+                  }).catch(() => {
+                    setTab('settings');
+                    Alert.alert('Publish Landing', 'Manage your landing page in the Settings tab.');
+                  });
+                }
               }}
               style={{
                 borderWidth: 1.5,

@@ -118,7 +118,19 @@ async function prefetchMessages(currentUserId?: string | null): Promise<void> {
   const rawList = Array.isArray(res?.data?.results) ? res.data.results : [];
   if (!rawList.length) return;
   const normalized = rawList.map((item: any) => normalizeConversation(item, effectiveUserId));
-  await AsyncStorage.setItem(`kis.conversations_cache:${effectiveUserId}`, JSON.stringify(normalized));
+  const normalizedCacheKey = `kis.conversations_cache:${effectiveUserId}`;
+  let existing: any[] = [];
+  try {
+    const raw = await AsyncStorage.getItem(normalizedCacheKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) existing = parsed;
+  } catch {}
+  const byId = new Map<string, any>();
+  [...existing, ...normalized].forEach((conversation) => {
+    const id = String(conversation?.conversationId ?? conversation?.id ?? '').trim();
+    if (id) byId.set(id, { ...(byId.get(id) ?? {}), ...conversation });
+  });
+  await AsyncStorage.setItem(normalizedCacheKey, JSON.stringify(Array.from(byId.values())));
   await setCache(
     CONVERSATION_CACHE_TYPE,
     `${CONVERSATION_CACHE_KEY}:${effectiveUserId}`,

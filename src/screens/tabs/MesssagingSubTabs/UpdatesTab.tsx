@@ -36,6 +36,7 @@ import { useSocket } from '../../../../SocketProvider';
 import Video from 'react-native-video';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
+import RNFS from 'react-native-fs';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
 type StatusReplyPermission = 'contacts' | 'nobody';
@@ -510,7 +511,8 @@ export default function UpdatesTab({
     }
     setRecordingMs(0);
     setIsRecording(true);
-    const path = await recorderRef.current.startRecorder();
+    const recordingPath = `${RNFS.CachesDirectoryPath}/kis-status-${Date.now()}.m4a`;
+    const path = await recorderRef.current.startRecorder(`file://${recordingPath}`);
     const uri =
       typeof path === 'string' && path.startsWith('file://')
         ? path

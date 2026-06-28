@@ -111,7 +111,8 @@ export default function JobsBoardScreen() {
                 );
                 Alert.alert('Application submitted', 'Your application has been sent successfully.');
               } else {
-                Alert.alert('Coming soon', 'Direct applications for non-partner job listings are not yet supported.');
+                await postRequest(ROUTES.business.jobApplications, { job: job.id });
+                Alert.alert('Application submitted', 'Your application has been sent successfully.');
               }
             } catch (e: any) {
               Alert.alert('Application failed', e?.message ?? 'Please try again.');

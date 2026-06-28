@@ -9,6 +9,7 @@ import {
   refreshAccessToken,
 } from '@/security/tokenRefresh';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
+import { formatApiError } from '../formatApiError';
 
 const MAX_POST_RETRIES = 2;
 
@@ -150,10 +151,10 @@ export const postRequest = async (
       return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
     }
 
-    const msg =
-      (responseData && (responseData.message || responseData.detail)) ||
-      options.errorMessage ||
-      'Request failed.';
+    const msg = formatApiError(
+      responseData,
+      options.errorMessage || 'Request failed.',
+    );
     return {
       success: false,
       message: msg,

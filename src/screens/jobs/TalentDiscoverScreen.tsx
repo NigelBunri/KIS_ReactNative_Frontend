@@ -68,12 +68,14 @@ export default function TalentDiscoverScreen() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [pendingConnections, setPendingConnections] = useState<Set<string>>(new Set());
 
   const fetchProfiles = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    setFetchError(null);
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
@@ -86,6 +88,7 @@ export default function TalentDiscoverScreen() {
       setProfiles(Array.isArray(list) ? list : []);
     } catch {
       setProfiles([]);
+      setFetchError('Unable to load profiles. Check your connection and try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -248,6 +251,17 @@ export default function TalentDiscoverScreen() {
           loading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={palette.primary} />
+            </View>
+          ) : fetchError ? (
+            <View style={styles.emptyState}>
+              <KISIcon name="wifi-off" size={40} color={palette.danger} />
+              <Text style={[styles.emptyText, { color: palette.danger }]}>{fetchError}</Text>
+              <Pressable
+                onPress={() => fetchProfiles()}
+                style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+              >
+                <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 14 }}>Retry</Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.emptyState}>

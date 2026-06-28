@@ -13,17 +13,23 @@ import {
   getAccessTokenForRequest,
   refreshAccessToken,
 } from '@/security/tokenRefresh';
+import { APP_ENV } from '@/env';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_UPLOAD_BYTES = 2_147_483_647;
-const uploadEnv = process.env as typeof process.env & {
+const uploadEnv = APP_ENV as typeof APP_ENV & {
+  KIS_CHAT_UPLOAD_MAX_BYTES?: string;
+  KIS_UPLOAD_MAX_BYTES?: string;
   CHAT_UPLOAD_MAX_BYTES?: string;
   UPLOAD_MAX_BYTES?: string;
 };
 const MAX_UPLOAD_BYTES = Number(
-  uploadEnv.CHAT_UPLOAD_MAX_BYTES ?? uploadEnv.UPLOAD_MAX_BYTES,
+  uploadEnv.KIS_CHAT_UPLOAD_MAX_BYTES ??
+    uploadEnv.KIS_UPLOAD_MAX_BYTES ??
+    uploadEnv.CHAT_UPLOAD_MAX_BYTES ??
+    uploadEnv.UPLOAD_MAX_BYTES,
 ) || DEFAULT_MAX_UPLOAD_BYTES;
 const IMAGE_UPLOAD_MAX_DIMENSION = 1600;
 const IMAGE_UPLOAD_QUALITY = 82;
