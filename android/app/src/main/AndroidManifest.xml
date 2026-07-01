@@ -112,8 +112,8 @@
         </intent-filter>
       </service>
 
-      <!-- react-native-callkeep: background receiver (handles missed calls, reboot) -->
-      <receiver
+      <!-- react-native-callkeep: background headless JS task service -->
+      <service
         android:name="io.wazo.callkeep.RNCallKeepBackgroundMessagingService"
         android:exported="false" />
 

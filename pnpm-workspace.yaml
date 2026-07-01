@@ -1,0 +1,2 @@
+patchedDependencies:
+  '@react-native-voice/voice': patches/@react-native-voice__voice.patch
