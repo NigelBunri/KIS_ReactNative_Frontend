@@ -19,6 +19,7 @@ import businessRoutes from './routes/businessRoutes';
 import educationRoutes from './routes/educationRoutes';
 import mediaExtendedRoutes from './routes/mediaExtendedRoutes';
 import healthExtendedRoutes from './routes/healthExtendedRoutes';
+import localizationRoutes from './routes/localizationRoutes';
 import {
   API_BASE_URL,
   BG_REMOVAL_START_URL,
@@ -54,6 +55,7 @@ const ROUTES: any = {
   ...educationRoutes,
   ...mediaExtendedRoutes,
   ...healthExtendedRoutes,
+  ...localizationRoutes,
 };
 
 // authRoutes owns the current-user profile endpoints while socialRoutes adds

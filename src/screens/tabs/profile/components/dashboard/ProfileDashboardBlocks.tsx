@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -829,11 +830,13 @@ export const LanguageSelectorCard = ({
   currentLabel,
   languages,
   currentCode,
+  downloadingCode,
   onSelect,
 }: {
   currentLabel: string;
   languages: LanguageOption[];
   currentCode: string;
+  downloadingCode?: string | null;
   onSelect?: (code: string) => void;
 }) => {
   const { dashboardTheme } = useDashboardTheme();
@@ -850,16 +853,20 @@ export const LanguageSelectorCard = ({
       >
         {languages.map((entry) => {
           const selected = entry.code === currentCode;
+          const downloading = entry.code === downloadingCode;
           return (
             <Pressable
               key={entry.code}
+              disabled={downloading}
               onPress={() => onSelect?.(entry.code)}
               style={[
                 dashboardStyles.languageChip,
                 selected ? dashboardTheme.chips.primary : dashboardTheme.chips.neutral,
               ]}
             >
-              {entry.flagEmoji ? (
+              {downloading ? (
+                <ActivityIndicator size="small" style={{ marginRight: 6 }} />
+              ) : entry.flagEmoji ? (
                 <Text style={{ fontSize: 18, marginRight: 6 }}>{entry.flagEmoji}</Text>
               ) : null}
               <Text

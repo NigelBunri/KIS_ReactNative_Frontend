@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { getLocales } from 'react-native-localize';
 
 import { LANGUAGE_REGISTRY, type LanguageEntry } from './registry';
+import { loadLanguageDictionary } from './remoteLanguageCache';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 
@@ -19,6 +20,10 @@ type LanguageContextValue = {
   setLanguage: (language: LanguageCode) => Promise<void>;
   ready: boolean;
   languages: Array<{ code: string; label: string; nativeName: string; flagEmoji: string }>;
+  // Non-null while a non-bundled language's translation file is being
+  // downloaded/read from the on-device cache. UI can use this to show a
+  // per-row loading state in the language picker.
+  downloadingLanguage: LanguageCode | null;
 };
 
 const STORAGE_KEY = 'kis_language';
@@ -46,12 +51,17 @@ const PROP_NAMES_TO_TRANSLATE = new Set([
   'cancelText',
 ]);
 
+// Only languages bundled with a `translations` dictionary (English) are seeded
+// here at boot. Every other registry entry is loaded lazily — see
+// `ensureLanguageResources` below — and `resources[code]` stays unset until
+// that load resolves. Per-string lookups already fall back to English when
+// `resources[code]` is unset, so this is safe before/while a language loads.
 const resources: Record<string, TranslationDictionary> = {};
 const LANGUAGE_OPTIONS: Array<{ code: string; label: string; nativeName: string; flagEmoji: string }> = [];
 const VALID_CODES = new Set<string>();
 
 for (const entry of LANGUAGE_REGISTRY) {
-  resources[entry.code] = entry.translations;
+  if (entry.translations) resources[entry.code] = entry.translations;
   LANGUAGE_OPTIONS.push({ code: entry.code, label: entry.label, nativeName: entry.nativeName, flagEmoji: entry.flagEmoji });
   VALID_CODES.add(entry.code);
 }
@@ -65,7 +75,37 @@ const LanguageContext = createContext<LanguageContextValue>({
   setLanguage: async () => undefined,
   ready: false,
   languages: LANGUAGE_OPTIONS,
+  downloadingLanguage: null,
 });
+
+// Dedupes concurrent load requests for the same language code (e.g. the
+// bootstrap effect and a user tap racing each other).
+const pendingLanguageLoads = new Map<LanguageCode, Promise<void>>();
+
+/**
+ * Ensures `resources[code]` is populated before it's used. No-op for `en`
+ * (always bundled) or a language that's already loaded. Throws if the
+ * on-device cache is empty and the download fails, so callers (setLanguage)
+ * can surface the failure instead of silently leaving the UI untranslated.
+ */
+export const ensureLanguageResources = (code: LanguageCode): Promise<void> => {
+  if (code === 'en' || resources[code]) return Promise.resolve();
+
+  const pending = pendingLanguageLoads.get(code);
+  if (pending) return pending;
+
+  const promise = loadLanguageDictionary(code)
+    .then((dictionary) => {
+      if (!dictionary) throw new Error(`Failed to load language file for "${code}".`);
+      resources[code] = dictionary;
+    })
+    .finally(() => {
+      pendingLanguageLoads.delete(code);
+    });
+
+  pendingLanguageLoads.set(code, promise);
+  return promise;
+};
 
 // ── Translation result cache ─────────────────────────────────────────────────
 // Caches translateString(value, undefined, lang) results per language.
@@ -189,6 +229,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>(activeLanguage);
   const [languageVersion, setLanguageVersion] = useState(0);
   const [ready, setReady] = useState(false);
+  const [downloadingLanguage, setDownloadingLanguage] = useState<LanguageCode | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -215,6 +256,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           }
         } catch { /* network unavailable or not authenticated yet — use local cache */ }
 
+        // Load the on-device cache (or download) before flipping `ready`, so the
+        // first paint already has translations available. If this fails, the
+        // per-string English fallback in translateString() keeps the app usable.
+        await ensureLanguageResources(nextLanguage).catch(() => {});
+
         activeLanguage = nextLanguage;
         if (mounted) setLanguageState(nextLanguage);
       } finally {
@@ -233,6 +279,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLanguage = async (nextLanguage: LanguageCode) => {
+    const needsDownload = nextLanguage !== 'en' && !resources[nextLanguage];
+    if (needsDownload) setDownloadingLanguage(nextLanguage);
+    try {
+      // Download/read-from-cache before switching, so we never flip the app
+      // into a language whose dictionary isn't available yet.
+      await ensureLanguageResources(nextLanguage);
+    } finally {
+      if (needsDownload) setDownloadingLanguage(null);
+    }
+
     activeLanguage = nextLanguage;
     setLanguageState(nextLanguage);
     setLanguageVersion((v) => v + 1);
@@ -250,8 +306,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLanguage,
       ready,
       languages: LANGUAGE_OPTIONS,
+      downloadingLanguage,
     }),
-    [language, languageVersion, ready],
+    [language, languageVersion, ready, downloadingLanguage],
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

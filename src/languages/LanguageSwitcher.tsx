@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -14,7 +14,7 @@ type Props = {
 export default function LanguageSwitcher({ visible: controlledVisible, onClose }: Props = {}) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const { language, languages, setLanguage } = useLanguage();
+  const { language, languages, setLanguage, downloadingLanguage } = useLanguage();
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
 
@@ -42,12 +42,20 @@ export default function LanguageSwitcher({ visible: controlledVisible, onClose }
 
           {languages.map(entry => {
             const selected = entry.code === language;
+            const downloading = entry.code === downloadingLanguage;
             return (
               <Pressable
                 key={entry.code}
+                disabled={downloading}
                 onPress={() => {
-                  setLanguage(entry.code).catch(() => undefined);
-                  close();
+                  setLanguage(entry.code)
+                    .then(() => close())
+                    .catch(() => {
+                      Alert.alert(
+                        t('Download failed'),
+                        t("Couldn't download this language. Check your connection and try again."),
+                      );
+                    });
                 }}
                 style={[
                   styles.option,
@@ -60,7 +68,11 @@ export default function LanguageSwitcher({ visible: controlledVisible, onClose }
                 ]}
               >
                 <View style={styles.optionLeft}>
-                  <Text style={styles.flag}>{entry.flagEmoji}</Text>
+                  {downloading ? (
+                    <ActivityIndicator size="small" color={palette.primary} style={styles.flagIndicator} />
+                  ) : (
+                    <Text style={styles.flag}>{entry.flagEmoji}</Text>
+                  )}
                   <Text style={[styles.optionLabel, { color: palette.text }]}>
                     {entry.nativeName}
                   </Text>
@@ -120,6 +132,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  flagIndicator: {
+    width: 22,
+    height: 22,
   },
   flag: {
     fontSize: 22,

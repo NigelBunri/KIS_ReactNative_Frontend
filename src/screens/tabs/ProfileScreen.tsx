@@ -228,7 +228,7 @@ export default function ProfileScreen() {
     () => createProfileDashboardTheme(palette, tone),
     [palette, tone],
   );
-  const { language, languages, setLanguage } = useLanguage();
+  const { language, languages, setLanguage, downloadingLanguage } = useLanguage();
   const { themeMode, setThemeMode } = useThemeMode();
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
   const { setAuth, setPhone, callingCode } = useAuth();
@@ -2846,8 +2846,14 @@ export default function ProfileScreen() {
                 currentLabel={currentLanguageLabel}
                 languages={languages}
                 currentCode={language}
+                downloadingCode={downloadingLanguage}
                 onSelect={code => {
-                  setLanguage(code).catch(() => undefined);
+                  setLanguage(code).catch(() => {
+                    Alert.alert(
+                      'Download failed',
+                      "Couldn't download this language. Check your connection and try again.",
+                    );
+                  });
                 }}
               />
             </View>

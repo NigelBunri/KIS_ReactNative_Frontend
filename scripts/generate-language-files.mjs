@@ -1,17 +1,29 @@
 /**
  * i18n generation script
  *
- * Scans all source files for translatable strings, writes en.json with every
- * discovered key, and creates/updates one <code>.json per additional language.
+ * Scans all source files for translatable strings and writes en.json with
+ * every discovered key. English is the only language bundled into the app;
+ * every other language's translation file lives on the backend and is
+ * downloaded to the device on first selection (see
+ * src/languages/remoteLanguageCache.ts and apps/localization in the backend
+ * repo) — this script no longer writes xx.json files into this folder.
+ *
+ * If a language's *.json happens to already exist in this folder (legacy
+ * local copies kept around for editing), the script will still refresh it
+ * in place using the same merge rules as before, purely as a convenience
+ * for translators — but the app itself no longer reads or bundles it.
  *
  * ADDING A NEW LANGUAGE
  * ─────────────────────
  * 1. Run this script to get a fresh en.json.
- * 2. Copy en.json → xx.json (e.g. fr.json).
- * 3. Translate the values in xx.json.
- * 4. Add the language to src/languages/registry.ts (two lines).
+ * 2. Copy en.json → xx.json somewhere convenient and translate the values.
+ * 3. Place the translated file at
+ *    backend/kis/apps/localization/locales/xx.json and add its code to
+ *    KNOWN_LANGUAGE_CODES in backend/kis/apps/localization/views.py.
+ * 4. Add one metadata-only entry (code/label/nativeName/flagEmoji, no
+ *    `translations`) to src/languages/registry.ts.
  *
- * The script will keep your xx.json up-to-date on future runs:
+ * The script will keep any local xx.json up-to-date on future runs:
  *  • new English keys are appended with their English value as a placeholder
  *  • keys removed from English are pruned from all other language files
  *  • existing translations are preserved
