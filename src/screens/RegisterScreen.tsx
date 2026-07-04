@@ -17,10 +17,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { setUserData } from '@/network/cache';
 import { postRequest } from '@/network/post/index';
 import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
-import { ensureDeviceId } from '@/security/e2ee';
+import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { setAuthTokens } from '@/security/authStorage';
+import { useAuth } from '../../App';
+import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -128,6 +132,7 @@ const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   });
 
 export default function RegisterScreen({ navigation }: any) {
+  const { setAuth, setUser } = useAuth();
   const { palette, tokens, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const styles = useMemo(() => createStyles(tokens, responsive.contentMaxWidth), [tokens, responsive.contentMaxWidth]);
@@ -225,6 +230,22 @@ export default function RegisterScreen({ navigation }: any) {
         ['user_dial_code', callingCode],
         ['user_country_code', countryCode],
       ]);
+
+      // Phone verification suspended (FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED false):
+      // the backend auto-verifies and returns tokens directly, so log the user in now.
+      const accessToken = res?.data?.access || res?.data?.access_token;
+      if (!FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED && accessToken) {
+        await setAuthTokens({
+          accessToken,
+          refreshToken: res?.data?.refresh || res?.data?.refresh_token || null,
+        });
+        const resolvedUser = res?.data?.user ?? null;
+        await setUserData(resolvedUser, res.data);
+        setUser?.(resolvedUser);
+        void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+        setAuth(true);
+        return;
+      }
 
       // Account created — now verify. No tokens yet.
       navigation.navigate('VerificationChannelSelect', { phone: phoneE164 });

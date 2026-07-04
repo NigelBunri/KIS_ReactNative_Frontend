@@ -5,4 +5,8 @@ export const FEATURE_FLAGS = {
   EDUCATION_V2: toBool(env.KIS_EDU_V2 ?? null) || __DEV__,
   // Set KIS_MEDIA_VERIFICATION_ENABLED=false in .env to bypass AI scan (testing without AI keys)
   MEDIA_VERIFICATION_ENABLED: env.KIS_MEDIA_VERIFICATION_ENABLED !== 'false',
+  // Suspended for now: registration/login skip OTP entirely and the backend
+  // auto-verifies accounts (see KIS_PHONE_VERIFICATION_ENABLED on the API).
+  // Set true here (and on the API) to bring phone verification back live.
+  PHONE_VERIFICATION_ENABLED: toBool(env.KIS_PHONE_VERIFICATION_ENABLED ?? null),
 };

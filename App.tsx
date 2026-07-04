@@ -47,6 +47,7 @@ import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offl
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
 import { flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { loadConsentPreferences } from '@/services/consentService';
+import { FEATURE_FLAGS } from '@/constants/featureFlags';
 
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -572,10 +573,12 @@ function AppContent() {
 
         if (active) {
           // Anti-bypass: tokens exist but phone was never verified (edge case from old data)
+          // Suspended via FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED — flip it (and the
+          // matching API flag) back to true to re-enforce this.
           const phoneVerified = Boolean(
             (u as any)?.verification?.phone?.verified,
           );
-          if (!phoneVerified) {
+          if (FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED && !phoneVerified) {
             const pendingPhone =
               (u as any)?.phone ||
               (u as any)?.phone_number ||
