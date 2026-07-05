@@ -291,7 +291,7 @@ export default function EmergencyScreen({ navigation }: Props) {
 
 function makeStyles(palette: any, sp: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     header: {
       paddingHorizontal: sp,
       paddingTop: 16,

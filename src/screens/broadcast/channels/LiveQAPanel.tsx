@@ -181,7 +181,7 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
         ))}
       </ScrollView>
 
-      <View style={[styles.inputRow, { borderTopColor: palette.border, backgroundColor: palette.bg }]}>
+      <View style={[styles.inputRow, { borderTopColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}>
         <TextInput
           value={questionText}
           onChangeText={setQuestionText}

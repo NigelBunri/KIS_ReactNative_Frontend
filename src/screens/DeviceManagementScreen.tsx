@@ -344,7 +344,7 @@ export default function DeviceManagementScreen() {
           {isRenaming ? (
             <View style={styles.renameRow}>
               <TextInput
-                style={[styles.renameInput, { backgroundColor: palette.bg, borderColor: palette.primary, color: palette.text }]}
+                style={[styles.renameInput, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.primary, color: palette.text }]}
                 value={renameValue}
                 onChangeText={setRenameValue}
                 placeholder="Device nickname"
@@ -419,7 +419,7 @@ export default function DeviceManagementScreen() {
   const hasSecondary = secondaryDevices.length > 0;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>

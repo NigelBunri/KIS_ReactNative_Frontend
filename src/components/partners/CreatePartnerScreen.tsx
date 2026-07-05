@@ -122,7 +122,7 @@ export default function PartnerCreateSlide({ onClose }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.page, { backgroundColor: palette.bg }]}
+      style={[styles.page, { backgroundColor: palette.bg, marginTop: 25 }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content}>

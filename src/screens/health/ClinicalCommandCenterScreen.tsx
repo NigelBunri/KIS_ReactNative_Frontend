@@ -1628,7 +1628,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   // ─── root render ──────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         {/* Header */}
         <View

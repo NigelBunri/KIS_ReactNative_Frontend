@@ -161,7 +161,7 @@ export default function QRScanLoginScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={() => {

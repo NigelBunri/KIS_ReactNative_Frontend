@@ -68,7 +68,7 @@ export default function FeedCommentsScreen({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[chatRoomStyles.root, { backgroundColor: palette.bg }]}>
+      <View style={[chatRoomStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={[chatRoomStyles.header, { borderBottomColor: palette.divider }]}>
           <Pressable onPress={onClose} style={chatRoomStyles.headerBackButton}>
             <KISIcon name="arrow-left" size={20} color={palette.text} />

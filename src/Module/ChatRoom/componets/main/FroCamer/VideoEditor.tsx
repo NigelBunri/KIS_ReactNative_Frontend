@@ -162,7 +162,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
       onRequestClose={onClose}
     >
       <SafeAreaView
-        style={[styles.root, { backgroundColor: palette.bg }]}
+        style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}
         edges={['top']}
       >
         {/* HEADER */}

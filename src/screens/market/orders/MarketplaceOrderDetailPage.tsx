@@ -242,7 +242,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
@@ -250,7 +250,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (error) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg, padding: 16 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, padding: 16 }]}>
         <Text style={{ color: palette.text }}>{error}</Text>
       </View>
     );
@@ -274,7 +274,7 @@ export default function MarketplaceOrderDetailPage() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}
+      style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}
       contentContainerStyle={styles.scrollContent}
     >
       <View

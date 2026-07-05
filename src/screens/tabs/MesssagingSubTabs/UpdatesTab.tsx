@@ -953,7 +953,7 @@ export default function UpdatesTab({
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}
         refreshControl={
@@ -1244,7 +1244,7 @@ export default function UpdatesTab({
         >
           <View />
         </Pressable>
-        <View style={[styles.modalCard, { backgroundColor: palette.bg }]}>
+        <View style={[styles.modalCard, { backgroundColor: palette.bg, marginTop: 25 }]}>
           <NewChannelForm
             palette={palette}
             onSuccess={created => {
@@ -1804,7 +1804,7 @@ export default function UpdatesTab({
 
       {/* Status viewer */}
       <Modal visible={viewerOpen} transparent animationType="fade">
-        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg }]} edges={['top']}>
+        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
           <View style={styles.viewerProgressRow} pointerEvents="auto">
             {(activeUser?.items ?? []).map((item, idx) => {
               const fill =

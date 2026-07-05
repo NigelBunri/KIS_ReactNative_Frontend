@@ -88,7 +88,7 @@ export default function GovernmentHubScreen({ navigation }: Props) {
   const cardSize = (layout.width - gutter * 2 - layout.cardGap) / 2;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Header */}
         <LinearGradient

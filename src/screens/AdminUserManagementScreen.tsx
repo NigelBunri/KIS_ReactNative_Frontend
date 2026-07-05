@@ -185,7 +185,7 @@ export default function AdminUserManagementScreen() {
   const styles = createStyles(palette, responsive);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>

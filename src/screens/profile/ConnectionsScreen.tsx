@@ -344,7 +344,7 @@ export default function ConnectionsScreen() {
     renderSuggestion;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={() => navigation.goBack()}

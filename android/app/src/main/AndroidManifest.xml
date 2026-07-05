@@ -52,6 +52,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- FOREGROUND_SERVICE_CAMERA: Android 14+ for camera in FG service        -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- FOREGROUND_SERVICE_MEDIA_PROJECTION: Android 14+ (API 34+), required   -->
+    <!-- for react-native-webrtc's screen-share MediaProjectionService, which   -->
+    <!-- the library itself declares (foregroundServiceType="mediaProjection") -->
+    <!-- but does not declare this permission for the host app.                -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <!-- ─── Boot (restore registered phone accounts after device reboot) ─────── -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

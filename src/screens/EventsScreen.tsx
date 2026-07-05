@@ -785,7 +785,7 @@ export default function EventsScreen() {
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.headerRow, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>

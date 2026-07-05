@@ -962,7 +962,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, paddingHorizontal: responsive.pageGutter }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />

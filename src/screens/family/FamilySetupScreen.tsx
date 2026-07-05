@@ -65,7 +65,7 @@ export default function FamilySetupScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         <View style={[styles.inner, { paddingHorizontal: gutter }]}>
           <Text style={[styles.title, { color: palette.text }]}>Family Setup</Text>

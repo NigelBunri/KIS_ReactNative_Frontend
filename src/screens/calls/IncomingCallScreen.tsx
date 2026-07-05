@@ -109,7 +109,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
-      <View style={[styles.bg, { backgroundColor: palette.bg }]}>
+      <View style={[styles.bg, { backgroundColor: palette.bg, marginTop: 25 }]}>
 
         {/* Ambient glow blob centred behind the avatar */}
         <View

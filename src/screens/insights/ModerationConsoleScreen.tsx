@@ -160,7 +160,7 @@ function FlagActionSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={sheet.overlay} onPress={onClose} />
-      <View style={[sheet.panel, { backgroundColor: palette.bg }]}>
+      <View style={[sheet.panel, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={[sheet.handle, { backgroundColor: palette.divider }]} />
         <Text style={[sheet.title, { color: palette.text }]}>Flag action</Text>
         <Text style={[sheet.sub, { color: palette.subtext }]} numberOfLines={3}>{flag.reason}</Text>
@@ -536,7 +536,7 @@ export default function ModerationConsoleScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Moderation Console</Text>

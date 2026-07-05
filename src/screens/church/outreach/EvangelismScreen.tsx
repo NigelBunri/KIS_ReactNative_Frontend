@@ -256,7 +256,7 @@ export default function EvangelismScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     scroll: { padding: sp, paddingBottom: 80 },
     screenTitle: { fontSize: 26, fontWeight: '700', color: palette.text, marginBottom: 20 },
     center: { alignItems: 'center', paddingVertical: 40 },

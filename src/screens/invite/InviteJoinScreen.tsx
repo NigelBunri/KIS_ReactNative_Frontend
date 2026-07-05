@@ -111,7 +111,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const displayName = groupName ? `"${groupName}"` : label;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.bg }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }]}>
       <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk, maxWidth: responsive.contentMaxWidth }]}>
         {status === 'loading' && (
           <>

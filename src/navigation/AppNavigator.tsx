@@ -684,7 +684,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: chatTranslateX }],
           zIndex: 1001,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         <ChatRoomPage
@@ -707,7 +707,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: subRoomTranslateX }],
           zIndex: 1002,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         {activeSubRoom && (
@@ -731,7 +731,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: infoTranslateX }],
           zIndex: 1002,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         {activeInfo ? (
@@ -762,7 +762,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: communityTranslateX }],
           zIndex: 1000,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         {activeCommunity ? (
@@ -785,7 +785,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: communityInfoTranslateX }],
           zIndex: 1003,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         {activeCommunityInfo ? (

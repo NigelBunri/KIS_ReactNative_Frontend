@@ -239,7 +239,7 @@ export default function SplashScreen({
   const electronColor = palette.primary;
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <StatusBar
         barStyle={tone === 'dark' ? 'light-content' : 'dark-content'}
       />

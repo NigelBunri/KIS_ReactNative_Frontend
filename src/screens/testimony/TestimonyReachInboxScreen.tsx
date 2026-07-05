@@ -254,8 +254,8 @@ export default function TestimonyReachInboxScreen() {
   const currentList = activeTab === 'for_you' ? received : sent;
 
   return (
-    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+      <View style={[styles.header, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
@@ -283,7 +283,7 @@ export default function TestimonyReachInboxScreen() {
       </View>
 
       <ScrollView
-        style={{ backgroundColor: palette.bg }}
+        style={{ backgroundColor: palette.bg, marginTop: 25 }}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />

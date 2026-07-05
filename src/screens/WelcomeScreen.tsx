@@ -238,7 +238,7 @@ export default function WelcomeScreen() {
                       width: heroSize,
                       height: heroSize,
                       opacity: fade,
-                      backgroundColor: palette.bg,
+                      backgroundColor: palette.bg, marginTop: 25,
                       transform: [{ scale: sparkleScale }],
                     },
                   ]}

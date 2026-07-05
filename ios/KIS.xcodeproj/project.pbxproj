@@ -9,22 +9,55 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-KIS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-KIS.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1F5B2BB5783FF4FC6DAA5FB0 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D479AB9881473D785F039A7 /* SampleHandler.swift */; };
+		304D811954FCDEC0B8323B77 /* RTCScreenSharingExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		DACE8D9A061DE2933D44340F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3F069872D1B686B57B9DBA0 /* Foundation.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AE70A1E6EF6667A78C2F951D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D4984B0096BC3DD4716459D8;
+			remoteInfo = RTCScreenSharingExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7405263AAB23091E48B669F8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				304D811954FCDEC0B8323B77 /* RTCScreenSharingExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* KIS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KIS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = KIS/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = KIS/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = KIS/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1B6B951D133126018D6E3493 /* KIS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = KIS.entitlements; sourceTree = "<group>"; };
+		1B90FCDD6FAD01BBFEA7C0B1 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1D479AB9881473D785F039A7 /* SampleHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-KIS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KIS.debug.xcconfig"; path = "Target Support Files/Pods-KIS/Pods-KIS.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-KIS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KIS.release.xcconfig"; path = "Target Support Files/Pods-KIS/Pods-KIS.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-KIS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-KIS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = KIS/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = KIS/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A3F069872D1B686B57B9DBA0 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		C4F539924D0986C67C118F7B /* RTCScreenSharingExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RTCScreenSharingExtension.entitlements; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RTCScreenSharingExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +66,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-KIS.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A455DB1027BFF2BF6BCEC5DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DACE8D9A061DE2933D44340F /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -47,6 +88,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				1B6B951D133126018D6E3493 /* KIS.entitlements */,
 			);
 			name = KIS;
 			sourceTree = "<group>";
@@ -56,8 +98,17 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-KIS.a */,
+				4EA8CE35F3AEE53B1241A788 /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4EA8CE35F3AEE53B1241A788 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				A3F069872D1B686B57B9DBA0 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -75,6 +126,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				8B5E9A5F6123A218BB162027 /* RTCScreenSharingExtension */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -85,8 +137,20 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* KIS.app */,
+				F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8B5E9A5F6123A218BB162027 /* RTCScreenSharingExtension */ = {
+			isa = PBXGroup;
+			children = (
+				1D479AB9881473D785F039A7 /* SampleHandler.swift */,
+				1B90FCDD6FAD01BBFEA7C0B1 /* Info.plist */,
+				C4F539924D0986C67C118F7B /* RTCScreenSharingExtension.entitlements */,
+			);
+			name = RTCScreenSharingExtension;
+			path = RTCScreenSharingExtension;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -113,15 +177,34 @@
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
 				6EE7C0ECC70F6DE790939080 /* [CP-User] [RNFB] Core Configuration */,
+				7405263AAB23091E48B669F8 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6C0C2DA3FAB19BFAAACB8B75 /* PBXTargetDependency */,
 			);
 			name = KIS;
 			productName = KIS;
 			productReference = 13B07F961A680F5B00A75B9A /* KIS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D4984B0096BC3DD4716459D8 /* RTCScreenSharingExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1E9192DD1DFEFA46656EB31D /* Build configuration list for PBXNativeTarget "RTCScreenSharingExtension" */;
+			buildPhases = (
+				E75C0C907F63C42F01F46DCA /* Sources */,
+				A455DB1027BFF2BF6BCEC5DC /* Frameworks */,
+				A58C42FFC2FF449DEA97FFFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RTCScreenSharingExtension;
+			productName = RTCScreenSharingExtension;
+			productReference = F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -150,6 +233,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* KIS */,
+				D4984B0096BC3DD4716459D8 /* RTCScreenSharingExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -162,6 +246,13 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A58C42FFC2FF449DEA97FFFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,7 +355,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E75C0C907F63C42F01F46DCA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F5B2BB5783FF4FC6DAA5FB0 /* SampleHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6C0C2DA3FAB19BFAAACB8B75 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RTCScreenSharingExtension;
+			target = D4984B0096BC3DD4716459D8 /* RTCScreenSharingExtension */;
+			targetProxy = AE70A1E6EF6667A78C2F951D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -273,6 +381,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = KIS/Info.plist;
@@ -302,6 +411,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = KIS/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -320,6 +430,27 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		3C7DF3E796634D4C6019C199 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kis.RTCScreenSharingExtension;
+				PRODUCT_NAME = RTCScreenSharingExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -467,6 +598,26 @@
 			};
 			name = Release;
 		};
+		B0647ECE5391C8C421213BD1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kis.RTCScreenSharingExtension;
+				PRODUCT_NAME = RTCScreenSharingExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -475,6 +626,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1E9192DD1DFEFA46656EB31D /* Build configuration list for PBXNativeTarget "RTCScreenSharingExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C7DF3E796634D4C6019C199 /* Release */,
+				B0647ECE5391C8C421213BD1 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -412,7 +412,7 @@ const CartDetailPage = () => {
       <View
         style={[
           cartDetailStyles.root,
-          { backgroundColor: palette.bg, padding: 16 },
+          { backgroundColor: palette.bg, marginTop: 25, padding: 16 },
         ]}
       >
         <Text
@@ -433,7 +433,7 @@ const CartDetailPage = () => {
   }
 
   return (
-    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View
         style={[
           cartDetailStyles.header,

@@ -154,7 +154,7 @@ export default function NotificationSettingsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg }]}>
+      <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={s.center}>
           <ActivityIndicator color={palette.primaryStrong} />
         </View>
@@ -163,7 +163,7 @@ export default function NotificationSettingsScreen() {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

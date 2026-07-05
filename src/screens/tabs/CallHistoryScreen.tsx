@@ -284,7 +284,7 @@ export default function CallHistoryScreen({ onBack }: Props) {
   };
 
   return (
-    <View style={[localStyles.root, { backgroundColor: palette.bg }]}>
+    <View style={[localStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Header */}
       <View style={[localStyles.header, { paddingTop: insets.top + 8, borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         {onBack && (

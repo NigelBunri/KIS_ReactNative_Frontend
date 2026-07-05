@@ -93,7 +93,7 @@ function PDFReader({ book, onClose }: { book: KCANBook; onClose: () => void }) {
   const source = { uri: book.pdf_url, cache: false };
 
   return (
-    <View style={[styles.readerWrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.readerWrap, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View style={[styles.readerHeader, { paddingHorizontal: responsive.pageGutter, backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
         <TouchableOpacity onPress={onClose} style={styles.readerBack}>
           <KISIcon name="arrow-back" size={22} color={palette.text} />

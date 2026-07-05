@@ -334,7 +334,7 @@ const CartsListPage = () => {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View
         style={[
           styles.header,

@@ -224,7 +224,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
   const availableChannels = CHANNEL_ORDER.filter(ch => channels?.[ch as keyof Channels]);
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <StatusBar
         barStyle={tone === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={palette.bg}
@@ -243,7 +243,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.container, { backgroundColor: palette.bg }]}
+        contentContainerStyle={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerBlock}>

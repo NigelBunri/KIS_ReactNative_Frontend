@@ -176,7 +176,7 @@ export default function PrayerWallScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     headerRow: { paddingHorizontal: sp, paddingTop: 16, paddingBottom: 8 },
     screenTitle: { fontSize: 26, fontWeight: '700', color: palette.text },
     tabRow: {

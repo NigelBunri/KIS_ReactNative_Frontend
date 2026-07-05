@@ -450,7 +450,7 @@ export default function SubscriptionManagementScreen() {
   const currentTier = subscription?.tier ?? subscription?.plan;
 
   return (
-    <SafeAreaView edges={['top']} style={[ss.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView edges={['top']} style={[ss.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Header */}
       <View style={[ss.header, { borderBottomColor: palette.divider }]}>
         <Pressable

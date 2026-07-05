@@ -2364,7 +2364,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -3151,7 +3151,7 @@ export default function ProfileScreen() {
           style={[
             styles.slideContainer,
             {
-              backgroundColor: palette.bg,
+              backgroundColor: palette.bg, marginTop: 25,
               width: responsive.width,
               transform: [{ translateX: c.slideX }],
             },

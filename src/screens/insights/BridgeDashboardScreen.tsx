@@ -53,7 +53,7 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>Bridge</Text>

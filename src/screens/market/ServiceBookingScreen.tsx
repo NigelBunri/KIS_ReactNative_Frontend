@@ -1586,7 +1586,7 @@ const ServiceBookingScreen = () => {
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
           justifyContent: 'center',
           alignItems: 'center',
         }}
@@ -1597,7 +1597,7 @@ const ServiceBookingScreen = () => {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <SectionCard

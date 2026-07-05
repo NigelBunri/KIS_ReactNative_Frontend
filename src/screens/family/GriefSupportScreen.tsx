@@ -105,14 +105,14 @@ export default function GriefSupportScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View style={{ paddingHorizontal: gutter, paddingTop: 20 }}>
         <Text style={[styles.screenTitle, { color: palette.text }]}>Grief Support</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>

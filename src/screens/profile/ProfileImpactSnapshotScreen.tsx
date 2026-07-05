@@ -57,7 +57,7 @@ export default function ProfileImpactSnapshotScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg }}
+      style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }}
       contentContainerStyle={{
         padding: responsive.pageGutter,
         paddingBottom: responsive.pageGutter + insets.bottom,

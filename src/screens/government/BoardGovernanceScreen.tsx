@@ -112,14 +112,14 @@ export default function BoardGovernanceScreen(_props: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Tab Bar */}
       <View
         style={[

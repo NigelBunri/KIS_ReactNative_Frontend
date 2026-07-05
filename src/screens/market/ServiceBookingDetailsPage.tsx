@@ -1413,7 +1413,7 @@ const ServiceBookingDetailsPage = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
           alignItems: 'center',
           justifyContent: 'center',
           paddingTop: insets.top,
@@ -1429,7 +1429,7 @@ const ServiceBookingDetailsPage = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
@@ -1474,7 +1474,7 @@ const ServiceBookingDetailsPage = () => {
     padding: 16,
   };
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }}>
       <View
         style={{
           paddingTop: 20,

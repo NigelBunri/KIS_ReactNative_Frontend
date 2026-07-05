@@ -97,7 +97,7 @@ export default function MediaDashboardScreen() {
     : [];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Media</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>

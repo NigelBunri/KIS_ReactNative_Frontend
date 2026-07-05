@@ -46,7 +46,7 @@ export default function WaitingForHostScreen({ visible, callTitle, onLeave }: Pr
 
   return (
     <Modal visible={visible} animationType="fade" transparent={false} statusBarTranslucent>
-      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <SafeAreaView style={styles.safe}>
 
           <View style={styles.center}>

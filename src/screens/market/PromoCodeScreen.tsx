@@ -218,7 +218,7 @@ export default function PromoCodeScreen() {
   }, [codeInput, fetchRedeemedCodes]);
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

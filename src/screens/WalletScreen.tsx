@@ -593,7 +593,7 @@ export default function WalletScreen() {
   ];
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: palette.divider }]}>
         <Pressable

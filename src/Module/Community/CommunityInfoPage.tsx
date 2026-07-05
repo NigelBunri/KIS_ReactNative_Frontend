@@ -406,7 +406,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   }, []);
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />

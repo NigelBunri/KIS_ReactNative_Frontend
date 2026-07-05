@@ -154,7 +154,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
       <View
         style={[
           styles.root,
-          { backgroundColor: palette.bg ?? palette.surface, paddingTop: insets.top },
+          { backgroundColor: palette.bg, marginTop: 25 ?? palette.surface, paddingTop: insets.top },
         ]}
       >
         {/* Header */}

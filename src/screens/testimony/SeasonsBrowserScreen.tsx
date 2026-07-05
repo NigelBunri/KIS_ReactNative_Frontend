@@ -180,8 +180,8 @@ export default function SeasonsBrowserScreen() {
   );
 
   return (
-    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+      <View style={[styles.header, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
@@ -195,7 +195,7 @@ export default function SeasonsBrowserScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterScroll}
-        style={[styles.filterBar, { backgroundColor: palette.bg }]}
+        style={[styles.filterBar, { backgroundColor: palette.bg, marginTop: 25 }]}
       >
         <Pressable
           onPress={() => setSelectedCategory(null)}

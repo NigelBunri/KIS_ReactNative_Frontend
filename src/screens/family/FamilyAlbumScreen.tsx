@@ -88,7 +88,7 @@ export default function FamilyAlbumScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
@@ -99,7 +99,7 @@ export default function FamilyAlbumScreen({ navigation }: Props) {
     const photos = selectedAlbum.photos ?? [];
     const photoSize = (layout.width - gutter * 2 - 6) / 3;
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={[styles.albumHeader, { paddingHorizontal: gutter }]}>
           <TouchableOpacity onPress={() => setSelectedAlbum(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
@@ -142,7 +142,7 @@ export default function FamilyAlbumScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <FlatList
         data={albums}
         keyExtractor={(item) => item.id}

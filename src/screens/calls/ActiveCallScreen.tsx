@@ -24,6 +24,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
@@ -108,6 +109,15 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+
+  // Local self-preview tile size — scaled up for tablets, matching the
+  // modern-video-app scale (WhatsApp/FaceTime/Meet) rather than a tiny thumbnail.
+  const PIP_W = responsive.isTablet ? 140 : 120;
+  const PIP_H = responsive.isTablet ? 200 : 170;
+  // Approximate rendered height of the bottom CallControls bar + its bottom
+  // safe-area padding, so the default position never covers the buttons.
+  const CONTROLS_CLEARANCE = 170;
 
   const [showControls, setShowControls] = useState(true);
   const [showChat, setShowChat] = useState(false);
@@ -144,8 +154,10 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const selfPanX = useRef(new Animated.Value(0)).current;
   const selfPanY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    selfPanX.setOffset(screenW - 110);
-    selfPanY.setOffset(insets.top + 16);
+    // Default to bottom-right, like WhatsApp/FaceTime/Meet, clear of the
+    // bottom control bar and respecting the bottom safe-area inset.
+    selfPanX.setOffset(screenW - PIP_W - 16);
+    selfPanY.setOffset(screenH - insets.bottom - CONTROLS_CLEARANCE - PIP_H);
     selfPanX.flattenOffset();
     selfPanY.flattenOffset();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,8 +191,6 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         selfPanX.flattenOffset();
         selfPanY.flattenOffset();
         // Clamp tile within safe screen bounds
-        const PIP_W = 92;
-        const PIP_H = 132;
         const rawX = (selfPanX as any)._value ?? 0;
         const rawY = (selfPanY as any)._value ?? 0;
         const clampedX = Math.max(0, Math.min(rawX, screenW - PIP_W));
@@ -412,8 +422,8 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     // Self preview
     selfPreview: {
       position: 'absolute',
-      width: 92,
-      height: 132,
+      width: PIP_W,
+      height: PIP_H,
       borderRadius: 16,
       overflow: 'hidden',
       borderWidth: 2,
@@ -478,7 +488,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       borderColor: `${palette.gold}59`,
     },
     endedCloseTxt: { color: palette.gold, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
-  }), [palette]);
+  }), [palette, PIP_W, PIP_H]);
 
   if (!session) return null;
 

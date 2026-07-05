@@ -2057,7 +2057,7 @@ export default function HealthcareScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
     <ScrollView
-      style={[styles.container, { backgroundColor: palette.bg }]}
+      style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: insets.top }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.primary} colors={[palette.primary]} />}
     >

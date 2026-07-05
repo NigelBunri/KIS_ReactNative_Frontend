@@ -23,7 +23,7 @@ export default function ProfileInsightsScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <InsightLayout
         title="Profile insights"
         data={insights.data}

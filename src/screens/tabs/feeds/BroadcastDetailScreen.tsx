@@ -630,7 +630,7 @@ export default function BroadcastDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator size="large" color={palette.primary} />
       </View>
     );
@@ -638,7 +638,7 @@ export default function BroadcastDetailScreen() {
 
   if (error) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <Text style={[styles.error, { color: palette.text }]}>{error}</Text>
         {deepLinkId ? (
           <Pressable
@@ -664,7 +664,7 @@ export default function BroadcastDetailScreen() {
 
   if (!broadcastItem) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <Text style={[styles.error, { color: palette.text }]}>
           Broadcast not found.
         </Text>

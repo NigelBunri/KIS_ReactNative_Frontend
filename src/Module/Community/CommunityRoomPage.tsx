@@ -201,7 +201,7 @@ export default function CommunityRoomPage({
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable onPress={onBack} style={styles.headerButton}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />

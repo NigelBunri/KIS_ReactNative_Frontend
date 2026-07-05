@@ -114,7 +114,7 @@ export default function PasswordChangeScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View
         style={[
           styles.header,

@@ -285,7 +285,7 @@ export default function LinkedDevicesScreen() {
   const nonCurrentCount = devices.filter(d => !d.current).length;
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Header */}
       <View
         style={[

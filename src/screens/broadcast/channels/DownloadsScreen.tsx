@@ -83,7 +83,7 @@ export default function DownloadsScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />

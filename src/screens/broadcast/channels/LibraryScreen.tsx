@@ -140,7 +140,7 @@ export default function LibraryScreen() {
   }, [loadContinue]);
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
         <Text style={[styles.headerTitle, { color: palette.text, fontSize: headerTitleSize }]}>Library</Text>
       </View>

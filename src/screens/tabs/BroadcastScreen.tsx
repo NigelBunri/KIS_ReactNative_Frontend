@@ -375,7 +375,7 @@ export default function BroadcastScreen() {
   }, [navigation]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
 
       {/*
        * ONE gradient — everything (header bar, vision, tabs, search) lives
@@ -396,7 +396,7 @@ export default function BroadcastScreen() {
         scrollEventThrottle={1}
         stickyHeaderIndices={[0]}
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1, backgroundColor: palette.bg }}
+        style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}
         contentContainerStyle={{ paddingBottom: compactBroadcast ? 92 : 120 }}
         refreshControl={
           <RefreshControl

@@ -537,7 +537,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{
@@ -562,7 +562,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView

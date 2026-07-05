@@ -239,7 +239,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: compact ? 94 : 128 }]}

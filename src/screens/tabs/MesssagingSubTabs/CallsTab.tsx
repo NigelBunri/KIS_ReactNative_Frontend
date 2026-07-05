@@ -468,7 +468,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   }, [scheduled, rows]);
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, padding: responsive.pageGutter }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25, padding: responsive.pageGutter }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>
           Calls

@@ -112,10 +112,10 @@ export default function DeclareTestimonySheet() {
   }, [canSubmit, category, title, story, openToContact, isEdit, editId, navigation]);
 
   return (
-    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView
-        style={{ backgroundColor: palette.bg }}
+        style={{ backgroundColor: palette.bg, marginTop: 25 }}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >

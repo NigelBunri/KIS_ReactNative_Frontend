@@ -1256,8 +1256,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let next: boolean;
     try {
       next = await callServiceToggleScreenShare(session.conversationId, s, peerIds);
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[SocketProvider] toggleScreenShare failed', e);
+      if (e?.message === 'SCREEN_SHARE_UNAVAILABLE') {
+        Alert.alert(
+          'Screen sharing unavailable',
+          "Screen sharing isn't available on this device or OS version.",
+        );
+      }
       return;
     }
     setActiveCall(prev => {

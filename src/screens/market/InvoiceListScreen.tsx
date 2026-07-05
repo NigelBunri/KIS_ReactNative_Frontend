@@ -133,7 +133,7 @@ export default function InvoiceListScreen() {
   }, [fetchInvoices]);
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View style={[s.header, { borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={() => navigation.goBack()}

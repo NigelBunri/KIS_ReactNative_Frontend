@@ -237,7 +237,7 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
   const canGoBack = navigation?.canGoBack?.();
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: palette.bg, marginTop: 25}]} edges={['top']}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: palette.divider }]}>
         {canGoBack && (
@@ -324,7 +324,7 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
           style={[
             s.cta,
             {
-              backgroundColor: palette.bg,
+              backgroundColor: palette.bg, marginTop: 25,
               borderTopColor: palette.divider,
               paddingBottom: Math.max(insets.bottom, 16),
             },

@@ -3056,7 +3056,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
 
   if (!shopId) {
     return (
-      <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <KISIcon name="storefront-outline" size={64} color={palette.subtext} />
           <Text style={{ fontSize: 22, fontWeight: '800', color: palette.text, marginTop: 16, textAlign: 'center' }}>
@@ -3077,7 +3077,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { backgroundColor: palette.surface }]}>
           <View style={styles.heroRow}>
@@ -3188,7 +3188,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: palette.bg,
+            backgroundColor: palette.bg, marginTop: 25,
             zIndex: 999,
           }}
         >

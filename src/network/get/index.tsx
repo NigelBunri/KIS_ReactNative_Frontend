@@ -270,10 +270,14 @@ export const getRequest = async (
           data: retryData,
         };
       }
-      console.error('[getRequest] 401 and token refresh failed', {
-        url: finalUrl,
-        detail: responseData?.detail,
-      });
+      // No access token was sent at all (rather than one that got rejected) —
+      // this is the expected pre-login state, not a broken session.
+      if (token) {
+        console.error('[getRequest] 401 and token refresh failed', {
+          url: finalUrl,
+          detail: responseData?.detail,
+        });
+      }
       return {
         success: false,
         message: options.errorMessage || responseData?.detail || 'Session expired. Please log in again.',

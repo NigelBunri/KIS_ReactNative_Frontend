@@ -79,7 +79,7 @@ export default function ProfileRecentActivityScreen() {
   );
 
   return (
-    <ScrollView style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
+    <ScrollView style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View style={{ gap: 6 }}>
         <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Recent activity</Text>
         <Text style={{ color: palette.subtext }}>

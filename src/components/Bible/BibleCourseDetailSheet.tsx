@@ -982,7 +982,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setLessonDetailVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>
@@ -1248,7 +1248,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setCertificateVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>Course Certificate</Text>
@@ -1312,7 +1312,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setQuizVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>{activeQuiz?.title || 'Quiz'}</Text>
@@ -1384,7 +1384,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setAssignmentVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>{activeAssignment?.title || 'Assignment'}</Text>
@@ -1415,7 +1415,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setForumVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>Course Forum</Text>
@@ -1461,7 +1461,7 @@ export default function BibleCourseDetailSheet({
         animationType="slide"
         onRequestClose={() => setThreadVisible(false)}
       >
-        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, paddingTop: insets.top + 20 }]}>
+        <SafeAreaView edges={['top']} style={[styles.lessonDetailWrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top + 20 }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>{activeThread?.title || 'Thread'}</Text>

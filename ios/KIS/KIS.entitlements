@@ -19,5 +19,13 @@
     <!-- Push Notifications capability (for FCM / APNs) -->
     <key>aps-environment</key>
     <string>development</string>
+
+    <!-- App Group shared with RTCScreenSharingExtension for the
+         ReplayKit broadcast socket handoff. Must match the App Group
+         configured on the extension target's entitlements. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.kis.broadcast</string>
+    </array>
 </dict>
 </plist>

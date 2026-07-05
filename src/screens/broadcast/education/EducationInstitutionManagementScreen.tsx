@@ -351,7 +351,7 @@ function CreateInstitutionSheet({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
         {/* Header */}
         <View
           style={{
@@ -1090,7 +1090,7 @@ function InstitutionDashboard({
   })();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       {/* Header */}
       <View
         style={{
@@ -1206,7 +1206,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       {/* Header */}
       <View
         style={{

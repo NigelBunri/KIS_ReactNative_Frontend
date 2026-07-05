@@ -110,7 +110,7 @@ export const GifPickerSheet: React.FC<Props> = ({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.bg,
+            backgroundColor: palette.bg, marginTop: 25,
             transform: [{ translateY }],
           },
         ]}

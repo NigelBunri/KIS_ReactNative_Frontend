@@ -101,7 +101,7 @@ export default function SOSScreen({ navigation }: Props) {
 
   if (sent) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={[styles.successContainer, { paddingHorizontal: gutter }]}>
           <View style={[styles.successIconCircle, { backgroundColor: palette.primarySoft }]}>
             <KISIcon name="checkmark-circle" size={72} color={palette.primary} />
@@ -122,7 +122,7 @@ export default function SOSScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View style={[styles.container, { paddingHorizontal: gutter }]}>
         {/* Back */}
         <TouchableOpacity

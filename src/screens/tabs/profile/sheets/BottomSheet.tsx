@@ -48,7 +48,7 @@ export default function BottomSheet({
         style={[
           styles.sheet,
           {
-            backgroundColor: palette.bg,
+            backgroundColor: palette.bg, marginTop: 25,
             maxWidth: responsive.isTablet ? 760 : undefined,
             alignSelf: 'center',
             width: '100%',

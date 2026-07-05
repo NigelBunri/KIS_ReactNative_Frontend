@@ -117,7 +117,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const callTitle = callInfo?.title || typeLabel;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }]}>
       <Animated.View
         style={[
           styles.card,

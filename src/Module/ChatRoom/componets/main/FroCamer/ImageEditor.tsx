@@ -278,7 +278,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       onRequestClose={onClose}
     >
       <SafeAreaView
-        style={[editorStyles.root, { backgroundColor: palette.bg }]}
+        style={[editorStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}
         edges={['top']}
       >
         {/* CANVAS */}

@@ -347,7 +347,7 @@ export default function PlaylistDetailScreen() {
 
   if (!playlist) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top', 'bottom']}>
         <View style={styles.notFound}>
           <Text style={[styles.notFoundText, { color: palette.subtext }]}>
             Playlist not found.
@@ -363,7 +363,7 @@ export default function PlaylistDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top', 'bottom']}>
       {/* ── Header ── */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.headerBack}>

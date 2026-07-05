@@ -245,7 +245,7 @@ export default function BibleScreen() {
   const streak = spiritualGrowthSummary?.journey?.streak ?? 0;
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25 }]}>
 
       {/* ══════════════════════════════════════════════════════════════════════
           GOLD GRADIENT HEADER — same visual language as Messages + Broadcast

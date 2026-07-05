@@ -190,7 +190,7 @@ export function EducationScreenScaffold({
 
   if (!scrollable) {
     return (
-      <View style={[styles.scaffoldRoot, { backgroundColor: palette.bg }]}>
+      <View style={[styles.scaffoldRoot, { backgroundColor: palette.bg, marginTop: 25 }]}>
         {header}
         <View style={[styles.scaffoldContent, contentContainerStyle]}>{children}</View>
       </View>
@@ -199,7 +199,7 @@ export function EducationScreenScaffold({
 
   return (
     <ScrollView
-      style={[styles.scaffoldRoot, { backgroundColor: palette.bg }]}
+      style={[styles.scaffoldRoot, { backgroundColor: palette.bg, marginTop: 25 }]}
       contentContainerStyle={[styles.scaffoldContent, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
     >
@@ -443,7 +443,7 @@ export function EducationListCard({
           {imageUrl ? (
             <Image
               source={{ uri: imageUrl }}
-              style={[styles.listCardImage, { borderColor: `${palette.divider}99`, backgroundColor: palette.bg }]}
+              style={[styles.listCardImage, { borderColor: `${palette.divider}99`, backgroundColor: palette.bg, marginTop: 25 }]}
               resizeMode="cover"
             />
           ) : null}

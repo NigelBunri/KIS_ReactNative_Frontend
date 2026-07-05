@@ -261,7 +261,7 @@ export default function MentorshipScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     navBar: {
       flexDirection: 'row',
       alignItems: 'center',

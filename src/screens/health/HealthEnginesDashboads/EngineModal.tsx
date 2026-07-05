@@ -178,7 +178,7 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         {/* HEADER */}

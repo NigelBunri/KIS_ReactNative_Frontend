@@ -626,7 +626,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.bg,
+  backgroundColor: palette.bg, marginTop: 25,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

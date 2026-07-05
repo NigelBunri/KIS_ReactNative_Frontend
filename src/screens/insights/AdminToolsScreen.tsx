@@ -96,7 +96,7 @@ export default function AdminToolsScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, paddingTop: insets.top + responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} style={{ backgroundColor: palette.bg }}>
+    <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, paddingTop: insets.top + responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} style={{ backgroundColor: palette.bg, marginTop: 25 }}>
       <Text style={{ fontSize: 28, fontWeight: '900', color: palette.text }}>Developer tools</Text>
       <Text style={{ color: palette.subtext, marginBottom: 16 }}>
         Jump into backend-specific dashboards. Each view pulls from the corresponding app’s analytics

@@ -80,14 +80,14 @@ export default function LegalTemplatesScreen(_props: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Type Filter */}
       <ScrollView
         horizontal
@@ -234,7 +234,7 @@ export default function LegalTemplatesScreen(_props: Props) {
         presentationStyle="pageSheet"
         onRequestClose={() => setSelectedTemplate(null)}
       >
-        <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+        <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
           <View
             style={[
               styles.modalHeader,

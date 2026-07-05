@@ -99,7 +99,7 @@ export default function SetupPINScreen() {
   const styles = useMemo(() => StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: palette.bg,
+      backgroundColor: palette.bg, marginTop: 25,
     },
     header: {
       paddingHorizontal: responsive.pageGutter,

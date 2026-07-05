@@ -112,7 +112,7 @@ export default function LobbyScreen({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <SafeAreaView style={styles.safe}>
 
           {/* Header */}

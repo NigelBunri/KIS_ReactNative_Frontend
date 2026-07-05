@@ -80,7 +80,7 @@ export default function AccountDeletionScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}

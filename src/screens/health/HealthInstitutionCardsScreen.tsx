@@ -1873,7 +1873,7 @@ export default function HealthInstitutionCardsScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -1894,7 +1894,7 @@ export default function HealthInstitutionCardsScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}

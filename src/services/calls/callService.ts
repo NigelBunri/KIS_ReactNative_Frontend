@@ -16,7 +16,9 @@ const _screenShareState: Record<string, boolean> = {};
  *
  * On first call (sharing off → on):
  *   1. Tries `mediaDevices.getDisplayMedia` (react-native-webrtc ≥ 106 + OS support).
- *   2. Falls back to front camera capture if getDisplayMedia is unavailable.
+ *   2. Throws `Error('SCREEN_SHARE_UNAVAILABLE')` if getDisplayMedia is unavailable
+ *      or fails — callers must surface this to the user rather than silently
+ *      swapping in the camera, which would misrepresent what's being shared.
  *   3. Replaces the video sender track in all active peer connections.
  *   4. Emits `call.screen_share` with `{ conversationId, enabled: true }` via the socket.
  *   5. Returns the new isScreenSharing value (true).
@@ -81,56 +83,54 @@ export async function toggleScreenShare(
     let RNW: any = null;
     try { RNW = require('react-native-webrtc'); } catch { /* not installed */ }
 
-    if (RNW) {
-      // Save existing camera track before swapping
-      const localStream = webRTCService.getLocalStream();
-      if (localStream) {
-        const videoTracks: any[] = localStream.getVideoTracks?.() ?? [];
-        if (videoTracks.length > 0) {
-          _originalVideoTrack = videoTracks[0];
-        }
-      }
+    // No camera fallback below: silently swapping in the camera would
+    // misrepresent what's actually being shared (the user's face instead of
+    // their screen), so any failure to get a real screen stream must
+    // propagate as an explicit error for the caller to surface to the user.
+    if (!RNW || typeof RNW.mediaDevices?.getDisplayMedia !== 'function') {
+      throw new Error('SCREEN_SHARE_UNAVAILABLE');
+    }
 
-      // Try getDisplayMedia first (Android/iOS screen capture)
-      if (typeof RNW.mediaDevices?.getDisplayMedia === 'function') {
-        try {
-          screenStream = await RNW.mediaDevices.getDisplayMedia({ video: true });
-        } catch {
-          screenStream = null;
-        }
+    // Save existing camera track before swapping
+    const localStream = webRTCService.getLocalStream();
+    if (localStream) {
+      const videoTracks: any[] = localStream.getVideoTracks?.() ?? [];
+      if (videoTracks.length > 0) {
+        _originalVideoTrack = videoTracks[0];
       }
+    }
 
-      // Fallback: capture front camera with a fresh stream
-      if (!screenStream) {
-        try {
-          screenStream = await RNW.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-            audio: false,
-          });
-        } catch { /* ignore */ }
-      }
+    try {
+      screenStream = await RNW.mediaDevices.getDisplayMedia({ video: true });
+    } catch {
+      _originalVideoTrack = null;
+      throw new Error('SCREEN_SHARE_UNAVAILABLE');
+    }
 
-      // Replace video sender track in each peer connection
-      if (screenStream) {
-        const screenVideoTrack = screenStream.getVideoTracks?.()?.[0];
-        if (screenVideoTrack) {
-          // Remember the screen track so toggle-off can stop exactly this one.
-          _screenTrack = screenVideoTrack;
-          const peerConns = (webRTCService as any).peers as Map<string, any>;
-          peerConns?.forEach((pc: any) => {
-            try {
-              const senders: any[] = pc.getSenders?.() ?? [];
-              const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-              if (videoSender) videoSender.replaceTrack(screenVideoTrack);
-            } catch { /* ignore */ }
-          });
-        }
+    // Replace video sender track in each peer connection
+    if (screenStream) {
+      const screenVideoTrack = screenStream.getVideoTracks?.()?.[0];
+      if (screenVideoTrack) {
+        // Remember the screen track so toggle-off can stop exactly this one.
+        _screenTrack = screenVideoTrack;
+        const peerConns = (webRTCService as any).peers as Map<string, any>;
+        peerConns?.forEach((pc: any) => {
+          try {
+            const senders: any[] = pc.getSenders?.() ?? [];
+            const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+            if (videoSender) videoSender.replaceTrack(screenVideoTrack);
+          } catch { /* ignore */ }
+        });
       }
     }
   } catch (err) {
     console.warn('[callService] toggleScreenShare failed:', err);
     _screenShareState[sessionId] = false;
-    return false;
+    // Rethrow so the caller can distinguish "screen share unavailable" from a
+    // successful toggle-off and surface an explicit error to the user,
+    // instead of silently reporting isScreenSharing = false as if nothing
+    // was ever attempted.
+    throw err;
   }
 
   socket?.emit('call.screen_share', { conversationId: sessionId, enabled: true });

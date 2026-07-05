@@ -257,7 +257,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <ImageBackground
           source={landingBackgroundImage ? { uri: landingBackgroundImage } : undefined}

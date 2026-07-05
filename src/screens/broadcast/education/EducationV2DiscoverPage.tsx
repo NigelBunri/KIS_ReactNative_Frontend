@@ -1345,7 +1345,7 @@ export default function EducationV2DiscoverPage({
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: palette.bg,
+          backgroundColor: palette.bg, marginTop: 25,
         }}
       >
         <ActivityIndicator color={palette.primary} />
@@ -1354,7 +1354,7 @@ export default function EducationV2DiscoverPage({
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       <ScrollView
         contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', paddingBottom: 120 }}
         refreshControl={

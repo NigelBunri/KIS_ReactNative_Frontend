@@ -68,7 +68,7 @@ export default function CacheManagementScreen() {
   }, [load]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top', 'bottom']}>
       <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />

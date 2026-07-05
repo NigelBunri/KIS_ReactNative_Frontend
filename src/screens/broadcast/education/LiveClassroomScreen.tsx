@@ -93,7 +93,7 @@ export default function LiveClassroomScreen({ route, navigation }: Props) {
   };
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     scroll: { flex: 1 },
     content: { paddingBottom: 80 },
     header: { padding: sp },

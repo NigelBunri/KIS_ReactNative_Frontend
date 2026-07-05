@@ -282,14 +282,14 @@ export default function ChannelHomePage() {
 
   if (loading && !channel) {
     return (
-      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <OfflineDataBadge meta={channelCacheMeta} style={{ marginHorizontal: responsive.pageGutter, marginTop: 12 }} />
         <View style={[styles.heroWrap, { height: compact ? 144 : 184 }]}>

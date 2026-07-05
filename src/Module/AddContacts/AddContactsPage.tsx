@@ -806,7 +806,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     : 'Select members';
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable
@@ -858,7 +858,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
         </View>
 
         {/* Page 2: forms (add contact / group / community / channel / member select) */}
-        <View style={{ width: SCREEN_WIDTH, flex: 1, backgroundColor: palette.bg }}>
+        <View style={{ width: SCREEN_WIDTH, flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
           {/* Member selection: full FlatList to virtualize potentially large contact lists */}
           {(mode === 'selectGroupMembers' || mode === 'selectCommunityMembers') ? (
             <MemberSelectionList
@@ -871,11 +871,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             />
           ) : (
           <KeyboardAvoidingView
-            style={{ flex: 1, backgroundColor: palette.bg }}
+            style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
-              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg }]}
+              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg, marginTop: 25 }]}
               contentContainerStyle={{ paddingBottom: responsive.isWatch ? 20 : 32 }}
               keyboardShouldPersistTaps="handled"
             >

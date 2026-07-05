@@ -68,7 +68,7 @@ export default function BadgesScreen({ navigation }: Props) {
   const cardWidth = (layout.width - sp * 2 - (numCols - 1) * 10) / numCols;
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     header: { padding: sp, paddingBottom: sp + 4 },
     backBtn: {
       flexDirection: 'row',

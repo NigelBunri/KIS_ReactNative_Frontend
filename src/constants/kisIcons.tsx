@@ -14,6 +14,8 @@ export type KISIconName =
   | 'user'
   | 'users'
   | 'home'
+  | 'eye'
+  | 'eye-closed'
   | 'search'
   | 'cart'
   | 'bell'
@@ -162,6 +164,8 @@ const ion: IonMap = {
 
   // UI
   home: { filled: 'home', outline: 'home-outline' },
+  eye: { filled: 'eye', outline: 'eye-outline' },
+  'eye-closed': { filled: 'eye-off', outline: 'eye-off-outline' },
   search: { filled: 'search', outline: 'search-outline' },
   cart: { filled: 'cart', outline: 'cart-outline' },
   bell: {

@@ -103,7 +103,7 @@ export default function BusinessHubScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     scroll: { paddingBottom: 80 },
     header: {
       paddingTop: 32,

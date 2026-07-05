@@ -412,7 +412,7 @@ export default function InstitutionOnboardingScreen() {
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: palette.bg,
+      backgroundColor: palette.bg, marginTop: 25,
     },
     mapText: {
       color: palette.text,

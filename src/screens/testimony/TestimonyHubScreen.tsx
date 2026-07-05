@@ -143,9 +143,9 @@ export default function TestimonyHubScreen() {
   const activeSeasons = useMemo(() => seasons.filter(s => s?.is_active !== false), [seasons]);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <ScrollView
-        style={{ backgroundColor: palette.bg }}
+        style={{ backgroundColor: palette.bg, marginTop: 25 }}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />
@@ -254,7 +254,7 @@ export default function TestimonyHubScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.stickyBar, { backgroundColor: palette.bg, borderTopColor: palette.divider, paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.stickyBar, { backgroundColor: palette.bg, marginTop: 25, borderTopColor: palette.divider, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <Pressable
           onPress={() => navigation.navigate('TestimonyReachInbox')}
           style={[styles.inboxBtn, { backgroundColor: palette.primaryStrong }]}

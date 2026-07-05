@@ -101,7 +101,7 @@ export default function ScholarshipsScreen({ navigation }: Props) {
   };
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

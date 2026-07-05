@@ -136,9 +136,11 @@ class AudioRouteManager {
     this._ringbackActive = true;
 
     if (InCallManager) {
-      // '_RINGBACK_' plays the system ringback tone (a soft repeating beep),
-      // distinct from '_DEFAULT_' which is the full device ringtone.
-      try { InCallManager.startRingback('_RINGBACK_'); } catch {}
+      // '_DTMF_' synthesizes a repeating beep-beep ringback tone natively,
+      // distinct from '_DEFAULT_' which is the full device ringtone used by
+      // the receiver. Any other string is not a recognized sentinel and
+      // silently falls back to the same default ringtone URI as the receiver.
+      try { InCallManager.startRingback('_DTMF_'); } catch {}
       return;
     }
 

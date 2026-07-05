@@ -270,7 +270,7 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
 
 function makeStyles(palette: any, sp: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: {
       flexDirection: 'row',
@@ -353,7 +353,7 @@ function makeStyles(palette: any, sp: number) {
       shadowOpacity: 0.4,
       shadowRadius: 8,
     },
-    modalSafe: { flex: 1, backgroundColor: palette.bg },
+    modalSafe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',

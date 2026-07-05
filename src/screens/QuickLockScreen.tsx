@@ -138,7 +138,7 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   const styles = useMemo(() => StyleSheet.create({
     overlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: palette.bg,
+      backgroundColor: palette.bg, marginTop: 25,
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,

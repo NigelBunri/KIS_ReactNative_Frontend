@@ -123,7 +123,7 @@ export default function TwoFactorScreen({ onBack }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.centered, { backgroundColor: palette.bg }]}>
+      <View style={[styles.root, styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator color={palette.primary} />
       </View>
     );
@@ -131,7 +131,7 @@ export default function TwoFactorScreen({ onBack }: Props) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
       <View style={[styles.headerRow, { borderBottomColor: palette.divider }]}>
         {onBack && (
           <Pressable onPress={onBack} style={styles.backBtn}>

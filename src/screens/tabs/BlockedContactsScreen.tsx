@@ -160,7 +160,7 @@ export default function BlockedContactsScreen({ onBack }: Props) {
   };
 
   return (
-    <View style={[localStyles.root, { backgroundColor: palette.bg }]}>
+    <View style={[localStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Header */}
       <View
         style={[

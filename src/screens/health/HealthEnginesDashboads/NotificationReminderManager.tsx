@@ -182,7 +182,7 @@ const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
   /* ================= UI ================= */
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={["top"]}>
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.md }}
@@ -386,7 +386,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const item = (palette: any, spacing: any) => ({
-  backgroundColor: palette.bg,
+  backgroundColor: palette.bg, marginTop: 25,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

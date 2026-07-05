@@ -223,7 +223,7 @@ export default function SmallGroupDetailScreen({ route, navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     center: { alignItems: 'center', justifyContent: 'center' },
     scroll: { padding: sp, paddingBottom: 80 },
     errorText: { fontSize: 15, color: palette.danger },

@@ -133,7 +133,7 @@ export function MediaComposerPage({
   const subtext = palette.subtext;
 
   return (
-    <View style={[styles.page, { backgroundColor: palette.bg }]}>
+    <View style={[styles.page, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {/* Main pick button */}
       <Pressable
         onPress={() => {

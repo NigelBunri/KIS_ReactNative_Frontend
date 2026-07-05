@@ -200,7 +200,7 @@ export default function UserProfileScreen() {
   const educations: any[] = profile?.educations ?? profile?.education ?? [];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
@@ -428,7 +428,7 @@ function makeStyles(palette: any) {
       paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: palette.border,
-      backgroundColor: palette.bg,
+      backgroundColor: palette.bg, marginTop: 25,
     },
     backBtn: {
       width: 44,

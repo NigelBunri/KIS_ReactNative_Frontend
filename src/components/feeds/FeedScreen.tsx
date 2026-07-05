@@ -988,7 +988,7 @@ export default function FeedScreen<T extends FeedPost>({
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
       {!isCommunityFeed ? (
         <>
           <View pointerEvents="none" style={styles.bgGlowA} />

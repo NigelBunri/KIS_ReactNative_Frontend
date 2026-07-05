@@ -228,7 +228,7 @@ const createStyles = (
   StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: palette.bg,
+      backgroundColor: palette.bg, marginTop: 25,
     },
     scroll: {
       flex: 1,

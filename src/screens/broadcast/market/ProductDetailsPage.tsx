@@ -924,7 +924,7 @@ export default function ProductDetailsPage() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View
           style={[
             styles.loadingCard,
@@ -942,7 +942,7 @@ export default function ProductDetailsPage() {
 
   if (error) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg, padding: 20 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, padding: 20 }]}>
         <View
           style={[
             styles.errorCard,
@@ -975,11 +975,11 @@ export default function ProductDetailsPage() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <View style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <View
         style={[
           styles.header,
-          { backgroundColor: palette.bg, borderBottomColor: palette.divider },
+          { backgroundColor: palette.bg, marginTop: 25, borderBottomColor: palette.divider },
         ]}
       >
         <Pressable

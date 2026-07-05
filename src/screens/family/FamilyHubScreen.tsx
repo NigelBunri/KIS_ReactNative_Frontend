@@ -79,7 +79,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
@@ -87,7 +87,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
 
   if (!family) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={styles.emptyState}>
           <KISIcon name="people-outline" size={64} color={palette.subtext} />
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No Family Yet</Text>
@@ -115,7 +115,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
   const overflow = (family.member_count ?? 0) - 5;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Header */}
         <LinearGradient

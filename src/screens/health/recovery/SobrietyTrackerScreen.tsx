@@ -216,7 +216,7 @@ export default function SobrietyTrackerScreen({ navigation }: Props) {
 
 function makeStyles(palette: any, sp: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: {
       flexDirection: 'row',

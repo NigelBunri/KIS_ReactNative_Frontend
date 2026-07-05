@@ -111,7 +111,7 @@ export default function TiersDashboardScreen() {
     plans.length > 0 ? Math.max(...plans.map((p) => p.subscriber_count ?? 0), 1) : 1;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Tiers</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>

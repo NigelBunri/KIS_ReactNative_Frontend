@@ -1765,7 +1765,7 @@ export default function BroadcastFeedSection({
     : [];
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
       {/* Body */}
       {mainSection === 'feed' && renderFeedBody()}
       {mainSection === 'market' && renderMarketBody()}

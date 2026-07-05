@@ -2309,7 +2309,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       ) : null}
 
       {/* ------------ Top Tabs (animated tab bar) ------------ */}
-      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
         <Tab.Navigator
           {...({ ref: tabRef } as any)}
           tabBar={(props) => <AnimatedTopBar {...props} />}
@@ -2592,7 +2592,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             bottom: 0,
             transform: [{ translateX: chatTranslateX }],
             zIndex: 50, // above everything
-            backgroundColor: palette.bg,
+            backgroundColor: palette.bg, marginTop: 25,
           }}
         >
           <ChatRoomPage
@@ -2615,7 +2615,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             bottom: 0,
             transform: [{ translateY: addTranslateY }],
             zIndex: 40,
-            backgroundColor: palette.bg,
+            backgroundColor: palette.bg, marginTop: 25,
           }}
         >
           <AddContactsPage onOpenChat={handleOpenChatFromAddContacts} onClose={closeAddContacts} initialMode={addInitialMode} />

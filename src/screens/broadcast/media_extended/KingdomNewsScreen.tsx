@@ -76,7 +76,7 @@ export default function KingdomNewsScreen({ navigation }: Props) {
   };
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg },
+    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     header: { padding: sp, paddingBottom: sp + 4 },
     backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, minHeight: 44 },
     backLabel: { fontSize: 16, color: palette.ivory, marginLeft: 4 },
@@ -143,7 +143,7 @@ export default function KingdomNewsScreen({ navigation }: Props) {
     },
     credText: { fontSize: 11, fontWeight: '600', color: palette.ivory },
     // Full article view
-    articleFull: { flex: 1, backgroundColor: palette.bg },
+    articleFull: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
     articleFullHeader: {
       flexDirection: 'row',
       alignItems: 'center',

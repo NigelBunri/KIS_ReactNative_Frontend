@@ -390,11 +390,11 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: palette.bg }}
+      style={{ flex: 1, backgroundColor: palette.bg, marginTop: insets.top }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top || tokens.spacing['2xl'], paddingBottom: insets.bottom + tokens.spacing['2xl'] }]}
+        contentContainerStyle={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top || tokens.spacing['2xl'], paddingBottom: insets.bottom + tokens.spacing['2xl'] }]}
         keyboardShouldPersistTaps="handled"
       >
       <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>

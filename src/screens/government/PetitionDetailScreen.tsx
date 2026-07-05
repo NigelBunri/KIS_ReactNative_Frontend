@@ -98,7 +98,7 @@ export default function PetitionDetailScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
@@ -106,7 +106,7 @@ export default function PetitionDetailScreen({ route }: Props) {
 
   if (!petition) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
         <View style={styles.emptyState}>
           <Text style={[styles.emptyText, { color: palette.subtext }]}>
             Petition not found.
@@ -129,7 +129,7 @@ export default function PetitionDetailScreen({ route }: Props) {
       : palette.gold;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: gutter,

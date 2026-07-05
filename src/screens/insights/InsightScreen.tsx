@@ -22,7 +22,7 @@ export default function InsightScreen({
   const insights = useInsights(target);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg }]}>
+    <View style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}>
       <InsightLayout
         title={title}
         subtitle={description}
