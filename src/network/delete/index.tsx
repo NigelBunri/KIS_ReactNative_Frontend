@@ -6,6 +6,7 @@ import {
   getAccessTokenForRequest,
   refreshAccessToken,
 } from '@/security/tokenRefresh';
+import { clearAuthSession, isUnrecoverableDeviceAuthError } from '@/security/authStorage';
 
 export const deleteRequest = async (
   url: string,
@@ -55,16 +56,28 @@ export const deleteRequest = async (
             message: options.successMessage || '',
           };
         }
+        console.error('[deleteRequest] retry after token refresh still failed', {
+          url,
+          status: retryResponse.status,
+          detail: retryData?.detail,
+        });
+        if (isUnrecoverableDeviceAuthError(retryData?.detail)) {
+          void clearAuthSession();
+        }
         return {
           success: false,
-          message: options.errorMessage || 'Session expired.',
+          message: options.errorMessage || retryData?.detail || 'Session expired.',
           status: retryResponse.status,
           data: retryData,
         };
       }
+      console.error('[deleteRequest] 401 and token refresh failed', {
+        url,
+        detail: responseData?.detail,
+      });
       return {
         success: false,
-        message: 'Session expired. Please log in again.',
+        message: options.errorMessage || responseData?.detail || 'Session expired. Please log in again.',
         status: 401,
         data: responseData,
       };

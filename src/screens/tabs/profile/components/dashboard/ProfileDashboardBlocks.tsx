@@ -236,7 +236,13 @@ export const ProfileHeroCard = ({
   const { top: topInset } = useSafeAreaInsets();
 
   return (
-    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard'), { borderRadius: 0, minHeight: (compact ? 284 : 308) + topInset }]}>
+    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard'), {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      minHeight: (compact ? 284 : 308) + topInset,
+    }]}>
       <View style={dashboardStyles.heroBackdrop}>
         {coverUrl ? (
           /* ── Cover image path — image fills the backdrop, gold-warm tinted scrim ── */

@@ -943,12 +943,20 @@ export const useProfileController = (opts: {
           }
           if (!hasCachedPayload) {
             setProfile(null);
+            console.error('[useProfileController] profiles/me failed', {
+              status: res?.status,
+              message: res?.message,
+              detail: (res as any)?.data?.detail,
+            });
             Alert.alert('Profile', res.message || 'Could not load profile');
           }
         }
       } catch (e: any) {
         if (!hasCachedPayload) {
           setProfile(null);
+          console.error('[useProfileController] profiles/me threw', {
+            error: e?.message,
+          });
           Alert.alert('Profile', e?.message ?? 'Could not load profile');
         }
       } finally {

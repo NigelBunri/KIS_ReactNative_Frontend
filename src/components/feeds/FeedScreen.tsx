@@ -177,14 +177,24 @@ const uploadFeedAttachment = async (attachment: any, token: string): Promise<any
     durationMs: typeof attachment.durationMs === 'number' ? attachment.durationMs : undefined,
   };
 
+  console.log('[FeedScreen] uploadFeedAttachment start', {
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+  });
   try {
     const uploaded = await uploadFileToBackend({
       file,
       authToken: token,
+      context: 'feed',
     });
+    console.log('[FeedScreen] uploadFeedAttachment succeeded', { fileName: file.name, assetId: uploaded?.assetId ?? uploaded?.id });
     return { ...attachment, ...uploaded };
   } catch (error) {
-    console.warn('[FeedScreen] uploadFeedAttachment failed; queueing media upload', error);
+    console.error('[FeedScreen] uploadFeedAttachment failed; falling back to background upload queue', {
+      fileName: file.name,
+      error: error instanceof Error ? error.message : String(error),
+    });
     try {
       const job = await queueMediaUpload({
         file,
@@ -199,7 +209,11 @@ const uploadFeedAttachment = async (attachment: any, token: string): Promise<any
         offlineMediaJobId: job.id,
         uploadStatus: 'queued',
       };
-    } catch {
+    } catch (queueError) {
+      console.error('[FeedScreen] queueMediaUpload also failed', {
+        fileName: file.name,
+        error: queueError instanceof Error ? queueError.message : String(queueError),
+      });
       Alert.alert('Upload failed', 'Unable to prepare attachment for background upload. Please try again.');
       return null;
     }
@@ -560,35 +574,68 @@ export default function FeedScreen<T extends FeedPost>({
 
   const handleCreate = useCallback(
     async (payload: FeedComposerPayload) => {
-      const prepared = await prepareBroadcastVideoPayload(payload);
-      if (!prepared) return;
-
-      const enrichedPayload = await uploadFeedAttachmentsIfNeeded(prepared);
-      if (!enrichedPayload) return;
-
-      const requestPayload = { ...enrichedPayload };
-      delete requestPayload.textPlain;
-      delete requestPayload.textPreview;
-      delete requestPayload.composerType;
-
-      const contextPayload = composerContext ? { [composerContext.key]: composerContext.value } : {};
-
-      const mediaJobIds = Array.isArray((requestPayload as any).attachments)
-        ? (requestPayload as any).attachments
-            .map((item: any) => item?.offlineMediaJobId)
-            .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
-        : [];
-
-      const res = await queueableJsonRequest({
-        domain: 'Feeds',
-        kind: 'feed.create_post',
-        method: 'POST',
-        url: composerEndpoint,
-        body: { ...contextPayload, ...requestPayload },
-        mediaJobIds,
-        errorMessage: composerErrorMessage ?? 'Unable to post.',
+      console.log('[FeedScreen] handleCreate start', {
+        composerEndpoint,
+        attachmentCount: Array.isArray(payload.attachments) ? payload.attachments.length : 0,
+        composerType: payload.composerType,
       });
-      if (res?.success) loadFeed();
+      try {
+        const prepared = await prepareBroadcastVideoPayload(payload);
+        if (!prepared) {
+          console.warn('[FeedScreen] handleCreate aborted: prepareBroadcastVideoPayload returned null (video upload likely failed)');
+          return;
+        }
+
+        const enrichedPayload = await uploadFeedAttachmentsIfNeeded(prepared);
+        if (!enrichedPayload) {
+          console.warn('[FeedScreen] handleCreate aborted: uploadFeedAttachmentsIfNeeded returned null (attachment upload/auth failed)');
+          return;
+        }
+
+        const requestPayload = { ...enrichedPayload };
+        delete requestPayload.textPlain;
+        delete requestPayload.textPreview;
+        delete requestPayload.composerType;
+
+        const contextPayload = composerContext ? { [composerContext.key]: composerContext.value } : {};
+
+        const mediaJobIds = Array.isArray((requestPayload as any).attachments)
+          ? (requestPayload as any).attachments
+              .map((item: any) => item?.offlineMediaJobId)
+              .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+          : [];
+
+        console.log('[FeedScreen] posting to composerEndpoint', {
+          url: composerEndpoint,
+          mediaJobIds,
+          attachmentCount: Array.isArray((requestPayload as any).attachments)
+            ? (requestPayload as any).attachments.length
+            : 0,
+        });
+
+        const res = await queueableJsonRequest({
+          domain: 'Feeds',
+          kind: 'feed.create_post',
+          method: 'POST',
+          url: composerEndpoint,
+          body: { ...contextPayload, ...requestPayload },
+          mediaJobIds,
+          errorMessage: composerErrorMessage ?? 'Unable to post.',
+        });
+        console.log('[FeedScreen] composerEndpoint response', {
+          url: composerEndpoint,
+          success: res?.success,
+          queued: (res as any)?.queued,
+          message: (res as any)?.message,
+        });
+        if (res?.success) loadFeed();
+      } catch (error) {
+        console.error('[FeedScreen] handleCreate threw before reaching the server', {
+          composerEndpoint,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        Alert.alert('Post failed', 'Something went wrong while posting. Please try again.');
+      }
     },
     [composerContext, composerEndpoint, composerErrorMessage, loadFeed],
   );
@@ -732,6 +779,7 @@ export default function FeedScreen<T extends FeedPost>({
     const attachment = await uploadFileToBackend({
       file: { uri, name: `kis-share-${Date.now()}.png`, type: 'image/png' },
       authToken: token,
+      context: 'share',
     });
     return attachment?.url ?? null;
   }, []);

@@ -261,10 +261,10 @@ export default function BibleScreen() {
         {/* Luxury shimmer across the very top */}
         <View style={styles.headerSheen} pointerEvents="none" />
         {/* Soft radial halo in the top-right corner for depth */}
-        <View style={styles.headerHalo} />
+        <View style={[styles.headerHalo, {marginTop: insets.top}]} />
 
         {/* ── Always-visible header bar ─────────────────────────────────── */}
-        <View style={[styles.headerBar, { paddingTop: insets.top + (compactBible ? 10 : 16) }]}>
+        <View style={[styles.headerBar, { paddingTop: insets.top + (compactBible ? 10 : 16) , marginTop: 25}]}>
           {/* Left: icon + eyebrow + title */}
           <View style={styles.headerTitleGroup}>
             <View style={styles.headerIconCircle}>

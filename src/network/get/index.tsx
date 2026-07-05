@@ -8,6 +8,7 @@ import {
   getAccessTokenForRequest,
   refreshAccessToken,
 } from '@/security/tokenRefresh';
+import { clearAuthSession, isUnrecoverableDeviceAuthError } from '@/security/authStorage';
 import { recordRedactedPerformanceEvent, computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 export type GetResponse<T = any> = ApiResult<T>;
@@ -254,9 +255,31 @@ export const getRequest = async (
           writeAutoCache(finalUrl, retryData);
           return { success: true, data: retryData, message: options.successMessage || '' };
         }
-        return { success: false, message: options.errorMessage || 'Session expired.', status: retryResponse.status, data: retryData };
+        console.error('[getRequest] retry after token refresh still failed', {
+          url: finalUrl,
+          status: retryResponse.status,
+          detail: retryData?.detail,
+        });
+        if (isUnrecoverableDeviceAuthError(retryData?.detail)) {
+          void clearAuthSession();
+        }
+        return {
+          success: false,
+          message: options.errorMessage || retryData?.detail || 'Session expired.',
+          status: retryResponse.status,
+          data: retryData,
+        };
       }
-      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
+      console.error('[getRequest] 401 and token refresh failed', {
+        url: finalUrl,
+        detail: responseData?.detail,
+      });
+      return {
+        success: false,
+        message: options.errorMessage || responseData?.detail || 'Session expired. Please log in again.',
+        status: 401,
+        data: responseData,
+      };
     }
 
     if (response.status === 429) {

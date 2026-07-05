@@ -26,6 +26,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeFactory = factory
 
     window = UIWindow(frame: UIScreen.main.bounds)
+    // UIWindow has no explicit background by default, which resolves to black.
+    // That shows through during launch and screen transitions before/around
+    // the JS content paints. systemBackground tracks light/dark automatically
+    // (white in light mode) instead of hardcoding one color for both.
+    window?.backgroundColor = .systemBackground
 
     factory.startReactNative(
       withModuleName: "KIS",

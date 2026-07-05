@@ -1830,8 +1830,15 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // screens' bar styles are unaffected when navigating away).
   useStatusBarStyle(tone, 'dark-content');
 
+  // The header panel's bottom corners are rounded (see messageGoldPanel), so a
+  // sliver of this View's background shows through behind them — it should
+  // match the page background (palette.bg), same as the tab content directly
+  // below/around it, so the header reads as a rounded card floating on the
+  // page rather than a patch of mismatched color.
+  const headerCornerBackdrop = palette.bg;
+
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+    <View style={[styles.wrap, { backgroundColor: headerCornerBackdrop }]}>
       <LinearGradient
         colors={messageGoldGradient as string[]}
         start={{ x: 0, y: 0 }}
@@ -1968,7 +1975,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               },
             ]}
           >
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, marginTop: 25 }}>
               <View
                 style={{
                   width: responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : 42,

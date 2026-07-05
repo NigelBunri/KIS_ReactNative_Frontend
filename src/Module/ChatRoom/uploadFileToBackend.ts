@@ -259,7 +259,18 @@ export async function uploadFileToBackend(opts: {
   const url = params.toString()
     ? `${baseUrl}/uploads/file?${params.toString()}`
     : `${baseUrl}/uploads/file`;
-  const uploadBackendName = /kis-nest-backend|:4000/.test(baseUrl) ? 'Nest' : 'Django';
+  const uploadBackendName = /kis-nest-backend|chat\.kingdomimpactventures|:4000/.test(baseUrl) ? 'Nest' : 'Django';
+
+  console.log('[uploadFileToBackend] start', {
+    url,
+    backend: uploadBackendName,
+    context: uploadContext,
+    fieldName: 'file',
+    fileName: uploadFile.name,
+    fileType: inferUploadMime(uploadFile.name, uploadFile.type),
+    fileSize,
+    hasDeviceId: Boolean(resolvedDeviceId),
+  });
 
   const isAuthUploadError = (err: any) => {
     const status = Number(err?.status ?? 0);
@@ -278,10 +289,20 @@ export async function uploadFileToBackend(opts: {
       }
 
       xhr.onload = () => {
+        console.log('[uploadFileToBackend] response', {
+          url,
+          status: xhr.status,
+          bodyPreview: String(xhr.responseText || '').slice(0, 500),
+        });
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             resolve(JSON.parse(xhr.responseText));
           } catch (err) {
+            console.error('[uploadFileToBackend] failed to parse success response', {
+              url,
+              status: xhr.status,
+              error: err instanceof Error ? err.message : String(err),
+            });
             reject(err);
           }
           return;
@@ -299,16 +320,22 @@ export async function uploadFileToBackend(opts: {
         } catch {
           // Keep the generic message; do not expose raw backend/storage responses.
         }
+        console.error('[uploadFileToBackend] server rejected upload', {
+          url,
+          status: xhr.status,
+          safeMessage,
+        });
         reject(Object.assign(new Error(safeMessage), { status: xhr.status, responseText: xhr.responseText }));
       };
 
       xhr.onerror = () => {
         const diagnostic = { status: xhr.status, readyState: xhr.readyState, responseURL: xhr.responseURL, uploadedUri: uploadFile.uri, originalUri: originalFile.uri };
-        if (__DEV__) console.warn('[uploadFileToBackend] xhr network error', diagnostic);
-        reject(Object.assign(new Error(`Upload failed after upload reached the server. Please retry; if it repeats, check the ${uploadBackendName} Render logs for /uploads/file.`), { status: xhr.status, diagnostic }));
+        console.error('[uploadFileToBackend] xhr network error (request never reached the server, or the response never came back)', { url, ...diagnostic });
+        reject(Object.assign(new Error(`Upload failed after upload reached the server. Please retry; if it repeats, check the ${uploadBackendName} logs for /uploads/file.`), { status: xhr.status, diagnostic }));
       };
 
       xhr.ontimeout = () => {
+        console.error('[uploadFileToBackend] xhr timeout', { url, timeoutMs: UPLOAD_TIMEOUT_MS });
         reject(new Error('Upload failed: the network was too slow and timed out. Please retry on a stronger connection.'));
       };
 
@@ -329,6 +356,7 @@ export async function uploadFileToBackend(opts: {
     authToken ||
     null;
   if (!firstToken) {
+    console.error('[uploadFileToBackend] no access token available; upload never sent', { url, context: uploadContext });
     onStatus?.('failed');
     throw new Error('Authentication token missing. Please reconnect and try again.');
   }
@@ -337,6 +365,12 @@ export async function uploadFileToBackend(opts: {
   try {
     json = await uploadOnce(firstToken);
   } catch (err) {
+    console.error('[uploadFileToBackend] initial upload attempt failed', {
+      url,
+      context: uploadContext,
+      error: err instanceof Error ? err.message : String(err),
+      status: (err as any)?.status,
+    });
     if (!isAuthUploadError(err)) {
       onStatus?.('failed');
       throw err;
@@ -344,6 +378,7 @@ export async function uploadFileToBackend(opts: {
 
     const refreshedToken = await refreshAccessToken(firstToken);
     if (!refreshedToken) {
+      console.error('[uploadFileToBackend] token refresh failed; giving up', { url });
       onStatus?.('failed');
       throw err;
     }
@@ -351,6 +386,11 @@ export async function uploadFileToBackend(opts: {
     try {
       json = await uploadOnce(refreshedToken);
     } catch (retryErr) {
+      console.error('[uploadFileToBackend] retry after token refresh failed', {
+        url,
+        error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+        status: (retryErr as any)?.status,
+      });
       onStatus?.('failed');
       throw retryErr;
     }
@@ -360,11 +400,21 @@ export async function uploadFileToBackend(opts: {
   const attachment = json?.attachment ?? json;
   const safety = attachment.safety as MediaSafetyPayload | undefined;
 
+  console.log('[uploadFileToBackend] upload accepted by server', {
+    url,
+    context: uploadContext,
+    assetId: attachment?.assetId ?? attachment?.mediaAssetId ?? attachment?.id,
+    scanStatus: attachment?.scanStatus ?? safety?.status,
+    quarantined: attachment?.quarantined ?? safety?.quarantined,
+    hasDisplayUrl: Boolean(attachment?.displayUrl ?? attachment?.url ?? attachment?.publicUrl),
+  });
+
   if (FEATURE_FLAGS.MEDIA_VERIFICATION_ENABLED) {
     // 'not_configured' means the AI scan is disabled on this server — the file
     // was never checked, so it is not condemned. Never block on not_configured.
     if (isMediaSafetyBlocked(safety)) {
       const msg = getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.';
+      console.error('[uploadFileToBackend] media safety blocked upload', { url, context: uploadContext, safety });
       onStatus?.('verification_failed');
       throw new VerificationFailedError(msg);
     }
@@ -373,6 +423,7 @@ export async function uploadFileToBackend(opts: {
       isMediaSafetyPendingReview(safety)
     ) {
       const msg = getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.';
+      console.warn('[uploadFileToBackend] media safety pending review; blocking for this context', { url, context: uploadContext, safety });
       onStatus?.('verification_failed');
       throw new VerificationFailedError(msg);
     }

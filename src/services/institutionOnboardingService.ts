@@ -77,7 +77,6 @@ export const uploadComplianceDocument = async (
   form.append('metadata', JSON.stringify({ field: field.key, mime: file.type }));
 
   return postRequest(healthRoutes.compliance.documents, form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     errorMessage: 'Unable to upload compliance document.',
   });
 };

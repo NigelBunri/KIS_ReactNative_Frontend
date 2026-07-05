@@ -311,6 +311,13 @@ const AuthContext = createContext<AuthCtx>({
 export const useAuth = () => useContext(AuthContext);
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
+// Empirical top-of-screen fudge factor, on top of the real measured insets.top
+// — see the root View's `top` style for where this is used and why. Each gold
+// screen needs its own amount (applying one shared value to all of them either
+// under- or over-corrects the rest), so this is keyed by bottom-tab route name.
+// Retune an individual entry here if that screen's gap reappears or overshoots;
+// nothing else should need to change. Routes not listed get 0 (insets.top only).
+const EXTRA_TOP_NUDGE_PX = 20
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
 
@@ -328,14 +335,42 @@ function AppContent() {
 
   const navigationRef = useRef<any>(null);
 
+  // getCurrentRoute() returns the deepest focused leaf route, not the bottom
+  // tab. The Messages tab nests its own Tab.Navigator (Chats/Updates/Calls/
+  // Communities), so its leaf is never literally 'Messages' — and any screen
+  // could grow nested tabs/stacks later, silently breaking a leaf-name list
+  // again. Walk the state tree instead and read MainTabs' own active route —
+  // that's stable regardless of how deeply nested the focused leaf is.
+  const getActiveBottomTabName = (state: any): string | null => {
+    if (!state?.routes?.length) return null;
+    const current = state.routes[state.index ?? state.routes.length - 1];
+    if (!current) return null;
+    if (current.name === 'MainTabs' && current.state) {
+      const tabState = current.state;
+      const activeTab = tabState.routes?.[tabState.index ?? tabState.routes.length - 1];
+      return activeTab?.name ?? null;
+    }
+    return current.state ? getActiveBottomTabName(current.state) : null;
+  };
+
   const syncActiveRoute = useCallback(() => {
-    const routeName = navigationRef.current?.getCurrentRoute?.()?.name;
+    const rootState = navigationRef.current?.getRootState?.();
+    const bottomTabName = getActiveBottomTabName(rootState);
+    const routeName = bottomTabName ?? navigationRef.current?.getCurrentRoute?.()?.name;
     if (typeof routeName === 'string' && routeName.length > 0) {
       setActiveRouteName(routeName);
     }
   }, []);
 
-  const usesGoldStatusBar = activeRouteName === 'Messages' || activeRouteName === 'Broadcast';
+  // Bible, Partners, and Profile render the same "gradient reaches y=0, inner
+  // content pads by insets.top" header pattern as Messages/Broadcast, so they
+  // belong in this list too.
+  const usesGoldStatusBar =
+    activeRouteName === 'Messages' ||
+    activeRouteName === 'Broadcast' ||
+    activeRouteName === 'Bible' ||
+    activeRouteName === 'Partners' ||
+    activeRouteName === 'Profile';
   const statusBarBackground = usesGoldStatusBar
     ? KIS_COLORS.brand.gold
     : scheme === 'dark'
@@ -346,6 +381,15 @@ function AppContent() {
     : 'light-content';
 
   const [isAuth, setAuth] = useState(false);
+
+  // onReady only fires once, on the very first NavigationContainer mount —
+  // the Login → MainTabs swap is driven by `isAuth` flipping (a conditional
+  // render, not a navigate() call), so onStateChange is the only other signal
+  // and isn't guaranteed to fire for it. Re-sync explicitly on that flip too.
+  useEffect(() => {
+    syncActiveRoute();
+  }, [isAuth, booting, syncActiveRoute]);
+
   const [load, setLoad] = useState(false);
   const [pendingVerificationPhone, setPendingVerificationPhone] = useState<string | null>(null);
   const [_phone, setPhone] = useState<string | null>(null);
@@ -998,7 +1042,19 @@ function AppContent() {
   return (
     <AuthContext.Provider value={ctx}>
       <SocketProvider>
-        <View style={{ flex: 1, backgroundColor: statusBarBackground }}>
+        <View
+          style={{
+            position: 'absolute',
+            // insets.top alone still leaves a residual gap, by a different amount
+            // per screen — see EXTRA_TOP_NUDGE_PX_BY_ROUTE above for where to
+            // retune an individual screen's value.
+            top: -(insets.top + EXTRA_TOP_NUDGE_PX),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: statusBarBackground,
+          }}
+        >
           <StatusBar
             animated
             translucent

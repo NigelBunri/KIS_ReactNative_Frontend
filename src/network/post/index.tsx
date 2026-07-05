@@ -8,6 +8,7 @@ import {
   getAccessTokenForRequest,
   refreshAccessToken,
 } from '@/security/tokenRefresh';
+import { clearAuthSession, isUnrecoverableDeviceAuthError } from '@/security/authStorage';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 import { formatApiError } from '../formatApiError';
 
@@ -146,9 +147,31 @@ export const postRequest = async (
         if (retryResponse.ok) {
           return { success: true, data: unwrapPayload(retryData), message: successMessage };
         }
-        return { success: false, message: options.errorMessage || 'Session expired.', status: retryResponse.status, data: retryData };
+        console.error('[postRequest] retry after token refresh still failed', {
+          url,
+          status: retryResponse.status,
+          detail: retryData?.detail,
+        });
+        if (isUnrecoverableDeviceAuthError(retryData?.detail)) {
+          void clearAuthSession();
+        }
+        return {
+          success: false,
+          message: options.errorMessage || retryData?.detail || 'Session expired.',
+          status: retryResponse.status,
+          data: retryData,
+        };
       }
-      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
+      console.error('[postRequest] 401 and token refresh failed', {
+        url,
+        detail: responseData?.detail,
+      });
+      return {
+        success: false,
+        message: options.errorMessage || responseData?.detail || 'Session expired. Please log in again.',
+        status: 401,
+        data: responseData,
+      };
     }
 
     const msg = formatApiError(

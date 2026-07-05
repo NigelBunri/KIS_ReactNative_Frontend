@@ -6,6 +6,7 @@ import {
   getAccessTokenForRequest,
   refreshAccessToken,
 } from '@/security/tokenRefresh';
+import { clearAuthSession, isUnrecoverableDeviceAuthError } from '@/security/authStorage';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 const MAX_PUT_RETRIES = 2;
@@ -103,9 +104,31 @@ export const putData = async (
         if (retryResponse.ok) {
           return { success: true, data: retryData, message: successMsg };
         }
-        return { success: false, message: errorMsg, status: retryResponse.status, data: retryData };
+        console.error('[putRequest] retry after token refresh still failed', {
+          url,
+          status: retryResponse.status,
+          detail: retryData?.detail,
+        });
+        if (isUnrecoverableDeviceAuthError(retryData?.detail)) {
+          void clearAuthSession();
+        }
+        return {
+          success: false,
+          message: options.errorMessage || retryData?.detail || errorMsg,
+          status: retryResponse.status,
+          data: retryData,
+        };
       }
-      return { success: false, message: 'Session expired. Please log in again.', status: 401, data: responseData };
+      console.error('[putRequest] 401 and token refresh failed', {
+        url,
+        detail: responseData?.detail,
+      });
+      return {
+        success: false,
+        message: options.errorMessage || responseData?.detail || 'Session expired. Please log in again.',
+        status: 401,
+        data: responseData,
+      };
     }
 
     const msg =

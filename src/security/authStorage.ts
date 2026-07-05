@@ -155,3 +155,22 @@ export const clearAuthSession = async (): Promise<void> => {
   ]);
   DeviceEventEmitter.emit(AUTH_SESSION_EXPIRED_EVENT);
 };
+
+// Backend messages from DeviceBoundJWTAuthentication (apps/accounts/jwt_auth.py)
+// for a token whose device_id claim can never match this device again — most
+// commonly because the stored device_id was regenerated (e.g. AsyncStorage was
+// cleared, or the app was reinstalled) while a still-valid refresh token tied
+// to the *old* device_id survived in the Keychain. Refreshing the access token
+// can't fix this: the new access token inherits the same stale device_id claim
+// from the refresh token, so the retry fails the exact same way forever. The
+// only fix is a clean re-login, which mints a token pair bound to the current
+// device_id.
+const UNRECOVERABLE_DEVICE_AUTH_DETAILS = new Set([
+  'Device mismatch',
+  'Missing X-Device-Id',
+  'Device-bound token required',
+  'Device session revoked',
+]);
+
+export const isUnrecoverableDeviceAuthError = (detail?: unknown): boolean =>
+  typeof detail === 'string' && UNRECOVERABLE_DEVICE_AUTH_DETAILS.has(detail);

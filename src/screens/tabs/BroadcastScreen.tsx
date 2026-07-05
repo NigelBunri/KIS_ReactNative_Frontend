@@ -428,6 +428,7 @@ export default function BroadcastScreen() {
               <View style={{
                 paddingHorizontal: responsive.pageGutter,
                 paddingTop: insets.top + (compactBroadcast ? 12 : 18),
+                marginTop: insets.top,
               }}>
                 {/* Header bar */}
                 <View style={styles.headerSection}>

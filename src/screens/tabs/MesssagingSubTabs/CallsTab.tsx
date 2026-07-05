@@ -103,6 +103,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
     }
 
     try {
+      console.log('[CallsTab] loadCalls: fetching', { url: ROUTES.calls.history, userId });
       const [histRes, schedRes] = await Promise.all([
         getRequest(`${ROUTES.calls.history}?limit=100`),
         getRequest(`${ROUTES.calls.scheduled}`).catch(() => null),
@@ -115,6 +116,13 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
           ? (histRes.data as CallHistoryItem[])
           : null;
 
+      console.log('[CallsTab] loadCalls: response', {
+        success: histRes.success,
+        status: (histRes as any)?.status,
+        message: (histRes as any)?.message,
+        count: serverCalls?.length ?? null,
+      });
+
       if (serverCalls) {
         setCalls(serverCalls);
         // Persist under the real userId so the next reload shows cached data
@@ -123,11 +131,20 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
         if (userId) {
           await saveCallHistory(userId, serverCalls);
         }
+      } else if (!histRes.success) {
+        console.error('[CallsTab] loadCalls: server call failed, showing cached/local data only', {
+          message: (histRes as any)?.message,
+          status: (histRes as any)?.status,
+        });
       }
 
       if (schedRes?.success && Array.isArray(schedRes.data?.calls)) {
         setScheduled(schedRes.data.calls as ScheduledCallItem[]);
       }
+    } catch (error) {
+      console.error('[CallsTab] loadCalls: threw before finishing', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
