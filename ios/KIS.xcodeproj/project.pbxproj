@@ -173,11 +173,11 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				7405263AAB23091E48B669F8 /* Embed Foundation Extensions */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
 				6EE7C0ECC70F6DE790939080 /* [CP-User] [RNFB] Core Configuration */,
-				7405263AAB23091E48B669F8 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -396,7 +396,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kis;
 				PRODUCT_NAME = KIS;
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -425,7 +425,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kis;
 				PRODUCT_NAME = KIS;
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

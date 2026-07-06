@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-image-picker/ios/ImagePickerManager.mm b/node_modules/react-native-image-picker/ios/ImagePickerManager.mm
+index 93e99be..6907780 100644
+--- a/node_modules/react-native-image-picker/ios/ImagePickerManager.mm
++++ b/node_modules/react-native-image-picker/ios/ImagePickerManager.mm
+@@ -67,7 +67,7 @@ - (void)launchImagePicker:(NSDictionary *)options callback:(RCTResponseSenderBlo
+ {
+     self.callback = callback;
+ 
+-    if (target == camera && [ImagePickerUtils isSimulator]) {
++    if (target == camera && ([ImagePickerUtils isSimulator] || ![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypeCamera])) {
+         self.callback(@[@{@"errorCode": errCameraUnavailable}]);
+         return;
+     }
