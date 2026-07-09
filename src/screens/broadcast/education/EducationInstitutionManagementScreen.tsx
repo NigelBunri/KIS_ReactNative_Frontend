@@ -27,7 +27,7 @@ import { patchRequest } from '@/network/patch';
 import { API_BASE_URL } from '@/network/config';
 import ROUTES from '@/network';
 import { Share } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 
 const INSTITUTIONS_ENDPOINT = `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`;
@@ -351,7 +351,7 @@ function CreateInstitutionSheet({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
         {/* Header */}
         <View
           style={{
@@ -1090,7 +1090,7 @@ function InstitutionDashboard({
   })();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       {/* Header */}
       <View
         style={{
@@ -1206,7 +1206,7 @@ export default function EducationInstitutionManagementScreen({ onClose }: Props)
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       {/* Header */}
       <View
         style={{

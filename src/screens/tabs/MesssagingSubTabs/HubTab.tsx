@@ -24,6 +24,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Channel = {
   id: string;
@@ -46,6 +47,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const styles = makeStyles(responsive.pageGutter);
 
   const [subscribed, setSubscribed] = useState<Channel[]>([]);
@@ -209,7 +211,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider ?? palette.inputBorder }]}>
         <Text style={[styles.title, { color: palette.text }]}>Channels</Text>
@@ -265,7 +267,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         onRequestClose={() => setDiscoverVisible(false)}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+        <View style={[styles.root, { backgroundColor: palette.bg, }]}>
           <View style={[styles.header, { borderBottomColor: palette.divider ?? palette.inputBorder }]}>
             <Pressable onPress={() => setDiscoverVisible(false)} style={styles.headerBtn} hitSlop={8}>
               <KISIcon name="close" size={22} color={palette.text} />

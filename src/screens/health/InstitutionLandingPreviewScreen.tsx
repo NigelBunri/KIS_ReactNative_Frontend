@@ -32,7 +32,7 @@ import TestimonialsSection from '@/components/sections/TestimonialsSection';
 import ProgramsSection from '@/components/sections/ProgramsSection';
 import CTASection from '@/components/sections/CTASection';
 import ContactSection from '@/components/sections/ContactSection';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InstitutionLandingPreview'>;
 
@@ -257,7 +257,7 @@ export default function InstitutionLandingPreviewScreen({ navigation, route }: P
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <ImageBackground
           source={landingBackgroundImage ? { uri: landingBackgroundImage } : undefined}

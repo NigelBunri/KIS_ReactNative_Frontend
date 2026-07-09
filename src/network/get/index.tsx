@@ -30,6 +30,31 @@ const GET_429_COOLDOWN_MS = 15000;
 const GET_429_MAX_COOLDOWN_MS = 5 * 60 * 1000;
 const GET_HOT_SUCCESS_TTL_MS = 10000;
 
+/* ── Dev-only repeat-request logging ─────────────────────────────────────────
+ * Logs a warning when the same GET path is requested repeatedly in a short
+ * window, so request storms are visible in the Metro console during
+ * development. No-ops (and adds no overhead) outside __DEV__. ─────────────── */
+
+const DEV_REPEAT_WINDOW_MS = 10000;
+const DEV_REPEAT_WARN_THRESHOLD = 4;
+const devRequestTimestampsByPath = __DEV__ ? new Map<string, number[]>() : null;
+
+const logDevRequest = (pathname: string, finalUrl: string): void => {
+  if (!__DEV__ || !devRequestTimestampsByPath) return;
+  const now = Date.now();
+  const timestamps = (devRequestTimestampsByPath.get(pathname) ?? []).filter(
+    (t) => now - t < DEV_REPEAT_WINDOW_MS,
+  );
+  timestamps.push(now);
+  devRequestTimestampsByPath.set(pathname, timestamps);
+  if (timestamps.length === DEV_REPEAT_WARN_THRESHOLD) {
+    console.warn(
+      `[getRequest] ${timestamps.length} calls to ${pathname} within ${DEV_REPEAT_WINDOW_MS / 1000}s — possible request loop.`,
+      finalUrl,
+    );
+  }
+};
+
 /* ── Retry helpers ────────────────────────────────────────────────────────── */
 
 const MAX_GET_RETRIES = 3; // up to 4 total attempts on poor networks
@@ -198,23 +223,28 @@ export const getRequest = async (
       ) {
         return { success: true, data: recentSuccess.payload, message: options.successMessage || '' };
       }
+    }
 
-      const blockedUntilUrl = blockedUntilByUrl.get(finalUrl) ?? 0;
-      const blockedUntilPath = blockedUntilByPath.get(pathname) ?? 0;
-      if (now < blockedUntilUrl) {
-        return {
-          success: false,
-          status: 429,
-          message: `Too many requests.${describe429Wait(blockedUntilUrl)}`,
-        };
-      }
-      if (now < blockedUntilPath) {
-        return {
-          success: false,
-          status: 429,
-          message: `Too many requests.${describe429Wait(blockedUntilPath)}`,
-        };
-      }
+    // The 429 cooldown always applies, even for forceNetwork callers.
+    // forceNetwork means "skip the stale-data cache", not "ignore the
+    // server telling us to back off" — bypassing this for forced callers
+    // (e.g. badge-count/notification polling) previously meant a throttled
+    // endpoint got hammered on every single poll instead of cooling down.
+    const blockedUntilUrl = blockedUntilByUrl.get(finalUrl) ?? 0;
+    const blockedUntilPath = blockedUntilByPath.get(pathname) ?? 0;
+    if (now < blockedUntilUrl) {
+      return {
+        success: false,
+        status: 429,
+        message: `Too many requests.${describe429Wait(blockedUntilUrl)}`,
+      };
+    }
+    if (now < blockedUntilPath) {
+      return {
+        success: false,
+        status: 429,
+        message: `Too many requests.${describe429Wait(blockedUntilPath)}`,
+      };
     }
 
     const startedAt = Date.now();
@@ -359,16 +389,18 @@ export const getRequest = async (
   const queryString = queryParams.toString();
   const finalUrl = queryString ? `${url}?${queryString}` : url;
 
-  if (!options.forceNetwork) {
-    const existing = inflightGetRequests.get(finalUrl);
-    if (existing) return existing;
-  }
+  if (__DEV__) logDevRequest(getPathname(finalUrl), finalUrl);
+
+  // Concurrent identical-URL requests always share one round trip — this is
+  // safe regardless of forceNetwork since the response is identical either
+  // way, and it stops callers like badge-count refresh (which fires from
+  // many overlapping event listeners) from firing duplicate network calls.
+  const existing = inflightGetRequests.get(finalUrl);
+  if (existing) return existing;
 
   const requestPromise: Promise<GetResponse> = execute().finally(() => {
     inflightGetRequests.delete(finalUrl);
   });
-  if (!options.forceNetwork) {
-    inflightGetRequests.set(finalUrl, requestPromise);
-  }
+  inflightGetRequests.set(finalUrl, requestPromise);
   return requestPromise;
 };

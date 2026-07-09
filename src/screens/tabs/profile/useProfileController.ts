@@ -315,6 +315,15 @@ const extractRequestErrorMessage = (result: any, fallback: string) => {
   return message || fallback;
 };
 
+// DRF throttle responses read like "Request was throttled. Expected available
+// in 9 seconds." — parse the wait time so repeated Save taps don't keep
+// re-firing all three profile-save requests into the same throttle window.
+const parseThrottleWaitMs = (result: any): number => {
+  const message = extractRequestErrorMessage(result, '');
+  const match = message.match(/available in (\d+)/i);
+  return match ? Number(match[1]) * 1000 : 10000;
+};
+
 const normalizePlanList = (payload: any): any[] => {
   const source = payload?.data ?? payload ?? {};
   const results =
@@ -362,6 +371,11 @@ export const useProfileController = (opts: {
   });
   const [lastWalletPaymentUrl] = useState('');
   const [tierCatalog, setTierCatalog] = useState<any[]>([]);
+  // Bumped on every successful avatar/cover upload so <Image> sources can be
+  // cache-busted — the backend (S3) can return the same URL for a user's
+  // avatar across uploads (stable per-user key), which would otherwise leave
+  // stale cached image bytes displayed even though the content changed.
+  const [avatarVersion, setAvatarVersion] = useState(0);
 
   const [draftProfile, setDraftProfile] = useState<DraftProfile>({
     display_name: '',
@@ -411,6 +425,7 @@ export const useProfileController = (opts: {
   const lastFetchRef = useRef(0);
   const profileRateLimitedUntilRef = useRef(0);
   const profileNetworkFreshUntilRef = useRef(0);
+  const saveRateLimitedUntilRef = useRef(0);
 
   const applyProfilePayload = useCallback(
     (payload: ProfilePayload) => {
@@ -936,6 +951,7 @@ export const useProfileController = (opts: {
           loadWalletLedger();
           void loadBroadcastProfiles();
           await writeScopedProfileCache(payload, extractProfileUserId(profile));
+          return payload;
         } else {
           if (Number(res?.status) === 429) {
             profileRateLimitedUntilRef.current = Date.now() + 15000;
@@ -1184,6 +1200,14 @@ export const useProfileController = (opts: {
 
   const saveProfile = async () => {
     if (!profile) return;
+    const cooldownRemainingMs = saveRateLimitedUntilRef.current - Date.now();
+    if (cooldownRemainingMs > 0) {
+      Alert.alert(
+        'Profile',
+        `Please wait ${Math.ceil(cooldownRemainingMs / 1000)}s before saving again.`,
+      );
+      return;
+    }
     setSaving(true);
 
     try {
@@ -1224,6 +1248,9 @@ export const useProfileController = (opts: {
           },
         );
         if (!userUpdateRes?.success) {
+          if (Number(userUpdateRes?.status) === 429) {
+            saveRateLimitedUntilRef.current = Date.now() + parseThrottleWaitMs(userUpdateRes);
+          }
           throw new Error(
             extractRequestErrorMessage(
               userUpdateRes,
@@ -1245,6 +1272,9 @@ export const useProfileController = (opts: {
         },
       );
       if (!languageSyncRes?.success) {
+        if (Number(languageSyncRes?.status) === 429) {
+          saveRateLimitedUntilRef.current = Date.now() + parseThrottleWaitMs(languageSyncRes);
+        }
         throw new Error(
           extractRequestErrorMessage(
             languageSyncRes,
@@ -1281,6 +1311,9 @@ export const useProfileController = (opts: {
           },
         );
         if (!profileUpdateRes?.success) {
+          if (Number(profileUpdateRes?.status) === 429) {
+            saveRateLimitedUntilRef.current = Date.now() + parseThrottleWaitMs(profileUpdateRes);
+          }
           throw new Error(
             extractRequestErrorMessage(
               profileUpdateRes,
@@ -1290,9 +1323,18 @@ export const useProfileController = (opts: {
         }
       }
 
+      const uploadedNewAvatar = !!draftProfile.avatar_file?.uri;
+
       await clearScopedProfileCache(profile?.user?.id);
-      await loadProfile(true);
+      const freshPayload = await loadProfile(true);
       closeSheet();
+
+      if (uploadedNewAvatar) {
+        // The backend (S3) can return the same URL for a user's avatar across
+        // uploads, which would otherwise leave a stale cached image on screen
+        // even though the underlying content changed — force a re-fetch.
+        setAvatarVersion(Date.now());
+      }
 
       if (phoneChanged) {
         Alert.alert(
@@ -1305,7 +1347,7 @@ export const useProfileController = (opts: {
 
       DeviceEventEmitter.emit('profile.updated', {
         displayName: draftProfile.display_name,
-        avatarUrl: draftProfile.avatar_preview,
+        avatarUrl: freshPayload?.profile?.avatar_url || draftProfile.avatar_url,
       });
       Alert.alert('Profile', 'Your profile changes were saved.');
     } catch (error: any) {
@@ -1870,6 +1912,7 @@ export const useProfileController = (opts: {
     // state
     profile,
     loading,
+    avatarVersion,
     walletLedger,
     kisWallet,
     billingHistory,

@@ -32,6 +32,7 @@ import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../App';
 import { isTierAtLeast } from '@/services/tierAccess';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -328,6 +329,7 @@ export default function EventsScreen() {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { user } = useAuth();
   const canCreateEvents = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
 
@@ -785,7 +787,7 @@ export default function EventsScreen() {
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       {/* Header */}
       <View style={[styles.headerRow, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>

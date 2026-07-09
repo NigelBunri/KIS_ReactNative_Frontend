@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import {
   Animated,
   Image,
@@ -23,6 +23,7 @@ import { createDefaultAvailability, normalizeAvailabilityPayload, ServiceAvailab
 import CategoryPickerModal from './CategoryPickerModal';
 import { useCatalogCategories } from './useCatalogCategories';
 import { CATEGORY_SELECTION_LIMIT } from '@/screens/market/market.constants';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type PickedImage = {
   uri: string;
@@ -140,7 +141,6 @@ const normalizeEditorRequirement = (req: any): CustomerRequirement => ({
     : 'text') as CustomerRequirement['type'],
   required: Boolean(req?.required),
 });
-
 
 const DEFAULT_SERVICE_FORM = {
   name: '',
@@ -265,7 +265,7 @@ export default function ServiceEditorDrawer({
   onClose,
   onSave,
 }: ServiceEditorDrawerProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -622,7 +622,7 @@ export default function ServiceEditorDrawer({
             left: compactDrawer ? 0 : undefined,
             transform: [{ translateX: slide }],
             backgroundColor: palette.card,
-            paddingTop: insets.top,
+            paddingTop: topInset,
           },
         ]}
       >

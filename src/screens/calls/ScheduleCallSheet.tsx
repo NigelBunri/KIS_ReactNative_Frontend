@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { CallType } from '@/services/calls/callTypes';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export type StandaloneCallResult = {
   callId: string;
@@ -73,6 +74,7 @@ function formatScheduled(d: Date): string {
 export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const [title, setTitle] = useState('');
   const [selectedType, setSelectedType] = useState<CallType>('voice');

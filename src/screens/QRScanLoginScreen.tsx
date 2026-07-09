@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera } from 'react-native-image-picker';
@@ -161,7 +161,7 @@ export default function QRScanLoginScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={() => {

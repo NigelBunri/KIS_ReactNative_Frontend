@@ -14,7 +14,7 @@ export default function MarketInsightsPage({ hasAnalyticsAccess, isMarketPro, on
   const showUpgrade = !hasAnalyticsAccess && !isMarketPro;
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.container, { backgroundColor: palette.bg, }]}>
       <View style={[styles.iconWrap, { backgroundColor: palette.card }]}>
         <KISIcon name="bar-chart-outline" size={48} color={palette.primaryStrong} />
       </View>

@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -140,7 +140,7 @@ export default function LibraryScreen() {
   }, [loadContinue]);
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
         <Text style={[styles.headerTitle, { color: palette.text, fontSize: headerTitleSize }]}>Library</Text>
       </View>

@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { launchImageLibrary } from 'react-native-image-picker';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -269,7 +269,7 @@ export default function MediaAssetManagerScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.screenTitle, { color: palette.text }]}>Media Assets</Text>
         </View>
@@ -282,7 +282,7 @@ export default function MediaAssetManagerScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.screenTitle, { color: palette.text }]}>Media Assets</Text>
         </View>
@@ -297,7 +297,7 @@ export default function MediaAssetManagerScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.screenTitle, { color: palette.text }]}>Media Assets</Text>
@@ -442,7 +442,7 @@ export default function MediaAssetManagerScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setSelected(null)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]} numberOfLines={1}>
               {selected?.name ?? `Asset ${selected?.id}`}
@@ -533,7 +533,7 @@ export default function MediaAssetManagerScreen() {
                       {safetyScan.labels && safetyScan.labels.length > 0 ? (
                         <View style={[styles.capsRow, { marginTop: 6 }]}>
                           {safetyScan.labels.map((lbl, i) => (
-                            <View key={i} style={[styles.capChip, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.divider }]}>
+                            <View key={i} style={[styles.capChip, { backgroundColor: palette.bg, borderColor: palette.divider }]}>
                               <Text style={{ fontSize: 11, color: palette.subtext }}>{lbl}</Text>
                             </View>
                           ))}

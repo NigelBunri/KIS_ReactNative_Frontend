@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   visible: boolean;
@@ -27,6 +28,7 @@ type Props = {
 export default function RtmpSheet({ visible, onClose, rtmpActive, rtmpUrl, onStart, onStop }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const slideAnim = useRef(new Animated.Value(400)).current;
   const [mounted, setMounted] = useState(visible);
   const [url, setUrl] = useState(rtmpUrl ?? '');

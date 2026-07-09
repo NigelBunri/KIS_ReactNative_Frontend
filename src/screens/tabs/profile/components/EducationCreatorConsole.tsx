@@ -137,7 +137,7 @@ export default function EducationCreatorConsole({ managementData, tierLabel }: P
                 borderRadius: 16,
                 padding: 10,
                 minWidth: 90,
-                backgroundColor: palette.bg, marginTop: 25,
+                backgroundColor: palette.bg,
               }}
             >
               <Text style={{ color: palette.subtext, fontSize: responsive.labelFontSize }}>{item.label}</Text>

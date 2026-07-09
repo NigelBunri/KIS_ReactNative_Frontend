@@ -8,6 +8,7 @@ import { styles } from '../profile/profile.styles';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type WalletModalProps = {
   palette: KISPalette;
@@ -469,6 +470,7 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const load = useCallback(async () => {
     setLoading(true);

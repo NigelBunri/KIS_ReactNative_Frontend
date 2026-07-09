@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -769,7 +769,7 @@ export default function BridgeManagementScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('accounts');
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>

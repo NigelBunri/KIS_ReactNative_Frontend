@@ -10,11 +10,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { validatePIN, clearPIN } from '@/services/QuickLockService';
 import { useAuth } from '../../App';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 async function tryBiometricAuth(): Promise<boolean> {
   try {
@@ -39,7 +40,7 @@ type Props = {
 export default function QuickLockScreen({ onDismiss }: Props) {
   const { setAuth } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette, tokens } = useKISTheme();
   const responsive = useResponsiveLayout();
   const [pin, setPin] = useState('');
@@ -138,7 +139,7 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   const styles = useMemo(() => StyleSheet.create({
     overlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: palette.bg, marginTop: 25,
+      backgroundColor: palette.bg,
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,
@@ -235,7 +236,7 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   }), [palette, tokens, responsive]);
 
   return (
-    <View style={[styles.overlay, { paddingTop: insets.top }]}>
+    <View style={[styles.overlay, { paddingTop: topInset }]}>
       <View style={[styles.container, { maxWidth: responsive.contentMaxWidth }]}>
         <Text style={styles.title}>Enter PIN</Text>
         <Text style={styles.subtitle}>Unlock to continue</Text>

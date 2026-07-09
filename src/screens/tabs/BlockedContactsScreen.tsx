@@ -11,12 +11,13 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export type BlockedContact = {
   userId: string;
@@ -78,7 +79,7 @@ type Props = {
 
 export default function BlockedContactsScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [contacts, setContacts] = useState<BlockedContact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,13 +161,13 @@ export default function BlockedContactsScreen({ onBack }: Props) {
   };
 
   return (
-    <View style={[localStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[localStyles.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
       <View
         style={[
           localStyles.header,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: topInset + 8,
             borderBottomColor: palette.divider,
             backgroundColor: palette.card,
           },

@@ -13,7 +13,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { webRTCService, RTCView, webRTCAvailable } from '@/services/calls/webRTCService';
@@ -112,7 +112,7 @@ export default function LobbyScreen({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, }]}>
         <SafeAreaView style={styles.safe}>
 
           {/* Header */}

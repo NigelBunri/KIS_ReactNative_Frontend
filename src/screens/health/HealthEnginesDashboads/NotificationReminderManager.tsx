@@ -8,7 +8,7 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
@@ -182,7 +182,7 @@ const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
   /* ================= UI ================= */
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={["top"]}>
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.md }}
@@ -386,7 +386,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const item = (palette: any, spacing: any) => ({
-  backgroundColor: palette.bg, marginTop: 25,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

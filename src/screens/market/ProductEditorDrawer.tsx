@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import {
   Animated,
   Image,
@@ -19,6 +19,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { marketStyles } from './market.styles';
 import CategoryPickerModal from './CategoryPickerModal';
 import { useCatalogCategories } from './useCatalogCategories';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   KIS_COIN_CODE,
   KIS_TO_USD_RATE,
@@ -344,7 +345,7 @@ export default function ProductEditorDrawer({
   onClose,
   onSave,
 }: ProductEditorDrawerProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -1001,7 +1002,7 @@ export default function ProductEditorDrawer({
             left: compactDrawer ? 0 : undefined,
             transform: [{ translateX: slide }],
             backgroundColor: palette.surface,
-            paddingTop: insets.top,
+            paddingTop: topInset,
           },
         ]}
       >
@@ -1246,7 +1247,7 @@ export default function ProductEditorDrawer({
               {renderAttributesSection()}
               {renderVariantsSection()}
 
-              <View style={{ marginTop: 25 }}>
+              <View style={{ }}>
                 <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
                   Product categories
                 </Text>

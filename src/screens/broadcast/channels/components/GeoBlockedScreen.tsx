@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -26,9 +27,10 @@ export default function GeoBlockedScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
   const { bodyFontSize, minTouchTarget } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.royalInk, paddingTop: 32 + insets.top, paddingBottom: 32 + insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: palette.royalInk, paddingTop: 32 + topInset, paddingBottom: 32 + insets.bottom }]}>
       <View style={styles.content}>
         <Text style={styles.icon}>🌍</Text>
 

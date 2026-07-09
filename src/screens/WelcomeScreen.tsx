@@ -4,13 +4,12 @@ import {
   View,
   StyleSheet,
   Animated,
-  Linking,
   useWindowDimensions,
   ScrollView,
   Platform,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
@@ -36,7 +35,6 @@ import { useAuth } from '../../App';
 import { getAccessToken, getRefreshToken } from '@/security/authStorage';
 import { refreshAccessToken } from '@/security/tokenRefresh';
 
-const PRIVACY_URL = 'https://christiancommunit.netlify.app';
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let welcomeAuthCheckBlockedUntil = 0;
 
@@ -116,10 +114,6 @@ export default function WelcomeScreen() {
     { label: 'Partner Cities', value: '52' },
     { label: 'Communities', value: '78' },
   ];
-
-  const openExternal = useCallback(() => {
-    Linking.openURL(PRIVACY_URL).catch(() => {});
-  }, []);
 
   // NEW: check if logged in and redirect if so
   const checkAndRedirectIfLoggedIn = useCallback(async () => {
@@ -238,7 +232,7 @@ export default function WelcomeScreen() {
                       width: heroSize,
                       height: heroSize,
                       opacity: fade,
-                      backgroundColor: palette.bg, marginTop: 25,
+                      backgroundColor: palette.bg,
                       transform: [{ scale: sparkleScale }],
                     },
                   ]}
@@ -336,7 +330,7 @@ export default function WelcomeScreen() {
 
             <KISText preset="helper" color={palette.subtext} style={styles.legal}>
               KIS | 2026 ·{' '}
-              <KISText preset="helper" color={palette.accent} style={styles.link} onPress={openExternal}>
+              <KISText preset="helper" color={palette.accent} style={styles.link} onPress={() => navigation.navigate('PrivacyPolicy')}>
                 Privacy
               </KISText>
               {' · '}

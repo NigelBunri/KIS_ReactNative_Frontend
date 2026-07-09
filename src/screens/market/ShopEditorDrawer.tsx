@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
@@ -9,6 +9,7 @@ import KISTextInput from '@/constants/KISTextInput';
 import type { MarketFormState } from '@/screens/tabs/profile-screen/types';
 import { marketStyles } from './market.styles';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type ShopEditorDrawerProps = {
   visible: boolean;
@@ -40,7 +41,7 @@ export default function ShopEditorDrawer({
   onDelete,
   canDeleteShop,
 }: ShopEditorDrawerProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
@@ -82,7 +83,7 @@ export default function ShopEditorDrawer({
             width: drawerWidth,
             left: compactDrawer ? 0 : undefined,
             backgroundColor: palette.surface,
-            paddingTop: insets.top,
+            paddingTop: topInset,
           },
         ]}
       >

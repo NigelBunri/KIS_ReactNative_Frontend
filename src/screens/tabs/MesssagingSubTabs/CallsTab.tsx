@@ -10,6 +10,8 @@ import {
   RefreshControl,
   DeviceEventEmitter,
   SectionList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
@@ -27,9 +29,11 @@ import type {
 import { callTypeLabel, callTypeIcon, formatDuration } from '@/services/calls/callTypes';
 import ScheduleCallSheet, { type StandaloneCallResult } from '@/screens/calls/ScheduleCallSheet';
 import { loadCallHistory, saveCallHistory } from '@/services/calls/callHistoryStorage';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type CallsTabProps = {
   searchTerm?: string;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 const buildStatusColor = (p: any): Record<string, string> => ({
@@ -76,11 +80,12 @@ function formatScheduledFor(iso: string | null): string {
   return `in ${h}h${m > 0 ? ` ${m}m` : ''}`;
 }
 
-export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
+export default function CallsTab({ searchTerm = '', onScroll }: CallsTabProps) {
   const { palette } = useKISTheme();
   const STATUS_COLOR = buildStatusColor(palette);
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { currentUserId, startCall, joinExistingCall, socket } = useSocket();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -468,7 +473,7 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
   }, [scheduled, rows]);
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25, padding: responsive.pageGutter }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, padding: responsive.pageGutter }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>
           Calls
@@ -502,6 +507,8 @@ export default function CallsTab({ searchTerm = '' }: CallsTabProps) {
         </View>
       ) : (
         <SectionList
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           sections={sections}
           keyExtractor={(item, index) => item.id ?? item.callId ?? String(index)}
           renderItem={({ item, section }) =>

@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -200,7 +200,7 @@ export default function UserProfileScreen() {
   const educations: any[] = profile?.educations ?? profile?.education ?? [];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
@@ -428,7 +428,7 @@ function makeStyles(palette: any) {
       paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: palette.border,
-      backgroundColor: palette.bg, marginTop: 25,
+      backgroundColor: palette.bg,
     },
     backBtn: {
       width: 44,

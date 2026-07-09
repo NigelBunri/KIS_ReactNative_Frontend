@@ -39,7 +39,7 @@ import {
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { HEALTH_DASHBOARD_DEFAULT_SERVICES } from '@/features/health-dashboard/defaults';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import {
   HEALTH_DASHBOARD_INSTITUTION_TYPES,
   type ServiceDefinition,
@@ -1654,7 +1654,7 @@ export default function AvailabilityManagementScreen({
 
   if (!dashboardType) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, padding: spacing.lg }}
@@ -1703,7 +1703,7 @@ export default function AvailabilityManagementScreen({
 
   if (loading || !draft) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -1724,7 +1724,7 @@ export default function AvailabilityManagementScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}

@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 
@@ -46,7 +46,7 @@ export default function WaitingForHostScreen({ visible, callTitle, onLeave }: Pr
 
   return (
     <Modal visible={visible} animationType="fade" transparent={false} statusBarTranslucent>
-      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, }]}>
         <SafeAreaView style={styles.safe}>
 
           <View style={styles.center}>

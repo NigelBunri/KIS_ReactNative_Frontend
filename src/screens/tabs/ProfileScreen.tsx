@@ -83,6 +83,8 @@ import {
   type FamilyAccessibilityPayload,
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
+import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import ReanimatedScroll, { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { useAgeMode } from '@/theme/ageModeContext';
 import { useThemeMode, type KISThemeMode } from '@/theme/themeModeContext';
 import {
@@ -217,11 +219,30 @@ const DEFAULT_MARKET_FORM: MarketFormState = {
 
 const getShopPreviewUri = (shop?: any) => resolveShopImageUri(shop);
 
+// Cache-busts an image URL with a version stamp. Needed because the backend
+// (S3) can return the exact same URL for a user's avatar/cover across
+// uploads (stable per-user key), which would otherwise leave stale cached
+// image bytes on screen even though the underlying content changed.
+const appendCacheBust = (url?: string | null, version?: number) => {
+  if (!url) return url;
+  if (!version) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}cb=${version}`;
+};
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
+  // is one of the 5 main-tab gold-header screens with its own hand-tuned
+  // spacing, so it reads the raw device inset instead.
+  const topInset = insets.top;
   const { palette, tone } = useKISTheme();
   useStatusBarStyle(tone);   // light-content on dark bg, dark-content on light bg
   const responsive = useResponsiveLayout();
+  // Drives the gold section's collapsing hero — see ProfileHeroCard.
+  const profileScrollY = useSharedValue(0);
+  const profileScrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => { profileScrollY.value = e.contentOffset.y; },
+  });
   const compactProfile = responsive.isWatch || responsive.isCompactPhone;
   const tinyProfile = responsive.isWatch;
   const dashboardTheme = useMemo(
@@ -2363,9 +2384,40 @@ export default function ProfileScreen() {
     );
   };
 
+  useGoldenSectionContent({
+    content: (
+      <ProfileHeroCard
+        coverUrl={c.profile?.profile?.cover_url}
+        avatarUrl={appendCacheBust(c.profile?.profile?.avatar_url, c.avatarVersion)}
+        displayName={profileDisplayName}
+        handle={profileHandle}
+        headline={c.profile?.profile?.headline || 'Add a headline that sells you'}
+        tierLabel={tierLabel || accountTier?.name || 'Free'}
+        completionLabel={`${profileCompletion}% complete`}
+        onEdit={c.openEditProfile}
+        onNotificationsPress={() => rootNavigation?.navigate('ProfileNotifications')}
+        onSettingsPress={() => c.openSheet('privacy')}
+        notificationCount={unreadNotifications.length}
+        verificationSummary={userVerificationSummary}
+        onVerificationPress={() =>
+          setVerificationCenterTarget({
+            subject: { type: 'user' },
+            title: 'User verification',
+            subtitle: 'Verify your identity and show trusted badges on your profile.',
+            summary: userVerificationSummary,
+          })
+        }
+        topInset={topInset}
+        scrollY={profileScrollY}
+      />
+    ),
+  });
+
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25 }]}>
-      <ScrollView
+    <View style={[styles.wrap, { backgroundColor: palette.bg}]}>
+      <ReanimatedScroll.ScrollView
+        onScroll={profileScrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={[
           styles.scroll,
           {
@@ -2403,36 +2455,9 @@ export default function ProfileScreen() {
           />
         ) : (
           <>
-            <ProfileHeroCard
-              coverUrl={c.profile.profile?.cover_url}
-              avatarUrl={c.profile.profile?.avatar_url}
-              displayName={profileDisplayName}
-              handle={profileHandle}
-              headline={
-                c.profile.profile?.headline || 'Add a headline that sells you'
-              }
-              tierLabel={tierLabel || accountTier?.name || 'Free'}
-              completionLabel={`${profileCompletion}% complete`}
-              onEdit={c.openEditProfile}
-              onNotificationsPress={() =>
-                rootNavigation?.navigate('ProfileNotifications')
-              }
-              onSettingsPress={() => c.openSheet('privacy')}
-              notificationCount={unreadNotifications.length}
-              verificationSummary={userVerificationSummary}
-              onVerificationPress={() =>
-                setVerificationCenterTarget({
-                  subject: { type: 'user' },
-                  title: 'User verification',
-                  subtitle: 'Verify your identity and show trusted badges on your profile.',
-                  summary: userVerificationSummary,
-                })
-              }
-              bottomOverlap={compactProfile ? 34 : 64}
-            />
             <View
               style={{
-                marginTop: compactProfile ? -34 : -64,
+                marginTop: 10,
                 paddingHorizontal: compactProfile ? 0 : 18,
                 paddingBottom: compactProfile ? 12 : 18,
                 gap: responsive.cardGap,
@@ -3125,7 +3150,7 @@ export default function ProfileScreen() {
             <LogoutSection palette={palette} onLogout={c.logout} loading={c.logoutLoading} />
           </>
         )}
-      </ScrollView>
+      </ReanimatedScroll.ScrollView>
 
       {/* Partner slide */}
       <VerificationStaffConsole
@@ -3151,7 +3176,7 @@ export default function ProfileScreen() {
           style={[
             styles.slideContainer,
             {
-              backgroundColor: palette.bg, marginTop: 25,
+              backgroundColor: palette.bg,
               width: responsive.width,
               transform: [{ translateX: c.slideX }],
             },

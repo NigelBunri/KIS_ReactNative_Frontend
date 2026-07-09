@@ -14,7 +14,7 @@ import {
   Linking,
 } from 'react-native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 import {
   launchCamera,
@@ -275,7 +275,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top']}>
 
 
         {/* HEADER */}

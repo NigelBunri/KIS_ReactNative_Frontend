@@ -12,6 +12,7 @@ import type { CallSession } from '@/services/calls/callTypes';
 import { REACTION_EMOJIS, isGroupCall, hasVideo } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // Per-call-type accent builder — all values resolved from palette tokens.
 // voice-group → palette.info (sky blue), broadcast → palette.danger (vivid red).
@@ -78,6 +79,7 @@ export default function CallControls({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const ACCENT = buildAccent(palette);
   const isGroup = isGroupCall(session.callType);
   const withVideo = hasVideo(session.callType);

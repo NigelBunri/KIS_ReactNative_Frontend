@@ -52,6 +52,7 @@ import RtmpSheet from './components/RtmpSheet';
 import InCallWhiteboardSheet from './components/InCallWhiteboardSheet';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const CONTROLS_HIDE_AFTER = 4000;
 
@@ -108,6 +109,7 @@ type Props = {
 export default function ActiveCallScreen({ session, actions }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
 
@@ -194,7 +196,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         const rawX = (selfPanX as any)._value ?? 0;
         const rawY = (selfPanY as any)._value ?? 0;
         const clampedX = Math.max(0, Math.min(rawX, screenW - PIP_W));
-        const clampedY = Math.max(insets.top + 8, Math.min(rawY, screenH - insets.bottom - PIP_H - 8));
+        const clampedY = Math.max(topInset + 8, Math.min(rawY, screenH - insets.bottom - PIP_H - 8));
         if (clampedX !== rawX) Animated.spring(selfPanX, { toValue: clampedX, useNativeDriver: false, bounciness: 6 }).start();
         if (clampedY !== rawY) Animated.spring(selfPanY, { toValue: clampedY, useNativeDriver: false, bounciness: 6 }).start();
       },
@@ -610,7 +612,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
         {/* ── TOP HUD ── */}
         <Animated.View
-          style={[styles.topHud, { paddingTop: insets.top + 8, opacity: controlsOpacity }]}
+          style={[styles.topHud, { paddingTop: topInset + 8, opacity: controlsOpacity }]}
           pointerEvents="box-none"
         >
           <View style={styles.topLeft}>

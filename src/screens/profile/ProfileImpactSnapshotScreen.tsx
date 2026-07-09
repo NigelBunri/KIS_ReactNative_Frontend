@@ -6,6 +6,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   buildImpactSnapshotSections,
   buildImpactSnapshotStats,
@@ -24,6 +25,7 @@ const labelForItem = (item: any) =>
 export default function ProfileImpactSnapshotScreen() {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export default function ProfileImpactSnapshotScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }}
+      style={{ flex: 1, paddingTop: topInset, backgroundColor: palette.bg, }}
       contentContainerStyle={{
         padding: responsive.pageGutter,
         paddingBottom: responsive.pageGutter + insets.bottom,

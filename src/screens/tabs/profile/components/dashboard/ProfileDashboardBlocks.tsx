@@ -9,8 +9,13 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  type SharedValue,
+} from 'react-native-reanimated';
 import KISButton from '@/constants/KISButton';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { VerificationBadgeRow } from '@/components/verification';
@@ -200,6 +205,26 @@ const SectionHeader = ({
   );
 };
 
+// Scroll distance (px) over which the hero collapses to just the sticky bar.
+const HERO_COLLAPSE_DISTANCE = 130;
+const BIG_AVATAR_SIZE_COMPACT = 84;
+const BIG_AVATAR_SIZE_REGULAR = 100;
+
+/**
+ * The Profile gold section — registered via useGoldenSectionContent (see
+ * ProfileScreen.tsx) and rendered inside the shared, fixed Golden Section
+ * host in App.tsx. LinkedIn-style: a cover-image banner with the profile
+ * picture overlapping its bottom edge, name/handle/headline/badges below
+ * that. Two states crossfade on the same `scrollY`, rather than one avatar
+ * morphing position/size (simpler, avoids a janky repositioning animation):
+ *  - Rich hero (cover + big overlapping avatar + name/headline/badges/edit)
+ *    — fully visible at rest, fades + collapses away as the user scrolls.
+ *  - Compact sticky bar (small avatar + name + notification/settings) —
+ *    invisible at rest, fades in as the rich hero fades out, absolutely
+ *    overlaid at the top so it doesn't reserve its own layout space (the
+ *    rich hero's collapsing height is the only thing driving the section's
+ *    total height).
+ */
 export const ProfileHeroCard = ({
   coverUrl,
   avatarUrl,
@@ -214,7 +239,8 @@ export const ProfileHeroCard = ({
   notificationCount,
   verificationSummary,
   onVerificationPress,
-  bottomOverlap = 0,
+  topInset,
+  scrollY,
 }: {
   coverUrl?: string | null;
   avatarUrl?: string | null;
@@ -229,143 +255,164 @@ export const ProfileHeroCard = ({
   notificationCount?: number;
   verificationSummary?: VerificationSummary | null;
   onVerificationPress?: () => void;
-  bottomOverlap?: number;
+  topInset: number;
+  scrollY: SharedValue<number>;
 }) => {
   const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
-  const { top: topInset } = useSafeAreaInsets();
+  const collapseNaturalHeight = useSharedValue(260);
+  const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
+
+  const collapseStyle = useAnimatedStyle(() => ({
+    maxHeight: interpolate(
+      scrollY.value,
+      [0, HERO_COLLAPSE_DISTANCE],
+      [collapseNaturalHeight.value, 0],
+      Extrapolation.CLAMP,
+    ),
+    opacity: interpolate(
+      scrollY.value,
+      [0, HERO_COLLAPSE_DISTANCE * 0.6],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const stickyBarStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [HERO_COLLAPSE_DISTANCE * 0.55, HERO_COLLAPSE_DISTANCE],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
 
   return (
-    <View style={[dashboardStyles.heroShell, compact && dashboardStyles.heroShellCompact, getProfileDashboardCardStyle(dashboardTheme, 'dashboard'), {
-      borderTopLeftRadius: 0,
-      borderTopRightRadius: 0,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
-      minHeight: (compact ? 284 : 308) + topInset,
-    }]}>
-      <View style={dashboardStyles.heroBackdrop}>
-        {coverUrl ? (
-          /* ── Cover image path — image fills the backdrop, gold-warm tinted scrim ── */
-          <>
-            <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
-            {/* Warm gold-dark gradient scrim: transparent top → deep warm bottom
-                so text/avatar remain legible without losing the cover photo */}
-            <LinearGradient
-              colors={['transparent', 'rgba(48,28,4,0.55)', 'rgba(18,10,0,0.80)']}
-              locations={[0, 0.55, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
-            {/* Thin top edge — aligns with the other golden screens */}
-            <View style={dashboardStyles.heroGoldSheen} pointerEvents="none" />
-          </>
-        ) : (
-          /* ── No cover — gold gradient IS the background ─────────────────────── */
-          <>
-            <LinearGradient
-              colors={[...KIS_ROYAL_GRADIENTS.goldHeader]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            {/* Luxury glows in gold tones for depth */}
-            <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: '#C9A24A', opacity: 0.40 }]} />
-            <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: '#6F4515', opacity: 0.35 }]} />
-            <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: '#9A6A14', opacity: 0.30 }]} />
-            <View style={[dashboardStyles.heroArcLarge, { borderColor: 'rgba(255,244,184,0.15)' }]} />
-            <View style={[dashboardStyles.heroArcSmall, { borderColor: 'rgba(255,244,184,0.10)' }]} />
-            {/* Bottom fade so avatar/text row has a readable dark base */}
-            <LinearGradient
-              colors={['transparent', 'rgba(18,10,0,0.60)']}
-              locations={[0.3, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
-            {/* Luxury shimmer line at very top */}
-            <View style={dashboardStyles.heroGoldSheen} pointerEvents="none" />
-          </>
-        )}
-      </View>
-
-      <View style={[dashboardStyles.heroActionsRail, { top: 16 + topInset }]}>
-        {/* Eyebrow chip — gold-tinted glass */}
-        <View style={[dashboardStyles.heroTopChip, {
-          backgroundColor: 'rgba(23,17,31,0.32)',
-          borderColor: 'rgba(255,244,184,0.30)',
-          borderWidth: 1,
-        }]}>
-          <Text style={{ color: 'rgba(255,244,184,0.82)', fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' }}>
-            Profile
-          </Text>
-        </View>
-        {/* Action icons — gold-on-dark, matching Messages/Broadcast/Bible/Partners */}
-        <View style={dashboardStyles.heroActionMain}>
-          <Pressable
-            onPress={onNotificationsPress}
-            style={[dashboardStyles.heroIconButton, {
-              backgroundColor: 'rgba(23,17,31,0.32)',
-              borderColor: 'rgba(255,244,184,0.30)',
-            }]}
-          >
-            <KISIcon name="bell" size={20} color="rgba(255,244,184,0.92)" />
-            {notificationCount ? (
-              <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
-                <Text style={[dashboardStyles.heroNotificationText, { color: palette.onPrimary }]}>{notificationCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable
-            onPress={onSettingsPress}
-            style={[dashboardStyles.heroIconButton, {
-              backgroundColor: 'rgba(23,17,31,0.32)',
-              borderColor: 'rgba(255,244,184,0.30)',
-            }]}
-          >
-            <KISIcon name="settings" size={20} color="rgba(255,244,184,0.92)" />
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={[dashboardStyles.heroContent, { paddingTop: (compact ? 78 : 88) + topInset, paddingBottom: 16 + bottomOverlap }]}>
-        <View style={[dashboardStyles.heroIdentityRow, compact && dashboardStyles.heroIdentityCompact]}>
-          <View style={[dashboardStyles.heroAvatarWrap, { width: compact ? 78 : 112, height: compact ? 78 : 112, borderRadius: compact ? 39 : 56 }]}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={[dashboardStyles.heroAvatar, { borderRadius: compact ? 39 : 56, borderColor: palette.ivory }]} />
+    // minHeight = the sticky bar's own rendered height (topInset clearance +
+    // its row content + padding). GoldHeaderShell's outer gradient clips to
+    // overflow:hidden and is sized by *this* view's content — without a
+    // floor here, once the rich hero's own maxHeight collapses toward 0
+    // there'd be nothing left holding the section open, so the gradient
+    // (and everything in it, including the absolutely-positioned sticky bar)
+    // shrinks away too — the sticky bar doesn't move, it gets clipped from
+    // the bottom up as the shell around it shrinks, which reads as "fades in
+    // then gets carried away with the rest of the page."
+    <View style={{ position: 'relative', minHeight: topInset + 70 }}>
+      {/* ── Rich hero — cover banner + overlapping avatar, collapses away ── */}
+      <Animated.View style={[collapseStyle, { overflow: 'hidden' }]}>
+        <View
+          onLayout={(e) => {
+            // Once maxHeight above starts constraining this view, onLayout
+            // re-fires with the *clipped* height, not the natural content
+            // height — recording that would shrink the "expanded" target on
+            // every scroll-down tick, so scrolling back up could never fully
+            // re-open the hero. Only ever grow the recorded height, never
+            // shrink it, so a single unclipped measurement (mount, or fully
+            // scrolled back to the top) sticks.
+            const measured = e.nativeEvent.layout.height;
+            if (measured > collapseNaturalHeight.value) {
+              collapseNaturalHeight.value = measured;
+            }
+          }}
+          style={{ paddingTop: topInset, position: 'relative', overflow: 'hidden' }}
+        >
+          {/* Background — real cover photo or the decorative gold gradient
+              fallback — spans the *entire* hero (not just a top strip), so
+              it reads as one cohesive backdrop behind the avatar+name row
+              and the headline/badges below it, same as a LinkedIn cover. */}
+          <View style={StyleSheet.absoluteFillObject}>
+            {coverUrl ? (
+              <>
+                <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
+                <LinearGradient
+                  colors={['transparent', 'rgba(18,10,0,0.45)']}
+                  locations={[0.35, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </>
             ) : (
-              <View style={[dashboardStyles.heroAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
-                <KISIcon name="person" size={compact ? 30 : 40} color={palette.subtext} />
-              </View>
+              <>
+                <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: '#C9A24A', opacity: 0.40 }]} />
+                <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: '#6F4515', opacity: 0.35 }]} />
+                <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: '#9A6A14', opacity: 0.30 }]} />
+                <View style={[dashboardStyles.heroArcLarge, { borderColor: 'rgba(255,244,184,0.15)' }]} />
+                <View style={[dashboardStyles.heroArcSmall, { borderColor: 'rgba(255,244,184,0.10)' }]} />
+              </>
             )}
-            <Pressable
-              onPress={onEdit}
-              style={[dashboardStyles.heroEditButton, getProfileDashboardCardStyle(dashboardTheme, 'glass')]}
-            >
-              <KISIcon name="edit" size={16} color={palette.text} />
+          </View>
+
+          {/* Avatar + name/handle + actions — one row, LinkedIn-style */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 18, gap: 14 }}>
+            {/* Outer wrapper has NO overflow:hidden — only the inner circle
+                clips the image, so the edit badge (positioned partly outside
+                the circle) doesn't get clipped along with it. */}
+            <View style={{ width: bigAvatarSize, height: bigAvatarSize }}>
+              <View style={[dashboardStyles.bigAvatarWrap, { width: bigAvatarSize, height: bigAvatarSize, borderRadius: bigAvatarSize / 2 }]}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFillObject, dashboardStyles.bigAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
+                    <KISIcon name="person" size={compact ? 26 : 30} color={palette.subtext} />
+                  </View>
+                )}
+              </View>
+              <Pressable
+                onPress={onEdit}
+                style={[dashboardStyles.bigAvatarEditBtn, getProfileDashboardCardStyle(dashboardTheme, 'glass')]}
+              >
+                <KISIcon name="edit" size={14} color={palette.text} />
+              </Pressable>
+            </View>
+
+            {/* Name/handle — fixed pale-gold text, same as every other Golden
+                Section: this sits on the gold gradient/cover backdrop, not a
+                theme-adjusted surface, so palette.text (dark brown in light
+                mode, light cream in dark mode) wouldn't reliably contrast
+                against it the way this does. */}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={dashboardStyles.heroName} numberOfLines={1}>
+                {displayName}
+              </Text>
+              <Text style={dashboardStyles.heroHandle} numberOfLines={1}>
+                {handle}
+              </Text>
+            </View>
+
+            {/* Notification/settings — same buttons as the sticky bar's, but
+                always visible here (the sticky bar's copies only fade in
+                once scrolled, so without these the actions would be
+                unreachable at rest). */}
+            <Pressable onPress={onNotificationsPress} style={dashboardStyles.stickyIconBtn}>
+              <KISIcon name="bell" size={18} color="rgba(255,244,184,0.92)" />
+              {notificationCount ? (
+                <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
+                  <Text style={[dashboardStyles.heroNotificationText, { color: palette.onPrimary }]}>{notificationCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable onPress={onSettingsPress} style={dashboardStyles.stickyIconBtn}>
+              <KISIcon name="settings" size={18} color="rgba(255,244,184,0.92)" />
             </Pressable>
           </View>
 
-          <View style={dashboardStyles.heroTextBlock}>
-            <Text style={[dashboardStyles.heroName, { fontSize: compact ? 24 : 34, color: palette.onPrimary }]} numberOfLines={compact ? 2 : 1}>
-              {displayName}
-            </Text>
-            <Text style={[dashboardStyles.heroHandle, { fontSize: compact ? 14 : 17, color: palette.ivory }]} numberOfLines={1}>
-              {handle}
-            </Text>
+          <View style={[dashboardStyles.heroContent, { paddingTop: 10 }]}>
             {headline ? (
-              <Text style={[dashboardStyles.heroHeadline, { fontSize: compact ? 13 : 14, color: palette.ivory }]} numberOfLines={2}>
+              <Text style={dashboardStyles.heroHeadline} numberOfLines={2}>
                 {headline}
               </Text>
             ) : null}
             <View style={dashboardStyles.heroBadgeRow}>
               {tierLabel ? (
-                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.glass]}>
-                  <KISIcon name="star" size={12} color={tierBadgeTextColor} />
-                  <Text style={[dashboardTheme.content.badge, { color: tierBadgeTextColor }]} numberOfLines={1}>
+                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.glass, dashboardStyles.heroBadgeCompact]}>
+                  <KISIcon name="star" size={10} color={tierBadgeTextColor} />
+                  <Text style={[dashboardTheme.content.badge, dashboardStyles.heroBadgeCompactText, { color: tierBadgeTextColor }]} numberOfLines={1}>
                     {tierLabel}
                   </Text>
                 </View>
               ) : null}
               {completionLabel ? (
-                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.glass]}>
-                  <Text style={[dashboardTheme.content.badge, { color: palette.text}]} numberOfLines={1}>
+                <View style={[dashboardStyles.heroBadge, dashboardTheme.chips.glass, dashboardStyles.heroBadgeCompact]}>
+                  <Text style={[dashboardTheme.content.badge, dashboardStyles.heroBadgeCompactText, { color: palette.text}]} numberOfLines={1}>
                     {completionLabel}
                   </Text>
                 </View>
@@ -380,7 +427,49 @@ export const ProfileHeroCard = ({
             </View>
           </View>
         </View>
-      </View>
+      </Animated.View>
+
+      {/* ── Compact sticky bar — invisible at rest, fades in as hero collapses.
+          Absolutely overlaid so it doesn't reserve its own layout space. ── */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          dashboardStyles.stickyRow,
+          stickyBarStyle,
+          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset + 14, paddingHorizontal: 16 },
+        ]}
+      >
+        <View style={dashboardStyles.stickyAvatarWrap}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFillObject, dashboardStyles.stickyAvatarFallback]}>
+              <KISIcon name="person" size={18} color="rgba(255,244,184,0.85)" />
+            </View>
+          )}
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={dashboardStyles.stickyName}>
+            {displayName}
+          </Text>
+          <Text numberOfLines={1} style={dashboardStyles.stickyHandle}>
+            {handle}
+          </Text>
+        </View>
+
+        <Pressable onPress={onNotificationsPress} style={dashboardStyles.stickyIconBtn}>
+          <KISIcon name="bell" size={18} color="rgba(255,244,184,0.92)" />
+          {notificationCount ? (
+            <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
+              <Text style={[dashboardStyles.heroNotificationText, { color: palette.onPrimary }]}>{notificationCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+        <Pressable onPress={onSettingsPress} style={dashboardStyles.stickyIconBtn}>
+          <KISIcon name="settings" size={18} color="rgba(255,244,184,0.92)" />
+        </Pressable>
+      </Animated.View>
     </View>
   );
 };
@@ -903,12 +992,69 @@ const dashboardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  heroShell: {
-    overflow: 'hidden',
-    minHeight: 308,
-    width: '100%',
+  // ── Compact sticky bar (absolutely overlaid, fades in as hero collapses) ──
+  stickyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 14,
   },
-  heroShellCompact: { minHeight: 284 },
+  stickyAvatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,244,184,0.35)',
+  },
+  stickyAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(23,17,31,0.32)',
+  },
+  stickyName: {
+    color: 'rgba(255,244,184,0.96)',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  stickyHandle: {
+    color: 'rgba(255,244,184,0.70)',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  stickyIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(23,17,31,0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,244,184,0.30)',
+  },
+  // ── Rich hero: full-bleed cover/gold backdrop + avatar-and-name row ──
+  bigAvatarWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#FFFDF8',
+  },
+  bigAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bigAvatarEditBtn: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   walletCoinIcon: {
     width: '100%',
     height: '100%',
@@ -917,18 +1063,6 @@ const dashboardStyles = StyleSheet.create({
   heroBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-  },
-  // 2px luxury shimmer line at the very top — shared visual language with
-  // Messages, Broadcast, Bible, and Partners gold headers.
-  heroGoldSheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: '#FFF4B8',
-    opacity: 0.50,
-    zIndex: 10,
   },
   heroCoverImage: {
     ...StyleSheet.absoluteFillObject,
@@ -980,28 +1114,6 @@ const dashboardStyles = StyleSheet.create({
   heroScrim: {
     ...StyleSheet.absoluteFillObject,
   },
-  heroActionsRail: {
-    position: 'absolute',
-    top: 16,
-    flexDirection: 'row',
-    gap: 10,
-    zIndex: 4,
-    width: "100%",
-    padding: 10,
-    justifyContent: 'space-between',
-  },
-  heroActionMain: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  heroIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   heroNotificationBadge: {
     position: 'absolute',
     top: -4,
@@ -1018,72 +1130,27 @@ const dashboardStyles = StyleSheet.create({
     fontWeight: '800',
   },
   heroContent: {
-    paddingTop: 88,
+    paddingTop: 20,
     paddingBottom: 16,
-  },
-  heroTopChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  heroIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    justifyContent: 'space-between',
-    paddingLeft: 10,
-  },
-  heroIdentityCompact: { alignItems: 'flex-start', gap: 12 },
-  heroAvatarWrap: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    position: 'relative',
-  },
-  heroAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 56,
-    borderWidth: 3,
-    // borderColor set inline using palette.ivory
-  },
-  heroAvatarFallback: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroEditButton: {
-    position: 'absolute',
-    right: -4,
-    bottom: -6,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroTextBlock: {
-    flex: 1,
-    gap: 5,
-    paddingBottom: 4,
+    paddingHorizontal: 16,
   },
   heroName: {
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: -1,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    color: 'rgba(255,244,184,0.96)',
   },
   heroHandle: {
-    // Always rendered over a dark hero backdrop; ivory gives correct on-dark contrast
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '600',
+    marginTop: 2,
+    color: 'rgba(255,244,184,0.70)',
   },
   heroHeadline: {
-    // Always rendered over a dark hero backdrop; ivory gives correct on-dark contrast
     fontSize: 14,
     lineHeight: 21,
+    marginTop: 6,
+    color: 'rgba(255,244,184,0.78)',
   },
   heroBadgeRow: {
     flexDirection: 'row',
@@ -1095,6 +1162,18 @@ const dashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  // Shrinks the tier/completion pills below the shared chips.glass default
+  // (paddingHorizontal:12/paddingVertical:7/fontSize:11) — layered on top of
+  // it rather than edited in the shared theme, since chips.glass is reused
+  // by chips elsewhere in the profile dashboard that shouldn't shrink too.
+  heroBadgeCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  heroBadgeCompactText: {
+    fontSize: 10,
   },
   completionRow: {
     flexDirection: 'row',

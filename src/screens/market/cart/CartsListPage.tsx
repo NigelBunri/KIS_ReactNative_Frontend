@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -26,6 +26,7 @@ import {
 } from '@/screens/market/cart/shopCartManager';
 import { getRequest } from '@/network/get';
 import { frontendKiscMajorToBackendCents } from '@/utils/currency';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type CartsListNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -34,7 +35,7 @@ type CartsListNavigation = NativeStackNavigationProp<
 
 const CartsListPage = () => {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const navigation = useNavigation<CartsListNavigation>();
   const [cartState, setCartState] = useState(getShopCartState());
@@ -334,7 +335,7 @@ const CartsListPage = () => {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View
         style={[
           styles.header,

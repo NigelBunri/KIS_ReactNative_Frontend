@@ -660,7 +660,7 @@ const BroadcastProductCard = ({
       </Modal>
       <Modal visible={ratingModal} transparent animationType="slide" onRequestClose={() => setRatingModal(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: palette.backdrop ?? 'rgba(0,0,0,0.4)' }}>
-          <View style={{ backgroundColor: palette.bg, marginTop: 25, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 }}>
+          <View style={{ backgroundColor: palette.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 }}>
             <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>Rate this product</Text>
             <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map(n => (
@@ -1419,7 +1419,7 @@ export default function BroadcastMarketPage({
   }, [marketItems, activeFilter, searchTerm]);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.container, { backgroundColor: palette.bg, }]}>
       <View style={styles.listWrapper}>
         {loading && !filteredProducts.length ? (
           <View style={styles.loader}>

@@ -10,7 +10,7 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
@@ -18,6 +18,7 @@ import { useSocket } from '../../../SocketProvider';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { CallType } from '@/services/calls/callTypes';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // SocketProvider writes entries with this shape to 'kis.call_history'.
 type SocketCallEntry = {
@@ -116,7 +117,7 @@ type Props = {
 
 export default function CallHistoryScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const { startCall, currentUserId } = useSocket();
   const [entries, setEntries] = useState<NormalisedEntry[]>([]);
@@ -284,9 +285,9 @@ export default function CallHistoryScreen({ onBack }: Props) {
   };
 
   return (
-    <View style={[localStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[localStyles.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
-      <View style={[localStyles.header, { paddingTop: insets.top + 8, borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
+      <View style={[localStyles.header, { paddingTop: topInset + 8, borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         {onBack && (
           <Pressable onPress={onBack} style={localStyles.backBtn} hitSlop={10}>
             <KISIcon name="arrow-left" size={22} color={palette.primary} />

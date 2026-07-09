@@ -9,8 +9,9 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { KISIcon } from '@/constants/kisIcons';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export type TextCardPayload = {
   text: string;
@@ -52,7 +53,7 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
   onClose,
   onSend,
 }) => {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [text, setText] = useState('');
   const [fontSize, setFontSize] = useState<number>(24);
   const [fontColor, setFontColor] = useState<string>(FONT_COLORS[0]);
@@ -101,7 +102,7 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingTop: insets.top + 12,
+          paddingTop: topInset + 12,
           paddingBottom: 12,
           backgroundColor: 'rgba(0,0,0,0.18)',
         }}

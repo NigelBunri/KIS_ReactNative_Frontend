@@ -22,6 +22,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function SuperThanksSheet({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const [topTips, setTopTips] = useState<Tip[]>([]);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);

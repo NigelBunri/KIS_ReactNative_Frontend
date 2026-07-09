@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type LoyaltyRule = {
   id?: string;
@@ -164,7 +164,7 @@ export default function LoyaltyScreen() {
   }, [balance, fetchAll, redeemPoints]);
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

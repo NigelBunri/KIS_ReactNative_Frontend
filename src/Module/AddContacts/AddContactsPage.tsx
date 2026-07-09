@@ -24,7 +24,7 @@ import {
   Linking,
   DeviceEventEmitter,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useKISTheme } from '../../theme/useTheme';
@@ -52,6 +52,7 @@ import { NewCommunityForm } from './components/NewCommunityForm';
 import { NewChannelForm } from './components/NewChannelForm';
 import { addContactsStyles as styles } from './addContactsStyles';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   fetchConversationsForCurrentUser,
   normalizeConversation,
@@ -181,7 +182,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
   initialGroupContext,
 }) => {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { width: SCREEN_WIDTH } = useWindowDimensions();
   const responsive = useResponsiveLayout();
   const pagePadding = responsive.pageGutter;
@@ -806,7 +807,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
     : 'Select members';
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable
@@ -858,7 +859,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
         </View>
 
         {/* Page 2: forms (add contact / group / community / channel / member select) */}
-        <View style={{ width: SCREEN_WIDTH, flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+        <View style={{ width: SCREEN_WIDTH, flex: 1, backgroundColor: palette.bg, }}>
           {/* Member selection: full FlatList to virtualize potentially large contact lists */}
           {(mode === 'selectGroupMembers' || mode === 'selectCommunityMembers') ? (
             <MemberSelectionList
@@ -871,11 +872,11 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             />
           ) : (
           <KeyboardAvoidingView
-            style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}
+            style={{ flex: 1, backgroundColor: palette.bg, }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
-              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg, marginTop: 25 }]}
+              style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg, }]}
               contentContainerStyle={{ paddingBottom: responsive.isWatch ? 20 : 32 }}
               keyboardShouldPersistTaps="handled"
             >

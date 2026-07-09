@@ -13,7 +13,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,7 @@ import KISTextInput from '@/constants/KISTextInput';
 import DocumentPicker from 'react-native-document-picker';
 import { getUserData } from '@/network/cache';
 import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   getDirectPaymentInfo,
   isProviderPaymentFailed,
@@ -336,7 +337,7 @@ const formatSlotLabel = (value: Date) =>
   });
 
 const ServiceBookingDetailsPage = () => {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const route =
     useRoute<RouteProp<RootStackParamList, 'ServiceBookingDetails'>>();
   const bookingId = route.params?.bookingId;
@@ -1413,10 +1414,10 @@ const ServiceBookingDetailsPage = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingTop: insets.top,
+          paddingTop: topInset,
         }}
       >
         <ActivityIndicator color={palette.primaryStrong} />
@@ -1429,11 +1430,11 @@ const ServiceBookingDetailsPage = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          paddingTop: insets.top + 24,
+          paddingTop: topInset + 24,
         }}
       >
         <Text style={{ color: palette.text, marginBottom: 12 }}>
@@ -1474,7 +1475,7 @@ const ServiceBookingDetailsPage = () => {
     padding: 16,
   };
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: topInset }}>
       <View
         style={{
           paddingTop: 20,

@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -23,6 +23,7 @@ import ROUTES from '@/network';
 import { useSocket } from '../../../SocketProvider';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import type { CallType } from '@/services/calls/callTypes';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CallJoin'>;
 
@@ -40,7 +41,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const { token } = route.params;
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { joinExistingCall, startCall } = useSocket();
 
   const [phase, setPhase] = useState<'loading' | 'preview' | 'joining' | 'error'>('loading');
@@ -117,7 +118,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const callTitle = callInfo?.title || typeLabel;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { paddingTop: topInset, backgroundColor: palette.bg, }]}>
       <Animated.View
         style={[
           styles.card,

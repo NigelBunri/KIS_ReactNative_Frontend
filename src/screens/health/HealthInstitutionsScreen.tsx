@@ -15,7 +15,7 @@ import { fetchHealthProfileState } from '@/services/healthProfileService';
 import type { RootStackParamList } from '@/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HealthInstitutionType } from '@/screens/tabs/profile-screen/types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import {
   filterInstitutionsForVisibleRoles,
   resolveHealthAccessUser,
@@ -102,7 +102,7 @@ export default function HealthInstitutionsScreen() {
   }, [loadInstitutions]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, }}>
       <InstitutionsListScreen
         institutions={institutions}
         onEdit={handleEdit}

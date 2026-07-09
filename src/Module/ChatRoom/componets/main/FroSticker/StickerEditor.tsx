@@ -14,7 +14,6 @@ import {
   PanResponder,
 } from 'react-native';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import ViewShot from 'react-native-view-shot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +22,7 @@ import ImageResizer from 'react-native-image-resizer';
 
 import { KISIcon } from '@/constants/kisIcons';
 import { StickerBackgroundRemovalScreen } from './StickerBackgroundRemovalScreen';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   fetchRemotePacks,
   loadCachedPacks,
@@ -102,7 +102,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
   const [textPos, setTextPos] = useState({ x: 40, y: 40 });
   const textStartPosRef = useRef({ x: 40, y: 40 });
 
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const viewShotRef = useRef<ViewShot | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -364,7 +364,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingTop: insets.top + 12,
+          paddingTop: topInset + 12,
           paddingBottom: 12,
           backgroundColor: palette.card,
         }}

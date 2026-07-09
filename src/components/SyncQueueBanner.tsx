@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, Pressable, StyleSheet, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+
 import {
   OFFLINE_ACTION_QUEUE_UPDATED_EVENT,
   flushOfflineActionQueue,
@@ -11,7 +12,7 @@ type QueueState = { pending: number; failed: number; total: number };
 const CLEAR_DELAY_MS = 3000;
 
 export default function SyncQueueBanner() {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [state, setState] = useState<QueueState | null>(null);
   const translateY = useRef(new Animated.Value(-60)).current;
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,7 +61,7 @@ export default function SyncQueueBanner() {
     <Animated.View
       style={[
         styles.container,
-        { paddingTop: insets.top > 0 ? insets.top : 8, backgroundColor },
+        { paddingTop: topInset > 0 ? topInset : 8, backgroundColor },
         { transform: [{ translateY }] },
       ]}
       accessibilityLiveRegion="polite"

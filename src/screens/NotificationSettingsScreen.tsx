@@ -25,6 +25,7 @@ import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { patchRequest } from '@/network/patch';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // AsyncStorage keys
 const KEY_DND_ENABLED = 'KIS_DND_ENABLED';
@@ -40,6 +41,7 @@ export default function NotificationSettingsScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
 
   const [loading, setLoading] = useState(true);
@@ -154,7 +156,7 @@ export default function NotificationSettingsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, }]}>
         <View style={s.center}>
           <ActivityIndicator color={palette.primaryStrong} />
         </View>
@@ -163,7 +165,7 @@ export default function NotificationSettingsScreen() {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

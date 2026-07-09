@@ -94,6 +94,7 @@ import {
   setActiveMedicalProfile,
 } from '@/services/healthcareContextService';
 import StaffConsole from '@/components/healthcare/StaffConsole';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   fetchStaffProfiles,
   assignStaffRole,
@@ -206,6 +207,7 @@ const INITIAL_DOCUMENT_FORM = {
 export default function HealthcareScreen() {
   const { palette, tokens } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { pageGutter } = useResponsiveLayout();
   const { startCall } = useSocket();
   const styles = useMemo(() => makeStyles(tokens, pageGutter, palette.divider), [tokens, pageGutter, palette.divider]);
@@ -1617,7 +1619,6 @@ export default function HealthcareScreen() {
     }
   }, [patientDetail, documentForm, loadPatientDetail]);
 
-
   const handleUpdateStaffRole = useCallback(
     async (staffId: string, payload: { role?: string; scope?: string }) => {
       setStaffUpdateId(staffId);
@@ -2057,8 +2058,8 @@ export default function HealthcareScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
     <ScrollView
-      style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: insets.top }}
+      style={[styles.container, { backgroundColor: palette.bg, }]}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: topInset }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.primary} colors={[palette.primary]} />}
     >
       <GlobalShell

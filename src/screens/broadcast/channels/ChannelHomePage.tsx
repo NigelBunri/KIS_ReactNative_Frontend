@@ -32,6 +32,7 @@ import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
 import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   freshOfflineMeta,
   offlineStructuredCacheKey,
@@ -176,6 +177,7 @@ export default function ChannelHomePage() {
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const columns = compact ? 1 : responsive.isTablet && responsive.isLandscape ? 3 : 2;
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const themed = useMemo(() => makeStyles(palette), [palette]);
   const initialChannel = route.params?.channel || null;
   const channelKey = route.params?.channelId || route.params?.handle || initialChannel?.id || initialChannel?.handle || '';
@@ -189,7 +191,6 @@ export default function ChannelHomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [channelCacheMeta, setChannelCacheMeta] = useState<OfflineCacheMeta | null>(null);
-
 
   const applyChannelSnapshot = useCallback((snapshot: any, meta: OfflineCacheMeta | null) => {
     if (!snapshot) return;
@@ -282,14 +283,14 @@ export default function ChannelHomePage() {
 
   if (loading && !channel) {
     return (
-      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <OfflineDataBadge meta={channelCacheMeta} style={{ marginHorizontal: responsive.pageGutter, marginTop: 12 }} />
         <View style={[styles.heroWrap, { height: compact ? 144 : 184 }]}>
@@ -306,7 +307,7 @@ export default function ChannelHomePage() {
             )}
             <View style={styles.heroShade} />
           </View>
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}>
+          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: topInset + 8 }]}>
             <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
         </View>

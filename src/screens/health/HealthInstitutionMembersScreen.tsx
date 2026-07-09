@@ -30,7 +30,7 @@ import {
 } from '@/theme/health';
 import type { HealthInstitutionMember } from './types';
 import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionMembers'>;
 
@@ -625,7 +625,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator color={palette.accentPrimary} />
           <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading members...</Text>
@@ -635,7 +635,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -840,7 +840,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
         </ScrollView>
 
         {contactsPickerOpen ? (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.bg, marginTop: 25 }}>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.bg, }}>
             <AddContactsPage
               onClose={() => setContactsPickerOpen(false)}
               onOpenChat={(_chat) => undefined}

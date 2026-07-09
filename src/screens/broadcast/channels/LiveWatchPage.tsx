@@ -43,6 +43,7 @@ import SuperChatPanel from './components/SuperChatPanel';
 import LivePollsPanel from './LivePollsPanel';
 import LiveQAPanel from './LiveQAPanel';
 import SubscribeBellButton from './components/SubscribeBellButton';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,7 @@ export default function LiveWatchPage() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'LiveWatch'>>();
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
@@ -361,7 +363,7 @@ export default function LiveWatchPage() {
       <Animated.View
         style={[
           styles.topOverlay,
-          { paddingTop: insets.top + (Platform.OS === 'android' ? 28 : 8) },
+          { paddingTop: topInset + (Platform.OS === 'android' ? 28 : 8) },
           { opacity: controlsVisible ? 1 : 0 },
         ]}
         pointerEvents={controlsVisible ? 'box-none' : 'none'}

@@ -382,7 +382,7 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
   }, [scrollToActivePost]);
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, }]}>
       {!hideHeader && (
         <View
           style={[

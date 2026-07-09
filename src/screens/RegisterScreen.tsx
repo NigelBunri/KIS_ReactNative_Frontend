@@ -15,13 +15,14 @@ import {
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 import { setUserData } from '@/network/cache';
 import { postRequest } from '@/network/post/index';
 import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { getSimPhoneNumber } from '@/services/simInfo';
 import { setAuthTokens } from '@/security/authStorage';
 import { useAuth } from '../../App';
 import { FEATURE_FLAGS } from '@/constants/featureFlags';
@@ -197,6 +198,33 @@ export default function RegisterScreen({ navigation }: any) {
       setLoading(true);
       const phoneE164 = `${callingCode}${normalizedPhone}`;
 
+      // Best-effort: Android only (iOS has no API for this). If the SIM's own
+      // number doesn't match what was typed, warn but let the user proceed —
+      // OTP verification is suspended, so this is the closest we can get to
+      // proof of ownership, and many Android devices won't expose it anyway.
+      const simPhoneNumber = await getSimPhoneNumber();
+      if (simPhoneNumber) {
+        const simDigits = simPhoneNumber.replace(/[^\d]/g, '');
+        const simMatches =
+          simDigits.endsWith(normalizedPhone) || normalizedPhone.endsWith(simDigits);
+        if (!simMatches) {
+          const proceed = await new Promise<boolean>(resolve => {
+            Alert.alert(
+              "Number doesn't match this device's SIM",
+              "The number you entered doesn't match this device's SIM card. Using your SIM number lets this device be recognized as your primary device later without needing a QR code.",
+              [
+                { text: 'Edit number', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Use this number anyway', onPress: () => resolve(true) },
+              ],
+            );
+          });
+          if (!proceed) {
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const deviceId = await ensureDeviceId();
       const payload: Record<string, any> = {
         phone: phoneE164,
@@ -207,6 +235,7 @@ export default function RegisterScreen({ navigation }: any) {
         password2: regPassword2,
         device_id: deviceId,
         device_platform: Platform.OS,
+        ...(simPhoneNumber ? { sim_phone_number: simPhoneNumber } : {}),
       };
       if (displayName.trim()) payload.display_name = displayName.trim();
 
@@ -262,7 +291,7 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <StatusBar
         barStyle={tone === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={palette.bg}
@@ -285,7 +314,7 @@ export default function RegisterScreen({ navigation }: any) {
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}
+          contentContainerStyle={[styles.container, { backgroundColor: palette.bg, }]}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerBlock}>
@@ -449,7 +478,7 @@ export default function RegisterScreen({ navigation }: any) {
                 preset="helper"
                 color={palette.primary}
                 style={{ fontWeight: '600' }}
-                onPress={() => navigation.navigate('TermsAndConditions')}
+                onPress={() => navigation.navigate('PrivacyPolicy')}
               >
                 Privacy Policy
               </KISText>

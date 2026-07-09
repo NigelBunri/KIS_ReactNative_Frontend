@@ -4,13 +4,15 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { KISIcon } from '@/constants/kisIcons';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export type MediaGalleryProps = {
   visible: boolean;
@@ -94,7 +96,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
   palette,
   onClose,
 }) => {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [activeTab, setActiveTab] = useState<MediaTab>('Images');
   const [fullscreenItem, setFullscreenItem] = useState<MediaItem | null>(null);
 
@@ -154,7 +156,14 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
       <View
         style={[
           styles.root,
-          { backgroundColor: palette.bg, marginTop: 25 ?? palette.surface, paddingTop: insets.top },
+          {
+            backgroundColor: palette.bg ?? palette.surface,
+            // pageSheet already insets from the notch on iOS (the sheet's top
+            // edge never reaches the real screen top); Android ignores
+            // presentationStyle and renders truly full-screen, so it still
+            // needs the manual inset.
+            paddingTop: Platform.OS === 'android' ? topInset : 0,
+          },
         ]}
       >
         {/* Header */}
@@ -232,7 +241,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           <View style={styles.fullscreenBg}>
             <Pressable
               onPress={() => setFullscreenItem(null)}
-              style={styles.fullscreenClose}
+              style={[styles.fullscreenClose, { top: topInset + 8 }]}
             >
               <KISIcon name="close" size={22} color="#fff" />
             </Pressable>
@@ -315,7 +324,6 @@ const styles = StyleSheet.create({
   },
   fullscreenClose: {
     position: 'absolute',
-    top: 48,
     right: 16,
     zIndex: 10,
     padding: 8,

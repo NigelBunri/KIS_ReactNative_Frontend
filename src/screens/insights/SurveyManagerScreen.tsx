@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -144,7 +144,7 @@ function CreateSurveyModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
         <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.modalTitle, { color: palette.text }]}>Create Survey</Text>
           <View style={{ flexDirection: 'row', gap: 16 }}>
@@ -201,7 +201,7 @@ function CreateSurveyModal({
           {addingQ ? (
             <View style={[styles.addQBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
               <TextInput
-                style={[styles.input, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.divider, color: palette.text }]}
+                style={[styles.input, { backgroundColor: palette.bg, borderColor: palette.divider, color: palette.text }]}
                 placeholder="Question text"
                 placeholderTextColor={palette.subtext}
                 value={qText_}
@@ -231,7 +231,7 @@ function CreateSurveyModal({
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
                 <Pressable
                   onPress={() => { setAddingQ(false); setQText(''); setQType('text'); }}
-                  style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, marginTop: 25 }]}
+                  style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, }]}
                 >
                   <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
                 </Pressable>
@@ -411,7 +411,7 @@ function SurveyDetailSheet({
 
   return (
     <Modal visible={!!survey} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
         {/* Header */}
         <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
           {editing ? (
@@ -479,7 +479,7 @@ function SurveyDetailSheet({
                 {survey.question_count ?? 0} questions · {survey.response_count ?? 0} responses
               </Text>
               {survey.status ? (
-                <View style={[styles.capChip, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.divider }]}>
+                <View style={[styles.capChip, { backgroundColor: palette.bg, borderColor: palette.divider }]}>
                   <Text style={{ fontSize: 11, color: palette.subtext }}>{survey.status}</Text>
                 </View>
               ) : null}
@@ -528,7 +528,7 @@ function SurveyDetailSheet({
                 {addingQ ? (
                   <View style={[styles.addQBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
                     <TextInput
-                      style={[styles.input, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.divider, color: palette.text }]}
+                      style={[styles.input, { backgroundColor: palette.bg, borderColor: palette.divider, color: palette.text }]}
                       placeholder="Question text"
                       placeholderTextColor={palette.subtext}
                       value={qTextNew}
@@ -558,7 +558,7 @@ function SurveyDetailSheet({
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
                       <Pressable
                         onPress={() => { setAddingQ(false); setQTextNew(''); setQTypeNew('text'); }}
-                        style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, marginTop: 25 }]}
+                        style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, }]}
                       >
                         <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
                       </Pressable>
@@ -652,7 +652,7 @@ export default function SurveyManagerScreen() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.screenTitle, { color: palette.text }]}>Survey Manager</Text>

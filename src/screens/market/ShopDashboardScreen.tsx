@@ -44,7 +44,7 @@ import { resolveShopImageUri } from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
 import { collectProductImageUris } from '@/utils/productImages';
 import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type PickedImage = { uri: string; name: string; type: string };
 const toUploadFile = (picked: PickedImage) => ({
@@ -3056,7 +3056,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
 
   if (!shopId) {
     return (
-      <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <KISIcon name="storefront-outline" size={64} color={palette.subtext} />
           <Text style={{ fontSize: 22, fontWeight: '800', color: palette.text, marginTop: 16, textAlign: 'center' }}>
@@ -3077,7 +3077,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { backgroundColor: palette.surface }]}>
           <View style={styles.heroRow}>
@@ -3188,7 +3188,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: palette.bg, marginTop: 25,
+            backgroundColor: palette.bg,
             zIndex: 999,
           }}
         >

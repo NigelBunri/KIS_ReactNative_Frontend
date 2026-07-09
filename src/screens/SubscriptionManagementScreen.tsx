@@ -20,6 +20,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ type DowngradeModalProps = {
 function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: DowngradeModalProps) {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const handleConfirm = () => {
     if (!selectedTier) {
@@ -202,6 +204,7 @@ function CancelModal({ visible, palette, onClose, onConfirm, submitting }: Cance
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState('');
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const handleConfirm = () => {
     const reason = selectedReason === 'Other' && customReason.trim()
@@ -450,7 +453,7 @@ export default function SubscriptionManagementScreen() {
   const currentTier = subscription?.tier ?? subscription?.plan;
 
   return (
-    <SafeAreaView edges={['top']} style={[ss.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView edges={['top']} style={[ss.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
       <View style={[ss.header, { borderBottomColor: palette.divider }]}>
         <Pressable

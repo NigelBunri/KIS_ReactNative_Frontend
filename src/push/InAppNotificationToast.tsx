@@ -15,9 +15,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { routeNotification } from './notificationRouter';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export interface InAppNotificationPayload {
   title: string;
@@ -36,7 +37,7 @@ const SWIPE_THRESHOLD = -30;
 const InAppNotificationToast = forwardRef<InAppNotificationToastHandle>(
   (_props, ref) => {
     const { palette } = useKISTheme();
-    const insets = useSafeAreaInsets();
+    const topInset = useSafeTopInset();
 
     const translateY = useRef(new Animated.Value(-BANNER_HEIGHT - 40)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -128,7 +129,7 @@ const InAppNotificationToast = forwardRef<InAppNotificationToastHandle>(
 
     if (!displayPayload) return null;
 
-    const topOffset = insets.top > 0 ? insets.top : 12;
+    const topOffset = topInset > 0 ? topInset : 12;
 
     return (
       <Animated.View

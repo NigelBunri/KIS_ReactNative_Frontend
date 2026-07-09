@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import Video from 'react-native-video';
 import Clipboard from '@react-native-clipboard/clipboard';
 
@@ -61,6 +61,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const PERSONALIZATION_HISTORY_KEY = '@kis:personalization-history';
 
@@ -314,7 +315,7 @@ export default function FeedScreen<T extends FeedPost>({
   feedType = 'broadcast',
 }: FeedScreenProps<T>) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const mediaHeaders = useMediaHeaders();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -988,7 +989,7 @@ export default function FeedScreen<T extends FeedPost>({
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, }]}>
       {!isCommunityFeed ? (
         <>
           <View pointerEvents="none" style={styles.bgGlowA} />
@@ -1001,7 +1002,7 @@ export default function FeedScreen<T extends FeedPost>({
         style={[
           styles.appBar,
           {
-            paddingTop: insets.top + 6,
+            paddingTop: topInset + 6,
             backgroundColor: palette.card,
           },
         ]}
@@ -1390,7 +1391,7 @@ export default function FeedScreen<T extends FeedPost>({
         statusBarTranslucent
         onRequestClose={closeVideoModal}
       >
-        <View style={[styles.videoModal, { paddingTop: insets.top }]}>
+        <View style={[styles.videoModal, { paddingTop: topInset }]}>
           {currentVideoSource ? (
             <View style={styles.videoContainer}>
               <Pressable
@@ -1398,7 +1399,7 @@ export default function FeedScreen<T extends FeedPost>({
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={[
                   styles.videoCloseButton,
-                  { top: insets.top + 12, left: 16, borderColor: 'rgba(255,255,255,0.4)' },
+                  { top: 12, left: 16, borderColor: 'rgba(255,255,255,0.4)' },
                 ]}
               >
                 <KISIcon name="close" size={24} color="#fff" />
@@ -1913,7 +1914,7 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
   onPressContext,
 }) => {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { socket, isConnected, currentUserId } = useSocket();
   const [messages, setMessages] = useState<CommentMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -2144,7 +2145,7 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[commentStyles.container, { paddingTop: insets.top + 12 }]}>
+      <View style={[commentStyles.container, { paddingTop: topInset + 12 }]}>
         <View style={commentStyles.header}>
           <View style={{ flex: 1 }}>
             <Text style={[commentStyles.headerLabel, { color: palette.text }]}>

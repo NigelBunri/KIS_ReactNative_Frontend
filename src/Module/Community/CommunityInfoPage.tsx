@@ -14,7 +14,6 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -27,6 +26,7 @@ import apiService from '@/services/apiService';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type MemberUser = {
   id?: string;
@@ -83,7 +83,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   onBack,
 }) => {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState<string>('');
@@ -406,7 +406,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   }, []);
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />

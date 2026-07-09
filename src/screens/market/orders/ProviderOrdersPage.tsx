@@ -9,7 +9,7 @@ import {
   View,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -21,6 +21,7 @@ import KISButton from '@/constants/KISButton';
 import type { RootStackParamList } from '@/navigation/types';
 import { backendOrderTotalToUsd } from '@/utils/currency';
 import { getDirectPaymentInfo, paymentStatusLabel } from '@/utils/directPaymentHandoff';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type ProviderOrdersNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -45,7 +46,7 @@ type MarketplaceOrderSummary = {
 
 export default function ProviderOrdersPage() {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<ProviderOrdersNavigation>();
   const [orders, setOrders] = useState<MarketplaceOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +203,7 @@ export default function ProviderOrdersPage() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View
         style={[
           styles.headerSection,

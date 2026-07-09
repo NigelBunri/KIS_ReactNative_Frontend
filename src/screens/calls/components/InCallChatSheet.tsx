@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InCallMessage } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   messages: InCallMessage[];
@@ -27,6 +28,7 @@ type Props = {
 export default function InCallChatSheet({ messages, visible, onClose, onSend, localUserId }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [text, setText] = useState('');
   const listRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;

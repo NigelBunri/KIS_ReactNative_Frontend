@@ -20,7 +20,7 @@ import { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import {
   getHealthThemeBorders,
   getHealthThemeColors,
@@ -1239,7 +1239,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onRequestClose={() => setTaskModalVisible(false)}
       >
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
             <View style={modalStyles.header}>
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Task detail
@@ -1323,7 +1323,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onRequestClose={() => setEscalationModalVisible(false)}
       >
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
             <View style={modalStyles.header}>
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Escalation detail
@@ -1425,7 +1425,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onRequestClose={() => setTriageModalVisible(false)}
       >
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
             <View style={modalStyles.header}>
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Triage detail
@@ -1543,7 +1543,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onRequestClose={() => setReferralModalVisible(false)}
       >
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
             <View style={modalStyles.header}>
               <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
                 Referral detail
@@ -1628,7 +1628,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   // ─── root render ──────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         {/* Header */}
         <View

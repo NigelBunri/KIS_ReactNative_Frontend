@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -234,7 +234,7 @@ export default function ProfileNotificationsScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View style={{ gap: 6 }}>
         <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Notifications</Text>

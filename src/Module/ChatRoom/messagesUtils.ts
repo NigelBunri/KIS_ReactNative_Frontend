@@ -421,14 +421,6 @@ export const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  messageGoldSheen: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 2,
-    backgroundColor: 'rgba(255,244,184,0.45)',
-  },
 
   /* App Bar */
   appBar: {

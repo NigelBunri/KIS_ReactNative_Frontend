@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -18,6 +18,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InviteJoin'>;
 
@@ -25,7 +26,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const { type, token } = route.params;
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -111,7 +112,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const displayName = groupName ? `"${groupName}"` : label;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.container, { paddingTop: topInset, backgroundColor: palette.bg, }]}>
       <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk, maxWidth: responsive.contentMaxWidth }]}>
         {status === 'loading' && (
           <>

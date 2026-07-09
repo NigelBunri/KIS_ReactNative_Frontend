@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
 const KCAN_CITY_IMAGE = require('@/assets/KCAN_city.jpg');
@@ -222,6 +223,7 @@ const SectionHeader = ({
 export default function KcanVisionModal({ visible, onClose }: Props) {
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const topInset = useSafeTopInset();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
@@ -239,7 +241,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: compact ? 94 : 128 }]}
@@ -526,7 +528,7 @@ export default function KcanVisionModal({ visible, onClose }: Props) {
         onRequestClose={() => setImagePreviewVisible(false)}
       >
         <View style={styles.imagePreviewRoot}>
-          <View style={styles.imagePreviewTopBar}>
+          <View style={[styles.imagePreviewTopBar, { paddingTop: topInset + 12 }]}>
             <Text style={styles.imagePreviewTitle}>KCAN City Vision</Text>
             <Pressable
               accessibilityRole="button"

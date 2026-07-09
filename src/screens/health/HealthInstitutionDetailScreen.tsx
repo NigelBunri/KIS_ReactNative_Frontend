@@ -34,7 +34,7 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { getInstitutionRoleForUser, resolveHealthAccessUser } from './accessControl';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionDetail'>;
 
@@ -196,7 +196,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
 
   if (!dashboardType) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, padding: HEALTH_THEME_SPACING.lg }}>
           <View style={{ alignItems: 'flex-end' }}>
             <TouchableOpacity
@@ -232,7 +232,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
 
   if (loading && !analytics) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
@@ -269,7 +269,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: HEALTH_THEME_SPACING.lg, paddingTop: HEALTH_THEME_SPACING.sm }}>
           <TouchableOpacity

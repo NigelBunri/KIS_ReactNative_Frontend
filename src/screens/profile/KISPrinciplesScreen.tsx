@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type PrincipleCard = {
   key: string;
@@ -110,6 +111,7 @@ const AGE_GROUPS = [
 export default function KISPrinciplesScreen() {
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation();
   const responsive = useResponsiveLayout();
   const isDark = tone === 'dark';
@@ -117,7 +119,7 @@ export default function KISPrinciplesScreen() {
   const styles = useMemo(() => createStyles(palette, isDark, responsive), [palette, isDark, responsive]);
 
   return (
-    <View style={[styles.root, { paddingTop: Math.max(insets.top, 12) }]}>
+    <View style={[styles.root, { paddingTop: Math.max(topInset, 12) }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -228,7 +230,7 @@ const createStyles = (
   StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: palette.bg, marginTop: 25,
+      backgroundColor: palette.bg,
     },
     scroll: {
       flex: 1,

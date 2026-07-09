@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
@@ -45,7 +45,7 @@ export default function SurveysDashboardScreen() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>

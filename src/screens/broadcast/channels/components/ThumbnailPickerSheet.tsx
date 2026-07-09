@@ -15,6 +15,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   visible: boolean;
@@ -40,6 +41,7 @@ export default function ThumbnailPickerSheet({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [picked, setPicked] = useState<Asset | null>(null);
   const [saving, setSaving] = useState(false);
 

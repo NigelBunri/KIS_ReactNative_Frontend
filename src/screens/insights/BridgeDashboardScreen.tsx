@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -53,7 +53,7 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>Bridge</Text>

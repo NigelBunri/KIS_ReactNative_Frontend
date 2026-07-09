@@ -54,6 +54,7 @@ import SubscribeBellButton from '@/screens/broadcast/channels/components/Subscri
 import AgeGateScreen from '@/screens/broadcast/channels/components/AgeGateScreen';
 import GeoBlockedScreen from '@/screens/broadcast/channels/components/GeoBlockedScreen';
 import { fetchPublicContentLanding } from '@/services/publicGrowthService';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const compactNumber = (value?: number) => {
   const num = Number(value || 0);
@@ -526,6 +527,7 @@ export default function ChannelContentDetailPage() {
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const themed = useMemo(() => makeStyles(palette), [palette]);
   const [content, setContent] = useState<BroadcastChannelContent | null>(route.params?.item || null);
   const [loading, setLoading] = useState(!route.params?.item);
@@ -625,7 +627,6 @@ export default function ChannelContentDetailPage() {
     const completed = result.action === Share.sharedAction;
     if (completed) applyCounts(await shareChannelContent(content.id, true));
   }, [applyCounts, channel?.display_name, content?.id, content?.title]);
-
 
   const handleVideoEnd = useCallback(() => {
     if (relatedContent.length > 0) {
@@ -802,12 +803,12 @@ export default function ChannelContentDetailPage() {
   }, [content?.id, content?.title]);
 
   if (loading && !content) {
-    return <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}><ActivityIndicator color={palette.primaryStrong} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, }]}><ActivityIndicator color={palette.primaryStrong} /></SafeAreaView>;
   }
 
   if (!content) {
     return (
-      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <Text style={{ color: palette.text, fontWeight: '900' }}>Content unavailable</Text>
         <Pressable onPress={() => navigation.goBack()} style={[styles.retryButton, { borderColor: palette.border }]}><Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Go back</Text></Pressable>
       </SafeAreaView>
@@ -830,11 +831,11 @@ export default function ChannelContentDetailPage() {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
         <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
           <MediaStage content={content} relatedContent={relatedContent as any} />
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: insets.top + 8 }]}><KISIcon name="arrow-left" size={20} color={palette.ivory} /></Pressable>
+          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: topInset + 8 }]}><KISIcon name="arrow-left" size={20} color={palette.ivory} /></Pressable>
 
           {/* Autoplay Up Next countdown */}
           {autoplayCountdown !== null && relatedContent[0] && (
@@ -921,7 +922,7 @@ export default function ChannelContentDetailPage() {
           presentationStyle="pageSheet"
           onRequestClose={() => setCommentsModalVisible(false)}
         >
-          <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: palette.text }}>Comments</Text>
               <Pressable onPress={() => setCommentsModalVisible(false)} hitSlop={10}>
@@ -1099,7 +1100,7 @@ export default function ChannelContentDetailPage() {
                 onChangeText={setClipTitle}
                 placeholder="Give your clip a name…"
                 placeholderTextColor={palette.subtext}
-                style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}
+                style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, }]}
               />
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -1109,7 +1110,7 @@ export default function ChannelContentDetailPage() {
                   value={clipStart}
                   onChangeText={setClipStart}
                   keyboardType="number-pad"
-                  style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}
+                  style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, }]}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -1118,7 +1119,7 @@ export default function ChannelContentDetailPage() {
                   value={clipEnd}
                   onChangeText={setClipEnd}
                   keyboardType="number-pad"
-                  style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}
+                  style={[styles.clipInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.bg, }]}
                 />
               </View>
             </View>

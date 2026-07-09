@@ -16,6 +16,7 @@ import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import type { KISPalette } from '@/theme/constants';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import Video from 'react-native-video';
 import { popularLanguages } from '../profile/profile.constants';
 import type { ItemType } from '../profile/profile.types';
@@ -116,6 +117,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
     deletingGalleryItemId = null,
   } = props;
   const responsive = useResponsiveLayout();
+  const topInset = useSafeTopInset();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightboxVisible, setLightboxVisible] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -674,7 +676,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
           <View
             style={{
               position: 'absolute',
-              top: 48,
+              top: topInset + 8,
               left: 14,
               right: 14,
               flexDirection: 'row',

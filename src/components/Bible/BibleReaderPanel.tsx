@@ -2108,7 +2108,7 @@ export default function BibleReaderPanel({
   return (
     <View style={styles.readerRoot}>
       <View
-        style={[styles.stickyReaderHeaderWrap, { backgroundColor: palette.bg, marginTop: 25 }]}
+        style={[styles.stickyReaderHeaderWrap, { backgroundColor: palette.bg, }]}
       >
         <View
           style={[

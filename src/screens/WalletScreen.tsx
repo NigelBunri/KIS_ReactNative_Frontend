@@ -17,6 +17,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { KISIcon } from '@/constants/kisIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ type MyCoinsTabProps = {
 
 function MyCoinsTab({ palette, refreshing, onRefresh, onScrollToEarn, onScrollToSpend }: MyCoinsTabProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [coinsData, setCoinsData] = useState<CoinsBalance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -244,6 +246,7 @@ type EarnTabProps = {
 
 function EarnTab({ palette, refreshing, onRefresh, scrollRef }: EarnTabProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [rules, setRules] = useState<LoyaltyRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -348,6 +351,7 @@ type HistoryTabProps = {
 
 function HistoryTab({ palette, refreshing, onRefresh, scrollRef }: HistoryTabProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [activities, setActivities] = useState<LoyaltyActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -450,6 +454,7 @@ type BillingTabProps = {
 
 function BillingTab({ palette, refreshing, onRefresh }: BillingTabProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -593,7 +598,7 @@ export default function WalletScreen() {
   ];
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: palette.divider }]}>
         <Pressable

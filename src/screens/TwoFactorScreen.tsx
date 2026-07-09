@@ -11,13 +11,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type TwoFactorStatus = {
   enabled: boolean;
@@ -33,7 +34,7 @@ type Props = {
 
 export default function TwoFactorScreen({ onBack }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +124,7 @@ export default function TwoFactorScreen({ onBack }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.root, styles.centered, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator color={palette.primary} />
       </View>
     );
@@ -131,7 +132,7 @@ export default function TwoFactorScreen({ onBack }: Props) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.headerRow, { borderBottomColor: palette.divider }]}>
         {onBack && (
           <Pressable onPress={onBack} style={styles.backBtn}>

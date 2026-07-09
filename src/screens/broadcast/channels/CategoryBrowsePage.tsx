@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -21,6 +21,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ type Props = {
 export default function CategoryBrowsePage(props: Props) {
   const { palette } = useKISTheme();
   const { pageGutter, cardGap, columns } = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CategoryBrowsePage'>>();
 
@@ -153,7 +154,7 @@ export default function CategoryBrowsePage(props: Props) {
 
   if (loading && contents.length === 0 && categories.length === 0) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: topInset }]}>
         <ActivityIndicator color={palette.primaryStrong} size="large" />
       </View>
     );
@@ -161,7 +162,7 @@ export default function CategoryBrowsePage(props: Props) {
 
   if (error) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+      <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: topInset }]}>
         <Text style={[styles.errorText, { color: palette.subtext }]}>{error}</Text>
       </View>
     );
@@ -194,7 +195,7 @@ export default function CategoryBrowsePage(props: Props) {
 
     const numColumns = Math.max(2, columns.dense);
     return (
-      <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor: palette.card, paddingTop: topInset }]}>
         <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>Browse Categories</Text>
         <FlatList
           key={`category-cols-${numColumns}`}
@@ -243,7 +244,7 @@ export default function CategoryBrowsePage(props: Props) {
   const numColumns = Math.max(2, columns.dense);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: topInset }]}>
       {categoryName ? (
         <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>{categoryName}</Text>
       ) : null}

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export default function PremiereCountdown({
   const { palette } = useKISTheme();
   const styles = useMemo(() => makeStyles(palette), [palette]);
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [remaining, setRemaining] = useState(() => secondsUntil(scheduledAt));
   const isLive = remaining <= 0;
   const [reminderSet, setReminderSet] = useState(false);
@@ -108,7 +110,7 @@ export default function PremiereCountdown({
   }, [scheduledAt, isLive]);
 
   const Inner = (
-    <View style={[styles.inner, { paddingTop: 16 + insets.top, paddingBottom: 16 + insets.bottom }]}>
+    <View style={[styles.inner, { paddingTop: 16 + topInset, paddingBottom: 16 + insets.bottom }]}>
       {/* Back */}
       <Pressable onPress={onBack} style={styles.backBtn}>
         <Text style={styles.backArrow}>‹</Text>

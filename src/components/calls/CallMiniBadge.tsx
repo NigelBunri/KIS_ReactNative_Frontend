@@ -10,11 +10,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useSocket } from '@/SocketProvider';
 import { callTypeIcon } from '@/services/calls/callTypes';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   /** Called when the badge is tapped — parent should restore the full call UI */
@@ -23,7 +24,7 @@ type Props = {
 
 export default function CallMiniBadge({ onRestore }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { activeCall, leaveCall } = useSocket();
 
   const slideAnim = useRef(new Animated.Value(-80)).current;
@@ -68,7 +69,7 @@ export default function CallMiniBadge({ onRestore }: Props) {
       style={[
         styles.badge,
         {
-          top: insets.top + 4,
+          top: topInset + 4,
           backgroundColor: palette.royalInk,
           borderColor: `${palette.success}80`,
           transform: [{ translateY: slideAnim }],

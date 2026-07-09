@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -196,7 +196,7 @@ export default function DiscipleshipScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     center: { alignItems: 'center', justifyContent: 'center' },
     scroll: { padding: sp, paddingBottom: 80 },
     screenTitle: { fontSize: 26, fontWeight: '700', color: palette.text, marginBottom: 4 },
@@ -223,7 +223,7 @@ function makeStyles(palette: any, layout: any) {
     },
     stepCircleCompleted: { backgroundColor: palette.primary, borderColor: palette.primary },
     stepCircleCurrent: { backgroundColor: palette.primaryStrong, borderColor: palette.primaryStrong },
-    stepCircleFuture: { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.divider },
+    stepCircleFuture: { backgroundColor: palette.bg, borderColor: palette.divider },
     stepLine: { width: 2, height: 28, backgroundColor: palette.divider, marginTop: 2 },
     stepLineCompleted: { backgroundColor: palette.primary },
     stepNum: { fontSize: 12, fontWeight: '700', color: palette.subtext },

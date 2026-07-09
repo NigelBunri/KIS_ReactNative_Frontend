@@ -38,7 +38,6 @@ import {
   ImageBackground,
 } from 'react-native';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -119,6 +118,7 @@ import type { DisappearDuration } from './componets/main/DisappearingTimerSheet'
 import { saveWallpaper, loadWallpaper, WALLPAPER_OPTIONS } from './componets/main/WallpaperPickerSheet';
 import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
 import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -222,12 +222,12 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /* ------------------------------------------------------------------------ */
 
   const { palette, isDark } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const rawTopInset = useSafeTopInset();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const topInset =
     typeof safeAreaTopInsetOverride === 'number'
       ? safeAreaTopInsetOverride
-      : insets.top;
+      : rawTopInset;
 
   /* ------------------------------------------------------------------------ */
   /*                               AUTH CONTEXT                                */

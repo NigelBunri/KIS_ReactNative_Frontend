@@ -13,7 +13,8 @@ import {
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { useKISTheme } from '@/theme/useTheme';
@@ -344,7 +345,7 @@ export default function DeviceManagementScreen() {
           {isRenaming ? (
             <View style={styles.renameRow}>
               <TextInput
-                style={[styles.renameInput, { backgroundColor: palette.bg, marginTop: 25, borderColor: palette.primary, color: palette.text }]}
+                style={[styles.renameInput, { backgroundColor: palette.bg, borderColor: palette.primary, color: palette.text }]}
                 value={renameValue}
                 onChangeText={setRenameValue}
                 placeholder="Device nickname"
@@ -419,7 +420,7 @@ export default function DeviceManagementScreen() {
   const hasSecondary = secondaryDevices.length > 0;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>

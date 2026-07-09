@@ -21,6 +21,7 @@ import Skeleton from '@/components/common/Skeleton';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Community = {
   id: string;
@@ -60,6 +61,7 @@ export default function CommunityRoomPage({
 }: CommunityRoomPageProps) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -201,7 +203,7 @@ export default function CommunityRoomPage({
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable onPress={onBack} style={styles.headerButton}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />

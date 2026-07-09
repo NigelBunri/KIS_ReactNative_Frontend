@@ -15,6 +15,7 @@ import type { CallParticipant } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
 import NetworkQualityBars from './NetworkQualityBars';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   participants: CallParticipant[];
@@ -45,6 +46,7 @@ const buildRoleColor = (p: any): Record<string, string> => ({
 export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant, onPromote }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const ROLE_COLOR = buildRoleColor(palette);
   const slideAnim = useRef(new Animated.Value(0)).current;
 

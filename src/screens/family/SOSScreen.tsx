@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -101,7 +101,7 @@ export default function SOSScreen({ navigation }: Props) {
 
   if (sent) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <View style={[styles.successContainer, { paddingHorizontal: gutter }]}>
           <View style={[styles.successIconCircle, { backgroundColor: palette.primarySoft }]}>
             <KISIcon name="checkmark-circle" size={72} color={palette.primary} />
@@ -122,7 +122,7 @@ export default function SOSScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <View style={[styles.container, { paddingHorizontal: gutter }]}>
         {/* Back */}
         <TouchableOpacity

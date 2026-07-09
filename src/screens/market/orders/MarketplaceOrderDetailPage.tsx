@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker, {
@@ -27,6 +27,7 @@ import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RootStackParamList } from '@/navigation/types';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   backendCentsToUsd,
   backendOrderTotalToUsd,
@@ -53,7 +54,7 @@ const receiptFilePath = (orderId: string) =>
 
 export default function MarketplaceOrderDetailPage() {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<MarketplaceOrderDetailNavigation>();
   const route = useRoute<MarketplaceOrderDetailRoute>();
   const { orderId, mode } = route.params;
@@ -242,7 +243,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
@@ -250,7 +251,7 @@ export default function MarketplaceOrderDetailPage() {
 
   if (error) {
     return (
-      <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, padding: 16 }]}>
+      <View style={[styles.root, { backgroundColor: palette.bg, padding: 16 }]}>
         <Text style={{ color: palette.text }}>{error}</Text>
       </View>
     );
@@ -274,7 +275,7 @@ export default function MarketplaceOrderDetailPage() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}
+      style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}
       contentContainerStyle={styles.scrollContent}
     >
       <View

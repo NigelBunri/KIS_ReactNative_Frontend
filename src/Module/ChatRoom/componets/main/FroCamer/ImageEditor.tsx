@@ -10,7 +10,7 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { KISIcon } from '@/constants/kisIcons';
 import { KISPalette, KIS_TOKENS } from '@/theme/constants';
 import { editorStyles } from './ImageEditor.styles';
@@ -278,7 +278,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       onRequestClose={onClose}
     >
       <SafeAreaView
-        style={[editorStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}
+        style={[editorStyles.root, { backgroundColor: palette.bg, }]}
         edges={['top']}
       >
         {/* CANVAS */}

@@ -33,6 +33,7 @@ import {
   getFeedRichTextValue,
 } from '@/components/feeds/richTextValue';
 import { wasNativeShareCompleted } from '@/utils/shareCompletion';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const REACTION_EVENT = 'broadcast.reaction';
 
@@ -85,7 +86,6 @@ const getFeedSource = (item: any) =>
 
 const getFeedBody = (item: any) => getFeedPlainText(item) || item?.body || '';
 
-
 const getChannelContentId = (item: any): string | null => {
   const value =
     item?.channel_content_id ??
@@ -116,6 +116,7 @@ export default function BroadcastDetailScreen() {
     >();
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { height: screenHeight } = useWindowDimensions();
   const swipeY = React.useRef(new Animated.Value(0)).current;
 
@@ -630,7 +631,7 @@ export default function BroadcastDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator size="large" color={palette.primary} />
       </View>
     );
@@ -638,7 +639,7 @@ export default function BroadcastDetailScreen() {
 
   if (error) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <Text style={[styles.error, { color: palette.text }]}>{error}</Text>
         {deepLinkId ? (
           <Pressable
@@ -664,7 +665,7 @@ export default function BroadcastDetailScreen() {
 
   if (!broadcastItem) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <Text style={[styles.error, { color: palette.text }]}>
           Broadcast not found.
         </Text>
@@ -715,7 +716,7 @@ export default function BroadcastDetailScreen() {
           </View>
           <View style={styles.scrimTop} pointerEvents="none" />
           <View style={styles.scrimBottom} pointerEvents="none" />
-          <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+          <View style={[styles.topBar, { paddingTop: topInset + 10 }]}>
             <View style={styles.backButton}>
               <KISIcon name="arrow-left" size={22} color={palette.ivory} />
             </View>
@@ -772,7 +773,7 @@ export default function BroadcastDetailScreen() {
           </View>
           <View style={styles.scrimTop} pointerEvents="none" />
           <View style={styles.scrimBottom} pointerEvents="none" />
-          <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+          <View style={[styles.topBar, { paddingTop: topInset + 10 }]}>
             <View style={styles.backButton}>
               <KISIcon name="arrow-left" size={22} color={palette.ivory} />
             </View>
@@ -857,7 +858,7 @@ export default function BroadcastDetailScreen() {
         <View style={styles.scrimTop} pointerEvents="none" />
         <View style={styles.scrimBottom} pointerEvents="none" />
 
-        <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+        <View style={[styles.topBar, { paddingTop: topInset + 10 }]}>
           <Pressable
             onPress={() => navigation.goBack()}
             style={styles.backButton}
@@ -1012,7 +1013,7 @@ export default function BroadcastDetailScreen() {
           <Pressable
             onPress={closeImageModal}
             hitSlop={12}
-            style={[styles.imageModalClose, { top: insets.top + 12 }]}
+            style={[styles.imageModalClose, { top: topInset + 12 }]}
           >
             <KISIcon name="close" size={26} color={palette.ivory} />
           </Pressable>

@@ -10,7 +10,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useRoute } from '@react-navigation/native';
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -224,7 +224,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
   const availableChannels = CHANNEL_ORDER.filter(ch => channels?.[ch as keyof Channels]);
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <StatusBar
         barStyle={tone === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={palette.bg}
@@ -243,7 +243,7 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}
+        contentContainerStyle={[styles.container, { backgroundColor: palette.bg, }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerBlock}>

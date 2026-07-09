@@ -30,6 +30,7 @@ import Video from 'react-native-video';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { KISIcon } from '@/constants/kisIcons';
@@ -229,6 +230,7 @@ export default function BroadcastFeedSection({
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const topInset = useSafeTopInset();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation();
   const mediaHeaders = useMediaHeaders();
@@ -1765,7 +1767,7 @@ export default function BroadcastFeedSection({
     : [];
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, }}>
       {/* Body */}
       {mainSection === 'feed' && renderFeedBody()}
       {mainSection === 'market' && renderMarketBody()}
@@ -1788,7 +1790,7 @@ export default function BroadcastFeedSection({
         statusBarTranslucent
         onRequestClose={closeVideoModal}
       >
-        <View style={styles.videoModal}>
+        <View style={[styles.videoModal, { paddingTop: topInset }]}>
           {currentVideoBundle ? (
             <>
               <Animated.View
@@ -1797,7 +1799,7 @@ export default function BroadcastFeedSection({
               >
                 <Pressable
                   onPress={closeVideoModal}
-                  style={[styles.videoCloseButton, { left: responsive.pageGutter, width: compact ? 38 : 44, height: compact ? 38 : 44, borderRadius: compact ? 19 : 22 }]}
+                  style={[styles.videoCloseButton, { top: 12, left: responsive.pageGutter, width: compact ? 38 : 44, height: compact ? 38 : 44, borderRadius: compact ? 19 : 22 }]}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <KISIcon name="close" size={24} color="#fff" />

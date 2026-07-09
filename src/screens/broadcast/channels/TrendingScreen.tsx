@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -20,6 +20,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 export default function TrendingScreen({ onPressContent }: Props) {
   const { palette } = useKISTheme();
   const { pageGutter, cardGap, minTouchTarget, columns } = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handlePressContent = useCallback((contentId: string) => {
@@ -178,7 +179,7 @@ export default function TrendingScreen({ onPressContent }: Props) {
   const numColumns = Math.max(2, columns.dense);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: palette.card, paddingTop: topInset }]}>
       {/* Period selector */}
       <View style={[styles.pillRow, { padding: pageGutter, gap: cardGap / 1.5 }]}>
         {PERIODS.map(p => {

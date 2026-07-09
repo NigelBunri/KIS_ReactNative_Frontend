@@ -15,7 +15,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Invoice = {
   id: string;
@@ -133,7 +133,7 @@ export default function InvoiceListScreen() {
   }, [fetchInvoices]);
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: palette.bg, }]}>
       <View style={[s.header, { borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={() => navigation.goBack()}

@@ -33,6 +33,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const LAST_ADDRESS_KEY = '@kis:last_shipping_address';
 
@@ -54,6 +55,7 @@ type CartDetailNavigation = NativeStackNavigationProp<
 const CartDetailPage = () => {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<CartDetailNavigation>();
   const route = useRoute<CartDetailRoute>();
   const shopId = route.params?.shopId;
@@ -412,7 +414,7 @@ const CartDetailPage = () => {
       <View
         style={[
           cartDetailStyles.root,
-          { backgroundColor: palette.bg, marginTop: 25, padding: 16 },
+          { backgroundColor: palette.bg, padding: 16 },
         ]}
       >
         <Text
@@ -433,7 +435,7 @@ const CartDetailPage = () => {
   }
 
   return (
-    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[cartDetailStyles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View
         style={[
           cartDetailStyles.header,

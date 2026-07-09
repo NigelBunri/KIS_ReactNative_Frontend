@@ -40,7 +40,7 @@ import {
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { nanoid } from 'nanoid/non-secure';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthInstitutionManagement'>;
 
@@ -537,7 +537,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient
           colors={[palette.gradientStart, palette.gradientEnd]}
           style={{
@@ -562,7 +562,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView

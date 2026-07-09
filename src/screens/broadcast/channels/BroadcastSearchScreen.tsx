@@ -16,7 +16,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -25,6 +25,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ export default function BroadcastSearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { palette } = useKISTheme();
   const { pageGutter, cardGap, minTouchTarget, columns } = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const initialQuery: string = route.params?.query ?? '';
 

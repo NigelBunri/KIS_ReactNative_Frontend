@@ -23,12 +23,14 @@ import ROUTES from '@/network';
 
 import type { RootStackParamList } from '@/navigation/types';
 import type { AdminUser, AdminUsersPagination } from '@/screens/tabs/partners/useAdminUsersPanel';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const TIERS = ['Free', 'Pro', 'Business', 'Business Pro', 'Partner', 'Partner Pro'];
 
 export default function AdminUserManagementScreen() {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -185,7 +187,7 @@ export default function AdminUserManagementScreen() {
   const styles = createStyles(palette, responsive);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>

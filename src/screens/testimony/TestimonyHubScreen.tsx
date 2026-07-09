@@ -19,6 +19,7 @@ import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useProfileController } from '@/screens/tabs/profile/useProfileController';
 import { useAuth } from '../../../App';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const CATEGORY_LABELS: Record<string, string> = {
   health: 'Health & Medical',
@@ -59,6 +60,7 @@ export default function TestimonyHubScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { setAuth, setPhone, callingCode } = useAuth();
   const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
   const currentUserId = useMemo(() => {
@@ -143,9 +145,9 @@ export default function TestimonyHubScreen() {
   const activeSeasons = useMemo(() => seasons.filter(s => s?.is_active !== false), [seasons]);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg, }]} edges={['top']}>
       <ScrollView
-        style={{ backgroundColor: palette.bg, marginTop: 25 }}
+        style={{ backgroundColor: palette.bg, }}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />
@@ -254,7 +256,7 @@ export default function TestimonyHubScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.stickyBar, { backgroundColor: palette.bg, marginTop: 25, borderTopColor: palette.divider, paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.stickyBar, { backgroundColor: palette.bg, borderTopColor: palette.divider, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <Pressable
           onPress={() => navigation.navigate('TestimonyReachInbox')}
           style={[styles.inboxBtn, { backgroundColor: palette.primaryStrong }]}

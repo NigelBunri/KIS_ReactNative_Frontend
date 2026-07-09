@@ -15,6 +15,8 @@ import {
   Platform,
   useWindowDimensions,
   DeviceEventEmitter,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -39,6 +41,7 @@ import { useSocket } from '../../../SocketProvider';
 import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
 import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Community = {
   id: string;
@@ -73,11 +76,13 @@ type Group = {
 
 type CommunitiesTabProps = {
   onOpenChat?: (chat: Chat) => void;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
-export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
+export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { width } = useWindowDimensions();
   const responsive = useResponsiveLayout();
   const { currentUserId } = useSocket();
@@ -618,7 +623,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
   }, [selected, palette.text, palette.danger, palette.error, responsive.headerTitleSize, searchPublicCommunities, handleLeaveSelectedCommunity]);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}> 
+    <View style={[styles.container, { backgroundColor: palette.bg, }]}> 
       {header}
       {loading ? (
         <View style={{ padding: 16, gap: 12 }}>
@@ -678,6 +683,8 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                 </Pressable>
               </View>
               <FlatList
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 data={posts}
                 keyExtractor={(item) => item.id}
                 ListEmptyComponent={
@@ -706,6 +713,8 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
                 <Text style={{ color: palette.bg, fontWeight: '600' }}>Create Group</Text>
               </Pressable>
               <FlatList
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 data={groups}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
@@ -733,6 +742,8 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
         </View>
       ) : (
         <FlatList
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           data={communities}
           keyExtractor={(item) => item.id}
           onEndReached={() => {
@@ -909,7 +920,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
           styles.overlay,
           {
             transform: [{ translateX: communitySlide }],
-            backgroundColor: palette.bg, marginTop: 25,
+            backgroundColor: palette.bg,
             zIndex: 10,
           },
         ]}
@@ -930,7 +941,7 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
           styles.overlay,
           {
             transform: [{ translateX: infoSlide }],
-            backgroundColor: palette.bg, marginTop: 25,
+            backgroundColor: palette.bg,
             zIndex: 11,
           },
         ]}
@@ -947,8 +958,8 @@ export default function CommunitiesTab({ onOpenChat }: CommunitiesTabProps) {
 
       {/* ── Discover Communities Modal ── */}
       <Modal visible={discoverVisible} animationType="slide" onRequestClose={() => setDiscoverVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
-          <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder, paddingTop: insets.top }]}>
+        <View style={{ flex: 1, backgroundColor: palette.bg, }}>
+          <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder, paddingTop: topInset }]}>
             <Pressable onPress={() => setDiscoverVisible(false)} style={styles.iconBtn}>
               <KISIcon name="close" size={20} color={palette.text} />
             </Pressable>

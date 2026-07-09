@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -98,7 +98,7 @@ export default function PetitionDetailScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
@@ -106,7 +106,7 @@ export default function PetitionDetailScreen({ route }: Props) {
 
   if (!petition) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <View style={styles.emptyState}>
           <Text style={[styles.emptyText, { color: palette.subtext }]}>
             Petition not found.
@@ -129,7 +129,7 @@ export default function PetitionDetailScreen({ route }: Props) {
       : palette.gold;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: gutter,

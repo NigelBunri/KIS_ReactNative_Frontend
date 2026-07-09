@@ -19,12 +19,14 @@ import { useBroadcastFeed } from '@/hooks/useBroadcastFeed';
 import { useKISTheme } from '@/theme/useTheme';
 
 import type { FeedsStackParamList } from './FeedsNavigator';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const REACTION_EVENT = 'broadcast.reaction';
 
 export default function FeedsListScreen() {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation =
     useNavigation<
       NativeStackNavigationProp<FeedsStackParamList, 'FeedsList'>

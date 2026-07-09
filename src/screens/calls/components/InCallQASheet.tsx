@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { QAQuestion } from '@/services/calls/callTypes';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   visible: boolean;
@@ -32,6 +33,7 @@ export default function InCallQASheet({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const slideAnim = useRef(new Animated.Value(500)).current;
   const [mounted, setMounted] = useState(visible);
   const [text, setText] = useState('');

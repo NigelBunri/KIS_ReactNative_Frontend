@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -114,7 +114,7 @@ export default function PasswordChangeScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]}>
       <View
         style={[
           styles.header,

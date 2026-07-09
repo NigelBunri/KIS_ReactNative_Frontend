@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -176,23 +175,10 @@ export default function ComplianceSettingsScreen() {
     );
   }, []);
 
-  const openURL = useCallback(async (url: string, label: string) => {
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert(label, 'Unable to open this link.');
-      }
-    } catch {
-      Alert.alert(label, 'Unable to open this link.');
-    }
-  }, []);
-
   const styles = createStyles(palette, responsive);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>
@@ -402,7 +388,7 @@ export default function ComplianceSettingsScreen() {
               styles.row,
               pressed && { backgroundColor: palette.surfaceElevated },
             ]}
-            onPress={() => openURL('https://kisapp.com/privacy', 'Privacy Policy')}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
           >
             <View style={styles.rowContent}>
               <Text style={[styles.rowTitle, { color: palette.text }]}>Privacy Policy</Text>

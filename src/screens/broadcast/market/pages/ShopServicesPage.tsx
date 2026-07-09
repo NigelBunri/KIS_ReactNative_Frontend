@@ -290,7 +290,7 @@ const ShopServicesPage = () => {
 
   if (!shopId) {
     return (
-      <View style={[serviceStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[serviceStyles.root, { backgroundColor: palette.bg, }]}>
         <Text
           style={[
             serviceStyles.errorText,
@@ -304,7 +304,7 @@ const ShopServicesPage = () => {
   }
 
   return (
-    <View style={[serviceStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[serviceStyles.root, { backgroundColor: palette.bg, }]}>
       <View
         style={[
           serviceStyles.header,

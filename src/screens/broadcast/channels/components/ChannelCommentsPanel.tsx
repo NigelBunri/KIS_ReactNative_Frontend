@@ -156,7 +156,7 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         )}
       </View>
       {editMode ? (
-        <View style={[styles.editInputRow, { borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}>
+        <View style={[styles.editInputRow, { borderColor: palette.border, backgroundColor: palette.bg, }]}>
           <TextInput
             value={editText}
             onChangeText={setEditText}
@@ -232,7 +232,7 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         </Pressable>
       </View>
       {replyOpen && (
-        <View style={[styles.replyInputRow, { borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}>
+        <View style={[styles.replyInputRow, { borderColor: palette.border, backgroundColor: palette.bg, }]}>
           <TextInput
             value={replyText}
             onChangeText={setReplyText}
@@ -378,7 +378,7 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
           </Pressable>
         ))}
       </View>
-      <View style={[styles.inputRow, { borderColor: palette.border, backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.inputRow, { borderColor: palette.border, backgroundColor: palette.bg, }]}>
         <TextInput
           value={body}
           onChangeText={setBody}

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import LinearGradient from 'react-native-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -88,7 +88,7 @@ export default function GovernmentHubScreen({ navigation }: Props) {
   const cardSize = (layout.width - gutter * 2 - layout.cardGap) / 2;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Header */}
         <LinearGradient

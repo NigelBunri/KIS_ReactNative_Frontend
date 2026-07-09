@@ -11,18 +11,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PartnerRedeemInvite'>;
 
 export default function PartnerRedeemInviteScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const [code, setCode] = useState(route.params?.code ?? '');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -65,7 +66,7 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.surface }]}
+      style={[styles.container, { paddingTop: topInset, backgroundColor: palette.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk }]}>

@@ -8,7 +8,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { Asset as ImagePickerAsset } from 'react-native-image-picker';
 import Video from 'react-native-video';
 
@@ -162,7 +162,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
       onRequestClose={onClose}
     >
       <SafeAreaView
-        style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}
+        style={[styles.root, { backgroundColor: palette.bg, }]}
         edges={['top']}
       >
         {/* HEADER */}

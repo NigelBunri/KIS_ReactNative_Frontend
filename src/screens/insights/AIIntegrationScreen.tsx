@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -301,7 +301,7 @@ function JobsTab({ palette }: { palette: any }) {
         presentationStyle="pageSheet"
         onRequestClose={() => setSelected(null)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]} numberOfLines={1}>
               {selected?.name ?? `Job ${selected?.id}`}
@@ -467,7 +467,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowNew(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>New QnA Session</Text>
             <Pressable onPress={() => setShowNew(false)} style={styles.modalClose}>
@@ -510,7 +510,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
         presentationStyle="pageSheet"
         onRequestClose={() => setSelected(null)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Session Detail</Text>
             <Pressable onPress={() => setSelected(null)} style={styles.modalClose}>
@@ -841,7 +841,7 @@ export default function AIIntegrationScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('Models');
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.screenTitle, { color: palette.text }]}>AI Integration</Text>

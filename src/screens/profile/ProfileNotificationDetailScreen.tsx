@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -20,7 +20,7 @@ export default function ProfileNotificationDetailScreen() {
   }, [route.params?.notificationId]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
         <View style={{ gap: 6 }}>
           <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>

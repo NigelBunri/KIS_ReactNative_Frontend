@@ -1,15 +1,16 @@
 // src/screens/calls/components/NetworkQualityBanner.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import type { NetworkQuality } from '@/services/calls/callTypes';
 import { useKISTheme } from '@/theme/useTheme';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = { quality: NetworkQuality; isAudioOnly?: boolean };
 
 export default function NetworkQualityBanner({ quality, isAudioOnly = false }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const opacity = useRef(new Animated.Value(0)).current;
   const show = quality === 1 || quality === 2 || isAudioOnly;
 
@@ -49,7 +50,7 @@ export default function NetworkQualityBanner({ quality, isAudioOnly = false }: P
   }
 
   return (
-    <Animated.View style={[styles.banner, { backgroundColor: bg, opacity, paddingTop: insets.top + 8 }]}>
+    <Animated.View style={[styles.banner, { backgroundColor: bg, opacity, paddingTop: topInset + 8 }]}>
       <Text style={[styles.text, { color: textColor }]}>{msg}</Text>
     </Animated.View>
   );

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { InsightPayload, TimeRange } from '@/api/insights/types';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   BarChart,
   DonutChart,
@@ -38,12 +39,12 @@ export default function InsightLayout({
   footer,
 }: Props) {
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { bodyFontSize, labelFontSize, headerTitleSize, pageGutter } = useResponsiveLayout();
   const displayEmpty = !loading && !error && !data;
   return (
     <ScrollView
-      style={[styles.container, { paddingTop: insets.top + 12 }]}
+      style={[styles.container, { paddingTop: topInset + 12 }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={palette.primary} />}
     >
       <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize }]}>{title}</Text>

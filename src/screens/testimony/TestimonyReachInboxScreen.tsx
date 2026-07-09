@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -254,8 +254,8 @@ export default function TestimonyReachInboxScreen() {
   const currentList = activeTab === 'for_you' ? received : sent;
 
   return (
-    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, }]} edges={['top']}>
+      <View style={[styles.header, { backgroundColor: palette.bg, }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
@@ -283,7 +283,7 @@ export default function TestimonyReachInboxScreen() {
       </View>
 
       <ScrollView
-        style={{ backgroundColor: palette.bg, marginTop: 25 }}
+        style={{ backgroundColor: palette.bg, }}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />

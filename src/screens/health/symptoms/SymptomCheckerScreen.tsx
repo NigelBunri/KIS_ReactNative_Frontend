@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
@@ -267,7 +267,7 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
 
 function makeStyles(palette: any, sp: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

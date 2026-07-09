@@ -20,7 +20,6 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '../../theme/useTheme';
 import { useResponsiveLayout } from '../../theme/responsive';
@@ -38,6 +37,7 @@ import { uploadFileToBackend } from './uploadFileToBackend';
 import Skeleton from '@/components/common/Skeleton';
 import { getAccessToken } from '@/security/authStorage';
 import { useSocket } from '../../../SocketProvider';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type ChatInfoPageProps = {
   chat: Chat;
@@ -81,7 +81,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 }) => {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { startCall, socket } = useSocket();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(
@@ -816,7 +816,6 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     ? contactUser?.email ?? 'Hidden by privacy'
     : (directContact?.user as any)?.email || '—';
 
-
   const profileSections = publicProfile?.sections ?? {};
   const experienceItems = profileSections.experiences ?? [];
   const educationItems = profileSections.educations ?? [];
@@ -962,7 +961,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, paddingHorizontal: responsive.pageGutter }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.text} />

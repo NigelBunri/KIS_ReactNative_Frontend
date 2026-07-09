@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -79,7 +79,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator style={styles.flex} color={palette.gold} size="large" />
       </SafeAreaView>
     );
@@ -87,7 +87,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
 
   if (!family) {
     return (
-      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <View style={styles.emptyState}>
           <KISIcon name="people-outline" size={64} color={palette.subtext} />
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No Family Yet</Text>
@@ -115,7 +115,7 @@ export default function FamilyHubScreen({ navigation }: Props) {
   const overflow = (family.member_count ?? 0) - 5;
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Header */}
         <LinearGradient

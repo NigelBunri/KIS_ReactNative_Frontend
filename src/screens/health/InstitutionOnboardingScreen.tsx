@@ -11,6 +11,7 @@ import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const STEP_ORDER = ['identity', 'location', 'contact', 'media', 'compliance'];
 
@@ -156,6 +157,7 @@ const renderField = (
 
 export default function InstitutionOnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const { bodyFontSize, labelFontSize, headerTitleSize, minTouchTarget, pageGutter, cardGap } = useResponsiveLayout();
   const [selectedType, setSelectedType] = useState(allInstitutionTypes[0]);
@@ -412,7 +414,7 @@ export default function InstitutionOnboardingScreen() {
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: palette.bg, marginTop: 25,
+      backgroundColor: palette.bg,
     },
     mapText: {
       color: palette.text,
@@ -425,7 +427,7 @@ export default function InstitutionOnboardingScreen() {
   }), [palette, pageGutter, cardGap, minTouchTarget, headerTitleSize, bodyFontSize, labelFontSize]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <View style={[styles.container, { paddingTop: topInset, paddingBottom: Math.max(insets.bottom, 12) }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
         <View style={styles.typeSelectorRow}>
           {allInstitutionTypes.map((type) => (

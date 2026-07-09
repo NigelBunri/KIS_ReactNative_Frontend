@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { fromByteArray, toByteArray } from 'base64-js';
@@ -228,7 +229,44 @@ const signalStore = new SignalProtocolStore();
 
 const createDeviceId = () => `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+// iOS Keychain entries survive app deletion by default, so persisting the
+// device_id there (rather than AsyncStorage, which is wiped on uninstall)
+// means reinstalling on the same physical iPhone keeps the same device_id —
+// the backend still recognizes it as the primary device, no QR re-link
+// needed. Android app storage is wiped on uninstall regardless of backend
+// used (no Keychain-equivalent persistence there), so primary-device
+// recognition after reinstall comes from the SIM-number check instead
+// (see services/simInfo.ts) — this function stays on AsyncStorage for Android.
+const readSecureDeviceId = async (): Promise<string | null> => {
+  try {
+    return await EncryptedStorage.getItem(DEVICE_ID_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeSecureDeviceId = async (deviceId: string): Promise<boolean> => {
+  try {
+    await EncryptedStorage.setItem(DEVICE_ID_KEY, deviceId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const ensureDeviceId = async (): Promise<string> => {
+  if (Platform.OS === 'ios') {
+    let deviceId = await readSecureDeviceId();
+    if (!deviceId) {
+      // Migrate a value from an older app version that only used AsyncStorage,
+      // before falling back to generating a brand-new id.
+      deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+      if (!deviceId) deviceId = createDeviceId();
+      await writeSecureDeviceId(deviceId);
+    }
+    return deviceId;
+  }
+
   let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
     deviceId = createDeviceId();
@@ -243,7 +281,11 @@ export const rotateDeviceId = async (): Promise<string> => {
   storeCache = null;
   await EncryptedStorage.removeItem(STORE_KEY);
   await AsyncStorage.removeItem(E2EE_READY_KEY);
-  await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
+  if (Platform.OS === 'ios') {
+    await writeSecureDeviceId(deviceId);
+  } else {
+    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
   return deviceId;
 };
 

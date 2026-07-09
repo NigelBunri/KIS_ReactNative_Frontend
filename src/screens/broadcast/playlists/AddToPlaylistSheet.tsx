@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   addItemToPlaylist,
   createPlaylistAndAdd,
@@ -33,6 +34,7 @@ type Props = {
 export default function AddToPlaylistSheet({ item, visible, onClose }: Props) {
   const { palette, tokens } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const [playlists, setPlaylists] = useState<Playlist[]>(

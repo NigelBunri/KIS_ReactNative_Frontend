@@ -24,12 +24,12 @@ import {
 } from '@/services/socialRecommendationService';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   searchTerm?: string;
   searchContext?: string;
 };
-
 
 const initialsFor = (channel: BroadcastChannelSummary) =>
   String(channel.display_name || channel.handle || 'KC')
@@ -335,6 +335,7 @@ function RecommendationChip({
 export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 'all' }: Props) {
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();

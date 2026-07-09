@@ -30,6 +30,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { VirtualBgConfig } from '@/services/calls/virtualBgService';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 export type VirtualBgMode = 'none' | 'blur' | 'image';
 export type VirtualBgOption = {
@@ -57,6 +58,7 @@ export default function VirtualBackgroundSheet({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const slideAnim = useRef(new Animated.Value(400)).current;
   const [mounted, setMounted] = useState(visible);
   const [customImages, setCustomImages] = useState<VirtualBgOption[]>([]);

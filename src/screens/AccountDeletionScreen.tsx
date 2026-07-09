@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -80,7 +80,7 @@ export default function AccountDeletionScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]}>
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}

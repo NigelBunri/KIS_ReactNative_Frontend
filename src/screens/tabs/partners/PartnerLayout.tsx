@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
 import PartnersLeftRail from '@/components/partners/PartnersLeftRail';
@@ -13,6 +13,7 @@ import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import PartnerAppLaunchBar from '@/components/partners/PartnerAppLaunchBar';
 import { usePartnerOrganizationAppsContext } from '@/context/partners/PartnerOrganizationAppsContext';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   rootPanHandlers: Record<string, any>;
@@ -141,7 +142,10 @@ export default function PartnerLayout({
   const { palette, tone } = useKISTheme();
   // Gold header → dark icons (same as Messages + Broadcast + Bible)
   useStatusBarStyle(tone, 'dark-content');
-  const insets = useSafeAreaInsets();
+  // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
+  // is one of the 5 main-tab gold-header screens with its own hand-tuned
+  // spacing, so it reads the raw device inset instead.
+  const topInset = useSafeAreaInsets().top;
   const {
     apps: organizationApps,
     loading: organizationAppsLoading,
@@ -172,7 +176,7 @@ export default function PartnerLayout({
         onSelectPartner={setSelectedPartnerId}
         onAddPartnerPress={onAddPartnerPress}
         loading={partnersLoading}
-        topInset={insets.top}
+        topInset={topInset}
       />
 
       {/* ── Centre pane — golden header lives inside the scrollable content ── */}
@@ -197,7 +201,7 @@ export default function PartnerLayout({
         onOpenInsights={onOpenInsights}
         loading={partnersLoading}
         onRefresh={onRefreshPartner}
-        topInset={insets.top}
+        topInset={topInset}
       />
 
       {!isMessagesExpanded ? (

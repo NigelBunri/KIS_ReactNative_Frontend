@@ -13,6 +13,7 @@ import type { SimpleContact } from './componets/main/ForAttachments/ContactsModa
 import type { PollDraft } from './componets/main/ForAttachments/PollModal';
 import type { EventDraft } from './componets/main/ForAttachments/EventModal';
 import TypingIndicator, { type TypingUser } from './componets/main/TypingIndicator';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   chat: Chat | null;
@@ -167,6 +168,7 @@ export default function ChatRoomBody({
   onCallHistoryCallback,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const mentionMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -193,7 +195,7 @@ export default function ChatRoomBody({
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
       behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? topInset + keyboardOffset : 0}
     >
       <MessageList
         messages={messages}

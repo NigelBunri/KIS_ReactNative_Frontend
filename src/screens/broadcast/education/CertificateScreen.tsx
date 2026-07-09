@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
@@ -79,7 +79,7 @@ export default function CertificateScreen({ navigation }: Props) {
   };
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     header: { padding: sp, paddingBottom: sp + 4 },
     backBtn: {
       flexDirection: 'row',

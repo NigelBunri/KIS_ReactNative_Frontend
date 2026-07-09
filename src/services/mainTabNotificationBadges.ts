@@ -6,7 +6,6 @@ import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeCon
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import {
   fetchInAppNotifications,
-  fetchUnreadInAppNotificationsCount,
   IN_APP_NOTIFICATIONS_UPDATED_EVENT,
   InAppNotification,
 } from '@/services/inAppNotificationService';
@@ -130,14 +129,19 @@ export const fetchMainTabBadgeCounts = async (currentUserId?: string | null): Pr
   const backendCounts = await fetchBackendMainTabBadgeCounts().catch(() => null);
   if (backendCounts) return backendCounts;
 
-  const [notifications, profileUnread, conversations, missedBibleSchedules] = await Promise.all([
+  // fetchUnreadInAppNotificationsCount() previously ran alongside
+  // fetchInAppNotifications() here, but it calls fetchInAppNotifications()
+  // internally — every fallback-triggered badge refresh was hitting
+  // /notifications/ twice in parallel for the same data. The unread count
+  // is just the unread subset of the list we already fetch below.
+  const [notifications, conversations, missedBibleSchedules] = await Promise.all([
     fetchInAppNotifications().catch(() => []),
-    fetchUnreadInAppNotificationsCount().catch(() => 0),
     fetchConversationsForCurrentUser([], currentUserId ?? undefined, true).catch(() => []),
     countMissedBibleSchedules().catch(() => 0),
   ]);
 
   const unreadNotifications = notifications.filter((item) => !item.readAt);
+  const profileUnread = unreadNotifications.length;
   const bibleUnread = unreadNotifications.filter(isBibleNotification).length + missedBibleSchedules;
   const broadcastUnread = unreadNotifications.filter(isBroadcastNotification).length;
 

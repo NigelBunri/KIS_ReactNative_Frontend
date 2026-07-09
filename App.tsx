@@ -35,7 +35,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   RESULTS,
@@ -54,6 +53,7 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import TermsAndConditionsScreen from './src/screens/TermsAndConditionsScreen';
+import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
 import VerificationChannelSelectScreen from './src/screens/VerificationChannelSelectScreen';
 import TwoFactorScreen from './src/screens/TwoFactorScreen';
@@ -171,7 +171,6 @@ import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
 import { AgeModeProvider, useAgeMode } from '@/theme/ageModeContext';
 import { ThemeModeProvider, useThemeMode } from '@/theme/themeModeContext';
-import { KIS_COLORS } from '@/theme/constants';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
 import WalletScreen from '@/screens/WalletScreen';
@@ -191,8 +190,8 @@ import DeclareSeasonSheet from '@/screens/testimony/DeclareSeasonSheet';
 import DeclareTestimonySheet from '@/screens/testimony/DeclareTestimonySheet';
 import ReachOutSheet from '@/screens/testimony/ReachOutSheet';
 import TestimonyReachInboxScreen from '@/screens/testimony/TestimonyReachInboxScreen';
-import OfflineBanner from '@/components/OfflineBanner';
 import SyncQueueBanner from '@/components/SyncQueueBanner';
+import NetworkStatusPill from '@/components/common/NetworkStatusPill';
 import LinkedDevicesScreen from '@/screens/LinkedDevicesScreen';
 import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
 
@@ -286,6 +285,10 @@ import KingdomMusicScreen from '@/screens/broadcast/media_extended/KingdomMusicS
 import EbooksScreen from '@/screens/broadcast/media_extended/EbooksScreen';
 import PodcastsScreen from '@/screens/broadcast/media_extended/PodcastsScreen';
 import PPVEventsScreen from '@/screens/broadcast/media_extended/PPVEventsScreen';
+import { GoldenSectionProvider, useGoldenSection } from '@/contexts/GoldenSectionContext';
+import { GoldHeaderShell } from '@/components/common/GoldHeaderShell';
+import { useKISTheme } from '@/theme/useTheme';
+
 
 type AuthCtx = {
   isAuth: boolean;
@@ -311,21 +314,32 @@ const AuthContext = createContext<AuthCtx>({
 export const useAuth = () => useContext(AuthContext);
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
-// Empirical top-of-screen fudge factor, on top of the real measured insets.top
-// — see the root View's `top` style for where this is used and why. Each gold
-// screen needs its own amount (applying one shared value to all of them either
-// under- or over-corrects the rest), so this is keyed by bottom-tab route name.
-// Retune an individual entry here if that screen's gap reappears or overshoots;
-// nothing else should need to change. Routes not listed get 0 (insets.top only).
-const EXTRA_TOP_NUDGE_PX = 20
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
+
+// Single persistent gold-gradient header shell, hoisted above the navigator.
+// Whichever main tab is focused (Messages/Broadcast/Bible/Partners/Profile)
+// registers its own content via useGoldenSectionContent; renders nothing
+// when no gold screen is focused.
+function GoldenSection() {
+  const { payload } = useGoldenSection();
+  const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
+  if (!payload) return null;
+  return (
+    <View style={{ backgroundColor: palette.bg, marginTop: -(insets.top * 2.6) }}>
+      <GoldHeaderShell colors={payload.colors} style={payload.shellStyle}>
+        {payload.content}
+      </GoldHeaderShell>
+      <NetworkStatusPill />
+    </View>
+  );
+}
 
 function AppContent() {
   const { language, languageVersion } = useLanguage();
   const { ageVersion } = useAgeMode();
   const { themeMode } = useThemeMode();
-  const insets = useSafeAreaInsets();
   const sysScheme = useColorScheme();
   const scheme = themeMode === 'system' ? sysScheme : themeMode;
   // Start null so the gold gradient never flashes before navigation is ready.
@@ -334,6 +348,7 @@ function AppContent() {
   const [booting, setBooting] = useState(true);
 
   const navigationRef = useRef<any>(null);
+  const insets = useSafeAreaInsets();
 
   // getCurrentRoute() returns the deepest focused leaf route, not the bottom
   // tab. The Messages tab nests its own Tab.Navigator (Chats/Updates/Calls/
@@ -363,7 +378,7 @@ function AppContent() {
   }, []);
 
   // Bible, Partners, and Profile render the same "gradient reaches y=0, inner
-  // content pads by insets.top" header pattern as Messages/Broadcast, so they
+  // content pads by topInset" header pattern as Messages/Broadcast, so they
   // belong in this list too.
   const usesGoldStatusBar =
     activeRouteName === 'Messages' ||
@@ -371,11 +386,6 @@ function AppContent() {
     activeRouteName === 'Bible' ||
     activeRouteName === 'Partners' ||
     activeRouteName === 'Profile';
-  const statusBarBackground = usesGoldStatusBar
-    ? KIS_COLORS.brand.gold
-    : scheme === 'dark'
-      ? KIS_COLORS.dark.chrome
-      : KIS_COLORS.light.bg;
   const statusBarStyle = usesGoldStatusBar || scheme !== 'dark'
     ? 'dark-content'
     : 'light-content';
@@ -1042,48 +1052,22 @@ function AppContent() {
   return (
     <AuthContext.Provider value={ctx}>
       <SocketProvider>
-        <View
-          style={{
-            position: 'absolute',
-            // insets.top alone still leaves a residual gap, by a different amount
-            // per screen — see EXTRA_TOP_NUDGE_PX_BY_ROUTE above for where to
-            // retune an individual screen's value.
-            top: -(insets.top + EXTRA_TOP_NUDGE_PX),
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: statusBarBackground,
-          }}
-        >
+        <View style={{ flex: 1 }}>
           <StatusBar
             animated
             translucent
             backgroundColor="transparent"
             barStyle={statusBarStyle}
           />
-          {usesGoldStatusBar ? (
-            <LinearGradient
-              pointerEvents="none"
-              colors={[KIS_COLORS.brand.gold, KIS_COLORS.brand.goldDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[appStyles.statusBarBackdrop, { height: Math.max(insets.top, StatusBar.currentHeight ?? 0) }]}
-            />
-          ) : (
-            <View
-              pointerEvents="none"
-              style={[
-                appStyles.statusBarBackdrop,
-                {
-                  height: Math.max(insets.top, StatusBar.currentHeight ?? 0),
-                  backgroundColor: statusBarBackground,
-                },
-              ]}
-            />
-          )}
-          <OfflineBanner />
-          <SyncQueueBanner />
-          <NavigationContainer
+          <GoldenSection />
+          {/* Explicit zIndex so screen content (e.g. Profile's "overview" card,
+              which overlaps up into the Golden Section's bottom edge via a
+              negative marginTop) reliably paints above the gold header rather
+              than being tucked underneath it, regardless of platform stacking
+              defaults for plain siblings. */}
+          <View style={{ flex: 1, zIndex: 1 }}>
+            <SyncQueueBanner />
+            <NavigationContainer
             ref={navigationRef}
             onReady={syncActiveRoute}
             onStateChange={syncActiveRoute}
@@ -1093,18 +1077,42 @@ function AppContent() {
               : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } }
             }
             linking={{
-              prefixes: ['kis://', 'https://kis.app', 'kisapp://'],
+              prefixes: [
+                'kis://',
+                'kisapp://',
+                'https://kingdomimpactventures.org',
+                'https://www.kingdomimpactventures.org',
+                'https://kis.kingdomimpactventures.org',
+              ],
+
               config: {
                 screens: {
                   OrgAppLaunch: 'org-app/:partnerId/:appId',
+
                   InviteJoin: 'join/:type/:token',
-                  CallJoin: 'call/join/:token',
                   PartnerRedeemInvite: 'join/partner/:code',
+
+                  CallJoin: 'call/join/:token',
+
                   BroadcastDetail: 'broadcasts/:id',
+                  BroadcastCommentRoom: 'broadcasts/:id/comments',
+
                   ChannelHome: 'channels/:channelId',
                   ChannelContentDetail: 'content/:contentId',
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  MainTabs: { screens: { Messages: 'messages', Profile: 'profile' } } as any,
+
+                  ShopDetail: 'shops/:slug',
+                  ProductDetail: 'products/:slug',
+                  ServiceDetail: 'services/:slug',
+
+                  UserProfile: 'profiles/:id',
+                  ProfileByHandle: 'u/:handle',
+
+                  MainTabs: {
+                    screens: {
+                      Messages: 'messages',
+                      Profile: 'profile',
+                    },
+                  } as any,
                 },
               },
             }}
@@ -1405,6 +1413,11 @@ function AppContent() {
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
+                      name="PrivacyPolicy"
+                      component={PrivacyPolicyScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
                       name="DeviceManagement"
                       component={DeviceManagementScreen}
                     />
@@ -1673,6 +1686,11 @@ function AppContent() {
                       component={TermsAndConditionsScreen}
                       options={{ headerShown: false }}
                     />
+                    <RootStack.Screen
+                      name="PrivacyPolicy"
+                      component={PrivacyPolicyScreen}
+                      options={{ headerShown: false }}
+                    />
                     <RootStack.Screen name="Login" component={LoginScreen} />
                     <RootStack.Screen
                       name="Register"
@@ -1712,6 +1730,7 @@ function AppContent() {
             <MiniPlayer />
             </MiniPlayerProvider>
           </NavigationContainer>
+            </View>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
           {showQuickLock && isAuth ? (
@@ -1733,7 +1752,9 @@ export default function App() {
         <LanguageProvider>
           <ThemeModeProvider>
             <AgeModeProvider>
-              <AppContent />
+              <GoldenSectionProvider>
+                <AppContent />
+              </GoldenSectionProvider>
             </AgeModeProvider>
           </ThemeModeProvider>
         </LanguageProvider>
@@ -1741,16 +1762,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const appStyles = StyleSheet.create({
-  statusBarBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 0,
-  },
-});
 
 const locationStyles = StyleSheet.create({
   root: {

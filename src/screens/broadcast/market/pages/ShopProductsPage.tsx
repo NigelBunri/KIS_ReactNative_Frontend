@@ -285,7 +285,7 @@ const ShopProductsPage = () => {
 
   if (!shopId) {
     return (
-      <View style={[productStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[productStyles.root, { backgroundColor: palette.bg, }]}>
         <Text
           style={[
             productStyles.errorText,
@@ -299,7 +299,7 @@ const ShopProductsPage = () => {
   }
 
   return (
-    <View style={[productStyles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[productStyles.root, { backgroundColor: palette.bg, }]}>
       <View
         style={[
           productStyles.header,

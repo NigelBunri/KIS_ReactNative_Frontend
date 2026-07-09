@@ -451,6 +451,10 @@ export const KIS_TOKENS = {
     '3xl': 40,
   },
 
+  /** Breathing room added below the real safe-area top inset for screen
+   *  headers. Never hardcode top spacing — always `insets.top + this`. */
+  SCREEN_HEADER_TOP_PADDING: 12,
+
   radius: {
     sm: 8,
     md: 10,

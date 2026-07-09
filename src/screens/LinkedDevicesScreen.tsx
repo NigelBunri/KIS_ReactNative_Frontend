@@ -22,6 +22,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -68,6 +69,7 @@ function normaliseDevice(raw: any): LinkedDevice {
 
 export default function LinkedDevicesScreen() {
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation();
   const { socket } = useSocket();
   const { palette } = useKISTheme();
@@ -285,13 +287,13 @@ export default function LinkedDevicesScreen() {
   const nonCurrentCount = devices.filter(d => !d.current).length;
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, }]}>
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: topInset + 8,
             backgroundColor: palette.surface,
             borderBottomColor: palette.divider,
           },

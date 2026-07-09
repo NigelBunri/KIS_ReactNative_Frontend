@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import LinearGradient from 'react-native-linear-gradient';
 import { useColorScheme } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import { HealthInstitution } from './types';
 import { fetchHealthProfileState } from '@/services/healthProfileService';
 import Skeleton from '@/components/common/Skeleton';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
   canUserManageInstitution,
   filterInstitutionsForVisibleRoles,
@@ -41,7 +42,7 @@ export function InstitutionsListScreen({
   currentUser = null,
   onRefresh,
 }: InstitutionsListScreenProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
   const spacing = HEALTH_THEME_SPACING;
@@ -97,7 +98,7 @@ export function InstitutionsListScreen({
   return (
     <LinearGradient
       colors={[palette.gradientStart, palette.gradientEnd]}
-      style={{ flex: 1, paddingTop: insets.top }}
+      style={{ flex: 1, paddingTop: topInset }}
     >
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, flexGrow: 1 }}

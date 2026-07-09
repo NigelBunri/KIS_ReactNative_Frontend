@@ -9,7 +9,7 @@ import {
   RefreshControl,
   useColorScheme,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";

@@ -19,6 +19,7 @@ import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import { KISIcon } from '@/constants/kisIcons';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const RECENT_SEARCHES_KEY = 'kis_recent_searches';
 const MAX_RECENT = 8;
@@ -116,6 +117,7 @@ type Props = {
 export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const responsive = useResponsiveLayout();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -233,7 +235,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       {/* Search header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <View style={[styles.inputRow, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>

@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '@/navigation/types';
 import { setPIN } from '@/services/QuickLockService';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 
@@ -99,7 +99,7 @@ export default function SetupPINScreen() {
   const styles = useMemo(() => StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: palette.bg, marginTop: 25,
+      backgroundColor: palette.bg,
     },
     header: {
       paddingHorizontal: responsive.pageGutter,

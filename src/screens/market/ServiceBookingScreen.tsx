@@ -23,7 +23,7 @@ import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import {
   createDefaultAvailability,
   formatDateKey,
@@ -1586,7 +1586,7 @@ const ServiceBookingScreen = () => {
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
           justifyContent: 'center',
           alignItems: 'center',
         }}
@@ -1597,7 +1597,7 @@ const ServiceBookingScreen = () => {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <SectionCard

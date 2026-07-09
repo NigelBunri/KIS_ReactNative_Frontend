@@ -384,7 +384,7 @@ export default function CommunityFeedPage({
   }, [scrollToActivePost]);
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, }]}>
       <View
         style={[
           styles.header,

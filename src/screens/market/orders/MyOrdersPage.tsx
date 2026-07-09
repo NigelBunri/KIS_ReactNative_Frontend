@@ -25,6 +25,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteShopCart } from '@/screens/market/cart/shopCartManager';
 import { backendOrderTotalToUsd } from '@/utils/currency';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type MyOrdersNavigation = NativeStackNavigationProp<
   RootStackParamList,
@@ -45,6 +46,7 @@ type MarketplaceOrder = {
 export default function MyOrdersPage() {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const navigation = useNavigation<MyOrdersNavigation>();
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -359,7 +361,7 @@ export default function MyOrdersPage() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View
         style={[
           styles.header,

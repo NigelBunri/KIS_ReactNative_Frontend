@@ -5,6 +5,7 @@ import type { HealthInstitutionType } from '@/screens/tabs/profile-screen/types'
 export type RootStackParamList = {
   Welcome: undefined;
   TermsAndConditions: undefined;
+  PrivacyPolicy: undefined;
   Login: undefined;
   Register: undefined;
   TwoFactor: {

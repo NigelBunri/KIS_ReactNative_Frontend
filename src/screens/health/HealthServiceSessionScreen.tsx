@@ -113,7 +113,7 @@ import {
 } from '@/theme/health';
 import { useKISTheme } from '@/theme/useTheme';
 import { RootStackParamList } from '@/navigation/types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthServiceSession'>;
 
@@ -4037,7 +4037,7 @@ export default function HealthServiceSessionScreen({
   }, [cleanBookingId]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient
         colors={[palette.gradientStart, palette.gradientEnd]}
         style={{ flex: 1 }}

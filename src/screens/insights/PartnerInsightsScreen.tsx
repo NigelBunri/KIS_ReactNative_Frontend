@@ -34,7 +34,7 @@ export default function PartnerInsightsScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg, }}>
       <InsightLayout
         title="Partner insights"
         data={insights.data}

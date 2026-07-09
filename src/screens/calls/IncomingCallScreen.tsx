@@ -17,7 +17,7 @@ import type { CallSession } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { KISIcon } from '@/constants/kisIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 
 // Per call type, resolve accent from palette tokens only — no hardcoded hex.
@@ -109,7 +109,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
-      <View style={[styles.bg, { backgroundColor: palette.bg, marginTop: 25 }]}>
+      <View style={[styles.bg, { backgroundColor: palette.bg, }]}>
 
         {/* Ambient glow blob centred behind the avatar */}
         <View

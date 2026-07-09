@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
+import { useGoldenSectionSuppression } from '@/contexts/GoldenSectionContext';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_COMPONENT_TOKENS, KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
@@ -45,7 +46,6 @@ import {
   startInAppNotificationRuntime,
 } from '@/services/inAppNotificationService';
 import { startBackgroundPrefetch } from '@/services/backgroundPrefetch';
-import NetInfo from '@react-native-community/netinfo';
 import {
   bindMainTabBadgeSourceEvents,
   emptyMainTabBadgeCounts,
@@ -54,6 +54,7 @@ import {
   MainTabBadgeCounts,
 } from '@/services/mainTabNotificationBadges';
 import { translateString } from '@/languages';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type RouteKey = 'Partners' | 'Bible' | 'Messages' | 'Broadcast' | 'Profile';
 
@@ -94,6 +95,7 @@ function AnimatedKISTabBar({
   }, [systemScheme, theme]);
 
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   // ✅ Responsive width that updates on orientation / size change
   const { width } = useWindowDimensions();
@@ -261,20 +263,12 @@ function AnimatedKISTabBar({
 
 export function MainTabs() {
   const { palette } = useKISTheme();
-  const { currentUserId, socket, isConnected } = useSocket();
+  const { currentUserId, socket } = useSocket();
   const [communityByConversationId, setCommunityByConversationId] = useState<
     Record<string, { id: string; name: string }>
   >({});
   // ✅ Responsive width for overlay slide
   const { width } = useWindowDimensions();
-
-  const [isOffline, setIsOffline] = useState(false);
-  useEffect(() => {
-    const unsub = NetInfo.addEventListener((state) => {
-      setIsOffline(!(state.isConnected && state.isInternetReachable !== false));
-    });
-    return () => unsub();
-  }, []);
 
   // 🔥 Chat room overlay — stack so sub-rooms push on top of the parent room
   const [chatHistory, setChatHistory] = useState<Chat[]>([]);
@@ -296,6 +290,16 @@ export function MainTabs() {
   const [activeCommunityInfo, setActiveCommunityInfo] = useState<{ id: string; name: string } | null>(null);
   const communityInfoSlide = useRef(new RNAnimated.Value(0)).current;
 
+  // These full-screen overlays (chat room, sub-room, chat info, community
+  // room/info) are position:absolute within this component's own root View,
+  // which sits below the Golden Section — they can't reach up to cover it
+  // themselves. Force-hide the Golden Section while any is open instead, so
+  // this View's box (and the overlay inside it) expands to fill that space
+  // and genuinely covers the whole screen.
+  useGoldenSectionSuppression(
+    chatVisible || subRoomVisible || infoVisible || communityVisible || communityInfoVisible,
+  );
+
   // 👇 control for hiding the nav bar (managed ONLY here)
   const [hidNav, setHidNav] = useState(false);
   const [badgeCounts, setBadgeCounts] = useState<MainTabBadgeCounts>(() => emptyMainTabBadgeCounts());
@@ -305,16 +309,39 @@ export function MainTabs() {
     startInAppNotificationRuntime();
     let alive = true;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastFetchAt = 0;
+    // Coalesce bursts of events (e.g. several chat messages arriving close
+    // together) into one fetch, then never fetch more than once per this
+    // window even if events keep arriving — otherwise an active chat, whose
+    // messages fire chat.message/chat.message_receipt on every send/receipt,
+    // would re-trigger this whole badge cascade on every single message.
+    const MIN_REFRESH_INTERVAL_MS = 4000;
+    const DEBOUNCE_MS = 120;
+
+    const doFetch = () => {
+      lastFetchAt = Date.now();
+      fetchMainTabBadgeCounts(currentUserId)
+        .then((next) => {
+          if (alive) setBadgeCounts(next);
+        })
+        .catch(() => undefined);
+    };
 
     const refreshBadges = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
-        fetchMainTabBadgeCounts(currentUserId)
-          .then((next) => {
-            if (alive) setBadgeCounts(next);
-          })
-          .catch(() => undefined);
-      }, 120);
+        const elapsed = Date.now() - lastFetchAt;
+        if (elapsed >= MIN_REFRESH_INTERVAL_MS) {
+          doFetch();
+          return;
+        }
+        if (throttleTimer) return;
+        throttleTimer = setTimeout(() => {
+          throttleTimer = null;
+          if (alive) doFetch();
+        }, MIN_REFRESH_INTERVAL_MS - elapsed);
+      }, DEBOUNCE_MS);
     };
 
     refreshBadges();
@@ -338,6 +365,12 @@ export function MainTabs() {
     realtimeEvents.forEach((eventName) => {
       socket?.on(eventName, refreshBadges);
     });
+    // Refresh once when the socket (re)connects, without tearing down and
+    // rebuilding this whole listener set on every connect/disconnect toggle
+    // (which is what happened previously — isConnected was in this effect's
+    // deps array purely to catch reconnects, and every toggle re-ran the
+    // entire effect body including an unconditional refreshBadges() call).
+    socket?.on('connect', refreshBadges);
 
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') refreshBadges();
@@ -346,13 +379,15 @@ export function MainTabs() {
     return () => {
       alive = false;
       if (refreshTimer) clearTimeout(refreshTimer);
+      if (throttleTimer) clearTimeout(throttleTimer);
       unbindBadgeEvents();
       realtimeEvents.forEach((eventName) => {
         socket?.off(eventName, refreshBadges);
       });
+      socket?.off('connect', refreshBadges);
       appStateSub.remove();
     };
-  }, [currentUserId, socket, isConnected]);
+  }, [currentUserId, socket]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -635,13 +670,6 @@ export function MainTabs() {
 
   return (
     <View style={{ flex: 1 }}>
-      {isOffline && (
-        <View style={{ backgroundColor: palette.danger, paddingVertical: 6, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '700' }}>
-            No internet connection — messages will send when reconnected
-          </Text>
-        </View>
-      )}
       <Tabs.Navigator
         initialRouteName="Messages"
         screenOptions={{
@@ -684,7 +712,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: chatTranslateX }],
           zIndex: 1001,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         <ChatRoomPage
@@ -707,7 +735,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: subRoomTranslateX }],
           zIndex: 1002,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         {activeSubRoom && (
@@ -731,7 +759,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: infoTranslateX }],
           zIndex: 1002,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         {activeInfo ? (
@@ -762,7 +790,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: communityTranslateX }],
           zIndex: 1000,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         {activeCommunity ? (
@@ -785,7 +813,7 @@ export function MainTabs() {
           bottom: 0,
           transform: [{ translateX: communityInfoTranslateX }],
           zIndex: 1003,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         {activeCommunityInfo ? (

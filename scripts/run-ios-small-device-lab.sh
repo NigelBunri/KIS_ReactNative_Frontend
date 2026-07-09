@@ -8,7 +8,7 @@ APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_ROOT"
 
 IOS_RUNTIME="${IOS_RUNTIME:-}"
-APP_BUNDLE_ID="${APP_BUNDLE_ID:-org.reactjs.native.example.KIS}"
+APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.kis}"
 METRO_WAIT_SECONDS="${METRO_WAIT_SECONDS:-8}"
 RESET_SIMULATORS="${RESET_SIMULATORS:-1}"
 

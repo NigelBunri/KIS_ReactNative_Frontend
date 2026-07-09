@@ -9,7 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import KISButton from '@/constants/KISButton';
 import {
   createInstitutionEngineManagedItem,
@@ -512,7 +512,7 @@ const input = (palette: any, spacing: any) => ({
 });
 
 const itemCard = (palette: any, spacing: any) => ({
-  backgroundColor: palette.bg, marginTop: 25,
+  backgroundColor: palette.bg,
   padding: spacing.sm,
   borderRadius: 12,
   marginVertical: spacing.xs,

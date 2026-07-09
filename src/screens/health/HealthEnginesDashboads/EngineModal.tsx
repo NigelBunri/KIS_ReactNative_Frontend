@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { getHealthThemeColors } from "@/theme/health/colors";
@@ -178,7 +178,7 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: palette.bg, marginTop: 25,
+          backgroundColor: palette.bg,
         }}
       >
         {/* HEADER */}

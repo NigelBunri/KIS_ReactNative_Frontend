@@ -181,7 +181,7 @@ function VideoPlayer({ message, onClose }: { message: Message; onClose: () => vo
   };
 
   return (
-    <View style={[styles.playerWrap, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <View style={[styles.playerWrap, { backgroundColor: palette.bg, }]}>
       <View style={[styles.playerHeader, { backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
           <KISIcon name="arrow-back" size={22} color={palette.text} />

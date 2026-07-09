@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -188,7 +188,7 @@ export default function CreateCampaignScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     navBar: {
       flexDirection: 'row',
       alignItems: 'center',

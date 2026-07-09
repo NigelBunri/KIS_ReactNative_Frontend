@@ -40,7 +40,7 @@ import {
 } from '@/components/section-builder/types';
 import { resolveBackgroundColor } from '@/components/section-builder/backgroundOptions';
 import type { InstitutionProfileEditorDraft } from '@/features/health-dashboard/models';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type LandingTargetKind = 'market' | 'education' | 'partner';
 
@@ -592,7 +592,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
 
   if (loading || !draft) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
         <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={palette.accentPrimary} />
           <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.sm }}>Loading landing builder...</Text>
@@ -602,7 +602,7 @@ export default function ProfileLandingEditorScreen({ navigation, route }: Props)
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
         <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <TouchableOpacity

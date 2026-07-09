@@ -1,11 +1,13 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   PanResponder,
   Platform,
   Pressable,
@@ -37,6 +39,7 @@ import Video from 'react-native-video';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
 type StatusReplyPermission = 'contacts' | 'nobody';
@@ -101,7 +104,6 @@ const STATUS_FONT_FAMILIES = [
   'Courier New',
 ];
 
-
 const normalizeAudienceIds = (value: any): string[] => {
   if (!value) return [];
   const source = Array.isArray(value)
@@ -149,15 +151,17 @@ const appendStatusAudienceFields = (
 type UpdatesTabProps = {
   searchTerm?: string;
   onOpenChat?: (chat: Chat) => void;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 export default function UpdatesTab({
   searchTerm = '',
   onOpenChat,
+  onScroll,
 }: UpdatesTabProps) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const { currentUserId } = useSocket();
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
@@ -953,8 +957,10 @@ export default function UpdatesTab({
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}
         refreshControl={
           <RefreshControl
@@ -1244,7 +1250,7 @@ export default function UpdatesTab({
         >
           <View />
         </Pressable>
-        <View style={[styles.modalCard, { backgroundColor: palette.bg, marginTop: 25 }]}>
+        <View style={[styles.modalCard, { backgroundColor: palette.bg, }]}>
           <NewChannelForm
             palette={palette}
             onSuccess={created => {
@@ -1804,7 +1810,7 @@ export default function UpdatesTab({
 
       {/* Status viewer */}
       <Modal visible={viewerOpen} transparent animationType="fade">
-        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg, }]} edges={['top']}>
           <View style={styles.viewerProgressRow} pointerEvents="auto">
             {(activeUser?.items ?? []).map((item, idx) => {
               const fill =

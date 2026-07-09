@@ -61,7 +61,7 @@ export default function PartnersLeftRail({
           width: railWidth,
           // paddingTop uses the safe-area inset so the rail background fills all
           // the way to y=0 (no gap at the top) while content clears the notch.
-          paddingTop: topInset + 8,
+          paddingTop: topInset + 36,
           backgroundColor: isDark ? 'rgba(10,9,14,0.92)' : '#FFFFFF',
           borderRightColor: palette.divider,
           opacity: entrance,

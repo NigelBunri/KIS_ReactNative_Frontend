@@ -117,7 +117,7 @@ export default function ProfileSheets(props: Props) {
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.sheet, { backgroundColor: palette.bg, marginTop: 25 }]}
+        style={[styles.sheet, { backgroundColor: palette.bg, }]}
       >
         <View style={styles.sheetHeader} {...panHandlers}>
           <Text style={[styles.sheetTitle, { color: palette.text }]}>

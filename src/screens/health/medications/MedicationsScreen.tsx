@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
@@ -250,7 +250,7 @@ export default function MedicationsScreen({ navigation }: Props) {
 
 function makeStyles(palette: any, sp: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: {
       paddingHorizontal: sp,
@@ -327,7 +327,7 @@ function makeStyles(palette: any, sp: number) {
       shadowOpacity: 0.4,
       shadowRadius: 8,
     },
-    modalSafe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    modalSafe: { flex: 1, backgroundColor: palette.bg, paddingTop: 40 },
     modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',

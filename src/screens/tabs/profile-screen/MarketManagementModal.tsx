@@ -280,7 +280,7 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                 style={[
                   marketStyles.shopCard,
                   {
-                    backgroundColor: palette.bg, marginTop: 25,
+                    backgroundColor: palette.bg,
                     borderColor: `${palette.primaryStrong}40`,
                     borderWidth: 1.5,
                     width: '100%',

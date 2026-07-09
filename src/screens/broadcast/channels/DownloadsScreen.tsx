@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { useKISTheme } from '@/theme/useTheme';
@@ -83,7 +83,7 @@ export default function DownloadsScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />

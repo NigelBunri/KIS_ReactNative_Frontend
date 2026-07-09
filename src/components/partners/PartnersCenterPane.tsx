@@ -1,8 +1,9 @@
 // src/screens/tabs/PartnersCenterPane.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { Animated, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
+import ReanimatedScroll from 'react-native-reanimated';
 import { PartnerCenterPaneSkeleton } from './PartnersSkeleton';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
@@ -190,6 +191,33 @@ export default function PartnersCenterPane({
     }).start();
   }, [contentAnim, selectedPartner?.id]);
 
+  const { onScroll, onHeaderLayout, collapseStyle } = useCollapsingGoldHeader(140);
+
+  useGoldenSectionContent({
+    content: (
+      <>
+        <PartnerCompactGoldBar
+          partner={selectedPartner}
+          topInset={topInset}
+          pageGutter={responsive.pageGutter}
+          onSettingsPress={onPartnerHeaderPress}
+          verificationSummary={partnerVerificationSummary}
+        />
+        <ReanimatedScroll.View style={[collapseStyle, { overflow: 'hidden' }]}>
+          <View onLayout={onHeaderLayout}>
+            <PartnerDetailHeroCard
+              partner={selectedPartner}
+              pageGutter={responsive.pageGutter}
+              onInsightsPress={onOpenInsights}
+              verificationSummary={partnerVerificationSummary}
+              onOpenVerification={() => setVerificationVisible(true)}
+            />
+          </View>
+        </ReanimatedScroll.View>
+      </>
+    ),
+  });
+
   if (loading && !selectedPartner?.id) {
     return <PartnerCenterPaneSkeleton />;
   }
@@ -217,7 +245,9 @@ export default function PartnersCenterPane({
         },
       ]}
     >
-      <ScrollView
+      <ReanimatedScroll.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: compact ? 28 : 42 }}
         showsVerticalScrollIndicator={false}
@@ -230,18 +260,6 @@ export default function PartnersCenterPane({
           ) : undefined
         }
       >
-        {/* ── Scrollable golden header — full-width, scrolls with content ── */}
-        <PartnerGoldenHeader
-          partner={selectedPartner}
-          topInset={topInset}
-          pageGutter={responsive.pageGutter}
-          onSettingsPress={onPartnerHeaderPress}
-          onInsightsPress={onOpenInsights}
-          verificationSummary={partnerVerificationSummary}
-          onOpenVerification={() => setVerificationVisible(true)}
-          compact={compact}
-        />
-
         {/* ── Padded content area below the header ─────────────────────── */}
         <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 12 }}>
 
@@ -283,7 +301,7 @@ export default function PartnersCenterPane({
           </Pressable>
         )}
         {/* Insights, VerificationStatusCard, and VerificationBadgeRow are now
-            inside PartnerGoldenHeader above — not repeated here. */}
+            inside PartnerDetailHeroCard above — not repeated here. */}
         <View
           style={[
             styles.workspaceCommandCard,
@@ -629,7 +647,7 @@ export default function PartnersCenterPane({
           </>
         )}
         </View>{/* end padded content wrapper */}
-      </ScrollView>
+      </ReanimatedScroll.ScrollView>
       <VerificationCenterSheet
         visible={verificationVisible}
         palette={palette}
@@ -645,38 +663,15 @@ export default function PartnersCenterPane({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PartnerGoldenHeader — scrollable (non-sticky) golden section at the top of
-// the center pane. Contains partner identity, settings, insights, and
-// verification status so it all lives in one cohesive branded area.
+// Partner golden section — split in two:
+//  - PartnerCompactGoldBar: identity glance (avatar/name/role/settings),
+//    registered via useGoldenSectionContent so it renders inside the shared,
+//    fixed Golden Section host in App.tsx (gold gradient supplied there).
+//  - PartnerDetailHeroCard: the rest (tagline, pills, insights, verification)
+//    stays in-page as a normal scrolling card — no gold gradient of its own.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type GoldenHeaderProps = {
-  partner: Partner | null;
-  topInset: number;
-  pageGutter: number;
-  onSettingsPress?: () => void;
-  onInsightsPress?: () => void;
-  verificationSummary?: any;
-  onOpenVerification?: () => void;
-  compact?: boolean;
-};
-
-function PartnerGoldenHeader({
-  partner,
-  topInset,
-  pageGutter,
-  onSettingsPress,
-  onInsightsPress,
-  verificationSummary,
-  onOpenVerification,
-  compact = false,
-}: GoldenHeaderProps) {
-  const { palette, tone, isDark } = useKISTheme();
-  const goldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
-  const metallicGold = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
-
+function getPartnerIdentity(partner: Partner | null) {
   const initials = partner?.initials ?? partner?.name?.slice(0, 2).toUpperCase() ?? '?';
   const roleName = (() => {
     const r = partner?.member_role ?? partner?.role ?? '';
@@ -687,115 +682,136 @@ function PartnerGoldenHeader({
     };
     return map[r.toLowerCase()] ?? r.charAt(0).toUpperCase() + r.slice(1);
   })();
+  return { initials, roleName };
+}
+
+type CompactGoldBarProps = {
+  partner: Partner | null;
+  topInset: number;
+  pageGutter: number;
+  onSettingsPress?: () => void;
+  verificationSummary?: any;
+};
+
+function PartnerCompactGoldBar({
+  partner,
+  topInset,
+  pageGutter,
+  onSettingsPress,
+  verificationSummary,
+}: CompactGoldBarProps) {
+  const { palette, tone } = useKISTheme();
+  const metallicGold = tone === 'dark'
+    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
+    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const { initials, roleName } = getPartnerIdentity(partner);
 
   return (
-    // Outer View has NO overflow:hidden so content (pills, buttons) never clips.
-    // The gradient fills it with absoluteFill and gets its own rounded corners
-    // via the inner LinearGradient's borderRadius + overflow:hidden.
     <View
       style={[
-        localHeaderStyles.container,
-        { paddingTop: topInset + 10, paddingHorizontal: pageGutter },
+        localHeaderStyles.compactRow,
+        { paddingTop: topInset * 2.6, paddingHorizontal: pageGutter },
       ]}
     >
-      {/* Gold gradient background — clips to rounded corners via overflow:hidden */}
-      <LinearGradient
-        colors={goldGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[StyleSheet.absoluteFillObject, localHeaderStyles.gradientBg]}
-      />
-      {/* Luxury shimmer */}
-      <View style={localHeaderStyles.sheen} pointerEvents="none" />
-      {/* Decorative halo */}
-      <View style={localHeaderStyles.halo} />
-
-      {/* ── Kicker ─────────────────────────────────────────────────────── */}
-      <Text style={localHeaderStyles.kicker}>🤝  Partner workspace</Text>
-
-      {/* ── Avatar row ─────────────────────────────────────────────────── */}
-      <View style={localHeaderStyles.avatarRow}>
-        <LinearGradient
-          colors={metallicGold}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={localHeaderStyles.heroAvatar}
-        >
-          <View pointerEvents="none" style={localHeaderStyles.goldSheen} />
-          {partner?.avatar_url ? (
-            <Image
-              source={{ uri: partner.avatar_url }}
-              style={StyleSheet.absoluteFillObject as any}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={{ color: palette.ivory, fontSize: 20, fontWeight: '900' }}>
-              {initials}
-            </Text>
-          )}
-        </LinearGradient>
-
-        {/* Settings button */}
-        {onSettingsPress && (
-          <Pressable
-            onPress={onSettingsPress}
-            style={({ pressed }) => [
-              localHeaderStyles.settingsBtn,
-              { opacity: pressed ? 0.75 : 1 },
-            ]}
-            accessibilityLabel="Partner settings"
-          >
-            <LinearGradient
-              colors={metallicGold}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject as any}
-            />
-            <View pointerEvents="none" style={localHeaderStyles.goldSheen} />
-            <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '800' }}>Settings</Text>
-            <KISIcon name="settings" size={14} color={palette.ivory} />
-          </Pressable>
+      <View
+        style={localHeaderStyles.compactAvatar}
+      >
+        <View pointerEvents="none" style={localHeaderStyles.goldSheen} />
+        {partner?.avatar_url ? (
+          <Image
+            source={{ uri: partner.avatar_url }}
+            style={StyleSheet.absoluteFillObject as any}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={{ color: palette.ivory, fontSize: 15, fontWeight: '900' }}>
+            {initials}
+          </Text>
         )}
       </View>
 
-      {/* ── Partner name ───────────────────────────────────────────────── */}
-      <Text
-        style={localHeaderStyles.partnerName}
-        numberOfLines={2}
-      >
-        {partner?.name ?? '—'}
-      </Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: 'rgba(255,244,184,0.96)', fontSize: 17, fontWeight: '900' }}
+        >
+          {partner?.name ?? '—'}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{ color: 'rgba(255,244,184,0.70)', fontSize: 11, fontWeight: '700', marginTop: 2 }}
+        >
+          {roleName}{verificationSummary?.verified ? ' · Verified ✓' : ''}
+        </Text>
+      </View>
 
-      {/* ── Tagline ────────────────────────────────────────────────────── */}
+      {onSettingsPress && (
+        <Pressable
+          onPress={onSettingsPress}
+          hitSlop={8}
+          style={({ pressed }) => [
+            localHeaderStyles.compactIconBtn,
+            { opacity: pressed ? 0.75 : 1 },
+          ]}
+          accessibilityLabel="Partner settings"
+        >
+          <KISIcon name="settings" size={18} color="rgba(255,244,184,0.92)" />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+type DetailHeroCardProps = {
+  partner: Partner | null;
+  pageGutter: number;
+  onInsightsPress?: () => void;
+  verificationSummary?: any;
+  onOpenVerification?: () => void;
+};
+
+/**
+ * The collapsing part of Partners' Golden Section — tagline, pills, insights,
+ * and verification. Avatar/name/role already live in the sticky
+ * PartnerCompactGoldBar above, so this doesn't repeat them; it just sits on
+ * the same gold gradient (no card chrome of its own) and collapses away via
+ * useCollapsingGoldHeader as the pane scrolls.
+ */
+function PartnerDetailHeroCard({
+  partner,
+  pageGutter,
+  onInsightsPress,
+  verificationSummary,
+  onOpenVerification,
+}: DetailHeroCardProps) {
+  const { roleName } = getPartnerIdentity(partner);
+
+  return (
+    <View style={[localHeaderStyles.detailCard, { paddingHorizontal: pageGutter }]}>
       {!!partner?.tagline && (
         <Text style={localHeaderStyles.tagline} numberOfLines={2}>
           {partner.tagline}
         </Text>
       )}
 
-      {/* ── Role + status pills ────────────────────────────────────────── */}
       <View style={localHeaderStyles.pillRow}>
         <View style={localHeaderStyles.pill}>
           <Text style={localHeaderStyles.pillText}>Role: {roleName}</Text>
         </View>
-        <View style={[localHeaderStyles.pill, { backgroundColor: 'rgba(217,168,117,0.18)' }]}>
+        <View style={localHeaderStyles.pill}>
           <Text style={localHeaderStyles.pillText}>Active partner</Text>
         </View>
         {verificationSummary?.verified && (
-          <View style={[localHeaderStyles.pill, { backgroundColor: 'rgba(60,210,100,0.18)' }]}>
-            <Text style={[localHeaderStyles.pillText, { color: 'rgba(180,255,200,0.95)' }]}>✓ Verified</Text>
+          <View style={[localHeaderStyles.pill, { backgroundColor: 'rgba(60,210,100,0.15)', borderColor: 'rgba(60,210,100,0.35)' }]}>
+            <Text style={[localHeaderStyles.pillText, { color: '#B8F5CC' }]}>✓ Verified</Text>
           </View>
         )}
       </View>
 
-      {/* ── Insights shortcut ──────────────────────────────────────────── */}
       {onInsightsPress && (
         <Pressable
           onPress={onInsightsPress}
-          style={({ pressed }) => [
-            localHeaderStyles.insightsBtn,
-            { opacity: pressed ? 0.8 : 1 },
-          ]}
+          style={({ pressed }) => [localHeaderStyles.insightsBtn, { opacity: pressed ? 0.8 : 1 }]}
         >
           <Text style={{ fontSize: 15 }}>📊</Text>
           <Text style={localHeaderStyles.insightsBtnText}>Insights</Text>
@@ -804,14 +820,10 @@ function PartnerGoldenHeader({
         </Pressable>
       )}
 
-      {/* ── Verification status card (if not yet verified) ─────────────── */}
       {!verificationSummary?.verified && onOpenVerification && (
         <Pressable
           onPress={onOpenVerification}
-          style={({ pressed }) => [
-            localHeaderStyles.verifyBtn,
-            { opacity: pressed ? 0.8 : 1 },
-          ]}
+          style={({ pressed }) => [localHeaderStyles.verifyBtn, { opacity: pressed ? 0.8 : 1 }]}
         >
           <Text style={{ fontSize: 15 }}>🔐</Text>
           <View style={{ flex: 1 }}>
@@ -821,7 +833,6 @@ function PartnerGoldenHeader({
           <KISIcon name="chevron-right" size={14} color="rgba(255,244,184,0.6)" />
         </Pressable>
       )}
-
     </View>
   );
 }
@@ -829,90 +840,51 @@ function PartnerGoldenHeader({
 // Local styles just for the golden header — kept separate so they don't
 // pollute the shared partnersStyles.ts file.
 const localHeaderStyles = StyleSheet.create({
-  container: {
-    // No overflow:hidden here — content must never be clipped.
-    paddingBottom: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  // The gradient background clips itself to rounded corners independently.
-  gradientBg: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 20,
-    overflow: 'hidden',
-  },
-  sheen: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: 2,
-    backgroundColor: '#FFF4B8',
-    opacity: 0.45,
-  },
-  halo: {
-    position: 'absolute',
-    top: -30, right: -20,
-    width: 120, height: 120,
-    borderRadius: 60,
-    backgroundColor: '#C9A24A',
-    opacity: 0.14,
-  },
-  goldSheen: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
-  },
-  kicker: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-    color: 'rgba(255,244,184,0.72)',
-    marginBottom: 12,
-  },
-  avatarRow: {
+  // ── Compact gold bar (rendered inside the shared gold gradient shell) ──
+  compactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    gap: 10,
+    paddingBottom: 16,
   },
-  heroAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 20,
+  compactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(255,244,184,0.35)',
   },
-  settingsBtn: {
-    flexDirection: 'row',
+  compactIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(23,17,31,0.28)',
     borderWidth: 1,
-    borderColor: 'rgba(255,244,184,0.35)',
-    overflow: 'hidden',
+    borderColor: 'rgba(255,244,184,0.26)',
   },
-  partnerName: {
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-    color: 'rgba(255,244,184,0.96)',
-    marginBottom: 4,
+  goldSheen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
+  },
+
+  // ── Detail card (collapsing content, sits directly on the shared gold
+  //    gradient — no card chrome of its own) ──
+  detailCard: {
+    paddingTop: 4,
+    paddingBottom: 16,
   },
   tagline: {
     fontSize: 13,
     fontWeight: '500',
-    color: 'rgba(255,244,184,0.65)',
     marginBottom: 12,
     lineHeight: 18,
+    color: 'rgba(255,244,184,0.78)',
   },
   pillRow: {
     flexDirection: 'row',
@@ -925,8 +897,8 @@ const localHeaderStyles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderColor: 'rgba(255,244,184,0.25)',
     backgroundColor: 'rgba(255,244,184,0.10)',
+    borderColor: 'rgba(255,244,184,0.25)',
   },
   pillText: {
     fontSize: 11,
@@ -941,14 +913,14 @@ const localHeaderStyles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,244,184,0.22)',
-    backgroundColor: 'rgba(23,17,31,0.30)',
     marginBottom: 8,
+    backgroundColor: 'rgba(23,17,31,0.30)',
+    borderColor: 'rgba(255,244,184,0.22)',
   },
   insightsBtnText: {
-    color: 'rgba(255,244,184,0.90)',
     fontWeight: '700',
     fontSize: 13,
+    color: 'rgba(255,244,184,0.90)',
   },
   verifyBtn: {
     flexDirection: 'row',
@@ -958,18 +930,18 @@ const localHeaderStyles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,244,184,0.22)',
     backgroundColor: 'rgba(23,17,31,0.30)',
+    borderColor: 'rgba(255,244,184,0.22)',
   },
   verifyBtnTitle: {
-    color: 'rgba(255,244,184,0.90)',
     fontWeight: '800',
     fontSize: 13,
+    color: 'rgba(255,244,184,0.90)',
   },
   verifyBtnSub: {
-    color: 'rgba(255,244,184,0.55)',
     fontWeight: '500',
     fontSize: 11,
     marginTop: 2,
+    color: 'rgba(255,244,184,0.55)',
   },
 });

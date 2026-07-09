@@ -8,9 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
-import { KISIcon } from '@/constants/kisIcons';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const EFFECTIVE_DATE = 'June 1, 2026';
 const COMPANY_NAME = 'KIS';
@@ -222,6 +223,7 @@ type Props = {
 export default function TermsAndConditionsScreen({ navigation, onAgree, showAgreeButton }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
   const scrollRef = useRef<ScrollView>(null);
   const sectionYRef = useRef<Record<string, number>>({});
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
@@ -237,21 +239,12 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
   const canGoBack = navigation?.canGoBack?.();
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: palette.bg, marginTop: 25}]} edges={['top']}>
-      {/* Header */}
-      <View style={[s.header, { borderBottomColor: palette.divider }]}>
-        {canGoBack && (
-          <Pressable onPress={() => navigation.goBack()} style={s.backBtn} hitSlop={12}>
-            <KISIcon name="arrow-left" size={22} color={palette.text} />
-          </Pressable>
-        )}
-        <View style={{ flex: 1 }}>
-          <Text style={[s.title, { color: palette.text }]}>Terms & Conditions</Text>
-          <Text style={[s.effectiveDate, { color: palette.subtext }]}>
-            Effective {EFFECTIVE_DATE}
-          </Text>
-        </View>
-      </View>
+    <View style={[s.safe, { backgroundColor: palette.bg }]}>
+      <ScreenHeader
+        title="Terms & Conditions"
+        subtitle={`Effective ${EFFECTIVE_DATE}`}
+        onBack={canGoBack ? () => navigation.goBack() : undefined}
+      />
 
       <ScrollView
         ref={scrollRef}
@@ -324,7 +317,7 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
           style={[
             s.cta,
             {
-              backgroundColor: palette.bg, marginTop: 25,
+              backgroundColor: palette.bg,
               borderTopColor: palette.divider,
               paddingBottom: Math.max(insets.bottom, 16),
             },
@@ -354,24 +347,13 @@ export default function TermsAndConditionsScreen({ navigation, onAgree, showAgre
           </Pressable>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 function makeStyles(palette: any) {
   return StyleSheet.create({
     safe: { flex: 1 },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    backBtn: { padding: 4 },
-    title: { fontSize: 18, fontWeight: '800' },
-    effectiveDate: { fontSize: 12, marginTop: 2 },
     content: { paddingHorizontal: 16, paddingTop: 16, gap: 16 },
     preamble: {
       borderRadius: 12,

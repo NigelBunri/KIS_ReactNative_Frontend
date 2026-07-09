@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -319,7 +319,7 @@ export default function SetListScreen({ navigation }: Props) {
 function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: palette.bg, marginTop: 25 },
+    safe: { flex: 1, backgroundColor: palette.bg, },
     topBar: {
       flexDirection: 'row',
       alignItems: 'center',

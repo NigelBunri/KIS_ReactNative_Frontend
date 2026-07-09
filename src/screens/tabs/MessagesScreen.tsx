@@ -17,9 +17,13 @@ import {
   AppState,
   useWindowDimensions,
   Modal,
+  PanResponder,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
+import ReAnimated, { withTiming } from 'react-native-reanimated';
+import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   createMaterialTopTabNavigator,
@@ -42,6 +46,7 @@ import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
 import CallsTab from '@/screens/tabs/MesssagingSubTabs/CallsTab';
 import CommunitiesTab from '@/screens/tabs/CommunitiesTab';
+import MessagesOfflineCard from '@/screens/tabs/MesssagingSubTabs/MessagesOfflineCard';
 import NetInfo from '@react-native-community/netinfo';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -72,7 +77,6 @@ type MessagesScreenProps = {
 };
 
 type LocalQuick = QuickChip;
-
 
 const isEncryptedPreviewPlaceholder = (value: unknown): boolean => {
   return typeof value === 'string' && value.trim().toLowerCase() === 'encrypted message';
@@ -133,9 +137,13 @@ type GlobalSearchResult = {
  * - Animate the overflow menu (fade + scale) instead of hard-mounting
  * - Avoid repeated setState on layout if height hasn't changed
  */
-export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, headerGradient, sheenColor }: MessagesScreenProps) {
+export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, headerGradient, sheenColor: _sheenColor }: MessagesScreenProps) {
   const { palette, tone } = useKISTheme();
   const insets = useSafeAreaInsets();
+  // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
+  // is one of the 5 main-tab gold-header screens with its own hand-tuned
+  // spacing, so it reads the raw device inset instead.
+  const topInset = insets.top;
   const { width, height } = useWindowDimensions();
   const responsive = useResponsiveLayout();
   const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
@@ -182,6 +190,7 @@ const effectiveCurrentUserId = currentUserId || authCacheUserId || null;
 const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
+const [isOffline, setIsOffline] = useState(false);
 const avatarAnim = useRef(new Animated.Value(0)).current;
 const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
@@ -652,15 +661,27 @@ useEffect(() => {
   }).start();
 }, [avatarPreview, avatarAnim]);
 
-// Flush pending mutations when network recovers
+// Track connectivity for the offline card, and flush pending mutations when
+// network recovers.
 useEffect(() => {
   const unsubscribe = NetInfo.addEventListener((state) => {
     const connected = state.isConnected === true && state.isInternetReachable !== false;
+    setIsOffline(!connected);
     if (connected) {
       flushPendingMutations().catch(() => {});
     }
   });
   return () => unsubscribe();
+}, []);
+
+const handleRetryConnection = useCallback(() => {
+  NetInfo.fetch().then((state) => {
+    const connected = state.isConnected === true && state.isInternetReachable !== false;
+    setIsOffline(!connected);
+    if (connected) {
+      flushPendingMutations().catch(() => {});
+    }
+  });
 }, []);
 
 const communitiesMountedRef = useRef(true);
@@ -1234,7 +1255,6 @@ useEffect(() => {
   };
 }, [socket]);
 
-
 useEffect(() => {
   if (selectedChat.length > 0) {
     setSelectMode(true);
@@ -1415,8 +1435,6 @@ const handleSelectAllChats = useCallback(() => {
   setMenuVisible(false);
 }, [conversations]);
 
-
-
   const [addVisible, setAddVisible] = useState(false);
   const [addInitialMode, setAddInitialMode] = useState<'list' | 'addGroup' | 'addChannel' | undefined>(undefined);
   const addSlide = useRef(new Animated.Value(0)).current; // 0 = off-screen, 1 = on-screen
@@ -1483,82 +1501,51 @@ const handleSelectAllChats = useCallback(() => {
     };
   }, []);
 
-  // ── Animated search + filter header ──────────────────────────────────────
-  // Only the search bar and filter chips animate away on scroll.
+  // ── Collapsing search + filter header ────────────────────────────────────
+  // Only the search bar and filter chips collapse away on scroll — same
+  // mechanism as Broadcast/Bible/Partners/Profile's Golden Sections now
+  // (continuous maxHeight+opacity interpolation of one shared scroll
+  // position), instead of the previous direction-threshold show/hide toggle.
   // The tab bar (Chats/Updates/Calls/Communities) is permanent navigation
   // and must never hide — users need to always know where they are.
-  const headerHeightAnim = useRef(new Animated.Value(0)).current;
-  const headerHRef = useRef(0);
-  const isHiddenRef = useRef(false);
+  const MESSAGES_COLLAPSE_DISTANCE = 110;
+  const { scrollY, onHeaderLayout, collapseStyle } = useCollapsingGoldHeader(MESSAGES_COLLAPSE_DISTANCE);
 
-  const onHeaderLayout = useCallback((e: LayoutChangeEvent) => {
-    const h = Math.max(0, e.nativeEvent.layout.height || 0);
-    if (h === headerHRef.current) return;
-    headerHRef.current = h;
-    if (!isHiddenRef.current) headerHeightAnim.setValue(h);
-  }, [headerHeightAnim]);
-
-  // ── Scroll heuristics ─────────────────────────────────────────────────────
-  const lastYRef = useRef(0);
-  const animatingRef = useRef<null | 'show' | 'hide'>(null);
-
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const runAnim = useCallback(
-    (hidden: boolean) => {
-      const target = hidden ? 0 : headerHRef.current;
-
-      if (reduceMotionRef.current) {
-        headerHeightAnim.setValue(target);
-        isHiddenRef.current = hidden;
-        animatingRef.current = null;
-        return;
-      }
-
-      animatingRef.current = hidden ? 'hide' : 'show';
-      animationRef.current?.stop();
-
-      const dur  = hidden ? 180 : 220;
-      const ease = hidden ? Easing.out(Easing.cubic) : Easing.out(Easing.quad);
-
-      animationRef.current = Animated.timing(headerHeightAnim, {
-        toValue: target,
-        duration: dur,
-        easing: ease,
-        useNativeDriver: false,
-      });
-      animationRef.current.start(({ finished }) => {
-        if (finished) {
-          isHiddenRef.current = hidden;
-          animatingRef.current = null;
-        }
-        animationRef.current = null;
-      });
-    },
-    [headerHeightAnim]
-  );
-
-  const animateHidden = useCallback((hidden: boolean) => {
-    const target = hidden ? 'hide' : 'show';
-    if (animatingRef.current === target) return;
-    runAnim(hidden);
-  }, [runAnim]);
-
-  const handleChatsScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const dy = y - lastYRef.current;
-
-    // Need at least 6px of intentional scroll before reacting
-    if (Math.abs(dy) < 6) return;
-
-    if (dy > 0) animateHidden(true);   // scrolling down → hide chrome
-    else animateHidden(false);          // scrolling up → reveal chrome
-
-    lastYRef.current = y;
-  }, [animateHidden]);
+  // Shared by every sub-tab's own scrollable (Chats/Updates/Calls/Communities)
+  // so the gold header's search+filter row collapses/reveals consistently no
+  // matter which tab the user is scrolling — not just Chats. A plain callback
+  // writing into the shared value (rather than useAnimatedScrollHandler) so
+  // the sub-tabs' own FlatList/ScrollView/SectionList don't need to become
+  // Reanimated-wrapped components themselves.
+  const handleTabScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.value = e.nativeEvent.contentOffset.y;
+  }, [scrollY]);
 
   const handleChatsEndReached = useCallback(() => {
-    animateHidden(false);
-  }, [animateHidden]);
+    scrollY.value = reduceMotionRef.current ? 0 : withTiming(0, { duration: 220 });
+  }, [scrollY]);
+
+  // Lets a vertical drag directly on the gold header itself (not just on the
+  // Chats/Updates/Calls/Communities lists below) collapse/reveal the search
+  // bar + filter chips — same heuristic BibleScreen uses for its own header.
+  // Tracks the collapse position 1:1 with the finger, same as a real scroll.
+  const gestureStartScrollRef = useRef(0);
+  const headerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dy) > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
+        onPanResponderGrant: () => {
+          gestureStartScrollRef.current = scrollY.value;
+        },
+        onPanResponderMove: (_, gesture) => {
+          // Finger moving up (negative dy) == scrolling down == collapsing.
+          const next = gestureStartScrollRef.current - gesture.dy;
+          scrollY.value = Math.max(0, Math.min(MESSAGES_COLLAPSE_DISTANCE, next));
+        },
+      }),
+    [scrollY],
+  );
 
   // ── Load/save custom filters ─────────────────────────────────────────────
   useEffect(() => {
@@ -1830,26 +1817,20 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // screens' bar styles are unaffected when navigating away).
   useStatusBarStyle(tone, 'dark-content');
 
-  // The header panel's bottom corners are rounded (see messageGoldPanel), so a
-  // sliver of this View's background shows through behind them — it should
-  // match the page background (palette.bg), same as the tab content directly
-  // below/around it, so the header reads as a rounded card floating on the
-  // page rather than a patch of mismatched color.
-  const headerCornerBackdrop = palette.bg;
-
-  return (
-    <View style={[styles.wrap, { backgroundColor: headerCornerBackdrop }]}>
-      <LinearGradient
-        colors={messageGoldGradient as string[]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.messageGoldPanel}
-      >
-        {/* Luxury shimmer line at the very top of the panel */}
-        <View
-          style={[styles.messageGoldSheen, sheenColor ? { backgroundColor: sheenColor } : undefined]}
-          pointerEvents="none"
-        />
+  // Registered with the shared Golden Section host in App.tsx instead of
+  // rendering GoldHeaderShell locally, so it stays mounted/animated across
+  // tab switches. Same JSX as before, just handed off instead of returned.
+  //
+  // Cleared (passed null) while the full-screen chat room / add-contacts
+  // overlays are open: those overlays are position:absolute within this
+  // screen's own tree, which starts *below* the Golden Section — they can't
+  // reach up to cover it. Hiding the Golden Section instead lets this
+  // screen's content area (and the overlay inside it) expand to fill that
+  // freed space, so the overlay genuinely covers the whole screen instead of
+  // opening underneath the still-visible gold header.
+  useGoldenSectionContent(chatVisible || addVisible ? null : {
+    content: (
+      <View {...headerPanResponder.panHandlers}>
 
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
@@ -1860,7 +1841,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: insets.top + 14,
+                paddingTop: topInset + 28,
               },
             ]}
           >
@@ -1971,11 +1952,11 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: insets.top + 14,
+                paddingTop: topInset + 28,
               },
             ]}
           >
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, marginTop: 25 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <View
                 style={{
                   width: responsive.isWatch ? 34 : responsive.isCompactPhone ? 38 : 42,
@@ -2057,7 +2038,6 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
 
         )}
 
-
       <Modal
         visible={menuVisible}
         transparent
@@ -2078,7 +2058,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             {
               position: 'absolute',
               right: messageHeaderPaddingX,
-              top: insets.top + (isTinyDevice ? 52 : 62),
+              top: topInset + (isTinyDevice ? 52 : 62),
               borderColor: palette.gold,
               backgroundColor: palette.card,
               shadowColor: palette.shadow,
@@ -2118,10 +2098,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       </View>
       </Modal>
 
-
       {/* ------------ Animated Elevated Search Bar + Filters ------------ */}
       {(
-        <Animated.View style={{ height: headerHeightAnim, overflow: 'hidden' }}>
+        <ReAnimated.View style={[collapseStyle, { overflow: 'hidden' }]}>
         <View
           onLayout={onHeaderLayout}
           style={{
@@ -2269,9 +2248,20 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             </Pressable>
           </View> : null}
         </View>
-        </Animated.View>
+        </ReAnimated.View>
       )}
-      </LinearGradient>
+      </View>
+    ),
+    colors: messageGoldGradient,
+    shellStyle: styles.messageGoldPanel,
+  });
+
+  return (
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
+      {/* ------------ Offline state — below the gold header's filter chips, ------------
+          above the Chats/Updates/Calls/Communities tabs. Replaces the old red
+          error bar (previously rendered app-wide in AppNavigator's MainTabs). */}
+      <MessagesOfflineCard visible={isOffline} onRetry={handleRetryConnection} />
 
       {/* ------------ Updates/Calls Search Modal ------------ */}
       {tabSearchOpen && activeTopTab !== 'Chats' ? (
@@ -2309,7 +2299,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       ) : null}
 
       {/* ------------ Top Tabs (animated tab bar) ------------ */}
-      <View style={{ flex: 1, backgroundColor: palette.bg, marginTop: 25 }}>
+      <View style={{ flex: 1, backgroundColor: palette.bg, }}>
         <Tab.Navigator
           {...({ ref: tabRef } as any)}
           tabBar={(props) => <AnimatedTopBar {...props} />}
@@ -2352,7 +2342,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   });
                   setAvatarPreviewFull(false);
                 }}
-                onScroll={handleChatsScroll}
+                onScroll={handleTabScroll}
                 onEndReached={handleChatsEndReached}
                 onOpenChat={handleOpenChat}
                 selectedChat={selectedChat}
@@ -2366,19 +2356,19 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             name="Updates"
             options={{ tabBarLabel: translateString('Updates') }}
             children={() => (
-              <UpdatesTab searchTerm={query} onOpenChat={onOpenChat} />
+              <UpdatesTab searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
           />
           <Tab.Screen
             name="Calls"
             options={{ tabBarLabel: translateString('Calls') }}
-            children={() => <CallsTab searchTerm={query} />}
+            children={() => <CallsTab searchTerm={query} onScroll={handleTabScroll} />}
           />
           <Tab.Screen
             name="Communities"
             options={{ tabBarLabel: translateString('Communities') }}
             children={() => (
-              <CommunitiesTab onOpenChat={onOpenChat} />
+              <CommunitiesTab onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
           />
         </Tab.Navigator>
@@ -2448,7 +2438,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           <Animated.View
             style={{
               position: 'absolute',
-              top: insets.top + 24,
+              top: topInset + 24,
               left: 0,
               right: 0,
               bottom: insets.bottom + 24,
@@ -2579,7 +2569,6 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
         filters={customFilters}
       />
 
-
       {/* ------------ Full-screen Chat Room Overlay ------------ */}
       {(
         <Animated.View
@@ -2592,7 +2581,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             bottom: 0,
             transform: [{ translateX: chatTranslateX }],
             zIndex: 50, // above everything
-            backgroundColor: palette.bg, marginTop: 25,
+            backgroundColor: palette.bg,
           }}
         >
           <ChatRoomPage
@@ -2615,7 +2604,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             bottom: 0,
             transform: [{ translateY: addTranslateY }],
             zIndex: 40,
-            backgroundColor: palette.bg, marginTop: 25,
+            backgroundColor: palette.bg,
           }}
         >
           <AddContactsPage onOpenChat={handleOpenChatFromAddContacts} onClose={closeAddContacts} initialMode={addInitialMode} />

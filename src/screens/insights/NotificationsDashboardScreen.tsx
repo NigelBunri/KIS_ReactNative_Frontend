@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useKISTheme } from '@/theme/useTheme';
@@ -124,7 +124,7 @@ export default function NotificationsDashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
         <Text style={[styles.title, { color: palette.text }]}>Notifications</Text>
         <Text style={[styles.subtitle, { color: palette.subtext }]}>

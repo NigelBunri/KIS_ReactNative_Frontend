@@ -583,7 +583,7 @@ function FormField({
           {
             color: palette.text,
             borderColor: palette.border,
-            backgroundColor: palette.bg, marginTop: 25 ?? palette.chrome,
+            backgroundColor: palette.bg ?? palette.chrome,
             height: multiline ? 72 : 40,
             textAlignVertical: multiline ? 'top' : 'center',
           },

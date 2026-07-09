@@ -28,8 +28,10 @@ import { postRequest } from '@/network/post/index';
 import ROUTES from '@/network';
 import { useAuth } from '../../App';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { getSimPhoneNumber } from '@/services/simInfo';
 import { setAuthTokens } from '@/security/authStorage';
 import { KIS_TOKENS } from '@/theme/constants';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const makeStyles = (tokens: typeof KIS_TOKENS, modalMaxWidth: number, backdropColor: string) =>
   StyleSheet.create({
@@ -131,6 +133,7 @@ export default function LoginScreen({ navigation }: any) {
   const styles = useMemo(() => makeStyles(tokens, modalMaxWidth, palette.backdrop), [tokens, modalMaxWidth, palette.backdrop]);
   const { setAuth, setPhone, setUser } = useAuth();
   const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState<CountryCode>('CM');
@@ -209,6 +212,10 @@ export default function LoginScreen({ navigation }: any) {
       const deviceId = await ensureDeviceId();
       const normalizedPhone = phoneNumber.replace(/[^\d]/g, '');
       const phoneE164 = `${dialCode}${normalizedPhone}`;
+      // Best-effort: if this device's SIM matches the account's number, the
+      // backend recognizes it as the primary device even on a fresh install,
+      // skipping the QR re-link requirement. Android only — always null on iOS.
+      const simPhoneNumber = await getSimPhoneNumber();
       const payload = {
         phone: phoneE164,
         phone_number: normalizedPhone,
@@ -216,6 +223,7 @@ export default function LoginScreen({ navigation }: any) {
         password,
         device_id: deviceId,
         device_platform: Platform.OS,
+        ...(simPhoneNumber ? { sim_phone_number: simPhoneNumber } : {}),
       };
 
       const res = await postRequest(ROUTES.auth.login, payload, {
@@ -390,11 +398,11 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: palette.bg, marginTop: insets.top }}
+      style={{ flex: 1, backgroundColor: palette.bg, marginTop: topInset }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.root, { backgroundColor: palette.bg, marginTop: 25, paddingTop: insets.top || tokens.spacing['2xl'], paddingBottom: insets.bottom + tokens.spacing['2xl'] }]}
+        contentContainerStyle={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset || tokens.spacing['2xl'], paddingBottom: insets.bottom + tokens.spacing['2xl'] }]}
         keyboardShouldPersistTaps="handled"
       >
       <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
@@ -503,6 +511,26 @@ export default function LoginScreen({ navigation }: any) {
           </KISText>
         </KISText>
       </View>
+
+      <KISText preset="helper" color={palette.subtext} style={[styles.centerText, { textAlign: 'center' }]}>
+        <KISText
+          preset="helper"
+          color={palette.primary}
+          style={styles.link}
+          onPress={() => navigation.navigate('PrivacyPolicy')}
+        >
+          Privacy
+        </KISText>
+        {' · '}
+        <KISText
+          preset="helper"
+          color={palette.primary}
+          style={styles.link}
+          onPress={() => navigation.navigate('TermsAndConditions')}
+        >
+          Terms
+        </KISText>
+      </KISText>
 
       </ScrollView>
 

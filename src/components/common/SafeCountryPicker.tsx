@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import CountryPicker from 'react-native-country-picker-modal';
 import type { CountryCode, Country } from 'react-native-country-picker-modal';
 

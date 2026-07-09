@@ -5,7 +5,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { postRequest } from '@/network/post';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type CommentThreadRouteParams = {
   CommentThreadScreen: {
@@ -53,7 +53,7 @@ export default function CommentThreadScreen() {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, marginTop: 25 }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable onPress={handleGoBack} hitSlop={10} style={styles.headerBack}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
