@@ -13,7 +13,7 @@ import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import PartnerAppLaunchBar from '@/components/partners/PartnerAppLaunchBar';
 import { usePartnerOrganizationAppsContext } from '@/context/partners/PartnerOrganizationAppsContext';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   rootPanHandlers: Record<string, any>;
@@ -144,8 +144,8 @@ export default function PartnerLayout({
   useStatusBarStyle(tone, 'dark-content');
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
-  // spacing, so it reads the raw device inset instead.
-  const topInset = useSafeAreaInsets().top;
+  // spacing, so it reads the raw (corrected) device inset instead.
+  const topInset = useRawTopInset();
   const {
     apps: organizationApps,
     loading: organizationAppsLoading,

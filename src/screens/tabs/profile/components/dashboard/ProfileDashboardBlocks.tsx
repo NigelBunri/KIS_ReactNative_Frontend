@@ -260,7 +260,13 @@ export const ProfileHeroCard = ({
 }) => {
   const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
-  const collapseNaturalHeight = useSharedValue(260);
+  // Starting guess for the hero's expanded height, corrected up via onLayout
+  // below on first real measurement — seeded from topInset (not a flat
+  // constant) since that's the biggest source of natural-height variance
+  // across devices; too low a guess clips the hero at mount (see onLayout
+  // comment) and the collapse animation fights that stale ceiling for a few
+  // frames before it can settle, reading as a stutter right as scroll starts.
+  const collapseNaturalHeight = useSharedValue(topInset + 250);
   const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
 
   const collapseStyle = useAnimatedStyle(() => ({
@@ -297,7 +303,7 @@ export const ProfileHeroCard = ({
     // shrinks away too — the sticky bar doesn't move, it gets clipped from
     // the bottom up as the shell around it shrinks, which reads as "fades in
     // then gets carried away with the rest of the page."
-    <View style={{ position: 'relative', minHeight: topInset + 70 }}>
+    <View style={{ position: 'relative', minHeight: topInset + 96 }}>
       {/* ── Rich hero — cover banner + overlapping avatar, collapses away ── */}
       <Animated.View style={[collapseStyle, { overflow: 'hidden' }]}>
         <View
@@ -342,7 +348,7 @@ export const ProfileHeroCard = ({
           </View>
 
           {/* Avatar + name/handle + actions — one row, LinkedIn-style */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 18, gap: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 44, gap: 14 }}>
             {/* Outer wrapper has NO overflow:hidden — only the inner circle
                 clips the image, so the edit badge (positioned partly outside
                 the circle) doesn't get clipped along with it. */}
@@ -436,7 +442,7 @@ export const ProfileHeroCard = ({
         style={[
           dashboardStyles.stickyRow,
           stickyBarStyle,
-          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset + 14, paddingHorizontal: 16 },
+          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset + 40, paddingHorizontal: 16 },
         ]}
       >
         <View style={dashboardStyles.stickyAvatarWrap}>

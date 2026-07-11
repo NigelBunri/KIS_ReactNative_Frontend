@@ -288,6 +288,7 @@ import PPVEventsScreen from '@/screens/broadcast/media_extended/PPVEventsScreen'
 import { GoldenSectionProvider, useGoldenSection } from '@/contexts/GoldenSectionContext';
 import { GoldHeaderShell } from '@/components/common/GoldHeaderShell';
 import { useKISTheme } from '@/theme/useTheme';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 
 type AuthCtx = {
@@ -322,13 +323,21 @@ let appAuthCheckBlockedUntil = 0;
 // registers its own content via useGoldenSectionContent; renders nothing
 // when no gold screen is focused.
 function GoldenSection() {
-  const { payload } = useGoldenSection();
+  const { payload, ownerKey } = useGoldenSection();
   const { palette } = useKISTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useRawTopInset();
   if (!payload) return null;
   return (
-    <View style={{ backgroundColor: palette.bg, marginTop: -(insets.top * 2.6) }}>
-      <GoldHeaderShell colors={payload.colors} style={payload.shellStyle}>
+    <View style={{ backgroundColor: palette.bg, marginTop: -(topInset * 2.6) }}>
+      {/* key={ownerKey} — force a fresh native gradient view per registering
+          screen instead of reusing/mutating one persistent view across tab
+          switches. react-native-linear-gradient isn't fully Fabric-compatible
+          yet (upstream: not fixed until its 3.0.0 line, still pre-release);
+          a persistent view reused across screens risks one screen's heavier
+          simultaneous-gradient rendering (Partners) wedging the shared native
+          view so it stays blank for every screen after, until this remounts
+          it. */}
+      <GoldHeaderShell key={ownerKey} colors={payload.colors} style={payload.shellStyle}>
         {payload.content}
       </GoldHeaderShell>
       <NetworkStatusPill />

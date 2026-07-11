@@ -1,6 +1,7 @@
 package com.kis
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.telephony.TelephonyManager
@@ -40,7 +41,7 @@ class SimInfoModule(private val reactContext: ReactApplicationContext) :
                 return
             }
 
-            val tm = reactContext.getSystemService(ReactApplicationContext.TELEPHONY_SERVICE)
+            val tm = reactContext.getSystemService(Context.TELEPHONY_SERVICE)
                 as? TelephonyManager
             @Suppress("DEPRECATION")
             val number = tm?.line1Number

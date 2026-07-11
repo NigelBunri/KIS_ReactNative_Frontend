@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate, Extrapolation, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
@@ -64,8 +65,8 @@ export default function BibleScreen() {
   const insets = useSafeAreaInsets();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
-  // spacing, so it reads the raw device inset instead.
-  const topInset = insets.top;
+  // spacing, so it reads the raw (corrected) device inset instead.
+  const topInset = useRawTopInset();
   const { palette, tone } = useKISTheme();
   // Gold header always needs dark icons (same as Broadcast + Messages)
   useStatusBarStyle(tone, 'dark-content');
@@ -262,7 +263,7 @@ export default function BibleScreen() {
         <View style={[styles.headerHalo, {marginTop: topInset}]} />
 
         {/* ── Always-visible header bar ─────────────────────────────────── */}
-        <View style={[styles.headerBar, { paddingTop: topInset + (compactBible ? 24 : 30) }]}>
+        <View style={[styles.headerBar, { paddingTop: topInset + (compactBible ? 34 : 40) }]}>
           {/* Left: icon + eyebrow + title */}
           <View style={styles.headerTitleGroup}>
             <View style={styles.headerIconCircle}>

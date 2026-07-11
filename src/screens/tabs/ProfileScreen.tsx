@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { useResponsiveLayout } from '@/theme/responsive';
 import {
   useFocusEffect,
@@ -233,8 +234,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
-  // spacing, so it reads the raw device inset instead.
-  const topInset = insets.top;
+  // spacing, so it reads the raw (corrected) device inset instead.
+  const topInset = useRawTopInset();
   const { palette, tone } = useKISTheme();
   useStatusBarStyle(tone);   // light-content on dark bg, dark-content on light bg
   const responsive = useResponsiveLayout();

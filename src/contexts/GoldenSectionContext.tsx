@@ -24,7 +24,16 @@ export type GoldenSectionPayload = {
 // blur-cleanup that fires after the next screen's focus-registration would
 // wipe out the new screen's just-registered content (a race during tab
 // switches that made the Golden Section, and anything below it, flicker).
-type Owner = symbol;
+//
+// A plain unique string rather than a Symbol() — App.tsx's shell uses this as
+// a React `key` on the shared GoldHeaderShell/LinearGradient so switching
+// which screen owns the Golden Section forces a fresh native view instead of
+// mutating one persistent instance's props. (Symbol's string form collapses
+// to its shared description text, e.g. "Symbol(goldenSectionOwner)", for
+// every instance, so it can't be used as a key directly.)
+type Owner = string;
+let ownerSeq = 0;
+const createOwner = (label: string): Owner => `${label}-${++ownerSeq}`;
 
 type GoldenSectionSetters = {
   setGoldenSection: (owner: Owner, payload: GoldenSectionPayload) => void;
@@ -47,7 +56,8 @@ const GoldenSectionSettersContext = createContext<GoldenSectionSetters>({
   setSuppressed: () => {},
 });
 
-const GoldenSectionPayloadContext = createContext<GoldenSectionPayload | null>(null);
+type GoldenSectionEntry = { owner: Owner; payload: GoldenSectionPayload } | null;
+const GoldenSectionPayloadContext = createContext<GoldenSectionEntry>(null);
 const GoldenSectionSuppressedContext = createContext(false);
 
 export function GoldenSectionProvider({ children }: { children: React.ReactNode }) {
@@ -88,7 +98,7 @@ export function GoldenSectionProvider({ children }: { children: React.ReactNode 
 
   return (
     <GoldenSectionSettersContext.Provider value={setters}>
-      <GoldenSectionPayloadContext.Provider value={state?.payload ?? null}>
+      <GoldenSectionPayloadContext.Provider value={state}>
         <GoldenSectionSuppressedContext.Provider value={suppressors.size > 0}>
           {children}
         </GoldenSectionSuppressedContext.Provider>
@@ -97,11 +107,20 @@ export function GoldenSectionProvider({ children }: { children: React.ReactNode 
   );
 }
 
-/** Raw payload/suppression access — used by the App.tsx-hosted GoldenSection shell. */
+/**
+ * Raw payload/suppression access — used by the App.tsx-hosted GoldenSection
+ * shell. `ownerKey` identifies which screen instance currently owns the
+ * slot — pass it as the shared GoldHeaderShell's `key` so a screen switch
+ * always mounts a fresh native gradient view rather than reusing/mutating
+ * one persistent instance (see the Owner type comment above for why).
+ */
 export function useGoldenSection() {
-  const payload = useContext(GoldenSectionPayloadContext);
+  const entry = useContext(GoldenSectionPayloadContext);
   const suppressed = useContext(GoldenSectionSuppressedContext);
-  return { payload: suppressed ? null : payload };
+  return {
+    payload: suppressed ? null : entry?.payload ?? null,
+    ownerKey: entry?.owner ?? null,
+  };
 }
 
 /**
@@ -121,7 +140,7 @@ export function useGoldenSectionContent(payload: GoldenSectionPayload | null) {
   const { setGoldenSection, clearGoldenSection } = useContext(GoldenSectionSettersContext);
   const isFocused = useIsFocused();
   const ownerRef = useRef<Owner | null>(null);
-  if (ownerRef.current === null) ownerRef.current = Symbol('goldenSectionOwner');
+  if (ownerRef.current === null) ownerRef.current = createOwner('goldenSectionOwner');
 
   useEffect(() => {
     if (!isFocused || !payload) return;
@@ -143,7 +162,7 @@ export function useGoldenSectionContent(payload: GoldenSectionPayload | null) {
 export function useGoldenSectionSuppression(active: boolean) {
   const { setSuppressed } = useContext(GoldenSectionSettersContext);
   const ownerRef = useRef<Owner | null>(null);
-  if (ownerRef.current === null) ownerRef.current = Symbol('goldenSectionSuppressor');
+  if (ownerRef.current === null) ownerRef.current = createOwner('goldenSectionSuppressor');
 
   useEffect(() => {
     const owner = ownerRef.current!;

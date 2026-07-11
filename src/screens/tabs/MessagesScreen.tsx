@@ -25,6 +25,7 @@ import ReAnimated, { withTiming } from 'react-native-reanimated';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import {
   createMaterialTopTabNavigator,
   MaterialTopTabBar,
@@ -142,8 +143,8 @@ export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, header
   const insets = useSafeAreaInsets();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
-  // spacing, so it reads the raw device inset instead.
-  const topInset = insets.top;
+  // spacing, so it reads the raw (corrected) device inset instead.
+  const topInset = useRawTopInset();
   const { width, height } = useWindowDimensions();
   const responsive = useResponsiveLayout();
   const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
@@ -1841,7 +1842,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: topInset + 28,
+                paddingTop: topInset + 38,
               },
             ]}
           >
@@ -1952,7 +1953,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: topInset + 28,
+                paddingTop: topInset + 38,
               },
             ]}
           >
@@ -2058,7 +2059,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             {
               position: 'absolute',
               right: messageHeaderPaddingX,
-              top: topInset + (isTinyDevice ? 52 : 62),
+              top: topInset + (isTinyDevice ? 62 : 72),
               borderColor: palette.gold,
               backgroundColor: palette.card,
               shadowColor: palette.shadow,

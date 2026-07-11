@@ -13,7 +13,7 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
@@ -123,8 +123,8 @@ export default function BroadcastScreen() {
   const responsive = useResponsiveLayout();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
-  // spacing, so it reads the raw device inset instead.
-  const topInset = useSafeAreaInsets().top;
+  // spacing, so it reads the raw (corrected) device inset instead.
+  const topInset = useRawTopInset();
   const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
   // goldHeader: gold-first so the transparent status bar shows gold, not dark.
@@ -395,7 +395,7 @@ export default function BroadcastScreen() {
               collapse itself), not two independently-timed animations
               fighting each other (that mismatch was the previous "too much
               gap" / "not smooth" bug). */}
-          <View style={{ paddingTop: topInset + 15}}>
+          <View style={{ paddingTop: topInset + 25}}>
             {/* ── STICKY: header bar — never collapses, matches the sticky-row ── */}
             {/* pattern shared by every Golden Section now. ────────────────── */}
             <View
