@@ -318,16 +318,21 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AUTH_429_BACKOFF_MS = 2 * 60 * 1000;
 let appAuthCheckBlockedUntil = 0;
 
-// Single persistent gold-gradient header shell, hoisted above the navigator.
-// Whichever main tab is focused (Messages/Broadcast/Bible/Partners/Profile)
-// registers its own content via useGoldenSectionContent; renders nothing
-// when no gold screen is focused.
+
+// Single persistent gold-gradient header shell, hoisted above the navigator
+// as a normal-flow flex sibling (every gold-header screen uses this same
+// path — Messages/Broadcast/Bible/Partners/Profile). Whichever main tab is
+// focused registers its own content via useGoldenSectionContent; renders
+// nothing when no gold screen is focused.
 function GoldenSection() {
   const { payload, ownerKey } = useGoldenSection();
   const { palette } = useKISTheme();
   const topInset = useRawTopInset();
+
   if (!payload) return null;
   return (
+    // marginTop pulls the gradient up so it bleeds behind the status bar
+    // instead of leaving a gap above it.
     <View style={{ backgroundColor: palette.bg, marginTop: -(topInset * 2.6) }}>
       {/* key={ownerKey} — force a fresh native gradient view per registering
           screen instead of reusing/mutating one persistent view across tab

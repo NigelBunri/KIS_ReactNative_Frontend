@@ -12,6 +12,7 @@ import {
   Animated,
   DeviceEventEmitter,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,7 +86,8 @@ import {
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
-import ReanimatedScroll, { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
+import ReanimatedScroll, { useAnimatedReaction, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useAgeMode } from '@/theme/ageModeContext';
 import { useThemeMode, type KISThemeMode } from '@/theme/themeModeContext';
 import {
@@ -192,6 +194,7 @@ import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
 import { useLanguage } from '@/languages';
 import {
   AppointmentSummaryCard,
+  HERO_COLLAPSE_DISTANCE,
   ImpactSnapshotCard,
   LanguageSelectorCard,
   MarketplaceOrdersSummary,
@@ -240,10 +243,37 @@ export default function ProfileScreen() {
   useStatusBarStyle(tone);   // light-content on dark bg, dark-content on light bg
   const responsive = useResponsiveLayout();
   // Drives the gold section's collapsing hero — see ProfileHeroCard.
-  const profileScrollY = useSharedValue(0);
-  const profileScrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => { profileScrollY.value = e.contentOffset.y; },
-  });
+  // ProfileHeroCard keeps its own bespoke collapseStyle/stickyBarStyle (its
+  // two-state crossfade needs a seeded natural-height to avoid an on-mount
+  // stutter, which the hook's own collapseStyle doesn't support).
+  const { scrollY: profileScrollY, onScroll: profileScrollHandler } = useCollapsingGoldHeader(HERO_COLLAPSE_DISTANCE);
+  // ProfileHeroCard's collapse animates a real layout property (maxHeight) on
+  // a box that sits above this same ScrollView as a normal-flow flex sibling
+  // (the gold header is no longer a position:absolute overlay), so shrinking
+  // it resizes the ScrollView's own container — which perturbs its content
+  // offset and re-fires the scroll handler on literally every touch-move
+  // frame. On a slow drag there's time for each correction to land before the
+  // next touch-move, so it reads as the whole screen vibrating in place and
+  // barely moving; a fast flick outruns the loop and looks fine (this is
+  // exactly what made it "only move on a fast release"). Unlike the other
+  // gold-header screens (search bar / banner text — cheap to relayout),
+  // ProfileHeroCard's collapsing box contains real network Images (cover +
+  // avatar), which makes each resize expensive enough for the loop's timing
+  // to become visible. profileHeaderY breaks the loop by only retargeting
+  // once the raw offset has moved a few pixels, then easing to it — coarse
+  // enough that the container resize can no longer fire on every frame. The
+  // real ScrollView's own scrolling stays driven by the raw, un-eased
+  // profileScrollY above, so the page itself never lags behind your finger —
+  // only the hero's own collapse animation is deliberately smoothed.
+  const profileHeaderY = useSharedValue(0);
+  useAnimatedReaction(
+    () => profileScrollY.value,
+    (current) => {
+      if (Math.abs(current - profileHeaderY.value) > 6) {
+        profileHeaderY.value = withTiming(current, { duration: 160 });
+      }
+    },
+  );
   const compactProfile = responsive.isWatch || responsive.isCompactPhone;
   const tinyProfile = responsive.isWatch;
   const dashboardTheme = useMemo(
@@ -2409,7 +2439,7 @@ export default function ProfileScreen() {
           })
         }
         topInset={topInset}
-        scrollY={profileScrollY}
+        scrollY={profileHeaderY}
       />
     ),
   });
@@ -2423,6 +2453,7 @@ export default function ProfileScreen() {
           styles.scroll,
           {
             gap: responsive.cardGap,
+            paddingTop: compactProfile ? 8 : 12,
             paddingBottom: (compactProfile ? 32 : 44) + insets.bottom,
           },
         ]}
@@ -3172,166 +3203,195 @@ export default function ProfileScreen() {
         />
       ) : null}
 
-      {c.showCreatePartner && (
-        <Animated.View
-          style={[
-            styles.slideContainer,
-            {
-              backgroundColor: palette.bg,
-              width: responsive.width,
-              transform: [{ translateX: c.slideX }],
-            },
-          ]}
-        >
-          <PartnerCreateSlide onClose={c.closeCreatePartner} />
-        </Animated.View>
-      )}
+      {/*
+       * These four overlays (partner-create slide, management panel, shop
+       * drawer, bottom sheet) are plain absolutely-positioned Views mounted
+       * deep inside this screen's own tree — i.e. inside the main
+       * navigator's subtree, which App.tsx wraps at zIndex:1, a *sibling* of
+       * the GoldenSection header overlay (zIndex:5). In React Native, zIndex
+       * only orders siblings within the same parent stacking context, so no
+       * local zIndex/elevation on these overlays can ever out-stack
+       * GoldenSection — they'd render underneath it. Hosting them inside a
+       * single native Modal escapes that stacking context entirely (a
+       * Modal paints in its own top-level native layer), which is how every
+       * other "modal" in the app already avoids this problem. animationType
+       * is "none" because each overlay drives its own translateX/translateY
+       * entrance animation.
+       */}
+      <Modal
+        transparent
+        animationType="none"
+        visible={Boolean(
+          c.showCreatePartner || managementPanelKey || shopEditorVisible || c.activeSheet,
+        )}
+        onRequestClose={() => {
+          if (c.activeSheet) c.closeSheet();
+          else if (shopEditorVisible) closeShopEditor();
+          else if (managementPanelKey) closeManagementPanel();
+          else if (c.showCreatePartner) c.closeCreatePartner();
+        }}
+      >
+        {c.showCreatePartner && (
+          <Animated.View
+            style={[
+              styles.slideContainer,
+              {
+                backgroundColor: palette.bg,
+                width: responsive.width,
+                transform: [{ translateX: c.slideX }],
+              },
+            ]}
+          >
+            <PartnerCreateSlide onClose={c.closeCreatePartner} />
+          </Animated.View>
+        )}
 
-      {managementPanelKey && (
-        <Animated.View
-          style={[
-            styles.managementPanel,
-            {
-              transform: [{ translateX: managementPanelOffset }],
-              backgroundColor: palette.surface,
-              width: responsive.width,
-            },
-          ]}
-        >
-          <View style={styles.managementPanelHeader}>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.managementPanelTitle, { color: palette.text }]}
+        {managementPanelKey && (
+          <Animated.View
+            style={[
+              styles.managementPanel,
+              {
+                transform: [{ translateX: managementPanelOffset }],
+                backgroundColor: palette.surface,
+                width: responsive.width,
+              },
+            ]}
+          >
+            <View style={styles.managementPanelHeader}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.managementPanelTitle, { color: palette.text }]}
+                >
+                  {managementPanelDefinition?.managementLabel ??
+                    managementPanelDefinition?.label ??
+                    'Profile console'}
+                </Text>
+                <Text
+                  style={[
+                    styles.managementPanelSubtitle,
+                    { color: palette.subtext },
+                  ]}
+                >
+                  {managementPanelDefinition?.helper}
+                </Text>
+              </View>
+              <Pressable
+                onPress={closeManagementPanel}
+                style={styles.managementClose}
               >
-                {managementPanelDefinition?.managementLabel ??
-                  managementPanelDefinition?.label ??
-                  'Profile console'}
-              </Text>
-              <Text
-                style={[
-                  styles.managementPanelSubtitle,
-                  { color: palette.subtext },
-                ]}
-              >
-                {managementPanelDefinition?.helper}
-              </Text>
+                <KISIcon name="close" size={28} color={palette.subtext} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={closeManagementPanel}
-              style={styles.managementClose}
-            >
-              <KISIcon name="close" size={28} color={palette.subtext} />
-            </Pressable>
-          </View>
-          {renderManagementPanelContent()}
-        </Animated.View>
-      )}
+            {renderManagementPanelContent()}
+          </Animated.View>
+        )}
 
-      <ShopEditorDrawer
-        visible={shopEditorVisible}
-        mode={shopEditorMode}
-        marketForm={marketForm}
-        loading={marketFormLoading}
-        onChangeField={updateMarketFormField}
-        onClose={closeShopEditor}
-        onSave={handleMarketFormSave}
-        onDelete={
-          marketFormMode === 'edit' && canDeleteActiveShop
-            ? handleMarketFormDelete
-            : undefined
-        }
-        activeShop={activeShop}
-        canDeleteShop={canDeleteActiveShop}
-      />
+        <ShopEditorDrawer
+          visible={shopEditorVisible}
+          mode={shopEditorMode}
+          marketForm={marketForm}
+          loading={marketFormLoading}
+          onChangeField={updateMarketFormField}
+          onClose={closeShopEditor}
+          onSave={handleMarketFormSave}
+          onDelete={
+            marketFormMode === 'edit' && canDeleteActiveShop
+              ? handleMarketFormDelete
+              : undefined
+          }
+          activeShop={activeShop}
+          canDeleteShop={canDeleteActiveShop}
+        />
 
-      {/* Bottom Sheet host */}
-      {c.activeSheet && (
-        <BottomSheet sheetY={c.sheetY} onBackdropPress={c.closeSheet}>
-          <SheetHeader title={sheetTitle} onClose={c.closeSheet} />
+        {/* Bottom Sheet host */}
+        {c.activeSheet && (
+          <BottomSheet sheetY={c.sheetY} onBackdropPress={c.closeSheet}>
+            <SheetHeader title={sheetTitle} onClose={c.closeSheet} />
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-            {c.activeSheet === 'editProfile' && (
-              <EditProfileModal
-                palette={palette}
-                draftProfile={c.draftProfile}
-                setDraftProfile={c.setDraftProfile}
-                pickImage={c.pickImage}
-                saving={c.saving}
-                saveProfile={c.saveProfile}
-                sections={c.sectionList}
-                onAddSectionItem={type => {
-                  if (type === 'portfolio' || type === 'intro_video') {
-                    c.addGalleryMedia();
-                    return;
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+              {c.activeSheet === 'editProfile' && (
+                <EditProfileModal
+                  palette={palette}
+                  draftProfile={c.draftProfile}
+                  setDraftProfile={c.setDraftProfile}
+                  pickImage={c.pickImage}
+                  saving={c.saving}
+                  saveProfile={c.saveProfile}
+                  sections={c.sectionList}
+                  onAddSectionItem={type => {
+                    if (type === 'portfolio' || type === 'intro_video') {
+                      c.addGalleryMedia();
+                      return;
+                    }
+                    c.openItemEditor(type);
+                  }}
+                  onEditSectionItem={(type, item) => c.openItemEditor(type, item)}
+                  onDeleteSectionItem={(type, id) => c.deleteItem(type, id)}
+                  galleryItems={editGalleryItems}
+                  onAddGalleryMedia={c.addGalleryMedia}
+                  addingGalleryMedia={c.addingGalleryMedia}
+                  onDeleteGalleryItem={handleDeleteGalleryItem}
+                  deletingGalleryItemId={deletingGalleryItemId}
+                />
+              )}
+
+              {c.activeSheet === 'privacy' && (
+                <PrivacyModal
+                  palette={palette}
+                  draftPrivacy={c.draftPrivacy}
+                  setDraftPrivacy={c.setDraftPrivacy}
+                  saving={c.saving}
+                  savePrivacy={c.savePrivacy}
+                  profile={c.profile}
+                />
+              )}
+
+              {c.activeSheet === 'editItem' && c.draftItem && (
+                <EditItemModal
+                  palette={palette}
+                  draftItem={c.draftItem}
+                  setDraftItem={c.setDraftItem}
+                  pickShowcaseFile={c.pickShowcaseFile}
+                  saving={c.saving}
+                  saveItem={c.saveItem}
+                />
+              )}
+
+              {c.activeSheet === 'wallet' && (
+                <WalletModal
+                  palette={palette}
+                  walletForm={c.walletForm}
+                  setWalletForm={c.setWalletForm}
+                  setWalletRecipient={c.setWalletRecipient}
+                  walletRecipientVerification={c.walletRecipientVerification}
+                  verifyWalletRecipient={c.verifyWalletRecipient}
+                  saving={c.saving}
+                  submitWalletAction={c.submitWalletAction}
+                  lastWalletPaymentUrl={c.lastWalletPaymentUrl}
+                />
+              )}
+
+              {c.activeSheet === 'upgrade' && (
+                <UpgradeModal
+                  tiers={upgradeTiers}
+                  accountTier={accountTier}
+                  saving={c.saving}
+                  onUpgrade={c.upgradeTier}
+                  subscription={
+                    c.billingHistory?.subscription ?? c.profile?.subscription
                   }
-                  c.openItemEditor(type);
-                }}
-                onEditSectionItem={(type, item) => c.openItemEditor(type, item)}
-                onDeleteSectionItem={(type, id) => c.deleteItem(type, id)}
-                galleryItems={editGalleryItems}
-                onAddGalleryMedia={c.addGalleryMedia}
-                addingGalleryMedia={c.addingGalleryMedia}
-                onDeleteGalleryItem={handleDeleteGalleryItem}
-                deletingGalleryItemId={deletingGalleryItemId}
-              />
-            )}
-
-            {c.activeSheet === 'privacy' && (
-              <PrivacyModal
-                palette={palette}
-                draftPrivacy={c.draftPrivacy}
-                setDraftPrivacy={c.setDraftPrivacy}
-                saving={c.saving}
-                savePrivacy={c.savePrivacy}
-                profile={c.profile}
-              />
-            )}
-
-            {c.activeSheet === 'editItem' && c.draftItem && (
-              <EditItemModal
-                palette={palette}
-                draftItem={c.draftItem}
-                setDraftItem={c.setDraftItem}
-                pickShowcaseFile={c.pickShowcaseFile}
-                saving={c.saving}
-                saveItem={c.saveItem}
-              />
-            )}
-
-            {c.activeSheet === 'wallet' && (
-              <WalletModal
-                palette={palette}
-                walletForm={c.walletForm}
-                setWalletForm={c.setWalletForm}
-                setWalletRecipient={c.setWalletRecipient}
-                walletRecipientVerification={c.walletRecipientVerification}
-                verifyWalletRecipient={c.verifyWalletRecipient}
-                saving={c.saving}
-                submitWalletAction={c.submitWalletAction}
-                lastWalletPaymentUrl={c.lastWalletPaymentUrl}
-              />
-            )}
-
-            {c.activeSheet === 'upgrade' && (
-              <UpgradeModal
-                tiers={upgradeTiers}
-                accountTier={accountTier}
-                saving={c.saving}
-                onUpgrade={c.upgradeTier}
-                subscription={
-                  c.billingHistory?.subscription ?? c.profile?.subscription
-                }
-                billingHistory={c.billingHistory}
-                usage={c.billingHistory?.usage || c.profile?.stats}
-                onCancel={c.cancelSubscription}
-                onResume={c.resumeSubscription}
-                onDowngrade={c.downgradeTier}
-                onRetry={c.retryTransaction}
-              />
-            )}
-          </ScrollView>
-        </BottomSheet>
-      )}
+                  billingHistory={c.billingHistory}
+                  usage={c.billingHistory?.usage || c.profile?.stats}
+                  onCancel={c.cancelSubscription}
+                  onResume={c.resumeSubscription}
+                  onDowngrade={c.downgradeTier}
+                  onRetry={c.retryTransaction}
+                />
+              )}
+            </ScrollView>
+          </BottomSheet>
+        )}
+      </Modal>
       <FeedComposerSheet
         visible={advancedFeedComposerVisible}
         onClose={() => {

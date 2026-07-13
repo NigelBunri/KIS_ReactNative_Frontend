@@ -17,13 +17,13 @@ import {
   AppState,
   useWindowDimensions,
   Modal,
-  PanResponder,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
-import ReAnimated, { withTiming } from 'react-native-reanimated';
+import ReAnimated, { useSharedValue, withTiming } from 'react-native-reanimated';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
+import { useHeaderDragToScroll, type ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import {
@@ -1526,28 +1526,6 @@ const handleSelectAllChats = useCallback(() => {
     scrollY.value = reduceMotionRef.current ? 0 : withTiming(0, { duration: 220 });
   }, [scrollY]);
 
-  // Lets a vertical drag directly on the gold header itself (not just on the
-  // Chats/Updates/Calls/Communities lists below) collapse/reveal the search
-  // bar + filter chips — same heuristic BibleScreen uses for its own header.
-  // Tracks the collapse position 1:1 with the finger, same as a real scroll.
-  const gestureStartScrollRef = useRef(0);
-  const headerPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dy) > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
-        onPanResponderGrant: () => {
-          gestureStartScrollRef.current = scrollY.value;
-        },
-        onPanResponderMove: (_, gesture) => {
-          // Finger moving up (negative dy) == scrolling down == collapsing.
-          const next = gestureStartScrollRef.current - gesture.dy;
-          scrollY.value = Math.max(0, Math.min(MESSAGES_COLLAPSE_DISTANCE, next));
-        },
-      }),
-    [scrollY],
-  );
-
   // ── Load/save custom filters ─────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -1606,6 +1584,37 @@ const handleSelectAllChats = useCallback(() => {
   const [activeTopTab, setActiveTopTab] = useState<'Chats' | 'Updates' | 'Calls' | 'Communities'>('Chats');
   const [tabSearchOpen, setTabSearchOpen] = useState(false);
   const [tabSearchQuery, setTabSearchQuery] = useState('');
+
+  // The gold header is registered content rendered by App.tsx's shared
+  // GoldenSection host (a normal-flow flex sibling above the navigator), not
+  // part of this screen's own view tree — a drag starting on it has no
+  // native scroll gesture to move the page. These refs let
+  // useHeaderDragToScroll (below) imperatively scroll whichever sub-tab is
+  // currently active in lockstep with the header drag, same pattern as
+  // BibleScreen's scrollActiveContentTo.
+  const chatsTabRef = useRef<ScrollableHandle>(null);
+  const updatesTabRef = useRef<ScrollableHandle>(null);
+  const callsTabRef = useRef<ScrollableHandle>(null);
+  const communitiesTabRef = useRef<ScrollableHandle>(null);
+  const scrollActiveContentTo = useCallback((y: number, animated: boolean) => {
+    const activeRef =
+      activeTopTab === 'Chats' ? chatsTabRef
+      : activeTopTab === 'Updates' ? updatesTabRef
+      : activeTopTab === 'Calls' ? callsTabRef
+      : communitiesTabRef;
+    activeRef.current?.scrollTo({ y, animated });
+  }, [activeTopTab]);
+  const messagesCollapseDistance = useSharedValue(MESSAGES_COLLAPSE_DISTANCE);
+  // Lets a vertical drag directly on the gold header itself (not just on the
+  // Chats/Updates/Calls/Communities lists below) collapse/reveal the search
+  // bar + filter chips — same shared mechanism BibleScreen uses for its own
+  // header, which also keeps the active list scrolling in lockstep with the
+  // drag instead of just animating the header in place.
+  const { panHandlers: headerPanHandlers } = useHeaderDragToScroll({
+    scrollY,
+    collapseDistance: messagesCollapseDistance,
+    onScrollTo: scrollActiveContentTo,
+  });
 
   const AnimatedTopBar = (tabProps: any) => {
     const nextTab = tabProps?.state?.routes?.[tabProps.state.index]?.name;
@@ -1831,7 +1840,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // opening underneath the still-visible gold header.
   useGoldenSectionContent(chatVisible || addVisible ? null : {
     content: (
-      <View {...headerPanResponder.panHandlers}>
+      <View {...headerPanHandlers}>
 
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
@@ -2319,6 +2328,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             options={{ tabBarLabel: translateString('Chats') }}
             children={() => (
               <ChatsTab
+                ref={chatsTabRef}
                 filters={customFilters}
                 activeQuick={activeQuickForChats}
                 activeCustomId={activeCustom}
@@ -2357,19 +2367,19 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             name="Updates"
             options={{ tabBarLabel: translateString('Updates') }}
             children={() => (
-              <UpdatesTab searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
+              <UpdatesTab ref={updatesTabRef} searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
           />
           <Tab.Screen
             name="Calls"
             options={{ tabBarLabel: translateString('Calls') }}
-            children={() => <CallsTab searchTerm={query} onScroll={handleTabScroll} />}
+            children={() => <CallsTab ref={callsTabRef} searchTerm={query} onScroll={handleTabScroll} />}
           />
           <Tab.Screen
             name="Communities"
             options={{ tabBarLabel: translateString('Communities') }}
             children={() => (
-              <CommunitiesTab onOpenChat={onOpenChat} onScroll={handleTabScroll} />
+              <CommunitiesTab ref={communitiesTabRef} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
           />
         </Tab.Navigator>

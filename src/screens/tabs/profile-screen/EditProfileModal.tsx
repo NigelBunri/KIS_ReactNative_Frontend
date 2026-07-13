@@ -2,10 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
   Image,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -225,7 +223,6 @@ export function EditProfileModal(props: EditProfileModalProps) {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
     <View style={{ gap: 12 }}>
       <View
         style={{
@@ -741,6 +738,5 @@ export function EditProfileModal(props: EditProfileModalProps) {
         </View>
       </Modal>
     </View>
-    </KeyboardAvoidingView>
   );
 }

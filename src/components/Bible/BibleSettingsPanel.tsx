@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
@@ -10,7 +11,7 @@ import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
-import type { BibleTranslation } from '@/screens/tabs/bible/useBibleData';
+import type { BibleSpiritualGrowthSummary, BibleTranslation } from '@/screens/tabs/bible/useBibleData';
 import {
   LocalBiblePreference,
   mergeAndWriteLocalBiblePreference,
@@ -20,6 +21,7 @@ import {
 
 type Props = {
   translations: BibleTranslation[];
+  spiritualGrowthSummary?: BibleSpiritualGrowthSummary | null;
 };
 
 type Preference = LocalBiblePreference;
@@ -67,10 +69,14 @@ const listFromResponse = (data: any) => {
 
 const boolText = (value?: boolean) => (value ? 'Yes' : 'No');
 
-export default function BibleSettingsPanel({ translations }: Props) {
+export default function BibleSettingsPanel({ translations, spiritualGrowthSummary }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
+  const metallicGoldGradient = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
+  const streak = spiritualGrowthSummary?.journey?.streak ?? 0;
+  const growthCounts = spiritualGrowthSummary?.counts ?? {};
+  const growthReadiness = spiritualGrowthSummary?.readiness ?? {};
   const [preference, setPreference] = useState<Preference | null>(null);
   const [loadingPreference, setLoadingPreference] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -219,6 +225,58 @@ export default function BibleSettingsPanel({ translations }: Props) {
           <View style={[styles.badge, { backgroundColor: palette.primarySoft }]}>
             <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>KCAN</Text>
           </View>
+        </View>
+      </BibleSectionCard>
+
+      <BibleSectionCard>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Your journey</Text>
+            <Text style={{ color: palette.subtext, marginTop: 4 }}>
+              Scripture, prayer, notes, plans, and discipleship in one flow.
+            </Text>
+          </View>
+          <LinearGradient
+            colors={metallicGoldGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.streakBadge}
+          >
+            <Text style={{ color: palette.ivory, fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
+              {streak}
+            </Text>
+            <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.9 }}>
+              DAY
+            </Text>
+          </LinearGradient>
+        </View>
+        <View style={styles.growthStats}>
+          {[
+            { label: 'Notes', value: growthCounts.notes ?? 0, icon: '📝' },
+            { label: 'Highlights', value: growthCounts.highlights ?? 0, icon: '✨' },
+            { label: 'Plans', value: growthCounts.active_reading_plans ?? 0, icon: '📅' },
+            { label: 'Missed', value: growthCounts.missed_reading_events ?? 0, icon: '⚠️' },
+          ].map((item) => (
+            <View key={item.label} style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+              <Text style={{ fontSize: 16, marginBottom: 2 }}>{item.icon}</Text>
+              <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                {item.value > 99 ? '99+' : item.value}
+              </Text>
+              <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.growthSignals}>
+          {[
+            growthReadiness.family_safe_journey ? 'Family-safe ✓' : 'Safety pending',
+            growthReadiness.low_bandwidth_ready ? 'Offline-ready ✓' : 'Online-first',
+            growthReadiness.licensed_translations_ready ? 'Licensed ✓' : 'License review',
+            growthReadiness.study_courses_ready ? 'Study-ready ✓' : 'Study setup',
+          ].map((label) => (
+            <View key={label} style={[styles.growthSignal, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+              <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700' }}>{label}</Text>
+            </View>
+          ))}
         </View>
       </BibleSectionCard>
 
@@ -411,6 +469,27 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '900' },
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  streakBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  growthStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  growthStat: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  growthStatValue: { fontSize: 17, fontWeight: '900', letterSpacing: 0.1 },
+  growthStatLabel: { fontSize: 11, fontWeight: '700', marginTop: 2, letterSpacing: 0.1 },
+  growthSignals: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  growthSignal: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   label: { fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginTop: 4 },
   settingRow: { borderWidth: 2, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },

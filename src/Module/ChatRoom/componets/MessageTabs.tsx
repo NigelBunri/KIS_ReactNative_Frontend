@@ -1,5 +1,5 @@
 // src/screens/tabs/MessageTabs.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -97,7 +98,7 @@ function Badge({ count, palette }: { count: number; palette: any }) {
   );
 }
 
-export function ChatsTab({
+export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function ChatsTab({
   conversations = [],
   filters,
   activeQuick,
@@ -121,8 +122,12 @@ export function ChatsTab({
   selectedChat = [],
   setSelectedChat,
   loading = false,
-}: ChatsTabProps) {
+}: ChatsTabProps, ref) {
   const { palette } = useKISTheme();
+  const listRef = useRef<FlatList>(null);
+  useImperativeHandle(ref, () => ({
+    scrollTo: ({ y, animated }) => listRef.current?.getScrollResponder()?.scrollTo({ y, animated }),
+  }), []);
 
   const getStatusSymbol = (status?: MessageStatus) => {
     if (!status) return '';
@@ -714,6 +719,7 @@ export function ChatsTab({
 
   return (
     <FlatList
+      ref={listRef}
       contentContainerStyle={{ padding: 16 }}
       data={listData}
       keyExtractor={(i) => `${i._isArchivedItem ? 'arch_' : ''}${i.id}`}
@@ -733,7 +739,7 @@ export function ChatsTab({
       renderItem={({ item }) => renderChatItem(item)}
     />
   );
-}
+});
 
 const SKELETON_COUNT = 8;
 

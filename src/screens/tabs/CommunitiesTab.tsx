@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,7 @@ import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
 import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 type Community = {
   id: string;
@@ -79,7 +80,7 @@ type CommunitiesTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
-export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps) {
+const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps, ref) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
@@ -95,6 +96,19 @@ export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabP
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [tab, setTab] = useState<'feed' | 'groups'>('feed');
+  // Only one of these 3 mutually-exclusive lists (feed/groups within a
+  // selected community, or the top-level communities list) is visible at a
+  // time, mirroring which of `selected`/`tab` is active — the imperative
+  // handle below dispatches to whichever is currently on-screen.
+  const feedListRef = useRef<FlatList>(null);
+  const groupsListRef = useRef<FlatList>(null);
+  const communitiesListRef = useRef<FlatList>(null);
+  useImperativeHandle(ref, () => ({
+    scrollTo: (opts) => {
+      const activeRef = !selected ? communitiesListRef : tab === 'feed' ? feedListRef : groupsListRef;
+      activeRef.current?.getScrollResponder()?.scrollTo(opts);
+    },
+  }), [selected, tab]);
   const [communityVisible, setCommunityVisible] = useState(false);
   const [activeCommunity, setActiveCommunity] = useState<Community | null>(null);
   const communitySlide = useState(() => new Animated.Value(-width))[0];
@@ -683,6 +697,7 @@ export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabP
                 </Pressable>
               </View>
               <FlatList
+                ref={feedListRef}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
                 data={posts}
@@ -713,6 +728,7 @@ export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabP
                 <Text style={{ color: palette.bg, fontWeight: '600' }}>Create Group</Text>
               </Pressable>
               <FlatList
+                ref={groupsListRef}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
                 data={groups}
@@ -742,6 +758,7 @@ export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabP
         </View>
       ) : (
         <FlatList
+          ref={communitiesListRef}
           onScroll={onScroll}
           scrollEventThrottle={16}
           data={communities}
@@ -1022,7 +1039,9 @@ export default function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabP
       </Modal>
     </View>
   );
-}
+});
+
+export default CommunitiesTab;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },

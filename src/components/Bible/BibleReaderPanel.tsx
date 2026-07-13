@@ -1,6 +1,8 @@
 import React, {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -78,6 +80,15 @@ const HIGHLIGHT_COLORS = [
   '#FED7AA',
 ];
 
+// Exposed to BibleScreen so the gold header's drag-to-collapse gesture
+// (BibleScreen's topAreaPanResponder) can move this panel's own ScrollView
+// in lockstep — the header lives outside this component (mounted by
+// App.tsx's GoldenSection overlay), so a drag starting on the header has no
+// other way to reach the actual scrollable content underneath.
+export type BibleReaderPanelHandle = {
+  scrollTo: (opts: { y: number; animated?: boolean }) => void;
+};
+
 type Props = {
   translations: BibleTranslation[];
   books: BibleBook[];
@@ -142,7 +153,7 @@ const localDateTimeForTomorrow = () => {
   return date.toISOString();
 };
 
-export default function BibleReaderPanel({
+const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function BibleReaderPanel({
   translations,
   books,
   reader,
@@ -153,7 +164,7 @@ export default function BibleReaderPanel({
   onScroll,
   onRefresh,
   refreshing = false,
-}: Props) {
+}: Props, ref) {
   const { palette, isDark } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compactReader = responsive.isWatch || responsive.isCompactPhone;
@@ -210,6 +221,9 @@ export default function BibleReaderPanel({
     Record<string, BibleOfflineDownloadJob>
   >({});
   const readerScrollRef = useRef<ScrollView | null>(null);
+  useImperativeHandle(ref, () => ({
+    scrollTo: (opts) => readerScrollRef.current?.scrollTo(opts),
+  }), []);
   const verseOffsetsRef = useRef<Record<string, number>>({});
   const pendingScrollVerseRef = useRef<number | null>(null);
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
@@ -2108,7 +2122,7 @@ export default function BibleReaderPanel({
   return (
     <View style={styles.readerRoot}>
       <View
-        style={[styles.stickyReaderHeaderWrap, { backgroundColor: palette.bg, }]}
+        style={[styles.stickyReaderHeaderWrap, { backgroundColor: palette.bg, paddingHorizontal: 12 }]}
       >
         <View
           style={[
@@ -2176,7 +2190,7 @@ export default function BibleReaderPanel({
         }
       >
         <BibleSectionCard>
-          <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
+          <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow, {paddingHorizontal : 12}]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: palette.text }]}>Read</Text>
               <Text style={{ color: palette.subtext, marginTop: 4 }}>
@@ -2374,7 +2388,9 @@ export default function BibleReaderPanel({
       {renderVerseActionModal()}
     </View>
   );
-}
+});
+
+export default BibleReaderPanel;
 
 const styles = StyleSheet.create({
   readerRoot: { flex: 1, minHeight: 0 },

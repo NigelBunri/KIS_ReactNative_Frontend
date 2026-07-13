@@ -206,7 +206,9 @@ const SectionHeader = ({
 };
 
 // Scroll distance (px) over which the hero collapses to just the sticky bar.
-const HERO_COLLAPSE_DISTANCE = 130;
+// Exported so ProfileScreen.tsx's useCollapsingGoldHeader call uses the same
+// value instead of duplicating the literal.
+export const HERO_COLLAPSE_DISTANCE = 130;
 const BIG_AVATAR_SIZE_COMPACT = 84;
 const BIG_AVATAR_SIZE_REGULAR = 100;
 

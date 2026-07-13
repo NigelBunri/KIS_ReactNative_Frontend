@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
@@ -40,6 +40,7 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
 type StatusReplyPermission = 'contacts' | 'nobody';
@@ -154,14 +155,18 @@ type UpdatesTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
-export default function UpdatesTab({
+const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function UpdatesTab({
   searchTerm = '',
   onOpenChat,
   onScroll,
-}: UpdatesTabProps) {
+}: UpdatesTabProps, ref) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const topInset = useSafeTopInset();
+  const scrollRef = useRef<ScrollView>(null);
+  useImperativeHandle(ref, () => ({
+    scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
+  }), []);
   const { currentUserId } = useSocket();
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
@@ -959,6 +964,7 @@ export default function UpdatesTab({
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <ScrollView
+        ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}
@@ -2060,7 +2066,9 @@ export default function UpdatesTab({
       </Modal>
     </View>
   );
-}
+});
+
+export default UpdatesTab;
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },

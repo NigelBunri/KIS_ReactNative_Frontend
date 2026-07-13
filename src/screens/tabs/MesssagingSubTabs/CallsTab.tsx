@@ -1,7 +1,7 @@
 // src/screens/tabs/MesssagingSubTabs/CallsTab.tsx
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from 'react-native';
+import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import Skeleton from '@/components/common/Skeleton';
@@ -80,12 +81,16 @@ function formatScheduledFor(iso: string | null): string {
   return `in ${h}h${m > 0 ? ` ${m}m` : ''}`;
 }
 
-export default function CallsTab({ searchTerm = '', onScroll }: CallsTabProps) {
+const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({ searchTerm = '', onScroll }: CallsTabProps, ref) {
   const { palette } = useKISTheme();
   const STATUS_COLOR = buildStatusColor(palette);
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
+  const listRef = useRef<SectionList>(null);
+  useImperativeHandle(ref, () => ({
+    scrollTo: ({ y, animated }) => listRef.current?.getScrollResponder()?.scrollTo({ y, animated }),
+  }), []);
   const { currentUserId, startCall, joinExistingCall, socket } = useSocket();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -507,6 +512,7 @@ export default function CallsTab({ searchTerm = '', onScroll }: CallsTabProps) {
         </View>
       ) : (
         <SectionList
+          ref={listRef}
           onScroll={onScroll}
           scrollEventThrottle={16}
           sections={sections}
@@ -552,7 +558,9 @@ export default function CallsTab({ searchTerm = '', onScroll }: CallsTabProps) {
       />
     </View>
   );
-}
+});
+
+export default CallsTab;
 
 function formatTimeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();

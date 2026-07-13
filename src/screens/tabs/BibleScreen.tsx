@@ -1,10 +1,7 @@
 // src/screens/tabs/BibleScreen.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DeviceEventEmitter,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { useAnimatedStyle, interpolate, Extrapolation, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import LinearGradient from 'react-native-linear-gradient';
@@ -22,7 +18,6 @@ import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { KIS_ROYAL_GRADIENTS } from '../../theme/constants';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
-import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useBibleData } from './bible/useBibleData';
 import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
@@ -78,17 +73,6 @@ export default function BibleScreen() {
   const bibleGoldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
-  // Same shared Reanimated mechanism as every other Golden Section
-  // (useCollapsingGoldHeader), but Bible's collapse distance is itself the
-  // measured natural height (not a fixed constant like Messages/Broadcast),
-  // and its interpolation has a 3-point opacity curve + a spring-to-nearest-
-  // edge release — both different enough from the hook's built-in
-  // `collapseStyle` that this screen builds its own useAnimatedStyle from
-  // the hook's shared `scrollY`/`naturalHeight` instead of using `collapseStyle`.
-  const { scrollY: headerScrollY, naturalHeight: topChromeHeightShared, onHeaderLayout: onTopChromeLayout } = useCollapsingGoldHeader(240);
-  const gestureStartOffsetRef = useRef(0);
-  const growthCounts = spiritualGrowthSummary?.counts ?? {};
-  const growthReadiness = spiritualGrowthSummary?.readiness ?? {};
 
   const tabs = useMemo(
     () => [
@@ -109,18 +93,6 @@ export default function BibleScreen() {
     setOpenReadFilters(() => open);
   }, []);
 
-  // Shared by BibleReaderPanel's own scroll and the other tabs' ScrollView —
-  // a plain callback writing into the shared value (not
-  // useAnimatedScrollHandler) so neither needs to become a Reanimated-
-  // wrapped component.
-  const handleContentScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    headerScrollY.value = e.nativeEvent.contentOffset.y;
-  }, [headerScrollY]);
-
-  useEffect(() => {
-    headerScrollY.value = 0;
-  }, [activeTab, headerScrollY]);
-
   // Listen for bible.verse.open events from global search
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('bible.verse.open', (payload: any) => {
@@ -134,55 +106,6 @@ export default function BibleScreen() {
     });
     return () => sub.remove();
   }, [loadReader]);
-
-  const topAreaPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dy) > 8 &&
-          Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
-        onPanResponderGrant: () => {
-          gestureStartOffsetRef.current = headerScrollY.value;
-        },
-        onPanResponderMove: (_, gesture) => {
-          const collapseDistance = Math.max(topChromeHeightShared.value, 1);
-          headerScrollY.value = Math.max(0, Math.min(collapseDistance, gestureStartOffsetRef.current - gesture.dy));
-        },
-        onPanResponderRelease: (_, gesture) => {
-          const collapseDistance = Math.max(topChromeHeightShared.value, 1);
-          const nextOffset = Math.max(0, Math.min(collapseDistance, gestureStartOffsetRef.current - gesture.dy));
-          const shouldCollapse =
-            gesture.vy < -0.35 || nextOffset > collapseDistance * 0.45;
-          const shouldExpand =
-            gesture.vy > 0.35 || nextOffset < collapseDistance * 0.18;
-          headerScrollY.value = withSpring(
-            shouldExpand ? 0 : shouldCollapse ? collapseDistance : nextOffset,
-            { damping: 16, stiffness: 140 },
-          );
-        },
-        onPanResponderTerminate: () => {
-          const collapseDistance = Math.max(topChromeHeightShared.value, 1);
-          headerScrollY.value = withSpring(
-            Math.max(0, Math.min(collapseDistance, headerScrollY.value)),
-            { damping: 16, stiffness: 140 },
-          );
-        },
-      }),
-    [headerScrollY, topChromeHeightShared],
-  );
-  const topChromeAnimatedStyle = useAnimatedStyle(() => {
-    const collapseDistance = Math.max(topChromeHeightShared.value, 1);
-    const fullHeight = topChromeHeightShared.value > 0 ? topChromeHeightShared.value : 240;
-    return {
-      height: interpolate(headerScrollY.value, [0, collapseDistance], [fullHeight, 0], Extrapolation.CLAMP),
-      opacity: interpolate(
-        headerScrollY.value,
-        [0, collapseDistance * 0.8, collapseDistance],
-        [1, 0.18, 0],
-        Extrapolation.CLAMP,
-      ),
-    };
-  });
 
   useEffect(() => {
     if (activeTab === 'daily') {
@@ -223,7 +146,6 @@ export default function BibleScreen() {
             loading={loadingReader}
             onLoad={loadReader}
             onRegisterFilterOpener={registerReadFilterOpener}
-            onScroll={handleContentScroll}
             onRefresh={handleBibleRefresh}
             refreshing={bibleRefreshing}
           />
@@ -244,18 +166,18 @@ export default function BibleScreen() {
       case 'messages':
         return <BibleMessagesPanel />;
       case 'settings':
-        return <BibleSettingsPanel translations={translations} />;
+        return <BibleSettingsPanel translations={translations} spiritualGrowthSummary={spiritualGrowthSummary} />;
       default:
         return null;
     }
   };
 
-  const streak = spiritualGrowthSummary?.journey?.streak ?? 0;
-
   // Registered with the shared Golden Section host in App.tsx instead of
   // rendering GoldHeaderShell locally — stays mounted across tab switches.
-  // topAreaPanResponder/topChromeAnimatedStyle below keep driving the
-  // (now externally-mounted) header JSX identically.
+  // A plain, static header now (identity bar + tab row): the collapsing
+  // "Your journey" stats card that used to live here moved to the Settings
+  // tab (BibleSettingsPanel), so there's no scroll-driven collapse animation
+  // to drive anymore.
   useGoldenSectionContent({
     content: (
       <>
@@ -308,105 +230,8 @@ export default function BibleScreen() {
           </View>
         </View>
 
-        {/* ── Collapsing section: subtitle + spiritual journey stats ────── */}
-        <Animated.View
-          {...topAreaPanResponder.panHandlers}
-          style={[styles.topChrome, topChromeAnimatedStyle]}
-        >
-          <View
-            style={styles.topChromeMeasure}
-            onLayout={onTopChromeLayout}
-          >
-            {/* Brief subtitle */}
-            <Text style={[styles.headerSubtitle, { color: 'rgba(255,244,184,0.78)', paddingHorizontal: responsive.pageGutter }]}>
-              Read Scripture, pray, meditate, and track your spiritual reading journey.
-            </Text>
-
-            {/* Spiritual journey stats card */}
-            <View style={[styles.growthCard, { backgroundColor: 'rgba(23,17,31,0.35)', borderColor: 'rgba(255,244,184,0.22)', marginHorizontal: responsive.pageGutter }]}>
-              <View style={styles.growthHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.growthTitle, { color: palette.onGold }]}>
-                    Your journey
-                  </Text>
-                  <Text style={[styles.growthSubtitle, { color: 'rgba(255,244,184,0.68)' }]}>
-                    Scripture, prayer, notes, plans, and discipleship in one flow.
-                  </Text>
-                </View>
-                {/* Streak badge — visible in the collapsing section */}
-                <LinearGradient
-                  colors={metallicGoldGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.streakBadge}
-                >
-                  <View pointerEvents="none" style={styles.goldSheen} />
-                  <Text style={{ color: palette.ivory, fontSize: 19, fontWeight: '900', lineHeight: 23 }}>
-                    {streak}
-                  </Text>
-                  <Text style={{ color: palette.ivory, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, opacity: 0.90 }}>
-                    DAY
-                  </Text>
-                </LinearGradient>
-              </View>
-              <View style={styles.growthStats}>
-                {[
-                  { label: 'Notes', value: growthCounts.notes ?? 0, icon: '📝' },
-                  { label: 'Highlights', value: growthCounts.highlights ?? 0, icon: '✨' },
-                  { label: 'Plans', value: growthCounts.active_reading_plans ?? 0, icon: '📅' },
-                  { label: 'Missed', value: growthCounts.missed_reading_events ?? 0, icon: '⚠️' },
-                ].map(item => (
-                  <View
-                    key={item.label}
-                    style={[styles.growthStat, { backgroundColor: 'rgba(255,244,184,0.10)', borderColor: 'rgba(255,244,184,0.18)' }]}
-                  >
-                    <Text style={{ fontSize: 16, marginBottom: 2 }}>{item.icon}</Text>
-                    <Text style={[styles.growthStatValue, { color: palette.onGold }]}>
-                      {item.value > 99 ? '99+' : item.value}
-                    </Text>
-                    <Text style={[styles.growthStatLabel, { color: 'rgba(255,244,184,0.65)' }]}>
-                      {item.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              {/* Readiness signals */}
-              <View style={styles.growthSignals}>
-                {[
-                  growthReadiness.family_safe_journey ? 'Family-safe ✓' : 'Safety pending',
-                  growthReadiness.low_bandwidth_ready ? 'Offline-ready ✓' : 'Online-first',
-                  growthReadiness.licensed_translations_ready ? 'Licensed ✓' : 'License review',
-                  growthReadiness.study_courses_ready ? 'Study-ready ✓' : 'Study setup',
-                ].map(label => (
-                  <View key={label} style={[styles.growthSignal, { borderColor: 'rgba(255,244,184,0.28)', backgroundColor: 'rgba(255,244,184,0.08)' }]}>
-                    <Text style={[styles.growthSignalText, { color: 'rgba(255,244,184,0.75)' }]}>
-                      {label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <ConsumerSpiritualRevenuePreviewCard
-              palette={palette}
-              kind="bible_home"
-              title="Bible and family growth preview"
-              subtitle="Consumer Plus and Family Plus are visible here for planning only; current Bible, prayer, meditation, and reading features stay available."
-            />
-            <NotificationRetentionPreviewCard
-              palette={palette}
-              kind="bible"
-              title="Spiritual reminder preview"
-              subtitle="Smarter reading, prayer, meditation, and family devotional reminders are preview-only."
-            />
-          </View>
-        </Animated.View>
-
         {/* ── Tab bar — inside the gradient so it's part of the gold header ── */}
-        <View
-          {...topAreaPanResponder.panHandlers}
-          style={[styles.stickyTabsOuter, { paddingHorizontal: responsive.pageGutter }]}
-        >
+        <View style={[styles.stickyTabsOuter, { paddingHorizontal: responsive.pageGutter }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -469,15 +294,13 @@ export default function BibleScreen() {
         {activeTab === 'read' ? (
           <View style={styles.readContent}>{renderTab()}</View>
         ) : (
-          <Animated.ScrollView
+          <ScrollView
             style={styles.contentScroll}
             contentContainerStyle={[
               styles.content,
               { gap: responsive.cardGap, paddingBottom: (compactBible ? 28 : 40) + insets.bottom },
             ]}
             showsVerticalScrollIndicator={false}
-            onScroll={handleContentScroll}
-            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
                 refreshing={bibleRefreshing}
@@ -485,8 +308,23 @@ export default function BibleScreen() {
               />
             }
           >
+            <Text style={[styles.headerSubtitle, { color: palette.subtext, paddingHorizontal: responsive.pageGutter }]}>
+              Read Scripture, pray, meditate, and track your spiritual reading journey.
+            </Text>
+            <ConsumerSpiritualRevenuePreviewCard
+              palette={palette}
+              kind="bible_home"
+              title="Bible and family growth preview"
+              subtitle="Consumer Plus and Family Plus are visible here for planning only; current Bible, prayer, meditation, and reading features stay available."
+            />
+            <NotificationRetentionPreviewCard
+              palette={palette}
+              kind="bible"
+              title="Spiritual reminder preview"
+              subtitle="Smarter reading, prayer, meditation, and family devotional reminders are preview-only."
+            />
             {renderTab()}
-          </Animated.ScrollView>
+          </ScrollView>
         )}
       </View>
     </View>
@@ -551,21 +389,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Streak badge (inside the collapsing section) ───────────────────────────
-  streakBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-
-  // ── Collapsing top chrome ──────────────────────────────────────────────────
-  topChrome: { overflow: 'hidden' },
-  topChromeMeasure: { paddingBottom: 6 },
-
   // ── Tab row (inside gradient) ──────────────────────────────────────────────
   stickyTabsOuter: { paddingBottom: 12 },
   tabRow: { alignItems: 'center' },
@@ -583,78 +406,9 @@ const styles = StyleSheet.create({
   readContent: { flex: 1, minHeight: 0 },
   contentScroll: { flex: 1 },
   content: { paddingVertical: 16, gap: 16, paddingBottom: 40 },
-  growthCard: {
-    borderWidth: 1.5,
-    borderRadius: 20,
-    padding: 14,
-    marginTop: 12,
-    marginBottom: 6,
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 6,
-    overflow: 'hidden',
-  },
-  growthHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  growthTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.1,
-  },
-  growthSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 17,
-    marginTop: 2,
-  },
   goldSheen: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255,255,255,0.16)',
     transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
-  },
-  growthStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  growthStat: {
-    flexGrow: 1,
-    flexBasis: '22%',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  growthStatValue: {
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 0.1,
-  },
-  growthStatLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
-    letterSpacing: 0.1,
-  },
-  growthSignals: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
-    marginTop: 12,
-  },
-  growthSignal: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  growthSignalText: {
-    fontSize: 11,
-    fontWeight: '700',
   },
 });
