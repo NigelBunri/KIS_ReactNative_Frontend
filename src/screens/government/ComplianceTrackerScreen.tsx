@@ -282,7 +282,7 @@ export default function ComplianceTrackerScreen(_props: Props) {
         <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, paddingTop: 40 }]}>
           <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={60}
           >
             <View

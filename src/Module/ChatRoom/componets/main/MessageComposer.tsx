@@ -10,6 +10,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
@@ -392,6 +393,22 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   useEffect(() => {
     loadStickers();
   }, [stickerVersion, loadStickers]);
+
+  /* ----------------------------- KEYBOARD VISIBILITY ----------------------- */
+  // bottomInset reserves space for the device's nav bar, but only while the
+  // keyboard is closed — once it's open the keyboard already covers that
+  // area, so keeping the padding leaves a dead gap above the keyboard.
+  const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
+
+  // Android quirk: dismissing the keyboard (e.g. the back button) hides it
+  // without blurring the TextInput, so the OS still considers it focused and
+  // won't reopen the keyboard on a plain tap. Forcing a blur immediately
+  // before refocusing makes Android reissue the "show keyboard" request.
+  const handleComposerInputPressIn = useCallback(() => {
+    if (isKeyboardVisible) return;
+    textInputRef.current?.blur();
+    requestAnimationFrame(() => textInputRef.current?.focus());
+  }, [isKeyboardVisible]);
 
   /* ----------------------------- PANEL STATE ------------------------------ */
   const [keyboardMode, setKeyboardMode] = useState(true);
@@ -840,7 +857,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         {
           borderTopColor: palette.divider,
           backgroundColor: palette.chatComposerBg ?? palette.card,
-          paddingBottom: bottomInset,
+          paddingBottom: isKeyboardVisible ? 0 : bottomInset,
         },
       ]}
     >
@@ -951,7 +968,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       )}
 
       {/* MAIN INPUT ROW */}
-      <View style={[styles.composerMainRow, { paddingVertical: responsive.isWatch ? 5 : responsive.isCompactPhone ? 7 : 10 }]}>
+      <View style={[styles.composerMainRow]}>
         {!isVoiceActive && (
           <>
             <Pressable
@@ -971,7 +988,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 {
                   marginHorizontal: responsive.isWatch ? 2 : 4,
                   paddingHorizontal: responsive.isWatch ? 8 : 12,
-                  paddingVertical: responsive.isWatch ? 4 : 6,
+                  paddingVertical: 5,
                   borderRadius: responsive.isWatch ? 15 : 18,
                   backgroundColor: palette.composerInputBg,
                   borderColor:
@@ -984,6 +1001,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 value={value}
                 editable={!disabled}
                 onChangeText={handleTextChange}
+                onPressIn={handleComposerInputPressIn}
                 placeholder={
                   editing
                     ? 'Edit message'

@@ -38,6 +38,12 @@ type ProfileGalleryItem = {
   deletable?: boolean;
 };
 
+type ImageUploadStatus = {
+  kind: 'avatar' | 'cover';
+  status: 'compressing' | 'initiating' | 'uploading' | 'confirming' | 'done';
+  progress: number;
+};
+
 type EditProfileModalProps = {
   palette: KISPalette;
   draftProfile: any;
@@ -45,6 +51,7 @@ type EditProfileModalProps = {
   pickImage: (type: 'avatar' | 'cover') => Promise<void>;
   saving: boolean;
   saveProfile: () => void;
+  imageUploadStatus?: ImageUploadStatus | null;
   sections?: SectionDescriptor[];
   onAddSectionItem?: (type: ItemType) => void;
   onEditSectionItem?: (type: ItemType, item: any) => void;
@@ -104,6 +111,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
     pickImage,
     saving,
     saveProfile,
+    imageUploadStatus = null,
     sections = [],
     onAddSectionItem,
     onEditSectionItem,
@@ -135,6 +143,25 @@ export function EditProfileModal(props: EditProfileModalProps) {
         .filter((item) => item.uri.length > 0),
     [galleryItems],
   );
+
+  const imageUploadLabel = useMemo(() => {
+    if (!imageUploadStatus) return '';
+    const subject = imageUploadStatus.kind === 'cover' ? 'cover photo' : 'profile photo';
+    switch (imageUploadStatus.status) {
+      case 'compressing':
+        return `Preparing ${subject}…`;
+      case 'initiating':
+        return `Preparing ${subject}…`;
+      case 'uploading':
+        return `Uploading ${subject}… ${Math.round(imageUploadStatus.progress * 100)}%`;
+      case 'confirming':
+        return `Finishing ${subject}…`;
+      case 'done':
+        return `${subject === 'cover photo' ? 'Cover photo' : 'Profile photo'} uploaded.`;
+      default:
+        return '';
+    }
+  }, [imageUploadStatus]);
 
   const selectedLanguages = useMemo(() => {
     const normalized = normalizeModalLanguages(draftProfile?.languages);
@@ -620,8 +647,16 @@ export function EditProfileModal(props: EditProfileModalProps) {
         ) : null}
       </View>
 
+      {imageUploadLabel ? (
+        <Text
+          style={[styles.subtext, { color: palette.subtext, textAlign: 'center', marginTop: 12 }]}
+        >
+          {imageUploadLabel}
+        </Text>
+      ) : null}
+
       <KISButton
-        style={{ marginTop: 18, marginBottom: 10 }}
+        style={{ marginTop: imageUploadLabel ? 6 : 18, marginBottom: 10 }}
         title={saving ? 'Saving...' : 'Save Profile Changes'}
         onPress={saveProfile}
         disabled={saving}

@@ -873,7 +873,7 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
           ) : (
           <KeyboardAvoidingView
             style={{ flex: 1, backgroundColor: palette.bg, }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <ScrollView
               style={[styles.body, { paddingHorizontal: pagePadding, paddingTop: responsive.isWatch ? 10 : 16, backgroundColor: palette.bg, }]}

@@ -112,16 +112,30 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           return;
         }
 
-        const options: CameraOptions = {
-          mediaType,
-          cameraType,
-          saveToPhotos: true,
-          includeExtra: true,
-          quality: mediaType === 'photo' ? 0.8 : undefined,
-          videoQuality: 'high',
-          durationLimit: mediaType === 'video' ? 60 : undefined,
-          presentationStyle: 'fullScreen',
-        };
+        // NOTE: react-native-image-picker's native Options.java reads some of
+        // these keys unconditionally (e.g. durationLimit), so a key set to
+        // JS `undefined` gets dropped by the bridge and crashes the app with
+        // NoSuchKeyException. Keys must be omitted entirely, not set to
+        // undefined, when they don't apply to the current mediaType.
+        const options: CameraOptions =
+          mediaType === 'photo'
+            ? {
+                mediaType,
+                cameraType,
+                saveToPhotos: true,
+                includeExtra: true,
+                quality: 0.8,
+                presentationStyle: 'fullScreen',
+              }
+            : {
+                mediaType,
+                cameraType,
+                saveToPhotos: true,
+                includeExtra: true,
+                videoQuality: 'high',
+                durationLimit: 60,
+                presentationStyle: 'fullScreen',
+              };
 
         const result = await launchCamera(options);
         if (result.didCancel) return;
@@ -275,7 +289,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
 
 
         {/* HEADER */}

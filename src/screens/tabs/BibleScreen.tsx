@@ -18,6 +18,7 @@ import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { KIS_ROYAL_GRADIENTS } from '../../theme/constants';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { useBibleData } from './bible/useBibleData';
 import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
@@ -171,6 +172,69 @@ export default function BibleScreen() {
         return null;
     }
   };
+
+  // Tablet-shell right-hand Context Panel — built entirely from
+  // spiritualGrowthSummary, which this screen already fetches via
+  // useBibleData(); no new network calls. today_passage doubles as the
+  // "verse of the day" card the reference mockup shows on Messages, but
+  // placed here instead since this is the one screen that actually has that
+  // data (see MessagesScreen.tsx's context-panel comment for why it's
+  // omitted there).
+  const journey = spiritualGrowthSummary?.journey;
+  const counts = spiritualGrowthSummary?.counts;
+  const todayPassage = journey?.today_passage;
+  useContextPanelContent(
+    spiritualGrowthSummary ? (
+      <>
+        {journey?.streak ? (
+          <TabletCard>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <KISIcon name="flame" size={18} color={palette.goldReadable} />
+              <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
+                {journey.streak}-day streak
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 6 }}>
+              Keep reading today to extend your streak.
+            </Text>
+          </TabletCard>
+        ) : null}
+
+        {todayPassage ? (
+          <TabletCard>
+            <Text style={{ fontSize: 11, fontWeight: '900', color: palette.goldReadable, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Today's Passage
+            </Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text, marginTop: 6 }}>
+              {todayPassage.title}
+            </Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 4 }}>
+              {todayPassage.passage_ref}
+            </Text>
+          </TabletCard>
+        ) : null}
+
+        {counts ? (
+          <TabletCard>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Your Journey</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+              {[
+                { label: 'Bookmarks', value: counts.bookmarks },
+                { label: 'Highlights', value: counts.highlights },
+                { label: 'Notes', value: counts.notes },
+                { label: 'Reading plans', value: counts.active_reading_plans },
+              ].filter((row) => typeof row.value === 'number').map((row) => (
+                <View key={row.label} style={{ minWidth: '45%', borderRadius: 14, padding: 10, backgroundColor: palette.selectedBg }}>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: palette.text }}>{row.value}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: palette.subtext }}>{row.label}</Text>
+                </View>
+              ))}
+            </View>
+          </TabletCard>
+        ) : null}
+      </>
+    ) : null,
+  );
 
   // Registered with the shared Golden Section host in App.tsx instead of
   // rendering GoldHeaderShell locally — stays mounted across tab switches.

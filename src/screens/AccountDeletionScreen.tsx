@@ -96,7 +96,7 @@ export default function AccountDeletionScreen() {
         <View style={styles.backButton} />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={[styles.content, { padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center' }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.warningCard, { backgroundColor: palette.surface, borderColor: palette.danger }]}>
           <KISIcon name="shield" size={28} color={palette.danger} />

@@ -11,6 +11,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 
 // Tenor GIF API — set TENOR_API_KEY in your .env file.
@@ -63,6 +64,7 @@ export const GifPickerSheet: React.FC<Props> = ({
   onSelectGif,
   palette,
 }) => {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [query, setQuery] = useState('');
   const [gifs, setGifs] = useState<TenorGif[]>([]);
@@ -179,7 +181,7 @@ export const GifPickerSheet: React.FC<Props> = ({
           />
         )}
 
-        <Text style={[styles.attribution, { color: palette.subtext }]}>
+        <Text style={[styles.attribution, { color: palette.subtext, paddingBottom: Math.max(insets.bottom, 12) }]}>
           Powered by Tenor
         </Text>
       </Animated.View>

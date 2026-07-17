@@ -168,7 +168,7 @@ export default function NotificationSettingsScreen() {
     <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: palette.bg, }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
         <View style={[s.header, { borderBottomColor: palette.divider }]}>

@@ -67,7 +67,7 @@ export default function PartnerRedeemInviteScreen({ route, navigation }: Props) 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: topInset, backgroundColor: palette.surface }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Animated.View style={[styles.card, { backgroundColor: palette.surface, opacity: fadeAnim, shadowColor: palette.royalInk }]}>
         <Pressable

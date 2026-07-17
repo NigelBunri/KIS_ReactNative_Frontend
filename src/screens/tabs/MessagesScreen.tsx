@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import ReAnimated, { useSharedValue, withTiming } from 'react-native-reanimated';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useHeaderDragToScroll, type ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +41,7 @@ import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import ChatRoomPage, { type AttachmentFilePayload } from '@/Module/ChatRoom/ChatRoomPage';
 import { CameraCaptureModal } from '@/Module/ChatRoom/componets/main/CameraCaptureModal';
 import { useSocket } from '../../../SocketProvider';
+import { useAuth } from '../../../App';
 import { loadMessages, upsertMessage } from '@/Module/ChatRoom/Storage/chatStorage';
 import { normalizePhoneKey, participantsToIds } from '@/Module/ChatRoom/messagesUtils';
 import { decryptFromUser, ensureDeviceId } from '@/security/e2ee';
@@ -186,6 +188,7 @@ const [conversationMeta, setConversationMeta] = useState<Record<string, Conversa
 const [communityByConversationId, setCommunityByConversationId] = useState<Record<string, { id: string; name: string }>>({});
 const [communityGroupConversationIds, setCommunityGroupConversationIds] = useState<Set<string>>(new Set());
 const { socket, isConnected, typingByConversation, currentUserId, presenceByUser, startCall } = useSocket();
+const { user: contextPanelUser } = useAuth();
 const [authCacheUserId, setAuthCacheUserId] = useState<string | null>(null);
 const effectiveCurrentUserId = currentUserId || authCacheUserId || null;
 const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
@@ -1826,6 +1829,68 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // Gold header → always use dark icons for readability (push/pop so other
   // screens' bar styles are unaffected when navigating away).
   useStatusBarStyle(tone, 'dark-content');
+
+  // Tablet-shell right-hand Context Panel (only rendered on tablet/desktop —
+  // see src/components/shell/ContextPanel.tsx; a no-op registration on
+  // phone). Built entirely from state this screen already fetches/computes
+  // (conversationMeta, presenceByUser) — no new network calls. "Mentions"
+  // and "Verse of the day" cards from the reference mockup are intentionally
+  // omitted: neither has a real backing data source anywhere in the app
+  // today, and fabricating one would violate "don't change backend logic" /
+  // the same no-fake-data rule already applied to the sidebar's omitted
+  // "Saved" item.
+  const totalUnreadCount = useMemo(
+    () => Object.values(conversationMeta).reduce((sum, entry) => sum + (entry.unreadCount || 0), 0),
+    [conversationMeta],
+  );
+  const unreadConversationCount = useMemo(
+    () => Object.values(conversationMeta).filter((entry) => (entry.unreadCount || 0) > 0).length,
+    [conversationMeta],
+  );
+  const onlineNowCount = useMemo(
+    () => Object.values(presenceByUser).filter((entry) => entry.isOnline).length,
+    [presenceByUser],
+  );
+  const firstName = (contextPanelUser?.display_name || contextPanelUser?.profile?.display_name || contextPanelUser?.username || '').split(' ')[0];
+
+  useContextPanelContent(
+    chatVisible || addVisible ? null : (
+      <>
+        <TabletCard>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: palette.text }}>
+            {firstName ? `Good day, ${firstName}` : 'Good day'} 👋
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 4 }}>
+            Here's what's happening in your world today.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <View style={{ flex: 1, borderRadius: 16, padding: 12, backgroundColor: palette.selectedBg }}>
+              <KISIcon name="unread" size={16} color={palette.goldReadable} />
+              <Text style={{ fontSize: 20, fontWeight: '900', color: palette.text, marginTop: 6 }}>{totalUnreadCount}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: palette.subtext }}>Unread</Text>
+            </View>
+            <View style={{ flex: 1, borderRadius: 16, padding: 12, backgroundColor: palette.selectedBg }}>
+              <KISIcon name="chat" size={16} color={palette.goldReadable} />
+              <Text style={{ fontSize: 20, fontWeight: '900', color: palette.text, marginTop: 6 }}>{unreadConversationCount}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: palette.subtext }}>Conversations</Text>
+            </View>
+          </View>
+        </TabletCard>
+
+        <TabletCard>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.success }} />
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Active Now</Text>
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 6 }}>
+            {onlineNowCount > 0
+              ? `${onlineNowCount} ${onlineNowCount === 1 ? 'person is' : 'people are'} online right now`
+              : 'No one is online right now'}
+          </Text>
+        </TabletCard>
+      </>
+    ),
+  );
 
   // Registered with the shared Golden Section host in App.tsx instead of
   // rendering GoldHeaderShell locally, so it stays mounted/animated across

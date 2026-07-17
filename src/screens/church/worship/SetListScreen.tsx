@@ -236,7 +236,7 @@ export default function SetListScreen({ navigation }: Props) {
 
       {/* ── Create Set List Modal ── */}
       <Modal visible={createVisible} transparent animationType="slide" onRequestClose={() => setCreateVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { backgroundColor: palette.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: palette.text }]}>New Set List</Text>

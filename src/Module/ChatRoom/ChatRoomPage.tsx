@@ -118,7 +118,7 @@ import type { DisappearDuration } from './componets/main/DisappearingTimerSheet'
 import { saveWallpaper, loadWallpaper, WALLPAPER_OPTIONS } from './componets/main/WallpaperPickerSheet';
 import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
 import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText';
-import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -222,7 +222,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /* ------------------------------------------------------------------------ */
 
   const { palette, isDark } = useKISTheme();
-  const rawTopInset = useSafeTopInset();
+  const rawTopInset = useRawTopInset();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const topInset =
     typeof safeAreaTopInsetOverride === 'number'
@@ -2163,6 +2163,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     >
       {!hideHeader && (
         <View
+          style={{ marginTop: -topInset }}
           onLayout={(e) => {
             const h = e?.nativeEvent?.layout?.height;
             if (h && h > 0) setChatHeaderH(h);
@@ -2170,6 +2171,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         >
         <ChatHeader
           chat={chat}
+          topInset={topInset}
           onBack={selectionMode ? exitSelectionMode : onBack}
           palette={palette}
           onOpenInfo={selectionMode ? undefined : handleOpenInfo}

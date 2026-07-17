@@ -30,7 +30,29 @@ export type ResponsiveLayout = {
   bodyFontSize: number;
   labelFontSize: number;
   columns: { cards: number; dense: number };
+
+  // ── Tablet shell layout mode ─────────────────────────────────────────
+  // Independent of the density-oriented isTablet/isLargeTablet above (which
+  // key off shortestSide for phone-density scaling). These key off raw
+  // `width` against the KIS tablet-shell breakpoints (768dp / 1024dp) and
+  // decide whether the app renders the phone bottom-tab UI or the tablet
+  // three-column shell (sidebar + top bar + context panel). Keep these two
+  // concerns separate: existing isTablet/isLargeTablet consumers (219 call
+  // sites) must not change behavior when these are added.
+  isPhoneLayout: boolean;
+  isTabletLayout: boolean;
+  isDesktopLayout: boolean;
+  shellMode: 'phone' | 'tablet' | 'desktop';
 };
+
+const TABLET_SHELL_BREAKPOINT = 768;
+const DESKTOP_SHELL_BREAKPOINT = 1024;
+
+export function getShellMode(width: number): 'phone' | 'tablet' | 'desktop' {
+  if (width >= DESKTOP_SHELL_BREAKPOINT) return 'desktop';
+  if (width >= TABLET_SHELL_BREAKPOINT) return 'tablet';
+  return 'phone';
+}
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -65,6 +87,8 @@ export function createResponsiveLayout(width: number, height: number, fontScale 
   const cards = isLargeTablet ? 3 : isTablet && isLandscape ? 2 : 1;
   const dense = isLargeTablet ? 4 : isTablet ? 3 : isCompactPhone || isWatch ? 1 : 2;
 
+  const shellMode = getShellMode(width);
+
   return {
     width,
     height,
@@ -87,6 +111,11 @@ export function createResponsiveLayout(width: number, height: number, fontScale 
     bodyFontSize: clamp(bodyFontSize / Math.max(fontScale, 1), 12, 17),
     labelFontSize: clamp(labelFontSize / Math.max(fontScale, 1), 10, 14),
     columns: { cards, dense },
+
+    isPhoneLayout: shellMode === 'phone',
+    isTabletLayout: shellMode === 'tablet',
+    isDesktopLayout: shellMode === 'desktop',
+    shellMode,
   };
 }
 

@@ -118,13 +118,11 @@ export const chatRoomStyles = StyleSheet.create({
   composerContainer: {
     flexDirection: 'column',   // stack banner + preview + main row
     paddingHorizontal: 6,
-    paddingVertical: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   composerMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
     justifyContent: 'center',
   },
 

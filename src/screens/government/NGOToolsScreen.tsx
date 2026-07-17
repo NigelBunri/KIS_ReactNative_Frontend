@@ -164,7 +164,7 @@ export default function NGOToolsScreen(_props: Props) {
     <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={80}
       >
         <ScrollView

@@ -119,7 +119,7 @@ export default function AddToPlaylistSheet({ item, visible, onClose }: Props) {
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={[styles.backdrop, { backgroundColor: palette.backdrop }]} onPress={onClose} />
 

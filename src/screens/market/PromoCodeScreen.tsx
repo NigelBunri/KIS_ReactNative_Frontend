@@ -221,7 +221,7 @@ export default function PromoCodeScreen() {
     <SafeAreaView style={[s.root, { backgroundColor: palette.bg, }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={[s.header, { borderBottomColor: palette.divider }]}>
           <Pressable

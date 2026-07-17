@@ -297,7 +297,7 @@ export default function RegisterScreen({ navigation }: any) {
         backgroundColor={palette.bg}
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         <View style={[styles.topBar, { backgroundColor: palette.surface }]}>

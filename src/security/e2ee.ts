@@ -264,6 +264,19 @@ export const ensureDeviceId = async (): Promise<string> => {
       if (!deviceId) deviceId = createDeviceId();
       await writeSecureDeviceId(deviceId);
     }
+    // Keychain is the source of truth on iOS, but every network request
+    // (src/network/{get,post,put,patch,delete}) reads the X-Device-Id header
+    // value straight from plain AsyncStorage, not through this function — a
+    // brand-new device (no prior AsyncStorage entry to migrate from, per the
+    // branch above) would otherwise resolve a real device id here while
+    // AsyncStorage['device_id'] stays permanently unset, so every request
+    // after login goes out with no X-Device-Id header, the backend's
+    // DeviceBoundJWTAuthentication rejects it with 401, and token refresh
+    // (which also depends on device_id) fails the same way — kicking the
+    // user back to the Welcome screen right after a successful login.
+    // Mirroring the resolved id into AsyncStorage here keeps it in sync for
+    // those call sites without changing their read path.
+    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
     return deviceId;
   }
 

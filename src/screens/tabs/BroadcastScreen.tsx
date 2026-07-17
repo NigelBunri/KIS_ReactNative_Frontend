@@ -18,9 +18,10 @@ import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type {
   MainTabsParamList,
@@ -132,6 +133,20 @@ export default function BroadcastScreen() {
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
+
+  // Tablet-shell sidebar deep-link: Sidebar's "Marketplace" nav item calls
+  // navigation.navigate('Broadcast', { mainTab: 'market' }) to switch this
+  // screen's internal sub-tab from outside (BroadcastScreen has no nested
+  // navigator for its sub-tabs — activeMainTab is local state — so a route
+  // param is the standard react-navigation way to reach in from a sibling).
+  const routeMainTabParam = useRoute<RouteProp<MainTabsParamList, 'Broadcast'>>().params?.mainTab;
+  useFocusEffect(
+    useCallback(() => {
+      if (routeMainTabParam && MAIN_TAB_ORDER.includes(routeMainTabParam as BroadcastMainTabId)) {
+        setActiveMainTab(routeMainTabParam as BroadcastMainTabId);
+      }
+    }, [routeMainTabParam]),
+  );
   const [searchTerms, setSearchTerms] = useState<
     Record<BroadcastMainTabId, string>
   >({
@@ -378,6 +393,56 @@ export default function BroadcastScreen() {
   const openCartList = useCallback(() => {
     navigation.navigate('CartsList' as never);
   }, [navigation]);
+
+  // Tablet-shell right-hand Context Panel — built from state this screen
+  // already owns (feedCategory/FEED_CATEGORIES, cartState). A "Drafts /
+  // Analytics" card from the reference mockup is omitted: no drafts or
+  // analytics data source exists anywhere in this screen or its APIs today,
+  // and inventing one would fabricate data (same principle applied to the
+  // sidebar's omitted "Saved" item).
+  useContextPanelContent(
+    <>
+      <TabletCard>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Browse</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {FEED_CATEGORIES.map((cat) => {
+            const active = feedCategory === cat.id;
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => setFeedCategory(cat.id)}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderRadius: 999,
+                  backgroundColor: active ? palette.selectedBg : palette.surfaceElevated,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? palette.selectedText : palette.subtext }}>
+                  {cat.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </TabletCard>
+
+      {totalCartItems > 0 ? (
+        <TabletCard>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <KISIcon name="cart" size={18} color={palette.goldReadable} />
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Your Cart</Text>
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 6 }}>
+            {totalCartItems} {totalCartItems === 1 ? 'item' : 'items'} waiting for checkout
+          </Text>
+          <Pressable onPress={openCartList} style={{ marginTop: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: palette.goldReadable }}>View cart ›</Text>
+          </Pressable>
+        </TabletCard>
+      ) : null}
+    </>,
+  );
 
   // Registered with the shared Golden Section host in App.tsx instead of
   // rendering GoldHeaderShell locally — stays mounted across tab switches.

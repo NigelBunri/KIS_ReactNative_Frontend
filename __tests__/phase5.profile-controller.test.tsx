@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 
 import ROUTES from '../src/network';
 import { useProfileController } from '../src/screens/tabs/profile/useProfileController';
+import { uploadProfileImage } from '../src/screens/tabs/profile/profileImageUpload';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
@@ -22,6 +23,14 @@ jest.mock('@/network/get', () => ({ getRequest: jest.fn() }));
 jest.mock('@/network/post', () => ({ postRequest: jest.fn() }));
 jest.mock('@/network/patch', () => ({ patchRequest: jest.fn() }));
 jest.mock('@/network/delete', () => ({ deleteRequest: jest.fn() }));
+
+// The direct-to-S3 upload flow (compress -> initiate -> PUT -> confirm) has
+// its own dedicated unit tests in profileImageUpload.test.ts; here we only
+// need to verify useProfileController.saveProfile() calls into it correctly
+// and handles its success/failure without disturbing the text-field save.
+jest.mock('../src/screens/tabs/profile/profileImageUpload', () => ({
+  uploadProfileImage: jest.fn(),
+}));
 
 jest.mock('@/security/authStorage', () => ({
   clearAuthTokens: jest.fn(),
@@ -82,6 +91,9 @@ const mockedDeleteRequest = deleteRequest as jest.MockedFunction<
 const mockedClearAuthTokens = clearAuthTokens as jest.MockedFunction<
   typeof clearAuthTokens
 >;
+const mockedUploadProfileImage = uploadProfileImage as jest.MockedFunction<
+  typeof uploadProfileImage
+>;
 
 const setupGetRequestMock = () => {
   mockedGetRequest.mockImplementation(async (url: string) => {
@@ -139,6 +151,11 @@ describe('useProfileController phase-05 runtime flows', () => {
       success: true,
       data: {},
       message: '',
+    } as any);
+    mockedUploadProfileImage.mockResolvedValue({
+      upload_id: 'upload-1',
+      status: 'confirmed',
+      profile: { avatar_url: 'https://cdn.example.com/avatar.jpg' },
     } as any);
     mockedPostRequest.mockImplementation(async (url: string) => {
       const target = String(url);
@@ -290,6 +307,142 @@ describe('useProfileController phase-05 runtime flows', () => {
           String(call[1]).includes('Buying, sending, withdrawing, or converting KIS promotional credits is disabled'),
       ),
     ).toBe(true);
+  });
+
+  test('saveProfile sends only text fields to the profile PATCH, never avatar_file/cover_file', async () => {
+    const setAuth = jest.fn();
+    const setPhone = jest.fn();
+    const ref = React.createRef<ControllerRef>();
+
+    await ReactTestRenderer.act(async () => {
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.loadProfile(true);
+    });
+
+    ReactTestRenderer.act(() => {
+      ref.current?.setDraftProfile((prev: any) => ({
+        ...prev,
+        headline: 'Builder',
+      }));
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.saveProfile();
+    });
+
+    expect(mockedPatchRequest).toHaveBeenCalledWith(
+      ROUTES.profiles.update('profile-1'),
+      { headline: 'Builder', bio: '', industry: '' },
+      expect.any(Object),
+    );
+    expect(mockedUploadProfileImage).not.toHaveBeenCalled();
+  });
+
+  test('saveProfile uploads a newly picked avatar via the direct-to-S3 flow', async () => {
+    const setAuth = jest.fn();
+    const setPhone = jest.fn();
+    const ref = React.createRef<ControllerRef>();
+
+    await ReactTestRenderer.act(async () => {
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.loadProfile(true);
+    });
+
+    const pickedAvatar = {
+      uri: 'file:///tmp/avatar.jpg',
+      name: 'avatar.jpg',
+      type: 'image/jpeg',
+    };
+    ReactTestRenderer.act(() => {
+      ref.current?.setDraftProfile((prev: any) => ({
+        ...prev,
+        avatar_file: pickedAvatar,
+        avatar_preview: pickedAvatar.uri,
+      }));
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.saveProfile();
+    });
+
+    expect(mockedUploadProfileImage).toHaveBeenCalledWith(
+      'avatar',
+      pickedAvatar,
+      expect.any(Function),
+    );
+    // The multipart bundling is gone — the profile PATCH stays JSON/text-only
+    // even when an avatar was also picked in this same save.
+    expect(mockedPatchRequest).toHaveBeenCalledWith(
+      ROUTES.profiles.update('profile-1'),
+      expect.objectContaining({ headline: expect.any(String) }),
+      expect.any(Object),
+    );
+    expect(
+      (Alert.alert as jest.Mock).mock.calls.some(
+        call =>
+          call[0] === 'Profile' &&
+          call[1] === 'Your profile changes were saved.',
+      ),
+    ).toBe(true);
+  });
+
+  test('saveProfile reports a partial failure when the avatar upload fails but text fields saved', async () => {
+    mockedUploadProfileImage.mockRejectedValueOnce(new Error('Image upload to storage failed. Please try again.'));
+
+    const setAuth = jest.fn();
+    const setPhone = jest.fn();
+    const ref = React.createRef<ControllerRef>();
+
+    await ReactTestRenderer.act(async () => {
+      ReactTestRenderer.create(
+        <ControllerHarness ref={ref} setAuth={setAuth} setPhone={setPhone} />,
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.loadProfile(true);
+    });
+
+    ReactTestRenderer.act(() => {
+      ref.current?.setDraftProfile((prev: any) => ({
+        ...prev,
+        headline: 'Builder',
+        avatar_file: { uri: 'file:///tmp/avatar.jpg', name: 'avatar.jpg', type: 'image/jpeg' },
+        avatar_preview: 'file:///tmp/avatar.jpg',
+      }));
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await ref.current?.saveProfile();
+    });
+
+    // Text fields still committed — the profile PATCH ran and succeeded.
+    expect(mockedPatchRequest).toHaveBeenCalledWith(
+      ROUTES.profiles.update('profile-1'),
+      expect.objectContaining({ headline: 'Builder' }),
+      expect.any(Object),
+    );
+    const partialFailureCall = (Alert.alert as jest.Mock).mock.calls.find(
+      call => call[0] === 'Profile' && String(call[1]).includes('Your profile details were saved, but'),
+    );
+    expect(partialFailureCall).toBeTruthy();
+    expect(String(partialFailureCall?.[1])).toContain('Profile photo:');
+    // Not reported as a total failure.
+    expect(
+      (Alert.alert as jest.Mock).mock.calls.some(
+        call => call[0] === 'Profile' && call[1] === 'Unable to save profile changes.',
+      ),
+    ).toBe(false);
   });
 
 });

@@ -56,6 +56,10 @@ type ChatHeaderProps = {
   // E2EE indicator
   isE2EE?: boolean;
   isConnecting?: boolean;
+
+  // Status-bar clearance, applied as this header's own top padding so its
+  // background (not the screen's) is what bleeds behind the status bar.
+  topInset?: number;
 };
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -95,6 +99,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onPressContext,
   isE2EE = false,
   isConnecting = false,
+  topInset = 0,
 }) => {
   const title = chat?.name ?? 'Chat';
   const headerAvatar =
@@ -269,9 +274,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         styles.header,
         {
           borderBottomColor: palette.divider,
-          backgroundColor: 'transparent',
+          backgroundColor: palette.chatHeaderBg ?? palette.card,
           // stack main row + info row vertically
           flexDirection: 'column',
+          paddingTop: topInset,
         },
       ]}
     >

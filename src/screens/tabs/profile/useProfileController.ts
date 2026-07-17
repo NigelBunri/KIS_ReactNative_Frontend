@@ -28,6 +28,10 @@ import {
   ProfilePayload,
   SheetType,
 } from './profile.types';
+import {
+  uploadProfileImage,
+  ProfileImageUploadProgress,
+} from './profileImageUpload';
 import { makeUUID, parseCsv } from './profile.utils';
 import { profileLayout } from './profile.styles';
 import { popularLanguages } from './profile.constants';
@@ -376,6 +380,12 @@ export const useProfileController = (opts: {
   // avatar across uploads (stable per-user key), which would otherwise leave
   // stale cached image bytes displayed even though the content changed.
   const [avatarVersion, setAvatarVersion] = useState(0);
+  // Direct-to-S3 upload progress for the avatar/cover picked in the edit
+  // sheet, surfaced by saveProfile() so the UI can show accurate
+  // compressing/uploading/confirming states instead of a single spinner.
+  const [imageUploadStatus, setImageUploadStatus] = useState<
+    ({ kind: 'avatar' | 'cover' } & ProfileImageUploadProgress) | null
+  >(null);
 
   const [draftProfile, setDraftProfile] = useState<DraftProfile>({
     display_name: '',
@@ -1284,28 +1294,15 @@ export const useProfileController = (opts: {
       }
 
       if (profileId) {
-        const form = new FormData();
-        form.append('headline', draftProfile.headline?.trim() || '');
-        form.append('bio', draftProfile.bio?.trim() || '');
-        form.append('industry', draftProfile.industry?.trim() || '');
-
-        if (draftProfile.avatar_file?.uri) {
-          form.append('avatar_file', {
-            uri: draftProfile.avatar_file.uri,
-            name: draftProfile.avatar_file.name,
-            type: draftProfile.avatar_file.type,
-          } as any);
-        }
-        if (draftProfile.cover_file?.uri) {
-          form.append('cover_file', {
-            uri: draftProfile.cover_file.uri,
-            name: draftProfile.cover_file.name,
-            type: draftProfile.cover_file.type,
-          } as any);
-        }
+        // Text fields only — avatar/cover now go through the direct-to-S3
+        // presigned-upload handshake below, never through this PATCH.
         const profileUpdateRes = await patchRequest(
           ROUTES.profiles.update(profileId),
-          form,
+          {
+            headline: draftProfile.headline?.trim() || '',
+            bio: draftProfile.bio?.trim() || '',
+            industry: draftProfile.industry?.trim() || '',
+          },
           {
             errorMessage: 'Unable to update profile details.',
           },
@@ -1323,16 +1320,52 @@ export const useProfileController = (opts: {
         }
       }
 
+      // Image uploads are intentionally NOT allowed to fail the whole save:
+      // the text fields above already committed server-side, so a photo
+      // upload failure is reported alongside a successful save rather than
+      // as a blanket "Unable to save profile changes" that would wrongly
+      // suggest the text edits were lost too.
+      const imageUploadErrors: string[] = [];
       const uploadedNewAvatar = !!draftProfile.avatar_file?.uri;
+      const uploadedNewCover = !!draftProfile.cover_file?.uri;
+
+      if (uploadedNewAvatar) {
+        try {
+          await uploadProfileImage('avatar', draftProfile.avatar_file!, update =>
+            setImageUploadStatus({ kind: 'avatar', ...update }),
+          );
+        } catch (error: any) {
+          imageUploadErrors.push(
+            `Profile photo: ${error?.message || 'upload failed.'}`,
+          );
+        } finally {
+          setImageUploadStatus(null);
+        }
+      }
+
+      if (uploadedNewCover) {
+        try {
+          await uploadProfileImage('cover', draftProfile.cover_file!, update =>
+            setImageUploadStatus({ kind: 'cover', ...update }),
+          );
+        } catch (error: any) {
+          imageUploadErrors.push(
+            `Cover photo: ${error?.message || 'upload failed.'}`,
+          );
+        } finally {
+          setImageUploadStatus(null);
+        }
+      }
 
       await clearScopedProfileCache(profile?.user?.id);
       const freshPayload = await loadProfile(true);
       closeSheet();
 
-      if (uploadedNewAvatar) {
-        // The backend (S3) can return the same URL for a user's avatar across
-        // uploads, which would otherwise leave a stale cached image on screen
-        // even though the underlying content changed — force a re-fetch.
+      if (uploadedNewAvatar || uploadedNewCover) {
+        // The backend (S3) can return the same URL for a user's avatar/cover
+        // across uploads, which would otherwise leave a stale cached image
+        // on screen even though the underlying content changed — force a
+        // re-fetch.
         setAvatarVersion(Date.now());
       }
 
@@ -1349,7 +1382,15 @@ export const useProfileController = (opts: {
         displayName: draftProfile.display_name,
         avatarUrl: freshPayload?.profile?.avatar_url || draftProfile.avatar_url,
       });
-      Alert.alert('Profile', 'Your profile changes were saved.');
+
+      if (imageUploadErrors.length) {
+        Alert.alert(
+          'Profile',
+          `Your profile details were saved, but: ${imageUploadErrors.join(' ')}`,
+        );
+      } else {
+        Alert.alert('Profile', 'Your profile changes were saved.');
+      }
     } catch (error: any) {
       Alert.alert(
         'Profile',
@@ -1357,6 +1398,7 @@ export const useProfileController = (opts: {
       );
     } finally {
       setSaving(false);
+      setImageUploadStatus(null);
     }
   };
 
@@ -1913,6 +1955,7 @@ export const useProfileController = (opts: {
     profile,
     loading,
     avatarVersion,
+    imageUploadStatus,
     walletLedger,
     kisWallet,
     billingHistory,

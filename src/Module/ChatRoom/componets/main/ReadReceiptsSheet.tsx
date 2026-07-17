@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import type { ReadByEntry } from '../../chatTypes';
 
@@ -26,6 +27,7 @@ export const ReadReceiptsSheet: React.FC<Props> = ({
   deliveredTo = [],
   palette,
 }) => {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -96,6 +98,7 @@ export const ReadReceiptsSheet: React.FC<Props> = ({
           {
             backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
+            paddingBottom: Math.max(insets.bottom, 32),
           },
         ]}
       >

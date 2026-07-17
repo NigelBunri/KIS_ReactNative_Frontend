@@ -28,6 +28,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_COMPONENT_TOKENS, KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
 import type { MainTabsParamList } from '@/navigation/types';
+import { TabletShell, TabletDialogOverlay, type SidebarNavKey } from '@/components/shell';
 
 import MessagesScreen from '../screens/tabs/MessagesScreen';
 import PartnersScreen from '../screens/tabs/PartnersScreen';
@@ -72,6 +73,13 @@ const routeIconMap: Record<RouteKey, KISIconName> = {
 type AnimatedKISTabBarProps = BottomTabBarProps & {
   hidNav: boolean;
   badgeCounts: MainTabBadgeCounts;
+  // Tablet shell needs the tab navigator's own `navigation` object (to drive
+  // Sidebar taps) and the currently-focused route name (to highlight the
+  // right Sidebar item) from outside this navigator's own screen tree, where
+  // React Navigation's useNavigationState() hook can't reach. This component
+  // is always mounted as Tabs.Navigator's `tabBar` render prop regardless of
+  // hidNav, so its effects always run and stay in sync even when hidden.
+  onTabBarState?: (info: { navigation: BottomTabBarProps['navigation']; activeRouteName: string }) => void;
 };
 
 function AnimatedKISTabBar({
@@ -80,6 +88,7 @@ function AnimatedKISTabBar({
   navigation,
   hidNav,
   badgeCounts,
+  onTabBarState,
 }: AnimatedKISTabBarProps) {
   // 🌓 Follow device theme
   const systemScheme = useColorScheme(); // 'light' | 'dark' | null
@@ -118,6 +127,11 @@ function AnimatedKISTabBar({
   const separatorColors = tone === 'dark'
     ? ['transparent', 'rgba(201,162,74,0.55)', 'rgba(185,133,46,0.75)', 'rgba(201,162,74,0.55)', 'transparent']
     : ['transparent', 'rgba(185,133,46,0.30)', 'rgba(185,133,46,0.50)', 'rgba(185,133,46,0.30)', 'transparent'];
+
+  const activeRouteName = state.routes[state.index]?.name ?? '';
+  React.useEffect(() => {
+    onTabBarState?.({ navigation, activeRouteName });
+  }, [navigation, activeRouteName, onTabBarState]);
 
   // 🔒 If hidNav is true, don't render the bar at all
   if (hidNav) {
@@ -262,14 +276,14 @@ function AnimatedKISTabBar({
 }
 
 export function MainTabs() {
-  const { palette } = useKISTheme();
   const { currentUserId, socket } = useSocket();
+  const { shellMode } = useResponsiveLayout();
+  const [tabBarState, setTabBarState] = useState<
+    { navigation: BottomTabBarProps['navigation']; activeRouteName: string } | null
+  >(null);
   const [communityByConversationId, setCommunityByConversationId] = useState<
     Record<string, { id: string; name: string }>
   >({});
-  // ✅ Responsive width for overlay slide
-  const { width } = useWindowDimensions();
-
   // 🔥 Chat room overlay — stack so sub-rooms push on top of the parent room
   const [chatHistory, setChatHistory] = useState<Chat[]>([]);
   const chatSlide = useRef(new RNAnimated.Value(0)).current;    // main layer (first chat)
@@ -630,30 +644,9 @@ export function MainTabs() {
     return () => sub.remove();
   }, []);
 
-  const chatTranslateX = chatSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
-
-  const subRoomTranslateX = subRoomSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
-
-  const communityTranslateX = communitySlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
-
-  const infoTranslateX = infoSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
-
-  const communityInfoTranslateX = communityInfoSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
+  // Slide-progress values (chatSlide/subRoomSlide/infoSlide/communitySlide/
+  // communityInfoSlide, 0..1) are consumed directly by TabletDialogOverlay
+  // below, which owns the phone-slide vs tablet-dialog interpolation itself.
 
   // Stable screen components — defined with useCallback so their identity only
   // changes when the callbacks they depend on change.  Inline arrow functions
@@ -668,53 +661,112 @@ export function MainTabs() {
     [openInfo, setHidNav],
   );
 
+  // Tablet-shell Sidebar drives the same `navigation` object the phone
+  // bottom-tab bar already uses (captured via AnimatedKISTabBar's
+  // onTabBarState above). Messages/Bible/Broadcast/Partners are direct tab
+  // routes. Communities and Marketplace aren't standalone routes — they're
+  // sub-tabs inside MessagesScreen's own nested tab navigator (Tab.Screen
+  // name="Communities", MessagesScreen.tsx) and BroadcastScreen's local
+  // `activeMainTab` state (reached via the `mainTab` route param wired in
+  // BroadcastScreen.tsx) respectively — react-navigation resolves nested
+  // params for the former, and for the latter a plain route param is the
+  // standard way to reach into a sibling screen's local state. Events and
+  // Settings intentionally stay as normal navigation (out of tablet-shell
+  // scope per plan) — `navigate` bubbles up to the RootStack for route names
+  // this tab navigator doesn't own. "Settings" has no unified screen in this
+  // app today (confirmed during planning) — the closest real destination is
+  // the "Account Security" section already living inside the Profile tab.
+  const handleSidebarNavigate = useCallback((key: SidebarNavKey) => {
+    const nav = tabBarState?.navigation as any;
+    if (!nav) return;
+    switch (key) {
+      case 'Messages':
+      case 'Bible':
+      case 'Broadcast':
+      case 'Partners':
+        nav.navigate(key);
+        break;
+      case 'Communities':
+        nav.navigate('Messages', { screen: 'Communities' });
+        break;
+      case 'Marketplace':
+        nav.navigate('Broadcast', { mainTab: 'market' });
+        break;
+      case 'Events':
+        nav.navigate('Events');
+        break;
+      case 'Settings':
+        nav.navigate('Profile');
+        break;
+    }
+  }, [tabBarState]);
+
+  const handleOpenProfile = useCallback(() => {
+    (tabBarState?.navigation as any)?.navigate('Profile');
+  }, [tabBarState]);
+
+  const activeSidebarKey: SidebarNavKey | null = (() => {
+    const name = tabBarState?.activeRouteName;
+    if (name === 'Messages' || name === 'Bible' || name === 'Broadcast' || name === 'Partners') {
+      return name;
+    }
+    return null;
+  })();
+
   return (
     <View style={{ flex: 1 }}>
-      <Tabs.Navigator
-        initialRouteName="Messages"
-        screenOptions={{
-          headerShown: false,
-          tabBarShowLabel: false,
-        }}
-        tabBar={(p) => <AnimatedKISTabBar {...p} hidNav={hidNav} badgeCounts={badgeCounts} />}
-      >
-        <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} />
-
-        <Tabs.Screen
-          name="Bible"
-          component={BibleScreen}
-          options={{ title: translateString('Bible') }}
-        />
-
-        <Tabs.Screen
-          name="Broadcast"
-          component={BroadcastScreen}
-          options={{ title: translateString('Broadcast') }}
-        />
-
-        <Tabs.Screen name="Partners" options={{ title: translateString('Partners') }} component={PartnersTabScreen} />
-
-        <Tabs.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ title: translateString('Profile') }}
-        />
-      </Tabs.Navigator>
-
-      {/* 💥 Full-screen Chat Room overlay ABOVE tabs + bar */}
-      <RNAnimated.View
-        pointerEvents={chatVisible ? 'auto' : 'none'}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateX: chatTranslateX }],
-          zIndex: 1001,
-          backgroundColor: palette.bg,
+      <TabletShell
+        activeKey={activeSidebarKey}
+        onNavigate={handleSidebarNavigate}
+        onOpenProfile={handleOpenProfile}
+        badgeCounts={{
+          Messages: badgeCounts.Messages,
+          Bible: badgeCounts.Bible,
+          Broadcast: badgeCounts.Broadcast,
+          Partners: badgeCounts.Partners,
         }}
       >
+        <Tabs.Navigator
+          initialRouteName="Messages"
+          screenOptions={{
+            headerShown: false,
+            tabBarShowLabel: false,
+          }}
+          tabBar={(p) => (
+            <AnimatedKISTabBar
+              {...p}
+              hidNav={hidNav || shellMode !== 'phone'}
+              badgeCounts={badgeCounts}
+              onTabBarState={setTabBarState}
+            />
+          )}
+        >
+          <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} />
+
+          <Tabs.Screen
+            name="Bible"
+            component={BibleScreen}
+            options={{ title: translateString('Bible') }}
+          />
+
+          <Tabs.Screen
+            name="Broadcast"
+            component={BroadcastScreen}
+            options={{ title: translateString('Broadcast') }}
+          />
+
+          <Tabs.Screen name="Partners" options={{ title: translateString('Partners') }} component={PartnersTabScreen} />
+
+          <Tabs.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: translateString('Profile') }}
+          />
+        </Tabs.Navigator>
+      </TabletShell>
+
+      {/* 💥 Chat Room overlay ABOVE tabs + bar — full-bleed slide on phone, floating centered dialog on tablet/desktop (TabletDialogOverlay) */}
+      <TabletDialogOverlay visible={chatVisible} progress={chatSlide} zIndex={1001}>
         <ChatRoomPage
           chat={activeChat}
           onBack={closeChat}
@@ -722,22 +774,10 @@ export function MainTabs() {
           onOpenChat={openChat}
           initialTargetMessageId={(activeChat as any)?.initialTargetMessageId ?? null}
         />
-      </RNAnimated.View>
+      </TabletDialogOverlay>
 
-      {/* Sub-room layer — slides in on top when user taps a sub-room from inside a chat */}
-      <RNAnimated.View
-        pointerEvents={subRoomVisible ? 'auto' : 'none'}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateX: subRoomTranslateX }],
-          zIndex: 1002,
-          backgroundColor: palette.bg,
-        }}
-      >
+      {/* Sub-room layer — opens on top when user taps a sub-room from inside a chat */}
+      <TabletDialogOverlay visible={subRoomVisible} progress={subRoomSlide} zIndex={1002}>
         {activeSubRoom && (
           <ChatRoomPage
             chat={activeSubRoom}
@@ -747,21 +787,9 @@ export function MainTabs() {
             initialTargetMessageId={(activeSubRoom as any)?.initialTargetMessageId ?? null}
           />
         )}
-      </RNAnimated.View>
+      </TabletDialogOverlay>
 
-      <RNAnimated.View
-        pointerEvents={infoVisible ? 'auto' : 'none'}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateX: infoTranslateX }],
-          zIndex: 1002,
-          backgroundColor: palette.bg,
-        }}
-      >
+      <TabletDialogOverlay visible={infoVisible} progress={infoSlide} zIndex={1002}>
         {activeInfo ? (
           <ChatInfoPage
             chat={activeInfo.chat}
@@ -778,21 +806,9 @@ export function MainTabs() {
             }}
           />
         ) : null}
-      </RNAnimated.View>
+      </TabletDialogOverlay>
 
-      <RNAnimated.View
-        pointerEvents={communityVisible ? 'auto' : 'none'}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateX: communityTranslateX }],
-          zIndex: 1000,
-          backgroundColor: palette.bg,
-        }}
-      >
+      <TabletDialogOverlay visible={communityVisible} progress={communitySlide} zIndex={1000}>
         {activeCommunity ? (
           <CommunityRoomPage
             community={activeCommunity}
@@ -801,21 +817,9 @@ export function MainTabs() {
             onOpenInfo={openCommunityInfo}
           />
         ) : null}
-      </RNAnimated.View>
+      </TabletDialogOverlay>
 
-      <RNAnimated.View
-        pointerEvents={communityInfoVisible ? 'auto' : 'none'}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateX: communityInfoTranslateX }],
-          zIndex: 1003,
-          backgroundColor: palette.bg,
-        }}
-      >
+      <TabletDialogOverlay visible={communityInfoVisible} progress={communityInfoSlide} zIndex={1003}>
         {activeCommunityInfo ? (
           <CommunityInfoPage
             communityId={activeCommunityInfo.id}
@@ -824,7 +828,7 @@ export function MainTabs() {
             onBack={closeCommunityInfo}
           />
         ) : null}
-      </RNAnimated.View>
+      </TabletDialogOverlay>
     </View>
   );
 }

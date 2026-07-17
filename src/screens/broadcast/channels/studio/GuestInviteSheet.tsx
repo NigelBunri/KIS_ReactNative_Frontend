@@ -157,7 +157,7 @@ export default function GuestInviteSheet({
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={[styles.backdrop, { backgroundColor: palette.backdrop }]} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: palette.surface }]}>

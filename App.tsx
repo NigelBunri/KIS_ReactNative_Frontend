@@ -42,6 +42,7 @@ import {
   type PermissionStatus,
 } from 'react-native-permissions';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
 import { flushPendingMutations } from '@/services/pendingMutationsQueue';
@@ -289,6 +290,8 @@ import { GoldenSectionProvider, useGoldenSection } from '@/contexts/GoldenSectio
 import { GoldHeaderShell } from '@/components/common/GoldHeaderShell';
 import { useKISTheme } from '@/theme/useTheme';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
+import LinearGradient from 'react-native-linear-gradient';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 
 
 type AuthCtx = {
@@ -330,23 +333,50 @@ function GoldenSection() {
   const topInset = useRawTopInset();
 
   if (!payload) return null;
+
+  // Defensive status-bar backdrop. The `marginTop` trick below (pulling the
+  // gradient block up so it bleeds behind the status bar) was hand-tuned
+  // against a narrow set of devices — the multiplier doesn't scale correctly
+  // across the full range of real topInset values (~59pt Dynamic Island vs.
+  // ~20-25pt iPad/older phones/Android), so on some of those it under-shifts,
+  // leaving the block's own opaque `palette.bg` background covering part of
+  // this backdrop instead of clearing it. On large-inset devices (Dynamic
+  // Island iPhones) the oversized shift happens to clear this region
+  // entirely, which is why this looked fine there and nowhere else — a
+  // stacking-order accident, not a real fix. `zIndex` here makes this
+  // backdrop win the overlap unconditionally, on every device, regardless of
+  // how (im)precise that block's own shift turns out to be — so the status
+  // bar area is always gold, full stop.
+  const backdropColors = (payload.colors ?? KIS_ROYAL_GRADIENTS.goldHeader) as string[];
+
   return (
-    // marginTop pulls the gradient up so it bleeds behind the status bar
-    // instead of leaving a gap above it.
-    <View style={{ backgroundColor: palette.bg, marginTop: -(topInset * 2.6) }}>
-      {/* key={ownerKey} — force a fresh native gradient view per registering
-          screen instead of reusing/mutating one persistent view across tab
-          switches. react-native-linear-gradient isn't fully Fabric-compatible
-          yet (upstream: not fixed until its 3.0.0 line, still pre-release);
-          a persistent view reused across screens risks one screen's heavier
-          simultaneous-gradient rendering (Partners) wedging the shared native
-          view so it stays blank for every screen after, until this remounts
-          it. */}
-      <GoldHeaderShell key={ownerKey} colors={payload.colors} style={payload.shellStyle}>
-        {payload.content}
-      </GoldHeaderShell>
-      <NetworkStatusPill />
-    </View>
+    <>
+      <LinearGradient
+        colors={backdropColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: topInset, zIndex: 10 }}
+        pointerEvents="none"
+      />
+      {/* marginTop pulls the gradient up so it bleeds behind the status bar
+          instead of leaving a gap above it. zIndex: 0 (explicit, not just
+          default) so it never outranks the backdrop above regardless of
+          platform-specific stacking defaults for plain siblings. */}
+      <View style={{ backgroundColor: palette.bg, marginTop: -(topInset * 2.6), zIndex: 0 }}>
+        {/* key={ownerKey} — force a fresh native gradient view per registering
+            screen instead of reusing/mutating one persistent view across tab
+            switches. react-native-linear-gradient isn't fully Fabric-compatible
+            yet (upstream: not fixed until its 3.0.0 line, still pre-release);
+            a persistent view reused across screens risks one screen's heavier
+            simultaneous-gradient rendering (Partners) wedging the shared native
+            view so it stays blank for every screen after, until this remounts
+            it. */}
+        <GoldHeaderShell key={ownerKey} colors={payload.colors} style={payload.shellStyle}>
+          {payload.content}
+        </GoldHeaderShell>
+        <NetworkStatusPill />
+      </View>
+    </>
   );
 }
 
@@ -1761,19 +1791,21 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
-        <LanguageProvider>
-          <ThemeModeProvider>
-            <AgeModeProvider>
-              <GoldenSectionProvider>
-                <AppContent />
-              </GoldenSectionProvider>
-            </AgeModeProvider>
-          </ThemeModeProvider>
-        </LanguageProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <KeyboardProvider>
+      <SafeAreaProvider>
+        <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
+          <LanguageProvider>
+            <ThemeModeProvider>
+              <AgeModeProvider>
+                <GoldenSectionProvider>
+                  <AppContent />
+                </GoldenSectionProvider>
+              </AgeModeProvider>
+            </ThemeModeProvider>
+          </LanguageProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </KeyboardProvider>
   );
 }
 

@@ -9,6 +9,7 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 
 const QUICK_OPTIONS = [
@@ -47,6 +48,7 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
   onSchedule,
   palette,
 }) => {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -93,6 +95,7 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
           {
             backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
+            paddingBottom: Math.max(insets.bottom, 40),
           },
         ]}
       >

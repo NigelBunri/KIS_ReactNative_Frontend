@@ -50,6 +50,12 @@ const authRoutes = {
     openToWork: `${API_BASE_URL}/api/v1/profiles/open-to-work/`,
     endorseSkill: (profileId: string) => `${API_BASE_URL}/api/v1/profiles/${profileId}/endorse-skill/`,
   },
+  // Direct-to-S3 presigned-PUT upload handshake — see
+  // apps/media/upload_intent.py on the backend for the full flow.
+  mediaUploads: {
+    profileImageInitiate: `${API_BASE_URL}/api/v1/media/uploads/profile-image/initiate/`,
+    confirm: (uploadId: string) => `${API_BASE_URL}/api/v1/media/uploads/${uploadId}/confirm/`,
+  },
   jobs: {
     board: `${API_BASE_URL}/api/v1/jobs/`,
     myApplications: `${API_BASE_URL}/api/v1/my-applications/`,

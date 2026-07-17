@@ -44,7 +44,7 @@ export default function BottomSheet({
         onPress={onBackdropPress}
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[
           styles.sheet,
           {

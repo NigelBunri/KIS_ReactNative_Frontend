@@ -122,7 +122,7 @@ export default function SuperThanksSheet({
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.55 }]} onPress={onClose} />
         <View style={[styles.panel, { backgroundColor: palette.surface, paddingBottom: 28 + insets.bottom }]}>

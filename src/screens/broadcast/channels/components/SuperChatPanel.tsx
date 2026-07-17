@@ -169,7 +169,7 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={[styles.backdrop, { backgroundColor: palette.royalInk, opacity: 0.5 }]} onPress={onClose} />
         <View style={[styles.panel, { backgroundColor: palette.surface }]}>

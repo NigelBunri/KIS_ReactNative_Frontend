@@ -86,6 +86,7 @@ import {
   type KISAgeMode,
 } from '@/services/familyAccessibilityService';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useContextPanelContent, TabletCard } from '@/components/shell';
 import ReanimatedScroll, { useAnimatedReaction, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useAgeMode } from '@/theme/ageModeContext';
@@ -2415,6 +2416,63 @@ export default function ProfileScreen() {
     );
   };
 
+  // Tablet-shell right-hand Context Panel — reuses profileCompletion,
+  // unreadNotifications, and the same action handlers (c.openEditProfile,
+  // c.openSheet, rootNavigation) already wired to ProfileHeroCard below, so
+  // there's no new data or new navigation targets. "Achievements" and
+  // "Recent visitors" from the reference mockup are omitted: no such data
+  // exists anywhere in this app today (confirmed via search) — see
+  // MessagesScreen.tsx's context-panel comment for the same no-fake-data
+  // principle applied to the sidebar's omitted "Saved" item.
+  useContextPanelContent(
+    <>
+      <TabletCard>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Profile Completion</Text>
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: palette.selectedBg, marginTop: 12, overflow: 'hidden' }}>
+          <View
+            style={{
+              height: '100%',
+              width: `${Math.max(0, Math.min(100, profileCompletion))}%`,
+              borderRadius: 4,
+              backgroundColor: palette.goldReadable,
+            }}
+          />
+        </View>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: palette.subtext, marginTop: 8 }}>
+          {profileCompletion}% complete
+        </Text>
+        {profileCompletion < 100 ? (
+          <Pressable onPress={c.openEditProfile} style={{ marginTop: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: palette.goldReadable }}>Complete your profile ›</Text>
+          </Pressable>
+        ) : null}
+      </TabletCard>
+
+      <TabletCard>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>Quick Actions</Text>
+        <View style={{ gap: 12, marginTop: 12 }}>
+          <Pressable onPress={c.openEditProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <KISIcon name="edit" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Edit profile</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => rootNavigation?.navigate('ProfileNotifications')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="bell" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
+              Notifications{unreadNotifications.length > 0 ? ` (${unreadNotifications.length})` : ''}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => c.openSheet('privacy')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <KISIcon name="settings" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Privacy settings</Text>
+          </Pressable>
+        </View>
+      </TabletCard>
+    </>,
+  );
+
   useGoldenSectionContent({
     content: (
       <ProfileHeroCard
@@ -3317,6 +3375,7 @@ export default function ProfileScreen() {
                   pickImage={c.pickImage}
                   saving={c.saving}
                   saveProfile={c.saveProfile}
+                  imageUploadStatus={c.imageUploadStatus}
                   sections={c.sectionList}
                   onAddSectionItem={type => {
                     if (type === 'portfolio' || type === 'intro_video') {

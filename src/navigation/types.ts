@@ -342,6 +342,11 @@ export type BroadcastRouteParams = {
   openManageFeeds?: boolean;
   creationType?: BroadcastCreationType;
   actionId?: string;
+  // Tablet-shell sidebar deep-link (e.g. Marketplace nav item) — loosely
+  // typed (not BroadcastMainTabId) to avoid coupling this navigation-types
+  // module to a screen-local type; BroadcastScreen validates the value
+  // against its own known tab ids before applying it.
+  mainTab?: string;
 };
 
 export type MainTabsParamList = {

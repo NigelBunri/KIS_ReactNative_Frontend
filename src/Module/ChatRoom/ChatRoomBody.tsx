@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
@@ -13,7 +14,6 @@ import type { SimpleContact } from './componets/main/ForAttachments/ContactsModa
 import type { PollDraft } from './componets/main/ForAttachments/PollModal';
 import type { EventDraft } from './componets/main/ForAttachments/EventModal';
 import TypingIndicator, { type TypingUser } from './componets/main/TypingIndicator';
-import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   chat: Chat | null;
@@ -168,7 +168,6 @@ export default function ChatRoomBody({
   onCallHistoryCallback,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const topInset = useSafeTopInset();
 
   const mentionMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -194,8 +193,14 @@ export default function ChatRoomBody({
   return (
     <KeyboardAvoidingView
       style={styles.keyboardWrapper}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? topInset + keyboardOffset : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // The header above this component eats into its own on-screen position,
+      // but RN's onLayout only reports position relative to its parent — not
+      // the true screen position — so the library under-counts how far to
+      // move above the keyboard. automaticOffset asks the native side for the
+      // real window position instead, which is accurate regardless of what
+      // sits above this view in the layout tree.
+      automaticOffset
     >
       <MessageList
         messages={messages}
@@ -232,7 +237,9 @@ export default function ChatRoomBody({
         onCallHistoryCallback={onCallHistoryCallback}
       />
 
-      <TypingIndicator typingUsers={typingUsers} palette={palette} />
+      {typingUsers.length > 0 ? (
+        <TypingIndicator typingUsers={typingUsers} palette={palette} />
+      ) : null}
 
       {/* Call records are merged chronologically into MessageList. */}
 

@@ -198,7 +198,7 @@ export default function InCallChatSheet({ messages, visible, onClose, onSend, lo
       />
 
       {/* Input */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}

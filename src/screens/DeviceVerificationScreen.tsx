@@ -212,7 +212,7 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.headerBlock}>
             <KISText preset="h1" style={{ textAlign: 'center', color: palette.text }}>

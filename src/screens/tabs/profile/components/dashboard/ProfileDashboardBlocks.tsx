@@ -270,7 +270,7 @@ export const ProfileHeroCard = ({
   // frames before it can settle, reading as a stutter right as scroll starts.
   const collapseNaturalHeight = useSharedValue(topInset + 250);
   const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
-
+  console.log('profile Image', avatarUrl);
   const collapseStyle = useAnimatedStyle(() => ({
     maxHeight: interpolate(
       scrollY.value,

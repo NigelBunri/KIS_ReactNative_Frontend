@@ -1,8 +1,11 @@
 // src/screens/tabs/PartnersScreen.tsx
 import React, { useCallback, useEffect } from 'react';
-import { Alert, Animated, DeviceEventEmitter, useWindowDimensions } from 'react-native';
+import { Alert, Animated, DeviceEventEmitter, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useKISTheme } from '@/theme/useTheme';
+import { useContextPanelContent, TabletCard } from '@/components/shell';
+import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
 import PartnerLayout from './partners/PartnerLayout';
 import { normalizePartnerRole } from '@/components/partners/settings/partnerSettingsData';
@@ -159,6 +162,45 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     reloadPartners,
     reloadSelectedPartner,
   } = usePartnersData(isSuperuser);
+
+  // Tablet-shell right-hand Context Panel — built from usePartnersData()'s
+  // already-fetched state (no new fetches) plus the existing openInsights
+  // navigation action. "Recent activity" from the reference mockup is
+  // omitted: no activity-feed data source exists on this screen today.
+  const { palette: partnersContextPalette } = useKISTheme();
+  useContextPanelContent(
+    <>
+      <TabletCard>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <KISIcon name="poll" size={18} color={partnersContextPalette.goldReadable} />
+          <Text style={{ fontSize: 15, fontWeight: '800', color: partnersContextPalette.text }}>Partner Insights</Text>
+        </View>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: partnersContextPalette.subtext, marginTop: 6 }}>
+          See performance across all your partner workspaces.
+        </Text>
+        <Pressable onPress={openInsights} style={{ marginTop: 10 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: partnersContextPalette.goldReadable }}>Open insights ›</Text>
+        </Pressable>
+      </TabletCard>
+
+      <TabletCard>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: partnersContextPalette.text }}>Workspace</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+          {[
+            { label: 'Partners', value: partners?.length },
+            { label: 'Groups', value: groupsForPartner?.length },
+            { label: 'Channels', value: channelsForPartner?.length },
+            { label: 'Communities', value: communitiesForPartner?.length },
+          ].filter((row) => typeof row.value === 'number').map((row) => (
+            <View key={row.label} style={{ minWidth: '45%', borderRadius: 14, padding: 10, backgroundColor: partnersContextPalette.selectedBg }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: partnersContextPalette.text }}>{row.value}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: partnersContextPalette.subtext }}>{row.label}</Text>
+            </View>
+          ))}
+        </View>
+      </TabletCard>
+    </>,
+  );
   const {
     links,
     loading: linksLoading,

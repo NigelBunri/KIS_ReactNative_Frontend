@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 
 export type DisappearDuration = 0 | 86400 | 604800 | 7776000;
@@ -33,6 +34,7 @@ export const DisappearingTimerSheet: React.FC<Props> = ({
   onSelect,
   palette,
 }) => {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export const DisappearingTimerSheet: React.FC<Props> = ({
           {
             backgroundColor: palette.surface ?? palette.bg,
             transform: [{ translateY }],
+            paddingBottom: Math.max(insets.bottom, 36),
           },
         ]}
       >

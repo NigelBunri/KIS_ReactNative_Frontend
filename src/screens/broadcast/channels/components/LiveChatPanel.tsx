@@ -137,7 +137,7 @@ export default function LiveChatPanel({
 
         {/* Input row */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.inputRow}>
             <TextInput
