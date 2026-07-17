@@ -67,9 +67,14 @@ export type AttachmentKind =
 const isCompressibleImage = (file: { name?: string; type?: string | null }) => {
   const type = String(file.type || '').toLowerCase();
   const name = String(file.name || '').toLowerCase();
-  if (!type.startsWith('image/')) return false;
   if (type.includes('gif') || name.endsWith('.gif')) return false;
-  return true;
+  if (type.startsWith('image/')) return true;
+  // Picker often omits `type` for Photos-library assets (esp. HEIC
+  // originals) — fall back to the filename so those still get forced
+  // through the JPEG re-encode below instead of uploading raw HEIC bytes
+  // mislabeled with a .jpg name/mime.
+  if (!type) return /\.(jpe?g|png|heic|heif|webp|bmp|tiff?)$/.test(name);
+  return false;
 };
 
 const withJpegExtension = (name: string) => {

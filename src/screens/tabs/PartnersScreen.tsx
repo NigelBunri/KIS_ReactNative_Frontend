@@ -72,7 +72,16 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
   const { setAuth } = useAuth();
   const { width, height } = useWindowDimensions();
-  const { pageGutter } = useResponsiveLayout();
+  // Slide-over panels below must size themselves off the width actually
+  // available inside the tablet/desktop shell's content column, not the raw
+  // device width — TabletLayout's mainColumn clips (overflow: hidden) once
+  // the Sidebar/ContextPanel are reserved, so a panel sized from `width`
+  // renders wider than that column and its left portion (often exactly
+  // where a panel's filter row sits, right under its search bar) gets cut
+  // off. `width` itself is kept for the few consumers below that
+  // deliberately need the true device width (e.g. useMessagesPane's
+  // right-peek offset).
+  const { pageGutter, shellContentWidth } = useResponsiveLayout();
   const [isSuperuser, setIsSuperuser] = React.useState(false);
   const isGoUser = React.useCallback((user: any) => {
     const roles = Array.isArray(user?.roles) ? user.roles.map((role: any) => String(role).toLowerCase()) : [];
@@ -279,7 +288,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     isOpen: isSettingsPanelOpen,
     openSection,
     closePanel,
-  } = usePartnerSettingsPanel(width, settingsSections);
+  } = usePartnerSettingsPanel(shellContentWidth, settingsSections);
   const {
     panelWidth: createPanelWidth,
     panelTranslateX: createPanelTranslateX,
@@ -287,63 +296,63 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     isOpen: isCreatePanelOpen,
     open: openCreatePanel,
     close: closeCreatePanel,
-  } = usePartnerCreatePanel(width);
+  } = usePartnerCreatePanel(shellContentWidth);
   const {
     panelWidth: discoverPanelWidth,
     panelTranslateX: discoverPanelTranslateX,
     isOpen: isDiscoverPanelOpen,
     open: openDiscoverPanel,
     close: closeDiscoverPanel,
-  } = usePartnerDiscoveryPanel(width);
+  } = usePartnerDiscoveryPanel(shellContentWidth);
   const {
     panelWidth: recruitmentPanelWidth,
     panelTranslateX: recruitmentPanelTranslateX,
     isOpen: isRecruitmentPanelOpen,
     open: openRecruitmentPanel,
     close: closeRecruitmentPanel,
-  } = usePartnerRecruitmentPanel(width);
+  } = usePartnerRecruitmentPanel(shellContentWidth);
   const {
     panelWidth: auditPanelWidth,
     panelTranslateX: auditPanelTranslateX,
     isOpen: isAuditPanelOpen,
     open: openAuditPanel,
     close: closeAuditPanel,
-  } = usePartnerAuditPanel(width);
+  } = usePartnerAuditPanel(shellContentWidth);
   const {
     panelWidth: policyPanelWidth,
     panelTranslateX: policyPanelTranslateX,
     isOpen: isPolicyPanelOpen,
     open: openPolicyPanel,
     close: closePolicyPanel,
-  } = usePartnerPolicyPanel(width);
+  } = usePartnerPolicyPanel(shellContentWidth);
   const {
     panelWidth: integrationsPanelWidth,
     panelTranslateX: integrationsPanelTranslateX,
     isOpen: isIntegrationsPanelOpen,
     open: openIntegrationsPanel,
     close: closeIntegrationsPanel,
-  } = usePartnerIntegrationsPanel(width);
+  } = usePartnerIntegrationsPanel(shellContentWidth);
   const {
     panelWidth: automationPanelWidth,
     panelTranslateX: automationPanelTranslateX,
     isOpen: isAutomationPanelOpen,
     open: openAutomationPanel,
     close: closeAutomationPanel,
-  } = usePartnerAutomationPanel(width);
+  } = usePartnerAutomationPanel(shellContentWidth);
   const {
     panelWidth: reportsPanelWidth,
     panelTranslateX: reportsPanelTranslateX,
     isOpen: isReportsPanelOpen,
     open: openReportsPanel,
     close: closeReportsPanel,
-  } = usePartnerReportsPanel(width);
+  } = usePartnerReportsPanel(shellContentWidth);
   const {
     panelWidth: governancePanelWidth,
     panelTranslateX: governancePanelTranslateX,
     isOpen: isGovernancePanelOpen,
     open: openGovernancePanel,
     close: closeGovernancePanel,
-  } = usePartnerGovernancePanel(width);
+  } = usePartnerGovernancePanel(shellContentWidth);
   const {
     panelWidth: featurePanelWidth,
     panelTranslateX: featurePanelTranslateX,
@@ -351,7 +360,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     feature: activeFeature,
     open: openFeaturePanel,
     close: closeFeaturePanel,
-  } = usePartnerFeaturePanel(width);
+  } = usePartnerFeaturePanel(shellContentWidth);
 
   const {
     panelWidth: orgProfilePanelWidth,
@@ -359,29 +368,29 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     isOpen: isOrgProfilePanelOpen,
     open: openOrgProfilePanel,
     close: closeOrgProfilePanel,
-  } = usePartnerOrgProfilePanel(width);
+  } = usePartnerOrgProfilePanel(shellContentWidth);
   const {
     panelWidth: orgAppsPanelWidth,
     panelTranslateX: orgAppsPanelTranslateX,
     isOpen: isOrgAppsPanelOpen,
     open: openOrgAppsPanel,
     close: closeOrgAppsPanel,
-  } = usePartnerOrganizationAppsPanel(width);
+  } = usePartnerOrganizationAppsPanel(shellContentWidth);
   const {
     panelWidth: coursesPanelWidth,
     panelTranslateX: coursesPanelTranslateX,
     isOpen: isCoursesPanelOpen,
     open: openCoursesPanel,
     close: closeCoursesPanel,
-  } = usePartnerCoursesPanel(width);
+  } = usePartnerCoursesPanel(shellContentWidth);
   const {
     panelWidth: linksPanelWidth,
     panelTranslateX: linksPanelTranslateX,
     isOpen: isLinksPanelOpen,
     open: openLinksPanel,
     close: closeLinksPanel,
-  } = usePartnerLinksPanel(width);
-  const complaintsPanel = usePartnerComplaintsPanel(width);
+  } = usePartnerLinksPanel(shellContentWidth);
+  const complaintsPanel = usePartnerComplaintsPanel(shellContentWidth);
 
   // ── KCAN Admin Panels (superuser / GO only) ──────────────────────────────
   // isKcanAdmin: true if superuser flag is confirmed OR if the backend already
@@ -389,19 +398,22 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const isKcanAdmin =
     isSelectedKCAN &&
     (isSuperuser || selectedPartner?.member_role === 'owner');
-  const adminDashboard = useAdminDashboardPanel(width);
-  const adminUsers = useAdminUsersPanel(width);
-  const adminContent = useAdminContentPanel(width);
-  const adminAnalytics = useAdminAnalyticsPanel(width);
-  const adminPartners = useAdminPartnersPanel(width);
-  const adminVerification = useAdminVerificationPanel(width);
-  const adminSystemHealth = useAdminSystemHealthPanel(width);
-  const adminAuditTrail = useAdminAuditTrailPanel(width);
+  const adminDashboard = useAdminDashboardPanel(shellContentWidth);
+  const adminUsers = useAdminUsersPanel(shellContentWidth);
+  const adminContent = useAdminContentPanel(shellContentWidth);
+  const adminAnalytics = useAdminAnalyticsPanel(shellContentWidth);
+  const adminPartners = useAdminPartnersPanel(shellContentWidth);
+  const adminVerification = useAdminVerificationPanel(shellContentWidth);
+  const adminSystemHealth = useAdminSystemHealthPanel(shellContentWidth);
+  const adminAuditTrail = useAdminAuditTrailPanel(shellContentWidth);
 
   // Bible App Admin and KIS App Admin panels (simple open/close with animation)
   const adminPanelWidth = React.useMemo(
-    () => (width < 600 ? width : Math.min(900, Math.max(600, Math.round(width * 0.85)))),
-    [width],
+    () =>
+      shellContentWidth < 600
+        ? shellContentWidth
+        : Math.min(900, Math.max(600, Math.round(shellContentWidth * 0.85))),
+    [shellContentWidth],
   );
   const [adminBibleOpen, setAdminBibleOpen] = React.useState(false);
   const adminBibleTranslateX = React.useRef(new Animated.Value(adminPanelWidth)).current;
@@ -430,14 +442,14 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   }, [adminKISAppTranslateX, adminPanelWidth]);
 
   // ── App Builder (Partner Pro) ─────────────────────────────────────────────
-  const appBuilderPanel = useAppBuilderPanel(width);
+  const appBuilderPanel = useAppBuilderPanel(shellContentWidth);
   const handleOpenAppBuilder = useCallback(() => {
     closePanel();
     setTimeout(() => appBuilderPanel.open(), 240);
   }, [closePanel, appBuilderPanel]);
 
   // ── Geolocation & Attendance (Partner Pro) ────────────────────────────────
-  const geolocationPanel = useGeolocationPanel(width);
+  const geolocationPanel = useGeolocationPanel(shellContentWidth);
   const handleOpenGeolocation = useCallback(() => {
     closePanel();
     setTimeout(() => geolocationPanel.open(), 240);

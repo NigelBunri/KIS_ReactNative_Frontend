@@ -351,13 +351,6 @@ function GoldenSection() {
 
   return (
     <>
-      <LinearGradient
-        colors={backdropColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: topInset, zIndex: 10 }}
-        pointerEvents="none"
-      />
       {/* marginTop pulls the gradient up so it bleeds behind the status bar
           instead of leaving a gap above it. zIndex: 0 (explicit, not just
           default) so it never outranks the backdrop above regardless of

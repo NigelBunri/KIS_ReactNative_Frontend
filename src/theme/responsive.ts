@@ -43,6 +43,12 @@ export type ResponsiveLayout = {
   isTabletLayout: boolean;
   isDesktopLayout: boolean;
   shellMode: 'phone' | 'tablet' | 'desktop';
+  // Actual width available to screen content once the tablet/desktop shell's
+  // chrome (Sidebar, ContextPanel) is accounted for — equal to `width` in
+  // phone layout. Any component that sizes itself as a fraction of the
+  // screen (slide-over panels, etc.) should size off this, not raw `width`
+  // — see shellContentWidth()'s doc comment for why.
+  shellContentWidth: number;
 };
 
 const TABLET_SHELL_BREAKPOINT = 768;
@@ -52,6 +58,29 @@ export function getShellMode(width: number): 'phone' | 'tablet' | 'desktop' {
   if (width >= DESKTOP_SHELL_BREAKPOINT) return 'desktop';
   if (width >= TABLET_SHELL_BREAKPOINT) return 'tablet';
   return 'phone';
+}
+
+// Mirrors the chrome widths TabletLayout.tsx reserves (Sidebar.tsx's
+// SIDEBAR_EXPANDED_WIDTH, ContextPanel.tsx's CONTEXT_PANEL_WIDTH) and its
+// MIN_CONTENT_WIDTH cutoff for showing the context panel at all. Duplicated
+// as literals here (not imported) because those are UI components that
+// themselves import this module — importing them back would cycle. Keep in
+// sync if the shell chrome widths change.
+//
+// This assumes the sidebar is expanded (300dp), which is a conservative
+// lower bound: TabletLayout's Sidebar can be collapsed to 88dp by the user,
+// giving screens more real room than this estimate — safe, since the
+// failure mode being prevented is content sizing itself WIDER than its
+// actual (clipped, overflow:hidden) column, not narrower.
+const SHELL_SIDEBAR_WIDTH = 300;
+const SHELL_CONTEXT_PANEL_WIDTH = 340;
+const SHELL_MIN_CONTENT_WIDTH = 480;
+
+export function getShellContentWidth(width: number): number {
+  if (getShellMode(width) === 'phone') return width;
+  const withoutSidebar = width - SHELL_SIDEBAR_WIDTH;
+  const showContextPanel = withoutSidebar - SHELL_CONTEXT_PANEL_WIDTH >= SHELL_MIN_CONTENT_WIDTH;
+  return showContextPanel ? withoutSidebar - SHELL_CONTEXT_PANEL_WIDTH : withoutSidebar;
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -116,6 +145,7 @@ export function createResponsiveLayout(width: number, height: number, fontScale 
     isTabletLayout: shellMode === 'tablet',
     isDesktopLayout: shellMode === 'desktop',
     shellMode,
+    shellContentWidth: getShellContentWidth(width),
   };
 }
 
