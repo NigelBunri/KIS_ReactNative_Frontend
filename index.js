@@ -9,8 +9,14 @@ import { AppRegistry, View } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
 import { installLocalizationRuntime } from './src/languages/runtimePatch';
+import { registerAndroidEvents } from './src/services/calls/callKitService';
 
 installLocalizationRuntime();
+
+// Must run unconditionally at JS entry (Android-only, no-op on iOS/if
+// react-native-callkeep isn't installed) so headless JS invocations from a
+// killed-state FCM call push can still route native answer/decline actions.
+registerAndroidEvents();
 
 if (!global.Buffer) {
   global.Buffer = Buffer;

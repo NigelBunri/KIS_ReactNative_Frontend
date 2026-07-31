@@ -44,6 +44,20 @@ if (CALLKIT_ENABLED) {
 
 export const callKeepAvailable = !!RNCallKeep;
 
+// Registers the headless-task handler that RNCallKeepBackgroundMessagingService
+// (declared in AndroidManifest.xml) needs to route native call-UI actions
+// (answer/decline from the lock screen) back into JS while the app isn't
+// running. Per react-native-callkeep's own setup requirement, this must run
+// unconditionally at JS entry (index.js) — not gated behind auth/socket
+// mount — so it's registered even in a headless JS invocation triggered by a
+// killed-state FCM message.
+export function registerAndroidEvents(): void {
+  if (!RNCallKeep || Platform.OS !== 'android') return;
+  try {
+    RNCallKeep.registerAndroidEvents();
+  } catch {}
+}
+
 const APP_NAME = 'KIS';
 
 type CallKeepCallbacks = {

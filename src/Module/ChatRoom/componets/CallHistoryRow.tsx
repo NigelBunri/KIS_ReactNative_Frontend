@@ -29,7 +29,9 @@ type Props = {
 };
 
 function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+  // Clamp negative diffs (device clock briefly behind server time) to 0
+  // instead of letting them silently fall through every bucket below.
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const mins = Math.floor(diff / 60_000);
   const hours = Math.floor(diff / 3_600_000);
   const days = Math.floor(diff / 86_400_000);

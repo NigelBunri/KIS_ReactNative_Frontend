@@ -35,6 +35,7 @@ import {
   saveMessages,
   markRoomHasPending,
   unmarkRoomHasPending,
+  withRoomStoreLock,
 } from '../Storage/chatStorage';
 import { hydrateDecryptedMessages } from '../Storage/decryptedMessageStorage';
 
@@ -131,6 +132,20 @@ export type UseChatPersistenceResult = {
 const STATUS_QUEUED: MessageStatus = 'pending';
 const STATUS_SENT: MessageStatus = 'sent';
 const STATUS_FAILED: MessageStatus = 'failed';
+
+// Shared rank table so no merge path can silently downgrade a message's
+// status (e.g. a 'read' receipt restored from disk getting clobbered by a
+// stale 'sent'/'delivered' copy merged in from another source). Keep in
+// sync with CACHE_STATUS_ORDER in Storage/chatStorage.ts.
+const MESSAGE_STATUS_RANK: Record<string, number> = {
+  failed: -1,
+  pending: 0,
+  sending: 0,
+  local_only: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+};
 
 /* ============================================================================
  * ID & TIME HELPERS
@@ -351,6 +366,19 @@ function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage 
   const merged = { ...prev, ...next } as any;
   const p = prev as any;
   const n = next as any;
+
+  // Never let a lower-ranked status (e.g. a stale 'sent' copy from a
+  // secondary storage source) clobber a higher-ranked one (e.g. 'read')
+  // that was already persisted for this message.
+  const prevRank = MESSAGE_STATUS_RANK[String(p.status ?? '')] ?? 0;
+  const nextRank = MESSAGE_STATUS_RANK[String(n.status ?? '')] ?? 0;
+  if (prevRank > nextRank) {
+    merged.status = p.status;
+  }
+  if (!n.readBy?.length && p.readBy?.length) merged.readBy = p.readBy;
+  if (!n.deliveredTo?.length && p.deliveredTo?.length) merged.deliveredTo = p.deliveredTo;
+  if (n.locallyReadAt == null && p.locallyReadAt != null) merged.locallyReadAt = p.locallyReadAt;
+
   if (!n.replyTo && p.replyTo) merged.replyTo = p.replyTo;
   if (!n.sticker && p.sticker) merged.sticker = p.sticker;
   if (!n.voice && p.voice) merged.voice = p.voice;
@@ -471,9 +499,8 @@ function mergeMessages(
     }
 
     if (msg.serverId) {
-      const statusOrder: Record<string, number> = { pending: 0, sending: 0, local_only: 0, sent: 1, delivered: 2, read: 3, failed: -1 };
-      const prevRank = statusOrder[prev.status ?? ''] ?? 0;
-      const nextRank = statusOrder[msg.status ?? ''] ?? 0;
+      const prevRank = MESSAGE_STATUS_RANK[prev.status ?? ''] ?? 0;
+      const nextRank = MESSAGE_STATUS_RANK[msg.status ?? ''] ?? 0;
       const preservedStatus = prevRank >= nextRank ? prev.status : msg.status;
       map.set(key, { ...mergePreservingRich(prev, msg), status: preservedStatus, fromMe: prev.fromMe ?? msg.fromMe });
       if (msg.clientId) {
@@ -587,7 +614,9 @@ export function useChatPersistence(
         messagesRef.current = sorted;
         setMessages(sorted);
         if (currentUserId) {
-          await saveMessages(roomId, sorted, currentUserId);
+          await withRoomStoreLock(roomId, currentUserId, () =>
+            saveMessages(roomId, sorted, currentUserId),
+          );
         }
       } catch (err) {
         console.warn('[useChatPersistence] load error', err);
@@ -614,7 +643,12 @@ export function useChatPersistence(
       // latest list instead of the stale pre-render snapshot.
       messagesRef.current = sorted;
       setMessages(sorted);
-      await saveMessages(roomIdRef.current, sorted, currentUserId);
+      // Serialize against bulkUpdateMessages (read/delivered receipts) so a
+      // receipt landing mid-save can't be silently overwritten by this save,
+      // or vice versa.
+      await withRoomStoreLock(roomIdRef.current, currentUserId, () =>
+        saveMessages(roomIdRef.current, sorted, currentUserId),
+      );
     },
     [currentUserId],
   );

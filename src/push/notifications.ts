@@ -1,9 +1,11 @@
+import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
+import { displayIncomingCall } from '@/services/calls/callKitService';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 
@@ -61,6 +63,44 @@ const retryPendingPushToken = async () => {
     }
     await registerPushToken({ pushToken: pending.pushToken, apnsToken: pending.apnsToken });
   } catch { /* silent */ }
+};
+
+// iOS PushKit VoIP token — a SEPARATE token from the FCM/APNs token above.
+// Only NestJS needs it (calls are entirely its domain); Django never sends
+// call pushes, so there's no reason to dual-write this one to Django.
+const registerVoipPushToken = async (voipToken: string) => {
+  if (!voipToken) return;
+  const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+  try {
+    await postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: voipToken, platform: 'ios', tokenType: 'voip', deviceId },
+    );
+  } catch { /* Non-fatal — falls back to FCM-only call push. */ }
+};
+
+/**
+ * Reads the VoIP token captured natively by AppDelegate.swift's
+ * PKPushRegistryDelegate (via the VoipTokenModule bridge) and registers it,
+ * then keeps it in sync on rotation. iOS-only — Android has no PushKit
+ * equivalent (calls there ring via a high-priority FCM data message instead).
+ */
+const initVoipPushToken = () => {
+  if (Platform.OS !== 'ios') return;
+  try {
+    const VoipTokenModule = NativeModules?.VoipTokenModule;
+    if (!VoipTokenModule?.getVoipToken) return;
+
+    VoipTokenModule.getVoipToken()
+      .then((token: string | null) => {
+        if (token) void registerVoipPushToken(token);
+      })
+      .catch(() => {});
+
+    DeviceEventEmitter.addListener('KIS_VoIP_Token_Updated', (token: string) => {
+      if (token) void registerVoipPushToken(token);
+    });
+  } catch { /* Native module not present in this build — no-op. */ }
 };
 
 /** Resolve the raw navigation object from either a plain nav or a React ref. */
@@ -128,6 +168,7 @@ export async function initPushHandlers(navigation?: any) {
       // Retry any previously failed push token registration first
       await retryPendingPushToken();
       await registerPushToken({ pushToken: fcmToken, apnsToken });
+      initVoipPushToken();
     } catch {}
 
     // Background/killed message handler. FCM shows `notification`-keyed messages
@@ -139,6 +180,22 @@ export async function initPushHandlers(navigation?: any) {
           const data = remoteMessage?.data ?? {};
           const title: string = data?.title ?? remoteMessage?.notification?.title ?? '';
           const body: string = data?.body ?? remoteMessage?.notification?.body ?? '';
+
+          // Incoming calls: show the native CallKit/ConnectionService ringing
+          // UI directly instead of queueing a regular notification — the
+          // call UI *is* the notification here, matching WhatsApp. Uses the
+          // same callId as the CallKeep UUID that the socket-path
+          // (SocketProvider.tsx) uses, so there's no duplicate/conflicting
+          // entry once the app wakes and the real call.offer event arrives.
+          if (data?.type === 'incoming_call' && data?.callId) {
+            displayIncomingCall({
+              callUUID: String(data.callId),
+              callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
+              callType: (data.callType as any) ?? 'voice',
+            });
+            return;
+          }
+
           if (!title && !body) return;
 
           // DND check — same midnight-wrap logic as the foreground handler.

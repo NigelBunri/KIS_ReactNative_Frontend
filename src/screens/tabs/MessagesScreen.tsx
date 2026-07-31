@@ -853,8 +853,16 @@ useEffect(() => {
   // Only refresh metadata for conversations that are NEW to the list.
   // Refreshing all conversations on every list change causes a thundering-herd
   // of storage reads when conversations re-order after a new message arrives.
+  //
+  // On cold start, prevConvIdsRef is empty so every conversation looks "new" —
+  // but if we already restored a persisted unreadCount for it (KIS_CONV_META_V1),
+  // trust that instead of forcing a recompute here. Recomputing unconditionally
+  // discards the just-restored, accurate count and replaces it with one derived
+  // from in-memory message status, which can still be settling right after
+  // launch (see chat persistence merge). Live updates (new messages, receipts)
+  // still call queueMetaRefresh directly via their own event handlers.
   for (const id of convIdSet) {
-    if (!prevConvIdsRef.current.has(id)) {
+    if (!prevConvIdsRef.current.has(id) && !conversationMetaRef.current[id]) {
       queueMetaRefresh(id);
     }
   }

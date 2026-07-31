@@ -7,14 +7,15 @@ import { useKISTheme } from '@/theme/useTheme';
 type Props = {
   startedAt: string | null | undefined;
   running: boolean;
+  endedAt?: string | null;
   color?: string;
   size?: number;
   showDot?: boolean;
 };
 
-export default function CallTimer({ startedAt, running, color, size = 14, showDot }: Props) {
+export default function CallTimer({ startedAt, running, endedAt, color, size = 14, showDot }: Props) {
   const { palette } = useKISTheme();
-  const { label } = useCallTimer(startedAt, running);
+  const { label } = useCallTimer(startedAt, running, endedAt);
   const resolvedColor = color ?? palette.ivory;
   return (
     <View style={styles.row}>

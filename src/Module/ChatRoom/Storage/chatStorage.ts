@@ -145,6 +145,29 @@ const readDurableHistory = async (
 
 const durableWriteQueues = new Map<string, Promise<void>>();
 
+// Serializes read-modify-write cycles (loadMessages -> mutate -> saveMessages)
+// against the same room+user scope. Without this, two concurrent status
+// updates (e.g. a 'delivered' receipt racing a 'read' receipt, or a receipt
+// racing an optimistic persist() from the chat screen) can both read the same
+// pre-update snapshot and then write back independently — whichever save
+// finishes last silently wins and drops the other update.
+const roomStoreLocks = new Map<string, Promise<unknown>>();
+
+export function withRoomStoreLock<T>(
+  roomId: string,
+  currentUserId: string | null | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const key = scopedRoomId(roomId, currentUserId);
+  const previous = roomStoreLocks.get(key) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(fn);
+  roomStoreLocks.set(key, next);
+  next.finally(() => {
+    if (roomStoreLocks.get(key) === next) roomStoreLocks.delete(key);
+  });
+  return next;
+}
+
 const writeDurableHistoryNow = async (
   roomId: string,
   messages: ChatMessage[],
@@ -741,10 +764,12 @@ export async function bulkUpdateMessages(
   updater: (message: ChatMessage) => ChatMessage,
   currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const existing = await loadMessages(roomId, currentUserId);
-  const next = existing.map(updater);
-  await saveMessages(roomId, next, currentUserId);
-  return next;
+  return withRoomStoreLock(roomId, currentUserId, async () => {
+    const existing = await loadMessages(roomId, currentUserId);
+    const next = existing.map(updater);
+    await saveMessages(roomId, next, currentUserId);
+    return next;
+  });
 }
 
 export async function clearMessages(roomId: string, currentUserId?: string | null): Promise<void> {

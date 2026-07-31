@@ -13,23 +13,40 @@ export function formatDuration(seconds: number): string {
   return `${pad(m)}:${pad(s)}`;
 }
 
-export function useCallTimer(startedAt: string | null | undefined, running: boolean) {
+export function useCallTimer(
+  startedAt: string | null | undefined,
+  running: boolean,
+  endedAt?: string | null,
+) {
   const [elapsed, setElapsed] = useState(0);
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!running || !startedAt) {
+    if (!startedAt) {
       if (ref.current) { clearInterval(ref.current); ref.current = null; }
+      setElapsed(0);
       return;
     }
     const base = Date.parse(startedAt);
+
+    if (!running) {
+      // Frozen (call ended/missed): show the final elapsed duration up to
+      // endedAt instead of resetting to 0 — this is a fresh component
+      // instance (the ended screen mounts a new CallTimer), so without this
+      // it would otherwise never tick and stay at its initial state.
+      if (ref.current) { clearInterval(ref.current); ref.current = null; }
+      const end = endedAt ? Date.parse(endedAt) : Date.now();
+      setElapsed(Math.max(0, Math.floor((end - base) / 1000)));
+      return;
+    }
+
     const tick = () => setElapsed(Math.floor((Date.now() - base) / 1000));
     tick();
     ref.current = setInterval(tick, 1000);
     return () => {
       if (ref.current) clearInterval(ref.current);
     };
-  }, [running, startedAt]);
+  }, [running, startedAt, endedAt]);
 
   return { elapsed, label: formatDuration(elapsed) };
 }

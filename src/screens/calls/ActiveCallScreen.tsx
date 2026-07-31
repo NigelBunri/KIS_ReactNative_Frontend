@@ -525,6 +525,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             <CallTimer
               startedAt={session.startedAt}
               running={false}
+              endedAt={session.endedAt}
               color={palette.subtext}
               size={15}
               showDot={false}

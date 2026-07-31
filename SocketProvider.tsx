@@ -35,6 +35,7 @@ import type {
   CallLayout,
   InCallMessage,
   ActiveReaction,
+  CallState,
 } from '@/services/calls/callTypes';
 import { isGroupCall, hasVideo } from '@/services/calls/callTypes';
 import { webRTCService, webRTCAvailable } from '@/services/calls/webRTCService';
@@ -63,6 +64,20 @@ import LobbyScreen from '@/screens/calls/LobbyScreen';
 import WaitingForHostScreen from '@/screens/calls/WaitingForHostScreen';
 import CallMiniBadge from '@/components/calls/CallMiniBadge';
 import type { VirtualBgOption } from '@/screens/calls/components/VirtualBackgroundSheet';
+
+// States where a call has been dialed/received but media has never connected.
+// Used to reset `startedAt` to the true connect time exactly once, the first
+// time a session reaches 'active' — later 'active' transitions (e.g. coming
+// back from 'reconnecting') must NOT reset it, or the elapsed timer and
+// persisted call duration would jump back to 0 mid-call.
+const CALL_STATES_BEFORE_CONNECT = new Set<CallState>([
+  'dialing',
+  'incoming',
+  'connecting',
+  'lobby',
+  'knocking',
+  'waiting-for-host',
+]);
 
 /* ============================================================================
  * CONTEXT TYPE
@@ -357,7 +372,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onConnectionState: (peerId, state) => {
         setActiveCall(prev => {
           if (!prev) return prev;
-          if (state === 'connected') return { ...prev, state: 'active' as const };
+          if (state === 'connected') {
+            const justConnected = CALL_STATES_BEFORE_CONNECT.has(prev.state);
+            return {
+              ...prev,
+              state: 'active' as const,
+              startedAt: justConnected ? new Date().toISOString() : prev.startedAt,
+            };
+          }
           if (state === 'disconnected' || state === 'failed') return { ...prev, state: 'reconnecting' as const };
           return prev;
         });
@@ -1669,10 +1691,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRouteManager.stopRingback();
           setActiveCall(prev => {
             if (!prev || prev.callId !== callId) return prev;
+            const justConnected = CALL_STATES_BEFORE_CONNECT.has(prev.state);
             return {
               ...prev,
               state: 'active',
-              startedAt: prev.startedAt ?? new Date().toISOString(),
+              startedAt: justConnected ? new Date().toISOString() : prev.startedAt,
             };
           });
           if (responderId && webRTCAvailable) {
@@ -1828,7 +1851,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           if (state === 'reconnecting') return { ...prev, state: 'reconnecting' };
-          if (state === 'connected' && prev.state !== 'ended' && prev.state !== 'missed') return { ...prev, state: 'active' };
+          if (state === 'connected' && prev.state !== 'ended' && prev.state !== 'missed') {
+            const justConnected = CALL_STATES_BEFORE_CONNECT.has(prev.state);
+            return {
+              ...prev,
+              state: 'active',
+              startedAt: justConnected ? new Date().toISOString() : prev.startedAt,
+            };
+          }
           return prev;
         });
       });
