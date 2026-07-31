@@ -39,6 +39,12 @@ export const CHAT_BASE_URL = __DEV__
 export const CHAT_WS_URL = _envChatWsUrl || CHAT_BASE_URL;
 export const CHAT_WS_PATH = trim(APP_ENV.KIS_CHAT_WS_PATH) || '/ws';
 export const CHAT_UPLOAD_URL = `${CHAT_BASE_URL}/uploads/file`;
+// Direct-to-S3 presigned-PUT upload handshake — mirrors ROUTES.mediaUploads
+// (Django) but served by the Nest chat backend. See
+// backend/Nestjs/src/uploads/upload-intent.service.ts for the full flow.
+export const CHAT_UPLOAD_INITIATE_URL = `${CHAT_BASE_URL}/uploads/initiate`;
+export const CHAT_UPLOAD_CONFIRM_URL = (uploadId: string) =>
+  `${CHAT_BASE_URL}/uploads/${encodeURIComponent(uploadId)}/confirm`;
 export const WEBSOCKET_URL = CHAT_WS_URL;
 
 export const NEST_API_BASE_URL = CHAT_BASE_URL;

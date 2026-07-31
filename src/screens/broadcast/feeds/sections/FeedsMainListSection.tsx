@@ -95,6 +95,7 @@ export default function FeedsMainListSection({
   } = useAuthorProfilePreview();
 
   const list = items ?? [];
+  console.log('FeedsMainListSection list', list);
 
   const headerSubtitle = useMemo(() => {
     if (!list.length) return '';

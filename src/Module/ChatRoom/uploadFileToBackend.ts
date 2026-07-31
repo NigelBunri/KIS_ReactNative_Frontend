@@ -34,6 +34,19 @@ const MAX_UPLOAD_BYTES = Number(
 const IMAGE_UPLOAD_MAX_DIMENSION = 1600;
 const IMAGE_UPLOAD_QUALITY = 82;
 
+// Only requests against the Nest chat backend get the direct-to-S3
+// presigned-PUT handshake (`/uploads/initiate` + `/uploads/:id/confirm`,
+// see backend/Nestjs/src/uploads/upload-intent.service.ts). Requests against
+// Django (voice messages, stickers — anywhere callers omit `baseUrl` and
+// fall back to API_BASE_URL) keep going through the legacy multipart proxy:
+// Django's generic signed-upload handshake (apps/media/upload_intent.py)
+// only has attach handlers for profile_avatar/profile_cover today, not
+// arbitrary chat contexts, and its multipart endpoint additionally runs
+// AI content-safety scanning on the bytes it receives — something a
+// direct-to-S3 upload can't do since the server never sees the bytes.
+const isNestChatBackend = (baseUrl: string) =>
+  /kis-nest-backend|chat\.kingdomimpactventures|:4000/.test(baseUrl);
+
 const formatUploadBytes = (bytes: number) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -194,6 +207,177 @@ export type AttachmentMeta = {
   localUploadKey?: string;
 };
 
+// Extracts a safe, user-facing message from a JSON error body — shared by
+// both the multipart-proxy path and the signed-URL path so error handling
+// stays consistent regardless of which backend rejected the upload.
+const safeErrorMessage = (responseText: string, fallback: string): string => {
+  try {
+    const parsed = JSON.parse(responseText || '{}');
+    const detail = parsed?.detail ?? parsed?.message ?? parsed?.error;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail) && typeof detail[0] === 'string') return detail[0];
+    if (detail && typeof detail === 'object') {
+      const first = Object.values(detail).flat().find((value) => typeof value === 'string');
+      if (typeof first === 'string') return first;
+    }
+  } catch {
+    // Keep the fallback; do not expose raw backend/storage responses.
+  }
+  return fallback;
+};
+
+const isAuthUploadError = (err: any) => {
+  const status = Number(err?.status ?? 0);
+  const message = String(err?.message ?? '').toLowerCase();
+  return status === 401 || status === 403 || message.includes('token') || message.includes('unauthorized');
+};
+
+// One authenticated JSON POST, with the same silent-refresh-then-retry-once
+// behavior the old single-request multipart flow had — now shared by both
+// the initiate and confirm steps of the signed-URL flow.
+async function authedJsonPost(
+  url: string,
+  body: Record<string, unknown>,
+  firstToken: string,
+  deviceId?: string,
+): Promise<any> {
+  const attempt = (token: string) =>
+    new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.timeout = UPLOAD_TIMEOUT_MS;
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      if (deviceId) xhr.setRequestHeader('X-Device-Id', deviceId);
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText || '{}'));
+          } catch (err) {
+            reject(err);
+          }
+          return;
+        }
+        reject(
+          Object.assign(new Error(safeErrorMessage(xhr.responseText, 'Upload failed. Please retry.')), {
+            status: xhr.status,
+            responseText: xhr.responseText,
+          }),
+        );
+      };
+      xhr.onerror = () =>
+        reject(new Error('Upload failed. Please check your connection and try again.'));
+      xhr.ontimeout = () =>
+        reject(new Error('Upload timed out. Please retry on a stronger connection.'));
+      xhr.send(JSON.stringify(body));
+    });
+
+  try {
+    return await attempt(firstToken);
+  } catch (err) {
+    if (!isAuthUploadError(err)) throw err;
+    const refreshedToken = await refreshAccessToken(firstToken);
+    if (!refreshedToken) throw err;
+    return attempt(refreshedToken);
+  }
+}
+
+// Direct-to-S3 handshake: initiate -> PUT bytes to the presigned URL ->
+// confirm. Mirrors src/screens/tabs/profile/profileImageUpload.ts, which
+// does the same three-step dance against Django's profile-image endpoints.
+async function uploadViaSignedUrl(params: {
+  baseUrl: string;
+  uploadFile: { uri: string; name: string; type: string | null; size?: number | null };
+  uploadContext: string;
+  conversationId?: string;
+  clientId?: string;
+  durationSeconds?: number;
+  firstToken: string;
+  deviceId?: string;
+  onStatus?: (status: 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed') => void;
+  onProgress?: (progress: number) => void;
+}): Promise<any> {
+  const {
+    baseUrl,
+    uploadFile,
+    uploadContext,
+    conversationId,
+    clientId,
+    durationSeconds,
+    firstToken,
+    deviceId,
+    onStatus,
+    onProgress,
+  } = params;
+  const contentType = inferUploadMime(uploadFile.name, uploadFile.type);
+
+  onStatus?.('verifying');
+  const initiateRes = await authedJsonPost(
+    `${baseUrl}/uploads/initiate`,
+    {
+      filename: uploadFile.name || 'file',
+      content_type: contentType,
+      size_bytes: uploadFile.size || 0,
+      context: uploadContext,
+      conversationId,
+      clientId,
+    },
+    firstToken,
+    deviceId,
+  );
+  const { upload_id: uploadId, upload_url: uploadUrl, required_headers: requiredHeaders } = initiateRes || {};
+  if (!uploadId || !uploadUrl) {
+    throw new Error('Unable to start upload.');
+  }
+
+  onStatus?.('uploading');
+  onProgress?.(0);
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
+    Object.entries(requiredHeaders || { 'Content-Type': contentType }).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, String(value));
+    });
+    // No Authorization header — the presigned URL is the only credential
+    // sent to storage, never the app's Django/Nest bearer token.
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      if (__DEV__) {
+        console.error('[uploadFileToBackend] presigned PUT rejected', {
+          status: xhr.status,
+          bodyPreview: String(xhr.responseText || '').slice(0, 300),
+        });
+      }
+      reject(new Error('File upload to storage failed. Please try again.'));
+    };
+    xhr.onerror = () =>
+      reject(new Error('Upload failed. Please check your connection and try again.'));
+    xhr.ontimeout = () =>
+      reject(new Error('Upload timed out. Please retry on a stronger connection.'));
+    if (xhr.upload) {
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        const ratio = event.total ? event.loaded / event.total : 0;
+        onProgress?.(Math.min(0.98, Math.max(0, ratio)));
+      };
+    }
+    xhr.send({ uri: uploadFile.uri, type: contentType, name: 'upload' } as any);
+  });
+
+  const confirmRes = await authedJsonPost(
+    `${baseUrl}/uploads/${encodeURIComponent(uploadId)}/confirm`,
+    durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {},
+    firstToken,
+    deviceId,
+  );
+  return confirmRes;
+}
+
 export async function uploadFileToBackend(opts: {
   file: { uri: string; name: string; type: string | null; size?: number | null; durationMs?: number | null };
   authToken?: string | null;
@@ -228,23 +412,7 @@ export async function uploadFileToBackend(opts: {
   const originalFile = file;
   const uploadFile = await prepareUploadFile(file);
 
-  const form = new FormData();
-  form.append('file', {
-    uri: uploadFile.uri,
-    name: uploadFile.name || 'file',
-    type: inferUploadMime(uploadFile.name, uploadFile.type),
-  } as any);
   const uploadContext = normalizeUploadContext(opts.context || 'chat');
-  form.append('context', uploadContext);
-
-  onStatus?.('verifying');
-  onProgress?.(0);
-
-  const params = new URLSearchParams();
-  if (conversationId) params.set('conversationId', conversationId);
-  if (clientId) params.set('clientId', clientId);
-  if (resolvedDeviceId) params.set('device_id', resolvedDeviceId);
-  params.set('context', uploadContext);
   const durationSecondsFromFile =
     typeof uploadFile.durationMs === 'number' && Number.isFinite(uploadFile.durationMs)
       ? Math.round(uploadFile.durationMs / 1000)
@@ -257,31 +425,206 @@ export async function uploadFileToBackend(opts: {
   ) {
     metadata.duration_seconds = durationSecondsFromFile;
   }
-  Object.entries(metadata).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    params.set(key, String(value));
-  });
-  const url = params.toString()
-    ? `${baseUrl}/uploads/file?${params.toString()}`
-    : `${baseUrl}/uploads/file`;
-  const uploadBackendName = /kis-nest-backend|chat\.kingdomimpactventures|:4000/.test(baseUrl) ? 'Nest' : 'Django';
+  const durationSeconds =
+    typeof metadata.duration_seconds === 'number'
+      ? metadata.duration_seconds
+      : typeof metadata.durationSeconds === 'number'
+        ? metadata.durationSeconds
+        : undefined;
+
+  const useSignedUrlFlow = isNestChatBackend(baseUrl);
+  const uploadBackendName = useSignedUrlFlow ? 'Nest' : 'Django';
 
   console.log('[uploadFileToBackend] start', {
-    url,
+    baseUrl,
     backend: uploadBackendName,
+    flow: useSignedUrlFlow ? 'signed-url' : 'multipart-proxy',
     context: uploadContext,
-    fieldName: 'file',
     fileName: uploadFile.name,
     fileType: inferUploadMime(uploadFile.name, uploadFile.type),
     fileSize,
     hasDeviceId: Boolean(resolvedDeviceId),
   });
 
-  const isAuthUploadError = (err: any) => {
-    const status = Number(err?.status ?? 0);
-    const message = String(err?.message ?? '').toLowerCase();
-    return status === 401 || status === 403 || message.includes('token') || message.includes('unauthorized');
-  };
+  const firstToken =
+    (await getAccessTokenForRequest().catch(() => null)) ||
+    authToken ||
+    null;
+  if (!firstToken) {
+    console.error('[uploadFileToBackend] no access token available; upload never sent', {
+      baseUrl,
+      context: uploadContext,
+    });
+    onStatus?.('failed');
+    throw new Error('Authentication token missing. Please reconnect and try again.');
+  }
+
+  let json: any;
+  try {
+    if (useSignedUrlFlow) {
+      json = await uploadViaSignedUrl({
+        baseUrl,
+        uploadFile,
+        uploadContext,
+        conversationId,
+        clientId,
+        durationSeconds,
+        firstToken,
+        deviceId: resolvedDeviceId,
+        onStatus,
+        onProgress,
+      });
+    } else {
+      json = await uploadViaMultipartProxy({
+        baseUrl,
+        uploadFile,
+        uploadContext,
+        conversationId,
+        clientId,
+        metadata,
+        resolvedDeviceId,
+        firstToken,
+        onStatus,
+        onProgress,
+      });
+    }
+  } catch (err) {
+    console.error('[uploadFileToBackend] upload attempt failed', {
+      baseUrl,
+      context: uploadContext,
+      error: err instanceof Error ? err.message : String(err),
+      status: (err as any)?.status,
+    });
+    onStatus?.('failed');
+    throw err;
+  }
+
+  onProgress?.(1);
+  const attachment = json?.attachment ?? json;
+  const safety = attachment.safety as MediaSafetyPayload | undefined;
+
+  console.log('[uploadFileToBackend] upload accepted by server', {
+    baseUrl,
+    context: uploadContext,
+    assetId: attachment?.assetId ?? attachment?.mediaAssetId ?? attachment?.id,
+    scanStatus: attachment?.scanStatus ?? safety?.status,
+    quarantined: attachment?.quarantined ?? safety?.quarantined,
+    hasDisplayUrl: Boolean(attachment?.displayUrl ?? attachment?.url ?? attachment?.publicUrl),
+  });
+
+  if (FEATURE_FLAGS.MEDIA_VERIFICATION_ENABLED) {
+    // 'not_configured' means the AI scan is disabled on this server — the file
+    // was never checked, so it is not condemned. Never block on not_configured.
+    if (isMediaSafetyBlocked(safety)) {
+      const msg = getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.';
+      console.error('[uploadFileToBackend] media safety blocked upload', { baseUrl, context: uploadContext, safety });
+      onStatus?.('verification_failed');
+      throw new VerificationFailedError(msg);
+    }
+    if (
+      ['chat', 'dm', 'group', 'partner', 'status'].includes(uploadContext) &&
+      isMediaSafetyPendingReview(safety)
+    ) {
+      const msg = getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.';
+      console.warn('[uploadFileToBackend] media safety pending review; blocking for this context', {
+        baseUrl,
+        context: uploadContext,
+        safety,
+      });
+      onStatus?.('verification_failed');
+      throw new VerificationFailedError(msg);
+    }
+  }
+
+  onStatus?.('done');
+  const resolvedDurationSeconds =
+    typeof attachment.duration_seconds === 'number'
+      ? attachment.duration_seconds
+      : typeof attachment.durationSeconds === 'number'
+        ? attachment.durationSeconds
+        : attachment.durationMs
+          ? Math.round(attachment.durationMs / 1000)
+          : undefined;
+  const kind = (attachment.kind as string | undefined) ?? 'other';
+  const displayUrl =
+    attachment.displayUrl ??
+    attachment.url ??
+    attachment.downloadUrl ??
+    attachment.publicUrl ??
+    attachment.uri ??
+    '';
+  return {
+    id: attachment.id ?? attachment.key ?? attachment.assetId ?? attachment.mediaAssetId,
+    url: displayUrl,
+    publicUrl: attachment.publicUrl,
+    downloadUrl: attachment.downloadUrl,
+    displayUrl,
+    assetId: attachment.assetId,
+    mediaAssetId: attachment.mediaAssetId,
+    mediaAssetRef: attachment.mediaAssetRef,
+    originalName: originalFile.name ?? attachment.originalName ?? attachment.name ?? uploadFile.name,
+    mimeType: attachment.mimeType ?? attachment.mime ?? inferUploadMime(uploadFile.name, uploadFile.type ?? originalFile.type),
+    size: attachment.size ?? uploadFile.size ?? originalFile.size ?? 0,
+    kind: kind as AttachmentKind,
+    private: attachment.private,
+    scanStatus: attachment.scanStatus,
+    quarantined: attachment.quarantined,
+    requiresReview: attachment.requiresReview,
+    safetyScanId: attachment.safetyScanId,
+    safety,
+    safetyMessage: getMediaSafetyMessage(safety),
+    width: attachment.width,
+    height: attachment.height,
+    durationMs: attachment.durationMs,
+    durationSeconds: resolvedDurationSeconds,
+    videoCategory:
+      attachment.video_category ??
+      (kind === 'short_video' ? 'shorts' : kind === 'video' || kind === 'long_video' ? 'videos' : undefined),
+    localUri: originalFile.uri,
+    localPath: originalFile.uri?.startsWith('file://') ? stripFileScheme(originalFile.uri) : undefined,
+    localUploadKey: `${originalFile.uri}:${originalFile.name}:${originalFile.type ?? ''}`,
+  } as AttachmentMeta;
+}
+
+// Legacy multipart proxy — unchanged behavior, still used for every
+// non-Nest target (Django's UploadFileView, which runs AI content-safety
+// scanning on the bytes it receives).
+async function uploadViaMultipartProxy(params: {
+  baseUrl: string;
+  uploadFile: { uri: string; name: string; type: string | null; size?: number | null; durationMs?: number | null };
+  uploadContext: string;
+  conversationId?: string;
+  clientId?: string;
+  metadata: Record<string, string | number>;
+  resolvedDeviceId?: string;
+  firstToken: string;
+  onStatus?: (status: 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed') => void;
+  onProgress?: (progress: number) => void;
+}): Promise<any> {
+  const { baseUrl, uploadFile, uploadContext, conversationId, clientId, metadata, resolvedDeviceId, firstToken, onStatus, onProgress } =
+    params;
+
+  const form = new FormData();
+  form.append('file', {
+    uri: uploadFile.uri,
+    name: uploadFile.name || 'file',
+    type: inferUploadMime(uploadFile.name, uploadFile.type),
+  } as any);
+  form.append('context', uploadContext);
+
+  onStatus?.('verifying');
+  onProgress?.(0);
+
+  const params_ = new URLSearchParams();
+  if (conversationId) params_.set('conversationId', conversationId);
+  if (clientId) params_.set('clientId', clientId);
+  if (resolvedDeviceId) params_.set('device_id', resolvedDeviceId);
+  params_.set('context', uploadContext);
+  Object.entries(metadata).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    params_.set(key, String(value));
+  });
+  const url = params_.toString() ? `${baseUrl}/uploads/file?${params_.toString()}` : `${baseUrl}/uploads/file`;
 
   const uploadOnce = (token: string) =>
     new Promise<any>((resolve, reject) => {
@@ -312,19 +655,7 @@ export async function uploadFileToBackend(opts: {
           }
           return;
         }
-        let safeMessage = 'Upload failed. Please retry.';
-        try {
-          const parsed = JSON.parse(xhr.responseText || '{}');
-          const detail = parsed?.detail ?? parsed?.message ?? parsed?.error;
-          if (typeof detail === 'string' && detail.trim()) safeMessage = detail;
-          else if (Array.isArray(detail) && typeof detail[0] === 'string') safeMessage = detail[0];
-          else if (detail && typeof detail === 'object') {
-            const first = Object.values(detail).flat().find((value) => typeof value === 'string');
-            if (typeof first === 'string') safeMessage = first;
-          }
-        } catch {
-          // Keep the generic message; do not expose raw backend/storage responses.
-        }
+        const safeMessage = safeErrorMessage(xhr.responseText, 'Upload failed. Please retry.');
         console.error('[uploadFileToBackend] server rejected upload', {
           url,
           status: xhr.status,
@@ -334,9 +665,9 @@ export async function uploadFileToBackend(opts: {
       };
 
       xhr.onerror = () => {
-        const diagnostic = { status: xhr.status, readyState: xhr.readyState, responseURL: xhr.responseURL, uploadedUri: uploadFile.uri, originalUri: originalFile.uri };
+        const diagnostic = { status: xhr.status, readyState: xhr.readyState, responseURL: xhr.responseURL, uploadedUri: uploadFile.uri };
         console.error('[uploadFileToBackend] xhr network error (request never reached the server, or the response never came back)', { url, ...diagnostic });
-        reject(Object.assign(new Error(`Upload failed after upload reached the server. Please retry; if it repeats, check the ${uploadBackendName} logs for /uploads/file.`), { status: xhr.status, diagnostic }));
+        reject(Object.assign(new Error(`Upload failed after upload reached the server. Please retry; if it repeats, check the backend logs for /uploads/file.`), { status: xhr.status, diagnostic }));
       };
 
       xhr.ontimeout = () => {
@@ -356,130 +687,12 @@ export async function uploadFileToBackend(opts: {
       xhr.send(form as any);
     });
 
-  const firstToken =
-    (await getAccessTokenForRequest().catch(() => null)) ||
-    authToken ||
-    null;
-  if (!firstToken) {
-    console.error('[uploadFileToBackend] no access token available; upload never sent', { url, context: uploadContext });
-    onStatus?.('failed');
-    throw new Error('Authentication token missing. Please reconnect and try again.');
-  }
-
-  let json: any;
   try {
-    json = await uploadOnce(firstToken);
+    return await uploadOnce(firstToken);
   } catch (err) {
-    console.error('[uploadFileToBackend] initial upload attempt failed', {
-      url,
-      context: uploadContext,
-      error: err instanceof Error ? err.message : String(err),
-      status: (err as any)?.status,
-    });
-    if (!isAuthUploadError(err)) {
-      onStatus?.('failed');
-      throw err;
-    }
-
+    if (!isAuthUploadError(err)) throw err;
     const refreshedToken = await refreshAccessToken(firstToken);
-    if (!refreshedToken) {
-      console.error('[uploadFileToBackend] token refresh failed; giving up', { url });
-      onStatus?.('failed');
-      throw err;
-    }
-
-    try {
-      json = await uploadOnce(refreshedToken);
-    } catch (retryErr) {
-      console.error('[uploadFileToBackend] retry after token refresh failed', {
-        url,
-        error: retryErr instanceof Error ? retryErr.message : String(retryErr),
-        status: (retryErr as any)?.status,
-      });
-      onStatus?.('failed');
-      throw retryErr;
-    }
+    if (!refreshedToken) throw err;
+    return uploadOnce(refreshedToken);
   }
-
-  onProgress?.(1);
-  const attachment = json?.attachment ?? json;
-  const safety = attachment.safety as MediaSafetyPayload | undefined;
-
-  console.log('[uploadFileToBackend] upload accepted by server', {
-    url,
-    context: uploadContext,
-    assetId: attachment?.assetId ?? attachment?.mediaAssetId ?? attachment?.id,
-    scanStatus: attachment?.scanStatus ?? safety?.status,
-    quarantined: attachment?.quarantined ?? safety?.quarantined,
-    hasDisplayUrl: Boolean(attachment?.displayUrl ?? attachment?.url ?? attachment?.publicUrl),
-  });
-
-  if (FEATURE_FLAGS.MEDIA_VERIFICATION_ENABLED) {
-    // 'not_configured' means the AI scan is disabled on this server — the file
-    // was never checked, so it is not condemned. Never block on not_configured.
-    if (isMediaSafetyBlocked(safety)) {
-      const msg = getMediaSafetyMessage(safety) || 'This upload cannot be accepted on KIS.';
-      console.error('[uploadFileToBackend] media safety blocked upload', { url, context: uploadContext, safety });
-      onStatus?.('verification_failed');
-      throw new VerificationFailedError(msg);
-    }
-    if (
-      ['chat', 'dm', 'group', 'partner', 'status'].includes(uploadContext) &&
-      isMediaSafetyPendingReview(safety)
-    ) {
-      const msg = getMediaSafetyMessage(safety) || 'Your upload is being checked before it can be sent.';
-      console.warn('[uploadFileToBackend] media safety pending review; blocking for this context', { url, context: uploadContext, safety });
-      onStatus?.('verification_failed');
-      throw new VerificationFailedError(msg);
-    }
-  }
-
-  onStatus?.('done');
-  const durationSeconds =
-    typeof attachment.duration_seconds === 'number'
-      ? attachment.duration_seconds
-      : typeof attachment.durationSeconds === 'number'
-        ? attachment.durationSeconds
-        : attachment.durationMs
-          ? Math.round(attachment.durationMs / 1000)
-          : undefined;
-  const kind = (attachment.kind as string | undefined) ?? 'other';
-  const displayUrl =
-    attachment.displayUrl ??
-    attachment.url ??
-    attachment.downloadUrl ??
-    attachment.publicUrl ??
-    attachment.uri ??
-    '';
-  return {
-    id: attachment.id ?? attachment.key ?? attachment.assetId ?? attachment.mediaAssetId,
-    url: displayUrl,
-    publicUrl: attachment.publicUrl,
-    downloadUrl: attachment.downloadUrl,
-    displayUrl,
-    assetId: attachment.assetId,
-    mediaAssetId: attachment.mediaAssetId,
-    mediaAssetRef: attachment.mediaAssetRef,
-    originalName: originalFile.name ?? attachment.originalName ?? attachment.name ?? uploadFile.name,
-    mimeType: attachment.mimeType ?? attachment.mime ?? inferUploadMime(uploadFile.name, uploadFile.type ?? originalFile.type),
-    size: attachment.size ?? uploadFile.size ?? originalFile.size ?? 0,
-    kind,
-    private: attachment.private,
-    scanStatus: attachment.scanStatus,
-    quarantined: attachment.quarantined,
-    requiresReview: attachment.requiresReview,
-    safetyScanId: attachment.safetyScanId,
-    safety,
-    safetyMessage: getMediaSafetyMessage(safety),
-    width: attachment.width,
-    height: attachment.height,
-    durationMs: attachment.durationMs,
-    durationSeconds,
-    videoCategory:
-      attachment.video_category ??
-      (kind === 'short_video' ? 'shorts' : kind === 'video' || kind === 'long_video' ? 'videos' : undefined),
-    localUri: originalFile.uri,
-    localPath: originalFile.uri?.startsWith('file://') ? stripFileScheme(originalFile.uri) : undefined,
-    localUploadKey: `${originalFile.uri}:${originalFile.name}:${originalFile.type ?? ''}`,
-  } as AttachmentMeta;
 }
