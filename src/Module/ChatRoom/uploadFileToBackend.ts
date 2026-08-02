@@ -1,4 +1,5 @@
 // src/screens/chat/uploadFileToBackend.ts
+import RNFS from 'react-native-fs';
 import { API_BASE_URL } from '@/network';
 import { stripFileScheme } from './chatMediaStorage';
 import {
@@ -331,6 +332,19 @@ async function uploadViaSignedUrl(params: {
     throw new Error('Unable to start upload.');
   }
 
+  // Re-check right before the actual native read (buildRequest/RCTNetworking
+  // opens the file here). The caller's own pre-flight check happens before
+  // the token-refresh + /uploads/initiate round-trip above, which can be a
+  // multi-second gap for a large video — re-verifying here closes that
+  // window as tightly as possible.
+  if (uploadFile.uri?.startsWith('file://')) {
+    const stillExists = await RNFS.exists(stripFileScheme(uploadFile.uri)).catch(() => false);
+    if (!stillExists) {
+      onStatus?.('failed');
+      throw new Error('This file is no longer available on your device. Please pick it again and resend.');
+    }
+  }
+
   onStatus?.('uploading');
   onProgress?.(0);
   await new Promise<void>((resolve, reject) => {
@@ -411,6 +425,20 @@ export async function uploadFileToBackend(opts: {
   }
   const originalFile = file;
   const uploadFile = await prepareUploadFile(file);
+
+  // Verify the local file is actually still there right before building the
+  // request. Without this, a file that vanished after staging (copy silently
+  // didn't materialize, or its source got cleaned up) surfaces as a cryptic
+  // native "no such file" crash deep inside RCTNetworking instead of a clean,
+  // catchable error the chat UI can show a retry state for.
+  if (uploadFile.uri?.startsWith('file://')) {
+    const localPath = stripFileScheme(uploadFile.uri);
+    const stillExists = await RNFS.exists(localPath).catch(() => false);
+    if (!stillExists) {
+      onStatus?.('failed');
+      throw new Error('This file is no longer available on your device. Please pick it again and resend.');
+    }
+  }
 
   const uploadContext = normalizeUploadContext(opts.context || 'chat');
   const durationSecondsFromFile =
@@ -626,8 +654,20 @@ async function uploadViaMultipartProxy(params: {
   });
   const url = params_.toString() ? `${baseUrl}/uploads/file?${params_.toString()}` : `${baseUrl}/uploads/file`;
 
-  const uploadOnce = (token: string) =>
-    new Promise<any>((resolve, reject) => {
+  const uploadOnce = async (token: string) => {
+    // Re-check right before the actual native read (buildRequest/RCTNetworking
+    // opens the file when xhr.send(form) runs below). The caller's own
+    // pre-flight check happened earlier, before this function was even
+    // reached — re-verifying here closes that window as tightly as possible.
+    if (uploadFile.uri?.startsWith('file://')) {
+      const stillExists = await RNFS.exists(stripFileScheme(uploadFile.uri)).catch(() => false);
+      if (!stillExists) {
+        onStatus?.('failed');
+        throw new Error('This file is no longer available on your device. Please pick it again and resend.');
+      }
+    }
+
+    return new Promise<any>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
       xhr.timeout = UPLOAD_TIMEOUT_MS;
@@ -686,6 +726,7 @@ async function uploadViaMultipartProxy(params: {
 
       xhr.send(form as any);
     });
+  };
 
   try {
     return await uploadOnce(firstToken);

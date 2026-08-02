@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import Video, { type VideoRef } from 'react-native-video';
+import RNFS from 'react-native-fs';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
 
@@ -19,7 +20,8 @@ import { useLanguage, useTranslation } from '@/languages';
 import { getAccessToken } from '@/security/authStorage';
 import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFileScheme } from '../chatMediaStorage';
 import { normalizeChatDisplayText } from '../safeChatText';
-import { API_BASE_URL, resolveBackendAssetUrl } from '@/network';
+import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl } from '@/network';
+import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
@@ -127,6 +129,11 @@ type FlatAttachmentMeta = {
 
 type NormalizedAttachment = {
   key: string;
+  // The server-issued stable attachment id, only set when it's genuinely
+  // trustworthy (i.e. not a synthesized fallback like the uri or a bare
+  // array index). Downloads must be requested by this id, never a url/key
+  // the client happens to be holding.
+  attachmentId?: string;
   uri: string;
   mime?: string;
   name?: string;
@@ -134,6 +141,11 @@ type NormalizedAttachment = {
   size?: number;
   localUri?: string;
   localPath?: string;
+  expired?: boolean;
+  quarantined?: boolean;
+  scanStatus?: string;
+  viewOnce?: boolean;
+  viewedAt?: string;
 };
 
 type MessageBubbleProps = {
@@ -520,9 +532,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const isStarred = !!(message as any).isStarred;
 
-  const [videoFullscreenUri, setVideoFullscreenUri] = useState<string | null>(null);
+  const [videoFullscreen, setVideoFullscreen] = useState<{ localUri?: string; remoteUri: string } | null>(null);
+  const [videoFullscreenUseRemote, setVideoFullscreenUseRemote] = useState(false);
 
   const [mediaHeaders, setMediaHeaders] = useState<Record<string, string>>({});
+
+  // A persisted localUri/localPath can point at a file that no longer exists
+  // — e.g. after a fresh app install/reload wipes the sandbox container the
+  // path was captured under. Once an <Image>/<Video> using it fails to load,
+  // we stop trusting it (per-attachment) and fall back to the remote CDN url
+  // instead of silently rendering a blank/black box forever.
+  const [localMediaBroken, setLocalMediaBroken] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -542,35 +562,51 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Per-attachment download state (non-image files)
   const [downloadState, setDownloadState] = useState<Record<string, {
     progress: number; // 0..1
-    status: 'idle' | 'downloading' | 'done' | 'failed';
+    status: 'idle' | 'downloading' | 'done' | 'failed' | 'expired' | 'forbidden' | 'quarantined';
     localPath?: string;
+    message?: string;
   }>>({});
+  // In-flight guard keyed by attachment state key — belt-and-braces against
+  // double-taps beyond what the `disabled` prop on the control already does
+  // (e.g. the image-tile onPress path below, which isn't disabled).
+  const downloadsInFlightRef = useRef<Set<string>>(new Set());
 
   const persistDownloadedAttachmentPath = useCallback((attId: string, localPath: string) => {
     if (!attId || !localPath || !onUpdateMessage) return;
     const localUri = fileUriForPath(localPath);
+    // Some stored attachments are wrapped as { attachment: {...} } (legacy
+    // shape) rather than flat — unwrap so matching/updating works either way.
+    const unwrap = (att: any) =>
+      att && typeof att === 'object' && 'attachment' in att && att.attachment ? att.attachment : att;
     const matches = (att: any, index: number) => {
+      const inner = unwrap(att);
       const values = [
-        att?.id,
-        att?.key,
-        att?.assetId,
-        att?.mediaAssetId,
-        att?.mediaAssetRef,
-        att?.url,
-        att?.displayUrl,
-        att?.downloadUrl,
-        att?.publicUrl,
-        att?.localUri,
-        att?.localPath,
+        inner?.id,
+        inner?.key,
+        inner?.assetId,
+        inner?.mediaAssetId,
+        inner?.mediaAssetRef,
+        inner?.url,
+        inner?.displayUrl,
+        inner?.downloadUrl,
+        inner?.publicUrl,
+        inner?.localUri,
+        inner?.localPath,
+        inner?.uri,
+        inner?.path,
         index,
       ].map((value) => String(value ?? ''));
       return values.includes(String(attId));
     };
     const withLocalPath = (list: any[] | undefined) =>
       Array.isArray(list)
-        ? list.map((att: any, index: number) =>
-            matches(att, index) ? { ...att, localPath, localUri } : att,
-          )
+        ? list.map((att: any, index: number) => {
+            if (!matches(att, index)) return att;
+            const isWrapped = att && typeof att === 'object' && 'attachment' in att && att.attachment;
+            return isWrapped
+              ? { ...att, attachment: { ...att.attachment, localPath, localUri } }
+              : { ...att, localPath, localUri };
+          })
         : list;
 
     const nextAttachments = withLocalPath((message as any).attachments) ?? [];
@@ -603,82 +639,215 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     } as ChatMessage);
   }, [message, onUpdateMessage]);
 
-  const downloadFile = async (attId: string, url: string, filename: string) => {
-    const resolvedUrl = resolveBackendAssetUrl(url) ?? url;
-    if (!resolvedUrl) return;
-    setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'downloading' } }));
-    try {
-      let RNBlobUtil: any = null;
-      try { RNBlobUtil = require('react-native-blob-util').default; } catch {}
+  const logDownload = (stage: string, details: Record<string, unknown>) => {
+    if (!__DEV__) return;
+    // Deliberately excludes bearer tokens and signed-URL query strings.
+    console.log(`[attachment-download:${stage}]`, details);
+  };
 
-      if (RNBlobUtil) {
-        const safeName = sanitizeChatMediaFileName(filename || `kis_file_${Date.now()}`);
-        const destPath = await buildChatMediaPath('downloads', safeName, attId);
-        const alreadyExists = await RNBlobUtil.fs.exists(destPath).catch(() => false);
-        if (alreadyExists) {
-          setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
-          persistDownloadedAttachmentPath(attId, destPath);
-          return;
-        }
-        const token = await getAccessToken();
-        const deviceId = await AsyncStorage.getItem('device_id');
-        const headers: Record<string, string> = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-        if (deviceId) headers['X-Device-Id'] = deviceId;
-        const requestHeaders = resolvedUrl.startsWith(API_BASE_URL) ? headers : {};
-        const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: safeName, path: destPath } })
-          .fetch('GET', resolvedUrl, requestHeaders);
-        task.progress((received: number, total: number) => {
-          if (total > 0) {
-            setDownloadState(prev => ({ ...prev, [attId]: { progress: Math.max(0, Math.min(1, received / total)), status: 'downloading' } }));
-          }
-        });
-        const response = await task;
-        const statusCode = Number(response?.info?.()?.status ?? 200);
-        if (statusCode >= 400) {
-          throw new Error(`Download failed with status ${statusCode}`);
-        }
+  const safeUrlForLog = (url?: string) => {
+    if (!url) return undefined;
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return url.split('?')[0];
+    }
+  };
+
+  const downloadFile = async (att: NormalizedAttachment) => {
+    const attId = att.key;
+    const filename = att.name || att.filename || `kis_file_${Date.now()}`;
+
+    if (downloadsInFlightRef.current.has(attId)) return; // duplicate-tap guard
+    if (downloadState[attId]?.status === 'downloading' || downloadState[attId]?.status === 'done') return;
+
+    if (att.expired) {
+      setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'expired', message: 'This file has expired.' } }));
+      return;
+    }
+    if (att.quarantined || (att.scanStatus && ['pending_review', 'blocked', 'failed'].includes(att.scanStatus))) {
+      setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'quarantined', message: 'This file is unavailable pending review.' } }));
+      return;
+    }
+
+    downloadsInFlightRef.current.add(attId);
+    setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'downloading' } }));
+    logDownload('start', { attachmentId: att.attachmentId, hasStorageKeyClientSide: false, originalName: filename, mime: att.mime, expectedSize: att.size });
+
+    let destPath: string | undefined;
+    let RNBlobUtil: any = null;
+    try { RNBlobUtil = require('react-native-blob-util').default; } catch {}
+
+    const fail = async (status: 'failed' | 'expired' | 'forbidden' | 'quarantined', message: string) => {
+      if (destPath) {
+        await RNBlobUtil?.fs?.unlink(destPath).catch(() => {});
+      }
+      logDownload('error', { attachmentId: att.attachmentId, status, message });
+      setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status, message } }));
+    };
+
+    try {
+      if (!RNBlobUtil) {
+        await fail('failed', 'Downloads are not supported on this build.');
+        return;
+      }
+
+      const safeName = sanitizeChatMediaFileName(filename);
+      destPath = await buildChatMediaPath('downloads', safeName, attId);
+      const existingStat = await RNFS.stat(destPath).catch(() => null);
+      if (existingStat && Number(existingStat.size) > 0) {
         setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
-        persistDownloadedAttachmentPath(attId, destPath);
-        RNBlobUtil.android?.actionViewIntent?.(destPath, 'application/octet-stream').catch(() => {
-          /* Protected media URLs need auth headers; do not open them in Safari. */
-        });
-      } else {
-        setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
+        persistDownloadedAttachmentPath(attId, destPath!);
+        return;
       }
+
+      // Resolve a fresh, authorized fetch URL by attachment id — never
+      // trust the attachment's cached url/key directly. Falls back to the
+      // legacy (now-authenticated) url only when there's no usable id, or
+      // the id-based lookup can't find a record (very old cached data).
+      let fetchUrl: string | undefined;
+      let expectedSize = att.size;
+      let expectedMime = att.mime;
+
+      if (att.attachmentId) {
+        try {
+          const resolved = await requestAttachmentDownloadUrl(att.attachmentId);
+          fetchUrl = resolved.downloadUrl;
+          expectedSize = resolved.size || expectedSize;
+          expectedMime = resolved.mimeType || expectedMime;
+          logDownload('authorized', {
+            attachmentId: att.attachmentId,
+            endpoint: safeUrlForLog(`${NEST_API_BASE_URL}/uploads/${att.attachmentId}/download-url`),
+            resolvedUrl: safeUrlForLog(resolved.downloadUrl),
+            expiresInSeconds: resolved.expiresInSeconds,
+          });
+        } catch (error) {
+          if (error instanceof AttachmentDownloadError) {
+            logDownload('authorization_error', { attachmentId: att.attachmentId, kind: error.kind, status: error.status, message: error.message });
+            if (error.kind === 'expired') return void (await fail('expired', 'This file has expired.'));
+            if (error.kind === 'forbidden') return void (await fail('forbidden', error.message || 'You do not have access to this file.'));
+            if (error.kind === 'not_found' && att.uri) {
+              // Very old cached attachment with no server-resolvable id — fall
+              // back to the legacy (now-authenticated) direct link.
+              fetchUrl = undefined;
+            } else {
+              return void (await fail('failed', error.message || 'Download failed.'));
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!fetchUrl) {
+        fetchUrl = resolveBackendAssetUrl(att.uri) ?? att.uri;
+      }
+      if (!fetchUrl) {
+        await fail('failed', 'No download link is available for this file.');
+        return;
+      }
+
+      const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (deviceId) headers['X-Device-Id'] = deviceId;
+      // Never attach our own bearer token to a presigned storage URL (S3) —
+      // only our own backends expect/accept it, and a signed URL's
+      // authorization is entirely in its query string.
+      const requestHeaders = (fetchUrl.startsWith(API_BASE_URL) || fetchUrl.startsWith(NEST_API_BASE_URL)) ? headers : {};
+
+      logDownload('request', { attachmentId: att.attachmentId, endpoint: safeUrlForLog(fetchUrl), destinationPath: destPath });
+
+      const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: safeName, path: destPath } })
+        .fetch('GET', fetchUrl, requestHeaders);
+      task.progress((received: number, total: number) => {
+        if (total > 0) {
+          setDownloadState(prev => ({ ...prev, [attId]: { progress: Math.max(0, Math.min(1, received / total)), status: 'downloading' } }));
+        }
+      });
+      const response = await task;
+      const info = response?.info?.();
+      const statusCode = Number(info?.status);
+      const responseContentType = String(info?.headers?.['Content-Type'] ?? info?.headers?.['content-type'] ?? '').toLowerCase();
+
+      logDownload('response', { attachmentId: att.attachmentId, httpStatus: statusCode, contentType: responseContentType });
+
+      if (!Number.isFinite(statusCode) || statusCode < 200 || statusCode >= 300) {
+        const kind = statusCode === 401 ? 'failed' : statusCode === 403 ? 'forbidden' : statusCode === 410 ? 'expired' : 'failed';
+        await fail(kind as any, `Download failed with status ${statusCode || 'unknown'}`);
+        return;
+      }
+      if (responseContentType.includes('application/json') || responseContentType.includes('text/html')) {
+        await fail('failed', 'Server returned an error instead of the file.');
+        return;
+      }
+
+      const finalStat = await RNFS.stat(destPath).catch(() => null);
+      const finalSize = finalStat ? Number(finalStat.size) : 0;
+      const fileExists = !!finalStat && finalSize > 0;
+      logDownload('complete', { attachmentId: att.attachmentId, downloadedBytes: finalSize, fileExists });
+
+      if (!fileExists) {
+        await fail('failed', 'Downloaded file was empty.');
+        return;
+      }
+      // Sanity-check against the size the server told us to expect —
+      // generous tolerance since compression/re-encoding can shift this.
+      if (expectedSize && expectedSize > 0 && finalSize < expectedSize * 0.5) {
+        await fail('failed', 'Downloaded file was incomplete.');
+        return;
+      }
+
+      setDownloadState(prev => ({ ...prev, [attId]: { progress: 1, status: 'done', localPath: destPath } }));
+      persistDownloadedAttachmentPath(attId, destPath);
+      RNBlobUtil.android?.actionViewIntent?.(destPath, expectedMime || 'application/octet-stream').catch(() => {
+        /* Protected media URLs need auth headers; do not open them in Safari. */
+      });
     } catch (error) {
-      if (__DEV__) {
-        console.warn('[MessageBubble] download failed', error instanceof Error ? error.message : String(error));
-      }
-      setDownloadState(prev => ({ ...prev, [attId]: { progress: 0, status: 'failed' } }));
+      logDownload('exception', {
+        attachmentId: att.attachmentId,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      await fail('failed', error instanceof Error ? error.message : 'Download failed.');
+    } finally {
+      downloadsInFlightRef.current.delete(attId);
     }
   };
 
   const renderDownloadControl = (
-    attId: string,
-    url: string,
-    filename: string,
+    att: NormalizedAttachment,
     variant: 'overlay' | 'inline' = 'inline',
   ) => {
-    if (isMe || !url) return null;
+    const attId = att.key;
+    if (isMe || !att.uri) return null;
     const state = downloadState[attId] ?? { status: 'idle', progress: 0 };
     const pct = Math.max(0, Math.min(100, Math.round((state.progress ?? 0) * 100)));
     const isDownloading = state.status === 'downloading';
     const isDone = state.status === 'done';
     if (isDone) return null;
     const isFailed = state.status === 'failed';
+    const isExpired = state.status === 'expired' || att.expired;
+    const isBlocked = state.status === 'forbidden' || state.status === 'quarantined' || att.quarantined;
+    // isFailed alone gates the retry affordance below — expired/forbidden are terminal, no retry.
     const label = isDownloading
       ? `Downloading ${pct}%`
       : isDone
       ? 'Downloaded'
+      : isExpired
+      ? 'Expired'
+      : isBlocked
+      ? 'Unavailable'
       : isFailed
       ? 'Retry download'
       : 'Download';
     const isOverlay = variant === 'overlay';
     return (
       <Pressable
-        disabled={isDownloading || isDone}
-        onPress={() => downloadFile(attId, url, filename)}
+        disabled={isDownloading || isDone || isExpired || isBlocked}
+        onPress={() => downloadFile(att)}
         style={{
           ...(isOverlay
             ? {
@@ -1043,9 +1212,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               ? att.size
               : undefined;
   
-          const key = String(att.id ?? uri ?? index);
-  
-          return { key, uri, mime, name, filename: att.filename, size, localUri: att.localUri, localPath: att.localPath };
+          // Only trust att.id as the real backend attachment id when it's
+          // actually a distinct identifier — not a fallback that already
+          // collapsed to the uri itself (chatStorage.ts synthesizes ids
+          // like `att-${index}-${url}` for malformed legacy rows).
+          const rawId = att.id != null ? String(att.id) : undefined;
+          const attachmentId = rawId && rawId !== uri && !rawId.startsWith('att-') ? rawId : undefined;
+          const key = String(rawId ?? uri ?? index);
+
+          return {
+            key,
+            attachmentId,
+            uri,
+            mime,
+            name,
+            filename: att.filename,
+            size,
+            localUri: att.localUri,
+            localPath: att.localPath,
+            expired: att.expired === true,
+            quarantined: att.quarantined === true,
+            scanStatus: att.scanStatus,
+            viewOnce: att.viewOnce === true,
+            viewedAt: att.viewedAt,
+          };
         })
         .filter(Boolean) as NormalizedAttachment[];
     };
@@ -1139,10 +1329,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             ? stripFileScheme(savedLocalUri)
             : undefined;
           const downloadedPath = downloadState[downloadKey]?.localPath ?? savedLocalPath ?? localUriPath;
-          const downloadedUri = downloadedPath ? fileUriForPath(downloadedPath) : (savedLocalUri || '');
+          const rawDownloadedUri = downloadedPath ? fileUriForPath(downloadedPath) : (savedLocalUri || '');
+          // Once this attachment's local file has failed to actually load
+          // (see onError below), stop trusting it so we fall through to the
+          // remote CDN url instead of a permanently blank/black render.
+          const downloadedUri = localMediaBroken[downloadKey] ? '' : rawDownloadedUri;
           const canOpenRemote = isOutgoing || isLocalAttachmentUrl(uri);
           const canOpenDownloaded = !!downloadedUri;
           const openableUri = downloadedUri || (canOpenRemote ? uri : '');
+          const markLocalMediaBroken = () => {
+            if (!rawDownloadedUri || localMediaBroken[downloadKey]) return;
+            // Don't trust a single onError — <Image>/<Video> can fire it for
+            // transient reasons (decode hiccup, brief lock right after a
+            // download finishes writing) unrelated to the file being gone.
+            // Only poison this attachment once we've confirmed the file is
+            // genuinely missing, so a one-off glitch doesn't permanently
+            // re-blur an already-downloaded attachment or bring back the
+            // download button/percentage indicator for no reason.
+            RNFS.exists(stripFileScheme(rawDownloadedUri))
+              .catch(() => false)
+              .then((stillExists) => {
+                if (!stillExists) {
+                  setLocalMediaBroken((prev) => ({ ...prev, [downloadKey]: true }));
+                }
+              });
+          };
 
           const isImage =
             mime?.startsWith('image/') ||
@@ -1189,7 +1400,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
                 onPress={() => {
                   if (!openableUri) {
-                    void downloadFile(downloadKey, uri, displayName);
+                    void downloadFile(att);
                     return;
                   }
                   Linking.openURL(openableUri).catch((err) =>
@@ -1211,6 +1422,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                     blurRadius={shouldBlurUntilDownloaded ? 9 : 0}
+                    onError={markLocalMediaBroken}
                   />
                 )}
                 {shouldBlurUntilDownloaded && (
@@ -1226,7 +1438,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     }}
                   />
                 )}
-                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1248,7 +1460,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
                 onPress={() => {
                   if (!openableUri) {
-                    void downloadFile(downloadKey, uri, displayName);
+                    void downloadFile(att);
                     return;
                   }
                   Linking.openURL(openableUri).catch((err) =>
@@ -1310,7 +1522,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     }}
                   />
                 )}
-                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1334,10 +1546,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
                 onPress={() => {
                   if (!downloadedUri) {
-                    void downloadFile(downloadKey, uri, displayName);
+                    void downloadFile(att);
                     return;
                   }
-                  setVideoFullscreenUri(downloadedUri);
+                  setVideoFullscreenUseRemote(false);
+                  setVideoFullscreen({ localUri: downloadedUri, remoteUri: uri });
                 }}
               >
                 <View
@@ -1354,7 +1567,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Text style={{ marginTop: 8, color: '#fff', fontWeight: '700', fontSize: 12 }} numberOfLines={1}>
                   {downloadedUri ? 'Play video' : displayName}
                 </Text>
-                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'overlay')}
+                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1378,7 +1591,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
                 onPress={() => {
                   if (!openableUri) {
-                    void downloadFile(downloadKey, uri, displayName);
+                    void downloadFile(att);
                     return;
                   }
                   Linking.openURL(openableUri).catch((err) => console.warn('open audio error', err));
@@ -1392,7 +1605,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 3, color: isOutgoing ? palette.onPrimaryMuted ?? '#e0e0e0' : palette.subtext }}>
                     Audio {sizeLabel ? `• ${sizeLabel}` : ''}
                   </Text>
-                  {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'inline')}
+                  {!canOpenDownloaded && renderDownloadControl(att, 'inline')}
                 </View>
                 {renderInlineUploadOverlay()}
               </Pressable>
@@ -1421,7 +1634,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               }}
               onPress={() => {
                 if (!openableUri) {
-                  void downloadFile(downloadKey, uri, displayName);
+                  void downloadFile(att);
                   return;
                 }
                 if (openableUri) {
@@ -1513,7 +1726,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </Text>
                 )}
 
-                {!canOpenDownloaded && renderDownloadControl(downloadKey, uri, displayName, 'inline')}
+                {!canOpenDownloaded && renderDownloadControl(att, 'inline')}
               </View>
               {renderInlineUploadOverlay()}
             </Pressable>
@@ -3268,9 +3481,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Pressable>
 
           {!(voice as any).localPath && !(voice as any).localUri && renderDownloadControl(
-            String((message as any).serverId ?? messageId ?? voice.uri ?? 'voice'),
-            voiceRemoteUrl,
-            String((voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
+            {
+              key: String((message as any).serverId ?? messageId ?? voice.uri ?? 'voice'),
+              // Voice notes aren't tracked in the attachments[] id contract
+              // (see message.schema.ts VoiceMeta), so this always falls
+              // back to the legacy authenticated-by-url path in
+              // downloadFile rather than the id-based download-url flow.
+              attachmentId: undefined,
+              uri: voiceRemoteUrl,
+              mime: 'audio/m4a',
+              name: String((voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
+            } as NormalizedAttachment,
             'inline',
           )}
 
@@ -3613,23 +3834,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {renderReactionViewerSheet()}
 
       {/* Fullscreen video player */}
-      {videoFullscreenUri && (
+      {videoFullscreen && (
         <Modal
           visible
           transparent={false}
           animationType="fade"
-          onRequestClose={() => setVideoFullscreenUri(null)}
+          onRequestClose={() => { setVideoFullscreen(null); setVideoFullscreenUseRemote(false); }}
           statusBarTranslucent
         >
           <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
             <Video
-              source={{ uri: videoFullscreenUri }}
+              source={{
+                uri: (!videoFullscreenUseRemote && videoFullscreen.localUri) || videoFullscreen.remoteUri,
+              }}
               style={{ flex: 1 }}
               resizeMode="contain"
               controls
+              onError={() => {
+                // Local file is stale/missing (e.g. after a reload wiped the
+                // sandbox container it was captured under) — fall back to
+                // the remote CDN url instead of a black screen.
+                if (!videoFullscreenUseRemote && videoFullscreen.localUri) {
+                  setVideoFullscreenUseRemote(true);
+                }
+              }}
             />
             <Pressable
-              onPress={() => setVideoFullscreenUri(null)}
+              onPress={() => { setVideoFullscreen(null); setVideoFullscreenUseRemote(false); }}
               style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />

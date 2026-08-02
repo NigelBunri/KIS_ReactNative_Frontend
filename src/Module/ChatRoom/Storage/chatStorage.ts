@@ -457,10 +457,44 @@ const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMessage =
   if ((!nextText || nextText.toLowerCase() === 'encrypted message') && prevText && prevText.toLowerCase() !== 'encrypted message') {
     merged.text = p.text;
   }
-  if (!(n.attachments?.length) && p.attachments?.length) merged.attachments = p.attachments;
-  if (!(n.media?.attachments?.length) && p.media?.attachments?.length) merged.media = p.media;
+  // Restore per-attachment localUri/localPath by index when both copies have
+  // attachments — otherwise a download recorded on one stored copy (e.g. the
+  // durable RNFS history file) but not yet reflected in the other (e.g. an
+  // older AsyncStorage snapshot) gets silently dropped by the `{...p, ...n}`
+  // spread above, and the attachment looks "never downloaded" again next
+  // launch even though the file is still on disk.
+  const withPreservedLocalMedia = (nList: any[] | undefined, pList: any[] | undefined) => {
+    if (!Array.isArray(nList) || !Array.isArray(pList)) return nList;
+    return nList.map((nAtt: any, idx: number) => {
+      const pAtt = pList[idx];
+      if (!pAtt) return nAtt;
+      return {
+        ...nAtt,
+        localUri: nAtt?.localUri ?? pAtt?.localUri,
+        localPath: nAtt?.localPath ?? pAtt?.localPath,
+      };
+    });
+  };
+  if (!(n.attachments?.length) && p.attachments?.length) {
+    merged.attachments = p.attachments;
+  } else if (n.attachments?.length && p.attachments?.length) {
+    merged.attachments = withPreservedLocalMedia(n.attachments, p.attachments);
+  }
+  if (!(n.media?.attachments?.length) && p.media?.attachments?.length) {
+    merged.media = p.media;
+  } else if (n.media?.attachments?.length && p.media?.attachments?.length) {
+    merged.media = { ...n.media, attachments: withPreservedLocalMedia(n.media.attachments, p.media.attachments) };
+  }
   if (!n.styledText && p.styledText) merged.styledText = p.styledText;
-  if (!n.voice && p.voice) merged.voice = p.voice;
+  if (n.voice && p.voice) {
+    merged.voice = {
+      ...n.voice,
+      localUri: n.voice.localUri ?? p.voice.localUri,
+      localPath: n.voice.localPath ?? p.voice.localPath,
+    };
+  } else if (!n.voice && p.voice) {
+    merged.voice = p.voice;
+  }
   if (!n.sticker && p.sticker) merged.sticker = p.sticker;
   if (!n.poll && p.poll) merged.poll = p.poll;
   if (!n.event && p.event) merged.event = p.event;

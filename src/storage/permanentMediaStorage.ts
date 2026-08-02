@@ -31,8 +31,21 @@ export const stripFileScheme = (uri: string) => {
   }
 };
 
-export const fileUriForPath = (path: string) =>
-  path.startsWith('file://') ? path : `file://${path}`;
+// Builds a well-formed file:// URI from a plain filesystem path. Every
+// segment must be percent-encoded — spaces, '#', '%', etc. are otherwise
+// left raw/unescaped, producing a malformed URI that native code then has to
+// "fix up" itself (RN's own URL bridging is lenient about this in some
+// codepaths but not others — this was the root cause of chat video uploads
+// failing with a native "no such file" error, and of local images/videos
+// rendering blank/black after an app reload, both traced back to this
+// function silently handing out invalid URIs for any filename with a space
+// in it, which is nearly all of them). Mirrors stripFileScheme's
+// decodeURIComponent below, so encode/decode stay symmetric.
+export const fileUriForPath = (path: string) => {
+  if (path.startsWith('file://')) return path;
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  return `file://${encoded}`;
+};
 
 const normalizeSegment = (value: string) =>
   sanitizePermanentFileName(value).replace(/\s+/g, '_');

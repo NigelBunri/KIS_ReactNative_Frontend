@@ -66,8 +66,19 @@ export const copyUriToChatMedia = async (
   const exists = await RNFS.exists(sourcePath).catch(() => false);
   if (!exists) return null;
   const targetPath = await buildChatMediaPath(bucket, filename, stableKey);
-  await RNFS.copyFile(sourcePath, targetPath);
-  return targetPath;
+  try {
+    await RNFS.copyFile(sourcePath, targetPath);
+  } catch {
+    return null;
+  }
+  // Belt-and-braces: copyFile can resolve without the destination actually
+  // existing (e.g. the source disappearing mid-copy — large video files take
+  // long enough for this to surface, unlike images which get re-encoded
+  // through a fresh cache file anyway). Returning a path with nothing behind
+  // it just defers the failure to the upload layer as a cryptic native
+  // "no such file" crash instead of a recoverable one here.
+  const copied = await RNFS.exists(targetPath).catch(() => false);
+  return copied ? targetPath : null;
 };
 
 // Alternative legacy paths that may contain files from previous code versions.
