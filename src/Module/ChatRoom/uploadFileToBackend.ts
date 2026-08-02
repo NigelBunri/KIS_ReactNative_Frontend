@@ -17,6 +17,7 @@ import {
 import { APP_ENV } from '@/env';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildConfirmPath, resolveUploadIntent } from './uploadIntentContract';
 
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_UPLOAD_BYTES = 2_147_483_647;
@@ -327,9 +328,23 @@ async function uploadViaSignedUrl(params: {
     firstToken,
     deviceId,
   );
-  const { upload_id: uploadId, upload_url: uploadUrl, required_headers: requiredHeaders } = initiateRes || {};
-  if (!uploadId || !uploadUrl) {
-    throw new Error('Unable to start upload.');
+
+  // Never derive the confirm id from the S3 storage key — see
+  // uploadIntentContract.ts for why (a key contains '/', which cannot
+  // survive as a single REST path segment even URL-encoded, causing the
+  // exact "Cannot POST /uploads/<key>/confirm" 404 this flow used to hit).
+  // This one shared path is used for every file kind — video, image, PDF,
+  // document — so the fix (and its guard) applies to all of them equally.
+  const { uploadId, uploadUrl, headers: requiredHeaders, storageKey } = resolveUploadIntent(initiateRes);
+
+  if (__DEV__) {
+    console.log('[uploadFileToBackend] initiate resolved', {
+      uploadId,
+      storageKey,
+      mimeType: contentType,
+      size: uploadFile.size,
+      confirmPath: buildConfirmPath(uploadId),
+    });
   }
 
   // Re-check right before the actual native read (buildRequest/RCTNetworking
@@ -384,7 +399,7 @@ async function uploadViaSignedUrl(params: {
   });
 
   const confirmRes = await authedJsonPost(
-    `${baseUrl}/uploads/${encodeURIComponent(uploadId)}/confirm`,
+    `${baseUrl}${buildConfirmPath(uploadId)}`,
     durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {},
     firstToken,
     deviceId,
