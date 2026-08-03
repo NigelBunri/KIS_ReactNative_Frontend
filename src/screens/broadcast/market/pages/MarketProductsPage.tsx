@@ -19,6 +19,7 @@ import {
 import MarketProductCard from '@/screens/broadcast/market/components/MarketProductCard';
 import { useCatalogCategories } from '@/screens/market/useCatalogCategories';
 import { collectProductImageUris } from '@/utils/productImages';
+import { uploadMarketplaceMedia } from '@/services/uploadMarketplaceMedia';
 
 type PickedImage = { uri: string; name: string; type: string };
 
@@ -42,12 +43,6 @@ const buildPickedImage = (
   const name = asset.fileName || `${prefix}_${Date.now()}.${extension}`;
   return { uri: asset.uri, name, type: asset.type || 'image/jpeg' };
 };
-
-const toUploadFile = (picked: PickedImage) => ({
-  uri: picked.uri,
-  name: picked.name,
-  type: picked.type,
-});
 
 type Props = {
   ownerId?: string | null;
@@ -73,6 +68,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   const [editing, setEditing] = useState<MarketProduct | null>(null);
   const [productImages, setProductImages] = useState<PickedImage[]>([]);
   const [form, setForm] = useState({ ...DEFAULT_PRODUCT_FORM });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const PINNED_PRODUCTS_KEY = 'kis.market.pinned_products.v1';
   const [pinnedIds, setPinnedIds] = useState<Record<string, boolean>>({});
@@ -225,46 +221,70 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
       Alert.alert('Market', 'Product image is required.');
       return;
     }
-    const formData = new FormData();
-    formData.append('shop', String(shopId));
-    formData.append('sku', `${shopId}-${Date.now()}`);
-    formData.append('name', trimmedName);
-    formData.append('slug', trimmedName.toLowerCase().replace(/\s+/g, '-'));
-    formData.append('description', form.description.trim());
-    formData.append('price', trimmedPrice);
-    formData.append('currency', 'USD');
-    const stockQty = Math.max(0, Number(form.stock_qty || 0));
-    formData.append(
-      'stock_qty',
-      String(Number.isFinite(stockQty) ? Math.floor(stockQty) : 0),
-    );
-    if (form.categoryId) {
-      formData.append('category_id', form.categoryId);
-    }
+    if (isSubmitting) return; // duplicate-tap guard
 
-    const selectedFiles = productImages;
-    if (selectedFiles.length) {
-      if (editing) {
-        selectedFiles.forEach(file => {
-          formData.append('images', toUploadFile(file) as any);
-        });
-      } else {
-        const [primary, ...rest] = selectedFiles;
-        if (primary) {
-          formData.append('image_file', toUploadFile(primary) as any);
-          rest.forEach(file =>
-            formData.append('images', toUploadFile(file) as any),
+    setIsSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        shop: String(shopId),
+        sku: `${shopId}-${Date.now()}`,
+        name: trimmedName,
+        slug: trimmedName.toLowerCase().replace(/\s+/g, '-'),
+        description: form.description.trim(),
+        price: trimmedPrice,
+        currency: 'USD',
+      };
+      const stockQty = Math.max(0, Number(form.stock_qty || 0));
+      body.stock_qty = Number.isFinite(stockQty) ? Math.floor(stockQty) : 0;
+      if (form.categoryId) {
+        body.category_id = form.categoryId;
+      }
+
+      const selectedFiles = productImages;
+      if (selectedFiles.length) {
+        const target = editing?.id ? { productId: editing.id } : { shopId: String(shopId) };
+        if (editing) {
+          // Matches the previous behavior exactly: on edit, every selected
+          // file goes to the gallery (this screen never replaces the main
+          // image on edit — see MarketStudioSection.tsx for the flow that does).
+          const galleryMediaIds = await Promise.all(
+            selectedFiles.map(async (file) => {
+              const media = await uploadMarketplaceMedia({ purpose: 'product_gallery_image', file, target });
+              return media.mediaId;
+            }),
           );
+          body.gallery_media_ids = galleryMediaIds;
+        } else {
+          const [primary, ...rest] = selectedFiles;
+          if (primary) {
+            const primaryMedia = await uploadMarketplaceMedia({ purpose: 'product_main_image', file: primary, target });
+            body.main_image_media_id = primaryMedia.mediaId;
+          }
+          if (rest.length) {
+            const galleryMediaIds = await Promise.all(
+              rest.map(async (file) => {
+                const media = await uploadMarketplaceMedia({ purpose: 'product_gallery_image', file, target });
+                return media.mediaId;
+              }),
+            );
+            body.gallery_media_ids = galleryMediaIds;
+          }
         }
       }
-    }
 
-    const response = editing?.id
-      ? await updateProduct(editing.id, formData)
-      : await createProduct(formData);
-    if (response?.ok) {
-      reset();
-      await reloadAll();
+      const response = editing?.id
+        ? await updateProduct(editing.id, body)
+        : await createProduct(body);
+      if (response?.ok) {
+        reset();
+        await reloadAll();
+      } else {
+        Alert.alert('Market', 'Unable to save this product. Please check the details and try again.');
+      }
+    } catch (err) {
+      Alert.alert('Market', err instanceof Error ? err.message : 'Unable to save this product.');
+    } finally {
+      setIsSubmitting(false);
     }
   }, [
     form,
@@ -275,6 +295,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     updateProduct,
     reloadAll,
     reset,
+    isSubmitting,
   ]);
 
   const stagedImageUrls = useMemo(() => {
@@ -553,8 +574,9 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
 
           <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
             <KISButton
-              title={editing ? 'Update product' : 'Add product'}
+              title={isSubmitting ? 'Saving…' : editing ? 'Update product' : 'Add product'}
               onPress={submit}
+              disabled={isSubmitting}
             />
             {editing ? (
               <KISButton

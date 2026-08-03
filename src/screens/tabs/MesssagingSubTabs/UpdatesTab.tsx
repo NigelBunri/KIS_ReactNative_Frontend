@@ -30,6 +30,7 @@ import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
 import KISText from '@/components/common/KISText';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { uploadStatusMedia, type StatusMediaPurpose } from '@/services/uploadStatusMedia';
 import {
   refreshFromDeviceAndBackendWithOptions,
   type KISContact,
@@ -149,6 +150,31 @@ const appendStatusAudienceFields = (
   }
 };
 
+// JSON equivalent of appendStatusAudienceFields, for status media created
+// via media_id (direct-to-S3 flow) instead of multipart `file`. Same field
+// names, same aliasing — StatusCreateSerializer.validate() reads either
+// shape identically.
+const buildStatusAudienceJsonFields = (
+  visibility: StatusVisibility,
+  userIds: string[],
+): Record<string, unknown> => {
+  const normalized = normalizeAudienceIds(userIds);
+  const fields: Record<string, unknown> = {
+    visibility,
+    audience_mode: visibility,
+  };
+  if (visibility === 'contacts' || normalized.length === 0) return fields;
+  fields.target_user_ids = normalized;
+  if (visibility === 'contacts_except') {
+    fields.excluded_user_ids = normalized;
+    fields.except_user_ids = normalized;
+  } else if (visibility === 'only_share_with') {
+    fields.allowed_user_ids = normalized;
+    fields.only_user_ids = normalized;
+  }
+  return fields;
+};
+
 type UpdatesTabProps = {
   searchTerm?: string;
   onOpenChat?: (chat: Chat) => void;
@@ -176,6 +202,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [statusUsers, setStatusUsers] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(false);
   const [statusComposerOpen, setStatusComposerOpen] = useState(false);
+  // Guards the publish button against double-tap: the direct-to-S3 flow for
+  // image/video/audio statuses is now a multi-step (initiate -> PUT ->
+  // confirm -> create) round trip per asset, taking noticeably longer than
+  // the old single multipart POST, so the risk of a duplicate submission on
+  // a second tap is materially higher than before this migration.
+  const [isPublishingStatus, setIsPublishingStatus] = useState(false);
   const [statusDraftText, setStatusDraftText] = useState('');
   const [statusDraftAssets, setStatusDraftAssets] = useState<any[]>([]);
   const [statusDraftType, setStatusDraftType] = useState<
@@ -1546,7 +1578,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
 
             <View style={styles.composerFooter}>
               <Pressable
+                disabled={isPublishingStatus}
                 onPress={() => {
+                  if (isPublishingStatus) return;
                   setStatusComposerOpen(false);
                   resetStatusDraft();
                 }}
@@ -1556,13 +1590,16 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     backgroundColor: pressed
                       ? palette.surface
                       : palette.surfaceElevated,
+                    opacity: isPublishingStatus ? 0.5 : 1,
                   },
                 ]}
               >
                 <Text style={{ color: palette.text }}>Cancel</Text>
               </Pressable>
               <Pressable
+                disabled={isPublishingStatus}
                 onPress={async () => {
+                  if (isPublishingStatus) return;
                   if (statusDraftType === 'text' && !statusDraftText.trim()) {
                     Alert.alert('Status', 'Please enter some text.');
                     return;
@@ -1584,78 +1621,19 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     );
                     return;
                   }
-                  if (statusDraftType === 'text') {
-                    const form = new FormData();
-                    form.append('type', statusDraftType);
-                    form.append('text', statusDraftText.trim());
-                    form.append('style', JSON.stringify(statusDraftStyle));
-                    appendStatusAudienceFields(
-                      form,
-                      statusDraftVisibility,
-                      statusDraftTargetUserIds,
-                    );
-                    form.append('reply_permission', statusDraftReplyPermission);
-                    const res = await postRequest(
-                      ROUTES.statuses.create,
-                      form,
-                      {
-                        errorMessage: 'Failed to create status',
-                      },
-                    );
-                    if (!res.success) {
-                      console.warn(
-                        '[UpdatesTab] status post failed',
-                        res.data ?? res.message,
-                      );
-                    }
-                    if (!res.success) {
-                      Alert.alert(
-                        'Status',
-                        res.message || 'Failed to create status',
-                      );
-                      return;
-                    }
-                  } else {
-                    for (const asset of statusDraftAssets) {
+                  setIsPublishingStatus(true);
+                  try {
+                    if (statusDraftType === 'text') {
                       const form = new FormData();
-                      const isVideo = asset.type?.startsWith('video');
-                      const isAudio = asset.type?.startsWith('audio');
-                      form.append(
-                        'type',
-                        isVideo ? 'video' : isAudio ? 'audio' : 'image',
-                      );
-                      form.append('file', {
-                        uri: asset.uri,
-                        name: asset.fileName || 'status',
-                        type: asset.type || 'application/octet-stream',
-                      } as any);
-                      const durationMs =
-                        typeof asset?.durationMs === 'number'
-                          ? asset.durationMs
-                          : typeof asset?.duration === 'number'
-                          ? asset.duration > 1000
-                            ? asset.duration
-                            : Math.round(asset.duration * 1000)
-                          : undefined;
-                      if (
-                        typeof durationMs === 'number' &&
-                        Number.isFinite(durationMs) &&
-                        durationMs > 0
-                      ) {
-                        form.append(
-                          'duration_ms',
-                          String(Math.round(durationMs)),
-                        );
-                      }
+                      form.append('type', statusDraftType);
+                      form.append('text', statusDraftText.trim());
+                      form.append('style', JSON.stringify(statusDraftStyle));
                       appendStatusAudienceFields(
                         form,
                         statusDraftVisibility,
                         statusDraftTargetUserIds,
                       );
-                      form.append(
-                        'reply_permission',
-                        statusDraftReplyPermission,
-                      );
+                      form.append('reply_permission', statusDraftReplyPermission);
                       const res = await postRequest(
                         ROUTES.statuses.create,
                         form,
@@ -1668,20 +1646,102 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                           '[UpdatesTab] status post failed',
                           res.data ?? res.message,
                         );
-                      }
-                      if (!res.success) {
                         Alert.alert(
                           'Status',
                           res.message || 'Failed to create status',
                         );
                         return;
                       }
+                    } else {
+                      // Direct-to-S3: each asset is uploaded (initiate -> PUT
+                      // -> confirm) to get a stable mediaId, then the status
+                      // is created from JSON referencing that mediaId — the
+                      // file's bytes never pass through Django. See
+                      // src/services/uploadStatusMedia.ts and
+                      // apps/statuses/status_media.py.
+                      for (const asset of statusDraftAssets) {
+                        const isVideo = asset.type?.startsWith('video');
+                        const isAudio = asset.type?.startsWith('audio');
+                        const statusType = isVideo ? 'video' : isAudio ? 'audio' : 'image';
+                        const purpose: StatusMediaPurpose = isVideo
+                          ? 'status_video'
+                          : isAudio
+                          ? 'status_audio'
+                          : 'status_image';
+
+                        let mediaId: string;
+                        try {
+                          const uploaded = await uploadStatusMedia({
+                            purpose,
+                            file: {
+                              uri: asset.uri,
+                              name: asset.fileName || 'status',
+                              type: asset.type || 'application/octet-stream',
+                              size: asset.fileSize ?? asset.size,
+                            },
+                          });
+                          mediaId = uploaded.mediaId;
+                        } catch (uploadErr: any) {
+                          Alert.alert(
+                            'Status',
+                            uploadErr?.message || 'Failed to upload status media',
+                          );
+                          return;
+                        }
+
+                        const durationMs =
+                          typeof asset?.durationMs === 'number'
+                            ? asset.durationMs
+                            : typeof asset?.duration === 'number'
+                            ? asset.duration > 1000
+                              ? asset.duration
+                              : Math.round(asset.duration * 1000)
+                            : undefined;
+
+                        const body: Record<string, unknown> = {
+                          type: statusType,
+                          media_id: mediaId,
+                          reply_permission: statusDraftReplyPermission,
+                          ...buildStatusAudienceJsonFields(
+                            statusDraftVisibility,
+                            statusDraftTargetUserIds,
+                          ),
+                        };
+                        if (
+                          typeof durationMs === 'number' &&
+                          Number.isFinite(durationMs) &&
+                          durationMs > 0
+                        ) {
+                          body.duration_ms = Math.round(durationMs);
+                        }
+
+                        const res = await postRequest(
+                          ROUTES.statuses.create,
+                          body,
+                          {
+                            errorMessage: 'Failed to create status',
+                          },
+                        );
+                        if (!res.success) {
+                          console.warn(
+                            '[UpdatesTab] status post failed',
+                            res.data ?? res.message,
+                          );
+                          Alert.alert(
+                            'Status',
+                            res.message || 'Failed to create status',
+                          );
+                          return;
+                        }
+                      }
                     }
+                    setStatusComposerOpen(false);
+                    resetStatusDraft();
+                    await loadStatuses();
+                    openViewer('me');
+                  } finally {
+                    setIsPublishingStatus(false);
                   }
-                  setStatusComposerOpen(false);
-                  resetStatusDraft();
-                  await loadStatuses();
-                  openViewer('me');
                 }}
                 style={({ pressed }) => [
                   styles.composerBtn,
@@ -1689,11 +1749,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     backgroundColor: pressed
                       ? palette.primarySoft
                       : palette.primary,
+                    opacity: isPublishingStatus ? 0.7 : 1,
                   },
                 ]}
               >
                 <Text style={{ color: palette.onPrimary }}>
-                  Post
+                  {isPublishingStatus ? 'Posting…' : 'Post'}
                 </Text>
               </Pressable>
             </View>

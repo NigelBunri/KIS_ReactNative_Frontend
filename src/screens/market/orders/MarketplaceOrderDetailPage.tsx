@@ -22,6 +22,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { uploadMarketplaceMedia } from '@/services/uploadMarketplaceMedia';
 import { getAccessToken } from '@/security/authStorage';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -172,19 +173,31 @@ export default function MarketplaceOrderDetailPage() {
     }
     setComplaintSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('order_id', order.id);
-      formData.append('text', complaintText.trim());
+      const body: Record<string, unknown> = {
+        order_id: order.id,
+        text: complaintText.trim(),
+      };
       if (complaintAttachment) {
-        formData.append('attachment', {
-          uri: complaintAttachment.fileCopyUri || complaintAttachment.uri,
-          type: complaintAttachment.type || 'application/octet-stream',
-          name: complaintAttachment.name || `attachment-${Date.now()}`,
-        } as any);
+        // Direct-to-S3 presigned upload — see uploadMarketplaceMedia.ts.
+        // Complaint attachments are dispute evidence: kept private, and
+        // only downloadable via the authorized attachment-download-url
+        // endpoint (never a permanent public URL) — see
+        // apps/commerce/media_uploads.py resolve_confirmed_media / the
+        // MarketplaceComplaintViewSet.attachment_download_url action.
+        const media = await uploadMarketplaceMedia({
+          purpose: 'complaint_attachment',
+          file: {
+            uri: complaintAttachment.fileCopyUri || complaintAttachment.uri,
+            type: complaintAttachment.type || 'application/octet-stream',
+            name: complaintAttachment.name || `attachment-${Date.now()}`,
+          },
+          target: { orderId: order.id },
+        });
+        body.attachment_media_id = media.mediaId;
       }
       const response = await postRequest(
         ROUTES.commerce.marketplaceComplaints,
-        formData,
+        body,
         {
           errorMessage: 'Unable to submit complaint.',
         },

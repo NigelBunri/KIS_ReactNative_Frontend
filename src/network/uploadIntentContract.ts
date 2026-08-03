@@ -1,18 +1,23 @@
-// src/Module/ChatRoom/uploadIntentContract.ts
+// src/network/uploadIntentContract.ts
 //
-// The contract for POST /uploads/initiate's response, and the one place
-// that decides what gets sent to POST /uploads/:id/confirm.
+// The contract for POST .../uploads/initiate's response, and the one place
+// that decides what gets sent to POST .../uploads/:id/confirm. Shared by
+// every backend that speaks this handshake (Nest chat uploads, Django
+// marketplace/commerce uploads, Django profile-image uploads) — the shape
+// is identical across all of them by design (see each backend's
+// upload_intent module), so there is exactly one place in the client that
+// resolves it.
 //
 // Root cause this exists to prevent recurring: a storage key is always
 // date-prefixed ("2026-08-02/<uuid>-name.mp4") and therefore always
 // contains '/'. A value containing '/' cannot survive as a single REST
-// path segment — even URL-encoded as %2F, Fastify's router does not decode
-// it back to '/' for route matching, so building the confirm URL from a
-// key 404s with "Cannot POST /uploads/<key>/confirm" before the request
-// ever reaches application code. This is not file-type-specific: every
-// upload through the signed-URL flow (image, video, audio, document) goes
-// through this exact same extraction logic, so a wrong field pick here
-// breaks all of them identically, not just video.
+// path segment — even URL-encoded as %2F, neither Fastify's nor Django's
+// router decodes it back to '/' for route matching, so building the
+// confirm URL from a key 404s with "Cannot POST .../uploads/<key>/confirm"
+// before the request ever reaches application code. This is not
+// file-type- or backend-specific: every upload through a signed-URL flow
+// goes through this exact same extraction logic, so a wrong field pick
+// here breaks all of them identically.
 
 export type InitiateUploadResponse = {
   uploadId: string;
@@ -36,12 +41,13 @@ const looksLikeStorageKey = (value: string) => value.includes('/') || /\.[a-z0-9
 
 /**
  * Extracts and validates the upload-intent id + presigned PUT url from a
- * raw POST /uploads/initiate response, for use in the confirm step.
+ * raw POST .../uploads/initiate response, for use in the confirm step.
  *
  * Deliberately does NOT fall back to storageKey/key/objectKey/uploadUrl/
  * filename for the id — any of those would silently reintroduce the
- * "Cannot POST /uploads/<key>/confirm" bug. Throws InvalidUploadIntentError
- * before any network call if the response doesn't carry a usable id.
+ * "Cannot POST .../uploads/<key>/confirm" bug. Throws
+ * InvalidUploadIntentError before any network call if the response
+ * doesn't carry a usable id.
  */
 export function resolveUploadIntent(initiateRes: any): {
   uploadId: string;
@@ -79,4 +85,14 @@ export function resolveUploadIntent(initiateRes: any): {
   return { uploadId, uploadUrl, headers, storageKey };
 }
 
+// Nest's chat backend confirm route: /uploads/:id/confirm (no prefix, no
+// trailing slash). Django backends use a different prefix/trailing-slash
+// convention — see buildDjangoMediaConfirmPath below.
 export const buildConfirmPath = (uploadId: string) => `/uploads/${encodeURIComponent(uploadId)}/confirm`;
+
+// Django's generic media confirm route (apps/media/urls.py):
+// /api/v1/media/uploads/<uuid:upload_id>/confirm/ — shared by every Django
+// upload context (profile images, marketplace media, ...); callers pass
+// their own API_BASE_URL prefix.
+export const buildDjangoMediaConfirmPath = (uploadId: string) =>
+  `/api/v1/media/uploads/${encodeURIComponent(uploadId)}/confirm/`;

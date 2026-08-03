@@ -44,14 +44,10 @@ import { resolveShopImageUri } from '@/utils/shopAssets';
 import { buildShopLandingPreview } from '@/utils/landingPreview';
 import { collectProductImageUris } from '@/utils/productImages';
 import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
+import { uploadMarketplaceMedia } from '@/services/uploadMarketplaceMedia';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type PickedImage = { uri: string; name: string; type: string };
-const toUploadFile = (picked: PickedImage) => ({
-  uri: picked.uri,
-  name: picked.name,
-  type: picked.type,
-});
 
 const LOCAL_IMAGE_SCHEMES = [
   'file://',
@@ -1779,27 +1775,22 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       }
       setProductLoading(true);
       try {
-        const formData = new FormData();
-        formData.append('shop', shop.id);
-        formData.append('name', trimmedName);
-        formData.append(
-          'description',
-          String(payload.description ?? '').trim(),
-        );
+        const body: Record<string, unknown> = {};
+        body.shop = shop.id;
+        body.name = trimmedName;
+        body.description = String(payload.description ?? '').trim();
         const priceValue = String(payload.price ?? '').trim();
-        formData.append('price', priceValue || '0');
-        const currencyValue =
-          KIS_COIN_CODE;
-        formData.append('currency', currencyValue);
+        body.price = priceValue || '0';
+        body.currency = KIS_COIN_CODE;
         const stockValue = String(
           payload.stock_qty ?? payload.stock ?? payload.stockQty ?? '',
         ).trim();
-        formData.append('stock_qty', stockValue || '0');
+        body.stock_qty = stockValue || '0';
         const inventoryTypeValue =
           String(
             payload.inventory_type ?? payload.inventoryType ?? 'PHYSICAL',
           ).trim() || 'PHYSICAL';
-        formData.append('inventory_type', inventoryTypeValue);
+        body.inventory_type = inventoryTypeValue;
         const normalizeIdList = (
           value?: string | number | null | (string | number)[],
         ) => {
@@ -1819,91 +1810,96 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         const normalizedCategoryIds = Array.from(
           new Set(candidateCategoryIds),
         ).slice(0, CATEGORY_SELECTION_LIMIT);
-        normalizedCategoryIds.forEach((categoryId: string) => {
-          formData.append('category_ids', categoryId);
-          formData.append('catalog_category_ids', categoryId);
-        });
+        if (normalizedCategoryIds.length) {
+          body.category_ids = normalizedCategoryIds;
+          body.catalog_category_ids = normalizedCategoryIds;
+        }
         const primaryCategoryId =
           normalizedCategoryIds[0] ??
           normalizeIdList(payload.category_id)[0] ??
           normalizeIdList(payload.categoryId)[0];
         if (primaryCategoryId) {
-          formData.append('category_id', primaryCategoryId);
+          body.category_id = primaryCategoryId;
         }
-        const appendIfValue = (
+        const setIfValue = (
           field: string,
           value?: string | number | null,
         ) => {
           const trimmed =
             value === undefined || value === null ? '' : String(value).trim();
           if (trimmed) {
-            formData.append(field, trimmed);
+            body[field] = trimmed;
           }
         };
-        const appendBoolean = (field: string, value?: boolean | null) => {
+        const setBoolean = (field: string, value?: boolean | null) => {
           if (typeof value === 'boolean') {
-            formData.append(field, value ? 'true' : 'false');
+            body[field] = value;
           }
         };
-        const appendListField = (field: string, values?: string[] | null) => {
+        const setListField = (field: string, values?: string[] | null) => {
           const normalized = (values ?? [])
             .map(item => String(item ?? '').trim())
             .filter(Boolean);
           if (!normalized.length) {
             return;
           }
-          normalized.forEach(item => formData.append(field, item));
+          body[field] = normalized;
         };
-        appendIfValue('sku', payload.sku);
-        appendIfValue('slug', payload.slug);
-        appendIfValue('brand', payload.brand);
-        appendIfValue('condition', payload.condition);
-        appendIfValue('sale_price', payload.sale_price ?? payload.salePrice);
-        appendIfValue(
+        setIfValue('sku', payload.sku);
+        setIfValue('slug', payload.slug);
+        setIfValue('brand', payload.brand);
+        setIfValue('condition', payload.condition);
+        setIfValue('sale_price', payload.sale_price ?? payload.salePrice);
+        setIfValue(
           'compare_at_price',
           payload.compare_at_price ?? payload.compareAtPrice,
         );
-        appendIfValue('material', payload.material);
-        appendIfValue('fit', payload.fit);
-        appendIfValue('size_guide', payload.size_guide ?? payload.sizeGuide);
-        appendListField(
+        setIfValue('material', payload.material);
+        setIfValue('fit', payload.fit);
+        setIfValue('size_guide', payload.size_guide ?? payload.sizeGuide);
+        setListField(
           'available_sizes',
           payload.available_sizes ??
             payload.availableSizes ??
             payload.availableSizesList,
         );
-        appendListField(
+        setListField(
           'available_colors',
           payload.available_colors ??
             payload.availableColors ??
             payload.availableColorsList,
         );
-        appendIfValue('weight', payload.weight);
-        appendIfValue('length', payload.length);
-        appendIfValue('width', payload.width);
-        appendIfValue('height', payload.height);
-        appendIfValue(
+        setIfValue('weight', payload.weight);
+        setIfValue('length', payload.length);
+        setIfValue('width', payload.width);
+        setIfValue('height', payload.height);
+        setIfValue(
           'low_stock_threshold',
           payload.low_stock_threshold ?? payload.lowStockThreshold,
         );
-        appendBoolean('is_active', payload.is_active ?? payload.isActive);
-        appendBoolean('is_featured', payload.is_featured ?? payload.isFeatured);
-        appendBoolean(
+        setBoolean('is_active', payload.is_active ?? payload.isActive);
+        setBoolean('is_featured', payload.is_featured ?? payload.isFeatured);
+        setBoolean(
           'requires_shipping',
           payload.requires_shipping ?? payload.requiresShipping,
         );
-        appendBoolean(
+        setBoolean(
           'pickup_available',
           payload.pickup_available ?? payload.pickupAvailable,
         );
-        appendBoolean(
+        setBoolean(
           'allow_backorder',
           payload.allow_backorder ?? payload.allowBackorder,
         );
-        formData.append('variants', JSON.stringify(payload.variants ?? []));
-        const attributesPayload = payload.attributes ?? {};
-        formData.append('attributes', JSON.stringify(attributesPayload));
+        body.variants = payload.variants ?? [];
+        body.attributes = payload.attributes ?? {};
 
+        // Direct-to-S3 presigned uploads — see uploadMarketplaceMedia.ts.
+        // Editing an existing product: target it so the backend re-checks
+        // ownership at attach time. Creating: target the shop instead
+        // (product doesn't exist yet — see the "safe draft strategy" in
+        // apps/commerce/media_uploads.py).
+        const uploadTarget = payload.id ? { productId: payload.id } : { shopId: String(shop.id) };
         const selectedImages: PickedImage[] = Array.isArray(payload.images)
           ? payload.images
           : Array.isArray(payload.gallery_images)
@@ -1912,31 +1908,46 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         const uploads = selectedImages.filter(image =>
           isLocalImageUri(image.uri),
         );
-        if (!payload.id && uploads.length === 0) {
+        if (!payload.id && uploads.length === 0 && !payload.main_image) {
           throw new Error('Please add at least one image for the product.');
         }
         if (uploads.length) {
           const [primary, ...rest] = uploads;
-          formData.append('image_file', toUploadFile(primary) as any);
-          rest.forEach(image =>
-            formData.append('images', toUploadFile(image) as any),
-          );
+          if (!payload.main_image) {
+            const primaryMedia = await uploadMarketplaceMedia({
+              purpose: 'product_main_image', file: primary, target: uploadTarget,
+            });
+            body.main_image_media_id = primaryMedia.mediaId;
+          } else {
+            rest.unshift(primary);
+          }
+          if (rest.length) {
+            const galleryMediaIds = await Promise.all(
+              rest.map(async image => {
+                const media = await uploadMarketplaceMedia({
+                  purpose: 'product_gallery_image', file: image, target: uploadTarget,
+                });
+                return media.mediaId;
+              }),
+            );
+            body.gallery_media_ids = galleryMediaIds;
+          }
         }
         if (payload.main_image && isLocalImageUri(payload.main_image.uri)) {
-          formData.append(
-            'main_image',
-            toUploadFile(payload.main_image) as any,
-          );
+          const mainMedia = await uploadMarketplaceMedia({
+            purpose: 'product_main_image', file: payload.main_image, target: uploadTarget,
+          });
+          body.main_image_media_id = mainMedia.mediaId;
         }
 
         const endpoint = payload.id
           ? `${ROUTES.commerce.products}${payload.id}/`
           : ROUTES.commerce.products;
         const response = payload.id
-          ? await patchRequest(endpoint, formData, {
+          ? await patchRequest(endpoint, body, {
               errorMessage: 'Unable to update product.',
             })
-          : await postRequest(endpoint, formData, {
+          : await postRequest(endpoint, body, {
               errorMessage: 'Unable to add product.',
             });
         if (!response?.success) {
@@ -2059,7 +2070,7 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       }
       setServiceLoading(true);
       try {
-        const formData = new FormData();
+        const body: Record<string, unknown> = {};
         const appendTrimmed = (
           field: string,
           value?: string | number | null,
@@ -2067,19 +2078,19 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           const trimmed =
             value === undefined || value === null ? '' : String(value).trim();
           if (trimmed) {
-            formData.append(field, trimmed);
+            body[field] = trimmed;
           }
         };
         const appendBoolean = (field: string, value?: boolean | null) => {
           if (typeof value === 'boolean') {
-            formData.append(field, value ? 'true' : 'false');
+            body[field] = value;
           }
         };
         const appendStringList = (field: string, value?: unknown) => {
           const items = Array.isArray(value)
             ? value.map(item => String(item ?? '').trim()).filter(Boolean)
             : [];
-          items.forEach(item => formData.append(field, item));
+          if (items.length) body[field] = items;
         };
         const toServicePackagePayload = (item: any) => ({
           id: item?.id,
@@ -2103,18 +2114,18 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
           type: String(item?.type ?? 'text').trim() || 'text',
           required: Boolean(item?.required),
         });
-        formData.append('shop', shop.id);
-        formData.append('name', trimmedName);
+        body.shop = shop.id;
+        body.name = trimmedName;
         const slugBase =
           trimmedName
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '') || `service-${Date.now()}`;
-        formData.append('slug', slugBase);
+        body.slug = slugBase;
         const description = String(payload.description ?? '').trim();
-        formData.append('description', description);
+        body.description = description;
         const priceValue = String(payload.price ?? '').trim();
-        formData.append('price', priceValue || '0');
+        body.price = priceValue || '0';
         appendTrimmed('short_summary', payload.shortSummary);
         appendTrimmed('pricing_model', payload.pricingModel);
         appendTrimmed('compare_at_price', payload.compareAtPrice);
@@ -2167,19 +2178,19 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         appendBoolean('featured', payload.featured);
         appendBoolean('is_featured', payload.featured);
         appendBoolean('remove_featured_image', payload.remove_featured_image);
-        normalizedCategoryIds.forEach((categoryId: string) => {
-          formData.append('category_ids', categoryId);
-          formData.append('catalog_category_ids', categoryId);
-        });
+        if (normalizedCategoryIds.length) {
+          body.category_ids = normalizedCategoryIds;
+          body.catalog_category_ids = normalizedCategoryIds;
+        }
         const primaryCategoryId = normalizedCategoryIds[0];
         if (primaryCategoryId) {
-          formData.append('category_id', primaryCategoryId);
+          body.category_id = primaryCategoryId;
         }
         const availabilityValue = serializeJsonField(
           payload.availability ?? '',
         );
         if (availabilityValue) {
-          formData.append('availability', availabilityValue);
+          body.availability = availabilityValue;
         }
         appendStringList('delivery_modes', payload.deliveryModes);
         appendStringList('coverage', payload.coverage);
@@ -2189,15 +2200,12 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         appendStringList('remove_image_ids', payload.remove_image_ids);
         const serviceTypeValue = String(payload.serviceType ?? '').trim();
         if (serviceTypeValue) {
-          formData.append('service_type', serviceTypeValue);
+          body.service_type = serviceTypeValue;
         }
         const normalizedAvailabilityRules = normalizeAvailabilityRulesPayload(
           payload.availabilityRules,
         );
-        formData.append(
-          'availability_rules',
-          JSON.stringify(normalizedAvailabilityRules),
-        );
+        body.availability_rules = normalizedAvailabilityRules;
         const parsePercentage = (value: string | number | null | undefined) => {
           if (value === null || value === undefined || value === '')
             return undefined;
@@ -2207,39 +2215,17 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         };
         const percentageDiscount = parsePercentage(payload.otherShopsDiscount);
         if (percentageDiscount !== undefined) {
-          formData.append('other_shops_discount', String(percentageDiscount));
+          body.other_shops_discount = String(percentageDiscount);
         }
-        formData.append(
-          'packages',
-          JSON.stringify(
-            (Array.isArray(payload.packages) ? payload.packages : [])
-              .map(toServicePackagePayload)
-              .filter(
-                (item: ReturnType<typeof toServicePackagePayload>) => item.name,
-              ),
-          ),
-        );
-        formData.append(
-          'addons',
-          JSON.stringify(
-            (Array.isArray(payload.addons) ? payload.addons : [])
-              .map(toServiceAddonPayload)
-              .filter(
-                (item: ReturnType<typeof toServiceAddonPayload>) => item.name,
-              ),
-          ),
-        );
-        formData.append(
-          'requirements',
-          JSON.stringify(
-            (Array.isArray(payload.requirements) ? payload.requirements : [])
-              .map(toServiceRequirementPayload)
-              .filter(
-                (item: ReturnType<typeof toServiceRequirementPayload>) =>
-                  item.label,
-              ),
-          ),
-        );
+        body.packages = (Array.isArray(payload.packages) ? payload.packages : [])
+          .map(toServicePackagePayload)
+          .filter((item: ReturnType<typeof toServicePackagePayload>) => item.name);
+        body.addons = (Array.isArray(payload.addons) ? payload.addons : [])
+          .map(toServiceAddonPayload)
+          .filter((item: ReturnType<typeof toServiceAddonPayload>) => item.name);
+        body.requirements = (Array.isArray(payload.requirements) ? payload.requirements : [])
+          .map(toServiceRequirementPayload)
+          .filter((item: ReturnType<typeof toServiceRequirementPayload>) => item.label);
 
         const featuredImage = payload.featuredImageAsset;
         const featuredUpload =
@@ -2270,24 +2256,34 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         ) {
           throw new Error('Please add at least one image for the service.');
         }
+        // Direct-to-S3 presigned uploads — see uploadMarketplaceMedia.ts.
+        const serviceUploadTarget = payload.id ? { serviceId: payload.id } : { shopId: String(shop.id) };
         if (effectiveFeaturedUpload) {
-          formData.append(
-            'image_file',
-            toUploadFile(effectiveFeaturedUpload) as any,
-          );
+          const media = await uploadMarketplaceMedia({
+            purpose: 'service_image', file: effectiveFeaturedUpload, target: serviceUploadTarget,
+          });
+          body.image_media_id = media.mediaId;
         }
-        effectiveGalleryUploads.forEach(image =>
-          formData.append('images', toUploadFile(image) as any),
-        );
+        if (effectiveGalleryUploads.length) {
+          const galleryMediaIds = await Promise.all(
+            effectiveGalleryUploads.map(async image => {
+              const media = await uploadMarketplaceMedia({
+                purpose: 'service_gallery_image', file: image, target: serviceUploadTarget,
+              });
+              return media.mediaId;
+            }),
+          );
+          body.gallery_media_ids = galleryMediaIds;
+        }
 
         const endpoint = payload.id
           ? ROUTES.commerce.shopService(payload.id)
           : ROUTES.commerce.shopServices;
         const response = payload.id
-          ? await patchRequest(endpoint, formData, {
+          ? await patchRequest(endpoint, body, {
               errorMessage: 'Unable to update service.',
             })
-          : await postRequest(endpoint, formData, {
+          : await postRequest(endpoint, body, {
               errorMessage: 'Unable to add service.',
             });
         if (!response?.success) {

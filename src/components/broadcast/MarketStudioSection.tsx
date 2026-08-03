@@ -13,6 +13,7 @@ import ROUTES from '@/network';
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import { PickedImage } from '@/screens/tabs/profile/profile.types';
 import { KISIcon } from '@/constants/kisIcons';
+import { uploadMarketplaceMedia } from '@/services/uploadMarketplaceMedia';
 
 /**
  * MarketStudioSection.tsx (UPDATED)
@@ -191,6 +192,8 @@ export default function MarketStudioSection({
   const [shopImagePreview, setShopImagePreview] = useState('');
   const [productImage, setProductImage] = useState<PickedImage | null>(null);
   const [productImagePreview, setProductImagePreview] = useState('');
+  const [isSubmittingShop, setIsSubmittingShop] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
   const [activeMarketTab, setActiveMarketTab] = useState<MarketTabId>(initialTab);
 
@@ -389,40 +392,55 @@ export default function MarketStudioSection({
       Alert.alert('Market', 'You have reached your shop limit.');
       return;
     }
+    if (isSubmittingShop) return; // duplicate-tap guard
 
-    const shopData = new FormData();
-    shopData.append('name', shopForm.name.trim());
-    shopData.append('employee_slots', normalizeEmployeeSlots(shopForm.employeeSlots));
-    shopData.append('description', shopForm.description.trim());
+    setIsSubmittingShop(true);
+    try {
+      let imageMediaId: string | undefined;
+      if (shopImage) {
+        // Direct-to-S3 presigned upload — see uploadMarketplaceMedia.ts.
+        // Editing an existing shop: target it so the backend re-checks
+        // ownership at attach time, not just at initiate time.
+        const media = await uploadMarketplaceMedia({
+          purpose: 'shop_logo',
+          file: shopImage,
+          target: isEditingShop && editingShopId ? { shopId: editingShopId } : undefined,
+        });
+        imageMediaId = media.mediaId;
+      }
 
-    if (shopImage) {
-      shopData.append(
-        'image_file',
-        {
-          uri: shopImage.uri,
-          name: shopImage.name,
-          type: shopImage.type,
-        } as any,
-      );
-    }
+      const body: Record<string, unknown> = {
+        name: shopForm.name.trim(),
+        employee_slots: normalizeEmployeeSlots(shopForm.employeeSlots),
+        description: shopForm.description.trim(),
+      };
+      if (imageMediaId) body.image_media_id = imageMediaId;
 
-    const url = isEditingShop ? `${ROUTES.commerce.shops}${editingShopId}/` : ROUTES.commerce.shops;
-    const method = isEditingShop ? patchRequest : postRequest;
+      const url = isEditingShop ? `${ROUTES.commerce.shops}${editingShopId}/` : ROUTES.commerce.shops;
+      const method = isEditingShop ? patchRequest : postRequest;
 
-    const res = await method(url, shopData, {
-      errorMessage: isEditingShop ? 'Unable to update shop.' : 'Unable to create shop.',
-    });
+      const res = await method(url, body, {
+        errorMessage: isEditingShop ? 'Unable to update shop.' : 'Unable to create shop.',
+      });
 
-    if (res?.success) {
-      resetShopForm();
-      loadMarket();
-    } else {
+      if (res?.success) {
+        resetShopForm();
+        loadMarket();
+      } else {
+        Alert.alert(
+          isEditingShop ? 'Unable to update shop' : 'Unable to create shop',
+          res?.message || 'Check the shop details and try again.',
+        );
+      }
+    } catch (err) {
       Alert.alert(
         isEditingShop ? 'Unable to update shop' : 'Unable to create shop',
-        res?.message || 'Check the shop details and try again.',
+        err instanceof Error ? err.message : 'Check the shop details and try again.',
       );
+    } finally {
+      setIsSubmittingShop(false);
     }
-  }, [shopForm, isEditingShop, editingShopId, canCreateShop, loadMarket, shopImage]);
+  }, [shopForm, isEditingShop, editingShopId, canCreateShop, loadMarket, shopImage, isSubmittingShop]);
 
   const handleProductSubmit = useCallback(async () => {
     if (!productForm.name?.trim() || !productForm.price?.trim()) {
@@ -445,39 +463,58 @@ export default function MarketStudioSection({
       Alert.alert('Market', 'Product image is required.');
       return;
     }
+    if (isSubmittingProduct) return; // duplicate-tap guard
 
-    const form = new FormData();
-    form.append('shop', targetShopId);
-    form.append('name', productForm.name.trim());
-    form.append('description', productForm.description.trim());
-    form.append('price', productForm.price.trim());
-    form.append('currency', 'USD');
-    const stockQty = Math.max(0, Number(productForm.stock || 0));
-    form.append('stock_qty', String(Number.isFinite(stockQty) ? Math.floor(stockQty) : 0));
+    setIsSubmittingProduct(true);
+    try {
+      let imageMediaId: string | undefined;
+      if (productImage) {
+        const media = await uploadMarketplaceMedia({
+          purpose: 'product_main_image',
+          file: productImage,
+          target: isEditingProduct && editingProductId
+            ? { productId: editingProductId }
+            : { shopId: targetShopId },
+        });
+        imageMediaId = media.mediaId;
+      }
 
-    if (productImage) {
-      form.append(
-        'image_file',
-        {
-          uri: productImage.uri,
-          name: productImage.name,
-          type: productImage.type,
-        } as any,
+      const body: Record<string, unknown> = {
+        shop: targetShopId,
+        name: productForm.name.trim(),
+        description: productForm.description.trim(),
+        price: productForm.price.trim(),
+        currency: 'USD',
+      };
+      const stockQty = Math.max(0, Number(productForm.stock || 0));
+      body.stock_qty = Number.isFinite(stockQty) ? Math.floor(stockQty) : 0;
+      if (imageMediaId) body.main_image_media_id = imageMediaId;
+
+      const url = isEditingProduct ? `${ROUTES.commerce.products}${editingProductId}/` : ROUTES.commerce.products;
+      const method = isEditingProduct ? patchRequest : postRequest;
+
+      const res = await method(url, body, {
+        errorMessage: isEditingProduct ? 'Unable to update product.' : 'Unable to add product.',
+      });
+
+      if (res?.success) {
+        resetProductForm();
+        loadMarket();
+      } else {
+        Alert.alert(
+          isEditingProduct ? 'Unable to update product' : 'Unable to add product',
+          res?.message || 'Check the product details and try again.',
+        );
+      }
+    } catch (err) {
+      Alert.alert(
+        isEditingProduct ? 'Unable to update product' : 'Unable to add product',
+        err instanceof Error ? err.message : 'Check the product details and try again.',
       );
+    } finally {
+      setIsSubmittingProduct(false);
     }
-
-    const url = isEditingProduct ? `${ROUTES.commerce.products}${editingProductId}/` : ROUTES.commerce.products;
-    const method = isEditingProduct ? patchRequest : postRequest;
-
-    const res = await method(url, form, {
-      errorMessage: isEditingProduct ? 'Unable to update product.' : 'Unable to add product.',
-    });
-
-    if (res?.success) {
-      resetProductForm();
-      loadMarket();
-    }
-  }, [productForm, editingProduct, activeShop, isEditingProduct, editingProductId, canAddProduct, loadMarket, productImage]);
+  }, [productForm, editingProduct, activeShop, isEditingProduct, editingProductId, canAddProduct, loadMarket, productImage, isSubmittingProduct]);
 
   const handleBroadcastProduct = async (productId: string) => {
     const res = await postRequest(
@@ -1026,7 +1063,11 @@ export default function MarketStudioSection({
         />
 
         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-          <KISButton title={isEditingShop ? 'Update shop' : 'Create shop'} onPress={handleShopSubmit} disabled={!isEditingShop && !canCreateShop} />
+          <KISButton
+            title={isSubmittingShop ? 'Saving…' : isEditingShop ? 'Update shop' : 'Create shop'}
+            onPress={handleShopSubmit}
+            disabled={isSubmittingShop || (!isEditingShop && !canCreateShop)}
+          />
           {isEditingShop && <KISButton title="Cancel" variant="secondary" size="sm" onPress={cancelShopEdit} />}
         </View>
 
@@ -1095,9 +1136,9 @@ export default function MarketStudioSection({
 
         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
           <KISButton
-            title={isEditingProduct ? 'Update product' : 'Add product'}
+            title={isSubmittingProduct ? 'Saving…' : isEditingProduct ? 'Update product' : 'Add product'}
             onPress={handleProductSubmit}
-            disabled={!isEditingProduct && !canAddProduct}
+            disabled={isSubmittingProduct || (!isEditingProduct && !canAddProduct)}
           />
           {isEditingProduct && <KISButton title="Cancel" variant="secondary" size="sm" onPress={cancelProductEdit} />}
         </View>

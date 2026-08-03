@@ -1,4 +1,9 @@
-import { InvalidUploadIntentError, buildConfirmPath, resolveUploadIntent } from '../uploadIntentContract';
+import {
+  InvalidUploadIntentError,
+  buildConfirmPath,
+  buildDjangoMediaConfirmPath,
+  resolveUploadIntent,
+} from '../uploadIntentContract';
 
 const UPLOAD_ID = 'a1a1a1a1-1111-1111-1111-111111111111';
 const STORAGE_KEY = '2026-08-02/1a55cbad-dd03-4f67-be7a-fa041dfec3da-video.mp4';
@@ -96,13 +101,23 @@ describe('resolveUploadIntent — storage key must never be used as the confirm 
   });
 });
 
-describe('buildConfirmPath', () => {
+describe('buildConfirmPath (Nest chat)', () => {
   it('URL-encodes the upload id', () => {
     expect(buildConfirmPath('has space/slash')).toBe('/uploads/has%20space%2Fslash/confirm');
   });
 
   it('leaves a well-formed UUID untouched', () => {
     expect(buildConfirmPath(UPLOAD_ID)).toBe(`/uploads/${UPLOAD_ID}/confirm`);
+  });
+});
+
+describe('buildDjangoMediaConfirmPath (Django profile/marketplace)', () => {
+  it('uses the Django media app prefix and trailing slash', () => {
+    expect(buildDjangoMediaConfirmPath(UPLOAD_ID)).toBe(`/api/v1/media/uploads/${UPLOAD_ID}/confirm/`);
+  });
+
+  it('URL-encodes the upload id', () => {
+    expect(buildDjangoMediaConfirmPath('has space/slash')).toBe('/api/v1/media/uploads/has%20space%2Fslash/confirm/');
   });
 });
 

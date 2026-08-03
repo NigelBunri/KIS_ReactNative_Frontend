@@ -280,7 +280,7 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
   );
 
   const updateProduct = useCallback(
-    async (productId: string, form: FormData) => {
+    async (productId: string, form: FormData | Record<string, unknown>) => {
       const res = await patchRequest(
         `${MARKET_PRODUCTS_ENDPOINT}${productId}/`,
         form,
@@ -294,7 +294,7 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
   );
 
   const createProduct = useCallback(
-    async (form: FormData) => {
+    async (form: FormData | Record<string, unknown>) => {
       const res = await postRequest(MARKET_PRODUCTS_ENDPOINT, form, {
         errorMessage: 'Unable to add product.',
       });

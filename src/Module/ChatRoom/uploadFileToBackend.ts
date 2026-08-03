@@ -17,7 +17,7 @@ import {
 import { APP_ENV } from '@/env';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { buildConfirmPath, resolveUploadIntent } from './uploadIntentContract';
+import { buildConfirmPath, resolveUploadIntent } from '@/network/uploadIntentContract';
 
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_UPLOAD_BYTES = 2_147_483_647;

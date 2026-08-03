@@ -53,6 +53,12 @@ const authRoutes = {
   // Direct-to-S3 presigned-PUT upload handshake — see
   // apps/media/upload_intent.py on the backend for the full flow.
   mediaUploads: {
+    // Generic initiate — used by any context registered in the backend's
+    // UPLOAD_CONTEXTS (apps/media/upload_intent.py), e.g. status_image /
+    // status_video / status_audio (see uploadStatusMedia.ts). Contexts with
+    // their own authorization needs (marketplace) go through a dedicated
+    // initiate route instead — see ROUTES.commerce.uploadsInitiate.
+    initiate: `${API_BASE_URL}/api/v1/media/uploads/initiate/`,
     profileImageInitiate: `${API_BASE_URL}/api/v1/media/uploads/profile-image/initiate/`,
     confirm: (uploadId: string) => `${API_BASE_URL}/api/v1/media/uploads/${uploadId}/confirm/`,
   },

@@ -730,6 +730,28 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/request_verification/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
     discovery: `${API_BASE_URL}/api/v1/commerce/discovery/`,
+    // Direct-to-S3 presigned-upload handshake for marketplace media — see
+    // apps/commerce/media_uploads.py on the backend. Confirmation reuses
+    // the shared Django media confirm route (see uploadIntentContract.ts's
+    // buildDjangoMediaConfirmPath), not a commerce-specific one.
+    uploadsInitiate: `${API_BASE_URL}/api/v1/commerce/uploads/initiate/`,
+    shopImageAttach: (shopId: string) => `${API_BASE_URL}/api/v1/commerce/shops/${shopId}/image/attach/`,
+    productMainImageAttach: (productId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/products/${productId}/main-image/attach/`,
+    productGalleryAttach: (productId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/products/${productId}/gallery/attach/`,
+    productGalleryRemove: (productId: string, imageId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/products/${productId}/gallery/${imageId}/`,
+    productGalleryReorder: (productId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/products/${productId}/gallery/reorder/`,
+    serviceImageAttach: (serviceId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shop-services/${serviceId}/image/attach/`,
+    serviceGalleryAttach: (serviceId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shop-services/${serviceId}/gallery/attach/`,
+    serviceGalleryRemove: (serviceId: string, imageId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shop-services/${serviceId}/gallery/${imageId}/`,
+    complaintAttachmentDownloadUrl: (complaintId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${complaintId}/attachment-download-url/`,
     productReviews: `${API_BASE_URL}/api/v1/commerce/product-reviews/`,
     productQuestions: `${API_BASE_URL}/api/v1/commerce/product-questions/`,
     productBroadcast: (id: string) =>
