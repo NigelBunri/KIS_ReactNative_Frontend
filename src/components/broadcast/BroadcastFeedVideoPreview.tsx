@@ -28,6 +28,11 @@ type Props = {
   videoStyle?: StyleProp<any>;
   autoPlay?: boolean;
   posterOverride?: string | null;
+  // See VideoPlayer.tsx's forceTextureView doc — pass true from callers
+  // that wrap this component in a transformed/animated ancestor (e.g. a
+  // swipeable full-screen viewer), where Android's default SurfaceView
+  // rendering can silently fail to composite the video frame.
+  forceTextureView?: boolean;
 };
 
 const basePlaybackMessage = 'Unable to play this video preview.';
@@ -39,6 +44,7 @@ export default function BroadcastFeedVideoPreview({
   videoStyle,
   autoPlay = false,
   posterOverride,
+  forceTextureView = false,
 }: Props) {
   const mediaHeaders = useMediaHeaders();
   const sources = useMemo(
@@ -235,6 +241,7 @@ export default function BroadcastFeedVideoPreview({
         onError={handleVideoError}
         containerStyle={styles.innerFill}
         videoStyle={videoStyle}
+        forceTextureView={forceTextureView}
       />
       {playbackError && sourceIndex > 0 ? (
         <View

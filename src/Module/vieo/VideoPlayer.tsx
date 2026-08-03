@@ -12,7 +12,7 @@ import {
   ViewStyle,
   StyleProp,
 } from 'react-native';
-import Video, { SelectedVideoTrackType, SelectedTrackType } from 'react-native-video';
+import Video, { SelectedVideoTrackType, SelectedTrackType, ViewType } from 'react-native-video';
 import { useKISTheme } from '@/theme/useTheme';
 import VideoControls from './components/VideoControls';
 import { useVideoPlayer } from './hooks/useVideoPlayer';
@@ -40,6 +40,16 @@ export type VideoPlayerProps = {
   onEnd?: () => void;
   onProgress?: (currentTime: number) => void;
   chapters?: ChannelContentChapter[];
+  // Android renders <Video> through a SurfaceView by default, which has
+  // its own separate rendering surface and reliably fails to composite
+  // (audio plays, frame stays black) when an ancestor applies a transform
+  // or sits inside certain animated/gradient wrappers — e.g.
+  // BroadcastDetailScreen's swipeable full-screen viewer, which wraps this
+  // player in an Animated.View with a translateY transform for the swipe
+  // gesture. Defaults to false (current SurfaceView behavior) so existing,
+  // already-working call sites (cards) are unaffected — only screens that
+  // actually need it opt in.
+  forceTextureView?: boolean;
 };
 
 export default function VideoPlayer({
@@ -62,6 +72,7 @@ export default function VideoPlayer({
   onEnd,
   onProgress: onProgressProp,
   chapters,
+  forceTextureView = false,
 }: VideoPlayerProps) {
   const { palette } = useKISTheme();
   const safeUrl = useMemo(() => normalizeVideoUrl(sourceUrl), [sourceUrl]);
@@ -201,6 +212,7 @@ export default function VideoPlayer({
         poster={poster}
         posterResizeMode="cover"
         resizeMode="contain"
+        viewType={forceTextureView ? ViewType.TEXTURE : undefined}
         paused={!state.playing}
         muted={state.muted}
         rate={state.speed}

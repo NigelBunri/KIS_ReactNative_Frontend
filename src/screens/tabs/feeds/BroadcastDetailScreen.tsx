@@ -823,6 +823,14 @@ export default function BroadcastDetailScreen() {
                 containerStyle={styles.fullMedia}
                 videoStyle={styles.fullMedia}
                 autoPlay={activeAttachmentIsVideo}
+                // This screen wraps the player in an Animated.View with a
+                // translateY transform (the swipe-between-videos gesture,
+                // see pageFrame/swipeY below) — Android's default
+                // SurfaceView rendering reliably fails to composite under a
+                // transformed ancestor, playing audio with no visible
+                // frame. TextureView participates in normal view
+                // compositing and doesn't have this failure mode.
+                forceTextureView
               />
             ) : attachmentUrl ? (
               <Pressable

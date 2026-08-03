@@ -15,6 +15,7 @@ import {
   dedupeAttachmentPreviews,
   getAttachmentPreviewInfo,
 } from './attachmentPreview';
+import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import {
   extractBroadcastAuthorBio,
   formatKisHandle,
@@ -202,12 +203,17 @@ export default function BroadcastFeedCard({
   const showExcerpt = Boolean(excerpt && excerpt.length);
 
   const attachmentPreviews = useMemo(() => {
-    const attachments = Array.isArray(item.attachments) ? item.attachments : [];
-    return dedupeAttachmentPreviews(
-      attachments
-        .map(a => getAttachmentPreviewInfo(a))
-        .filter(info => Boolean(info.previewUri || info.url)),
+    // Same construction order as FeedItemCard.tsx (the trending clip card,
+    // where video already plays correctly): dedupe BEFORE filtering by
+    // url/previewUri presence, and correlate `.raw` back by index against
+    // the same unfiltered array dedupe ran over — BroadcastFeedVideoPreview
+    // needs the raw attachment record (stream_url/resource_url/etc.), not
+    // just the preview info, to resolve a playable video source.
+    const rawAttachments = (Array.isArray(item.attachments) ? item.attachments : []).filter(Boolean);
+    const deduped = dedupeAttachmentPreviews(rawAttachments.map(a => getAttachmentPreviewInfo(a))).map(
+      (info, i) => ({ ...info, raw: rawAttachments[i] ?? null }),
     );
+    return deduped.filter(info => Boolean(info.previewUri || info.url));
   }, [item.attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
 
@@ -418,23 +424,32 @@ export default function BroadcastFeedCard({
             { borderColor: palette.divider, backgroundColor: palette.surface, aspectRatio: compact ? 4 / 3 : 16 / 9 },
           ]}
         >
-          <Pressable onPress={onPressPrimary} style={styles.slideshowPressable}>
-            {activeAttachment.previewUri || activeAttachment.url ? (
-              <Image
-                source={{
-                  uri: activeAttachment.previewUri ?? activeAttachment.url!,
-                }}
-                style={styles.slideshowImage}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.slideshowImage,
-                  { backgroundColor: palette.bar },
-                ]}
-              />
-            )}
-          </Pressable>
+          {activeAttachment.isVideo && activeAttachment.raw ? (
+            <BroadcastFeedVideoPreview
+              attachment={activeAttachment.raw}
+              palette={palette}
+              containerStyle={styles.slideshowImage}
+              posterOverride={activeAttachment.previewUri ?? undefined}
+            />
+          ) : (
+            <Pressable onPress={onPressPrimary} style={styles.slideshowPressable}>
+              {activeAttachment.previewUri || activeAttachment.url ? (
+                <Image
+                  source={{
+                    uri: activeAttachment.previewUri ?? activeAttachment.url!,
+                  }}
+                  style={styles.slideshowImage}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.slideshowImage,
+                    { backgroundColor: palette.bar },
+                  ]}
+                />
+              )}
+            </Pressable>
+          )}
 
           {Boolean(item.is_live) ? (
             <View
@@ -457,7 +472,12 @@ export default function BroadcastFeedCard({
             </View>
           ) : null}
 
-          {activeAttachment?.isVideo ? (
+          {activeAttachment?.isVideo && !activeAttachment.raw ? (
+            // Only shown in the (rare) fallback case where we couldn't
+            // resolve a raw attachment record to play inline — otherwise
+            // BroadcastFeedVideoPreview above already renders its own
+            // poster + tap-to-play affordance, and this pill would just
+            // sit on top of a real player showing native controls.
             <View style={styles.playOverlay} pointerEvents="none">
               <View style={styles.playPill}>
                 <KISIcon name="play" size={18} color="#fff" />

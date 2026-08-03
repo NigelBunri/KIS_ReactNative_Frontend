@@ -14,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Video from 'react-native-video';
+import Video, { ViewType } from 'react-native-video';
 import RNFS from 'react-native-fs';
 import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
@@ -24,6 +24,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
+import { isVideoAttachment } from '@/components/broadcast/attachmentPreview';
+import { getBroadcastFeedVideoSources } from '@/components/broadcast/feedVideoPlayback';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
 import type { RootStackParamList } from '@/navigation/types';
@@ -180,6 +182,14 @@ function VideoPlayerControls({
         source={{ uri: videoUrl }}
         style={StyleSheet.absoluteFillObject}
         resizeMode="contain"
+        // Android renders <Video> through a SurfaceView by default, which
+        // has its own separate rendering surface and reliably fails to
+        // composite (audio plays, frame stays black — no error, nothing
+        // in the JS layer even knows) when the player sits under animated/
+        // gradient siblings like the controls overlay below. TextureView
+        // is a regular Android View that participates in normal view
+        // compositing, which is the standard fix for exactly this case.
+        viewType={ViewType.TEXTURE}
         paused={paused}
         rate={speed}
         onLoad={({ duration: d }) => { setDuration(d); setBuffering(false); }}
@@ -444,8 +454,18 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
     );
   }
 
-  if ((type === 'video' || type === 'short_video') && primary?.url) {
-    const videoUrl = resolveAssetUrl(primary) || primary.url || '';
+  // Broadened beyond a strict content_type match + primary.url check —
+  // this page is reached for any channel-sourced broadcast opened outside
+  // swipe-feed mode (see BroadcastDetailScreen.tsx's redirect), so it needs
+  // the same field-checking breadth the trending/feed cards already use
+  // (stream_url/resource_url/source_url/etc., media_type/mime_type/kind),
+  // not just content_type + a bare .url field, or a video whose record
+  // only has those richer fields would fall through to the static-poster
+  // branch below with no player at all.
+  const isVideoType = type === 'video' || type === 'short_video' || isVideoAttachment(primary);
+  if (isVideoType) {
+    const fallbackSource = getBroadcastFeedVideoSources(primary)[0]?.url;
+    const videoUrl = resolveAssetUrl(primary) || primary?.url || fallbackSource || '';
     if (videoUrl) {
       return (
         <VideoPlayerControls
@@ -463,7 +483,7 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
     <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
       {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
       <View style={styles.mediaOverlay} />
-      {['video', 'short_video'].includes(type) ? <View style={styles.playBubble}><KISIcon name="play" size={30} color={palette.ivory} /></View> : null}
+      {isVideoType ? <View style={styles.playBubble}><KISIcon name="play" size={30} color={palette.ivory} /></View> : null}
       {assets.length > 1 ? <View style={styles.galleryCount}><Text style={[styles.galleryCountText, { color: palette.ivory }]}>{assets.length} files</Text></View> : null}
     </View>
   );
@@ -832,28 +852,40 @@ export default function ChannelContentDetailPage() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
-      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}>
-        <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
-          <MediaStage content={content} relatedContent={relatedContent as any} />
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: topInset + 8 }]}><KISIcon name="arrow-left" size={20} color={palette.ivory} /></Pressable>
+      {/* Deliberately a sibling BEFORE the ScrollView, not its first child.
+          react-native-video renders through an Android SurfaceView, which
+          reliably fails to composite (audio plays, frame stays black) when
+          nested inside a scrolling container — the exact symptom reported
+          here. BroadcastDetailScreen.tsx's already-working full-screen
+          viewer never puts its video inside a ScrollView either; this
+          mirrors that. */}
+      <View style={[styles.stageWrap, { minHeight: compact ? 240 : 320 }]}>
+        <MediaStage content={content} relatedContent={relatedContent as any} />
+        <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: topInset + 8 }]}><KISIcon name="arrow-left" size={20} color={palette.ivory} /></Pressable>
 
-          {/* Autoplay Up Next countdown */}
-          {autoplayCountdown !== null && relatedContent[0] && (
-            <View style={styles.autoplayBanner}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.autoplayLabel, { color: palette.divider }]}>Up next in {autoplayCountdown}s</Text>
-                <Text style={[styles.autoplayTitle, { color: palette.ivory }]} numberOfLines={1}>{relatedContent[0].title || 'Next video'}</Text>
-              </View>
-              <Pressable onPress={() => setAutoplayCountdown(null)} style={{ padding: 6 }}>
-                <KISIcon name="close" size={16} color={palette.ivory} />
-              </Pressable>
-              <View style={[styles.autoplayBar, { backgroundColor: palette.divider }]}>
-                <View style={[styles.autoplayProgress, { width: `${((5 - autoplayCountdown) / 5) * 100}%` as any, backgroundColor: palette.gold }]} />
-              </View>
+        {/* Autoplay Up Next countdown */}
+        {autoplayCountdown !== null && relatedContent[0] && (
+          <View style={styles.autoplayBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.autoplayLabel, { color: palette.divider }]}>Up next in {autoplayCountdown}s</Text>
+              <Text style={[styles.autoplayTitle, { color: palette.ivory }]} numberOfLines={1}>{relatedContent[0].title || 'Next video'}</Text>
             </View>
-          )}
-        </View>
+            <Pressable onPress={() => setAutoplayCountdown(null)} style={{ padding: 6 }}>
+              <KISIcon name="close" size={16} color={palette.ivory} />
+            </Pressable>
+            <View style={[styles.autoplayBar, { backgroundColor: palette.divider }]}>
+              <View style={[styles.autoplayProgress, { width: `${((5 - autoplayCountdown) / 5) * 100}%` as any, backgroundColor: palette.gold }]} />
+            </View>
+          </View>
+        )}
+      </View>
 
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + (compact ? 18 : 28) }}
+      >
         <View style={[themed.contentCard, { marginHorizontal: responsive.pageGutter, padding: compact ? 12 : 16 }]}>
           <View style={styles.titleTopRow}>
             <TypeBadge type={content.content_type} />
