@@ -7,8 +7,10 @@ import {
   isVerificationFailedError,
   AttachmentMeta,
 } from './uploadFileToBackend';
+import RNFS from 'react-native-fs';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
-import { copyUriToChatMedia, fileUriForPath } from './chatMediaStorage';
+import { copyUriToChatMedia, fileUriForPath, stripFileScheme } from './chatMediaStorage';
+import { buildVoiceAttachment } from './voiceAttachment';
 import { postRequest } from '@/network/post';
 import { blockContact } from '@/screens/tabs/BlockedContactsScreen';
 
@@ -216,7 +218,13 @@ export const handleSendVoice = async ({
       file: {
         uri,
         name: uri.split('/').pop() || `voice_${Date.now()}.m4a`,
-        type: 'audio/m4a',
+        // audio/mp4 is the correctly-registered MIME for an AAC-in-M4A
+        // container (what HoldToLockComposer.tsx's recorder now explicitly
+        // requests on both platforms via AudioSet — see that file). The
+        // previous 'audio/m4a' is a non-standard string that happened to
+        // pass Django's prefix-based validation but is a worse hint for
+        // players sniffing by declared type than the real registered MIME.
+        type: 'audio/mp4',
       },
       authToken,
       deviceId: deviceId || undefined,
@@ -242,12 +250,36 @@ export const handleSendVoice = async ({
     fromMe: true,
     senderId: currentUserId,
     conversationId: convId,
-    voice: {
-      url: attachment?.url ?? attachment?.downloadUrl ?? attachment?.displayUrl ?? uri,
-      durationMs,
-    },
+    // Deterministic from the recording's own uri (which already embeds a
+    // timestamp — see HoldToLockComposer.tsx's kis-voice-${Date.now()}.m4a),
+    // not a fresh random id — so a duplicate call for the SAME recording
+    // (e.g. a double-tap on send before the button disables) reuses Nest's
+    // existing clientId-based idempotency (messages.service.ts's
+    // createIdempotentLegacy) instead of creating a second message.
+    clientId: `voice_${uri.replace(/[^a-zA-Z0-9]+/g, '_')}`,
+    voice: buildVoiceAttachment({ attachment, localUri: uri, durationMs }),
+    // Kept as a redundant, independently-persisted copy of the same URL —
+    // apps.media/Nest's AttachmentSchema already declares every field it
+    // needs (unlike the pre-fix VoiceMeta), so this survives persistence
+    // even if a future regression strips `voice` again. See
+    // voiceAttachment.ts's resolveVoicePlaybackUri, which checks this as
+    // a fallback.
     attachments: attachment ? [attachment] : [],
   });
+
+  // Safe to remove the recorded temp file now that a remote copy exists —
+  // playback of THIS message no longer needs it: MessageBubble's voice
+  // player falls back to the remote url automatically (and, if that url
+  // has since expired, to voicePlaybackResolver's refresh-via-Nest path)
+  // whenever the local file is missing. Never deletes on upload failure —
+  // a failed send may be retried from the same local recording. HoldToLock
+  // Composer.tsx records into RNFS.CachesDirectoryPath, which the OS may
+  // also purge under storage pressure at any time — this is a proactive
+  // cleanup of a file that would otherwise linger indefinitely, not the
+  // only thing standing between a stale reference and a crash.
+  if (attachment?.url) {
+    RNFS.unlink(stripFileScheme(uri)).catch(() => {});
+  }
 };
 
 /* =========================================================

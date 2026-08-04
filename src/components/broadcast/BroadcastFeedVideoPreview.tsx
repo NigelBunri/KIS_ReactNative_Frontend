@@ -33,6 +33,10 @@ type Props = {
   // swipeable full-screen viewer), where Android's default SurfaceView
   // rendering can silently fail to composite the video frame.
   forceTextureView?: boolean;
+  // See VideoPlayer.tsx's externalPause doc — pass true when the screen
+  // hosting this preview has lost navigation focus or the app has
+  // backgrounded, so audio doesn't keep playing off-screen.
+  externalPause?: boolean;
 };
 
 const basePlaybackMessage = 'Unable to play this video preview.';
@@ -45,6 +49,7 @@ export default function BroadcastFeedVideoPreview({
   autoPlay = false,
   posterOverride,
   forceTextureView = false,
+  externalPause = false,
 }: Props) {
   const mediaHeaders = useMediaHeaders();
   const sources = useMemo(
@@ -242,6 +247,7 @@ export default function BroadcastFeedVideoPreview({
         containerStyle={styles.innerFill}
         videoStyle={videoStyle}
         forceTextureView={forceTextureView}
+        externalPause={externalPause}
       />
       {playbackError && sourceIndex > 0 ? (
         <View

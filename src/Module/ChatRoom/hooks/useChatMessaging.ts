@@ -886,11 +886,32 @@ export function useChatMessaging({
       const media = rawMedia ? { ...rawMedia, attachments } : attachments.length ? { attachments } : undefined;
 
       const rawVoice = serverMsg.voice ?? serverMsg.voice_note ?? serverMsg.voiceNote ?? null;
+      // Falls back to attachments[0] (mapped above) when the voice object
+      // itself has no usable url — a redundant, independently-persisted
+      // copy of the same attachment, and the only thing that saved a
+      // voice note from being permanently unplayable before VoiceMeta
+      // declared url/objectKey/etc. (see backend/Nestjs message.schema.ts).
+      const fallbackVoiceAttachment = attachments[0];
       const voice = rawVoice && typeof rawVoice === 'object'
         ? {
-            uri: rawVoice.uri ?? rawVoice.url ?? '',
-            url: rawVoice.url ?? rawVoice.uri ?? '',
+            uri:
+              rawVoice.uri || rawVoice.url || fallbackVoiceAttachment?.url || '',
+            url: rawVoice.url || rawVoice.uri || fallbackVoiceAttachment?.url || undefined,
+            // Permanent identity used to refresh an expired url (see
+            // voicePlaybackResolver.ts) — mediaAssetId is the correct field;
+            // objectKey is kept only for older persisted rows that predate
+            // it (see chatTypes.ts's VoiceAttachment for why objectKey is
+            // not a trustworthy real storage key).
+            mediaAssetId:
+              rawVoice.mediaAssetId ?? rawVoice.media_asset_id ?? rawVoice.objectKey ?? rawVoice.object_key ?? undefined,
+            objectKey: rawVoice.objectKey ?? rawVoice.object_key ?? undefined,
+            id: rawVoice.id ?? fallbackVoiceAttachment?.id ?? undefined,
+            mimeType: rawVoice.mimeType ?? rawVoice.mime_type ?? fallbackVoiceAttachment?.mimeType ?? undefined,
+            fileName: rawVoice.fileName ?? rawVoice.originalName ?? fallbackVoiceAttachment?.originalName ?? undefined,
+            fileSize: rawVoice.fileSize ?? rawVoice.size ?? fallbackVoiceAttachment?.size ?? undefined,
             durationMs: rawVoice.durationMs ?? rawVoice.duration_ms ?? 0,
+            waveform: Array.isArray(rawVoice.waveform) ? rawVoice.waveform : undefined,
+            urlExpiresAt: rawVoice.urlExpiresAt ?? rawVoice.url_expires_at ?? undefined,
           } as any
         : undefined;
 

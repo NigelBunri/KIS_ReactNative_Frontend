@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   DeviceEventEmitter,
   Image,
   Modal,
@@ -14,7 +15,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -118,6 +119,21 @@ export default function BroadcastDetailScreen() {
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
   const { height: screenHeight } = useWindowDimensions();
+  // Drives the swipe-between-videos gesture. IMPORTANT: every animation
+  // touching this value must use useNativeDriver: false, and the active
+  // page below is positioned via `top` (a layout property), never
+  // `transform`. Reason: the active page's live video renders through
+  // Android's ExoPlayer, whose surface is a SurfaceView. The installed
+  // react-native-video (6.18.0) does not implement runtime surface-type
+  // switching on Android — its ExoPlayerView.kt `updateSurfaceView()` is a
+  // literal no-op stub — so a `forceTextureView`/`viewType` prop (see
+  // BroadcastFeedVideoPreview below) cannot fix a transform-under-
+  // SurfaceView compositing failure in this version; there is no working
+  // TextureView escape hatch. Avoiding `transform` on the video's ancestor
+  // entirely is the only reliable fix, hence `top` instead. Because this
+  // is one Animated.Value shared by all three pages (prev/current/next),
+  // every consumer must agree on native-driver usage, so useNativeDriver
+  // is false everywhere below, not just for the active page.
   const swipeY = React.useRef(new Animated.Value(0)).current;
 
   const initialItem = route.params?.item ?? null;
@@ -262,7 +278,7 @@ export default function BroadcastDetailScreen() {
     setRefreshingTop(true);
     Animated.spring(swipeY, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver: false,
       damping: 18,
       stiffness: 210,
     }).start();
@@ -323,7 +339,7 @@ export default function BroadcastDetailScreen() {
               }
               Animated.spring(swipeY, {
                 toValue: 0,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 damping: 18,
                 stiffness: 210,
               }).start();
@@ -334,7 +350,7 @@ export default function BroadcastDetailScreen() {
               Animated.timing(swipeY, {
                 toValue: -screenHeight,
                 duration: 380,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }).start(() => {
                 openNextFeed();
                 swipeY.setValue(0);
@@ -351,7 +367,7 @@ export default function BroadcastDetailScreen() {
               Animated.timing(swipeY, {
                 toValue: screenHeight,
                 duration: 380,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }).start(() => {
                 openPreviousFeed();
                 swipeY.setValue(0);
@@ -362,7 +378,7 @@ export default function BroadcastDetailScreen() {
 
           Animated.spring(swipeY, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: false,
             damping: 18,
             stiffness: 210,
           }).start();
@@ -370,7 +386,7 @@ export default function BroadcastDetailScreen() {
         onPanResponderTerminate: () => {
           Animated.spring(swipeY, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: false,
             damping: 18,
             stiffness: 210,
           }).start();
@@ -560,6 +576,20 @@ export default function BroadcastDetailScreen() {
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageModalUri, setImageModalUri] = useState<string | null>(null);
+
+  // Forces the active video off when this screen loses navigation focus
+  // (another screen pushed on top, without unmounting this one) or the app
+  // backgrounds — without this, audio keeps playing off-screen. See
+  // VideoPlayer.tsx's externalPause doc for the resume behavior.
+  const isScreenFocused = useIsFocused();
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+  const videoExternalPause = !isScreenFocused || !isAppActive;
 
   const openImageModal = useCallback((uri?: string | null) => {
     if (!uri) return;
@@ -805,10 +835,15 @@ export default function BroadcastDetailScreen() {
       <Animated.View
         style={[
           styles.pageFrame,
-          { backgroundColor: palette.royalInk },
-          {
-            transform: [{ translateY: swipeY }],
-          },
+          // `top` + explicit `height`, not `transform` — see the swipeY
+          // declaration above for why. `height` must be set explicitly
+          // here because styles.pageFrame's absoluteFillObject also sets
+          // `bottom: 0`; once `height` is explicit, layout uses top+height
+          // and the redundant `bottom` is ignored, so this still renders
+          // as a full-screen page that slides via `top` instead of
+          // stretching.
+          { backgroundColor: palette.royalInk, height: screenHeight },
+          { top: swipeY },
         ]}
       >
         <View style={styles.mediaLayer}>
@@ -816,8 +851,18 @@ export default function BroadcastDetailScreen() {
             activeAttachmentIsVideo && activeAttachment ? (
               <BroadcastFeedVideoPreview
                 // Remount when the active item/attachment changes so the next
-                // video restarts and autoplays after a swipe.
-                key={`${broadcastId}:${activeAttachmentIndex}`}
+                // video restarts and autoplays after a swipe. Keyed by the
+                // attachment's own identity (falling back to its url, then
+                // index only as a last resort) so a background refetch that
+                // reorders/replaces attachments at the same index still
+                // forces a real remount instead of silently reusing a
+                // player instance pointed at stale content.
+                key={`${broadcastId}:${
+                  (activeAttachment as any)?.id ??
+                  (activeAttachment as any)?.mediaAssetId ??
+                  attachmentUrl ??
+                  activeAttachmentIndex
+                }`}
                 attachment={activeAttachment}
                 palette={palette as any}
                 containerStyle={styles.fullMedia}
@@ -831,6 +876,7 @@ export default function BroadcastDetailScreen() {
                 // frame. TextureView participates in normal view
                 // compositing and doesn't have this failure mode.
                 forceTextureView
+                externalPause={videoExternalPause}
               />
             ) : attachmentUrl ? (
               <Pressable

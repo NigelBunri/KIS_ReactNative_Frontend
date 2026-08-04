@@ -16,12 +16,39 @@ import {
 import AudioRecorderPlayer, {
   RecordBackType,
   PlayBackType,
+  AudioSet,
+  AVEncodingOption,
+  AVEncoderAudioQualityIOSType,
+  OutputFormatAndroidType,
+  AudioEncoderAndroidType,
+  AudioSourceAndroidType,
 } from 'react-native-audio-recorder-player';
 import { KISIcon } from '@/constants/kisIcons';
 import RNFS from 'react-native-fs';
 
 const audioRecorderPlayer = new AudioRecorderPlayer();
 audioRecorderPlayer.setSubscriptionDuration(0.09);
+
+// Explicit codec config for voice notes — without this, startRecorder()
+// uses each platform's own default: Android already defaults to AAC-in-
+// MPEG_4 (matching the `.m4a` filename/`audio/mp4` MIME sent to the
+// backend), but iOS defaults to Apple Lossless (ALAC) when no
+// AVFormatIDKeyIOS is given, while the file is still named `.m4a` and
+// declared as `audio/mp4` — a real codec/label mismatch that risks
+// playback failures on decoders that trust the declared format over
+// sniffing the actual bytes. This makes both platforms produce genuinely
+// consistent AAC-in-M4A audio.
+const VOICE_NOTE_AUDIO_SET: AudioSet = {
+  AVFormatIDKeyIOS: AVEncodingOption.aac,
+  AVSampleRateKeyIOS: 44100,
+  AVNumberOfChannelsKeyIOS: 1,
+  AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+  OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,
+  AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+  AudioSourceAndroid: AudioSourceAndroidType.MIC,
+  AudioSamplingRateAndroid: 44100,
+  AudioChannelsAndroid: 1,
+};
 
 // Gesture thresholds
 const LOCK_THRESHOLD_Y = -52;   // drag up to lock
@@ -215,7 +242,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
 
     try {
       const recordingPath = `${RNFS.CachesDirectoryPath}/kis-voice-${Date.now()}.m4a`;
-      const uri = await audioRecorderPlayer.startRecorder(`file://${recordingPath}`);
+      const uri = await audioRecorderPlayer.startRecorder(`file://${recordingPath}`, VOICE_NOTE_AUDIO_SET);
       if (cancelledRef.current) {
         // Finger was released before the recorder initialised
         try { await audioRecorderPlayer.stopRecorder(); } catch {}

@@ -43,6 +43,10 @@ ReactNative.DeviceEventEmitter = {
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ goBack: mockGoBack }),
   useRoute: () => mockRoute,
+  // BroadcastDetailScreen forces video playback off when the screen loses
+  // focus (see its externalPause wiring) — tests render it as the active
+  // screen, so focused is the correct default here.
+  useIsFocused: () => true,
 }));
 
 jest.mock('@/theme/useTheme', () => ({

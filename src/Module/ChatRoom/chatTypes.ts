@@ -123,6 +123,63 @@ export type ChatMediaPayload = {
 };
 
 /* ============================================================================
+ * VOICE NOTES
+ * ============================================================================
+ */
+
+/**
+ * Canonical voice-note attachment shape — the ONE structure sender-side
+ * optimistic drafts, confirmed sends, and receiver hydration all populate
+ * identically. Previously the sender wrote `voice.uri` (a field the
+ * backend's Mongoose VoiceMeta schema didn't declare at all) while
+ * confirmed/received messages used `voice.url` — and until VoiceMeta
+ * declared these fields, EVERY field except `durationMs` was silently
+ * stripped on persistence regardless of naming, which was the actual root
+ * cause of voice notes being unplayable for receivers (see
+ * backend/Nestjs's message.schema.ts VoiceMeta / messages.dto.ts VoiceDto).
+ *
+ * `objectKey` (Django's MediaAsset id) is the STABLE identity — safe to
+ * keep indefinitely and re-resolve a fresh signed `url` from later. `url`
+ * itself is a snapshot of the last-known signed download URL and WILL
+ * expire; never treat it as permanent identity (see
+ * requestVoiceDownloadUrl in voiceAttachment.ts for the refresh path).
+ */
+export type VoiceAttachment = {
+  /** Legacy field, kept for backward compatibility with existing local
+   * playback code paths — prefer `url`/`mediaAssetId` in new code. Always
+   * populated (falls back to url/mediaAssetId when nothing else is available). */
+  uri: string;
+  url?: string;
+  /** Django MediaAsset.id (UUID) — the PERMANENT identity, never an
+   * expiring URL. Send this to Nest's GET
+   * /chat/messages/:messageId/voice/playback-url to refresh an
+   * expired/expiring `url` (see voicePlaybackResolver.ts). */
+  mediaAssetId?: string;
+  /** Display/back-compat only — Django's legacy upload endpoint never
+   * returns the real S3 key to a client, so this is NOT a trustworthy
+   * object key today; historically it was populated with the same value as
+   * mediaAssetId. Never send this to a playback/download endpoint as if it
+   * were a real storage key — the server always re-derives the object from
+   * its own persisted record. */
+  objectKey?: string;
+  /** Stable id for the underlying upload (Django UploadFileView's local id or assetId). */
+  id?: string;
+  mimeType?: string;
+  fileName?: string;
+  fileSize?: number;
+  durationMs: number;
+  waveform?: number[];
+  /** ISO-8601. Advisory only — the freshness check that actually matters
+   * happens against voicePlaybackResolver.ts's own cache, not this field;
+   * kept for parity with what the server may echo back. */
+  urlExpiresAt?: string;
+  /** Present only on the sender's own device before/shortly after upload. */
+  localUri?: string;
+  localPath?: string;
+  name?: string;
+};
+
+/* ============================================================================
  * CONTACT SHARING
  * ============================================================================
  */
@@ -289,14 +346,7 @@ export type ChatMessage = {
   encryptionVersion?: string;
   encryptionKeyVersion?: string;
 
-  voice?: {
-    uri: string;
-    url?: string;
-    localUri?: string;
-    localPath?: string;
-    name?: string;
-    durationMs: number;
-  };
+  voice?: VoiceAttachment;
 
   styledText?: {
     text: string;

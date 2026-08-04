@@ -22,6 +22,8 @@ import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFil
 import { normalizeChatDisplayText } from '../safeChatText';
 import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl } from '@/network';
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
+import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
+import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
@@ -501,8 +503,51 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [playbackDurationMs, setPlaybackDurationMs] = useState(0);
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
   const [voiceBuffering, setVoiceBuffering] = useState(false);
+  // Set once resolveFreshVoicePlaybackUrl() returns a url the embedded
+  // voice.url/attachments[0] didn't have (expired/missing) — see
+  // handleVoicePress/onError below.
+  const [remoteResolvedUrl, setRemoteResolvedUrl] = useState<string | null>(null);
+  const [voiceResolving, setVoiceResolving] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
   const voiceVideoRef = useRef<VideoRef | null>(null);
+  // Guards setState-after-unmount from an in-flight resolveFreshVoicePlaybackUrl
+  // call, and against a stale response landing after the message/bubble has
+  // already moved on (e.g. fast list scroll while a refresh was in flight).
+  const voiceMountedRef = useRef(true);
+  useEffect(() => {
+    voiceMountedRef.current = true;
+    return () => {
+      voiceMountedRef.current = false;
+    };
+  }, []);
+  // Proactive refresh: warms voicePlaybackResolver's cache as soon as a
+  // settled (not still sending) voice message renders, instead of waiting
+  // for the user to tap play or for playback to fail. Silent — no spinner,
+  // no error surfaced — a tap or a playback error still triggers its own
+  // resolve/retry independently if this fails (offline, rate limited,
+  // etc.), so swallowing the error here is safe, not a silent-failure risk.
+  useEffect(() => {
+    if ((message as any).kind !== 'voice' || !voice) return;
+    if (status === 'local_only' || status === 'pending' || status === 'sending') return;
+    const msgId = String((message as any).serverId ?? (message as any).id ?? '');
+    const assetId = (voice as any).mediaAssetId || (voice as any).objectKey;
+    if (!msgId || !assetId) return;
+    if (cachedVoicePlaybackUrl(msgId)) return; // already fresh, nothing to warm
+    resolveFreshVoicePlaybackUrl(msgId)
+      .then((resolved) => {
+        if (!voiceMountedRef.current) return;
+        setRemoteResolvedUrl(resolved.url);
+      })
+      .catch(() => {});
+    // Re-run only when the message's own identity/status actually changes —
+    // not on every render (voice's object identity can change without its
+    // content changing across some of this file's mapping paths).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(message as any).id, (message as any).serverId, (message as any).kind, status]);
+
+  // One automatic retry per play attempt after a playback error — reset in
+  // beginPlayback() so a later, separate attempt gets its own retry budget.
+  const voiceRetriedRef = useRef(false);
   const playbackOwnerRef = useRef(
     String((message as any).serverId ?? (message as any).id ?? `voice-${Date.now()}`),
   );
@@ -1023,15 +1068,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     setPlaybackSpeed(nextSpeed);
   };
 
+  // Shared by the fast path (embedded url already usable) and the resolver
+  // path (handleVoicePress below, after a fresh url comes back) so both
+  // start playback identically.
+  const beginPlayback = () => {
+    voiceRetriedRef.current = false;
+    setVoicePlaybackError(null);
+    setVoiceBuffering(true);
+    DeviceEventEmitter.emit(CHAT_VOICE_PLAYBACK_EVENT, playbackOwnerRef.current);
+    setIsPlaying(true);
+  };
+
   const handleTogglePlay = () => {
     if (!voice) return;
     if (isPlaying) {
       stopPlayback(false);
     } else {
-      setVoicePlaybackError(null);
-      setVoiceBuffering(true);
-      DeviceEventEmitter.emit(CHAT_VOICE_PLAYBACK_EVENT, playbackOwnerRef.current);
-      setIsPlaying(true);
+      beginPlayback();
     }
   };
 
@@ -3360,16 +3413,71 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       isPlaying ? playbackPositionMs : playbackDurationMs || voice.durationMs,
     );
     const totalDurationLabel = formatTimeFromMs(playbackDurationMs || voice.durationMs);
-    const voiceRemoteUrl = resolveBackendAssetUrl((voice as any).url ?? voice.uri) ?? String((voice as any).url ?? voice.uri ?? '');
-    const voicePlaybackUri = (voice as any).localUri ??
-      ((voice as any).localPath ? fileUriForPath((voice as any).localPath) : undefined) ??
-      voiceRemoteUrl;
-    const voicePlaybackSource = {
-      uri: voicePlaybackUri,
-      ...(voicePlaybackUri.startsWith(API_BASE_URL) && Object.keys(mediaHeaders).length
-        ? { headers: mediaHeaders }
-        : {}),
+
+    const voiceMessageId = String((message as any).serverId ?? (message as any).id ?? '');
+    // Falls back to objectKey for messages persisted before mediaAssetId
+    // existed as its own field — see chatTypes.ts's VoiceAttachment and
+    // voice-playback.service.ts's identical fallback on the Nest side.
+    const voiceMediaAssetId = ((voice as any).mediaAssetId || (voice as any).objectKey) as string | undefined;
+
+    // Canonical resolution (see voiceAttachment.ts): local file first (the
+    // sender's own device, right after recording/before upload confirms),
+    // then a freshly-resolved url from Nest (remoteResolvedUrl, set after
+    // handleVoicePress/onError below calls resolveFreshVoicePlaybackUrl),
+    // then voice.url/voice.uri, then the parallel attachments[0] entry every
+    // voice message also carries as a redundant, independently-persisted
+    // copy — the only thing that saved receivers from an unplayable voice
+    // note before VoiceMeta declared url/objectKey on the backend.
+    const localPlaybackUri = (voice as any).localUri ??
+      ((voice as any).localPath ? fileUriForPath((voice as any).localPath) : undefined);
+    const remoteVoiceCandidate =
+      remoteResolvedUrl || resolveEmbeddedVoicePlaybackUri(voice, attachments[0]?.url);
+    const resolvedRemoteUri = remoteVoiceCandidate
+      ? resolveBackendAssetUrl(remoteVoiceCandidate) ?? remoteVoiceCandidate
+      : null;
+    const voicePlaybackUri: string | null = localPlaybackUri ?? resolvedRemoteUri ?? null;
+
+    // A message still being sent/uploaded legitimately has no playable url
+    // yet — that is not the same as a genuinely broken/missing voice note,
+    // and must not show the "Cannot play this" failure state prematurely.
+    const voiceReadiness = classifyVoicePlaybackReadiness(voicePlaybackUri, status);
+    const isVoiceStillResolving = voiceReadiness === 'resolving' || voiceResolving;
+    // "unavailable" only means truly unrecoverable — no local file, no
+    // embedded url, AND no mediaAssetId to refresh one via Nest. When a
+    // mediaAssetId IS present, tapping play should try the resolver instead
+    // of immediately declaring the note unplayable (see handleVoicePress).
+    const isVoiceRecoverableViaResolver = voiceReadiness === 'unavailable' && Boolean(voiceMediaAssetId);
+    const isVoiceUnavailable = voiceReadiness === 'unavailable' && !isVoiceRecoverableViaResolver;
+
+    const handleVoicePress = async () => {
+      if (voicePlaybackUri) {
+        handleTogglePlay();
+        return;
+      }
+      if (!isVoiceRecoverableViaResolver || !voiceMessageId) return;
+      setVoicePlaybackError(null);
+      setVoiceResolving(true);
+      try {
+        const resolved = await resolveFreshVoicePlaybackUrl(voiceMessageId);
+        if (!voiceMountedRef.current) return; // bubble unmounted mid-request
+        setVoiceResolving(false);
+        setRemoteResolvedUrl(resolved.url);
+        beginPlayback();
+      } catch (error) {
+        if (!voiceMountedRef.current) return;
+        setVoiceResolving(false);
+        setVoicePlaybackError(describeVoicePlaybackError(error));
+      }
     };
+
+    const voicePlaybackSource = voicePlaybackUri
+      ? {
+          uri: voicePlaybackUri,
+          ...(voicePlaybackUri.startsWith(API_BASE_URL) && Object.keys(mediaHeaders).length
+            ? { headers: mediaHeaders }
+            : {}),
+        }
+      : null;
 
     return (
       <View
@@ -3390,53 +3498,90 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {renderSenderName()}
           {renderReplyPreview()}
 
-          <Video
-            ref={voiceVideoRef}
-            source={voicePlaybackSource}
-            paused={!isPlaying}
-            rate={playbackSpeed}
-            volume={1}
-            muted={false}
-            controls={false}
-            audioOutput="speaker"
-            ignoreSilentSwitch="ignore"
-            mixWithOthers="duck"
-            playInBackground={false}
-            playWhenInactive={false}
-            progressUpdateInterval={100}
-            onLoadStart={() => {
-              if (isPlaying) setVoiceBuffering(true);
-            }}
-            onLoad={({ duration }) => {
-              const durationMs = Math.max(0, Number(duration || 0) * 1000);
-              if (durationMs > 0) setPlaybackDurationMs(durationMs);
-              setVoiceBuffering(false);
-            }}
-            onBuffer={({ isBuffering }) => setVoiceBuffering(isBuffering)}
-            onProgress={({ currentTime }) => {
-              const positionMs = Math.max(0, Number(currentTime || 0) * 1000);
-              const durationMs = playbackDurationMs || voice.durationMs || 0;
-              setVoiceBuffering(false);
-              setPlaybackPositionMs(positionMs);
-              setProgress(durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0);
-            }}
-            onEnd={() => stopPlayback(true)}
-            onError={(error) => {
-              if (__DEV__) console.warn('[MessageBubble] voice media error', error);
-              setVoicePlaybackError('Unable to play this voice message. Try downloading it again.');
-              stopPlayback(false);
-            }}
-            style={styles.hiddenVoicePlayer}
-          />
+          {voicePlaybackSource ? (
+            <Video
+              ref={voiceVideoRef}
+              source={voicePlaybackSource}
+              paused={!isPlaying}
+              rate={playbackSpeed}
+              volume={1}
+              muted={false}
+              controls={false}
+              audioOutput="speaker"
+              ignoreSilentSwitch="ignore"
+              mixWithOthers="duck"
+              playInBackground={false}
+              playWhenInactive={false}
+              progressUpdateInterval={100}
+              onLoadStart={() => {
+                if (isPlaying) setVoiceBuffering(true);
+              }}
+              onLoad={({ duration }) => {
+                const durationMs = Math.max(0, Number(duration || 0) * 1000);
+                if (durationMs > 0) setPlaybackDurationMs(durationMs);
+                setVoiceBuffering(false);
+              }}
+              onBuffer={({ isBuffering }) => setVoiceBuffering(isBuffering)}
+              onProgress={({ currentTime }) => {
+                const positionMs = Math.max(0, Number(currentTime || 0) * 1000);
+                const durationMs = playbackDurationMs || voice.durationMs || 0;
+                setVoiceBuffering(false);
+                setPlaybackPositionMs(positionMs);
+                setProgress(durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0);
+              }}
+              onEnd={() => stopPlayback(true)}
+              onError={(error) => {
+                if (__DEV__) {
+                  console.warn('[MessageBubble] voice media error', {
+                    sourceUrl: safeUrlForLog(voicePlaybackUri ?? undefined),
+                    error,
+                  });
+                }
+                stopPlayback(false);
+                // One automatic retry: the embedded/cached url may simply
+                // be expired. Force-refresh via Nest and retry play once
+                // before showing a failure — see voiceRetriedRef (reset in
+                // beginPlayback so a later, separate attempt gets its own
+                // budget).
+                if (!voiceRetriedRef.current && voiceMediaAssetId && voiceMessageId) {
+                  voiceRetriedRef.current = true;
+                  setVoiceBuffering(true);
+                  resolveFreshVoicePlaybackUrl(voiceMessageId, { force: true })
+                    .then((resolved) => {
+                      if (!voiceMountedRef.current) return;
+                      setRemoteResolvedUrl(resolved.url);
+                      beginPlayback();
+                    })
+                    .catch((refreshError) => {
+                      if (!voiceMountedRef.current) return;
+                      setVoiceBuffering(false);
+                      setVoicePlaybackError(describeVoicePlaybackError(refreshError));
+                    });
+                  return;
+                }
+                // react-native-video's onError doesn't reliably surface the
+                // underlying HTTP status (401/403/404 vs a network/format
+                // failure all collapse into the same generic decoder error
+                // on both ExoPlayer and AVPlayer) — this is the honest,
+                // achievable message rather than a fabricated status code.
+                setVoicePlaybackError('Unable to play this voice message. Check your connection and try again.');
+              }}
+              style={styles.hiddenVoicePlayer}
+            />
+          ) : null}
 
           <Pressable
-            onPress={handleTogglePlay}
+            onPress={() => {
+              void handleVoicePress();
+            }}
+            disabled={!voicePlaybackSource && !isVoiceRecoverableViaResolver}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
+              opacity: voicePlaybackSource || isVoiceRecoverableViaResolver ? 1 : 0.5,
             }}
           >
-            {voiceBuffering ? (
+            {isVoiceStillResolving || voiceBuffering ? (
               <ActivityIndicator size="small" color={palette.primary} />
             ) : (
               <KISIcon
@@ -3480,24 +3625,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           </Pressable>
 
-          {!(voice as any).localPath && !(voice as any).localUri && renderDownloadControl(
+          {!(voice as any).localPath && !(voice as any).localUri && resolvedRemoteUri && renderDownloadControl(
             {
               key: String((message as any).serverId ?? messageId ?? voice.uri ?? 'voice'),
-              // Voice notes aren't tracked in the attachments[] id contract
-              // (see message.schema.ts VoiceMeta), so this always falls
-              // back to the legacy authenticated-by-url path in
-              // downloadFile rather than the id-based download-url flow.
+              // Voice notes aren't tracked in the Nest attachments[] id
+              // contract (they upload via Django's legacy multipart
+              // endpoint — see uploadFileToBackend.ts's isNestChatBackend
+              // check), so this always falls back to the legacy
+              // authenticated-by-url path in downloadFile rather than the
+              // Nest id-based download-url flow.
               attachmentId: undefined,
-              uri: voiceRemoteUrl,
-              mime: 'audio/m4a',
-              name: String((voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
+              uri: resolvedRemoteUri,
+              mime: (voice as any).mimeType || 'audio/mp4',
+              name: String((voice as any).fileName ?? (voice as any).name ?? `voice_${messageId ?? Date.now()}.m4a`),
             } as NormalizedAttachment,
             'inline',
           )}
 
-          {voicePlaybackError ? (
+          {voicePlaybackError || isVoiceUnavailable ? (
             <Text style={{ marginTop: 6, fontSize: 11, color: palette.danger }}>
-              {voicePlaybackError}
+              {voicePlaybackError || 'This voice message could not be found. It may still be uploading, or the sender may need to resend it.'}
             </Text>
           ) : null}
 
