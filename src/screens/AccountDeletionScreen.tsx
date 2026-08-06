@@ -22,6 +22,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
+import { unregisterPushToken } from '@/push/notifications';
 import { useAuth } from '../../App';
 
 export default function AccountDeletionScreen() {
@@ -57,6 +58,13 @@ export default function AccountDeletionScreen() {
           onPress: async () => {
             setLoading(true);
             try {
+              // Before deleting the account — the delete call likely
+              // revokes/blacklists this session's tokens immediately, and
+              // an unregister call needs a still-valid session to
+              // authenticate. Without this, the device kept receiving
+              // pushes for an account that no longer exists until its
+              // token happened to go stale on its own.
+              await unregisterPushToken();
               const deleteRes = await deleteRequest(
                 ROUTES.auth.accountDelete,
                 { errorMessage: 'Unable to delete account.', body: { password: password.trim() } },

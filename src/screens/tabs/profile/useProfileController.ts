@@ -12,6 +12,7 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import { CacheConfig } from '@/network/cacheKeys';
 import { clearAuthTokens } from '@/security/authStorage';
+import { unregisterPushToken } from '@/push/notifications';
 import {
   clearScopedProfileCache,
   extractProfileUserId,
@@ -1022,6 +1023,13 @@ export const useProfileController = (opts: {
       if (!server?.success) {
         // Continue with local session cleanup even if server logout fails.
       }
+      // Deactivate this install's push registrations on both backends
+      // before wiping the local token — otherwise the account keeps
+      // receiving pushes after logout, and if a different user later logs
+      // into this same device without a fresh FCM token, they could end
+      // up receiving pushes meant for this account until Nest's device
+      // token record fills. Best-effort, never blocks logout.
+      await unregisterPushToken();
       await clearAuthTokens();
       await clearScopedProfileCache(profile?.user?.id);
       await AsyncStorage.removeItem('user_phone');

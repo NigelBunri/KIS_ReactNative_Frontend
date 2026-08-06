@@ -16,7 +16,11 @@ const registerPushToken = async (payload: {
   const pushToken = payload.pushToken || '';
   if (!pushToken) return;
   const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
-  const platform = (await AsyncStorage.getItem('device_platform')) || '';
+  // Was read from an AsyncStorage key ('device_platform') that nothing in
+  // the app ever writes — every registration silently sent an empty
+  // platform to Django, and Nest's own fallback ('android') was wrong for
+  // every iOS device. Platform.OS is the actual, always-correct source.
+  const platform = Platform.OS;
   try {
     const res = await postRequest(
       ROUTES.notifications.deviceTokenRegister,
@@ -80,6 +84,38 @@ const registerVoipPushToken = async (voipToken: string) => {
 };
 
 /**
+ * Deactivates this installation's push registrations on both backends —
+ * call before clearing local session state on logout or account deletion.
+ * Was previously missing entirely: neither backend was ever told a device
+ * signed out, so a stale token kept receiving pushes for that account
+ * indefinitely (and, before the Nest-side upsert fix, could even collide
+ * with a *different* account logging into the same device afterward).
+ *
+ * Best-effort and non-blocking by design — logout must not fail or hang
+ * because a push-unregister call timed out.
+ */
+export async function unregisterPushToken(): Promise<void> {
+  try {
+    const [deviceId, pushToken] = await Promise.all([
+      AsyncStorage.getItem('device_id'),
+      AsyncStorage.getItem('push_token'),
+    ]);
+    if (!deviceId && !pushToken) return;
+
+    await Promise.all([
+      postRequest(
+        ROUTES.notifications.deviceTokenUnregister,
+        { device_id: deviceId || undefined, push_token: pushToken || undefined },
+      ).catch(() => {}),
+      postRequest(
+        `${NEST_API_BASE_URL}/notifications/tokens/unregister`,
+        { token: pushToken || undefined, deviceId: deviceId || undefined },
+      ).catch(() => {}),
+    ]);
+  } catch { /* Best-effort — local session cleanup proceeds regardless. */ }
+}
+
+/**
  * Reads the VoIP token captured natively by AppDelegate.swift's
  * PKPushRegistryDelegate (via the VoipTokenModule bridge) and registers it,
  * then keeps it in sync on rotation. iOS-only — Android has no PushKit
@@ -130,6 +166,7 @@ export async function initPushHandlers(navigation?: any) {
     const onMessage = messagingMod?.onMessage;
     const onNotificationOpenedApp = messagingMod?.onNotificationOpenedApp;
     const getInitialNotification = messagingMod?.getInitialNotification;
+    const onTokenRefresh = messagingMod?.onTokenRefresh;
 
     if (
       typeof getApps !== 'function' ||
@@ -170,6 +207,23 @@ export async function initPushHandlers(navigation?: any) {
       await registerPushToken({ pushToken: fcmToken, apnsToken });
       initVoipPushToken();
     } catch {}
+
+    // A rotated FCM token was previously only ever picked up on the next
+    // cold start (only getToken() at mount was read) — mid-session
+    // rotation left both backends holding a dead token until the app
+    // happened to restart. This keeps them in sync immediately.
+    if (typeof onTokenRefresh === 'function') {
+      onTokenRefresh(messaging, async (newToken: string) => {
+        if (!newToken) return;
+        try {
+          await AsyncStorage.setItem('fcm_token', newToken);
+          await AsyncStorage.setItem('push_token', newToken);
+          const apnsToken =
+            typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
+          await registerPushToken({ pushToken: newToken, apnsToken });
+        } catch { /* silent — retryPendingPushToken picks it up next launch */ }
+      });
+    }
 
     // Background/killed message handler. FCM shows `notification`-keyed messages
     // automatically via the OS. For data-only messages we persist them to
