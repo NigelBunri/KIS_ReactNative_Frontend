@@ -92,7 +92,7 @@ import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useAgeMode } from '@/theme/ageModeContext';
 import { useThemeMode, type KISThemeMode } from '@/theme/themeModeContext';
 import {
-  isPINEnabled,
+  getCachedHasPin,
   getLockTimeout,
   setLockTimeout,
   clearPIN,
@@ -284,7 +284,7 @@ export default function ProfileScreen() {
   const { language, languages, setLanguage, downloadingLanguage } = useLanguage();
   const { themeMode, setThemeMode } = useThemeMode();
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
-  const { setAuth, setPhone, callingCode } = useAuth();
+  const { setAuth, setPhone, callingCode, hasPin, setHasPin, user: authUser } = useAuth();
   const c = useProfileController({
     setAuth,
     setPhone,
@@ -646,18 +646,31 @@ export default function ProfileScreen() {
   }, [setGlobalAgeMode]);
 
   const refreshPINState = useCallback(async () => {
-    const [enabled, timeout] = await Promise.all([isPINEnabled(), getLockTimeout()]);
-    setPinEnabled(enabled);
+    const timeout = await getLockTimeout();
     setLockTimeoutMinutes(timeout);
+    // hasPin (from AuthContext) is the server-authoritative Quick Lock PIN
+    // state, hydrated from has_pin on /users/me/ and the login response —
+    // it reflects a PIN created on ANY device, not just this one. Only
+    // fall back to the local device cache while it's still unresolved
+    // (e.g. cold start before the first auth check completes).
+    if (hasPin != null) {
+      setPinEnabled(hasPin);
+    } else {
+      setPinEnabled(await getCachedHasPin());
+    }
     // Restore lock_timeout_minutes from backend for cross-device consistency
     getRequest(ROUTES.profilePreferences.me, { errorMessage: '' })
       .then(res => {
         if (res?.success && res.data?.lock_timeout_minutes != null) {
-          setLockTimeoutMinutes(res.data.lock_timeout_minutes);
+          const synced = res.data.lock_timeout_minutes;
+          setLockTimeoutMinutes(synced);
+          // Persist locally so the on-device auto-lock check (which reads
+          // EncryptedStorage directly) honors the value synced from another device
+          void setLockTimeout(synced);
         }
       })
       .catch(() => null);
-  }, []);
+  }, [hasPin]);
 
   useEffect(() => {
     void refreshPINState();
@@ -2929,7 +2942,7 @@ export default function ProfileScreen() {
                     billingLinksStyles.link,
                     { borderBottomColor: palette.divider },
                   ]}
-                  onPress={() => rootNavigation?.navigate('Wallet')}
+                  onPress={() => rootNavigation?.navigate('Loyalty')}
                 >
                   <Text
                     style={[
@@ -3082,26 +3095,42 @@ export default function ProfileScreen() {
                   label: 'Privacy & Compliance',
                   route: 'ComplianceSettings' as const,
                   danger: false,
+                  badge: false,
                 },
                 {
                   label: 'Notification Settings',
                   route: 'NotificationSettings' as const,
                   danger: false,
+                  badge: false,
                 },
                 {
                   label: 'Change Password',
                   route: 'PasswordChange' as const,
                   danger: false,
+                  badge: false,
                 },
+                // Verified email is required for primary-device recovery
+                // (lost/stolen phone) — surface it here, before the user
+                // ever needs it, and drop the row once it's done.
+                ...(authUser?.email_verified
+                  ? []
+                  : [{
+                      label: 'Verify Email',
+                      route: 'EmailVerification' as const,
+                      danger: false,
+                      badge: true,
+                    }]),
                 {
                   label: 'Manage Devices',
                   route: 'DeviceManagement' as const,
                   danger: false,
+                  badge: false,
                 },
                 {
                   label: 'Delete Account',
                   route: 'AccountDeletion' as const,
                   danger: true,
+                  badge: false,
                 },
               ].map((item, index) => (
                 <Pressable
@@ -3118,15 +3147,27 @@ export default function ProfileScreen() {
                     borderTopColor: palette.divider,
                   })}
                 >
-                  <Text
-                    style={{
-                      fontSize: responsive.bodyFontSize,
-                      fontWeight: '600',
-                      color: item.danger ? palette.danger : palette.text,
-                    }}
-                  >
-                    {item.label}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text
+                      style={{
+                        fontSize: responsive.bodyFontSize,
+                        fontWeight: '600',
+                        color: item.danger ? palette.danger : palette.text,
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                    {item.badge ? (
+                      <View
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: 4,
+                          backgroundColor: palette.warning ?? palette.primary,
+                        }}
+                      />
+                    ) : null}
+                  </View>
                   <KISIcon
                     name="chevron-right"
                     size={16}
@@ -3156,6 +3197,9 @@ export default function ProfileScreen() {
                               style: 'destructive',
                               onPress: async () => {
                                 await clearPIN();
+                                // Update immediately on this device — don't
+                                // wait for the next /users/me/ refresh.
+                                setHasPin?.(false);
                                 void refreshPINState();
                               },
                             },
@@ -3427,6 +3471,8 @@ export default function ProfileScreen() {
                   saving={c.saving}
                   submitWalletAction={c.submitWalletAction}
                   lastWalletPaymentUrl={c.lastWalletPaymentUrl}
+                  navigation={rootNavigation}
+                  closeSheet={c.closeSheet}
                 />
               )}
 
@@ -3445,6 +3491,7 @@ export default function ProfileScreen() {
                   onResume={c.resumeSubscription}
                   onDowngrade={c.downgradeTier}
                   onRetry={c.retryTransaction}
+                  rewardBalance={c.rewardBalance}
                 />
               )}
             </ScrollView>
