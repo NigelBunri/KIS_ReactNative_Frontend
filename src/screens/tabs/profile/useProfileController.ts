@@ -1,6 +1,6 @@
 // src/screens/tabs/profile/useProfileController.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, DeviceEventEmitter, Linking } from 'react-native';
+import { Alert, AppState, AppStateStatus, Animated, DeviceEventEmitter, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Asset, launchImageLibrary } from 'react-native-image-picker';
@@ -13,6 +13,7 @@ import ROUTES from '@/network';
 import { CacheConfig } from '@/network/cacheKeys';
 import { clearAuthTokens } from '@/security/authStorage';
 import { unregisterPushToken } from '@/push/notifications';
+import { clearLocalQuickLockState } from '@/services/QuickLockService';
 import {
   clearScopedProfileCache,
   extractProfileUserId,
@@ -375,6 +376,7 @@ export const useProfileController = (opts: {
     usd_label: '',
   });
   const [lastWalletPaymentUrl] = useState('');
+  const [rewardBalance, setRewardBalance] = useState<number>(0);
   const [tierCatalog, setTierCatalog] = useState<any[]>([]);
   // Bumped on every successful avatar/cover upload so <Image> sources can be
   // cache-busted — the backend (S3) can return the same URL for a user's
@@ -403,6 +405,16 @@ export const useProfileController = (opts: {
   const [draftItem, setDraftItem] = useState<any>(null);
   const [draftPrivacy, setDraftPrivacy] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  // Set right after opening a Flutterwave payment link (upgradeTier /
+  // retryTransaction) — those flows hand off to the EXTERNAL browser
+  // (Linking.openURL, not an in-app webview), so there's no way to detect
+  // completion until the user manually switches back. Without this, the
+  // profile screen kept showing the pre-upgrade tier until the user
+  // happened to trigger some other refresh — the backend's own state was
+  // already correct (via the webhook, or the payments/complete website
+  // page's self-healing verify-with-Flutterwave fallback), the app just
+  // never re-fetched it.
+  const pendingPaymentReturnRef = useRef(false);
   const [addingGalleryMedia, setAddingGalleryMedia] = useState(false);
   const [prefsDraft, setPrefsDraft] = useState<PrefsDraft>({
     services: [],
@@ -519,7 +531,10 @@ export const useProfileController = (opts: {
       duration: 260,
       useNativeDriver: true,
     }).start();
-    if (type === 'upgrade') loadBillingHistory();
+    if (type === 'upgrade') {
+      loadBillingHistory();
+      loadRewardBalance();
+    }
   };
 
   const closeSheet = () => {
@@ -654,6 +669,17 @@ export const useProfileController = (opts: {
         invoice_pdf_url: res.data?.invoice_pdf_url,
       });
     }
+  }, []);
+
+  const loadRewardBalance = useCallback(async () => {
+    const res = await getRequest(ROUTES.rewards.balance, {
+      errorMessage: 'Unable to load KIS Coins balance.',
+    });
+    if (res?.success) {
+      setRewardBalance(Number(res?.data?.available ?? 0));
+      return;
+    }
+    setRewardBalance(0);
   }, []);
 
   const loadBroadcastProfiles = useCallback(async () => {
@@ -1006,6 +1032,25 @@ export const useProfileController = (opts: {
     }, [loadProfile]),
   );
 
+  // Companion to pendingPaymentReturnRef above — the app has no way to know
+  // a Flutterwave checkout finished until the user comes back from the
+  // external browser, which surfaces here as an AppState transition to
+  // "active". forceNetwork=true bypasses loadProfile's own throttle/cache
+  // since this is specifically about getting the just-updated tier, not
+  // whatever was cached before the payment.
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState === 'active' && pendingPaymentReturnRef.current) {
+          pendingPaymentReturnRef.current = false;
+          void loadProfile(true);
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [loadProfile]);
+
   useEffect(() => {
     void loadTierCatalog();
   }, [loadTierCatalog]);
@@ -1032,6 +1077,10 @@ export const useProfileController = (opts: {
       await unregisterPushToken();
       await clearAuthTokens();
       await clearScopedProfileCache(profile?.user?.id);
+      // Local Quick Lock PIN/timeout are per-device caches of one account's
+      // state — wipe them so the next account signed in on this device
+      // doesn't inherit (or get locked out by) this account's PIN.
+      await clearLocalQuickLockState();
       await AsyncStorage.removeItem('user_phone');
       setPhone?.(null);
       setAuth(false);
@@ -1640,7 +1689,7 @@ export const useProfileController = (opts: {
     loadProfile();
   };
 
-  const upgradeTier = async (tierId: string) => {
+  const upgradeTier = async (tierId: string, applyRewards = false) => {
     const tiers = profile?.tiers || [];
     const tier = tiers.find((t: any) => String(t?.id) === String(tierId));
     const tierName = String(
@@ -1666,6 +1715,7 @@ export const useProfileController = (opts: {
     const res = await postRequest(ROUTES.wallet.upgrade, {
       tier: tierId,
       payment_method: 'flutterwave',
+      apply_rewards: applyRewards,
     });
     setSaving(false);
 
@@ -1677,18 +1727,31 @@ export const useProfileController = (opts: {
       return;
     }
 
+    // discount_cents/coins_applied are always computed server-side
+    // (apps.billing.services.calculate_redemption) — never trust or
+    // recompute this figure on the client, only display what the
+    // backend already decided.
+    const discountCents = Number(res?.data?.discount_cents ?? 0);
+    const coinsApplied = Number(res?.data?.coins_applied ?? 0);
+    const rewardsNote =
+      discountCents > 0
+        ? ` ${coinsApplied.toLocaleString()} KIS Coins were applied for a $${(discountCents / 100).toFixed(2)} discount.`
+        : '';
+
     const paymentUrl = res?.data?.payment_url;
     if (paymentUrl) {
+      pendingPaymentReturnRef.current = true;
       Linking.openURL(paymentUrl).catch(() => {
+        pendingPaymentReturnRef.current = false;
         Alert.alert(
           'Upgrade',
           'The secure checkout was created, but the payment link could not be opened automatically.',
         );
       });
-      await loadBillingHistory();
+      await Promise.all([loadBillingHistory(), loadRewardBalance()]);
       Alert.alert(
         'Upgrade',
-        'Secure USD checkout is ready. Complete the Flutterwave payment to activate this plan.',
+        `Secure USD checkout is ready. Complete the Flutterwave payment to activate this plan.${rewardsNote}`,
       );
       return;
     }
@@ -1697,12 +1760,13 @@ export const useProfileController = (opts: {
       loadWalletLedger(),
       loadBillingHistory(),
       loadKisWallet(),
+      loadRewardBalance(),
     ]);
     closeSheet();
     loadProfile();
     Alert.alert(
       'Upgrade',
-      `Your account is now on ${tier?.name || 'the selected'} tier.`,
+      `Your account is now on ${tier?.name || 'the selected'} tier.${rewardsNote}`,
     );
     if (isPartnerTier) openCreatePartner();
   };
@@ -1782,7 +1846,9 @@ export const useProfileController = (opts: {
     }
     const paymentUrl = res?.data?.payment_url;
     if (paymentUrl) {
+      pendingPaymentReturnRef.current = true;
       Linking.openURL(paymentUrl).catch(() => {
+        pendingPaymentReturnRef.current = false;
         Alert.alert(
           'Payment',
           'Payment retry was created, but the payment link could not be opened automatically.',
@@ -1966,6 +2032,7 @@ export const useProfileController = (opts: {
     imageUploadStatus,
     walletLedger,
     kisWallet,
+    rewardBalance,
     billingHistory,
     activeSheet,
     showCreatePartner,
