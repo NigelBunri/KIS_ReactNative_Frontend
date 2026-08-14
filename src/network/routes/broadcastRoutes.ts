@@ -428,6 +428,7 @@ const broadcastRoutes = {
     subscribe: `${API_BASE_URL}/api/v1/broadcasts/subscribe/`,
     educationCourseBroadcast: `${API_BASE_URL}/api/v1/broadcasts/education/courses/broadcast/`,
     educationHub: `${API_BASE_URL}/api/v1/broadcasts/education/hub/`,
+    educationUploadsInitiate: `${API_BASE_URL}/api/v1/broadcasts/education/uploads/initiate/`,
     educationInstitutions: `${API_BASE_URL}/api/v1/broadcasts/education/institutions/`,
     educationInstitution: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/`,

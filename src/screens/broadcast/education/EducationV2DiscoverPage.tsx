@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from 'react-native';
-import EducationInstitutionManagementScreen from '@/screens/broadcast/education/EducationInstitutionManagementScreen';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
@@ -166,6 +165,7 @@ export default function EducationV2DiscoverPage({
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const navigation = useNavigation<any>();
   const { data, loading, error, refresh, setSearch, filters, updateFilter, cacheMeta } =
     useEducationDiscovery({
       initialSearch: searchTerm,
@@ -187,7 +187,6 @@ export default function EducationV2DiscoverPage({
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [expandedList, setExpandedList] =
     useState<ExpandedEducationList | null>(null);
-  const [showInstitutionManagement, setShowInstitutionManagement] = useState(false);
 
   useEffect(() => {
     setSearch(searchTerm || '');
@@ -1372,9 +1371,14 @@ export default function EducationV2DiscoverPage({
           <>
             {renderLearningOverview()}
 
-            {/* Institution Management Entry */}
+            {/* Institution Management Entry — navigates to the Profile
+                tab's education management panel (EducationManagementModal),
+                the single authoritative institution-admin implementation,
+                via the same broadcastProfileKey mechanism the Broadcast
+                header's "Create" button already uses for every other
+                profile type (see BroadcastScreen.tsx's handleCreate). */}
             <Pressable
-              onPress={() => setShowInstitutionManagement(true)}
+              onPress={() => navigation.navigate('Profile', { broadcastProfileKey: 'education' })}
               style={{
                 borderWidth: 1.5,
                 borderColor: palette.primary,
@@ -1409,18 +1413,6 @@ export default function EducationV2DiscoverPage({
               </View>
               <KISIcon name="chevron-forward-outline" size={18} color={palette.primaryStrong} />
             </Pressable>
-
-            {/* Institution Management Modal */}
-            <Modal
-              visible={showInstitutionManagement}
-              animationType="slide"
-              presentationStyle="pageSheet"
-              onRequestClose={() => setShowInstitutionManagement(false)}
-            >
-              <EducationInstitutionManagementScreen
-                onClose={() => setShowInstitutionManagement(false)}
-              />
-            </Modal>
 
             {renderHero()}
             <View style={{ marginBottom: 24 }}>

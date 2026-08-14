@@ -53,9 +53,3 @@ export const FEEDS_ENDPOINT = `${API_BASE_URL}/api/v1/broadcasts/`;
 export const BG_REMOVAL_START_URL = `${API_BASE_URL}/api/v1/remove-background/`;
 export const BG_REMOVAL_STATUS_URL = (jobId: string) =>
   `${API_BASE_URL}/api/v1/gbJobs/${jobId}/`;
-
-export const EDUCATION_HOME_ENDPOINT = '/api/v1/education/home/';
-export const EDUCATION_LESSONS_ENDPOINT = '/api/v1/education/lessons/';
-export const EDUCATION_COURSES_ENDPOINT = '/api/v1/education/courses/';
-export const EDUCATION_ENROLL_ENDPOINT = (courseId: string) =>
-  `/api/v1/education/courses/${courseId}/enroll/`;

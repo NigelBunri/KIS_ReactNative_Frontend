@@ -9,6 +9,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   View,
 } from 'react-native';
@@ -26,6 +27,10 @@ import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
+import {
+  uploadEducationMedia,
+  type EducationUploadContext,
+} from '@/services/uploadEducationMedia';
 import type { KISPalette } from '@/theme/constants';
 import { styles } from '../profile/profile.styles';
 import type { EducationFormState } from './types';
@@ -88,6 +93,8 @@ type EducationInstitution = {
   description?: string;
   institution_type?: string;
   membership_policy?: string;
+  contact_email?: string;
+  contact_phone?: string;
   active_member_count?: number;
   pending_application_count?: number;
   can_manage?: boolean;
@@ -176,7 +183,33 @@ type InstitutionFormState = {
   logoUrl: string;
   logoPreviewUri: string;
   logoAsset: any | null;
+  institutionType: string;
+  membershipPolicy: string;
+  contactEmail: string;
+  contactPhone: string;
 };
+
+// Must match apps.broadcasts.models.EducationInstitutionType /
+// EducationInstitutionMembershipPolicy exactly — the backend silently
+// coerces any other value to a default (ACADEMY / APPLICATION) rather than
+// rejecting it, so a mismatched frontend list here would look like it
+// works while quietly saving the wrong thing.
+const INSTITUTION_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'school', label: 'School' },
+  { value: 'college', label: 'College' },
+  { value: 'university', label: 'University' },
+  { value: 'academy', label: 'Academy' },
+  { value: 'training_center', label: 'Training Center' },
+  { value: 'bootcamp', label: 'Bootcamp' },
+  { value: 'community', label: 'Community' },
+  { value: 'other', label: 'Other' },
+];
+
+const MEMBERSHIP_POLICY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'open', label: 'Open — anyone can join' },
+  { value: 'application', label: 'Application required' },
+  { value: 'closed', label: 'Closed — invite only' },
+];
 
 const EMPTY_FORM: InstitutionFormState = {
   name: '',
@@ -184,6 +217,10 @@ const EMPTY_FORM: InstitutionFormState = {
   logoUrl: '',
   logoPreviewUri: '',
   logoAsset: null,
+  institutionType: 'academy',
+  membershipPolicy: 'application',
+  contactEmail: '',
+  contactPhone: '',
 };
 
 const emptyCourseModuleForm = () => ({
@@ -209,61 +246,50 @@ const emptyCourseModuleItemForm = () => ({
   broadcast_id: '',
 });
 
-const uploadInstitutionLogo = async (asset: any): Promise<string> => {
-  const form = new FormData();
-  form.append('context', 'education_institution_logo');
-  form.append('attachment', {
-    uri: asset.fileCopyUri || asset.uri,
-    type: asset.type || 'image/jpeg',
-    name: asset.fileName || `education-logo-${Date.now()}.jpg`,
-  } as any);
-  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form, {
-    errorMessage: 'Unable to upload institution logo.',
+// Direct-to-S3: the backend re-resolves and safety-scans every mediaId
+// server-side (apps/broadcasts/education_media.py) — it never trusts a
+// client-supplied url, mime type, or quarantine flag. See
+// src/services/uploadEducationMedia.ts.
+const uploadInstitutionLogo = async (
+  asset: any,
+  institutionId?: string,
+): Promise<{ media_id: string }> => {
+  const uploaded = await uploadEducationMedia({
+    context: 'education_institution_logo',
+    file: {
+      uri: asset.fileCopyUri || asset.uri,
+      type: asset.type || 'image/jpeg',
+      name: asset.fileName || `education-logo-${Date.now()}.jpg`,
+    },
+    institutionId,
   });
-  if (!res?.success) {
-    throw new Error(res?.message || 'Unable to upload institution logo.');
-  }
-  const url =
-    res?.data?.attachment?.url ??
-    res?.data?.url ??
-    res?.data?.attachment_url ??
-    '';
-  const normalized = String(url || '').trim();
-  if (!normalized) {
-    throw new Error('Institution logo upload did not return a URL.');
-  }
-  return normalized;
+  return { media_id: uploaded.mediaId };
 };
 
-const uploadEducationAttachmentPayload = async (asset: any, context: string) => {
-  const form = new FormData();
-  form.append('context', context);
-  form.append('attachment', {
-    uri: asset.fileCopyUri || asset.uri,
-    type: asset.type || 'application/octet-stream',
-    name: asset.fileName || asset.name || `education-attachment-${Date.now()}`,
-  } as any);
-  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form, {
-    errorMessage: 'Unable to upload attachment.',
+const uploadEducationAttachmentPayload = async (
+  asset: any,
+  context: EducationUploadContext,
+  institutionId?: string,
+) => {
+  const uploaded = await uploadEducationMedia({
+    context,
+    file: {
+      uri: asset.fileCopyUri || asset.uri,
+      type: asset.type || 'application/octet-stream',
+      name: asset.fileName || asset.name || `education-attachment-${Date.now()}`,
+    },
+    institutionId,
   });
-  if (!res?.success) {
-    throw new Error(res?.message || 'Unable to upload attachment.');
-  }
-  const attachment = res?.data?.attachment ?? {};
-  const url = attachment?.url ?? res?.data?.url ?? res?.data?.attachment_url ?? '';
-  const normalized = String(url || '').trim();
-  if (!normalized && !attachment?.quarantined) {
-    throw new Error('Attachment upload did not return a URL.');
-  }
-  return { url: normalized, attachment };
+  return { media_id: uploaded.mediaId, attachment: uploaded };
 };
 
 const uploadEducationAttachment = async (
   asset: any,
-  context: string,
-): Promise<string> => {
-  const payload = await uploadEducationAttachmentPayload(asset, context);
-  return payload.url;
+  context: EducationUploadContext,
+  institutionId?: string,
+): Promise<{ media_id: string }> => {
+  const payload = await uploadEducationAttachmentPayload(asset, context, institutionId);
+  return { media_id: payload.media_id };
 };
 
 const stripFileScheme = (value?: string | null) =>
@@ -443,6 +469,10 @@ const buildInstitutionForm = (
   logoUrl: institution?.branding?.logo_url ?? '',
   logoPreviewUri: institution?.branding?.logo_url ?? '',
   logoAsset: null,
+  institutionType: institution?.institution_type ?? 'academy',
+  membershipPolicy: institution?.membership_policy ?? 'application',
+  contactEmail: institution?.contact_email ?? '',
+  contactPhone: institution?.contact_phone ?? '',
 });
 
 const SectionCard = ({
@@ -1846,6 +1876,17 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     }
   }, [moduleForm.kind]);
 
+  const handleShareInstitution = useCallback(async (institution?: EducationInstitution | null) => {
+    if (!institution?.name) return;
+    try {
+      await Share.share({
+        message: `Check out ${institution.name} on KIS.`,
+      });
+    } catch {
+      // User cancelled or the native share sheet failed — nothing to report.
+    }
+  }, []);
+
   const handleSaveInstitution = useCallback(async () => {
     const trimmedName = institutionForm.name.trim();
     if (!trimmedName) {
@@ -1854,11 +1895,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     }
     setInstitutionSubmitting(true);
     try {
-      let logoUrl = institutionForm.logoUrl.trim();
+      let logoAttachment: { media_id: string } | undefined;
       if (institutionForm.logoAsset) {
         setLogoUploading(true);
         try {
-          logoUrl = await uploadInstitutionLogo(institutionForm.logoAsset);
+          logoAttachment = await uploadInstitutionLogo(
+            institutionForm.logoAsset,
+            editingInstitutionId || undefined,
+          );
         } catch (uploadErr: any) {
           throw new Error(uploadErr?.message || 'Unable to upload institution logo.');
         } finally {
@@ -1868,9 +1912,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       const payload = {
         name: trimmedName,
         description: institutionForm.description.trim() || undefined,
-        branding: {
-          logo_url: logoUrl || '',
-        },
+        institution_type: institutionForm.institutionType || 'academy',
+        membership_policy: institutionForm.membershipPolicy || 'application',
+        contact_email: institutionForm.contactEmail.trim(),
+        contact_phone: institutionForm.contactPhone.trim(),
+        branding: logoAttachment
+          ? { logo_attachment: logoAttachment }
+          : { logo_url: institutionForm.logoUrl.trim() || '' },
       };
       const response = editingInstitutionId
         ? await patchRequest(
@@ -2025,15 +2073,20 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
     };
     let coverImageUrl = toText(moduleForm.cover_image_url);
+    let coverImageAttachment: { media_id: string } | undefined;
     if (
       IMAGE_ENABLED_EDUCATION_MODULES.includes(activeModuleKey) &&
       moduleForm.cover_image_asset
     ) {
-      coverImageUrl = await uploadEducationAttachment(
+      coverImageAttachment = await uploadEducationAttachment(
         moduleForm.cover_image_asset,
         'education_module_cover_image',
+        selectedInstitutionId,
       );
     }
+    const coverImageFields = coverImageAttachment
+      ? { cover_image_attachment: coverImageAttachment }
+      : { cover_image_url: coverImageUrl };
     let payload: Record<string, any> = {};
     let createRoute = '';
     let detailRoute = '';
@@ -2046,7 +2099,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           code: toText(moduleForm.code),
           summary: toText(moduleForm.summary),
           description: toText(moduleForm.description),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           status: toText(moduleForm.status) || 'draft',
         };
         createRoute = ROUTES.broadcasts.educationInstitutionPrograms(
@@ -2067,7 +2120,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           code: toText(moduleForm.code),
           summary: toText(moduleForm.summary),
           description: toText(moduleForm.description),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           status: toText(moduleForm.status) || 'draft',
           duration_minutes: Number(moduleForm.duration_minutes || 0) || 0,
           seat_limit: parseOptionalInt(moduleForm.seat_limit),
@@ -2092,7 +2145,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           title: trimmedTitle,
           summary: toText(moduleForm.summary),
           content: toText(moduleForm.content),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           status: toText(moduleForm.status) || 'draft',
           lesson_order: Number(moduleForm.lesson_order || 0) || 0,
           duration_minutes: Number(moduleForm.duration_minutes || 0) || 0,
@@ -2118,7 +2171,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         payload = {
           title: trimmedTitle,
           summary: toText(moduleForm.summary),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           starts_at: toText(moduleForm.starts_at),
           ends_at: toText(moduleForm.ends_at),
           timezone_name: toText(moduleForm.timezone_name) || 'UTC',
@@ -2163,19 +2216,20 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             kind: normalizedKind,
           });
           let resourceUrl = toText(moduleForm.resource_url);
-          let resourceAttachment: any = null;
+          let resourceAttachment: { media_id: string } | null = null;
           if (moduleForm.resource_asset) {
             const uploadPayload = await uploadEducationAttachmentPayload(
               moduleForm.resource_asset,
               'education_material',
+              selectedInstitutionId,
             );
-            resourceUrl = uploadPayload.url;
-            resourceAttachment = uploadPayload.attachment;
+            resourceUrl = '';
+            resourceAttachment = { media_id: uploadPayload.media_id };
           }
           payload = {
             title: trimmedTitle,
             summary: toText(moduleForm.summary),
-            cover_image_url: coverImageUrl,
+            ...coverImageFields,
             kind: normalizedKind || 'document',
             resource_url: resourceUrl,
             resource_attachment: resourceAttachment || undefined,
@@ -2217,7 +2271,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           title: trimmedTitle,
           summary: toText(moduleForm.summary),
           instructions: toText(moduleForm.instructions),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           assessment_type: toText(moduleForm.assessment_type) || 'mcq',
           status: toText(moduleForm.status) || 'draft',
           duration_minutes: Number(moduleForm.duration_minutes || 0) || 0,
@@ -2250,7 +2304,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           title: trimmedTitle,
           summary: toText(moduleForm.summary),
           description: toText(moduleForm.description),
-          cover_image_url: coverImageUrl,
+          ...coverImageFields,
           event_type: toText(moduleForm.event_type) || 'event',
           starts_at: toText(moduleForm.starts_at),
           ends_at: toText(moduleForm.ends_at),
@@ -6881,6 +6935,63 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           />
           <View style={{ gap: 8 }}>
             <Text style={{ color: palette.text, fontWeight: '800' }}>
+              Institution type
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {INSTITUTION_TYPE_OPTIONS.map(option => {
+                const active = institutionForm.institutionType === option.value;
+                return (
+                  <KISButton
+                    key={option.value}
+                    title={option.label}
+                    size="xs"
+                    variant={active ? 'secondary' : 'outline'}
+                    onPress={() =>
+                      setInstitutionForm(prev => ({ ...prev, institutionType: option.value }))
+                    }
+                    disabled={institutionSubmitting}
+                  />
+                );
+              })}
+            </View>
+          </View>
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: palette.text, fontWeight: '800' }}>
+              Membership policy
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {MEMBERSHIP_POLICY_OPTIONS.map(option => {
+                const active = institutionForm.membershipPolicy === option.value;
+                return (
+                  <KISButton
+                    key={option.value}
+                    title={option.label}
+                    size="xs"
+                    variant={active ? 'secondary' : 'outline'}
+                    onPress={() =>
+                      setInstitutionForm(prev => ({ ...prev, membershipPolicy: option.value }))
+                    }
+                    disabled={institutionSubmitting}
+                  />
+                );
+              })}
+            </View>
+          </View>
+          <KISTextInput
+            label="Contact email (optional)"
+            value={toText(institutionForm.contactEmail)}
+            onChange={updateInstitutionFormText('contactEmail')}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <KISTextInput
+            label="Contact phone (optional)"
+            value={toText(institutionForm.contactPhone)}
+            onChange={updateInstitutionFormText('contactPhone')}
+            keyboardType="phone-pad"
+          />
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: palette.text, fontWeight: '800' }}>
               Institution logo
             </Text>
             <Text style={{ color: palette.subtext, fontSize: 13 }}>
@@ -9046,6 +9157,12 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       onPress={() =>
                         onOpenLandingBuilder?.(selectedInstitution)
                       }
+                      variant="ghost"
+                    />
+                    <EducationActionButton
+                      palette={palette}
+                      label="Share"
+                      onPress={() => void handleShareInstitution(selectedInstitution)}
                       variant="ghost"
                     />
                   </>

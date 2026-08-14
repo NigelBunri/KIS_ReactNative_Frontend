@@ -185,6 +185,7 @@ export type RootStackParamList = {
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;
+  EmailVerification: undefined;
   ComplianceSettings: undefined;
   CacheManagement: undefined;
   AdminUserManagement: undefined;
@@ -194,10 +195,11 @@ export type RootStackParamList = {
   ParentRecovery: undefined;
   InvoiceList: undefined;
   Loyalty: undefined;
+  Referrals: undefined;
+  HowRewardsWork: undefined;
   PromoCode: undefined;
   SetupPIN: undefined;
   QuickLock: undefined;
-  Wallet: undefined;
   SubscriptionManagement: undefined;
   PlaylistList: undefined;
   PlaylistDetail: {
@@ -278,13 +280,6 @@ export type RootStackParamList = {
   ComplianceTracker: undefined;
   WhistleblowerReport: undefined;
   BoardGovernance: undefined;
-  // Education
-  LiveClassroom: { classroomId: string };
-  AssignmentsScreen: { classroomId: string };
-  StudentProgress: undefined;
-  Scholarships: undefined;
-  DigitalBadges: undefined;
-  EducationCertificate: undefined;
   // Media
   Podcasts: undefined;
   PodcastEpisodeScreen: { episodeId: string };

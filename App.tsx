@@ -157,6 +157,7 @@ import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
 import BlockedContactsScreen from '@/screens/tabs/BlockedContactsScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
+import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
 import CacheManagementScreen from '@/screens/CacheManagementScreen';
 import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
@@ -165,6 +166,8 @@ import QRScanLoginScreen from '@/screens/QRScanLoginScreen';
 import ParentRecoveryScreen from '@/screens/ParentRecoveryScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
+import ReferralScreen from '@/screens/market/ReferralScreen';
+import HowRewardsWorkScreen from '@/screens/market/HowRewardsWorkScreen';
 import PromoCodeScreen from '@/screens/market/PromoCodeScreen';
 import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
 import EventsScreen from '@/screens/EventsScreen';
@@ -174,12 +177,11 @@ import { AgeModeProvider, useAgeMode } from '@/theme/ageModeContext';
 import { ThemeModeProvider, useThemeMode } from '@/theme/themeModeContext';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
-import WalletScreen from '@/screens/WalletScreen';
 import SubscriptionManagementScreen from '@/screens/SubscriptionManagementScreen';
 import AIIntegrationScreen from './src/screens/insights/AIIntegrationScreen';
 import MediaAssetManagerScreen from './src/screens/insights/MediaAssetManagerScreen';
 import SurveyManagerScreen from './src/screens/insights/SurveyManagerScreen';
-import { isPINEnabled, shouldLockAsync, persistLastActiveAt, getPersistedLastActiveAt } from '@/services/QuickLockService';
+import { shouldLockAsync, persistLastActiveAt, getPersistedLastActiveAt, getCachedHasPin, setCachedHasPin } from '@/services/QuickLockService';
 import UserProfileScreen from '@/screens/profile/UserProfileScreen';
 import JobsBoardScreen from '@/screens/jobs/JobsBoardScreen';
 import MyApplicationsScreen from '@/screens/jobs/MyApplicationsScreen';
@@ -274,12 +276,6 @@ import SobrietyTrackerScreen from '@/screens/health/recovery/SobrietyTrackerScre
 import SymptomCheckerScreen from '@/screens/health/symptoms/SymptomCheckerScreen';
 
 // ── Broadcast education & media extended ──
-import AssignmentsScreen from '@/screens/broadcast/education/AssignmentsScreen';
-import StudentProgressScreen from '@/screens/broadcast/education/StudentProgressScreen';
-import BadgesScreen from '@/screens/broadcast/education/BadgesScreen';
-import CertificateScreen from '@/screens/broadcast/education/CertificateScreen';
-import LiveClassroomScreen from '@/screens/broadcast/education/LiveClassroomScreen';
-import ScholarshipsScreen from '@/screens/broadcast/education/ScholarshipsScreen';
 import CreatorAnalyticsScreen from '@/screens/broadcast/media_extended/CreatorAnalyticsScreen';
 import KingdomNewsScreen from '@/screens/broadcast/media_extended/KingdomNewsScreen';
 import KingdomMusicScreen from '@/screens/broadcast/media_extended/KingdomMusicScreen';
@@ -304,6 +300,10 @@ type AuthCtx = {
   refreshLocation?: (requestPermission?: boolean) => Promise<boolean>;
   user?: KISUser | null;
   setUser?: (user: KISUser | null) => void;
+  // Server-authoritative "does this account have a Quick Lock PIN"
+  // fact. null = not yet hydrated this session. See QuickLockService.
+  hasPin?: boolean | null;
+  setHasPin?: (v: boolean | null) => void;
 };
 const AuthContext = createContext<AuthCtx>({
   isAuth: false,
@@ -314,6 +314,8 @@ const AuthContext = createContext<AuthCtx>({
   refreshLocation: async () => false,
   user: null,
   setUser: () => {},
+  hasPin: null,
+  setHasPin: () => {},
 });
 export const useAuth = () => useContext(AuthContext);
 
@@ -443,6 +445,21 @@ function AppContent() {
   const [user, setUser] = useState<KISUser | null>(null);
   const [showQuickLock, setShowQuickLock] = useState(false);
   const lastActiveAtRef = useRef<number>(Date.now());
+  // Server-authoritative Quick Lock PIN state. null = unresolved this
+  // session (falls back to the cached value below). Kept in a ref too so
+  // the AppState listener — created once and not re-subscribed on every
+  // change — always reads the latest value instead of a stale closure.
+  const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const hasPinRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    hasPinRef.current = hasPin;
+  }, [hasPin]);
+  // Seed from the last known value immediately at mount so the very first
+  // foreground check (before checkAuth's network round trip resolves) has
+  // a sane fallback instead of assuming "no PIN".
+  useEffect(() => {
+    getCachedHasPin().then(setHasPin).catch(() => {});
+  }, []);
   const [locationReady, setLocationReady] = useState(false);
   const locationReadyRef = useRef(false);
   const [locationChecking, setLocationChecking] = useState(true);
@@ -602,6 +619,20 @@ function AppContent() {
     void cleanIrrelevantStorage();
   }, []);
 
+  // Applies a user payload from checkLogin/login and, when it carries the
+  // server-authoritative has_pin flag, syncs it into React state and the
+  // offline cache in the same step — this is the single point where every
+  // auth entry point (boot, foreground, session-expired) converges Quick
+  // Lock's PIN state across devices.
+  const applyUser = useCallback((u: KISUser | null) => {
+    setUser(u);
+    if (u && typeof (u as any).has_pin === 'boolean') {
+      const hp = Boolean((u as any).has_pin);
+      setHasPin(hp);
+      void setCachedHasPin(hp);
+    }
+  }, []);
+
   const checkAuth = useCallback(async () => {
     try {
       const token = await getAccessToken();
@@ -615,6 +646,7 @@ function AppContent() {
 
       if (!token) {
         setUser(null);
+        setHasPin(null);
         setAuth(false);
         return;
       }
@@ -679,18 +711,18 @@ function AppContent() {
             setAuth(false);
             return;
           }
-          setUser(u);
+          applyUser(u);
           setAuth(true);
         } else if (Number(res?.status) === 429) {
           appAuthCheckBlockedUntil = Date.now() + AUTH_429_BACKOFF_MS;
-          setUser(u);
+          applyUser(u);
           setAuth(true);
         } else if (
           res?.success === false &&
           res?.message === 'No internet connection.'
         ) {
           console.log('Offline but token exists — trusting local auth.');
-          setUser(u);
+          applyUser(u);
           setAuth(true);
         } else {
           setUser(null);
@@ -707,7 +739,7 @@ function AppContent() {
       setUser(null);
       setAuth(!!token);
     }
-  }, []);
+  }, [applyUser]);
 
   useEffect(() => {
     (async () => {
@@ -863,8 +895,11 @@ function AppContent() {
     if (!isAuth) return;
     const subscription = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
-        const pinEnabled = await isPINEnabled();
-        if (pinEnabled) {
+        // Server-authoritative (via hasPinRef, backed by has_pin from
+        // /users/me/ and the login response) so a PIN created on another
+        // device engages Quick Lock here too — not just a PIN set locally.
+        const pinConfigured = Boolean(hasPinRef.current);
+        if (pinConfigured) {
           const lock = await shouldLockAsync(lastActiveAtRef.current);
           if (lock) {
             setShowQuickLock(true);
@@ -950,6 +985,8 @@ function AppContent() {
       refreshLocation: syncLocationCountry,
       user,
       setUser,
+      hasPin,
+      setHasPin,
     }),
     [
       isAuth,
@@ -958,6 +995,7 @@ function AppContent() {
       locationCallingCode,
       syncLocationCountry,
       user,
+      hasPin,
     ],
   );
 
@@ -1435,6 +1473,10 @@ function AppContent() {
                       component={PasswordChangeScreen}
                     />
                     <RootStack.Screen
+                      name="EmailVerification"
+                      component={EmailVerificationScreen}
+                    />
+                    <RootStack.Screen
                       name="ComplianceSettings"
                       component={ComplianceSettingsScreen}
                       options={{ headerShown: false }}
@@ -1490,14 +1532,19 @@ function AppContent() {
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
-                      name="PromoCode"
-                      component={PromoCodeScreen}
+                      name="Referrals"
+                      component={ReferralScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
-                      name="Wallet"
-                      component={WalletScreen}
-                      options={{ presentation: 'modal', title: 'Wallet' }}
+                      name="HowRewardsWork"
+                      component={HowRewardsWorkScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="PromoCode"
+                      component={PromoCodeScreen}
+                      options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="SubscriptionManagement"
@@ -1699,12 +1746,6 @@ function AppContent() {
                     <RootStack.Screen name="SymptomChecker" component={SymptomCheckerScreen} options={{ headerShown: false }} />
 
                     {/* ── Broadcast education & media extended ── */}
-                    <RootStack.Screen name="AssignmentsScreen" component={AssignmentsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="StudentProgress" component={StudentProgressScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="DigitalBadges" component={BadgesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="EducationCertificate" component={CertificateScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="LiveClassroom" component={LiveClassroomScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Scholarships" component={ScholarshipsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="CreatorAnalytics" component={CreatorAnalyticsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="KingdomNews" component={KingdomNewsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="KingdomMusic" component={KingdomMusicScreen} options={{ headerShown: false }} />

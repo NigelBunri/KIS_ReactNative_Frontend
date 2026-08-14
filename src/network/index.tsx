@@ -11,12 +11,13 @@ import socialRoutes from './routes/socialRoutes';
 import adminRoutes from './routes/adminRoutes';
 import personalizationRoutes from './routes/personalizationRoutes';
 import billingRoutes from './routes/billingRoutes';
+import rewardsRoutes from './routes/rewardsRoutes';
+import referralsRoutes from './routes/referralsRoutes';
 import testimonyRoutes from './routes/testimonyRoutes';
 import churchRoutes from './routes/churchRoutes';
 import familyRoutes from './routes/familyRoutes';
 import governmentRoutes from './routes/governmentRoutes';
 import businessRoutes from './routes/businessRoutes';
-import educationRoutes from './routes/educationRoutes';
 import mediaExtendedRoutes from './routes/mediaExtendedRoutes';
 import healthExtendedRoutes from './routes/healthExtendedRoutes';
 import localizationRoutes from './routes/localizationRoutes';
@@ -31,10 +32,6 @@ import {
   CHAT_WS_PATH,
   CHAT_WS_URL,
   DEV_BACKEND_HOST,
-  EDUCATION_COURSES_ENDPOINT,
-  EDUCATION_ENROLL_ENDPOINT,
-  EDUCATION_HOME_ENDPOINT,
-  EDUCATION_LESSONS_ENDPOINT,
   FEEDS_ENDPOINT,
   NEST_API_BASE_URL,
   WEBSOCKET_URL,
@@ -49,12 +46,13 @@ const ROUTES: any = {
   ...adminRoutes,
   ...personalizationRoutes,
   billing: billingRoutes,
+  rewards: rewardsRoutes,
+  referrals: referralsRoutes,
   ...testimonyRoutes,
   ...churchRoutes,
   ...familyRoutes,
   ...governmentRoutes,
   ...businessRoutes,
-  ...educationRoutes,
   ...mediaExtendedRoutes,
   ...healthExtendedRoutes,
   ...localizationRoutes,
@@ -66,14 +64,6 @@ const ROUTES: any = {
 ROUTES.profiles = {
   ...((authRoutes as any).profiles || {}),
   ...((socialRoutes as any).profiles || {}),
-};
-
-// Several route modules contribute to the same top-level namespaces. The main
-// spread above is intentionally shallow, so merge those namespaces explicitly to
-// avoid dropping endpoints such as education.discovery during startup prefetch.
-ROUTES.education = {
-  ...((broadcastRoutes as any).education || {}),
-  ...((educationRoutes as any).education || {}),
 };
 
 ROUTES.events = {
@@ -224,8 +214,4 @@ export {
   BG_REMOVAL_START_URL,
   BG_REMOVAL_STATUS_URL,
   NEST_API_BASE_URL,
-  EDUCATION_HOME_ENDPOINT,
-  EDUCATION_LESSONS_ENDPOINT,
-  EDUCATION_COURSES_ENDPOINT,
-  EDUCATION_ENROLL_ENDPOINT,
 };
