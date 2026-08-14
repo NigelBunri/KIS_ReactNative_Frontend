@@ -257,11 +257,22 @@ export default function LoginScreen({ navigation }: any) {
           res?.data?.secondary_device_required ||
           res?.data?.qr_login_required
         ) {
+          // This fires for a reinstalled Android phone too (its device_id
+          // was wiped along with app storage, so the backend sees it as an
+          // unrecognized new device) — not only for a genuinely different
+          // second device. Offering only "Scan QR" leaves that person with
+          // no way forward, since scanning requires the primary device they
+          // may no longer have access to; "Recover Account" routes to the
+          // verified-email recovery flow instead.
           return Alert.alert(
             'Use secondary device login',
-            'This account is already active on another device. Open Profile -> Manage Devices on the primary device, then link this device with the QR code.',
+            'This account is already active on another device. Open Profile -> Manage Devices on the primary device, then link this device with the QR code — or recover your account if you no longer have access to it.',
             [
               { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Recover Account',
+                onPress: () => navigation.navigate('ParentRecovery'),
+              },
               {
                 text: 'Scan QR',
                 onPress: () => navigation.navigate('QRScanLogin'),

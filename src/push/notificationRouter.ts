@@ -100,9 +100,12 @@ export function routeNotification(
       return;
     }
 
-    // Wallet transaction notifications.
+    // Wallet transaction notifications — WalletScreen (route 'Wallet') was
+    // retired in the billing/rewards project's mobile consolidation
+    // (Phase 8): its "Billing" tab duplicated InvoiceListScreen, which is
+    // the actual home for WalletTransaction/payment records now.
     if (transaction_id) {
-      navigation.navigate('Wallet');
+      navigation.navigate('InvoiceList');
       return;
     }
 

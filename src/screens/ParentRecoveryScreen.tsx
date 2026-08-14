@@ -55,7 +55,7 @@ export default function ParentRecoveryScreen() {
       // Always show this message regardless of result — prevents account enumeration
       Alert.alert(
         'Check your email',
-        'If an account matches, a recovery code has been sent. It expires in 15 minutes.\n\nNote: there is a 24-hour delay before the parent device role transfers, for your security.',
+        'If an account matches, a recovery code has been sent. It expires in 15 minutes.\n\nOnce verified, this device becomes your primary device immediately and your previous primary device is signed out.',
       );
       setStep('verify');
     } catch (e: any) {
@@ -135,7 +135,7 @@ export default function ParentRecoveryScreen() {
             <Text style={[styles.title, { color: palette.text }]}>Recover Primary Device</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               If you lost your primary device, enter your phone number or email. We'll send a recovery code.
-              For security, there is a 24-hour delay before the primary role is transferred.
+              Verifying it makes this device your primary immediately and signs your previous primary device out.
             </Text>
 
             <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
@@ -214,9 +214,9 @@ export default function ParentRecoveryScreen() {
 
         {step === 'done' && (
           <>
-            <Text style={[styles.title, { color: palette.text }]}>Recovery Initiated</Text>
+            <Text style={[styles.title, { color: palette.text }]}>Recovery Complete</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
-              Your recovery is being processed. This device will become your primary device within 24 hours. You are now logged in.
+              This device is now your primary device. Your previous primary device has been signed out immediately. You are now logged in.
             </Text>
             <View style={[styles.successBox, { backgroundColor: `${palette.success}22`, borderColor: palette.success, maxWidth: formMaxWidth }]}>
               <KISIcon name="check" size={20} color={palette.success} />
@@ -228,8 +228,8 @@ export default function ParentRecoveryScreen() {
         <View style={[styles.securityNote, { backgroundColor: palette.surface, borderColor: palette.divider, maxWidth: formMaxWidth }]}>
           <KISIcon name="lock" size={14} color={palette.subtext} />
           <Text style={[styles.securityNoteText, { color: palette.subtext }]}>
-            For your security, the 24-hour delay gives you time to cancel if this recovery was not initiated by you.
-            All recovery attempts are logged and audited.
+            The recovery code only reaches a verified email you already control, and transfer happens immediately —
+            your previous primary device is signed out as soon as this completes. All recovery attempts are logged and audited.
           </Text>
         </View>
       </ScrollView>

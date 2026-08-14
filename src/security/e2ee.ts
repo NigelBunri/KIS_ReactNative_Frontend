@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { fromByteArray, toByteArray } from 'base64-js';
@@ -230,13 +229,23 @@ const signalStore = new SignalProtocolStore();
 const createDeviceId = () => `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 // iOS Keychain entries survive app deletion by default, so persisting the
-// device_id there (rather than AsyncStorage, which is wiped on uninstall)
-// means reinstalling on the same physical iPhone keeps the same device_id —
-// the backend still recognizes it as the primary device, no QR re-link
-// needed. Android app storage is wiped on uninstall regardless of backend
-// used (no Keychain-equivalent persistence there), so primary-device
-// recognition after reinstall comes from the SIM-number check instead
-// (see services/simInfo.ts) — this function stays on AsyncStorage for Android.
+// device_id there means reinstalling on the same physical iPhone keeps the
+// same device_id — the backend still recognizes it as the primary device,
+// no QR re-link needed.
+//
+// Android has no equivalent: EncryptedStorage there is backed by
+// EncryptedSharedPreferences + Android Keystore, both of which live inside
+// the app's own private data directory and are wiped by the OS on uninstall
+// *and* on "clear app storage" — same as plain AsyncStorage. Using
+// EncryptedStorage on Android still closes a real gap (device_id was
+// previously the one identity value plain AsyncStorage held while
+// everything else sensitive already used EncryptedStorage) but it does NOT
+// make device_id survive reinstall. Primary-device recognition after an
+// Android reinstall still has to come from either the best-effort SIM-number
+// check (services/simInfo.ts, unreliable — permission often denied, many
+// OEMs don't expose it) or the account-recovery flow (ParentRecoveryScreen),
+// not from storage persistence — don't reintroduce the old comment's premise
+// that this fixes reinstall.
 const readSecureDeviceId = async (): Promise<string | null> => {
   try {
     return await EncryptedStorage.getItem(DEVICE_ID_KEY);
@@ -255,36 +264,27 @@ const writeSecureDeviceId = async (deviceId: string): Promise<boolean> => {
 };
 
 export const ensureDeviceId = async (): Promise<string> => {
-  if (Platform.OS === 'ios') {
-    let deviceId = await readSecureDeviceId();
-    if (!deviceId) {
-      // Migrate a value from an older app version that only used AsyncStorage,
-      // before falling back to generating a brand-new id.
-      deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
-      if (!deviceId) deviceId = createDeviceId();
-      await writeSecureDeviceId(deviceId);
-    }
-    // Keychain is the source of truth on iOS, but every network request
-    // (src/network/{get,post,put,patch,delete}) reads the X-Device-Id header
-    // value straight from plain AsyncStorage, not through this function — a
-    // brand-new device (no prior AsyncStorage entry to migrate from, per the
-    // branch above) would otherwise resolve a real device id here while
-    // AsyncStorage['device_id'] stays permanently unset, so every request
-    // after login goes out with no X-Device-Id header, the backend's
-    // DeviceBoundJWTAuthentication rejects it with 401, and token refresh
-    // (which also depends on device_id) fails the same way — kicking the
-    // user back to the Welcome screen right after a successful login.
-    // Mirroring the resolved id into AsyncStorage here keeps it in sync for
-    // those call sites without changing their read path.
-    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
-    return deviceId;
-  }
-
-  let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+  let deviceId = await readSecureDeviceId();
   if (!deviceId) {
-    deviceId = createDeviceId();
-    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
+    // Migrate a value from an older app version that only used AsyncStorage,
+    // before falling back to generating a brand-new id.
+    deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+    if (!deviceId) deviceId = createDeviceId();
+    await writeSecureDeviceId(deviceId);
   }
+  // EncryptedStorage is the source of truth, but every network request
+  // (src/network/{get,post,put,patch,delete}) reads the X-Device-Id header
+  // value straight from plain AsyncStorage, not through this function — a
+  // brand-new device (no prior AsyncStorage entry to migrate from, per the
+  // branch above) would otherwise resolve a real device id here while
+  // AsyncStorage['device_id'] stays permanently unset, so every request
+  // after login goes out with no X-Device-Id header, the backend's
+  // DeviceBoundJWTAuthentication rejects it with 401, and token refresh
+  // (which also depends on device_id) fails the same way — kicking the
+  // user back to the Welcome screen right after a successful login.
+  // Mirroring the resolved id into AsyncStorage here keeps it in sync for
+  // those call sites without changing their read path.
+  await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
   return deviceId;
 };
 
@@ -294,11 +294,8 @@ export const rotateDeviceId = async (): Promise<string> => {
   storeCache = null;
   await EncryptedStorage.removeItem(STORE_KEY);
   await AsyncStorage.removeItem(E2EE_READY_KEY);
-  if (Platform.OS === 'ios') {
-    await writeSecureDeviceId(deviceId);
-  } else {
-    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
-  }
+  await writeSecureDeviceId(deviceId);
+  await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
   return deviceId;
 };
 

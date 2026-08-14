@@ -16,6 +16,7 @@ import { setPIN } from '@/services/QuickLockService';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { useAuth } from '../../App';
 
 const PIN_LENGTH = 6;
 
@@ -27,6 +28,7 @@ export default function SetupPINScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { palette, tokens } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const { setHasPin } = useAuth();
 
   const [step, setStep] = useState<Step>('enter');
   const [firstPIN, setFirstPIN] = useState('');
@@ -62,6 +64,9 @@ export default function SetupPINScreen() {
       setSaving(true);
       try {
         await setPIN(currentPin);
+        // Update immediately on this device — don't wait for the next
+        // /users/me/ refresh to make Quick Lock recognize the new PIN.
+        setHasPin?.(true);
         navigation.goBack();
       } catch (e: any) {
         setError(e?.message || 'Failed to save PIN.');
@@ -69,7 +74,7 @@ export default function SetupPINScreen() {
         setSaving(false);
       }
     }
-  }, [step, firstPIN, shake, navigation]);
+  }, [step, firstPIN, shake, navigation, setHasPin]);
 
   const pressKey = useCallback((digit: string) => {
     if (saving) return;

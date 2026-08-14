@@ -24,7 +24,7 @@ export default function UpgradeSheet(props: {
   tiers: any[];
   accountTier: any;
   saving: boolean;
-  onUpgrade: (tierId: string) => void;
+  onUpgrade: (tierId: string, applyRewards?: boolean) => void;
   subscription?: any;
   billingHistory?: { transactions?: any[]; ledger?: any[]; invoice_pdf_url?: string | null };
   usage?: Record<string, any>;
@@ -32,6 +32,7 @@ export default function UpgradeSheet(props: {
   onResume?: () => void;
   onDowngrade?: (tierId: string) => void;
   onRetry?: (txRef: string) => void;
+  rewardBalance?: number;
 }) {
   const { palette } = useKISTheme();
   const {
@@ -46,7 +47,14 @@ export default function UpgradeSheet(props: {
     onResume,
     onDowngrade,
     onRetry,
+    rewardBalance,
   } = props;
+  // The final discount is always computed and capped server-side by
+  // apps.billing.services.calculate_redemption; this toggle only tells the
+  // backend the user wants their available KIS Coins considered — it never
+  // predicts or displays a discount amount itself.
+  const [applyRewards, setApplyRewards] = React.useState(false);
+  const hasRewardBalance = Number(rewardBalance ?? 0) > 0;
 
   const currentKey = String(accountTier?.id ?? accountTier?.name ?? '');
   const currentMeta = tierMetaFor(accountTier || {});
@@ -167,6 +175,38 @@ export default function UpgradeSheet(props: {
         </Text>
       </View>
 
+      {hasRewardBalance && (
+        <Pressable
+          onPress={() => setApplyRewards((v) => !v)}
+          style={[
+            styles.tierCard,
+            {
+              borderColor: applyRewards ? palette.primaryStrong : palette.divider,
+              backgroundColor: palette.card,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            },
+          ]}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>
+              Apply KIS Coins to this upgrade
+            </Text>
+            <Text style={{ color: palette.subtext, fontSize: 12 }}>
+              You have {Number(rewardBalance ?? 0).toLocaleString()} KIS Coins available. A cash payment is still required — the exact discount is calculated at checkout.
+            </Text>
+          </View>
+          <KISIcon
+            name="check"
+            focused={applyRewards}
+            size={22}
+            color={applyRewards ? palette.primaryStrong : palette.subtext}
+          />
+        </Pressable>
+      )}
+
       <View
         style={[
           styles.tierCard,
@@ -245,7 +285,7 @@ export default function UpgradeSheet(props: {
           <KISButton
             title="Upgrade to Partner Pro"
             variant="outline"
-            onPress={() => partnerProTier?.id && onUpgrade(partnerProTier.id)}
+            onPress={() => partnerProTier?.id && onUpgrade(partnerProTier.id, applyRewards)}
             disabled={!partnerProTier?.id || saving}
           />
         </View>
@@ -317,7 +357,7 @@ export default function UpgradeSheet(props: {
                   onPress={() => {
                     if (isLocked) return;
                     if (isDowngrade) onDowngrade?.(tier.id);
-                    else onUpgrade(tier.id);
+                    else onUpgrade(tier.id, applyRewards);
                   }}
                   style={[
                     styles.tierCard,
@@ -376,7 +416,7 @@ export default function UpgradeSheet(props: {
                       onPress={() => {
                         if (isLocked || isCurrent) return;
                         if (isDowngrade) onDowngrade?.(tier.id);
-                        else onUpgrade(tier.id);
+                        else onUpgrade(tier.id, applyRewards);
                       }}
                       disabled={isCurrent || isLocked || saving}
                     />

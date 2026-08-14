@@ -23,6 +23,7 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { unregisterPushToken } from '@/push/notifications';
+import { clearLocalQuickLockState } from '@/services/QuickLockService';
 import { useAuth } from '../../App';
 
 export default function AccountDeletionScreen() {
@@ -75,6 +76,11 @@ export default function AccountDeletionScreen() {
                 return;
               }
               await AsyncStorage.clear();
+              // AsyncStorage.clear() doesn't touch EncryptedStorage (a
+              // separate native keychain/keystore module) — Quick Lock's
+              // PIN/timeout live there and must be wiped explicitly so a
+              // future account on this device can't inherit them.
+              await clearLocalQuickLockState();
               setAuth(false);
             } catch (err: any) {
               Alert.alert('Delete account', err?.message || 'Unable to delete account.');

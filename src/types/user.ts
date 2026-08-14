@@ -9,6 +9,7 @@ export interface KISUser {
   phone?: string | null;
   phone_number?: string | null;
   email?: string | null;
+  email_verified?: boolean;
   is_active?: boolean;
   status?: string;
   is_staff?: boolean;
@@ -16,6 +17,9 @@ export interface KISUser {
   date_joined?: string;
   last_login?: string;
   profile?: KISUserProfile | null;
+  // Server-authoritative Quick Lock PIN state — never the PIN or its hash,
+  // just whether one is configured on this account. See QuickLockService.
+  has_pin?: boolean;
   // legacy fields some endpoints still return
   user_id?: string;
   userId?: string;

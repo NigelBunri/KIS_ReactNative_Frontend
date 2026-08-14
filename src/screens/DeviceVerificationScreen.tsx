@@ -23,7 +23,7 @@ import { KIS_TOKENS } from '@/theme/constants';
 import { useAuth } from '../../App';
 import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
-import { initE2EE } from '@/security/e2ee';
+import { initE2EE, ensureDeviceId } from '@/security/e2ee';
 
 type RouteParams = {
   phone?: string | null;
@@ -100,7 +100,11 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const getDeviceId = useCallback(async () => {
-    return (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+    // Bypassing the shared ensureDeviceId() here used to fall back to the
+    // literal string 'unknown-device' if AsyncStorage['device_id'] wasn't
+    // set yet, which the backend would then register as an actual device —
+    // ensureDeviceId() persists/reuses the real id the rest of the app uses.
+    return ensureDeviceId();
   }, []);
 
   const getCountry = useCallback(async () => {

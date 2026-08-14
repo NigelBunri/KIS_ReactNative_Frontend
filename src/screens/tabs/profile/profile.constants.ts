@@ -112,12 +112,20 @@ export const visibilityDescriptions: Record<string, string> = {
   private: 'Only you can see this part.',
 };
 
+// Deposit/Transfer/Convert/Upgrade were removed here (Phase 7 of the
+// billing/rewards project): the backend endpoints they called are legacy
+// financial flows already disabled by default
+// (KIS_LEGACY_WALLET_DEPOSIT_ENABLED / _TRANSFER_ENABLED /
+// KIS_LEGACY_CASH_CREDIT_CONVERSION_ENABLED), and all three tabs' handlers
+// showed a false "success" message regardless of the actual (403) result —
+// postRequest resolves rather than throwing on HTTP errors, and none of
+// them checked res.success. Upgrade was separately broken (sent an empty
+// payload) and fully redundant with the real upgrade flow
+// (UpgradeModal/UpgradeSheet, reachable from ProfileScreen's dedicated
+// "Upgrade" action) — KIS has exactly one authoritative upgrade flow now,
+// this was never it.
 export const walletModes = [
   { value: 'history', label: 'Credit history' },
-  { value: 'deposit', label: 'Deposit' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'convert', label: 'Convert' },
-  { value: 'upgrade', label: 'Upgrade' },
 ];
 
 export const paymentProviders = [

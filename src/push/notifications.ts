@@ -6,6 +6,7 @@ import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
 import { displayIncomingCall } from '@/services/calls/callKitService';
+import { ensureDeviceId } from '@/security/e2ee';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 
@@ -15,7 +16,7 @@ const registerPushToken = async (payload: {
 }) => {
   const pushToken = payload.pushToken || '';
   if (!pushToken) return;
-  const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+  const deviceId = await ensureDeviceId();
   // Was read from an AsyncStorage key ('device_platform') that nothing in
   // the app ever writes — every registration silently sent an empty
   // platform to Django, and Nest's own fallback ('android') was wrong for
@@ -74,7 +75,7 @@ const retryPendingPushToken = async () => {
 // call pushes, so there's no reason to dual-write this one to Django.
 const registerVoipPushToken = async (voipToken: string) => {
   if (!voipToken) return;
-  const deviceId = (await AsyncStorage.getItem('device_id')) || 'unknown-device';
+  const deviceId = await ensureDeviceId();
   try {
     await postRequest(
       `${NEST_API_BASE_URL}/notifications/tokens/register`,

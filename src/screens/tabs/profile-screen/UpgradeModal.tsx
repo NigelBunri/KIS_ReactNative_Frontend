@@ -5,7 +5,7 @@ type UpgradeModalProps = {
   tiers: any[];
   accountTier: any;
   saving: boolean;
-  onUpgrade: (tierId: string) => Promise<void> | void;
+  onUpgrade: (tierId: string, applyRewards?: boolean) => Promise<void> | void;
   subscription?: any;
   billingHistory?: any;
   usage?: Record<string, any>;
@@ -13,6 +13,7 @@ type UpgradeModalProps = {
   onResume?: () => void;
   onDowngrade?: (tierId: string) => void;
   onRetry?: (txRef: string) => void;
+  rewardBalance?: number;
 };
 
 export function UpgradeModal(props: UpgradeModalProps) {
