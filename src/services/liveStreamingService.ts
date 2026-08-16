@@ -107,6 +107,8 @@ class LiveStreamingService {
   private pendingCandidates: any[]   = [];
   private _facing: CameraFacing      = 'front';
   private _state: 'idle' | 'connecting' | 'live' | 'stopped' = 'idle';
+  private consecutiveIceTrickleFailures = 0;
+  private consecutiveStatsFailures = 0;
 
   // ── Public getters ──────────────────────────────────────────────────────────
 
@@ -194,14 +196,18 @@ class LiveStreamingService {
           if (params.encodings?.length) {
             params.encodings[0].maxBitrate = config.maxBitrateBps;
           }
-          await videoSender.setParameters(params).catch(() => {});
+          // Cosmetic: the bitrate cap just won't be applied. Not connection-
+          // critical, so log only rather than surfacing a user-facing error.
+          await videoSender.setParameters(params).catch((err: any) => {
+            if (__DEV__) console.warn('[liveStreamingService] setParameters(maxBitrate) failed', err);
+          });
         }
       }
 
       this.pc.addEventListener('icecandidate', ({ candidate }: any) => {
         if (!candidate) return;
         if (this.whipResourceUrl) {
-          this.sendIceTrickle(candidate).catch(() => {});
+          this.trickleCandidate(candidate);
         } else {
           this.pendingCandidates.push(candidate);
         }
@@ -259,7 +265,7 @@ class LiveStreamingService {
 
       // Drain buffered candidates
       for (const c of this.pendingCandidates) {
-        await this.sendIceTrickle(c).catch(() => {});
+        await this.trickleCandidate(c);
       }
       this.pendingCandidates = [];
 
@@ -284,7 +290,13 @@ class LiveStreamingService {
       await fetch(this.whipResourceUrl, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }).catch(() => {});
+      }).catch((err: any) => {
+        // The broadcaster is already tearing down locally either way — a
+        // failed DELETE just means the media server may be left with an
+        // orphaned ingest session, so this is diagnostic-only, not
+        // something the user needs to react to.
+        if (__DEV__) console.warn('[liveStreamingService] WHIP teardown DELETE failed', err);
+      });
       this.whipResourceUrl = null;
     }
 
@@ -299,6 +311,8 @@ class LiveStreamingService {
     this.pc = null;
     this.pendingCandidates = [];
     this._state = 'idle';
+    this.consecutiveIceTrickleFailures = 0;
+    this.consecutiveStatsFailures = 0;
   }
 
   // ── Camera switching ────────────────────────────────────────────────────────
@@ -355,6 +369,30 @@ class LiveStreamingService {
     });
   }
 
+  // A single dropped candidate rarely matters (ICE negotiation is resilient
+  // to some loss), but a *run* of failures means trickle-ICE is broken and
+  // the connection may never complete — that's exactly the silent-stuck-
+  // on-"CONNECTING" failure mode this previously produced with no
+  // diagnostics. Log every failure, but only surface a user-facing error
+  // once a burst crosses this threshold, not per-candidate.
+  private static readonly ICE_TRICKLE_FAILURE_ALERT_THRESHOLD = 3;
+
+  private async trickleCandidate(candidate: any): Promise<void> {
+    try {
+      await this.sendIceTrickle(candidate);
+      this.consecutiveIceTrickleFailures = 0;
+    } catch (err: any) {
+      this.consecutiveIceTrickleFailures += 1;
+      if (__DEV__) console.warn('[liveStreamingService] ICE trickle PATCH failed', err);
+      if (
+        this.consecutiveIceTrickleFailures ===
+        LiveStreamingService.ICE_TRICKLE_FAILURE_ALERT_THRESHOLD
+      ) {
+        this.emitError(new Error('Connection is unstable — network candidates are failing to reach the server.'));
+      }
+    }
+  }
+
   // ── Stats polling ───────────────────────────────────────────────────────────
 
   private startStatsPolling() {
@@ -399,6 +437,7 @@ class LiveStreamingService {
       this.prevBytesSent = bytesSent;
       this.prevStatsTs   = now;
 
+      this.consecutiveStatsFailures = 0;
       this.emit({
         bitrateBps: bps,
         frameRate: Math.round(fps),
@@ -408,7 +447,16 @@ class LiveStreamingService {
         resolution: { width: w, height: h },
         isConnected: this._state === 'live',
       });
-    } catch {}
+    } catch (err: any) {
+      this.consecutiveStatsFailures += 1;
+      if (__DEV__) console.warn('[liveStreamingService] getStats() failed', err);
+      // getStats() failing repeatedly means the health bar is showing
+      // stale numbers with no indication they've stopped updating —
+      // surface that once, rather than freezing silently forever.
+      if (this.consecutiveStatsFailures === 3) {
+        this.emitError(new Error('Unable to read connection stats — the health indicators may be out of date.'));
+      }
+    }
   }
 }
 

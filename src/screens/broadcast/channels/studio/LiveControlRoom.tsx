@@ -390,6 +390,11 @@ function BroadcasterPanel({
   const [streamKey,   setStreamKey]     = useState('');
   const [keyLoading,  setKeyLoading]    = useState(false);
   const [switching,   setSwitching]     = useState(false);
+  // liveStreamingService previously swallowed ICE-trickle/teardown/stats
+  // failures with `.catch(() => {})` — a broadcaster could sit stuck on
+  // "CONNECTING" with zero diagnostics. This surfaces whatever the service
+  // now reports via onError as a small dismissible banner, non-blocking.
+  const [connectionErrorMessage, setConnectionErrorMessage] = useState<string | null>(null);
 
   // Stream settings state
   const [latencyMode, setLatencyMode] = useState<LatencyMode>(stream.latency_mode ?? 'normal');
@@ -436,13 +441,20 @@ function BroadcasterPanel({
     switchCamera,
   } = useLiveStream(stream.id);
 
-  // Subscribe to service state + stats
+  // Subscribe to service state + stats + errors
   useEffect(() => {
-    const unsub1 = liveStreamingService.onStateChange(setServiceState);
+    const unsub1 = liveStreamingService.onStateChange(state => {
+      setServiceState(state);
+      // A fresh connection attempt shouldn't show a stale error banner.
+      if (state === 'connecting' || state === 'live') setConnectionErrorMessage(null);
+    });
     const unsub2 = liveStreamingService.onStats(setHealthStats);
+    const unsub3 = liveStreamingService.onError(err => {
+      setConnectionErrorMessage(err?.message || 'A connection problem occurred.');
+    });
     setServiceState(liveStreamingService.state);
     setHealthStats(liveStreamingService.stats);
-    return () => { unsub1(); unsub2(); };
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, []);
 
   // Fetch stream key for RTMP/OBS section
@@ -539,6 +551,35 @@ function BroadcasterPanel({
 
   return (
     <View>
+      {/* Non-blocking connection diagnostics banner — previously these
+          failures were swallowed silently and the broadcaster had no way
+          to know why they were stuck on "CONNECTING". */}
+      {connectionErrorMessage && (isDeviceLive || isConnecting) && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            marginBottom: 8,
+            borderRadius: 10,
+            backgroundColor: palette?.warningSoft ?? '#3a2a12',
+          }}
+        >
+          <Text
+            style={{ flex: 1, color: palette?.warningStrong ?? '#f5a623', fontSize: 12, fontWeight: '600' }}
+            numberOfLines={2}
+          >
+            {connectionErrorMessage}
+          </Text>
+          <Pressable onPress={() => setConnectionErrorMessage(null)} hitSlop={8}>
+            <Text style={{ color: palette?.warningStrong ?? '#f5a623', fontWeight: '900' }}>×</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Health bar (when device is broadcasting) */}
       {(isDeviceLive || isConnecting) && (
         <StreamHealthBar
