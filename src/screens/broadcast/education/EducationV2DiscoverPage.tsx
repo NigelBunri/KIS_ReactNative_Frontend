@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -187,6 +188,43 @@ export default function EducationV2DiscoverPage({
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [expandedList, setExpandedList] =
     useState<ExpandedEducationList | null>(null);
+  const [loadingInstitutionId, setLoadingInstitutionId] = useState<string | null>(null);
+
+  const openInstitutionCourses = useCallback(
+    async (institution: EducationInstitutionSpotlight) => {
+      if (!institution?.id || loadingInstitutionId) return;
+      setLoadingInstitutionId(institution.id);
+      try {
+        const response = await getRequest(ROUTES.education.discovery, {
+          params: { institution_id: institution.id },
+        });
+        if (response?.success === false) {
+          throw new Error(response?.message ?? 'Unable to load this institution’s courses.');
+        }
+        const payload = response?.data ?? response ?? {};
+        const sections = Array.isArray(payload.sections) ? payload.sections : [];
+        const items: EducationContentItem[] = sections.flatMap(
+          (section: any) => (Array.isArray(section?.items) ? section.items : []),
+        );
+        setExpandedList({
+          kind: 'content',
+          title: institution.name,
+          subtitle: items.length
+            ? `${items.length} course${items.length === 1 ? '' : 's'} from ${institution.name}`
+            : `${institution.name} hasn’t published any courses yet.`,
+          items,
+        });
+      } catch (err: any) {
+        Alert.alert(
+          'Institution',
+          err?.message || 'Unable to load this institution’s courses. Please try again.',
+        );
+      } finally {
+        setLoadingInstitutionId(null);
+      }
+    },
+    [loadingInstitutionId],
+  );
 
   useEffect(() => {
     setSearch(searchTerm || '');
@@ -811,17 +849,21 @@ export default function EducationV2DiscoverPage({
     institution: EducationInstitutionSpotlight,
   ) => {
     const imageUri = resolveInstitutionImage(institution);
+    const isLoadingCourses = loadingInstitutionId === institution.id;
     return (
-      <View
+      <Pressable
         key={institution.id}
-        style={{
+        onPress={() => openInstitutionCourses(institution)}
+        disabled={!!loadingInstitutionId}
+        style={({ pressed }) => ({
           borderRadius: 24,
           borderWidth: 1,
           borderColor: palette.border,
           backgroundColor: palette.surface,
           overflow: 'hidden',
           marginBottom: 12,
-        }}
+          opacity: pressed || (loadingInstitutionId && !isLoadingCourses) ? 0.85 : 1,
+        })}
       >
         <View
           style={{
@@ -930,7 +972,19 @@ export default function EducationV2DiscoverPage({
             </Text>
           </View>
         </View>
-      </View>
+        {isLoadingCourses ? (
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.18)',
+            }}
+          >
+            <ActivityIndicator color={palette.ivory ?? '#fff'} />
+          </View>
+        ) : null}
+      </Pressable>
     );
   };
 
@@ -1094,9 +1148,11 @@ export default function EducationV2DiscoverPage({
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {institutionSpotlights.map(
             (institution: EducationInstitutionSpotlight) => (
-              <View
+              <Pressable
                 key={institution.id}
-                style={{
+                onPress={() => openInstitutionCourses(institution)}
+                disabled={!!loadingInstitutionId}
+                style={({ pressed }) => ({
                   width: 240,
                   marginRight: 12,
                   borderRadius: 22,
@@ -1108,7 +1164,8 @@ export default function EducationV2DiscoverPage({
                   shadowOpacity: 0.07,
                   shadowRadius: 14,
                   shadowOffset: { width: 0, height: 8 },
-                }}
+                  opacity: pressed ? 0.85 : 1,
+                })}
               >
                 <Text
                   style={{
@@ -1163,7 +1220,20 @@ export default function EducationV2DiscoverPage({
                     {institution.eventCount ?? 0} events
                   </Text>
                 </View>
-              </View>
+                {loadingInstitutionId === institution.id ? (
+                  <View
+                    style={{
+                      ...StyleSheet.absoluteFillObject,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 22,
+                      backgroundColor: 'rgba(0,0,0,0.18)',
+                    }}
+                  >
+                    <ActivityIndicator color={palette.ivory ?? '#fff'} />
+                  </View>
+                ) : null}
+              </Pressable>
             ),
           )}
         </ScrollView>
