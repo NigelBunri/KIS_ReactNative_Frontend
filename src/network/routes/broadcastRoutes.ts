@@ -113,30 +113,34 @@ const broadcastRoutes = {
     kcanMessageView: (id: string | number) => `${API_BASE_URL}/api/v1/bible/kcan-messages/${id}/view/`,
   },
   education: {
-    discovery: `${API_BASE_URL}/api/v1/bible/courses/`,
-    search: `${API_BASE_URL}/api/v1/bible/search/`,
-    detail: (id: string) => `${API_BASE_URL}/api/v1/bible/courses/${id}/`,
+    // Points at the real Education v2 API (apps/broadcasts/urls.py), not the
+    // Bible module - it was pointed at /api/v1/bible/courses/ previously,
+    // which returns a completely different response shape and silently
+    // broke the entire learner discovery/enroll/progress flow.
+    discovery: `${API_BASE_URL}/api/v1/education/discovery/`,
+    // No dedicated search endpoint exists on the backend; discovery already
+    // supports a `?q=` filter, so search is just discovery with a query.
+    search: `${API_BASE_URL}/api/v1/education/discovery/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/education/contents/${id}/`,
     certificate: (id: string) =>
-      `${API_BASE_URL}/api/v1/bible/courses/${id}/certificate/`,
+      `${API_BASE_URL}/api/v1/education/contents/${id}/certificate/`,
     certificateShare: (token: string) =>
-      `${API_BASE_URL}/api/v1/bible/credentials/share/${token}/`,
-    enroll: (_id: string) =>
-      `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
+      `${API_BASE_URL}/api/v1/education/certificates/share/${token}/`,
+    enroll: (id: string) =>
+      `${API_BASE_URL}/api/v1/education/contents/${id}/enroll/`,
     itemAction: (contentId: string, itemId: string) =>
       `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
-    progress: `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
-    review: `${API_BASE_URL}/api/v1/bible/peer-reviews/`,
+    progress: `${API_BASE_URL}/api/v1/education/progress/`,
     contentReviews: (id: string) =>
-      `${API_BASE_URL}/api/v1/bible/peer-reviews/?course=${id}`,
+      `${API_BASE_URL}/api/v1/education/contents/${id}/reviews/`,
     contentQuestions: (id: string) =>
-      `${API_BASE_URL}/api/v1/bible/quiz-questions/?course=${id}`,
+      `${API_BASE_URL}/api/v1/education/contents/${id}/questions/`,
     bookingSatisfy: (institutionId: string, bookingId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/bookings/${bookingId}/satisfy/`,
     partnerLinks: (partnerId: string) =>
       `${API_BASE_URL}/api/v1/partners/${partnerId}/links/`,
     partnerLink: (partnerId: string, profileKey: string) =>
       `${API_BASE_URL}/api/v1/partners/${partnerId}/links/${profileKey}/`,
-    enrollments: `${API_BASE_URL}/api/v1/bible/course-enrollments/`,
   },
   partners: {
     list: `${API_BASE_URL}/api/v1/partners/`,
