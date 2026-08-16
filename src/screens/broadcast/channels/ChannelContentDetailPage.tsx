@@ -839,6 +839,11 @@ export default function ChannelContentDetailPage() {
     return <GeoBlockedScreen onBack={() => navigation.goBack()} />;
   }
 
+  // ageConfirmed is UI-only self-attestation, not a security boundary — see
+  // AgeGateScreen's header comment. The underlying content/media fetched
+  // below is identical regardless of this flag; nothing more sensitive is
+  // gated behind it, so this is a weak content-hint UX gap, not a data
+  // exposure. Real enforcement needs server-side birthdate verification.
   const ageRestriction = content.age_restriction;
   if ((ageRestriction === '13+' || ageRestriction === '18+') && !ageConfirmed) {
     return (

@@ -1,6 +1,15 @@
 // src/screens/broadcast/channels/components/AgeGateScreen.tsx
 //
 // Full-screen age-restriction overlay. Shown before age-restricted content plays.
+//
+// NOT a security boundary: this is pure client-side self-attestation (a
+// single tap, no date-of-birth entry, no persistence, resets on remount).
+// The backend's ChannelContent.age_restriction field is descriptive
+// metadata only — it is never enforced server-side, because the User model
+// has no birthdate field to check it against. Real enforcement requires
+// adding a birthdate to the account model and gating playback-URL issuance
+// server-side; until that exists, treat this screen as a content-hint UX
+// affordance, not an access control.
 
 import React from 'react';
 import {
