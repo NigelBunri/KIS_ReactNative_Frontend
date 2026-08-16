@@ -31,7 +31,7 @@ import {
 } from '@/screens/market/cart/shopCartManager';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { postRequest, generateIdempotencyKey } from '@/network/post';
 import { openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
@@ -287,20 +287,34 @@ const CartDetailPage = () => {
 
     setCheckingOut(true);
     try {
+      // unit_price_cents is advisory only — the server always re-derives
+      // the authoritative price from the product/variant at order time and
+      // ignores this value, but sending it in the field the backend
+      // actually documents (rather than relying on its `unit_price`
+      // fallback) keeps the request self-describing.
       const orderItems = items.map(item => ({
         product_id: item.productId,
         variant_id: item.variantId || undefined,
         quantity: item.quantity,
-        unit_price: item.price,
+        unit_price_cents: Math.round((Number(item.price) || 0) * 100),
         size: item.size || undefined,
         color: item.color || undefined,
       }));
-      const res = await postRequest(ROUTES.commerce.marketplaceOrders, {
-        shop_id: shopId,
-        items: orderItems,
-        ...(hasPhysicalProducts ? { delivery_address: shippingAddress } : {}),
-        metadata: { source: 'cart' },
-      });
+      const res = await postRequest(
+        ROUTES.commerce.marketplaceOrders,
+        {
+          shop_id: shopId,
+          items: orderItems,
+          ...(hasPhysicalProducts ? { delivery_address: shippingAddress } : {}),
+          metadata: { source: 'cart' },
+        },
+        {
+          // Stable for the duration of this checkout attempt so postRequest's
+          // own transient-error retry can't create two separate orders.
+          idempotencyKey: generateIdempotencyKey(`marketplace_checkout_${shopId}`),
+          errorMessage: 'Unable to place order. Please try again.',
+        },
+      );
       if (res.success || res.data?.id) {
         const orderId = res.data?.id ? String(res.data.id) : null;
         const paymentUrl: string =
