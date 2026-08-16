@@ -260,6 +260,7 @@ const uploadInstitutionLogo = async (
       uri: asset.fileCopyUri || asset.uri,
       type: asset.type || 'image/jpeg',
       name: asset.fileName || `education-logo-${Date.now()}.jpg`,
+      size: asset.fileSize ?? asset.size ?? undefined,
     },
     institutionId,
   });
@@ -277,6 +278,7 @@ const uploadEducationAttachmentPayload = async (
       uri: asset.fileCopyUri || asset.uri,
       type: asset.type || 'application/octet-stream',
       name: asset.fileName || asset.name || `education-attachment-${Date.now()}`,
+      size: asset.fileSize ?? asset.size ?? undefined,
     },
     institutionId,
   });
@@ -631,6 +633,32 @@ const toText = (value: any) => {
   return String(value).trim();
 };
 
+// Same coercion as toText but WITHOUT trimming — toText's trim() strips a
+// space the instant it's typed at the end of a controlled TextInput's
+// value, since a freshly-typed trailing space is always "trailing" at that
+// render. That fought every space keystroke in these forms. Use this for
+// live `value=` props; keep toText (which trims) for comparisons, IDs, and
+// populating form state from already-saved server data.
+const toInputText = (value: any) => {
+  if (value == null) return '';
+
+  if (typeof value === 'string') return value;
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.value === 'string') return value.value;
+    if (typeof value.text === 'string') return value.text;
+    if (typeof value.label === 'string') return value.label;
+
+    return '';
+  }
+
+  return String(value);
+};
+
 const getTextInputValue = (value: any) => {
   if (value == null) return '';
 
@@ -884,6 +912,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const [courseModuleItemForm, setCourseModuleItemForm] = useState<
     Record<string, any>
   >(emptyCourseModuleItemForm());
+  // Set when the user taps "Create item" from the empty-state of the
+  // course-module-item linked-item picker (renderCourseModuleWorkspace) —
+  // remembers where to return to and which field to auto-fill once the new
+  // record is saved. See handleSaveModuleRecord's success path.
+  const [linkedItemCreateContext, setLinkedItemCreateContext] = useState<{
+    courseId: string;
+    itemType: string;
+  } | null>(null);
   const [contactsPickerOpen, setContactsPickerOpen] = useState(false);
   const [addingStaffMember, setAddingStaffMember] = useState(false);
   const [updatingStaffRole, setUpdatingStaffRole] = useState<string | null>(
@@ -1287,6 +1323,43 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       await loadModuleRecords(moduleKey, selectedInstitutionId);
     },
     [loadModuleRecords, selectedInstitutionId],
+  );
+
+  const LINKED_ITEM_SECTION_KEY: Record<string, EducationModuleKey> = {
+    lesson: 'lessons',
+    material: 'materials',
+    class_session: 'classes',
+    assessment: 'exams',
+    event: 'events',
+    broadcast: 'broadcasts',
+  };
+  const LINKED_ITEM_TARGET_KEY: Record<string, string> = {
+    lesson: 'lesson_id',
+    material: 'material_id',
+    class_session: 'class_session_id',
+    assessment: 'assessment_id',
+    event: 'event_id',
+    broadcast: 'broadcast_id',
+  };
+
+  // "Create item" from the linked-item picker's empty state: navigates to
+  // the right module's create form (reusing openModule + the existing
+  // moduleForm editor, exactly like the "New X" buttons elsewhere), rather
+  // than leaving the user at a dead end with nothing to pick.
+  const startLinkedItemCreation = useCallback(
+    async (itemType: string, courseId: string) => {
+      const sectionKey = LINKED_ITEM_SECTION_KEY[itemType];
+      if (!sectionKey || !courseId) return;
+      setLinkedItemCreateContext({ courseId, itemType });
+      await openModule(sectionKey);
+      const prefilled: Record<string, any> = emptyModuleForm();
+      if (sectionKey === 'lessons') prefilled.course_id = courseId;
+      if (sectionKey === 'materials') prefilled.course_ids = [courseId];
+      setModuleForm(prefilled);
+      setEditingModuleItemId(null);
+      setModuleEditorVisible(true);
+    },
+    [openModule],
   );
 
   const closeModule = useCallback(() => {
@@ -2386,6 +2459,27 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       await loadModuleRecords(activeModuleKey, selectedInstitutionId);
       await fetchDashboard(selectedInstitutionId);
       closeModuleEditor();
+      if (
+        linkedItemCreateContext &&
+        !editingModuleItemId &&
+        linkedItemCreateContext.itemType &&
+        LINKED_ITEM_SECTION_KEY[linkedItemCreateContext.itemType] ===
+          activeModuleKey
+      ) {
+        const newItemId = String(response?.data?.id || '');
+        const { courseId, itemType } = linkedItemCreateContext;
+        setLinkedItemCreateContext(null);
+        await openDetailForModule('courses', { id: courseId });
+        if (newItemId) {
+          const targetKey = LINKED_ITEM_TARGET_KEY[itemType];
+          if (targetKey) {
+            setCourseModuleItemForm(prev => ({
+              ...prev,
+              [targetKey]: newItemId,
+            }));
+          }
+        }
+      }
     } catch (error: any) {
       Alert.alert(
         MODULE_LABELS[activeModuleKey],
@@ -2400,8 +2494,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     editingModuleItemId,
     fetchDashboard,
     fetchModuleLookups,
+    linkedItemCreateContext,
     loadModuleRecords,
     moduleForm,
+    openDetailForModule,
     selectedInstitutionId,
   ]);
 
@@ -3153,6 +3249,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       onSelect: (value: string) => void,
       emptyText: string,
       allowClear: boolean = true,
+      onCreateNew?: () => void,
     ) => {
       const selected = options.find(
         row => String(row?.id || '') === selectedValue,
@@ -3229,6 +3326,28 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   </Pressable>
                 );
               })}
+            </View>
+          ) : onCreateNew ? (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: 14,
+                padding: 12,
+                backgroundColor: palette.card,
+                gap: 10,
+              }}
+            >
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                No items available yet.{'\n'}Create an item first to
+                continue.
+              </Text>
+              <KISButton
+                title="Create item"
+                size="xs"
+                variant="secondary"
+                onPress={onCreateNew}
+              />
             </View>
           ) : (
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
@@ -4729,25 +4848,25 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           >
             <KISTextInput
               label="Module title"
-              value={toText(courseModuleForm.title)}
+              value={toInputText(courseModuleForm.title)}
               onChange={updateCourseModuleFormText('title')}
             />
             <KISTextInput
               label="Summary"
-              value={toText(courseModuleForm.summary)}
+              value={toInputText(courseModuleForm.summary)}
               onChange={updateCourseModuleFormText('summary')}
               multiline
               style={{ minHeight: 70 }}
             />
             <KISTextInput
               label="Order"
-              value={toText(courseModuleForm.module_order)}
+              value={toInputText(courseModuleForm.module_order)}
               onChange={updateCourseModuleFormText('module_order')}
               keyboardType="numeric"
             />
             <KISTextInput
               label="Status"
-              value={toText(courseModuleForm.status)}
+              value={toInputText(courseModuleForm.status)}
               onChange={updateCourseModuleFormText('status')}
             />
             <KISButton
@@ -4953,7 +5072,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             )}
             <KISTextInput
               label="Item type"
-              value={toText(courseModuleItemForm.item_type)}
+              value={toInputText(courseModuleItemForm.item_type)}
               onChange={value => {
                 const textValue = getTextInputValue(value);
                 setCourseModuleItemForm(prev => ({
@@ -4982,28 +5101,33 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 })),
               'Choose the content record to place in this module.',
               false,
+              () =>
+                startLinkedItemCreation(
+                  currentType,
+                  toText(detailPayload?.course?.id),
+                ),
             )}
             <KISTextInput
               label="Order"
-              value={toText(courseModuleItemForm.item_order)}
+              value={toInputText(courseModuleItemForm.item_order)}
               onChange={updateCourseModuleItemFormText('item_order')}
               keyboardType="numeric"
             />
             <KISTextInput
               label="Display title override"
-              value={toText(courseModuleItemForm.title_override)}
+              value={toInputText(courseModuleItemForm.title_override)}
               onChange={updateCourseModuleItemFormText('title_override')}
             />
             <KISTextInput
               label="Summary override"
-              value={toText(courseModuleItemForm.summary_override)}
+              value={toInputText(courseModuleItemForm.summary_override)}
               onChange={updateCourseModuleItemFormText('summary_override')}
               multiline
               style={{ minHeight: 70 }}
             />
             <KISTextInput
               label="Estimated minutes"
-              value={toText(courseModuleItemForm.estimated_minutes)}
+              value={toInputText(courseModuleItemForm.estimated_minutes)}
               onChange={updateCourseModuleItemFormText('estimated_minutes')}
               keyboardType="numeric"
             />
@@ -5055,6 +5179,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     palette.surface,
     palette.text,
     renderLookupSelector,
+    startLinkedItemCreation,
     updateCourseModuleFormText,
     updateCourseModuleItemFormText,
   ]);
@@ -6923,12 +7048,12 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         >
           <KISTextInput
             label="Institution name"
-            value={toText(institutionForm.name)}
+            value={toInputText(institutionForm.name)}
             onChange={updateInstitutionFormText('name')}
           />
           <KISTextInput
             label="Description"
-            value={toText(institutionForm.description)}
+            value={toInputText(institutionForm.description)}
             onChange={updateInstitutionFormText('description')}
             multiline
             style={{ minHeight: 80 }}
@@ -6979,14 +7104,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           </View>
           <KISTextInput
             label="Contact email (optional)"
-            value={toText(institutionForm.contactEmail)}
+            value={toInputText(institutionForm.contactEmail)}
             onChange={updateInstitutionFormText('contactEmail')}
             keyboardType="email-address"
             autoCapitalize="none"
           />
           <KISTextInput
             label="Contact phone (optional)"
-            value={toText(institutionForm.contactPhone)}
+            value={toInputText(institutionForm.contactPhone)}
             onChange={updateInstitutionFormText('contactPhone')}
             keyboardType="phone-pad"
           />
@@ -7773,24 +7898,24 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Code"
-                          value={toText(moduleForm.code)}
+                          value={toInputText(moduleForm.code)}
                           onChange={updateModuleFormText('code')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Description"
-                          value={toText(moduleForm.description)}
+                          value={toInputText(moduleForm.description)}
                           onChange={updateModuleFormText('description')}
                           multiline
                           style={{ minHeight: 90 }}
@@ -7801,7 +7926,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="draft"
                         />
@@ -7811,24 +7936,24 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Code"
-                          value={toText(moduleForm.code)}
+                          value={toInputText(moduleForm.code)}
                           onChange={updateModuleFormText('code')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Description"
-                          value={toText(moduleForm.description)}
+                          value={toInputText(moduleForm.description)}
                           onChange={updateModuleFormText('description')}
                           multiline
                           style={{ minHeight: 90 }}
@@ -7839,19 +7964,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="draft"
                         />
                         <KISDateTimeInput
                           label="Duration minutes"
-                          value={toText(moduleForm.duration_minutes)}
+                          value={toInputText(moduleForm.duration_minutes)}
                           onChange={updateModuleFormText('duration_minutes')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Seat limit"
-                          value={toText(moduleForm.seat_limit)}
+                          value={toInputText(moduleForm.seat_limit)}
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
@@ -7884,19 +8009,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Content"
-                          value={toText(moduleForm.content)}
+                          value={toInputText(moduleForm.content)}
                           onChange={updateModuleFormText('content')}
                           multiline
                           style={{ minHeight: 100 }}
@@ -7907,19 +8032,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Lesson order"
-                          value={toText(moduleForm.lesson_order)}
+                          value={toInputText(moduleForm.lesson_order)}
                           onChange={updateModuleFormText('lesson_order')}
                           keyboardType="numeric"
                         />
                         <KISDateTimeInput
                           label="Duration minutes"
-                          value={toText(moduleForm.duration_minutes)}
+                          value={toInputText(moduleForm.duration_minutes)}
                           onChange={updateModuleFormText('duration_minutes')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="draft"
                         />
@@ -7929,12 +8054,12 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
@@ -7985,33 +8110,33 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         />
                         <KISTextInput
                           label="Timezone"
-                          value={toText(moduleForm.timezone_name)}
+                          value={toInputText(moduleForm.timezone_name)}
                           onChange={updateModuleFormText('timezone_name')}
                         />
                         <KISTextInput
                           label="Delivery mode"
-                          value={toText(moduleForm.delivery_mode)}
+                          value={toInputText(moduleForm.delivery_mode)}
                           onChange={updateModuleFormText('delivery_mode')}
                         />
                         <KISTextInput
                           label="Location"
-                          value={toText(moduleForm.location_text)}
+                          value={toInputText(moduleForm.location_text)}
                           onChange={updateModuleFormText('location_text')}
                         />
                         <KISTextInput
                           label="Meeting URL"
-                          value={toText(moduleForm.meeting_url)}
+                          value={toInputText(moduleForm.meeting_url)}
                           onChange={updateModuleFormText('meeting_url')}
                         />
                         <KISTextInput
                           label="Seat limit"
-                          value={toText(moduleForm.seat_limit)}
+                          value={toInputText(moduleForm.seat_limit)}
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="scheduled"
                         />
@@ -8040,12 +8165,12 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           </Text>
                           <KISTextInput
                             label="Title"
-                            value={toText(moduleForm.title)}
+                            value={toInputText(moduleForm.title)}
                             onChange={updateModuleFormText('title')}
                           />
                           <KISTextInput
                             label="Summary"
-                            value={toText(moduleForm.summary)}
+                            value={toInputText(moduleForm.summary)}
                             onChange={updateModuleFormText('summary')}
                             multiline
                             style={{ minHeight: 70 }}
@@ -8056,13 +8181,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           )}
                           <KISTextInput
                             label="Kind"
-                            value={toText(moduleForm.kind)}
+                            value={toInputText(moduleForm.kind)}
                             onChange={updateModuleFormText('kind')}
                             placeholder="document"
                           />
                           <KISTextInput
                             label="Status"
-                            value={toText(moduleForm.status)}
+                            value={toInputText(moduleForm.status)}
                             onChange={updateModuleFormText('status')}
                             placeholder="draft"
                           />
@@ -8304,19 +8429,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Instructions"
-                          value={toText(moduleForm.instructions)}
+                          value={toInputText(moduleForm.instructions)}
                           onChange={updateModuleFormText('instructions')}
                           multiline
                           style={{ minHeight: 90 }}
@@ -8327,7 +8452,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Assessment type"
-                          value={toText(moduleForm.assessment_type)}
+                          value={toInputText(moduleForm.assessment_type)}
                           onChange={updateModuleFormText('assessment_type')}
                           placeholder="mcq"
                         />
@@ -8390,25 +8515,25 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         />
                         <KISDateTimeInput
                           label="Duration minutes"
-                          value={toText(moduleForm.duration_minutes)}
+                          value={toInputText(moduleForm.duration_minutes)}
                           onChange={updateModuleFormText('duration_minutes')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Max attempts"
-                          value={toText(moduleForm.max_attempts)}
+                          value={toInputText(moduleForm.max_attempts)}
                           onChange={updateModuleFormText('max_attempts')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Passing score %"
-                          value={toText(moduleForm.passing_score_percent)}
+                          value={toInputText(moduleForm.passing_score_percent)}
                           onChange={updateModuleFormText('passing_score_percent')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="draft"
                         />
@@ -8418,19 +8543,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Description"
-                          value={toText(moduleForm.description)}
+                          value={toInputText(moduleForm.description)}
                           onChange={updateModuleFormText('description')}
                           multiline
                           style={{ minHeight: 90 }}
@@ -8480,7 +8605,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         )}
                         <KISTextInput
                           label="Event type"
-                          value={toText(moduleForm.event_type)}
+                          value={toInputText(moduleForm.event_type)}
                           onChange={updateModuleFormText('event_type')}
                           placeholder="event"
                         />
@@ -8498,33 +8623,33 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         />
                         <KISTextInput
                           label="Timezone"
-                          value={toText(moduleForm.timezone_name)}
+                          value={toInputText(moduleForm.timezone_name)}
                           onChange={updateModuleFormText('timezone_name')}
                         />
                         <KISTextInput
                           label="Delivery mode"
-                          value={toText(moduleForm.delivery_mode)}
+                          value={toInputText(moduleForm.delivery_mode)}
                           onChange={updateModuleFormText('delivery_mode')}
                         />
                         <KISTextInput
                           label="Location"
-                          value={toText(moduleForm.location_text)}
+                          value={toInputText(moduleForm.location_text)}
                           onChange={updateModuleFormText('location_text')}
                         />
                         <KISTextInput
                           label="Meeting URL"
-                          value={toText(moduleForm.meeting_url)}
+                          value={toInputText(moduleForm.meeting_url)}
                           onChange={updateModuleFormText('meeting_url')}
                         />
                         <KISTextInput
                           label="Seat limit"
-                          value={toText(moduleForm.seat_limit)}
+                          value={toInputText(moduleForm.seat_limit)}
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="draft"
                         />
@@ -8534,26 +8659,26 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       <>
                         <KISTextInput
                           label="Title"
-                          value={toText(moduleForm.title)}
+                          value={toInputText(moduleForm.title)}
                           onChange={updateModuleFormText('title')}
                         />
                         <KISTextInput
                           label="Summary"
-                          value={toText(moduleForm.summary)}
+                          value={toInputText(moduleForm.summary)}
                           onChange={updateModuleFormText('summary')}
                           multiline
                           style={{ minHeight: 70 }}
                         />
                         <KISTextInput
                           label="Description"
-                          value={toText(moduleForm.description)}
+                          value={toInputText(moduleForm.description)}
                           onChange={updateModuleFormText('description')}
                           multiline
                           style={{ minHeight: 90 }}
                         />
                         <KISTextInput
                           label="Broadcast kind"
-                          value={toText(moduleForm.broadcast_kind)}
+                          value={toInputText(moduleForm.broadcast_kind)}
                           onChange={updateModuleFormText('broadcast_kind')}
                           placeholder="program, course, lesson, class_session, event, training_session, institution_notice"
                         />
@@ -8638,29 +8763,29 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         />
                         <KISTextInput
                           label="Timezone"
-                          value={toText(moduleForm.timezone_name)}
+                          value={toInputText(moduleForm.timezone_name)}
                           onChange={updateModuleFormText('timezone_name')}
                         />
                         <KISTextInput
                           label="Seat limit"
-                          value={toText(moduleForm.seat_limit)}
+                          value={toInputText(moduleForm.seat_limit)}
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Price amount"
-                          value={toText(moduleForm.price_amount)}
+                          value={toInputText(moduleForm.price_amount)}
                           onChange={updateModuleFormText('price_amount')}
                           keyboardType="numeric"
                         />
                         <KISTextInput
                           label="Price currency"
-                          value={toText(moduleForm.price_currency)}
+                          value={toInputText(moduleForm.price_currency)}
                           onChange={updateModuleFormText('price_currency')}
                         />
                         <KISTextInput
                           label="Status"
-                          value={toText(moduleForm.status)}
+                          value={toInputText(moduleForm.status)}
                           onChange={updateModuleFormText('status')}
                           placeholder="published"
                         />

@@ -18,6 +18,7 @@
 // trusts a client-supplied url/mime/quarantine flag.
 
 import ImageResizer from 'react-native-image-resizer';
+import RNFS from 'react-native-fs';
 import { postRequest } from '@/network/post';
 import { API_BASE_URL } from '@/network';
 import ROUTES from '@/network';
@@ -57,11 +58,27 @@ const withJpegExtension = (name: string) => (name || `upload_${Date.now()}`).rep
 async function prepareFile(file: PickedFile, context: EducationUploadContext): Promise<PreparedFile> {
   const shouldCompress = context !== 'education_material' && isCompressibleImage(file.type);
   if (!shouldCompress) {
+    let size = Number(file.size) > 0 ? Number(file.size) : 0;
+    if (size <= 0) {
+      // The picker didn't report a size (seen with react-native-document-picker
+      // on some file providers, both iOS and Android) - stat the local file
+      // directly rather than silently sending sizeBytes: 0, which the backend
+      // hard-rejects with "Must be a positive integer."
+      try {
+        const stat = await RNFS.stat(file.uri);
+        size = Number(stat?.size) || 0;
+      } catch {
+        size = 0;
+      }
+    }
+    if (size <= 0) {
+      throw new Error("We couldn't determine this file's size. Please try selecting it again.");
+    }
     return {
       uri: file.uri,
       name: file.name || `upload_${Date.now()}`,
       type: file.type || 'application/octet-stream',
-      size: file.size || 0,
+      size,
     };
   }
   const resized = await ImageResizer.createResizedImage(
