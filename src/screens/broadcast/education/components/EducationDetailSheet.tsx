@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Image,
   Linking,
   Modal,
   Pressable,
@@ -13,8 +12,9 @@ import {
   View,
 } from 'react-native';
 import Video from 'react-native-video';
-import Pdf from 'react-native-pdf';
 import RNFS from 'react-native-fs';
+import LoadingImage from '@/components/media/LoadingImage';
+import LoadingPdf from '@/components/media/LoadingPdf';
 import { buildMediaSource, useMediaHeaders } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -979,22 +979,15 @@ export default function EducationDetailSheet({
               overflow: 'hidden',
             }}
           >
-            <Pdf
-              source={pdfSource ?? { uri: resourceUrl }}
-              style={{ flex: 1 }}
-            />
+            <LoadingPdf source={pdfSource ?? { uri: resourceUrl }} />
           </View>
         ) : null}
         {resourceUrl && kind === 'image' && hasLearningAccess ? (
           <View style={{ marginTop: 14 }}>
-            <Image
+            <LoadingImage
               source={imageSource}
-              style={{
-                width: '100%',
-                height: mediaPreviewHeight,
-                borderRadius: 18,
-                backgroundColor: palette.card,
-              }}
+              containerStyle={{ width: '100%', height: mediaPreviewHeight }}
+              style={{ borderRadius: 18, backgroundColor: palette.card }}
               resizeMode="contain"
             />
           </View>
@@ -2556,9 +2549,8 @@ export default function EducationDetailSheet({
                   }}
                 >
                   {certificateLocalUri ? (
-                    <Pdf
+                    <LoadingPdf
                       source={{ uri: certificateLocalUri }}
-                      style={{ flex: 1 }}
                       onError={error => {
                         Alert.alert(
                           'Certificate',

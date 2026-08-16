@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -17,7 +16,8 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
 import RNFS from 'react-native-fs';
 import Video from 'react-native-video';
-import Pdf from 'react-native-pdf';
+import LoadingImage from '@/components/media/LoadingImage';
+import LoadingPdf from '@/components/media/LoadingPdf';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import type { KISContact } from '@/Module/AddContacts/contactsService';
 import KISButton from '@/constants/KISButton';
@@ -2557,14 +2557,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           </View>
 
           {resourceUrl && kind === 'image' ? (
-            <Image
+            <LoadingImage
               source={imageSource}
-              style={{
-                width: '100%',
-                height: 220,
-                borderRadius: 18,
-                backgroundColor: palette.bg,
-              }}
+              containerStyle={{ width: '100%', height: 220 }}
+              style={{ borderRadius: 18, backgroundColor: palette.bg }}
               resizeMode="contain"
             />
           ) : null}
@@ -2595,10 +2591,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           ) : null}
           {resourceUrl && isPdfMimeType(mime) ? (
             <View style={{ height: 420, borderRadius: 18, overflow: 'hidden' }}>
-              <Pdf
-                source={pdfSource ?? { uri: resourceUrl }}
-                style={{ flex: 1 }}
-              />
+              <LoadingPdf source={pdfSource ?? { uri: resourceUrl }} />
             </View>
           ) : null}
           {!resourceUrl ? (
@@ -5266,11 +5259,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 }}
               >
                 {resolveEducationCoverImage(row) ? (
-                  <Image
+                  <LoadingImage
                     source={{ uri: resolveEducationCoverImage(row) }}
+                    containerStyle={{ width: 56, height: 56 }}
                     style={{
-                      width: 56,
-                      height: 56,
                       borderRadius: 16,
                       backgroundColor: palette.bg,
                       borderWidth: 1,
@@ -6970,14 +6962,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               gap: 12,
             }}
           >
-            <Image
+            <LoadingImage
               source={{ uri: moduleForm.cover_image_preview_uri }}
-              style={{
-                width: '100%',
-                height: 180,
-                borderRadius: 18,
-                backgroundColor: palette.bg,
-              }}
+              containerStyle={{ width: '100%', height: 180 }}
+              style={{ borderRadius: 18, backgroundColor: palette.bg }}
               resizeMode="cover"
             />
             <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
@@ -7134,14 +7122,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   gap: 12,
                 }}
               >
-                <Image
+                <LoadingImage
                   source={{ uri: institutionForm.logoPreviewUri }}
-                  style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 22,
-                    backgroundColor: palette.bg,
-                  }}
+                  containerStyle={{ width: 96, height: 96 }}
+                  style={{ borderRadius: 22, backgroundColor: palette.bg }}
                   resizeMode="cover"
                 />
                 <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -7318,14 +7302,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     }}
                   >
                     {selectedInstitutionLogoUri ? (
-                      <Image
+                      <LoadingImage
                         source={{ uri: selectedInstitutionLogoUri }}
-                        style={{
-                          width: 76,
-                          height: 76,
-                          borderRadius: 22,
-                          backgroundColor: palette.bg,
-                        }}
+                        containerStyle={{ width: 76, height: 76 }}
+                        style={{ borderRadius: 22, backgroundColor: palette.bg }}
                         resizeMode="cover"
                       />
                     ) : (
@@ -8394,14 +8374,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             >
                               {String(moduleForm.kind || '').toLowerCase() ===
                               'image' ? (
-                                <Image
+                                <LoadingImage
                                   source={{ uri: moduleForm.resource_url }}
-                                  style={{
-                                    width: 88,
-                                    height: 88,
-                                    borderRadius: 14,
-                                    backgroundColor: palette.bg,
-                                  }}
+                                  containerStyle={{ width: 88, height: 88 }}
+                                  style={{ borderRadius: 14, backgroundColor: palette.bg }}
                                   resizeMode="cover"
                                 />
                               ) : null}
@@ -9541,11 +9517,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                       }}
                     >
                       {institutionLogoUri ? (
-                        <Image
+                        <LoadingImage
                           source={{ uri: institutionLogoUri }}
+                          containerStyle={{ width: 56, height: 56 }}
                           style={{
-                            width: 56,
-                            height: 56,
                             borderRadius: 14,
                             backgroundColor: palette.bg,
                             borderWidth: 1,

@@ -61,6 +61,10 @@ export default function PermanentRemoteImage({
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [online, setOnline] = useState(true);
+  // Separate from `checking` (local-cache lookup) — this tracks the actual
+  // <Image> network fetch/decode of a remote (non-cached) URL, which can
+  // take a moment on a signed S3 URL and previously showed nothing at all.
+  const [imageLoading, setImageLoading] = useState(false);
 
   const remoteUri = typeof uri === 'string' && uri.trim() ? uri.trim() : '';
   const cacheKey = useMemo(
@@ -135,16 +139,27 @@ export default function PermanentRemoteImage({
   const sourceUri = localPath ? fileUriForPath(localPath) : online ? remoteUri : '';
   const hasImage = Boolean(sourceUri);
   const needsDownload = Boolean(remoteUri && !localPath);
+  // Only the remote (uncached) path actually fetches over the network —
+  // a locally-cached file:// URI resolves near-instantly and shouldn't
+  // flash a spinner.
+  const isRemoteFetch = hasImage && !localPath;
 
   return (
     <View style={[styles.container, containerStyle]}>
       {hasImage ? (
-        <Image source={{ uri: sourceUri }} style={[StyleSheet.absoluteFillObject, style]} resizeMode={resizeMode} />
+        <Image
+          source={{ uri: sourceUri }}
+          style={[StyleSheet.absoluteFillObject, style]}
+          resizeMode={resizeMode}
+          onLoadStart={() => setImageLoading(true)}
+          onLoad={() => setImageLoading(false)}
+          onError={() => setImageLoading(false)}
+        />
       ) : (
         placeholder ?? <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.surfaceElevated ?? palette.surface }]} />
       )}
 
-      {checking ? (
+      {checking || (isRemoteFetch && imageLoading) ? (
         <View style={styles.overlay}>
           <ActivityIndicator color={palette.primaryStrong ?? palette.primary} />
         </View>

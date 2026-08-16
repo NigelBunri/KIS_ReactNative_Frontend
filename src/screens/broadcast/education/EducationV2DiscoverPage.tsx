@@ -4,13 +4,13 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import LoadingImage from '@/components/media/LoadingImage';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
@@ -560,7 +560,7 @@ export default function EducationV2DiscoverPage({
           }}
         >
           {imageUri ? (
-            <Image
+            <LoadingImage
               source={{ uri: imageUri }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
@@ -712,7 +712,7 @@ export default function EducationV2DiscoverPage({
             }}
           >
             {imageUri ? (
-              <Image
+              <LoadingImage
                 source={{ uri: imageUri }}
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
@@ -832,7 +832,7 @@ export default function EducationV2DiscoverPage({
           }}
         >
           {imageUri ? (
-            <Image
+            <LoadingImage
               source={{ uri: imageUri }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
