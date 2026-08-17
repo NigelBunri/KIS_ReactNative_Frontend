@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -107,7 +107,8 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
   const [selectedDrug, setSelectedDrug] = useState<Drug | null>(null);
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState('');
-  const [duration, setDuration] = useState('');
+  const [durationValue, setDurationValue] = useState('');
+  const [durationUnit, setDurationUnit] = useState<'days' | 'weeks' | 'months'>('days');
   const [refills, setRefills] = useState('0');
 
   const [currentItems, setCurrentItems] = useState<PrescriptionItem[]>([]);
@@ -276,16 +277,26 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
       drug: selectedDrug,
       dosage,
       frequency,
-      duration,
+      duration: durationValue ? `${durationValue} ${durationUnit}` : '',
       refills: Number(refills || 0),
     };
     setCurrentItems((prev) => [...prev, item]);
     setSelectedDrug(null);
     setDosage('');
     setFrequency('');
-    setDuration('');
+    setDurationValue('');
+    setDurationUnit('days');
     setRefills('0');
-  }, [allowControlled, dosage, duration, frequency, maxRefills, refills, selectedDrug]);
+  }, [
+    allowControlled,
+    dosage,
+    durationUnit,
+    durationValue,
+    frequency,
+    maxRefills,
+    refills,
+    selectedDrug,
+  ]);
 
   const generatePrescription = useCallback(async () => {
     if (!patientName.trim() || currentItems.length === 0) {
@@ -348,10 +359,16 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
   const expiredCount = prescriptions.filter((item) => item.status === 'expired').length;
   const dispensedCount = prescriptions.filter((item) => item.status === 'dispensed').length;
 
+  const scrollRef = useRef<ScrollView>(null);
+  const drugCatalogY = useRef(0);
+  const scrollToDrugCatalog = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(drugCatalogY.current - 12, 0), animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView ref={scrollRef} style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Engine Configuration</Text>
 
@@ -377,7 +394,12 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         />
       </View>
 
-      <View style={card(palette, spacing)}>
+      <View
+        style={card(palette, spacing)}
+        onLayout={(event) => {
+          drugCatalogY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Text style={{ ...typography.h2, color: palette.text }}>Drug Catalog</Text>
 
         {drugsLoading ? (
@@ -430,18 +452,44 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
 
         <TextInput placeholder="Patient Name" value={patientName} onChangeText={setPatientName} style={input(palette, spacing)} />
 
-        {drugs.map((drug) => (
-          <TouchableOpacity key={drug.id} onPress={() => setSelectedDrug(drug)} style={{ marginVertical: 4 }}>
-            <Text style={{ color: palette.text }}>{drug.name}</Text>
-          </TouchableOpacity>
-        ))}
+        {drugs.length === 0 ? (
+          <View style={{ gap: spacing.xs, paddingVertical: spacing.xs }}>
+            <Text style={{ color: palette.subtext }}>
+              No drugs in the catalog yet. Add one first to build a prescription.
+            </Text>
+            <KISButton title="Add a drug" variant="outline" onPress={scrollToDrugCatalog} />
+          </View>
+        ) : (
+          drugs.map((drug) => (
+            <TouchableOpacity key={drug.id} onPress={() => setSelectedDrug(drug)} style={{ marginVertical: 4 }}>
+              <Text style={{ color: palette.text }}>{drug.name}</Text>
+            </TouchableOpacity>
+          ))
+        )}
 
         {selectedDrug ? (
           <>
             <Text style={{ color: palette.text }}>Selected: {selectedDrug.name}</Text>
             <TextInput placeholder="Dosage" value={dosage} onChangeText={setDosage} style={input(palette, spacing)} />
             <TextInput placeholder="Frequency (e.g 2x daily)" value={frequency} onChangeText={setFrequency} style={input(palette, spacing)} />
-            <TextInput placeholder="Duration (e.g 7 days)" value={duration} onChangeText={setDuration} style={input(palette, spacing)} />
+            <View style={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}>
+              <TextInput
+                placeholder="Duration"
+                keyboardType="numeric"
+                value={durationValue}
+                onChangeText={(text) => setDurationValue(text.replace(/[^0-9]/g, ''))}
+                style={[input(palette, spacing), { flex: 1 }]}
+              />
+              <KISButton
+                title={durationUnit}
+                variant="outline"
+                onPress={() =>
+                  setDurationUnit((prev) =>
+                    prev === 'days' ? 'weeks' : prev === 'weeks' ? 'months' : 'days',
+                  )
+                }
+              />
+            </View>
             <TextInput placeholder="Refills" keyboardType="numeric" value={refills} onChangeText={setRefills} style={input(palette, spacing)} />
             <KISButton title="Add To Prescription" onPress={addItem} />
           </>

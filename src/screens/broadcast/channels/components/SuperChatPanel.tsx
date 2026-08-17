@@ -111,7 +111,10 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
     try {
       const res = await postRequest(
         ROUTES.broadcasts.liveStreamTipSend(streamId),
-        { amount: selectedAmount, message: message.trim() || undefined },
+        {
+          amount_cents: Math.round(selectedAmount * 100),
+          message: message.trim() || undefined,
+        },
         { errorMessage: 'Failed to send Super Chat' },
       );
       if (res?.success || res?.data) {

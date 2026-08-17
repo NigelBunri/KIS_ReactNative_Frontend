@@ -2,6 +2,7 @@
 import React from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 
 export function EventComposerPage({
   eventTitle,
@@ -29,12 +30,11 @@ export function EventComposerPage({
         onChangeText={setEventTitle}
         style={[styles.input, { color: palette.text, borderColor: palette.divider }]}
       />
-      <TextInput
-        placeholder="Start date/time (YYYY-MM-DD HH:MM)"
-        placeholderTextColor={palette.subtext}
-        value={eventStartsAt}
-        onChangeText={setEventStartsAt}
-        style={[styles.input, { color: palette.text, borderColor: palette.divider }]}
+      <KISDateTimeInput
+        mode="datetime"
+        value={eventStartsAt || null}
+        onChange={setEventStartsAt}
+        placeholder="Select start date/time"
       />
       <TextInput
         placeholder="Location (optional)"

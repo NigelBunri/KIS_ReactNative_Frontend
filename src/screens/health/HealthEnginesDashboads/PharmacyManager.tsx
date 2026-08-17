@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import {
   createInstitutionEngineManagedItem,
   deleteInstitutionEngineManagedItem,
@@ -334,9 +335,15 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
   const completedOrders = orders.filter((row) => row.status === 'Delivered').length;
   const revenue = useMemo(() => orders.reduce((sum, row) => sum + row.totalPrice, 0), [orders]);
 
+  const scrollRef = useRef<ScrollView>(null);
+  const inventoryY = useRef(0);
+  const scrollToInventory = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(inventoryY.current - 12, 0), animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView ref={scrollRef} style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Pharmacy Configuration</Text>
         <KISButton
@@ -358,7 +365,12 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         />
       </View>
 
-      <View style={card(palette, spacing)}>
+      <View
+        style={card(palette, spacing)}
+        onLayout={(event) => {
+          inventoryY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Text style={{ ...typography.h2, color: palette.text }}>Medication Inventory</Text>
 
         {inventoryLoading ? (
@@ -413,11 +425,13 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
           onChangeText={(text) => setNewMed((prev) => ({ ...prev, price: text }))}
           style={input(palette, spacing)}
         />
-        <TextInput
-          placeholder="Expiry Date YYYY-MM-DD"
-          value={newMed.expiryDate}
-          onChangeText={(text) => setNewMed((prev) => ({ ...prev, expiryDate: text }))}
-          style={input(palette, spacing)}
+        <KISDateTimeInput
+          mode="date"
+          value={newMed.expiryDate || null}
+          onChange={(isoValue) =>
+            setNewMed((prev) => ({ ...prev, expiryDate: isoValue.slice(0, 10) }))
+          }
+          placeholder="Expiry date"
         />
 
         <View style={{ gap: spacing.xs }}>
@@ -439,20 +453,29 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         <TextInput placeholder="Patient Name" value={patientName} onChangeText={setPatientName} style={input(palette, spacing)} />
 
         <Text style={{ ...typography.h3, color: palette.text }}>Select Medications</Text>
-        {inventory.map((med) => (
-          <TouchableOpacity
-            key={med.id}
-            onPress={() => toggleMedSelection(med)}
-            style={[
-              itemCard(palette, spacing),
-              selectedMeds.find((selected) => selected.id === med.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
-            ]}
-          >
-            <Text style={{ color: palette.text }}>
-              {med.name} ({med.stock} in stock)
+        {inventory.length === 0 ? (
+          <View style={{ gap: spacing.xs, paddingVertical: spacing.xs }}>
+            <Text style={{ color: palette.subtext }}>
+              No medications in inventory yet. Add one first to build an order.
             </Text>
-          </TouchableOpacity>
-        ))}
+            <KISButton title="Add a medication" variant="outline" onPress={scrollToInventory} />
+          </View>
+        ) : (
+          inventory.map((med) => (
+            <TouchableOpacity
+              key={med.id}
+              onPress={() => toggleMedSelection(med)}
+              style={[
+                itemCard(palette, spacing),
+                selectedMeds.find((selected) => selected.id === med.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
+              ]}
+            >
+              <Text style={{ color: palette.text }}>
+                {med.name} ({med.stock} in stock)
+              </Text>
+            </TouchableOpacity>
+          ))
+        )}
 
         {!autoAssign ? (
           <TextInput placeholder="Assign Pharmacist" value={pharmacist} onChangeText={setPharmacist} style={input(palette, spacing)} />

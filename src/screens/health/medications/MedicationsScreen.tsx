@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -220,7 +221,6 @@ export default function MedicationsScreen({ navigation }: Props) {
               { label: 'Medication Name *', value: medName, onChange: setMedName, placeholder: 'e.g. Metformin' },
               { label: 'Dosage', value: dosage, onChange: setDosage, placeholder: 'e.g. 500mg' },
               { label: 'Frequency', value: frequency, onChange: setFrequency, placeholder: 'e.g. Twice daily' },
-              { label: 'Refill Due (YYYY-MM-DD)', value: refillDue, onChange: setRefillDue, placeholder: 'e.g. 2025-08-01' },
               { label: 'Instructions', value: instructions, onChange: setInstructions, placeholder: 'Take with food...' },
             ].map((field) => (
               <React.Fragment key={field.label}>
@@ -234,6 +234,13 @@ export default function MedicationsScreen({ navigation }: Props) {
                 />
               </React.Fragment>
             ))}
+            <Text style={styles.fieldLabel}>Refill Due</Text>
+            <KISDateTimeInput
+              mode="date"
+              value={refillDue || null}
+              onChange={(isoValue) => setRefillDue(isoValue.slice(0, 10))}
+              placeholder="Select refill due date"
+            />
             <KISButton
               title="Add Medication"
               variant="primary"

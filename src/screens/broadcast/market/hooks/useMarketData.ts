@@ -274,7 +274,7 @@ export default function useMarketData({ ownerId = null, q = '' }: Params) {
       });
       if (res?.success === false) return { ok: false, message: res.message };
       await reloadAll();
-      return { ok: true, message: '' };
+      return { ok: true, message: '', data: res?.data as MarketShop | undefined };
     },
     [reloadAll],
   );

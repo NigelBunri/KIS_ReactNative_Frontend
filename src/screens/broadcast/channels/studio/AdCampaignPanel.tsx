@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -112,7 +113,7 @@ export default function AdCampaignPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelAdCampaigns(channelId),
         {
           title: formTitle.trim(),
-          budget_total: budget,
+          budget_cents: Math.round(budget * 100),
           start_date: formStart.trim() || undefined,
           end_date: formEnd.trim() || undefined,
           status: formActive ? 'active' : 'draft',
@@ -175,19 +176,18 @@ export default function AdCampaignPanel({ channelId }: Props) {
             keyboardType="decimal-pad"
             style={[styles.input, { color: palette.text, borderColor: palette.border }]}
           />
-          <TextInput
-            value={formStart}
-            onChangeText={setFormStart}
-            placeholder="Start date (YYYY-MM-DD)"
-            placeholderTextColor={palette.subtext}
-            style={[styles.input, { color: palette.text, borderColor: palette.border }]}
+          <KISDateTimeInput
+            mode="date"
+            value={formStart || null}
+            onChange={(isoValue) => setFormStart(isoValue.slice(0, 10))}
+            placeholder="Start date"
           />
-          <TextInput
-            value={formEnd}
-            onChangeText={setFormEnd}
-            placeholder="End date (YYYY-MM-DD)"
-            placeholderTextColor={palette.subtext}
-            style={[styles.input, { color: palette.text, borderColor: palette.border }]}
+          <KISDateTimeInput
+            mode="date"
+            value={formEnd || null}
+            onChange={(isoValue) => setFormEnd(isoValue.slice(0, 10))}
+            placeholder="End date"
+            minimumDate={formStart ? new Date(formStart) : undefined}
           />
           <View style={styles.toggleRow}>
             <Text style={[styles.toggleLabel, { color: palette.text }]}>Set as Active</Text>

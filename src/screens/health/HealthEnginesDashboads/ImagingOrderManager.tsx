@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -316,9 +316,15 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
     [defaultMargin, orders],
   );
 
+  const scrollRef = useRef<ScrollView>(null);
+  const catalogY = useRef(0);
+  const scrollToCatalog = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(catalogY.current - 12, 0), animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView ref={scrollRef} style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Imaging Engine Configuration</Text>
 
@@ -349,7 +355,12 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         />
       </View>
 
-      <View style={card(palette, spacing)}>
+      <View
+        style={card(palette, spacing)}
+        onLayout={(event) => {
+          catalogY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Text style={{ ...typography.h2, color: palette.text }}>Imaging Catalog</Text>
 
         {catalogLoading ? (
@@ -411,18 +422,27 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
           style={input(palette, spacing)}
         />
 
-        {catalog.map((study) => (
-          <TouchableOpacity
-            key={study.id}
-            onPress={() => toggleStudy(study)}
-            style={[
-              itemCard(palette, spacing),
-              selectedStudies.find((selected) => selected.id === study.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
-            ]}
-          >
-            <Text style={{ color: palette.text }}>{study.name}</Text>
-          </TouchableOpacity>
-        ))}
+        {catalog.length === 0 ? (
+          <View style={{ gap: spacing.xs, paddingVertical: spacing.xs }}>
+            <Text style={{ color: palette.subtext }}>
+              No imaging studies in the catalog yet. Add one first to create an order.
+            </Text>
+            <KISButton title="Add an imaging study" variant="outline" onPress={scrollToCatalog} />
+          </View>
+        ) : (
+          catalog.map((study) => (
+            <TouchableOpacity
+              key={study.id}
+              onPress={() => toggleStudy(study)}
+              style={[
+                itemCard(palette, spacing),
+                selectedStudies.find((selected) => selected.id === study.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
+              ]}
+            >
+              <Text style={{ color: palette.text }}>{study.name}</Text>
+            </TouchableOpacity>
+          ))
+        )}
 
         {['Routine', 'Urgent', 'STAT'].map((value) => (
           <KISButton

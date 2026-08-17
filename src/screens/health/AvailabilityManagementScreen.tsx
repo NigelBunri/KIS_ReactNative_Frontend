@@ -2152,15 +2152,28 @@ export default function AvailabilityManagementScreen({
                         })}
                       </View>
                     ) : (
-                      <Text
-                        style={{
-                          ...typography.caption,
-                          color: palette.subtext,
-                        }}
-                      >
-                        No active services. Activate at least one service in
-                        Service Catalog.
-                      </Text>
+                      <View style={{ gap: 8 }}>
+                        <Text
+                          style={{
+                            ...typography.caption,
+                            color: palette.subtext,
+                          }}
+                        >
+                          No active services. Activate at least one service to
+                          set availability.
+                        </Text>
+                        <KISButton
+                          title="Go to Service Catalog"
+                          size="xs"
+                          variant="outline"
+                          onPress={() =>
+                            institutionId &&
+                            navigation.navigate('HealthInstitutionServicesCatalog', {
+                              institutionId,
+                            })
+                          }
+                        />
+                      </View>
                     )}
 
                     <Text

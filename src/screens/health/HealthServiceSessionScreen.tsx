@@ -15,6 +15,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import {
@@ -7775,23 +7776,14 @@ export default function HealthServiceSessionScreen({
 
               {reminderEngineMapped !== false ? (
                 <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
-                  <TextInput
-                    value={reminderNextRunDraft}
-                    onChangeText={setReminderNextRunDraft}
-                    editable={
-                      !reminderBusy && !reminderLoading && !reminderIsClosed
+                  <KISDateTimeInput
+                    mode="datetime"
+                    value={reminderNextRunDraft || null}
+                    onChange={setReminderNextRunDraft}
+                    disabled={
+                      reminderBusy || reminderLoading || reminderIsClosed
                     }
-                    placeholder="Next run ISO datetime (optional)"
-                    placeholderTextColor={palette.subtext}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: palette.divider,
-                      borderRadius: 12,
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: spacing.sm,
-                      color: palette.text,
-                      backgroundColor: palette.surface,
-                    }}
+                    placeholder="Next run (optional)"
                   />
                   <TextInput
                     value={reminderNoteDraft}

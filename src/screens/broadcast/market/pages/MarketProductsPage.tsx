@@ -61,6 +61,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     deleteProduct,
     broadcastProduct,
     unpublishProduct,
+    createShop,
     mineCacheMeta,
   } = useMarketData({ ownerId, q: '' });
 
@@ -69,6 +70,35 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
   const [productImages, setProductImages] = useState<PickedImage[]>([]);
   const [form, setForm] = useState({ ...DEFAULT_PRODUCT_FORM });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Inline "create a shop" escape hatch — lets a user with no shop yet
+  // finish creating one without losing the product form they've already
+  // filled in below (form/productImages state is untouched underneath).
+  const [shopCreatorVisible, setShopCreatorVisible] = useState(false);
+  const [newShopName, setNewShopName] = useState('');
+  const [creatingShop, setCreatingShop] = useState(false);
+  const handleCreateShop = useCallback(async () => {
+    const trimmedName = newShopName.trim();
+    if (!trimmedName) {
+      Alert.alert('Market', 'Shop name is required.');
+      return;
+    }
+    setCreatingShop(true);
+    try {
+      const fd = new FormData();
+      fd.append('name', trimmedName);
+      const result = await createShop(fd);
+      if (result.ok) {
+        setShopCreatorVisible(false);
+        setNewShopName('');
+        if (result.data?.id) setActiveShopId(result.data.id);
+      } else {
+        Alert.alert('Unable to create shop', result.message || 'Please try again.');
+      }
+    } finally {
+      setCreatingShop(false);
+    }
+  }, [createShop, newShopName]);
 
   const PINNED_PRODUCTS_KEY = 'kis.market.pinned_products.v1';
   const [pinnedIds, setPinnedIds] = useState<Record<string, boolean>>({});
@@ -214,7 +244,10 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
     }
     const shopId = editing?.shop ?? activeShop?.id;
     if (!shopId) {
-      Alert.alert('Market', 'Create a shop before adding products.');
+      // Don't discard the product form the user already filled in — open
+      // the inline shop creator instead of a dead-end alert. Everything
+      // typed below (form/productImages) is untouched while this is open.
+      setShopCreatorVisible(true);
       return;
     }
     if (!editing && productImages.length === 0) {
@@ -344,11 +377,66 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
             </Text>
           </View>
 
-          <Text
-            style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
           >
-            Active shop: {activeShop?.name ?? 'None'}
-          </Text>
+            <Text
+              style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}
+            >
+              Active shop: {activeShop?.name ?? 'None'}
+            </Text>
+            <KISButton
+              title="+ Create shop"
+              size="xs"
+              variant="outline"
+              onPress={() => setShopCreatorVisible(true)}
+            />
+          </View>
+
+          {shopCreatorVisible ? (
+            <View
+              style={{
+                borderWidth: 2,
+                borderColor: palette.divider,
+                backgroundColor: palette.surface,
+                borderRadius: 18,
+                padding: 12,
+                gap: 10,
+              }}
+            >
+              <Text
+                style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}
+              >
+                New shop
+              </Text>
+              <KISTextInput
+                label="Shop name"
+                value={newShopName}
+                onChangeText={setNewShopName}
+              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <KISButton
+                  title={creatingShop ? 'Creating…' : 'Create shop'}
+                  onPress={handleCreateShop}
+                  disabled={creatingShop}
+                />
+                <KISButton
+                  title="Cancel"
+                  variant="outline"
+                  onPress={() => {
+                    setShopCreatorVisible(false);
+                    setNewShopName('');
+                  }}
+                  disabled={creatingShop}
+                />
+              </View>
+            </View>
+          ) : null}
 
           <View
             style={{

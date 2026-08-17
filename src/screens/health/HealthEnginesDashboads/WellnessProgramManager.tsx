@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -383,9 +383,16 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
     );
   }
 
+  const scrollRef = useRef<ScrollView>(null);
+  const programsY = useRef(0);
+  const scrollToPrograms = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(programsY.current - 12, 0), animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
     <ScrollView
+      ref={scrollRef}
       style={{ padding: spacing.md }}
       refreshControl={
         <RefreshControl
@@ -429,7 +436,12 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
       </View>
 
       {/* PROGRAMS */}
-      <View style={card(palette, spacing)}>
+      <View
+        style={card(palette, spacing)}
+        onLayout={(event) => {
+          programsY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Text style={{ ...typography.h2, color: palette.text }}>
           Wellness Programs
         </Text>
@@ -533,13 +545,22 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
           onChangeText={setPatientName}
           style={input(palette, spacing)}
         />
-        {programs.map((program) => (
-          <KISButton
-            key={program.id}
-            title={`Enroll in ${program.name}`}
-            onPress={() => enrollPatient(program.id)}
-          />
-        ))}
+        {programs.length === 0 ? (
+          <View style={{ gap: spacing.xs, paddingVertical: spacing.xs }}>
+            <Text style={{ color: palette.subtext }}>
+              No wellness programs yet. Add one first to enroll a patient.
+            </Text>
+            <KISButton title="Add a program" variant="outline" onPress={scrollToPrograms} />
+          </View>
+        ) : (
+          programs.map((program) => (
+            <KISButton
+              key={program.id}
+              title={`Enroll in ${program.name}`}
+              onPress={() => enrollPatient(program.id)}
+            />
+          ))
+        )}
       </View>
 
       {/* PATIENT PROGRESS */}

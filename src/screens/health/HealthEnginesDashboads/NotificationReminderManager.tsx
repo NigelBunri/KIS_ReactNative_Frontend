@@ -14,6 +14,7 @@ import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
 import KISButton from "@/constants/KISButton";
+import KISDateTimeInput from "@/constants/KISDateTimeInput";
 import {
   createInstitutionEngineManagedItem,
   fetchInstitutionEngineManagedItems,
@@ -276,11 +277,11 @@ const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
           onChangeText={setMessage}
           style={input(palette, spacing)}
         />
-        <TextInput
-          placeholder="Schedule Date (optional)"
-          value={scheduleDate}
-          onChangeText={setScheduleDate}
-          style={input(palette, spacing)}
+        <KISDateTimeInput
+          mode="datetime"
+          value={scheduleDate || null}
+          onChange={setScheduleDate}
+          placeholder="Schedule date (optional)"
         />
 
         {/* CHANNEL SELECT */}

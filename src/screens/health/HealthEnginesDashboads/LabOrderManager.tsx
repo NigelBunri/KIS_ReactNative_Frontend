@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -271,9 +271,15 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
     [labMargin, orders],
   );
 
+  const scrollRef = useRef<ScrollView>(null);
+  const catalogY = useRef(0);
+  const scrollToCatalog = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(catalogY.current - 12, 0), animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-    <ScrollView style={{ padding: spacing.md }}>
+    <ScrollView ref={scrollRef} style={{ padding: spacing.md }}>
       <View style={card(palette, spacing)}>
         <Text style={{ ...typography.h2, color: palette.text }}>Lab Engine Configuration</Text>
 
@@ -292,7 +298,12 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         />
       </View>
 
-      <View style={card(palette, spacing)}>
+      <View
+        style={card(palette, spacing)}
+        onLayout={(event) => {
+          catalogY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Text style={{ ...typography.h2, color: palette.text }}>Lab Test Catalog</Text>
 
         {catalogLoading ? (
@@ -354,18 +365,27 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
 
         <TextInput placeholder="Patient Name" value={patientName} onChangeText={setPatientName} style={input(palette, spacing)} />
 
-        {labCatalog.map((test) => (
-          <TouchableOpacity
-            key={test.id}
-            onPress={() => toggleTestSelection(test)}
-            style={[
-              itemCard(palette, spacing),
-              selectedTests.find((selected) => selected.id === test.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
-            ]}
-          >
-            <Text style={{ color: palette.text }}>{test.name}</Text>
-          </TouchableOpacity>
-        ))}
+        {labCatalog.length === 0 ? (
+          <View style={{ gap: spacing.xs, paddingVertical: spacing.xs }}>
+            <Text style={{ color: palette.subtext }}>
+              No lab tests in the catalog yet. Add one first to create an order.
+            </Text>
+            <KISButton title="Add a lab test" variant="outline" onPress={scrollToCatalog} />
+          </View>
+        ) : (
+          labCatalog.map((test) => (
+            <TouchableOpacity
+              key={test.id}
+              onPress={() => toggleTestSelection(test)}
+              style={[
+                itemCard(palette, spacing),
+                selectedTests.find((selected) => selected.id === test.id) ? { borderWidth: 2, borderColor: palette.primary } : null,
+              ]}
+            >
+              <Text style={{ color: palette.text }}>{test.name}</Text>
+            </TouchableOpacity>
+          ))
+        )}
 
         <Text style={{ color: palette.text }}>Urgency:</Text>
         {['Routine', 'Urgent', 'STAT'].map((level) => (

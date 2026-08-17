@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -311,13 +312,12 @@ export default function HealthGoalsScreen({ navigation }: Props) {
               onChangeText={setFormUnit}
             />
 
-            <Text style={styles.fieldLabel}>Deadline (YYYY-MM-DD, optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 2025-12-31"
-              placeholderTextColor={palette.subtext}
-              value={formDeadline}
-              onChangeText={setFormDeadline}
+            <Text style={styles.fieldLabel}>Deadline (optional)</Text>
+            <KISDateTimeInput
+              mode="date"
+              value={formDeadline || null}
+              onChange={(isoValue) => setFormDeadline(isoValue.slice(0, 10))}
+              placeholder="Select a deadline"
             />
 
             <KISButton

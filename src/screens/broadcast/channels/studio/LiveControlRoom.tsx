@@ -36,6 +36,7 @@ import {
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import KISTextInput from '@/constants/KISTextInput';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -831,11 +832,12 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
       <View style={[styles.form, { borderColor: palette.border }]}>
         <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Schedule a new stream</Text>
         <KISTextInput label="Title" value={title} onChangeText={setTitle} />
-        <KISTextInput
-          label="Scheduled start (ISO 8601, optional)"
-          value={scheduledAt}
-          onChangeText={setScheduledAt}
-          placeholder="e.g. 2026-06-01T18:00:00Z"
+        <KISDateTimeInput
+          label="Scheduled start (optional)"
+          mode="datetime"
+          value={scheduledAt || null}
+          onChange={setScheduledAt}
+          placeholder="Select a start time"
         />
         <KISTextInput
           label="Description (optional)"

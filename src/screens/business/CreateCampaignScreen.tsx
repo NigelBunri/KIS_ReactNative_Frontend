@@ -16,6 +16,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -48,7 +49,7 @@ export default function CreateCampaignScreen({ navigation }: Props) {
       Alert.alert('Invalid amount', 'Please enter a valid target amount.');
       return;
     }
-    if (!deadline.trim()) { Alert.alert('Required', 'Please enter a deadline (YYYY-MM-DD).'); return; }
+    if (!deadline.trim()) { Alert.alert('Required', 'Please choose a deadline.'); return; }
 
     setSubmitting(true);
     try {
@@ -140,14 +141,13 @@ export default function CreateCampaignScreen({ navigation }: Props) {
               </View>
             ) : null}
 
-            <Text style={[styles.label, { marginTop: 16 }]}>Deadline (YYYY-MM-DD) *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="2025-12-31"
-              placeholderTextColor={palette.subtext}
-              value={deadline}
-              onChangeText={setDeadline}
-              keyboardType="numbers-and-punctuation"
+            <Text style={[styles.label, { marginTop: 16 }]}>Deadline *</Text>
+            <KISDateTimeInput
+              mode="date"
+              value={deadline || null}
+              onChange={(isoValue) => setDeadline(isoValue.slice(0, 10))}
+              placeholder="Select a deadline"
+              minimumDate={new Date()}
             />
 
             <Text style={[styles.label, { marginTop: 16 }]}>Category</Text>

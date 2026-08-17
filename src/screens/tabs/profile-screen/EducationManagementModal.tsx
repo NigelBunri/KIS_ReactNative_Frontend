@@ -211,6 +211,82 @@ const MEMBERSHIP_POLICY_OPTIONS: { value: string; label: string }[] = [
   { value: 'closed', label: 'Closed — invite only' },
 ];
 
+// Must match apps.broadcasts.models.EducationAcademicRecordStatus exactly —
+// used for Program/Course/Lesson/Module/Material/Assessment/Event status.
+const ACADEMIC_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'published', label: 'Published' },
+  { value: 'archived', label: 'Archived' },
+];
+
+// Must match apps.broadcasts.models.EducationClassSessionStatus exactly.
+const CLASS_SESSION_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'live', label: 'Live' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+// Must match apps.broadcasts.models.EducationClassSessionMode exactly —
+// used for Class session and Event delivery mode.
+const DELIVERY_MODE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'online', label: 'Online' },
+  { value: 'onsite', label: 'Onsite' },
+  { value: 'hybrid', label: 'Hybrid' },
+];
+
+// Must match apps.broadcasts.models.EducationMaterialKind exactly.
+const MATERIAL_KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: 'document', label: 'Document' },
+  { value: 'video', label: 'Video' },
+  { value: 'link', label: 'Link' },
+  { value: 'slides', label: 'Slides' },
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'reference', label: 'Reference' },
+];
+
+// Must match apps.broadcasts.models.EducationAssessmentType exactly.
+const ASSESSMENT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'mcq', label: 'Multiple choice' },
+  { value: 'theory', label: 'Theory' },
+  { value: 'mixed', label: 'Mixed' },
+];
+
+// Must match apps.broadcasts.models.EducationInstitutionEventType exactly.
+const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'event', label: 'Event' },
+  { value: 'training_session', label: 'Training session' },
+];
+
+// Must match apps.broadcasts.models.EducationBroadcastKind exactly.
+const BROADCAST_KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: 'program', label: 'Program' },
+  { value: 'course', label: 'Course' },
+  { value: 'lesson', label: 'Lesson' },
+  { value: 'class_session', label: 'Class session' },
+  { value: 'training_session', label: 'Training session' },
+  { value: 'event', label: 'Event' },
+  { value: 'institution_notice', label: 'Institution notice' },
+];
+
+// Must match apps.broadcasts.models.EducationBroadcastStatus exactly.
+const BROADCAST_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'published', label: 'Published' },
+  { value: 'archived', label: 'Archived' },
+];
+
+// Must match the module-item keyMap used server-side in views.py — the
+// content type this module item links to.
+const MODULE_ITEM_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'lesson', label: 'Lesson' },
+  { value: 'material', label: 'Material' },
+  { value: 'class_session', label: 'Class session' },
+  { value: 'assessment', label: 'Assessment' },
+  { value: 'event', label: 'Event' },
+  { value: 'broadcast', label: 'Broadcast' },
+];
+
 const EMPTY_FORM: InstitutionFormState = {
   name: '',
   description: '',
@@ -912,13 +988,15 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const [courseModuleItemForm, setCourseModuleItemForm] = useState<
     Record<string, any>
   >(emptyCourseModuleItemForm());
-  // Set when the user taps "Create item" from the empty-state of the
-  // course-module-item linked-item picker (renderCourseModuleWorkspace) —
-  // remembers where to return to and which field to auto-fill once the new
-  // record is saved. See handleSaveModuleRecord's success path.
-  const [linkedItemCreateContext, setLinkedItemCreateContext] = useState<{
-    courseId: string;
-    itemType: string;
+  // Set when the user taps "Create new" from any lookup selector's
+  // empty/onCreateNew state (Program, Course, Lesson, Class session, etc.)
+  // — remembers which module we navigated away to create, and what to do
+  // with the new record's id once it's saved. See startInlineLookupCreate
+  // and handleSaveModuleRecord's success path, which is the single place
+  // that resolves this for every lookup field in the file.
+  const [pendingLookupCreate, setPendingLookupCreate] = useState<{
+    createModuleKey: EducationModuleKey;
+    onComplete: (newId: string) => void;
   } | null>(null);
   const [contactsPickerOpen, setContactsPickerOpen] = useState(false);
   const [addingStaffMember, setAddingStaffMember] = useState(false);
@@ -1342,26 +1420,60 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     broadcast: 'broadcast_id',
   };
 
-  // "Create item" from the linked-item picker's empty state: navigates to
-  // the right module's create form (reusing openModule + the existing
-  // moduleForm editor, exactly like the "New X" buttons elsewhere), rather
-  // than leaving the user at a dead end with nothing to pick.
-  const startLinkedItemCreation = useCallback(
-    async (itemType: string, courseId: string) => {
-      const sectionKey = LINKED_ITEM_SECTION_KEY[itemType];
-      if (!sectionKey || !courseId) return;
-      setLinkedItemCreateContext({ courseId, itemType });
-      await openModule(sectionKey);
-      const prefilled: Record<string, any> = emptyModuleForm();
-      if (sectionKey === 'lessons') prefilled.course_id = courseId;
-      if (sectionKey === 'materials') prefilled.course_ids = [courseId];
-      setModuleForm(prefilled);
+  // Generic "create the missing related record without leaving this form"
+  // helper, used by every renderLookupSelector/renderMultiLookupSelector
+  // `onCreateNew` callback across the file (Course→Program, Lesson→Course,
+  // Class session→Course/Lesson, Assessment/Event/Broadcast→*, Material→*,
+  // etc.). Snapshots the current module + form + editing id, navigates to
+  // create a fresh record of `createModuleKey`, and once it's saved,
+  // restores the snapshot with the new record's id written into
+  // `targetFieldKey` (appended, for multi-select fields) before reopening
+  // the editor — so the user never loses what they'd already typed.
+  const startInlineLookupCreate = useCallback(
+    async (
+      createModuleKey: EducationModuleKey,
+      targetFieldKey: string,
+      isMulti: boolean,
+    ) => {
+      const returnModuleKey = activeModuleKey;
+      const returnForm = moduleForm;
+      const returnEditingId = editingModuleItemId;
+      if (!returnModuleKey) return;
+      setPendingLookupCreate({
+        createModuleKey,
+        onComplete: (newId: string) => {
+          setActiveModuleKey(returnModuleKey);
+          setModuleForm(() => {
+            if (isMulti) {
+              const existing = Array.isArray(returnForm[targetFieldKey])
+                ? returnForm[targetFieldKey]
+                : [];
+              return {
+                ...returnForm,
+                [targetFieldKey]: existing.includes(newId)
+                  ? existing
+                  : [...existing, newId],
+              };
+            }
+            return { ...returnForm, [targetFieldKey]: newId };
+          });
+          setEditingModuleItemId(returnEditingId);
+          setModuleEditorVisible(true);
+        },
+      });
+      await openModule(createModuleKey);
+      setModuleForm(emptyModuleForm());
       setEditingModuleItemId(null);
       setModuleEditorVisible(true);
     },
-    [openModule],
+    [activeModuleKey, editingModuleItemId, moduleForm, openModule],
   );
 
+  // "Create item" from the Module Item form's "Linked item" picker empty
+  // state — a special case of startInlineLookupCreate that returns to the
+  // course's curriculum workspace (courseModuleItemForm) instead of the
+  // general moduleForm flow, since Module Items live inside a course
+  // detail view rather than their own top-level module screen.
   const closeModule = useCallback(() => {
     setScreen('dashboard');
     setActiveModuleKey(null);
@@ -1373,6 +1485,11 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     setDetailRecordId(null);
     setDetailError(null);
     setDetailStack([]);
+    // Backing out of the module screen entirely abandons any in-flight
+    // "create the missing related record" hop — otherwise a stale
+    // snapshot could resurface and silently overwrite an unrelated form
+    // the next time that same module type happens to be created.
+    setPendingLookupCreate(null);
   }, []);
 
   const getDetailTargetId = useCallback(
@@ -1545,6 +1662,42 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       getModuleDetailRoute,
       selectedInstitutionId,
     ],
+  );
+
+  // "Create item" from the Module Item form's "Linked item" picker empty
+  // state — a special case of startInlineLookupCreate that returns to the
+  // course's curriculum workspace (courseModuleItemForm) instead of the
+  // general moduleForm flow, since Module Items live inside a course
+  // detail view rather than their own top-level module screen. Declared
+  // here (after openDetailForModule) rather than alongside
+  // startInlineLookupCreate since it depends on openDetailForModule.
+  const startLinkedItemCreation = useCallback(
+    async (itemType: string, courseId: string) => {
+      const sectionKey = LINKED_ITEM_SECTION_KEY[itemType];
+      if (!sectionKey || !courseId) return;
+      setPendingLookupCreate({
+        createModuleKey: sectionKey,
+        onComplete: (newItemId: string) => {
+          void openDetailForModule('courses', { id: courseId }).then(() => {
+            const targetKey = LINKED_ITEM_TARGET_KEY[itemType];
+            if (targetKey) {
+              setCourseModuleItemForm(prev => ({
+                ...prev,
+                [targetKey]: newItemId,
+              }));
+            }
+          });
+        },
+      });
+      await openModule(sectionKey);
+      const prefilled: Record<string, any> = emptyModuleForm();
+      if (sectionKey === 'lessons') prefilled.course_id = courseId;
+      if (sectionKey === 'materials') prefilled.course_ids = [courseId];
+      setModuleForm(prefilled);
+      setEditingModuleItemId(null);
+      setModuleEditorVisible(true);
+    },
+    [openModule, openDetailForModule],
   );
 
   const openModuleDetail = useCallback(
@@ -1860,7 +2013,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     setModuleEditorVisible(false);
     setEditingModuleItemId(null);
     setModuleForm(emptyModuleForm());
-  }, []);
+    // Cancelling the create form that a lookup's "+ New" button opened
+    // (rather than saving it) must also drop the pending hop — otherwise
+    // it lingers and could hijack an unrelated future create of the same
+    // module type into silently overwriting that form instead.
+    if (pendingLookupCreate && pendingLookupCreate.createModuleKey === activeModuleKey) {
+      setPendingLookupCreate(null);
+    }
+  }, [activeModuleKey, pendingLookupCreate]);
 
   const handlePickMaterialResource = useCallback(async () => {
     try {
@@ -2419,7 +2579,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           timezone_name: toText(moduleForm.timezone_name) || 'UTC',
           seat_limit: parseOptionalInt(moduleForm.seat_limit),
           booking_enabled: Boolean(moduleForm.booking_enabled),
-          price_amount: toText(moduleForm.price_amount) || undefined,
+          price_amount: parseOptionalInt(moduleForm.price_amount) ?? undefined,
           price_currency: 'USD',
           status: toText(moduleForm.status) || 'published',
         };
@@ -2460,25 +2620,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       await fetchDashboard(selectedInstitutionId);
       closeModuleEditor();
       if (
-        linkedItemCreateContext &&
+        pendingLookupCreate &&
         !editingModuleItemId &&
-        linkedItemCreateContext.itemType &&
-        LINKED_ITEM_SECTION_KEY[linkedItemCreateContext.itemType] ===
-          activeModuleKey
+        pendingLookupCreate.createModuleKey === activeModuleKey
       ) {
         const newItemId = String(response?.data?.id || '');
-        const { courseId, itemType } = linkedItemCreateContext;
-        setLinkedItemCreateContext(null);
-        await openDetailForModule('courses', { id: courseId });
-        if (newItemId) {
-          const targetKey = LINKED_ITEM_TARGET_KEY[itemType];
-          if (targetKey) {
-            setCourseModuleItemForm(prev => ({
-              ...prev,
-              [targetKey]: newItemId,
-            }));
-          }
-        }
+        const { onComplete } = pendingLookupCreate;
+        setPendingLookupCreate(null);
+        if (newItemId) onComplete(newItemId);
       }
     } catch (error: any) {
       Alert.alert(
@@ -2494,10 +2643,9 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     editingModuleItemId,
     fetchDashboard,
     fetchModuleLookups,
-    linkedItemCreateContext,
+    pendingLookupCreate,
     loadModuleRecords,
     moduleForm,
-    openDetailForModule,
     selectedInstitutionId,
   ]);
 
@@ -3249,9 +3397,26 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       );
       return (
         <View style={{ gap: 8 }}>
-          <Text style={{ color: palette.text, fontWeight: '800' }}>
-            {label}
-          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: palette.text, fontWeight: '800' }}>
+              {label}
+            </Text>
+            {onCreateNew && options.length ? (
+              <KISButton
+                title="+ New"
+                size="xs"
+                variant="outline"
+                onPress={onCreateNew}
+              />
+            ) : null}
+          </View>
           {selected ? (
             <View
               style={{
@@ -3361,6 +3526,70 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     ],
   );
 
+  // Fixed-choice picker for enum fields (status/kind/type/mode) — the
+  // backend rejects or silently coerces unrecognized values, so these must
+  // never be free text. Options passed in must match the backend enum
+  // exactly (see the *_OPTIONS constants near the top of this file).
+  const renderOptionPicker = useCallback(
+    (
+      label: string,
+      selectedValue: string,
+      options: { value: string; label: string }[],
+      onSelect: (value: string) => void,
+      disabled?: boolean,
+    ) => (
+      <View style={{ gap: 8 }}>
+        <Text style={{ color: palette.text, fontWeight: '800' }}>{label}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {options.map(option => {
+            const active = selectedValue === option.value;
+            return (
+              <KISButton
+                key={option.value}
+                title={option.label}
+                size="xs"
+                variant={active ? 'secondary' : 'outline'}
+                onPress={() => onSelect(option.value)}
+                disabled={disabled}
+              />
+            );
+          })}
+        </View>
+      </View>
+    ),
+    [palette.text],
+  );
+
+  // Groups a run of fields under a labeled section header, for long forms
+  // (e.g. Course) where a flat field list is hard to scan. Purely visual —
+  // does not change field order, validation, or payload shape.
+  const renderFieldSection = useCallback(
+    (title: string, subtitle: string | undefined, children: React.ReactNode) => (
+      <View
+        style={{
+          gap: 12,
+          paddingTop: 16,
+          marginTop: 4,
+          borderTopWidth: 1,
+          borderTopColor: palette.divider,
+        }}
+      >
+        <View style={{ gap: 2 }}>
+          <Text style={{ color: palette.text, fontWeight: '800', fontSize: 15 }}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={{ color: palette.subtext, fontSize: 12 }}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        <View style={{ gap: 14 }}>{children}</View>
+      </View>
+    ),
+    [palette.divider, palette.subtext, palette.text],
+  );
+
   const renderMultiLookupSelector = useCallback(
     (
       label: string,
@@ -3368,6 +3597,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       options: any[],
       onChange: (values: string[]) => void,
       emptyText: string,
+      onCreateNew?: () => void,
     ) => {
       const normalizedValues = Array.isArray(selectedValues)
         ? selectedValues
@@ -3385,9 +3615,26 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       };
       return (
         <View style={{ gap: 8 }}>
-          <Text style={{ color: palette.text, fontWeight: '800' }}>
-            {label}
-          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: palette.text, fontWeight: '800' }}>
+              {label}
+            </Text>
+            {onCreateNew && options.length ? (
+              <KISButton
+                title="+ New"
+                size="xs"
+                variant="outline"
+                onPress={onCreateNew}
+              />
+            ) : null}
+          </View>
           {selectedItems.length ? (
             <View
               style={{
@@ -3487,6 +3734,28 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                   </Pressable>
                 );
               })}
+            </View>
+          ) : onCreateNew ? (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: 14,
+                padding: 12,
+                backgroundColor: palette.card,
+                gap: 10,
+              }}
+            >
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                No items available yet.{'\n'}Create an item first to
+                continue.
+              </Text>
+              <KISButton
+                title="Create item"
+                size="xs"
+                variant="secondary"
+                onPress={onCreateNew}
+              />
             </View>
           ) : (
             <Text style={{ color: palette.subtext, fontSize: 12 }}>
@@ -4857,11 +5126,14 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               onChange={updateCourseModuleFormText('module_order')}
               keyboardType="numeric"
             />
-            <KISTextInput
-              label="Status"
-              value={toInputText(courseModuleForm.status)}
-              onChange={updateCourseModuleFormText('status')}
-            />
+            {renderOptionPicker(
+              'Status',
+              toText(courseModuleForm.status),
+              ACADEMIC_STATUS_OPTIONS,
+              value =>
+                setCourseModuleForm(prev => ({ ...prev, status: value })),
+              courseModuleSubmitting,
+            )}
             <KISButton
               title={
                 courseModuleForm.is_preview
@@ -5062,25 +5334,25 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 })),
               'Choose the module that should contain this learning item.',
               false,
+              () => openCourseModuleEditor(),
             )}
-            <KISTextInput
-              label="Item type"
-              value={toInputText(courseModuleItemForm.item_type)}
-              onChange={value => {
-                const textValue = getTextInputValue(value);
+            {renderOptionPicker(
+              'Item type',
+              toText(courseModuleItemForm.item_type),
+              MODULE_ITEM_TYPE_OPTIONS,
+              value =>
                 setCourseModuleItemForm(prev => ({
                   ...prev,
-                  item_type: textValue,
+                  item_type: value,
                   lesson_id: '',
                   material_id: '',
                   class_session_id: '',
                   assessment_id: '',
                   event_id: '',
                   broadcast_id: '',
-                }));
-              }}
-              placeholder="lesson, material, class_session, assessment, event, broadcast"
-            />
+                })),
+              courseModuleSubmitting,
+            )}
             {renderLookupSelector(
               'Linked item',
               toText(
@@ -7904,72 +8176,100 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           'Program image',
                           'Used when this program is advertised on public broadcast and discovery pages.',
                         )}
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="draft"
-                        />
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          ACADEMIC_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     {activeModuleKey === 'courses' ? (
                       <>
-                        <KISTextInput
-                          label="Title"
-                          value={toInputText(moduleForm.title)}
-                          onChange={updateModuleFormText('title')}
-                        />
-                        <KISTextInput
-                          label="Code"
-                          value={toInputText(moduleForm.code)}
-                          onChange={updateModuleFormText('code')}
-                        />
-                        <KISTextInput
-                          label="Summary"
-                          value={toInputText(moduleForm.summary)}
-                          onChange={updateModuleFormText('summary')}
-                          multiline
-                          style={{ minHeight: 70 }}
-                        />
-                        <KISTextInput
-                          label="Description"
-                          value={toInputText(moduleForm.description)}
-                          onChange={updateModuleFormText('description')}
-                          multiline
-                          style={{ minHeight: 90 }}
-                        />
-                        {renderModuleCoverImageField(
-                          'Course image',
-                          'Used to advertise this course in the broadcast discovery experience.',
+                        {renderFieldSection(
+                          'Basic info',
+                          undefined,
+                          <>
+                            <KISTextInput
+                              label="Title"
+                              value={toInputText(moduleForm.title)}
+                              onChange={updateModuleFormText('title')}
+                            />
+                            <KISTextInput
+                              label="Code"
+                              value={toInputText(moduleForm.code)}
+                              onChange={updateModuleFormText('code')}
+                            />
+                          </>,
                         )}
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="draft"
-                        />
-                        <KISDateTimeInput
-                          label="Duration minutes"
-                          value={toInputText(moduleForm.duration_minutes)}
-                          onChange={updateModuleFormText('duration_minutes')}
-                          keyboardType="numeric"
-                        />
-                        <KISTextInput
-                          label="Seat limit"
-                          value={toInputText(moduleForm.seat_limit)}
-                          onChange={updateModuleFormText('seat_limit')}
-                          keyboardType="numeric"
-                        />
-                        {renderLookupSelector(
-                          'Program',
-                          toText(moduleForm.program_id),
-                          moduleLookups.programs,
-                          value =>
-                            setModuleForm(prev => ({
-                              ...prev,
-                              program_id: value,
-                            })),
-                          'Choose the parent program for this course.',
+                        {renderFieldSection(
+                          'Content',
+                          'What students see when browsing this course.',
+                          <>
+                            <KISTextInput
+                              label="Summary"
+                              value={toInputText(moduleForm.summary)}
+                              onChange={updateModuleFormText('summary')}
+                              multiline
+                              style={{ minHeight: 70 }}
+                            />
+                            <KISTextInput
+                              label="Description"
+                              value={toInputText(moduleForm.description)}
+                              onChange={updateModuleFormText('description')}
+                              multiline
+                              style={{ minHeight: 90 }}
+                            />
+                            {renderModuleCoverImageField(
+                              'Course image',
+                              'Used to advertise this course in the broadcast discovery experience.',
+                            )}
+                          </>,
+                        )}
+                        {renderFieldSection(
+                          'Scheduling & capacity',
+                          undefined,
+                          <>
+                            <KISTextInput
+                              label="Duration minutes"
+                              value={toInputText(moduleForm.duration_minutes)}
+                              onChange={updateModuleFormText('duration_minutes')}
+                              keyboardType="numeric"
+                            />
+                            <KISTextInput
+                              label="Seat limit"
+                              value={toInputText(moduleForm.seat_limit)}
+                              onChange={updateModuleFormText('seat_limit')}
+                              keyboardType="numeric"
+                            />
+                          </>,
+                        )}
+                        {renderFieldSection(
+                          'Organization',
+                          undefined,
+                          <>
+                            {renderOptionPicker(
+                              'Status',
+                              toText(moduleForm.status),
+                              ACADEMIC_STATUS_OPTIONS,
+                              value => setModuleForm(prev => ({ ...prev, status: value })),
+                              moduleSubmitting,
+                            )}
+                            {renderLookupSelector(
+                              'Program (optional)',
+                              toText(moduleForm.program_id),
+                              moduleLookups.programs,
+                              value =>
+                                setModuleForm(prev => ({
+                                  ...prev,
+                                  program_id: value,
+                                })),
+                              'Choose the parent program for this course, or leave unset — a course does not require a program.',
+                              true,
+                              () => startInlineLookupCreate('programs', 'program_id', false),
+                            )}
+                          </>,
                         )}
                       </>
                     ) : null}
@@ -7986,6 +8286,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             })),
                           'Choose the parent course for this lesson.',
                           false,
+                          () => startInlineLookupCreate('courses', 'course_id', false),
                         )}
                         <KISTextInput
                           label="Title"
@@ -8016,18 +8317,19 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           onChange={updateModuleFormText('lesson_order')}
                           keyboardType="numeric"
                         />
-                        <KISDateTimeInput
+                        <KISTextInput
                           label="Duration minutes"
                           value={toInputText(moduleForm.duration_minutes)}
                           onChange={updateModuleFormText('duration_minutes')}
                           keyboardType="numeric"
                         />
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="draft"
-                        />
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          ACADEMIC_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     {activeModuleKey === 'classes' ? (
@@ -8059,6 +8361,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               lesson_id: '',
                             })),
                           'Choose the parent course for this class session.',
+                          true,
+                          () => startInlineLookupCreate('courses', 'course_id', false),
                         )}
                         {renderLookupSelector(
                           'Lesson',
@@ -8075,6 +8379,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               lesson_id: value,
                             })),
                           'Optionally link this class session to a lesson.',
+                          true,
+                          () => startInlineLookupCreate('lessons', 'lesson_id', false),
                         )}
                         <KISDateTimeInput
                           label="Starts at"
@@ -8093,11 +8399,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           value={toInputText(moduleForm.timezone_name)}
                           onChange={updateModuleFormText('timezone_name')}
                         />
-                        <KISTextInput
-                          label="Delivery mode"
-                          value={toInputText(moduleForm.delivery_mode)}
-                          onChange={updateModuleFormText('delivery_mode')}
-                        />
+                        {renderOptionPicker(
+                          'Delivery mode',
+                          toText(moduleForm.delivery_mode),
+                          DELIVERY_MODE_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, delivery_mode: value })),
+                          moduleSubmitting,
+                        )}
                         <KISTextInput
                           label="Location"
                           value={toInputText(moduleForm.location_text)}
@@ -8114,12 +8422,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="scheduled"
-                        />
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          CLASS_SESSION_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     {activeModuleKey === 'materials' ? (
@@ -8159,18 +8468,20 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                             'Material image',
                             'Used to advertise this material in education lists and related broadcasts.',
                           )}
-                          <KISTextInput
-                            label="Kind"
-                            value={toInputText(moduleForm.kind)}
-                            onChange={updateModuleFormText('kind')}
-                            placeholder="document"
-                          />
-                          <KISTextInput
-                            label="Status"
-                            value={toInputText(moduleForm.status)}
-                            onChange={updateModuleFormText('status')}
-                            placeholder="draft"
-                          />
+                          {renderOptionPicker(
+                            'Kind',
+                            toText(moduleForm.kind),
+                            MATERIAL_KIND_OPTIONS,
+                            value => setModuleForm(prev => ({ ...prev, kind: value })),
+                            moduleSubmitting,
+                          )}
+                          {renderOptionPicker(
+                            'Status',
+                            toText(moduleForm.status),
+                            ACADEMIC_STATUS_OPTIONS,
+                            value => setModuleForm(prev => ({ ...prev, status: value })),
+                            moduleSubmitting,
+                          )}
                         </View>
 
                         <View
@@ -8212,6 +8523,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 program_ids: values,
                               })),
                             'Select one or more programs.',
+                            () => startInlineLookupCreate('programs', 'program_ids', true),
                           )}
                           {renderMultiLookupSelector(
                             'Courses',
@@ -8225,6 +8537,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 course_ids: values,
                               })),
                             'Select one or more courses.',
+                            () => startInlineLookupCreate('courses', 'course_ids', true),
                           )}
                           {renderMultiLookupSelector(
                             'Lessons',
@@ -8250,6 +8563,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 lesson_ids: values,
                               })),
                             'Select one or more lessons.',
+                            () => startInlineLookupCreate('lessons', 'lesson_ids', true),
                           )}
                           {renderMultiLookupSelector(
                             'Class sessions',
@@ -8275,6 +8589,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 class_session_ids: values,
                               })),
                             'Select one or more class sessions.',
+                            () => startInlineLookupCreate('classes', 'class_session_ids', true),
                           )}
                           {renderMultiLookupSelector(
                             'Assessments',
@@ -8300,6 +8615,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 assessment_ids: values,
                               })),
                             'Select one or more assessments.',
+                            () => startInlineLookupCreate('exams', 'assessment_ids', true),
                           )}
                         </View>
 
@@ -8426,12 +8742,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           'Assessment image',
                           'Used when this assessment is highlighted or advertised through education broadcasts.',
                         )}
-                        <KISTextInput
-                          label="Assessment type"
-                          value={toInputText(moduleForm.assessment_type)}
-                          onChange={updateModuleFormText('assessment_type')}
-                          placeholder="mcq"
-                        />
+                        {renderOptionPicker(
+                          'Assessment type',
+                          toText(moduleForm.assessment_type),
+                          ASSESSMENT_TYPE_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, assessment_type: value })),
+                          moduleSubmitting,
+                        )}
                         {renderLookupSelector(
                           'Course',
                           toText(moduleForm.course_id),
@@ -8444,6 +8761,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: '',
                             })),
                           'Optionally link this exam to a course.',
+                          true,
+                          () => startInlineLookupCreate('courses', 'course_id', false),
                         )}
                         {renderLookupSelector(
                           'Lesson',
@@ -8460,6 +8779,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               lesson_id: value,
                             })),
                           'Optionally link this exam to a lesson.',
+                          true,
+                          () => startInlineLookupCreate('lessons', 'lesson_id', false),
                         )}
                         {renderLookupSelector(
                           'Class session',
@@ -8476,6 +8797,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: value,
                             })),
                           'Optionally link this exam to a class session.',
+                          true,
+                          () => startInlineLookupCreate('classes', 'class_session_id', false),
                         )}
                         <KISDateTimeInput
                           label="Starts at"
@@ -8489,7 +8812,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           mode="datetime"
                           onChange={updateModuleFormText('ends_at')}
                         />
-                        <KISDateTimeInput
+                        <KISTextInput
                           label="Duration minutes"
                           value={toInputText(moduleForm.duration_minutes)}
                           onChange={updateModuleFormText('duration_minutes')}
@@ -8507,12 +8830,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           onChange={updateModuleFormText('passing_score_percent')}
                           keyboardType="numeric"
                         />
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="draft"
-                        />
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          ACADEMIC_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     {activeModuleKey === 'events' ? (
@@ -8550,6 +8874,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               program_id: value,
                             })),
                           'Optionally link this event to a program.',
+                          true,
+                          () => startInlineLookupCreate('programs', 'program_id', false),
                         )}
                         {renderLookupSelector(
                           'Course',
@@ -8562,6 +8888,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: '',
                             })),
                           'Optionally link this event to a course.',
+                          true,
+                          () => startInlineLookupCreate('courses', 'course_id', false),
                         )}
                         {renderLookupSelector(
                           'Class session',
@@ -8578,13 +8906,16 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: value,
                             })),
                           'Optionally link this event to a class session.',
+                          true,
+                          () => startInlineLookupCreate('classes', 'class_session_id', false),
                         )}
-                        <KISTextInput
-                          label="Event type"
-                          value={toInputText(moduleForm.event_type)}
-                          onChange={updateModuleFormText('event_type')}
-                          placeholder="event"
-                        />
+                        {renderOptionPicker(
+                          'Event type',
+                          toText(moduleForm.event_type),
+                          EVENT_TYPE_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, event_type: value })),
+                          moduleSubmitting,
+                        )}
                         <KISDateTimeInput
                           label="Starts at"
                           value={moduleForm.starts_at}
@@ -8602,11 +8933,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           value={toInputText(moduleForm.timezone_name)}
                           onChange={updateModuleFormText('timezone_name')}
                         />
-                        <KISTextInput
-                          label="Delivery mode"
-                          value={toInputText(moduleForm.delivery_mode)}
-                          onChange={updateModuleFormText('delivery_mode')}
-                        />
+                        {renderOptionPicker(
+                          'Delivery mode',
+                          toText(moduleForm.delivery_mode),
+                          DELIVERY_MODE_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, delivery_mode: value })),
+                          moduleSubmitting,
+                        )}
                         <KISTextInput
                           label="Location"
                           value={toInputText(moduleForm.location_text)}
@@ -8623,12 +8956,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           onChange={updateModuleFormText('seat_limit')}
                           keyboardType="numeric"
                         />
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="draft"
-                        />
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          ACADEMIC_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     {activeModuleKey === 'broadcasts' ? (
@@ -8652,12 +8986,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           multiline
                           style={{ minHeight: 90 }}
                         />
-                        <KISTextInput
-                          label="Broadcast kind"
-                          value={toInputText(moduleForm.broadcast_kind)}
-                          onChange={updateModuleFormText('broadcast_kind')}
-                          placeholder="program, course, lesson, class_session, event, training_session, institution_notice"
-                        />
+                        {renderOptionPicker(
+                          'Broadcast kind',
+                          toText(moduleForm.broadcast_kind),
+                          BROADCAST_KIND_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, broadcast_kind: value })),
+                          moduleSubmitting,
+                        )}
                         {renderLookupSelector(
                           'Program',
                           toText(moduleForm.program_id),
@@ -8668,6 +9003,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               program_id: value,
                             })),
                           'Optionally target a program.',
+                          true,
+                          () => startInlineLookupCreate('programs', 'program_id', false),
                         )}
                         {renderLookupSelector(
                           'Course',
@@ -8681,6 +9018,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: '',
                             })),
                           'Optionally target a course.',
+                          true,
+                          () => startInlineLookupCreate('courses', 'course_id', false),
                         )}
                         {renderLookupSelector(
                           'Lesson',
@@ -8697,6 +9036,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               lesson_id: value,
                             })),
                           'Optionally target a lesson.',
+                          true,
+                          () => startInlineLookupCreate('lessons', 'lesson_id', false),
                         )}
                         {renderLookupSelector(
                           'Class session',
@@ -8713,6 +9054,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               class_session_id: value,
                             })),
                           'Optionally target a class session.',
+                          true,
+                          () => startInlineLookupCreate('classes', 'class_session_id', false),
                         )}
                         {renderLookupSelector(
                           'Event',
@@ -8724,6 +9067,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               event_id: value,
                             })),
                           'Optionally target an event or training session.',
+                          true,
+                          () => startInlineLookupCreate('events', 'event_id', false),
                         )}
                         <KISDateTimeInput
                           label="Starts at"
@@ -8754,17 +9099,16 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                           onChange={updateModuleFormText('price_amount')}
                           keyboardType="numeric"
                         />
-                        <KISTextInput
-                          label="Price currency"
-                          value={toInputText(moduleForm.price_currency)}
-                          onChange={updateModuleFormText('price_currency')}
-                        />
-                        <KISTextInput
-                          label="Status"
-                          value={toInputText(moduleForm.status)}
-                          onChange={updateModuleFormText('status')}
-                          placeholder="published"
-                        />
+                        <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                          Currency is fixed to USD by the platform.
+                        </Text>
+                        {renderOptionPicker(
+                          'Status',
+                          toText(moduleForm.status),
+                          BROADCAST_STATUS_OPTIONS,
+                          value => setModuleForm(prev => ({ ...prev, status: value })),
+                          moduleSubmitting,
+                        )}
                       </>
                     ) : null}
                     <View style={{ flexDirection: 'row', gap: 10 }}>

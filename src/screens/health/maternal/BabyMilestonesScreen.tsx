@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -223,13 +224,12 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
               ))}
             </ScrollView>
 
-            <Text style={styles.fieldLabel}>Date (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 2025-03-15"
-              placeholderTextColor={palette.subtext}
-              value={milestoneDate}
-              onChangeText={setMilestoneDate}
+            <Text style={styles.fieldLabel}>Date</Text>
+            <KISDateTimeInput
+              mode="date"
+              value={milestoneDate || null}
+              onChange={(isoValue) => setMilestoneDate(isoValue.slice(0, 10))}
+              placeholder="Select milestone date"
             />
 
             <Text style={styles.fieldLabel}>Notes (optional)</Text>
