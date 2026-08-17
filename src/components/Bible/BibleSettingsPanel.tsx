@@ -364,7 +364,8 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
                 Visible only when the current account can access KCAN admin Bible APIs.
               </Text>
             </View>
-            <KISButton title={scanning ? 'Scanning...' : 'Scan'} size="xs" onPress={scanRegistry} disabled={scanning} />
+            <KISButton title={scanning ? 'Scanning...' : 'Scan'}
+            loading={scanning} size="xs" onPress={scanRegistry} disabled={scanning} />
           </View>
 
           <Text style={[styles.label, { color: palette.subtext }]}>Translation registry</Text>

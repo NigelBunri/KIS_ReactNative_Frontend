@@ -349,6 +349,7 @@ export default function LabOrderManager({ institutionId, engineKey }: Props) {
         <View style={{ gap: spacing.xs }}>
           <KISButton
             title={catalogSaving ? 'Saving...' : editingTestId ? 'Update Test' : 'Add Test'}
+            loading={catalogSaving}
             onPress={() => {
               saveLabTest().catch(() => undefined);
             }}

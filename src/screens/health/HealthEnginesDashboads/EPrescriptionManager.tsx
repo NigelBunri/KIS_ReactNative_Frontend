@@ -424,6 +424,7 @@ export default function EPrescriptionManager({ institutionId, engineKey }: Props
         <View style={{ gap: spacing.xs }}>
           <KISButton
             title={drugsSaving ? 'Saving...' : editingDrugId ? 'Update Drug' : 'Add Drug'}
+            loading={drugsSaving}
             onPress={() => {
               saveDrug().catch(() => undefined);
             }}

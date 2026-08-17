@@ -277,6 +277,7 @@ export default function EHRManager({ institutionId }: Props) {
 
         <KISButton
           title={savingPatient ? "Saving…" : "Create Patient"}
+          loading={savingPatient}
           onPress={createPatient}
         />
       </View>
@@ -328,6 +329,7 @@ export default function EHRManager({ institutionId }: Props) {
             <>
               <KISButton
                 title={addingVisit ? "Adding…" : "Add Visit"}
+                loading={addingVisit}
                 onPress={addVisit}
               />
 

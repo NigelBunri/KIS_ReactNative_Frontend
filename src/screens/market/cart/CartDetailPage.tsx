@@ -669,6 +669,7 @@ const CartDetailPage = () => {
                   ? 'Placing order…'
                   : 'Proceed to Checkout'
               }
+              loading={paymentProcessing}
               size="sm"
               variant="primary"
               disabled={checkingOut || paymentProcessing}

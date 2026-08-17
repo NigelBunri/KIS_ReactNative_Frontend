@@ -1028,6 +1028,7 @@ export default function EducationDetailSheet({
           />
           <KISButton
             title={resourceBusy ? 'Downloading…' : 'Download'}
+            loading={resourceBusy}
             size="sm"
             disabled={!resourceUrl || !hasLearningAccess || resourceBusy}
             onPress={() =>
@@ -1937,6 +1938,7 @@ export default function EducationDetailSheet({
                       <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
                         <KISButton
                           title={bookingBusy ? 'Releasing…' : 'Mark satisfied'}
+                          loading={bookingBusy}
                           size="sm"
                           onPress={() => void handleMarkSatisfied()}
                           disabled={bookingBusy}

@@ -481,6 +481,7 @@ export default function InstitutionOnboardingScreen() {
         <KISButton title="Previous" variant="outline" onPress={handlePrev} disabled={currentStep === 0} />
         <KISButton
           title={currentStep + 1 === sections.length ? (submitting ? 'Submitting…' : 'Submit') : 'Next'}
+          loading={currentStep + 1 === sections.length}
           onPress={currentStep + 1 === sections.length ? handleSubmit : handleNext}
           disabled={submitting}
         />

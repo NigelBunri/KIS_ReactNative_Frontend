@@ -316,6 +316,7 @@ const OrganizationAppFormScreen = () => {
               </View>
               <KISButton
                 title={iconUploading ? 'Uploading...' : iconPreview ? 'Replace icon' : 'Pick icon'}
+                loading={iconUploading}
                 onPress={handlePickIcon}
                 disabled={iconUploading}
                 size="sm"
@@ -469,6 +470,7 @@ const OrganizationAppFormScreen = () => {
         <View style={{ marginTop: 16 }}>
           <KISButton
             title={submitting ? 'Saving…' : isEditing ? 'Update app' : 'Create app'}
+            loading={submitting}
             onPress={handleSubmit}
             disabled={submitting}
             size="sm"

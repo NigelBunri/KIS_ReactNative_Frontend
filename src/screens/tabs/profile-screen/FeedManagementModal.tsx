@@ -761,6 +761,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                             ? 'Broadcasting…'
                             : 'Broadcast'
                         }
+                        loading={panelFeedBroadcastingId === feed.id}
                         size="xs"
                         variant="outline"
                         onPress={() => handleBroadcastFeedItem(feed)}
@@ -773,6 +774,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                             ? 'Removing…'
                             : 'Remove live'
                         }
+                        loading={panelFeedBroadcastingId === feed.id}
                         size="xs"
                         variant="outline"
                         onPress={() => handleRemoveBroadcastFeedItem(feed)}
@@ -783,6 +785,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                       title={
                         panelFeedDeletingId === feed.id ? 'Deleting…' : 'Delete'
                       }
+                      loading={panelFeedDeletingId === feed.id}
                       size="xs"
                       variant="secondary"
                       onPress={() => handleDeleteFeedItem(feed.id)}
@@ -1069,6 +1072,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                 ? 'Update broadcast item'
                 : 'Add broadcast item'
             }
+            loading={panelFeedAdding}
             onPress={handleSubmitFeedItem}
             disabled={panelFeedAdding}
           />

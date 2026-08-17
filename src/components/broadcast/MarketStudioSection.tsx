@@ -1065,6 +1065,7 @@ export default function MarketStudioSection({
         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
           <KISButton
             title={isSubmittingShop ? 'Saving…' : isEditingShop ? 'Update shop' : 'Create shop'}
+            loading={isSubmittingShop}
             onPress={handleShopSubmit}
             disabled={isSubmittingShop || (!isEditingShop && !canCreateShop)}
           />
@@ -1137,6 +1138,7 @@ export default function MarketStudioSection({
         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
           <KISButton
             title={isSubmittingProduct ? 'Saving…' : isEditingProduct ? 'Update product' : 'Add product'}
+            loading={isSubmittingProduct}
             onPress={handleProductSubmit}
             disabled={isSubmittingProduct || (!isEditingProduct && !canAddProduct)}
           />

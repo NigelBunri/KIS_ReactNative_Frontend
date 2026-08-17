@@ -5160,6 +5160,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 }
                 onPress={() => void handleSaveCourseModule()}
                 disabled={courseModuleSubmitting}
+                loading={courseModuleSubmitting}
               />
               <KISButton
                 title="Cancel"
@@ -5183,53 +5184,43 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 gap: 10,
               }}
             >
+              <View style={{ gap: 4 }}>
+                <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>
+                  {module.title || `Module ${index + 1}`}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                  {module.summary || `${module.items?.length || 0} items`}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 11 }}>
+                  {module.item_count || module.items?.length || 0} items •{' '}
+                  {module.duration_minutes || 0} min
+                </Text>
+              </View>
               <View
                 style={{
                   flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: 10,
+                  gap: 8,
+                  flexWrap: 'wrap',
                 }}
               >
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={{ color: palette.text, fontWeight: '900' }}>
-                    {module.title || `Module ${index + 1}`}
-                  </Text>
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    {module.summary || `${module.items?.length || 0} items`}
-                  </Text>
-                  <Text style={{ color: palette.subtext, fontSize: 11 }}>
-                    {module.item_count || module.items?.length || 0} items •{' '}
-                    {module.duration_minutes || 0} min
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: 8,
-                    flexWrap: 'wrap',
-                    justifyContent: 'flex-end',
-                  }}
-                >
-                  <KISButton
-                    title="Edit"
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openCourseModuleEditor(module)}
-                  />
-                  <KISButton
-                    title="Add item"
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openCourseModuleItemEditor(module.id)}
-                  />
-                  <KISButton
-                    title="Delete"
-                    size="xs"
-                    variant="secondary"
-                    onPress={() => handleDeleteCourseModule(module)}
-                  />
-                </View>
+                <KISButton
+                  title="Edit"
+                  size="xs"
+                  variant="outline"
+                  onPress={() => openCourseModuleEditor(module)}
+                />
+                <KISButton
+                  title="Add item"
+                  size="xs"
+                  variant="outline"
+                  onPress={() => openCourseModuleItemEditor(module.id)}
+                />
+                <KISButton
+                  title="Delete"
+                  size="xs"
+                  variant="secondary"
+                  onPress={() => handleDeleteCourseModule(module)}
+                />
               </View>
               {(module.items || []).length ? (
                 (module.items || []).map((item: any, itemIndex: number) => (
@@ -5407,6 +5398,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 }
                 onPress={() => void handleSaveCourseModuleItem()}
                 disabled={courseModuleSubmitting}
+                loading={courseModuleSubmitting}
               />
               <KISButton
                 title="Cancel"
@@ -7445,6 +7437,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               }
               onPress={handleSaveInstitution}
               disabled={institutionSubmitting}
+              loading={institutionSubmitting || logoUploading}
             />
             <KISButton
               title="Cancel"
@@ -9122,6 +9115,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                         }
                         onPress={handleSaveModuleRecord}
                         disabled={moduleSubmitting}
+                        loading={moduleSubmitting}
                       />
                       <KISButton
                         title="Cancel"

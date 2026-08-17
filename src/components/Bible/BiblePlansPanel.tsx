@@ -1125,6 +1125,7 @@ export default function BiblePlansPanel() {
                   {!enrolled ? (
                     <KISButton
                       title={enrollingPlanId === plan.id ? 'Enrolling…' : 'Start Plan'}
+                      loading={enrollingPlanId === plan.id}
                       size="sm"
                       disabled={enrollingPlanId === plan.id}
                       onPress={() => enrollInPlan(plan)}

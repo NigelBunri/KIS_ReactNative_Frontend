@@ -1404,6 +1404,7 @@ export default function InstitutionServicesCatalogScreen({
             <View style={{ marginTop: spacing.sm }}>
               <KISButton
                 title={saving ? 'Saving...' : 'Add Service'}
+                loading={saving}
                 onPress={addCustomService}
                 disabled={saving}
               />

@@ -228,6 +228,7 @@ export function FinancialPanel({ palette, profileId, organizationId, refreshKey 
               </View>
               <KISButton
                 title={pendingReconcileId === entry.id ? 'Reconciling…' : 'Reconcile'}
+                loading={pendingReconcileId === entry.id}
                 size="xs"
                 variant="outline"
                 onPress={() => {
@@ -290,6 +291,7 @@ export function FinancialPanel({ palette, profileId, organizationId, refreshKey 
               </Text>
               <KISButton
                 title={pendingDisputeId === dispute.id ? 'Resolving…' : 'Resolve'}
+                loading={pendingDisputeId === dispute.id}
                 size="xs"
                 variant="outline"
                 onPress={() => {

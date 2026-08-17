@@ -361,6 +361,7 @@ export function VerificationCenterSheet({
               <View style={styles.evidenceUploadRow}>
                 <KISButton
                   title={uploadingEvidence ? 'Uploading...' : 'Upload private evidence'}
+                  loading={uploadingEvidence}
                   variant="secondary"
                   size="sm"
                   onPress={pickEvidenceFile}
@@ -452,6 +453,7 @@ export function VerificationCenterSheet({
 
             <KISButton
               title={submitting ? 'Submitting...' : pendingCaseId ? 'Add evidence to case' : 'Submit verification request'}
+              loading={submitting}
               onPress={submit}
               disabled={submitting}
             />

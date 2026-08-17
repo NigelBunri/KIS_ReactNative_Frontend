@@ -306,6 +306,7 @@ export default function WhistleblowerScreen(_props: Props) {
 
                   <KISButton
                     title={submitting ? 'Submitting…' : 'Submit Report'}
+                    loading={submitting}
                     onPress={handleSubmit}
                     disabled={submitting}
                     style={{ marginTop: 20 }}
@@ -329,6 +330,7 @@ export default function WhistleblowerScreen(_props: Props) {
 
               <KISButton
                 title={checking ? 'Checking…' : 'Check Status'}
+                loading={checking}
                 onPress={handleCheckStatus}
                 disabled={checking}
                 style={{ marginTop: 16 }}

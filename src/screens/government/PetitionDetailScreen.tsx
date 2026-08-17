@@ -231,6 +231,7 @@ export default function PetitionDetailScreen({ route }: Props) {
         {/* Sign CTA */}
         <KISButton
           title={signing ? 'Signing…' : 'Sign Petition'}
+          loading={signing}
           onPress={handleSign}
           disabled={signing}
           style={{ marginTop: 16 }}

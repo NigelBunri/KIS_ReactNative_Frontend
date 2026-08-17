@@ -92,7 +92,8 @@ export function EditItemModal(props: EditItemModalProps) {
         </Pressable>
       )}
 
-      <KISButton title={saving ? 'Saving...' : 'Save'} onPress={saveItem} disabled={saving} />
+      <KISButton title={saving ? 'Saving...' : 'Save'}
+      loading={saving} onPress={saveItem} disabled={saving} />
     </View>
     </KeyboardAvoidingView>
   );

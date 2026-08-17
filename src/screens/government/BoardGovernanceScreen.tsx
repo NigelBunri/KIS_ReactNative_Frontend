@@ -309,6 +309,7 @@ export default function BoardGovernanceScreen(_props: Props) {
                         title={
                           voting === election.id ? 'Submitting…' : 'Cast Vote'
                         }
+                        loading={voting === election.id}
                         onPress={() => handleVote(election.id)}
                         disabled={
                           voting === election.id ||

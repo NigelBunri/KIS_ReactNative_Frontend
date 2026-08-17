@@ -310,6 +310,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         <View style={{ gap: spacing.xs }}>
           <KISButton
             title={saving ? 'Saving...' : editingTypeId ? 'Update Type' : 'Create Type'}
+            loading={saving}
             onPress={() => {
               createOrUpdateType().catch(() => undefined);
             }}
@@ -320,6 +321,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
           ) : null}
           <KISButton
             title={loading ? 'Refreshing...' : 'Reload Types'}
+            loading={loading}
             variant="outline"
             onPress={() => {
               loadTypes().catch(() => undefined);
@@ -370,6 +372,7 @@ export default function AppointmentManager({ institutionId, engineKey }: Props) 
         {slots.length > 0 && (
           <KISButton
             title={publishing ? 'Publishing…' : 'Publish Slots to Booking Engine'}
+            loading={publishing}
             variant="primary"
             disabled={publishing}
             style={{ marginTop: spacing.sm }}

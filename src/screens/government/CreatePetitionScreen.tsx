@@ -199,6 +199,7 @@ export default function CreatePetitionScreen({ navigation }: Props) {
 
           <KISButton
             title={saving ? 'Creating…' : 'Create Petition'}
+            loading={saving}
             onPress={handleSubmit}
             disabled={saving}
             style={{ marginTop: 24 }}

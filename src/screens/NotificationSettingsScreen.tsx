@@ -317,6 +317,7 @@ export default function NotificationSettingsScreen() {
         <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <KISButton
             title={saving ? 'Saving…' : 'Save'}
+            loading={saving}
             disabled={saving}
             onPress={handleSave}
             variant="primary"

@@ -4215,6 +4215,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Preparing...'
                       : 'Retry Workflow Setup'
                   }
+                  loading={workflowContextLoading}
                   size="xs"
                   variant="outline"
                   onPress={() => {
@@ -4511,6 +4512,7 @@ export default function HealthServiceSessionScreen({
                   title={
                     appointmentLoading ? 'Refreshing...' : 'Refresh Booking'
                   }
+                  loading={appointmentLoading}
                   variant="outline"
                   onPress={() => {
                     loadAppointmentBooking().catch(() => undefined);
@@ -4530,6 +4532,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       busy ? 'Processing...' : 'Reschedule (Next Available)'
                     }
+                    loading={busy}
                     onPress={() => {
                       rescheduleToNextAvailable().catch(() => undefined);
                     }}
@@ -4539,6 +4542,7 @@ export default function HealthServiceSessionScreen({
                 {appointmentCanMutate ? (
                   <KISButton
                     title={busy ? 'Processing...' : 'Cancel Appointment'}
+                    loading={busy}
                     variant="outline"
                     onPress={() => {
                       cancelBooking().catch(() => undefined);
@@ -4665,6 +4669,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Video Session'
                       : 'Prepare Video Session'
                   }
+                  loading={videoLoading}
                   variant="outline"
                   onPress={() => {
                     refreshVideoSession().catch(() => undefined);
@@ -4808,6 +4813,7 @@ export default function HealthServiceSessionScreen({
                     </Text>
                     <KISButton
                       title={videoItemsLoading ? 'Loading...' : 'Reload'}
+                      loading={videoItemsLoading}
                       size="xs"
                       variant="outline"
                       onPress={() => {
@@ -5003,6 +5009,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       videoBusy ? 'Processing...' : 'Complete Video Session'
                     }
+                    loading={videoBusy}
                     onPress={() => {
                       endVideoSession('completed').catch(() => undefined);
                     }}
@@ -5016,6 +5023,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={videoBusy ? 'Processing...' : 'Cancel Video Session'}
+                    loading={videoBusy}
                     variant="outline"
                     onPress={() => {
                       endVideoSession('cancelled').catch(() => undefined);
@@ -5148,6 +5156,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Messaging'
                       : 'Prepare Messaging'
                   }
+                  loading={messagingLoading}
                   variant="outline"
                   onPress={() => {
                     refreshMessagingSession({ markRead: false }).catch(
@@ -5234,6 +5243,7 @@ export default function HealthServiceSessionScreen({
                   <View style={{ marginTop: spacing.xs }}>
                     <KISButton
                       title={messagingBusy ? 'Sending...' : 'Send Message'}
+                      loading={messagingBusy}
                       onPress={() => {
                         sendMessage().catch(() => undefined);
                       }}
@@ -5338,6 +5348,7 @@ export default function HealthServiceSessionScreen({
                         ? 'Processing...'
                         : 'Complete Messaging Session'
                     }
+                    loading={messagingBusy}
                     onPress={() => {
                       endMessagingSession('completed').catch(() => undefined);
                     }}
@@ -5354,6 +5365,7 @@ export default function HealthServiceSessionScreen({
                         ? 'Processing...'
                         : 'Close Messaging Session'
                     }
+                    loading={messagingBusy}
                     variant="outline"
                     onPress={() => {
                       endMessagingSession('closed').catch(() => undefined);
@@ -5557,6 +5569,7 @@ export default function HealthServiceSessionScreen({
                               ? 'Refresh Engine'
                               : 'Prepare Engine'
                           }
+                          loading={clinicalLoading[engineCode]}
                           variant="outline"
                           onPress={() => {
                             refreshClinicalSession(engineCode).catch(
@@ -5639,6 +5652,7 @@ export default function HealthServiceSessionScreen({
                                 ? 'Processing...'
                                 : 'Complete Engine'
                             }
+                            loading={clinicalBusy[engineCode]}
                             onPress={() => {
                               finishClinicalSession(
                                 engineCode,
@@ -5658,6 +5672,7 @@ export default function HealthServiceSessionScreen({
                                 ? 'Processing...'
                                 : 'Cancel Engine'
                             }
+                            loading={clinicalBusy[engineCode]}
                             variant="outline"
                             onPress={() => {
                               finishClinicalSession(
@@ -5799,6 +5814,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Admission'
                       : 'Prepare Admission'
                   }
+                  loading={admissionLoading}
                   variant="outline"
                   onPress={() => {
                     refreshAdmissionSession().catch(() => undefined);
@@ -5923,6 +5939,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       admissionBusy ? 'Processing...' : 'Complete Admission'
                     }
+                    loading={admissionBusy}
                     onPress={() => {
                       finishAdmissionSession('completed').catch(
                         () => undefined,
@@ -5937,6 +5954,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={admissionBusy ? 'Processing...' : 'Cancel Admission'}
+                    loading={admissionBusy}
                     variant="outline"
                     onPress={() => {
                       finishAdmissionSession('cancelled').catch(
@@ -6075,6 +6093,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Emergency'
                       : 'Prepare Emergency'
                   }
+                  loading={emergencyLoading}
                   variant="outline"
                   onPress={() => {
                     refreshEmergencySession().catch(() => undefined);
@@ -6193,6 +6212,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={emergencyBusy ? 'Sending...' : 'Send Tracking Ping'}
+                    loading={emergencyBusy}
                     onPress={() => {
                       sendEmergencyTrackingPing().catch(() => undefined);
                     }}
@@ -6250,6 +6270,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       emergencyBusy ? 'Processing...' : 'Resolve Emergency'
                     }
+                    loading={emergencyBusy}
                     onPress={() => {
                       finishEmergencySession('resolved').catch(() => undefined);
                     }}
@@ -6262,6 +6283,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={emergencyBusy ? 'Processing...' : 'Cancel Emergency'}
+                    loading={emergencyBusy}
                     variant="outline"
                     onPress={() => {
                       finishEmergencySession('cancelled').catch(
@@ -6399,6 +6421,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Pharmacy'
                       : 'Prepare Pharmacy'
                   }
+                  loading={pharmacyLoading}
                   variant="outline"
                   onPress={() => {
                     refreshPharmacySession().catch(() => undefined);
@@ -6519,6 +6542,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       pharmacyBusy ? 'Sending...' : 'Send Fulfillment Ping'
                     }
+                    loading={pharmacyBusy}
                     onPress={() => {
                       sendPharmacyTrackingPing().catch(() => undefined);
                     }}
@@ -6576,6 +6600,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       pharmacyBusy ? 'Processing...' : 'Complete Fulfillment'
                     }
+                    loading={pharmacyBusy}
                     onPress={() => {
                       finishPharmacySession('completed').catch(() => undefined);
                     }}
@@ -6590,6 +6615,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       pharmacyBusy ? 'Processing...' : 'Cancel Fulfillment'
                     }
+                    loading={pharmacyBusy}
                     variant="outline"
                     onPress={() => {
                       finishPharmacySession('cancelled').catch(() => undefined);
@@ -6762,6 +6788,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Billing'
                       : 'Prepare Billing'
                   }
+                  loading={billingLoading}
                   variant="outline"
                   onPress={() => {
                     refreshBillingSession().catch(() => undefined);
@@ -6841,6 +6868,7 @@ export default function HealthServiceSessionScreen({
                 <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
                   <KISButton
                     title={billingBusy ? 'Processing...' : 'Complete Billing'}
+                    loading={billingBusy}
                     onPress={() => {
                       finishBillingSession('completed').catch(() => undefined);
                     }}
@@ -6855,6 +6883,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       billingBusy ? 'Processing...' : 'Mark Billing Failed'
                     }
+                    loading={billingBusy}
                     variant="outline"
                     onPress={() => {
                       finishBillingSession('failed').catch(() => undefined);
@@ -6868,6 +6897,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={billingBusy ? 'Processing...' : 'Cancel Billing'}
+                    loading={billingBusy}
                     variant="outline"
                     onPress={() => {
                       finishBillingSession('cancelled').catch(() => undefined);
@@ -7015,6 +7045,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Logistics'
                       : 'Prepare Logistics'
                   }
+                  loading={homeLogisticsLoading}
                   variant="outline"
                   onPress={() => {
                     refreshHomeLogisticsSession().catch(() => undefined);
@@ -7141,6 +7172,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       homeLogisticsBusy ? 'Sending...' : 'Send Logistics Ping'
                     }
+                    loading={homeLogisticsBusy}
                     onPress={() => {
                       sendHomeLogisticsTrackingPing().catch(() => undefined);
                     }}
@@ -7198,6 +7230,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       homeLogisticsBusy ? 'Processing...' : 'Complete Logistics'
                     }
+                    loading={homeLogisticsBusy}
                     onPress={() => {
                       finishHomeLogisticsSession('completed').catch(
                         () => undefined,
@@ -7214,6 +7247,7 @@ export default function HealthServiceSessionScreen({
                     title={
                       homeLogisticsBusy ? 'Processing...' : 'Cancel Logistics'
                     }
+                    loading={homeLogisticsBusy}
                     variant="outline"
                     onPress={() => {
                       finishHomeLogisticsSession('cancelled').catch(
@@ -7355,6 +7389,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Wellness'
                       : 'Prepare Wellness'
                   }
+                  loading={wellnessLoading}
                   variant="outline"
                   onPress={() => {
                     refreshWellnessSession().catch(() => undefined);
@@ -7496,6 +7531,7 @@ export default function HealthServiceSessionScreen({
                 <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
                   <KISButton
                     title={wellnessBusy ? 'Sending...' : 'Send Wellness Ping'}
+                    loading={wellnessBusy}
                     onPress={() => {
                       sendWellnessActivityPing().catch(() => undefined);
                     }}
@@ -7551,6 +7587,7 @@ export default function HealthServiceSessionScreen({
                 <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
                   <KISButton
                     title={wellnessBusy ? 'Processing...' : 'Complete Wellness'}
+                    loading={wellnessBusy}
                     onPress={() => {
                       finishWellnessSession('completed').catch(() => undefined);
                     }}
@@ -7563,6 +7600,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={wellnessBusy ? 'Processing...' : 'Cancel Wellness'}
+                    loading={wellnessBusy}
                     variant="outline"
                     onPress={() => {
                       finishWellnessSession('cancelled').catch(() => undefined);
@@ -7697,6 +7735,7 @@ export default function HealthServiceSessionScreen({
                       ? 'Refresh Reminder'
                       : 'Prepare Reminder'
                   }
+                  loading={reminderLoading}
                   variant="outline"
                   onPress={() => {
                     refreshReminderSession().catch(() => undefined);
@@ -7805,6 +7844,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={reminderBusy ? 'Sending...' : 'Send Delivery Ping'}
+                    loading={reminderBusy}
                     onPress={() => {
                       sendReminderDeliveryPing().catch(() => undefined);
                     }}
@@ -7860,6 +7900,7 @@ export default function HealthServiceSessionScreen({
                 <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
                   <KISButton
                     title={reminderBusy ? 'Processing...' : 'Complete Reminder'}
+                    loading={reminderBusy}
                     onPress={() => {
                       finishReminderSession('completed').catch(() => undefined);
                     }}
@@ -7872,6 +7913,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={reminderBusy ? 'Processing...' : 'Disable Reminder'}
+                    loading={reminderBusy}
                     variant="outline"
                     onPress={() => {
                       finishReminderSession('disabled').catch(() => undefined);
@@ -7885,6 +7927,7 @@ export default function HealthServiceSessionScreen({
                   />
                   <KISButton
                     title={reminderBusy ? 'Processing...' : 'Cancel Reminder'}
+                    loading={reminderBusy}
                     variant="outline"
                     onPress={() => {
                       finishReminderSession('cancelled').catch(() => undefined);

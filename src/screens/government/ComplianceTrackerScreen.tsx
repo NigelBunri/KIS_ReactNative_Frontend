@@ -352,6 +352,7 @@ export default function ComplianceTrackerScreen(_props: Props) {
               />
               <KISButton
                 title={saving ? 'Saving…' : 'Add Deadline'}
+                loading={saving}
                 onPress={handleAddDeadline}
                 disabled={saving}
                 style={{ marginTop: 20 }}

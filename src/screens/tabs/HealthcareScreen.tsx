@@ -2195,6 +2195,7 @@ export default function HealthcareScreen() {
           />
           <KISButton
             title={sessionSubmitting ? 'Scheduling…' : 'Schedule session'}
+            loading={sessionSubmitting}
             onPress={handleScheduleSession}
             disabled={sessionSubmitting}
           />
@@ -2344,6 +2345,7 @@ export default function HealthcareScreen() {
           />
           <KISButton
             title={taskSubmitting ? 'Creating…' : 'Add task'}
+            loading={taskSubmitting}
             onPress={handleCreateClinicalTask}
             disabled={taskSubmitting}
           />
@@ -2412,6 +2414,7 @@ export default function HealthcareScreen() {
           />
           <KISButton
             title={escalationSubmitting ? 'Logging…' : 'Create escalation'}
+            loading={escalationSubmitting}
             onPress={handleCreateEscalation}
             disabled={escalationSubmitting}
           />
@@ -2466,6 +2469,7 @@ export default function HealthcareScreen() {
           />
           <KISButton
             title={referralSubmitting ? 'Creating…' : 'Add referral'}
+            loading={referralSubmitting}
             onPress={handleCreateReferral}
             disabled={referralSubmitting}
           />
@@ -2522,6 +2526,7 @@ export default function HealthcareScreen() {
         />
         <KISButton
           title={triageSubmitting ? 'Running…' : 'Run triage'}
+          loading={triageSubmitting}
           onPress={handleRunTriage}
           disabled={triageSubmitting}
         />
@@ -2603,6 +2608,7 @@ export default function HealthcareScreen() {
         </View>
         <KISButton
           title={patientSaving ? 'Saving…' : 'Create patient'}
+          loading={patientSaving}
           onPress={handleCreatePatient}
           disabled={patientSaving}
         />
@@ -2856,6 +2862,7 @@ export default function HealthcareScreen() {
                 />
                 <KISButton
                   title={accessGrantSubmitting ? 'Sharing…' : 'Create access grant'}
+                  loading={accessGrantSubmitting}
                   onPress={handleCreateAccessGrant}
                   size="sm"
                   disabled={accessGrantSubmitting}
@@ -3008,6 +3015,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={problemSubmitting ? 'Saving…' : 'Save problem'}
+                loading={problemSubmitting}
                 onPress={handleCreateProblemRecord}
                 size="sm"
                 disabled={problemSubmitting}
@@ -3045,6 +3053,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={immunizationSubmitting ? 'Saving…' : 'Save immunization'}
+                loading={immunizationSubmitting}
                 onPress={handleCreateImmunizationRecord}
                 size="sm"
                 disabled={immunizationSubmitting}
@@ -3082,6 +3091,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={procedureSubmitting ? 'Saving…' : 'Save procedure'}
+                loading={procedureSubmitting}
                 onPress={handleCreateProcedureRecord}
                 size="sm"
                 disabled={procedureSubmitting}
@@ -3119,6 +3129,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={documentSubmitting ? 'Saving…' : 'Save document'}
+                loading={documentSubmitting}
                 onPress={handleCreateHealthDocument}
                 size="sm"
                 disabled={documentSubmitting}
@@ -3150,6 +3161,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={familySaving ? 'Saving…' : 'Save family'}
+                loading={familySaving}
                 onPress={handleCreateFamilyProfile}
                 size="sm"
                 disabled={familySaving}
@@ -3181,6 +3193,7 @@ export default function HealthcareScreen() {
               />
               <KISButton
                 title={consentSaving ? 'Saving…' : 'Save consent'}
+                loading={consentSaving}
                 onPress={handleCreateConsentRecord}
                 size="sm"
                 disabled={consentSaving}
@@ -3283,6 +3296,7 @@ export default function HealthcareScreen() {
             />
             <KISButton
               title={medSubmitting ? 'Sending…' : 'Add order'}
+              loading={medSubmitting}
               onPress={handleCreateMedicationOrder}
               size="sm"
               disabled={medSubmitting}
@@ -3322,6 +3336,7 @@ export default function HealthcareScreen() {
             />
             <KISButton
               title={vitalSubmitting ? 'Sending…' : 'Log vital'}
+              loading={vitalSubmitting}
               onPress={handleCreateVitalSign}
               size="sm"
               disabled={vitalSubmitting}
@@ -3389,6 +3404,7 @@ export default function HealthcareScreen() {
             />
             <KISButton
               title={wellnessSubmitting ? 'Saving…' : 'Save wellness metric'}
+              loading={wellnessSubmitting}
               onPress={handleCreateWellnessMetric}
               size="sm"
               disabled={wellnessSubmitting}
@@ -3415,6 +3431,7 @@ export default function HealthcareScreen() {
         )}
         <KISButton
           title={triageSubmitting ? 'Running…' : 'Run triage check'}
+          loading={triageSubmitting}
           onPress={handleRunTriage}
           disabled={triageSubmitting}
         />

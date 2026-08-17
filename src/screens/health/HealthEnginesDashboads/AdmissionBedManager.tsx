@@ -421,6 +421,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
         <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
           <KISButton
             title={saving ? 'Saving...' : editingRoomId ? 'Update Room' : 'Create Room'}
+            loading={saving}
             onPress={() => {
               createOrUpdateRoom().catch(() => undefined);
             }}
@@ -431,6 +432,7 @@ export default function AdmissionBedManager({ institutionId, engineKey }: Props)
           ) : null}
           <KISButton
             title={loading ? 'Refreshing...' : 'Reload Rooms'}
+            loading={loading}
             variant="outline"
             onPress={() => {
               loadRooms().catch(() => undefined);

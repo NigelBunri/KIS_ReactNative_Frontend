@@ -495,6 +495,7 @@ export default function BibleLessonsPanel() {
                 ) : null}
                 <KISButton
                   title={quizSubmitting ? 'Submitting…' : 'Submit Quiz'}
+                  loading={quizSubmitting}
                   size="sm"
                   disabled={quizSubmitting}
                   onPress={() => submitQuiz(selectedLesson)}

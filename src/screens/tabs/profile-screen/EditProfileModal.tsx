@@ -658,6 +658,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
       <KISButton
         style={{ marginTop: imageUploadLabel ? 6 : 18, marginBottom: 10 }}
         title={saving ? 'Saving...' : 'Save Profile Changes'}
+        loading={saving}
         onPress={saveProfile}
         disabled={saving}
       />

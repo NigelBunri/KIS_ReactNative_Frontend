@@ -236,6 +236,7 @@ export default function NGOToolsScreen(_props: Props) {
 
             <KISButton
               title={savingProfile ? 'Saving…' : 'Save Profile'}
+              loading={savingProfile}
               onPress={handleSaveProfile}
               disabled={savingProfile}
               style={{ marginTop: 14 }}
@@ -336,6 +337,7 @@ export default function NGOToolsScreen(_props: Props) {
               <View style={styles.grantFormActions}>
                 <KISButton
                   title={savingGrant ? 'Submitting…' : 'Submit Application'}
+                  loading={savingGrant}
                   onPress={handleSubmitGrant}
                   disabled={savingGrant}
                   style={{ flex: 1 }}

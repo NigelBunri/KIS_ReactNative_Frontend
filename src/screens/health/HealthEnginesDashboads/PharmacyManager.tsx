@@ -437,6 +437,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
         <View style={{ gap: spacing.xs }}>
           <KISButton
             title={inventorySaving ? 'Saving...' : editingMedicationId ? 'Update Medication' : 'Add Medication'}
+            loading={inventorySaving}
             onPress={() => {
               saveMedication().catch(() => undefined);
             }}
@@ -492,6 +493,7 @@ export default function PharmacyManager({ institutionId, engineKey }: Props) {
 
         <KISButton
           title={creatingOrder ? 'Creating...' : 'Create Order'}
+          loading={creatingOrder}
           onPress={() => { createOrder().catch(() => undefined); }}
           disabled={creatingOrder}
         />

@@ -829,6 +829,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
             <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
               <KISButton
                 title={saving ? 'Saving...' : 'Save Members, Roles & Settings'}
+                loading={saving}
                 onPress={() => {
                   saveMembers().catch(() => undefined);
                 }}

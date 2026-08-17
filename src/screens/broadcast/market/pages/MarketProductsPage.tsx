@@ -422,6 +422,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <KISButton
                   title={creatingShop ? 'Creating…' : 'Create shop'}
+                  loading={creatingShop}
                   onPress={handleCreateShop}
                   disabled={creatingShop}
                 />
@@ -663,6 +664,7 @@ export default function MarketProductsPage({ ownerId = null }: Props) {
           <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
             <KISButton
               title={isSubmitting ? 'Saving…' : editing ? 'Update product' : 'Add product'}
+              loading={isSubmitting}
               onPress={submit}
               disabled={isSubmitting}
             />

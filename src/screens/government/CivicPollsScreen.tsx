@@ -247,6 +247,7 @@ export default function CivicPollsScreen(_props: Props) {
                   ))}
                   <KISButton
                     title={voting === poll.id ? 'Submitting…' : 'Vote'}
+                    loading={voting === poll.id}
                     onPress={() => handleVote(poll.id)}
                     disabled={voting === poll.id || !selectedOptions[poll.id]}
                     style={{ marginTop: 12 }}

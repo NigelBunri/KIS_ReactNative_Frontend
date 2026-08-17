@@ -2561,6 +2561,7 @@ const ServiceBookingDetailsPage = () => {
           />
           <KISButton
             title={uploadingReceipt ? 'Uploading…' : 'Upload receipt'}
+            loading={uploadingReceipt}
             variant="outline"
             size="xs"
             onPress={handleUploadReceipt}

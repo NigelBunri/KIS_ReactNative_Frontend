@@ -197,6 +197,7 @@ export default function EmergencyScreen({ navigation }: Props) {
               <Text style={styles.noBloodTypeText}>Blood type not registered</Text>
               <KISButton
                 title={registeringBlood ? 'Registering…' : 'Register Your Type'}
+                loading={registeringBlood}
                 variant="outline"
                 size="sm"
                 disabled={registeringBlood}

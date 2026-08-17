@@ -2427,6 +2427,7 @@ export default function AvailabilityManagementScreen({
             <View style={{ marginTop: spacing.md }}>
               <KISButton
                 title={saving ? 'Saving...' : 'Save Availability'}
+                loading={saving}
                 onPress={saveAvailability}
                 disabled={saving}
               />

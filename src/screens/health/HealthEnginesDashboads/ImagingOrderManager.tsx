@@ -400,6 +400,7 @@ export default function ImagingOrderManager({ institutionId, engineKey }: Props)
         <View style={{ gap: spacing.xs }}>
           <KISButton
             title={catalogSaving ? 'Saving...' : editingStudyId ? 'Update Study' : 'Add Study'}
+            loading={catalogSaving}
             onPress={() => {
               saveStudy().catch(() => undefined);
             }}

@@ -27,6 +27,7 @@ export function ManagementAttachments(props: ManagementAttachmentsProps) {
         <Text style={{ color: palette.text, fontWeight: '900' }}>Attachments</Text>
         <KISButton
           title={uploading ? 'Uploading…' : 'Add attachment'}
+          loading={uploading}
           size="sm"
           variant="secondary"
           onPress={onAddAttachment}

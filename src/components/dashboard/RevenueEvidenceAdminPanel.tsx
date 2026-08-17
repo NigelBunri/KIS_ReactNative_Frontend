@@ -435,7 +435,8 @@ export default function RevenueEvidenceAdminPanel() {
           multiline
           style={[styles.textarea, { color: palette.text, borderColor: palette.divider, backgroundColor: palette.inputBg }]}
         />
-        <KISButton title={saving ? 'Saving...' : 'Create evidence'} size="sm" onPress={createRecord} disabled={saving} />
+        <KISButton title={saving ? 'Saving...' : 'Create evidence'}
+        loading={saving} size="sm" onPress={createRecord} disabled={saving} />
       </View>
 
       <View style={styles.records}>

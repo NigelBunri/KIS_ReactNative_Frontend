@@ -118,6 +118,7 @@ export default function StaffConsole({
                 <View style={styles.buttonRow}>
                   <KISButton
                     title={updatingId === entry.id ? 'Saving…' : 'Save role'}
+                    loading={updatingId === entry.id}
                     size="xs"
                     variant="primary"
                     onPress={() => onUpdateRole(entry.id, { role: form.role, scope: form.scope })}
@@ -125,6 +126,7 @@ export default function StaffConsole({
                   />
                   <KISButton
                     title={shiftLoadingId === entry.id ? 'Updating shifts…' : 'Assign shift'}
+                    loading={shiftLoadingId === entry.id}
                     size="xs"
                     variant="secondary"
                     onPress={() =>

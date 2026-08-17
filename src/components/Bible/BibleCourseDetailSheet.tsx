@@ -785,6 +785,7 @@ export default function BibleCourseDetailSheet({
               <View style={[styles.actionRow, { marginTop: 12 }]}>
                 <KISButton
                   title={refundLoading ? 'Requesting...' : 'Request refund'}
+                  loading={refundLoading}
                   size="sm"
                   variant="outline"
                   onPress={handleRequestRefund}

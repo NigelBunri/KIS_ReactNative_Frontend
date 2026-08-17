@@ -305,6 +305,7 @@ export default function SetListScreen({ navigation }: Props) {
             <View style={[styles.modalFooter, { borderTopColor: palette.divider }]}>
               <KISButton
                 title={saving ? 'Saving…' : 'Create Set List'}
+                loading={saving}
                 disabled={saving || !createTitle.trim()}
                 onPress={handleCreate}
               />

@@ -530,6 +530,7 @@ export default function MarketplaceOrderDetailPage() {
         </View>
         <KISButton
           title={loading ? 'Refreshing…' : 'Refresh payment status'}
+          loading={loading}
           size="sm"
           variant="outline"
           onPress={fetchOrder}

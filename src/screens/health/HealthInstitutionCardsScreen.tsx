@@ -2080,6 +2080,7 @@ export default function HealthInstitutionCardsScreen({
               <View style={{ marginTop: spacing.sm }}>
                 <KISButton
                   title={saving ? 'Saving...' : 'Save Membership Settings'}
+                  loading={saving}
                   onPress={() => {
                     saveMembershipSettings().catch(() => undefined);
                   }}
@@ -2220,6 +2221,7 @@ export default function HealthInstitutionCardsScreen({
                       >
                         <KISButton
                           title={saving ? 'Joining...' : 'Join Institution'}
+                          loading={saving}
                           size="xs"
                           onPress={() => {
                             handleJoinInstitution().catch(() => undefined);

@@ -849,6 +849,7 @@ export default function BroadcastHealthcarePage({
                         ? 'Joining...'
                         : 'Join Institution'
                     }
+                    loading={joiningInstitutionId === institutionId}
                     size="xs"
                     onPress={() => {
                       handleJoinInstitution(institutionId).catch(

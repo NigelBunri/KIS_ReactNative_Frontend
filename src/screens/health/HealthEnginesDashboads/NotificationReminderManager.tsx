@@ -233,6 +233,7 @@ const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
 
         <KISButton
           title={savingTemplate ? "Saving…" : "Save Template"}
+          loading={savingTemplate}
           onPress={createTemplate}
         />
 
@@ -306,6 +307,7 @@ const NotificationReminderManager = ({ institutionId, engineKey }: Props) => {
 
         <KISButton
           title={sendingNotification ? "Sending…" : "Send Notification"}
+          loading={sendingNotification}
           onPress={createNotification}
         />
       </View>

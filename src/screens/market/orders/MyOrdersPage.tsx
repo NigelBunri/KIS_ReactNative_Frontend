@@ -292,6 +292,7 @@ export default function MyOrdersPage() {
           {canCancel ? (
             <KISButton
               title={loadingKey === 'cancel' ? 'Cancelling…' : 'Cancel'}
+              loading={loadingKey === 'cancel'}
               size="xs"
               variant="outline"
               onPress={() =>
@@ -308,6 +309,7 @@ export default function MyOrdersPage() {
           {canSatisfy ? (
             <KISButton
               title={loadingKey === 'satisfy' ? 'Confirming…' : 'Satisfied'}
+              loading={loadingKey === 'satisfy'}
               size="xs"
               variant="secondary"
               onPress={() =>
@@ -329,6 +331,7 @@ export default function MyOrdersPage() {
           {canDelete ? (
             <KISButton
               title={loadingKey === 'delete' ? 'Deleting…' : 'Delete'}
+              loading={loadingKey === 'delete'}
               size="xs"
               variant="ghost"
               onPress={() =>
@@ -350,6 +353,7 @@ export default function MyOrdersPage() {
           ) : null}
           <KISButton
             title={loadingKey === 'receipt' ? 'Downloading…' : 'Receipt'}
+            loading={loadingKey === 'receipt'}
             size="xs"
             variant="ghost"
             onPress={() => downloadReceipt(item.id)}
