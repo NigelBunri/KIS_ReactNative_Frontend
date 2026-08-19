@@ -1,7 +1,9 @@
 import React from 'react';
-import { Animated, ImageBackground, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { Animated, ImageBackground, Pressable, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { NestedReorderableList, useReorderableDrag } from 'react-native-reorderable-list';
 import { resolveBackendAssetUrl } from '@/network';
 import { resolveBackgroundColor } from './backgroundOptions';
+import { KISIcon } from '@/constants/kisIcons';
 
 import type { DynamicLandingSection } from './types';
 import HeroSection from '@/components/sections/HeroSection';
@@ -25,7 +27,21 @@ type Props = {
   editable?: boolean;
   onEdit?: (sectionId: string) => void;
   onDelete?: (sectionId: string) => void;
+  /** Enables press-and-hold drag reorder. Requires the list NOT be nested
+   * inside another ScrollView (see WebsiteBuilderScreen, which restructures
+   * around this for that reason) — reorderable lists own their own scroll. */
+  reorderable?: boolean;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 };
+
+function SectionDragHandle({ palette, spacing }: { palette: any; spacing: any }) {
+  const drag = useReorderableDrag();
+  return (
+    <Pressable onLongPress={drag} hitSlop={10} style={{ paddingHorizontal: spacing.xs, paddingVertical: 2 }}>
+      <KISIcon name="menu" size={18} color={palette.subtext} />
+    </Pressable>
+  );
+}
 
 const renderSection = (section: DynamicLandingSection, palette: any, typography: any, spacing: any) => {
   const props = { data: section.data, palette, typography, spacing };
@@ -59,6 +75,44 @@ const renderSection = (section: DynamicLandingSection, palette: any, typography:
   }
 };
 
+/** Live-rendered preview of a section still being drafted (not yet saved
+ * into `sections`) — same per-type components SectionPreview and the real
+ * public page use, so what the owner sees while editing is what actually
+ * ships, not a placeholder. Used by WebsiteBuilderScreen's split view. */
+export function LiveSectionPreview({
+  type, data, palette, typography, spacing,
+}: {
+  type: DynamicLandingSection['type'] | null;
+  data: Record<string, any>;
+  palette: any; typography: any; spacing: any;
+}) {
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
+  const previewPalette = React.useMemo(() => buildPreviewPalette(palette, isDark), [isDark, palette]);
+
+  if (!type) return null;
+  return (
+    <View
+      style={{
+        marginTop: spacing.sm,
+        borderRadius: spacing.md,
+        borderWidth: 1,
+        borderColor: previewPalette.divider,
+        backgroundColor: previewPalette.card,
+        overflow: 'hidden',
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.sm, borderBottomWidth: 1, borderBottomColor: previewPalette.divider }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: previewPalette.accentPrimary }} />
+        <Text style={{ ...typography.label, color: previewPalette.subtext }}>Live Preview</Text>
+      </View>
+      <View style={{ padding: spacing.sm }}>
+        {renderSection({ id: 'draft', type, name: '', data } as DynamicLandingSection, previewPalette, typography, spacing)}
+      </View>
+    </View>
+  );
+}
+
 const buildPreviewPalette = (palette: any, isDark: boolean) => ({
   ...palette,
   onPrimary: '#FFFFFF',
@@ -77,6 +131,7 @@ const AnimatedSectionCard = ({
   onEdit,
   onDelete,
   isDark,
+  dragHandle,
 }: {
   section: DynamicLandingSection;
   index: number;
@@ -87,6 +142,7 @@ const AnimatedSectionCard = ({
   onEdit?: (sectionId: string) => void;
   onDelete?: (sectionId: string) => void;
   isDark: boolean;
+  dragHandle?: React.ReactNode;
 }) => {
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(12)).current;
@@ -137,9 +193,12 @@ const AnimatedSectionCard = ({
             <View style={isHero ? undefined : { padding: spacing.sm }}>
             {editable ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ ...typography.label, color: palette.subtext }}>
-                  Section {index + 1}: {section.name || section.type}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 }}>
+                  {dragHandle}
+                  <Text style={{ ...typography.label, color: palette.subtext }}>
+                    Section {index + 1}: {section.name || section.type}
+                  </Text>
+                </View>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <TouchableOpacity onPress={() => onEdit?.(section.id)}>
                     <Text style={{ ...typography.label, color: palette.accentPrimary }}>Edit</Text>
@@ -160,7 +219,7 @@ const AnimatedSectionCard = ({
   );
 };
 
-export default function SectionPreview({ sections, palette, typography, spacing, editable, onEdit, onDelete }: Props) {
+export default function SectionPreview({ sections, palette, typography, spacing, editable, onEdit, onDelete, reorderable, onReorder }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const previewPalette = React.useMemo(() => buildPreviewPalette(palette, isDark), [isDark, palette]);
@@ -170,6 +229,36 @@ export default function SectionPreview({ sections, palette, typography, spacing,
       <View style={{ borderRadius: spacing.md, borderWidth: 1, borderColor: previewPalette.divider, backgroundColor: previewPalette.surface, padding: spacing.md, marginTop: spacing.md }}>
         <Text style={{ ...typography.body, color: previewPalette.subtext }}>No sections added yet. Use + Add New Section to begin.</Text>
       </View>
+    );
+  }
+
+  if (reorderable && onReorder) {
+    // Nested (not the page's own scroll) — WebsiteBuilderScreen wraps its
+    // whole body in this library's <ScrollViewContainer> instead of a plain
+    // ScrollView specifically so this can drag-reorder while living inside
+    // the same page scroll as everything else around it.
+    return (
+      <NestedReorderableList
+        data={sections}
+        keyExtractor={(section) => section.id}
+        onReorder={({ from, to }) => onReorder(from, to)}
+        scrollable={false}
+        contentContainerStyle={{ marginTop: spacing.md, gap: spacing.md }}
+        renderItem={({ item: section, index }) => (
+          <AnimatedSectionCard
+            section={section}
+            index={index}
+            palette={previewPalette}
+            typography={typography}
+            spacing={spacing}
+            editable={editable}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            isDark={isDark}
+            dragHandle={<SectionDragHandle palette={previewPalette} spacing={spacing} />}
+          />
+        )}
+      />
     );
   }
 

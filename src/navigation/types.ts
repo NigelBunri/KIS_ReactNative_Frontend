@@ -191,6 +191,10 @@ export type RootStackParamList = {
     websiteId: string;
     previewUrl?: string;
   };
+  WebsiteTheme: {
+    websiteId: string;
+    branding?: Record<string, any>;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

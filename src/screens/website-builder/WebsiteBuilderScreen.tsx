@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, Text, TouchableOpacity, View } from 'react-native';
+import { NestedReorderableList, ScrollViewContainer, useReorderableDrag, reorderItems } from 'react-native-reorderable-list';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -17,7 +18,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import DynamicSectionForm from '@/components/section-builder/DynamicSectionForm';
-import SectionPreview from '@/components/section-builder/SectionPreview';
+import SectionPreview, { LiveSectionPreview } from '@/components/section-builder/SectionPreview';
 import SectionTypeSelector from '@/components/section-builder/SectionTypeSelector';
 import { SECTION_TYPE_META } from '@/components/section-builder/sectionTypeMeta';
 import {
@@ -45,6 +46,7 @@ type WebsiteRecord = {
   name: string;
   status: 'draft' | 'published' | 'unpublished';
   pages: WebsitePageSummary[];
+  branding?: Record<string, any>;
 };
 
 const WEBSITE_PUBLIC_BASE_URL = 'https://kingdomimpactventures.org';
@@ -62,6 +64,42 @@ const uploadSectionImage = async (asset: any, context: string): Promise<string> 
   const file = (res as any)?.data?.attachment ?? (res as any)?.attachment ?? {};
   return String(file?.url || file?.uri || file?.file_url || file?.fileUrl || asset.uri);
 };
+
+function PageTab({
+  page, isActive, palette, typography, spacing, onPress, onLongPress,
+}: {
+  page: WebsitePageSummary;
+  isActive: boolean;
+  palette: any; typography: any; spacing: any;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const drag = useReorderableDrag();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: palette.divider,
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.sm,
+        backgroundColor: isActive ? palette.accentPrimary : palette.card,
+      }}
+    >
+      <Pressable onLongPress={drag} hitSlop={8}>
+        <KISIcon name="menu" size={14} color={isActive ? '#FFFFFF' : palette.subtext} />
+      </Pressable>
+      <Text style={{ ...typography.label, color: isActive ? '#FFFFFF' : palette.text }}>
+        {page.title}{page.status === 'published' ? '' : ' (draft)'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const { ownerType, ownerId, ownerLabel } = route.params;
@@ -231,6 +269,10 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     ]);
   }, [editingSectionId]);
 
+  const handleReorderSections = useCallback((fromIndex: number, toIndex: number) => {
+    setSections((prev) => reorderItems(prev, fromIndex, toIndex));
+  }, []);
+
   const handleSavePage = useCallback(async () => {
     if (!website || !activePage) return;
     setSaving(true);
@@ -285,6 +327,22 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     ]);
   }, [website, load]);
 
+  const handleReorderPages = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (!website) return;
+    const reordered = reorderItems(website.pages, fromIndex, toIndex);
+    setWebsite((prev) => (prev ? { ...prev, pages: reordered } : prev));
+    try {
+      await Promise.all(
+        reordered.map((page, index) =>
+          patchRequest(ROUTES.websites.pageDetail(website.id, page.id), { sort_order: index }, { errorMessage: 'Unable to save page order.' }),
+        ),
+      );
+    } catch (error: any) {
+      Alert.alert('Website Builder', error?.message || 'Unable to save page order.');
+      await load();
+    }
+  }, [website, load]);
+
   const handlePublishWebsite = useCallback(async () => {
     if (!website) return;
     const res = await postRequest(ROUTES.websites.publish(website.id), {}, { errorMessage: 'Unable to publish website.' });
@@ -318,6 +376,11 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsitePreview', { websiteId: website.id, previewUrl });
   }, [website, navigation]);
 
+  const handleOpenTheme = useCallback(() => {
+    if (!website) return;
+    navigation.navigate('WebsiteTheme', { websiteId: website.id, branding: website.branding });
+  }, [website, navigation]);
+
   const handleShare = useCallback(async () => {
     if (!website) return;
     const url = activePage && !activePage.is_home
@@ -345,7 +408,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+      <ScrollViewContainer contentContainerStyle={{ padding: spacing.md }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
             <Text style={{ ...typography.h2, color: palette.text }}>{ownerLabel || website.name}</Text>
@@ -357,6 +420,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
 
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           <KISButton title="Preview" variant="outline" onPress={handlePreview} />
+          <KISButton title="Theme" variant="outline" onPress={handleOpenTheme} />
           {website.status === 'published' ? (
             <>
               <KISButton title="Share" variant="outline" onPress={handleShare} />
@@ -368,35 +432,38 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         </View>
 
         <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Pages</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.xs }}>
-          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-            {website.pages.map((page) => (
-              <TouchableOpacity
-                key={page.id}
-                onPress={() => switchPage(page)}
-                onLongPress={() => handleDeletePage(page)}
-                style={{
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: palette.divider,
-                  paddingVertical: spacing.xs,
-                  paddingHorizontal: spacing.sm,
-                  backgroundColor: page.id === activePageId ? palette.accentPrimary : palette.card,
-                }}
-              >
-                <Text style={{ ...typography.label, color: page.id === activePageId ? '#FFFFFF' : palette.text }}>
-                  {page.title}{page.status === 'published' ? '' : ' (draft)'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
+          Hold the {'≡'} handle to reorder. Long-press a page (not Home) to delete it.
+        </Text>
+        <NestedReorderableList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollable
+          data={website.pages}
+          keyExtractor={(page) => page.id}
+          onReorder={({ from, to }) => handleReorderPages(from, to)}
+          style={{ marginTop: spacing.xs }}
+          contentContainerStyle={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}
+          renderItem={({ item: page }) => (
+            <PageTab
+              page={page}
+              isActive={page.id === activePageId}
+              palette={palette}
+              typography={typography}
+              spacing={spacing}
+              onPress={() => switchPage(page)}
+              onLongPress={() => handleDeletePage(page)}
+            />
+          )}
+          ListFooterComponent={
             <TouchableOpacity
               onPress={() => setIsAddingPage((prev) => !prev)}
               style={{ borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: palette.divider, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm }}
             >
               <Text style={{ ...typography.label, color: palette.accentPrimary }}>+ Add Page</Text>
             </TouchableOpacity>
-          </View>
-        </ScrollView>
+          }
+        />
 
         {isAddingPage ? (
           <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' }}>
@@ -429,6 +496,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           editable
           onEdit={handleEditSection}
           onDelete={handleDeleteSection}
+          reorderable
+          onReorder={handleReorderSections}
         />
 
         <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>+ Add Section</Text>
@@ -458,6 +527,14 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           <KISTextInput label="Section Name" value={sectionDraftName} onChangeText={setSectionDraftName} style={{ marginTop: spacing.sm }} />
         ) : null}
 
+        <LiveSectionPreview
+          type={selectedType}
+          data={sectionDraftData}
+          palette={palette}
+          typography={typography}
+          spacing={spacing}
+        />
+
         <DynamicSectionForm
           selectedType={selectedType}
           draftData={sectionDraftData}
@@ -480,7 +557,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         <View style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
           <KISButton title={editingSectionId ? 'Update Section' : 'Create Section'} onPress={handleAddSection} disabled={!selectedType || saving || uploadingImage} />
         </View>
-      </ScrollView>
+      </ScrollViewContainer>
     </SafeAreaView>
   );
 }
