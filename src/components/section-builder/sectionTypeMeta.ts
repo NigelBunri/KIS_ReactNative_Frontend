@@ -73,6 +73,11 @@ export const SECTION_TYPE_META: SectionTypeMeta[] = [
     description: 'Add a YouTube video, Calendly booking widget, Google Map, Spotify player, or Loom video.',
   },
   {
+    type: 'kis_video',
+    title: 'KIS Video',
+    description: 'Embed one of your own KIS videos — a channel post or health service video — played directly, not linked out.',
+  },
+  {
     type: 'kis_content',
     title: 'Add KIS Content',
     description: 'Show live courses, products, services, posts, or other KIS content — always up to date automatically.',

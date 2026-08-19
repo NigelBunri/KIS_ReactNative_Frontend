@@ -6,6 +6,7 @@ import KISTextInput from '@/constants/KISTextInput';
 import type { KisContentTargetType, SectionType, SectionDataByType } from './types';
 import BackgroundColorSelector from './BackgroundColorSelector';
 import KisContentPickerModal from './KisContentPickerModal';
+import KisVideoPickerModal, { type KisVideoResult } from './KisVideoPickerModal';
 
 type Props = {
   selectedType: SectionType | null;
@@ -100,6 +101,7 @@ const TypeSpecificFields = ({
   kisContentOwnerId?: string;
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
   if (type === 'hero_banner') {
     return (
       <>
@@ -457,6 +459,59 @@ const TypeSpecificFields = ({
           autoCorrect={false}
         />
         <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>{activeProvider.hint}</Text>
+      </>
+    );
+  }
+
+  if (type === 'kis_video') {
+    const canPickVideo = !!kisContentOwnerType && !!kisContentOwnerId;
+    const hasSelection = !!data.target_id;
+    return (
+      <>
+        <SectionHeading title="KIS Video" subtitle="Embed one of your own KIS videos, played directly on your site" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title (optional)" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <View style={{ marginTop: spacing.sm }}>
+          <KISButton
+            title={hasSelection ? 'Change Video' : 'Choose Video'}
+            variant="outline"
+            disabled={!canPickVideo}
+            onPress={() => setVideoPickerOpen(true)}
+          />
+          {!canPickVideo ? (
+            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+              Save this website first to browse your videos.
+            </Text>
+          ) : null}
+          {hasSelection ? (
+            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+              Selected a video from {data.source === 'health_engine_item' ? 'your health services' : 'your channel'}.
+            </Text>
+          ) : null}
+        </View>
+        {canPickVideo ? (
+          <KisVideoPickerModal
+            visible={videoPickerOpen}
+            ownerType={kisContentOwnerType as string}
+            ownerId={kisContentOwnerId as string}
+            selectedTargetId={data.target_id}
+            onSelect={(video: KisVideoResult) => {
+              // video_url/thumbnail_url are cosmetic — only for this
+              // editor's own live preview. The public page always
+              // re-resolves from source+target_id server-side
+              // (apps.websites.kis_video.resolve_kis_video), same as
+              // kis_content already does for its resolved_items.
+              onChange({
+                ...data,
+                source: video.source,
+                target_id: video.target_id,
+                video_url: video.video_url,
+                thumbnail_url: video.thumbnail_url,
+              });
+              setVideoPickerOpen(false);
+            }}
+            onClose={() => setVideoPickerOpen(false)}
+          />
+        ) : null}
       </>
     );
   }

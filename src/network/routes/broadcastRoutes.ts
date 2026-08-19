@@ -858,6 +858,7 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/websites/${websiteId}/pages/${pageId}/unpublish/`,
     kisContentSearch: (targetType: string) =>
       `${API_BASE_URL}/api/v1/websites/kis-content/${targetType}/search/`,
+    kisVideoSearch: `${API_BASE_URL}/api/v1/websites/kis-video/search/`,
     formResponses: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/form-responses/`,
     webhooks: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/webhooks/`,
     webhookDetail: (websiteId: string, webhookId: string) =>

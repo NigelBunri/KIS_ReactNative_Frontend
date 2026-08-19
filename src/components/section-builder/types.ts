@@ -12,6 +12,7 @@ export type SectionType =
   | 'hours'
   | 'form'
   | 'embed'
+  | 'kis_video'
   | 'kis_content';
 
 // Mirrors apps.websites.models.KIS_CONTENT_TARGET_TYPES on the backend —
@@ -140,6 +141,25 @@ export type EmbedSectionData = {
   url: string;
 };
 
+// Matches apps.websites.kis_video.KIS_VIDEO_SOURCES on the backend — a
+// single specific KIS video (not a grid), resolved server-side, never a
+// third-party embed. Only Broadcast Channel and Health Institution
+// owners have real video content to pick from as of writing this — see
+// that module's docstring for why Education/Marketplace aren't here.
+export type KisVideoSource = 'broadcast_content' | 'health_engine_item';
+
+export type KisVideoSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  source: KisVideoSource | '';
+  target_id: string;
+  /** Cosmetic — this editor's own live preview only. The public page
+   * always re-resolves from source+target_id server-side. */
+  video_url?: string;
+  thumbnail_url?: string;
+};
+
 // Live-linked section — references real KIS records by id (target_ids)
 // or an auto filter, resolved server-side on every read. Never stores a
 // copy of the underlying course/product/service/etc — see
@@ -170,6 +190,7 @@ export type SectionDataByType = {
   hours: HoursSectionData;
   form: FormSectionData;
   embed: EmbedSectionData;
+  kis_video: KisVideoSectionData;
   kis_content: KisContentSectionData;
 };
 
@@ -220,6 +241,8 @@ export const createEmptySectionData = (type: SectionType): SectionDataByType[Sec
       };
     case 'embed':
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'slate_air', title: '', provider: 'youtube', url: '' };
+    case 'kis_video':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'slate_air', title: '', source: '', target_id: '' };
     case 'kis_content':
       return {
         sectionBackgroundImageUrl: '',
