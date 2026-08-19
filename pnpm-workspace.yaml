@@ -1,2 +1,13 @@
 patchedDependencies:
   '@react-native-voice/voice': patches/@react-native-voice__voice.patch
+
+# react-native-quick-crypto declares readable-stream@4.5.2 as a dependency
+# but pnpm wasn't materializing the nested node_modules/readable-stream
+# link for it (a resolution/linking gap, not a version conflict — 4.5.2
+# is already in the store), which crashed Metro with an ENOENT reading
+# its package.json. This forces pnpm to treat it as an explicit,
+# correctly-linked dependency.
+packageExtensions:
+  react-native-quick-crypto:
+    dependencies:
+      readable-stream: '4.5.2'

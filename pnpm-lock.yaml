@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-6qksfK9v4to4WjJ3IGGTB63B1f8p+UV4npR7qGabuVM=
+
 patchedDependencies:
   '@react-native-voice/voice':
     hash: eeb5c774709609ab451f3d756f89e053001e03df1e94f44d119cab8f5f34a27d
