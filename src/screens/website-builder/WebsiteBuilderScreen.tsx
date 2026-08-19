@@ -117,6 +117,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [sectionDraftData, setSectionDraftData] = useState<Record<string, any>>({});
   const [sectionDraftName, setSectionDraftName] = useState('');
+  const [sectionDraftResponsive, setSectionDraftResponsive] = useState<{ hidden_on?: Array<'mobile' | 'desktop'> }>({});
   const [isSectionTypePickerOpen, setIsSectionTypePickerOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isAddingPage, setIsAddingPage] = useState(false);
@@ -228,20 +229,28 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         prev.map((section) =>
           section.id !== editingSectionId
             ? section
-            : { ...section, type: selectedType, name: sectionDraftName || section.name, data: { ...createEmptySectionData(selectedType), ...sectionDraftData } as any },
+            : {
+                ...section,
+                type: selectedType,
+                name: sectionDraftName || section.name,
+                data: { ...createEmptySectionData(selectedType), ...sectionDraftData } as any,
+                responsive: sectionDraftResponsive,
+              },
         ),
       );
     } else {
       const created = createSection(selectedType);
       created.name = sectionDraftName || created.name;
       created.data = { ...created.data, ...sectionDraftData } as any;
+      created.responsive = sectionDraftResponsive;
       setSections((prev) => [...prev, created]);
     }
     setEditingSectionId(null);
     setSelectedType(null);
     setSectionDraftName('');
     setSectionDraftData({});
-  }, [editingSectionId, sectionDraftData, sectionDraftName, selectedType]);
+    setSectionDraftResponsive({});
+  }, [editingSectionId, sectionDraftData, sectionDraftName, sectionDraftResponsive, selectedType]);
 
   const handleEditSection = useCallback((sectionId: string) => {
     const current = sections.find((item) => item.id === sectionId);
@@ -250,6 +259,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     setSelectedType(current.type);
     setSectionDraftName(current.name || '');
     setSectionDraftData({ ...(current.data || {}) });
+    setSectionDraftResponsive({ ...(current.responsive || {}) });
   }, [sections]);
 
   const handleDeleteSection = useCallback((sectionId: string) => {
@@ -578,6 +588,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           spacing={spacing}
           kisContentOwnerType={ownerType}
           kisContentOwnerId={ownerId}
+          responsive={sectionDraftResponsive}
+          onResponsiveChange={setSectionDraftResponsive}
         />
 
         {uploadingImage ? (

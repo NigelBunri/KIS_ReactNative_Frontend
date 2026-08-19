@@ -199,6 +199,7 @@ export type DynamicLandingSection<T extends SectionType = SectionType> = {
   name: string;
   type: T;
   data: SectionDataByType[T];
+  responsive?: { hidden_on?: Array<'mobile' | 'desktop'> };
 };
 
 const createId = () => `section_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

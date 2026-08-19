@@ -25,6 +25,11 @@ type Props = {
    * supplies both. */
   kisContentOwnerType?: string;
   kisContentOwnerId?: string;
+  /** Owner-controlled per-section visibility, saved alongside `data` as a
+   * sibling key on the section (see apps.websites.serializers'
+   * validate_sections `responsive.hidden_on`), not inside `data` itself. */
+  responsive?: { hidden_on?: Array<'mobile' | 'desktop'> };
+  onResponsiveChange?: (next: { hidden_on?: Array<'mobile' | 'desktop'> }) => void;
 };
 
 const KIS_CONTENT_TARGET_TYPE_OPTIONS: Array<{ value: KisContentTargetType; label: string }> = [
@@ -625,9 +630,17 @@ export default function DynamicSectionForm({
   spacing,
   kisContentOwnerType,
   kisContentOwnerId,
+  responsive,
+  onResponsiveChange,
 }: Props) {
   const normalized = useMemo<Record<string, any>>(() => draftData || {}, [draftData]);
   const hasSectionBackgroundImage = !!String(normalized.sectionBackgroundImageUrl || '').trim();
+  const hiddenOn = responsive?.hidden_on || [];
+  const toggleHiddenOn = (breakpoint: 'mobile' | 'desktop') => {
+    if (!onResponsiveChange) return;
+    const next = hiddenOn.includes(breakpoint) ? hiddenOn.filter((bp) => bp !== breakpoint) : [...hiddenOn, breakpoint];
+    onResponsiveChange({ hidden_on: next });
+  };
 
   if (!selectedType) {
     return (
@@ -671,6 +684,25 @@ export default function DynamicSectionForm({
         kisContentOwnerType={kisContentOwnerType}
         kisContentOwnerId={kisContentOwnerId}
       />
+      <SectionHeading
+        title="Responsive Visibility"
+        subtitle="Hide this section on mobile or desktop visitors"
+        typography={typography}
+        palette={palette}
+        spacing={spacing}
+      />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <KISButton
+          title={hiddenOn.includes('mobile') ? 'Hidden on Mobile' : 'Visible on Mobile'}
+          variant={hiddenOn.includes('mobile') ? 'outline' : 'primary'}
+          onPress={() => toggleHiddenOn('mobile')}
+        />
+        <KISButton
+          title={hiddenOn.includes('desktop') ? 'Hidden on Desktop' : 'Visible on Desktop'}
+          variant={hiddenOn.includes('desktop') ? 'outline' : 'primary'}
+          onPress={() => toggleHiddenOn('desktop')}
+        />
+      </View>
       <SectionHeading title="Selected Section Background" subtitle="Image or one of 6 color themes" typography={typography} palette={palette} spacing={spacing} />
       <KISButton title="Select Section Background Image" variant="outline" onPress={onPickSectionBackgroundImage} />
       <View style={{ marginTop: spacing.xs }}>
