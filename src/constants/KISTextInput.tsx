@@ -302,7 +302,7 @@ export default function KISTextInput({
   return (
     <View
       style={[
-        { marginBottom: 40, position: 'relative', height: 40 },
+        { marginBottom: 4, position: 'relative', minHeight: 40 },
         containerStyle,
       ]}
     >
@@ -315,7 +315,7 @@ export default function KISTextInput({
           styles.inputWrap,
           computedWrapStyle,
           layout?.wrapStyle,
-          { minWidth: '90%', justifyContent: 'center', marginBottom: 20 },
+          { minWidth: '90%', justifyContent: 'center', marginBottom: 10 },
         ]}
       >
         {left ? (
@@ -349,7 +349,7 @@ export default function KISTextInput({
       </View>
 
       {!!errorText ? (
-        <Text style={[errorStyle, { marginTop: -16 }]}>{errorText}</Text>
+        <Text style={[errorStyle, { marginTop: -8 }]}>{errorText}</Text>
       ) : null}
     </View>
   );

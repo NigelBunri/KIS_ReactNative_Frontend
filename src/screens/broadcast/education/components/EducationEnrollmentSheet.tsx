@@ -16,6 +16,8 @@ type Props = {
   onClose: () => void;
   onFreeEnroll: (content: EducationContentItem) => void;
   onCheckout: (content: EducationContentItem) => void;
+  onRequestAccess?: (content: EducationContentItem) => void;
+  requestingAccess?: boolean;
   paymentState: 'idle' | 'processing' | 'success' | 'error';
   receiptUrl?: string | null;
 };
@@ -32,6 +34,8 @@ export default function EducationEnrollmentSheet({
   onClose,
   onFreeEnroll,
   onCheckout,
+  onRequestAccess,
+  requestingAccess,
   paymentState,
   receiptUrl,
 }: Props) {
@@ -47,6 +51,17 @@ export default function EducationEnrollmentSheet({
 
   const pricing = 'price' in content ? content.price : undefined;
   const priceLabel = formatPrice(pricing);
+  // viewer_state is attached loosely (not in the shared type) by the
+  // discovery/detail response mapper — see EducationV2DiscoverPage.tsx's
+  // existing defensive snake_case/camelCase reads of the same object.
+  const viewerState = (content as any)?.viewerState || {};
+  const isPrivate = viewerState?.visibility === 'private';
+  const accessRequestStatus =
+    viewerState?.access_request_status ?? viewerState?.accessRequestStatus ?? null;
+  const canRequestAccess = Boolean(
+    viewerState?.can_request_access ?? viewerState?.canRequestAccess,
+  );
+  const accessApproved = accessRequestStatus === 'approved' || !isPrivate;
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -103,8 +118,26 @@ export default function EducationEnrollmentSheet({
             <Text style={{ marginTop: 12, color: palette.subtext }}>
               {content.summary}
             </Text>
+            {isPrivate && !accessApproved ? (
+              <Text style={{ color: palette.subtext, marginTop: 10 }}>
+                {accessRequestStatus === 'pending'
+                  ? 'Your access request is pending institution approval.'
+                  : accessRequestStatus === 'rejected'
+                  ? 'Your access request for this course was denied.'
+                  : 'This is a private course. Request access to view or purchase it.'}
+              </Text>
+            ) : null}
             <View style={{ marginTop: 18, flexDirection: compactSheet ? 'column' : 'row', gap: 12 }}>
-              {pricing?.isFree ? (
+              {isPrivate && !accessApproved ? (
+                canRequestAccess && onRequestAccess ? (
+                  <KISButton
+                    title={requestingAccess ? 'Requesting…' : 'Request access'}
+                    onPress={() => onRequestAccess(content)}
+                    disabled={requestingAccess}
+                    loading={requestingAccess}
+                  />
+                ) : null
+              ) : pricing?.isFree ? (
                 <KISButton
                   title="Join for free"
                   onPress={() => onFreeEnroll(content)}

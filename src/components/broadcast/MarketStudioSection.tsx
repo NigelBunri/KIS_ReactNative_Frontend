@@ -41,86 +41,19 @@ const parseTierLimit = (value: unknown) => {
   return numeric;
 };
 
+// Only capabilities with a real, shipped backend behind them — cross-checked
+// against apps/commerce (Shop.is_verified/verification_status/trust_badges,
+// ProductReview, Promotion, ShopFollow, ShopTeamMember) before being shown
+// to users, so this list never advertises something the app doesn't do yet.
 const MARKET_DIFFERENTIATORS = [
-  'Verified shop badges with analytics',
-  'Smart product descriptions & tag suggestions',
-  'Global discovery feed with search, filters, and trending badges',
-  'Auto-pricing alerts when competitors discount similar goods',
-  'Custom storefront theming per shop',
-  'Flash sale scheduling with countdown timers',
+  'Verified shop badges once your shop passes review',
+  'Global discovery feed with search and filters',
   'USD-only pricing with secure Flutterwave checkout',
-  'Bundled products (kits and collections)',
-  'Customer reviews + verified order badges',
-  'Dynamic shipping estimate builder',
-  'Promo codes + loyalty point rules',
-  'Live chat / broadcast integration for product drops',
-  'Inventory alerts & restock reminders',
-  'Abandoned cart recovery notes',
-  'Revenue dashboards + payout exports',
+  'Customer reviews on every product',
+  'Promo codes and shop-level discounts',
+  'Follow shops to keep up with new drops',
+  'Live product drops integrated with broadcasts',
 ];
-
-const MARKET_ANALYTICS_FEATURES = [
-  'Real-time revenue dashboards stratified by shop and partner tiers',
-  'Credit flow snapshots (earned vs spent) updated every minute',
-  'Geo + timezone heatmaps showing engagement spikes across regions',
-  'Inventory velocity forecasting with auto-restock triggers',
-  'Data-driven pricing elasticity curves for premium drops',
-  'Live conversion rates and attendee retention per broadcast',
-  'Segmented subscription churn risk scoring by shop',
-  'Automated compliance flags with VIP contact tracing',
-  'Trend signals for credit-backed kit launches',
-  'Sentiment analysis on product chatter and broadcast comments',
-  'Revenue impact modelling for exclusive lessons or drops',
-  'Creator ranking leaderboards by total credits generated',
-  'Product bundling performance insights with ROI estimates',
-  'Marketplace health overview including fraud & authenticity cues',
-  'Follower growth and loyalty lift metrics across channels',
-  'Custom KPI boards (sales, enrollments, credits) with share links',
-  'Video + broadcast attribution per promoted product',
-  'Auto-generated highlight reels summarizing credit peaks',
-  'Audience geography matrix for global lesson attractions',
-  'Actionable alerts for supply shortages or fulfillment delays',
-];
-
-const MARKET_POWER_FEATURES = [
-  'Subscribe to product alerts and receive in-app credit notifications',
-  'Join a shop to unlock exclusive drops, member-only feeds, and briefs',
-  'Credit-only checkout keeps experience cash-free and auditable',
-  'Broadcast-integrated carts let you buy while watching a drop',
-  'Portfolio-based shop layouts with curated kit showcases',
-  'Automated bundling suggestions for cross-shop exposure',
-  'Authenticity badges with real-time verification',
-  'Live fraud scoring plus moderation cues on every checkout',
-  'Dynamic promo codes tied to loyalty tiers and analytics',
-  'Community highlights for trending products and testimonials',
-];
-
-/**
- * ✅ Live Broadcast + 19 more market/lesson-oriented features (scaffold list)
- * You can hook these to backend gradually without changing UI again.
- */
-const MARKET_PLATFORM_FEATURES = [
-  'Live product drops (LIVE badge + broadcast studio entry)',
-  'Scheduled drops with countdown timers',
-  'Limited stock badges (Only X left)',
-  'Trending products sort',
-  'Saved products (wishlist)',
-  'Creator/Shop follow',
-  'Shop verification badge (tier-based)',
-  'Bundles / kits support',
-  'Promo codes & loyalty rules UI',
-  'Flash sale toggles',
-  'Abandoned cart nudges (copy hooks)',
-  'Product reviews UI stub',
-  'Delivery estimate chip',
-  'Price change alerts subscription',
-  'Drop replay videos linked to broadcasts',
-  'Lesson + product bundles (course kits)',
-  'Shop membership tiers',
-  'Auto-approve join policy UI',
-  'USD checkout readiness hint chip',
-  'Insights shortcut + KPI cards',
-] as const;
 
 type MarketTabId = 'feed' | 'drops' | 'shops' | 'products' | 'analytics' | 'lessons';
 
@@ -778,20 +711,6 @@ export default function MarketStudioSection({
         >
           <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Go Live Drop</Text>
         </Pressable>
-
-        <Pressable
-          onPress={() => Alert.alert('Feature set', MARKET_PLATFORM_FEATURES.join('\n• '))}
-          style={{
-            borderWidth: 2,
-            borderColor: palette.divider,
-            backgroundColor: palette.surface,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 999,
-          }}
-        >
-          <Text style={{ color: palette.subtext, fontWeight: '900' }}>Platform features</Text>
-        </Pressable>
       </View>
 
       {loading ? (
@@ -1216,26 +1135,17 @@ export default function MarketStudioSection({
 
   const renderAnalyticsTab = () => (
     <Card>
-      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Market intelligence</Text>
+      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Market overview</Text>
       <Text style={{ color: palette.subtext, fontSize: 12 }}>
-        {hasAnalyticsAccess ? 'Analytics active.' : 'Upgrade'}
+        {hasAnalyticsAccess ? 'Analytics active on your plan.' : 'Upgrade to Business Pro for market analytics.'}
       </Text>
 
       <View style={{ gap: 6, marginTop: 10 }}>
-        {MARKET_ANALYTICS_FEATURES.map((feature) => (
-          <Text key={feature} style={{ color: palette.subtext, fontSize: 12 }}>
-            • {feature}
-          </Text>
-        ))}
-      </View>
-
-      <View style={{ gap: 6, marginTop: 10 }}>
-        <Text style={{ color: palette.text, fontWeight: '900' }}>Power features</Text>
-        {MARKET_POWER_FEATURES.map((feature) => (
-          <Text key={feature} style={{ color: palette.subtext, fontSize: 12 }}>
-            • {feature}
-          </Text>
-        ))}
+        <Text style={{ color: palette.subtext, fontSize: 12 }}>• {shopUsage}</Text>
+        <Text style={{ color: palette.subtext, fontSize: 12 }}>• {productUsage}</Text>
+        <Text style={{ color: palette.subtext, fontSize: 12 }}>
+          • Full payout and order history is available in your Wallet.
+        </Text>
       </View>
 
       <View style={{ gap: 6, marginTop: 10 }}>

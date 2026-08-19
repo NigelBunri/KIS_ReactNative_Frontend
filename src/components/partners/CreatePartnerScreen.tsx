@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import { useKISTheme } from '../../theme/useTheme';
 import KISButton from '../../constants/KISButton';
 import { postRequest } from '@/network/post';
@@ -27,6 +28,7 @@ type Props = {
 
 export default function PartnerCreateSlide({ onClose }: Props) {
   const { palette } = useKISTheme();
+  const topInset = useSafeTopInset();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -125,7 +127,9 @@ export default function PartnerCreateSlide({ onClose }: Props) {
       style={[styles.page, { backgroundColor: palette.bg, }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: topInset + 32 }]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <KISButton title="Back" variant="outline" onPress={onClose} />
@@ -203,6 +207,7 @@ export default function PartnerCreateSlide({ onClose }: Props) {
         <View style={{ marginTop: 24 }}>
           <KISButton
             title={isSubmitting ? 'Creating…' : 'Create Partner'}
+            loading={isSubmitting}
             onPress={handleSubmit}
             disabled={isSubmitting}
           />

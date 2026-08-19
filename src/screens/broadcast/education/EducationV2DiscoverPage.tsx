@@ -186,6 +186,7 @@ export default function EducationV2DiscoverPage({
     'idle' | 'processing' | 'success' | 'error'
   >('idle');
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [requestingAccess, setRequestingAccess] = useState(false);
   const [expandedList, setExpandedList] =
     useState<ExpandedEducationList | null>(null);
   const [loadingInstitutionId, setLoadingInstitutionId] = useState<string | null>(null);
@@ -504,6 +505,47 @@ export default function EducationV2DiscoverPage({
       await handleEnrollmentRequest(item);
     },
     [handleEnrollmentRequest],
+  );
+
+  const handleRequestAccess = useCallback(
+    async (item: EducationContentItem) => {
+      setRequestingAccess(true);
+      try {
+        const response = await queueableJsonRequest({
+          domain: 'Education',
+          kind: 'education.accessRequest',
+          method: 'POST',
+          url: ROUTES.education.contentAccessRequest(item.id),
+          body: {},
+          dedupeKey: `education:access-request:${item.id}`,
+          errorMessage: 'Unable to submit access request.',
+        });
+        if (!response?.success) {
+          Alert.alert('Access request', response?.message || 'Unable to submit access request.');
+          return;
+        }
+        const accessRequest = response?.data?.access_request;
+        const nextViewerState = {
+          ...((item as any)?.viewerState || {}),
+          access_request_status: accessRequest?.status ?? 'pending',
+          can_request_access: false,
+        };
+        if (detailItem?.id === item.id) {
+          setDetailItem(prev =>
+            prev ? ({ ...prev, viewerState: nextViewerState } as unknown as EducationContentItem) : prev,
+          );
+        }
+        if (selectedCourse?.id === item.id) {
+          setSelectedCourse(prev =>
+            prev ? ({ ...prev, viewerState: nextViewerState } as unknown as EducationContentItem) : prev,
+          );
+        }
+        Alert.alert('Access request', 'Your request has been submitted for approval.');
+      } finally {
+        setRequestingAccess(false);
+      }
+    },
+    [detailItem?.id, selectedCourse?.id],
   );
 
   const renderExpandedHeader = (title: string, subtitle: string) => (
@@ -1588,6 +1630,8 @@ export default function EducationV2DiscoverPage({
         onClose={() => setEnrollmentVisible(false)}
         onFreeEnroll={item => freeEnroll(item)}
         onCheckout={item => checkout(item)}
+        onRequestAccess={item => void handleRequestAccess(item)}
+        requestingAccess={requestingAccess}
         paymentState={paymentState}
         receiptUrl={receiptUrl}
       />

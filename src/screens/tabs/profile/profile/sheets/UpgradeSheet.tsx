@@ -9,9 +9,10 @@ import { styles } from '../../profile.styles';
 import { tierMetaFor } from '../tierMeta';
 const PARTNER_PRO_HIGHLIGHTS = [
   'Unlimited partner organizations, automation, and integrations',
-  'Advanced partner analytics + compliance dashboards, exports, and access reviews',
-  'Priority partner webhooks, automation rules, and fraud insights',
-  'Partner-grade studio routing for broadcasts, lessons, and market drops',
+  'Advanced partner analytics and access-control reviews',
+  'Priority partner webhooks and automation rules',
+  'Unlimited team seats across your partner organizations',
+  'Concierge onboarding and migration support',
 ];
 const formatUsd = (amountCents: unknown, withSign = false) => {
   const cents = Number(amountCents);
@@ -478,14 +479,14 @@ export default function UpgradeSheet(props: {
                 ) : null}
               </View>
               <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                {tx.receipt_pdf_url ? (
+                {tx.status === 'success' && tx.receipt_pdf_url ? (
                   <KISButton
                     title="Receipt"
                     size="xs"
                     variant="outline"
                     onPress={() => Linking.openURL(tx.receipt_pdf_url)}
                   />
-                ) : tx.receipt_url ? (
+                ) : tx.status === 'success' && tx.receipt_url ? (
                   <KISButton
                     title="Receipt"
                     size="xs"

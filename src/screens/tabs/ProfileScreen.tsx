@@ -1185,6 +1185,10 @@ export default function ProfileScreen() {
 
   const openMarketLandingBuilder = useCallback(
     (shop?: any) => {
+      // The management panel is a persistent native Modal — it must be
+      // closed before navigating away, otherwise it keeps painting above
+      // (and fully occluding) whatever screen we just navigated to.
+      closeManagementPanel();
       rootNavigation?.navigate('ProfileLandingEditor', {
         kind: 'market',
         profileLabel: shop?.name
@@ -1194,26 +1198,28 @@ export default function ProfileScreen() {
         shopName: shop?.name,
       });
     },
-    [rootNavigation],
+    [rootNavigation, closeManagementPanel],
   );
 
   const handleViewShopDashboard = useCallback(
     (shop: any) => {
       if (!shop) return;
+      closeManagementPanel();
       rootNavigation?.navigate('ShopDashboard', { shop });
     },
-    [rootNavigation],
+    [rootNavigation, closeManagementPanel],
   );
 
   const openEducationLandingBuilder = useCallback(
     (institution?: any) => {
+      closeManagementPanel();
       rootNavigation?.navigate('ProfileLandingEditor', {
         kind: 'education',
         profileLabel: institution?.name || 'Education Profile',
         returnBroadcastProfileKey: 'education',
       });
     },
-    [rootNavigation],
+    [rootNavigation, closeManagementPanel],
   );
 
   const openPartnerLandingBuilder = useCallback(
@@ -1231,18 +1237,20 @@ export default function ProfileScreen() {
   const handleViewInstitution = useCallback(
     (inst: any) => {
       if (!inst?.id || !inst?.type) return;
+      closeManagementPanel();
       rootNavigation?.navigate('HealthInstitutionDetail', {
         institutionId: inst.id,
         institutionType: inst.type,
         institutionName: inst.name,
       });
     },
-    [rootNavigation],
+    [rootNavigation, closeManagementPanel],
   );
 
   const handleEditInstitution = useCallback(
     (inst: any) => {
       if (!inst?.id) return;
+      closeManagementPanel();
       rootNavigation?.navigate('HealthInstitutionManagement', {
         institutionId: inst.id,
         institutionName: inst.name,
@@ -1253,14 +1261,15 @@ export default function ProfileScreen() {
         ),
       });
     },
-    [rootNavigation],
+    [rootNavigation, closeManagementPanel],
   );
 
   const handleAddInstitution = useCallback(() => {
+    closeManagementPanel();
     rootNavigation?.navigate('HealthInstitutionManagement', {
       institutionType: 'clinic',
     });
-  }, [rootNavigation]);
+  }, [rootNavigation, closeManagementPanel]);
 
   const managementPanelData = managementPanelKey
     ? broadcastProfiles?.[managementPanelKey]
@@ -2317,6 +2326,8 @@ export default function ProfileScreen() {
             phone: String(c.profile?.user?.phone || '').trim() || undefined,
             email: String(c.profile?.user?.email || '').trim() || undefined,
           }}
+          accountTier={accountTier}
+          tierLabel={tierLabel}
           onManageInstitution={handleEditInstitution}
           onViewInstitution={handleViewInstitution}
           onAddInstitution={handleAddInstitution}
@@ -2371,6 +2382,7 @@ export default function ProfileScreen() {
           subtitle={panelHint ?? ''}
           managementData={managementPanelData}
           tierLabel={tierLabel}
+          accountTier={accountTier}
           courses={courses}
           modules={modules}
           educationForm={educationForm}
@@ -3359,7 +3371,12 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <View style={styles.managementPanelHeader}>
+            <View
+              style={[
+                styles.managementPanelHeader,
+                { paddingTop: topInset + 32 },
+              ]}
+            >
               <View style={{ flex: 1 }}>
                 <Text
                   style={[styles.managementPanelTitle, { color: palette.text }]}

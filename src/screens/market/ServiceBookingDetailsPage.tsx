@@ -1345,7 +1345,10 @@ const ServiceBookingDetailsPage = () => {
   const hasPaymentReference = Boolean(
     booking?.payment?.transaction_reference || booking?.payment_tx_ref,
   );
-  const showReceiptsSection = Boolean(bookingId);
+  // Only show the Receipts section once a payment was actually made —
+  // otherwise there is nothing real to generate/download, and offering
+  // the CTA anyway just leads to a broken/empty receipt link.
+  const showReceiptsSection = Boolean(bookingId) && hasPaymentReference;
   useEffect(() => {
     if (hasPaymentReference) {
       void fetchReceiptLinks();
@@ -1995,8 +1998,7 @@ const ServiceBookingDetailsPage = () => {
               />
             </View>
             <Text style={{ color: palette.subtext, fontSize: 13 }}>
-              Download a copy of the receipt that matches the styling stored
-              under /media/billing/receipts/.
+              Download a copy of your payment receipt.
             </Text>
             {loadingReceipt && !receiptActions.length ? (
               <ActivityIndicator color={palette.primaryStrong} />

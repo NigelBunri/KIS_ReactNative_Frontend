@@ -55,6 +55,7 @@ type EducationManagementModalProps = {
   subtitle: string;
   managementData: any;
   tierLabel: string | null;
+  accountTier?: any;
   courses: any[];
   modules: any[];
   educationForm: EducationFormState;
@@ -98,6 +99,9 @@ type EducationInstitution = {
   active_member_count?: number;
   pending_application_count?: number;
   can_manage?: boolean;
+  payout_account_status?: string;
+  payout_account_name?: string;
+  payout_bank_last4?: string;
   current_membership?: { role?: string; status?: string } | null;
   branding?: {
     logo_url?: string;
@@ -209,6 +213,17 @@ const MEMBERSHIP_POLICY_OPTIONS: { value: string; label: string }[] = [
   { value: 'open', label: 'Open — anyone can join' },
   { value: 'application', label: 'Application required' },
   { value: 'closed', label: 'Closed — invite only' },
+];
+
+// Must match apps.broadcasts.models.EducationCourseVisibility exactly.
+const COURSE_VISIBILITY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'public', label: 'Public — anyone can discover it' },
+  { value: 'private', label: 'Private — request & approval required' },
+];
+
+const COURSE_PRICING_OPTIONS: { value: string; label: string }[] = [
+  { value: 'free', label: 'Free' },
+  { value: 'paid', label: 'Paid' },
 ];
 
 // Must match apps.broadcasts.models.EducationAcademicRecordStatus exactly —
@@ -685,6 +700,7 @@ const emptyModuleForm = () => ({
   booking_enabled: false,
   price_amount: '',
   price_currency: 'USD',
+  visibility: 'public',
   membership_policy: 'application',
   institution_type: 'academy',
 });
@@ -900,7 +916,15 @@ const validateMaterialAsset = (asset: {
 const buildViewerSource = (uri?: string | null) => (uri ? { uri } : undefined);
 
 export function EducationManagementModal(props: EducationManagementModalProps) {
-  const { palette, title, subtitle, tierLabel, onOpenLandingBuilder, onOpenVerificationCenter } = props;
+  const { palette, title, subtitle, tierLabel, accountTier, onOpenLandingBuilder, onOpenVerificationCenter } = props;
+
+  const educationInstitutionLimit = (() => {
+    const raw = accountTier?.features_json?.education_profiles;
+    if (raw === undefined || raw === null || raw === '') return null;
+    if (String(raw).toLowerCase() === 'unlimited') return null;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : null;
+  })();
 
   const [hubData, setHubData] = useState<EducationHubPayload | null>(null);
   const [dashboardData, setDashboardData] =
@@ -923,6 +947,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     useState<InstitutionFormState>(EMPTY_FORM);
   const [institutionSubmitting, setInstitutionSubmitting] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [payoutBankCode, setPayoutBankCode] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutBusinessName, setPayoutBusinessName] = useState('');
+  const [payoutConnecting, setPayoutConnecting] = useState(false);
+  const [courseAccessRequests, setCourseAccessRequests] = useState<any[]>([]);
+  const [courseAccessRequestsLoading, setCourseAccessRequestsLoading] = useState(false);
+  const [courseAccessRequestActionId, setCourseAccessRequestActionId] = useState<string | null>(null);
   const [activeModuleKey, setActiveModuleKey] =
     useState<EducationModuleKey | null>(null);
   const [moduleRecords, setModuleRecords] = useState<any[]>([]);
@@ -1135,6 +1166,51 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     }
   }, []);
 
+  const fetchCourseAccessRequests = useCallback(async (institutionId: string) => {
+    setCourseAccessRequestsLoading(true);
+    try {
+      const response = await getRequest(
+        `${ROUTES.broadcasts.educationInstitutionCourseAccessRequests(institutionId)}?status=pending`,
+        { errorMessage: 'Unable to load course access requests.', forceNetwork: true },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to load course access requests.');
+      }
+      setCourseAccessRequests(
+        Array.isArray(response.data?.access_requests) ? response.data.access_requests : [],
+      );
+    } catch {
+      setCourseAccessRequests([]);
+    } finally {
+      setCourseAccessRequestsLoading(false);
+    }
+  }, []);
+
+  const handleCourseAccessRequestAction = useCallback(
+    async (courseId: string, requestId: string, action: 'approve' | 'reject') => {
+      setCourseAccessRequestActionId(requestId);
+      try {
+        const response = await postRequest(
+          ROUTES.broadcasts.educationCourseAccessRequestAction(courseId, requestId),
+          { action },
+          { errorMessage: 'Unable to update access request.' },
+        );
+        if (!response?.success) {
+          throw new Error(response?.message || 'Unable to update access request.');
+        }
+        setCourseAccessRequests(prev => prev.filter(row => row.id !== requestId));
+        if (selectedInstitutionId) {
+          await fetchDashboard(selectedInstitutionId);
+        }
+      } catch (error: any) {
+        Alert.alert('Access request', error?.message || 'Unable to update access request.');
+      } finally {
+        setCourseAccessRequestActionId(null);
+      }
+    },
+    [fetchDashboard, selectedInstitutionId],
+  );
+
   const fetchModuleLookups = useCallback(async (institutionId: string) => {
     try {
       const [
@@ -1331,11 +1407,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   useEffect(() => {
     if (!selectedInstitutionId) {
       setDashboardData(null);
+      setCourseAccessRequests([]);
       return;
     }
     void fetchDashboard(selectedInstitutionId);
     void fetchModuleLookups(selectedInstitutionId);
-  }, [fetchDashboard, fetchModuleLookups, selectedInstitutionId]);
+    void fetchCourseAccessRequests(selectedInstitutionId);
+  }, [fetchCourseAccessRequests, fetchDashboard, fetchModuleLookups, selectedInstitutionId]);
 
   useEffect(() => {
     if (activeModuleKey !== 'bookings' && bookingStatusFilter !== 'all') {
@@ -1740,6 +1818,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       next.description = toText(item.description);
       next.content = toText(item.content);
       next.status = toText(item.status);
+      next.price_amount = toText(item.price_amount);
+      next.visibility = toText(item.visibility) || 'public';
       next.program_id = toText(item.program_id);
       next.course_id = toText(item.course_id);
       next.lesson_id = toText(item.lesson_id);
@@ -2199,6 +2279,47 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     institutionForm,
   ]);
 
+  const handleConnectPayoutAccount = useCallback(async () => {
+    if (!editingInstitutionId) return;
+    if (!payoutBankCode.trim() || !payoutAccountNumber.trim()) {
+      Alert.alert('Payments', 'Bank and account number are required.');
+      return;
+    }
+    setPayoutConnecting(true);
+    try {
+      const response = await postRequest(
+        ROUTES.broadcasts.educationInstitutionPayoutAccountConnect(editingInstitutionId),
+        {
+          account_bank: payoutBankCode.trim(),
+          account_number: payoutAccountNumber.trim(),
+          business_name: payoutBusinessName.trim() || institutionForm.name.trim(),
+        },
+        { errorMessage: 'Unable to connect payout account.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to connect payout account.');
+      }
+      setPayoutBankCode('');
+      setPayoutAccountNumber('');
+      setPayoutBusinessName('');
+      await fetchHub();
+      await fetchDashboard(editingInstitutionId);
+      Alert.alert('Payments', 'Payout account connected.');
+    } catch (error: any) {
+      Alert.alert('Payments', error?.message || 'Unable to connect payout account.');
+    } finally {
+      setPayoutConnecting(false);
+    }
+  }, [
+    editingInstitutionId,
+    fetchDashboard,
+    fetchHub,
+    institutionForm.name,
+    payoutAccountNumber,
+    payoutBankCode,
+    payoutBusinessName,
+  ]);
+
   const handlePickInstitutionLogo = useCallback(async () => {
     try {
       const result = await launchImageLibrary({
@@ -2357,6 +2478,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           status: toText(moduleForm.status) || 'draft',
           duration_minutes: Number(moduleForm.duration_minutes || 0) || 0,
           seat_limit: parseOptionalInt(moduleForm.seat_limit),
+          price_amount: parseOptionalInt(moduleForm.price_amount),
+          visibility: toText(moduleForm.visibility) || 'public',
           program_id: toText(moduleForm.program_id) || undefined,
         };
         createRoute = ROUTES.broadcasts.educationInstitutionCourses(
@@ -7426,6 +7549,53 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
               />
             )}
           </View>
+          {editingInstitutionId ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: palette.text, fontWeight: '800' }}>
+                Payments
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                Connect a Flutterwave payout account so this institution can
+                accept payment for its paid courses. Settlement splits
+                automatically between the institution and the platform on
+                every purchase — you never share a secret API key.
+              </Text>
+              <Text style={{ color: palette.text, fontWeight: '700' }}>
+                Status:{' '}
+                {selectedInstitution?.payout_account_status === 'active'
+                  ? `Connected${selectedInstitution?.payout_bank_last4 ? ` (•••• ${selectedInstitution.payout_bank_last4})` : ''}`
+                  : selectedInstitution?.payout_account_status === 'pending'
+                  ? 'Pending'
+                  : 'Not connected'}
+              </Text>
+              <KISTextInput
+                label="Bank code"
+                value={payoutBankCode}
+                onChange={value => setPayoutBankCode(getTextInputValue(value))}
+                placeholder="e.g. 044"
+              />
+              <KISTextInput
+                label="Account number"
+                value={payoutAccountNumber}
+                onChange={value => setPayoutAccountNumber(getTextInputValue(value))}
+                keyboardType="numeric"
+              />
+              <KISTextInput
+                label="Business name (optional)"
+                value={payoutBusinessName}
+                onChange={value => setPayoutBusinessName(getTextInputValue(value))}
+                placeholder={institutionForm.name || 'Defaults to institution name'}
+              />
+              <KISButton
+                title={payoutConnecting ? 'Connecting…' : 'Connect payout account'}
+                size="xs"
+                variant="outline"
+                onPress={() => void handleConnectPayoutAccount()}
+                disabled={payoutConnecting}
+                loading={payoutConnecting}
+              />
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <KISButton
               title={
@@ -8261,6 +8431,47 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                               'Choose the parent program for this course, or leave unset — a course does not require a program.',
                               true,
                               () => startInlineLookupCreate('programs', 'program_id', false),
+                            )}
+                          </>,
+                        )}
+                        {renderFieldSection(
+                          'Pricing & access',
+                          'Free/Public courses can be accessed immediately. Paid and/or Private courses require payment and/or an approved access request before a learner can view the content.',
+                          <>
+                            {renderOptionPicker(
+                              'Pricing',
+                              toText(moduleForm.price_amount) ? 'paid' : 'free',
+                              COURSE_PRICING_OPTIONS,
+                              value =>
+                                setModuleForm(prev => ({
+                                  ...prev,
+                                  price_amount: value === 'free' ? '' : prev.price_amount || '0',
+                                })),
+                              moduleSubmitting,
+                            )}
+                            {toText(moduleForm.price_amount) ? (
+                              <>
+                                <KISTextInput
+                                  label="Price (USD)"
+                                  value={toInputText(moduleForm.price_amount)}
+                                  onChange={updateModuleFormText('price_amount')}
+                                  keyboardType="numeric"
+                                />
+                                {selectedInstitution?.payout_account_status !== 'active' ? (
+                                  <Text style={{ color: palette.danger ?? palette.primaryStrong, fontSize: 12 }}>
+                                    ⚠ This institution has no active payout account connected yet.
+                                    Learners won't be able to complete payment until one is connected
+                                    in Institution settings → Payments.
+                                  </Text>
+                                ) : null}
+                              </>
+                            ) : null}
+                            {renderOptionPicker(
+                              'Visibility',
+                              toText(moduleForm.visibility) || 'public',
+                              COURSE_VISIBILITY_OPTIONS,
+                              value => setModuleForm(prev => ({ ...prev, visibility: value })),
+                              moduleSubmitting,
                             )}
                           </>,
                         )}
@@ -9684,6 +9895,48 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 </View>
               </EducationSectionCard>
 
+              {courseAccessRequests.length || courseAccessRequestsLoading ? (
+                <EducationSectionCard
+                  palette={palette}
+                  eyebrow="Needs your review"
+                  title="Course Access Requests"
+                  description="Learners requesting access to your private courses. Only approved requesters can view or purchase that course."
+                >
+                  <View style={{ gap: 12 }}>
+                    {courseAccessRequestsLoading && !courseAccessRequests.length ? (
+                      <Text style={{ color: palette.subtext }}>Loading…</Text>
+                    ) : null}
+                    {courseAccessRequests.map(row => (
+                      <EducationListCard
+                        key={row.id}
+                        palette={palette}
+                        title={row.display_name || row.email || 'Learner'}
+                        subtitle={`Requesting access to "${row.course_title || 'a course'}"`}
+                        metaItems={[]}
+                        primaryAction={
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <EducationActionButton
+                              palette={palette}
+                              label={courseAccessRequestActionId === row.id ? 'Working…' : 'Approve'}
+                              onPress={() =>
+                                void handleCourseAccessRequestAction(row.course_id, row.id, 'approve')
+                              }
+                            />
+                            <EducationActionButton
+                              palette={palette}
+                              label="Deny"
+                              onPress={() =>
+                                void handleCourseAccessRequestAction(row.course_id, row.id, 'reject')
+                              }
+                            />
+                          </View>
+                        }
+                      />
+                    ))}
+                  </View>
+                </EducationSectionCard>
+              ) : null}
+
               <EducationSectionCard
                 palette={palette}
                 eyebrow="Recent Activity"
@@ -9968,6 +10221,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             }}
           >
             Current education tier: {tierLabel}
+            {'\n'}
+            {educationInstitutionLimit === null
+              ? `${institutions.length} institution${institutions.length === 1 ? '' : 's'} created`
+              : `${institutions.length}/${educationInstitutionLimit} institution${educationInstitutionLimit === 1 ? '' : 's'} used`}
           </Text>
         ) : null}
       </ScrollView>
