@@ -863,6 +863,8 @@ const broadcastRoutes = {
     inviteRevoke: (websiteId: string, inviteId: string) =>
       `${API_BASE_URL}/api/v1/websites/${websiteId}/invites/${inviteId}/revoke/`,
     redeemInvite: `${API_BASE_URL}/api/v1/websites/redeem-invite/`,
+    analyticsSummary: (websiteId: string, days?: number) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/analytics/summary/${days ? `?days=${days}` : ''}`,
     publicSite: (slug: string) => `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/`,
     publicPage: (slug: string, pageSlug: string) =>
       `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/pages/${pageSlug}/`,

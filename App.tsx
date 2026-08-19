@@ -110,6 +110,7 @@ import WebsiteFormResponsesScreen from './src/screens/website-builder/WebsiteFor
 import WebsiteWebhooksScreen from './src/screens/website-builder/WebsiteWebhooksScreen';
 import WebsiteCollaboratorsScreen from './src/screens/website-builder/WebsiteCollaboratorsScreen';
 import WebsiteJoinScreen from './src/screens/website-builder/WebsiteJoinScreen';
+import WebsiteVisitsScreen from './src/screens/website-builder/WebsiteVisitsScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
 import HealthInstitutionMembersScreen from './src/screens/health/HealthInstitutionMembersScreen';
 import InstitutionServicesCatalogScreen from './src/screens/health/InstitutionServicesCatalogScreen';
@@ -1618,6 +1619,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="WebsiteJoin"
                       component={WebsiteJoinScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsiteVisits"
+                      component={WebsiteVisitsScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"
