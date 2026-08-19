@@ -198,6 +198,9 @@ export type RootStackParamList = {
   WebsiteFormResponses: {
     websiteId: string;
   };
+  WebsiteWebhooks: {
+    websiteId: string;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

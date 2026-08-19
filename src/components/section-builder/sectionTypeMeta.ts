@@ -68,6 +68,11 @@ export const SECTION_TYPE_META: SectionTypeMeta[] = [
     description: 'Collect name/email/message-style responses from visitors, with spam filtering and email alerts.',
   },
   {
+    type: 'embed',
+    title: 'Embed',
+    description: 'Add a YouTube video, Calendly booking widget, Google Map, Spotify player, or Loom video.',
+  },
+  {
     type: 'kis_content',
     title: 'Add KIS Content',
     description: 'Show live courses, products, services, posts, or other KIS content — always up to date automatically.',

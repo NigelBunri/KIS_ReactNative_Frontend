@@ -11,6 +11,7 @@ export type SectionType =
   | 'social_links'
   | 'hours'
   | 'form'
+  | 'embed'
   | 'kis_content';
 
 // Mirrors apps.websites.models.KIS_CONTENT_TARGET_TYPES on the backend —
@@ -126,6 +127,19 @@ export type FormSectionData = {
   fields: Array<{ id: string; key: string; label: string; type: FormFieldType; required: boolean }>;
 };
 
+// Matches apps.websites.models.EMBED_PROVIDERS on the backend — keep in
+// sync. An allowlist, not an arbitrary-URL embed — see that constant's
+// docstring for why (a stored-XSS-adjacent vector otherwise).
+export type EmbedProvider = 'youtube' | 'vimeo' | 'calendly' | 'google_maps' | 'google_calendar' | 'spotify' | 'loom';
+
+export type EmbedSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  provider: EmbedProvider;
+  url: string;
+};
+
 // Live-linked section — references real KIS records by id (target_ids)
 // or an auto filter, resolved server-side on every read. Never stores a
 // copy of the underlying course/product/service/etc — see
@@ -155,6 +169,7 @@ export type SectionDataByType = {
   social_links: SocialLinksSectionData;
   hours: HoursSectionData;
   form: FormSectionData;
+  embed: EmbedSectionData;
   kis_content: KisContentSectionData;
 };
 
@@ -203,6 +218,8 @@ export const createEmptySectionData = (type: SectionType): SectionDataByType[Sec
           { id: 'field_message', key: 'message', label: 'Message', type: 'textarea', required: false },
         ],
       };
+    case 'embed':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'slate_air', title: '', provider: 'youtube', url: '' };
     case 'kis_content':
       return {
         sectionBackgroundImageUrl: '',

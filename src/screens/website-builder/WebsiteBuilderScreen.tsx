@@ -386,6 +386,11 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsiteFormResponses', { websiteId: website.id });
   }, [website, navigation]);
 
+  const handleOpenWebhooks = useCallback(() => {
+    if (!website) return;
+    navigation.navigate('WebsiteWebhooks', { websiteId: website.id });
+  }, [website, navigation]);
+
   const handleShare = useCallback(async () => {
     if (!website) return;
     const url = activePage && !activePage.is_home
@@ -427,6 +432,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           <KISButton title="Preview" variant="outline" onPress={handlePreview} />
           <KISButton title="Theme" variant="outline" onPress={handleOpenTheme} />
           <KISButton title="Responses" variant="outline" onPress={handleOpenFormResponses} />
+          <KISButton title="Webhooks" variant="outline" onPress={handleOpenWebhooks} />
           {website.status === 'published' ? (
             <>
               <KISButton title="Share" variant="outline" onPress={handleShare} />

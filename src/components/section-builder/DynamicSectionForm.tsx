@@ -54,6 +54,26 @@ const parseMultiline = (value: string) =>
 
 const toMultiline = (value: string[] | undefined) => (Array.isArray(value) ? value.join('\n') : '');
 
+// Converts a regular share link into the embed-src format each provider's
+// player actually needs (matches apps.websites.embeds' backend patterns) —
+// most people paste a normal youtube.com/watch or youtu.be link, not the
+// /embed/ form, so this saves that translation step rather than making
+// every user do it by hand. Providers without a well-known share-link
+// pattern (Calendly, Google Maps/Calendar, Spotify, Loom) are left as-is;
+// those tools' own "Embed" share option already gives the right URL.
+const normalizeEmbedUrl = (provider: string, raw: string): string => {
+  const trimmed = raw.trim();
+  if (provider === 'youtube') {
+    const watch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+    if (watch) return `https://www.youtube.com/embed/${watch[1]}`;
+  }
+  if (provider === 'vimeo') {
+    const watch = trimmed.match(/vimeo\.com\/(\d+)/);
+    if (watch) return `https://player.vimeo.com/video/${watch[1]}`;
+  }
+  return trimmed;
+};
+
 const TypeSpecificFields = ({
   type,
   data,
@@ -397,6 +417,46 @@ const TypeSpecificFields = ({
           }
           style={{ marginTop: spacing.xs }}
         />
+      </>
+    );
+  }
+
+  if (type === 'embed') {
+    const providers: Array<{ value: string; label: string; hint: string }> = [
+      { value: 'youtube', label: 'YouTube', hint: 'Paste any youtube.com or youtu.be video link' },
+      { value: 'vimeo', label: 'Vimeo', hint: 'Paste any vimeo.com video link' },
+      { value: 'calendly', label: 'Calendly', hint: 'Paste your Calendly booking page link' },
+      { value: 'google_maps', label: 'Google Maps', hint: 'Paste a Google Maps "Embed a map" src URL' },
+      { value: 'google_calendar', label: 'Google Calendar', hint: 'Paste a Google Calendar "Embed" src URL' },
+      { value: 'spotify', label: 'Spotify', hint: 'Paste a Spotify "Embed" link (open.spotify.com/embed/...)' },
+      { value: 'loom', label: 'Loom', hint: 'Paste a Loom "Embed" link (loom.com/embed/...)' },
+    ];
+    const activeProvider = providers.find((p) => p.value === data.provider) || providers[0];
+    return (
+      <>
+        <SectionHeading title="Embed" subtitle="Add a video, booking widget, map, or player from a trusted provider" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title (optional)" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.sm }}>Provider</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
+          {providers.map((p) => (
+            <KISButton
+              key={p.value}
+              title={p.label}
+              size="sm"
+              variant={data.provider === p.value ? 'primary' : 'outline'}
+              onPress={() => onChange(update(data, 'provider', p.value))}
+            />
+          ))}
+        </View>
+        <KISTextInput
+          label="Link"
+          value={String(data.url || '')}
+          onChangeText={(v) => onChange(update(data, 'url', normalizeEmbedUrl(String(data.provider || 'youtube'), v)))}
+          style={{ marginTop: spacing.sm }}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>{activeProvider.hint}</Text>
       </>
     );
   }

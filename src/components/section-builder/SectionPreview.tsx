@@ -18,6 +18,7 @@ import FaqsSection from '@/components/sections/FaqsSection';
 import SocialLinksSection from '@/components/sections/SocialLinksSection';
 import HoursSection from '@/components/sections/HoursSection';
 import FormSection from '@/components/sections/FormSection';
+import EmbedSection from '@/components/sections/EmbedSection';
 import KisContentSection from '@/components/sections/KisContentSection';
 
 type Props = {
@@ -71,6 +72,8 @@ const renderSection = (section: DynamicLandingSection, palette: any, typography:
       return <HoursSection {...props} />;
     case 'form':
       return <FormSection {...props} />;
+    case 'embed':
+      return <EmbedSection {...props} />;
     case 'kis_content':
       return <KisContentSection {...props} />;
     default:

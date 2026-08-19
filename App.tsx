@@ -107,6 +107,7 @@ import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderSc
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
 import WebsiteThemeScreen from './src/screens/website-builder/WebsiteThemeScreen';
 import WebsiteFormResponsesScreen from './src/screens/website-builder/WebsiteFormResponsesScreen';
+import WebsiteWebhooksScreen from './src/screens/website-builder/WebsiteWebhooksScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
 import HealthInstitutionMembersScreen from './src/screens/health/HealthInstitutionMembersScreen';
 import InstitutionServicesCatalogScreen from './src/screens/health/InstitutionServicesCatalogScreen';
@@ -1603,6 +1604,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="WebsiteFormResponses"
                       component={WebsiteFormResponsesScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsiteWebhooks"
+                      component={WebsiteWebhooksScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"
