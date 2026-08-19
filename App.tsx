@@ -106,6 +106,7 @@ import ProfileLandingEditorScreen from './src/screens/profile/ProfileLandingEdit
 import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
 import WebsiteThemeScreen from './src/screens/website-builder/WebsiteThemeScreen';
+import WebsiteFormResponsesScreen from './src/screens/website-builder/WebsiteFormResponsesScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
 import HealthInstitutionMembersScreen from './src/screens/health/HealthInstitutionMembersScreen';
 import InstitutionServicesCatalogScreen from './src/screens/health/InstitutionServicesCatalogScreen';
@@ -1598,6 +1599,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="WebsiteTheme"
                       component={WebsiteThemeScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsiteFormResponses"
+                      component={WebsiteFormResponsesScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"

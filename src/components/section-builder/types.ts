@@ -10,6 +10,7 @@ export type SectionType =
   | 'faqs'
   | 'social_links'
   | 'hours'
+  | 'form'
   | 'kis_content';
 
 // Mirrors apps.websites.models.KIS_CONTENT_TARGET_TYPES on the backend —
@@ -111,6 +112,20 @@ export type HoursSectionData = {
   days: Array<{ id: string; day: string; hours: string }>;
 };
 
+// Matches apps.websites.models.FORM_FIELD_TYPES on the backend — keep in
+// sync. Submissions are validated server-side against this same `fields`
+// schema (apps.websites.forms.validate_submission_data) — any key not
+// declared here is dropped, never stored.
+export type FormFieldType = 'text' | 'email' | 'textarea';
+
+export type FormSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  submitLabel: string;
+  fields: Array<{ id: string; key: string; label: string; type: FormFieldType; required: boolean }>;
+};
+
 // Live-linked section — references real KIS records by id (target_ids)
 // or an auto filter, resolved server-side on every read. Never stores a
 // copy of the underlying course/product/service/etc — see
@@ -139,6 +154,7 @@ export type SectionDataByType = {
   faqs: FaqsSectionData;
   social_links: SocialLinksSectionData;
   hours: HoursSectionData;
+  form: FormSectionData;
   kis_content: KisContentSectionData;
 };
 
@@ -175,6 +191,18 @@ export const createEmptySectionData = (type: SectionType): SectionDataByType[Sec
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'slate_air', title: 'Follow Us', links: [] };
     case 'hours':
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'mint_soft', title: 'Hours', days: [] };
+    case 'form':
+      return {
+        sectionBackgroundImageUrl: '',
+        sectionBackgroundColorKey: 'ocean_mist',
+        title: 'Contact Us',
+        submitLabel: 'Submit',
+        fields: [
+          { id: 'field_name', key: 'name', label: 'Name', type: 'text', required: true },
+          { id: 'field_email', key: 'email', label: 'Email', type: 'email', required: true },
+          { id: 'field_message', key: 'message', label: 'Message', type: 'textarea', required: false },
+        ],
+      };
     case 'kis_content':
       return {
         sectionBackgroundImageUrl: '',

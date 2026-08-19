@@ -381,6 +381,11 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsiteTheme', { websiteId: website.id, branding: website.branding });
   }, [website, navigation]);
 
+  const handleOpenFormResponses = useCallback(() => {
+    if (!website) return;
+    navigation.navigate('WebsiteFormResponses', { websiteId: website.id });
+  }, [website, navigation]);
+
   const handleShare = useCallback(async () => {
     if (!website) return;
     const url = activePage && !activePage.is_home
@@ -421,6 +426,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' }}>
           <KISButton title="Preview" variant="outline" onPress={handlePreview} />
           <KISButton title="Theme" variant="outline" onPress={handleOpenTheme} />
+          <KISButton title="Responses" variant="outline" onPress={handleOpenFormResponses} />
           {website.status === 'published' ? (
             <>
               <KISButton title="Share" variant="outline" onPress={handleShare} />

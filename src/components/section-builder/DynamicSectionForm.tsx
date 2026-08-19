@@ -346,6 +346,61 @@ const TypeSpecificFields = ({
     );
   }
 
+  if (type === 'form') {
+    const fields = Array.isArray(data.fields) ? data.fields : [];
+    return (
+      <>
+        <SectionHeading
+          title="Contact Form"
+          subtitle="Use label::type::required format, one field per line (type: text, email, or textarea; required: yes or no)"
+          typography={typography}
+          palette={palette}
+          spacing={spacing}
+        />
+        <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <KISTextInput
+          label="Submit Button Text"
+          value={String(data.submitLabel || 'Submit')}
+          onChangeText={(v) => onChange(update(data, 'submitLabel', v))}
+          style={{ marginTop: spacing.xs }}
+        />
+        <KISTextInput
+          label="Fields"
+          multiline
+          value={fields.map((f: any) => `${f.label || ''}::${f.type || 'text'}::${f.required ? 'yes' : 'no'}`).join('\n')}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'fields',
+                v
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .map((line, idx) => {
+                    const [label, rawType, rawRequired] = line.split('::');
+                    const trimmedLabel = (label || '').trim() || `Field ${idx + 1}`;
+                    const fieldType = ['text', 'email', 'textarea'].includes((rawType || '').trim())
+                      ? (rawType || '').trim()
+                      : 'text';
+                    const slug = trimmedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '') || `field_${idx}`;
+                    return {
+                      id: `field_${idx}`,
+                      key: `${slug}_${idx}`,
+                      label: trimmedLabel,
+                      type: fieldType,
+                      required: (rawRequired || '').trim().toLowerCase() === 'yes',
+                    };
+                  }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
   // kis_content — the live-linked section. Target type + explicit picks
   // (via KisContentPickerModal) or an auto filter; presentation config
   // controls how resolved items render on the public page.

@@ -195,6 +195,9 @@ export type RootStackParamList = {
     websiteId: string;
     branding?: Record<string, any>;
   };
+  WebsiteFormResponses: {
+    websiteId: string;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

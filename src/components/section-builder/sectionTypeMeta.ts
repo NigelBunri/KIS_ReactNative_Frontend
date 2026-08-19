@@ -63,6 +63,11 @@ export const SECTION_TYPE_META: SectionTypeMeta[] = [
     description: 'Operating hours by day of the week.',
   },
   {
+    type: 'form',
+    title: 'Contact Form',
+    description: 'Collect name/email/message-style responses from visitors, with spam filtering and email alerts.',
+  },
+  {
     type: 'kis_content',
     title: 'Add KIS Content',
     description: 'Show live courses, products, services, posts, or other KIS content — always up to date automatically.',
