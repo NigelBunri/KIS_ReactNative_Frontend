@@ -208,6 +208,9 @@ export type RootStackParamList = {
   WebsiteVisits: {
     websiteId: string;
   };
+  WebsiteCustomDomain: {
+    websiteId: string;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

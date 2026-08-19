@@ -401,6 +401,11 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsiteVisits', { websiteId: website.id });
   }, [website, navigation]);
 
+  const handleOpenCustomDomain = useCallback(() => {
+    if (!website) return;
+    navigation.navigate('WebsiteCustomDomain', { websiteId: website.id });
+  }, [website, navigation]);
+
   const handleShare = useCallback(async () => {
     if (!website) return;
     const url = activePage && !activePage.is_home
@@ -445,6 +450,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           <KISButton title="Webhooks" variant="outline" onPress={handleOpenWebhooks} />
           <KISButton title="Collaborators" variant="outline" onPress={handleOpenCollaborators} />
           <KISButton title="Visits" variant="outline" onPress={handleOpenVisits} />
+          <KISButton title="Custom Domain" variant="outline" onPress={handleOpenCustomDomain} />
           {website.status === 'published' ? (
             <>
               <KISButton title="Share" variant="outline" onPress={handleShare} />
