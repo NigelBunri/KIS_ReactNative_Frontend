@@ -19,6 +19,12 @@ type Summary = {
   unique_visitors: number;
   daily: Array<{ date: string; count: number }>;
   top_pages: Array<{ page_id: string; title: string; slug: string; count: number }>;
+  top_referrers: Array<{ referrer_host: string; count: number }>;
+  device_breakdown: Array<{ device_type: string; count: number }>;
+};
+
+const DEVICE_LABELS: Record<string, string> = {
+  mobile: 'Mobile', tablet: 'Tablet', desktop: 'Desktop', other: 'Other',
 };
 
 function StatCard({ label, value, palette, typography, spacing }: { label: string; value: number; palette: any; typography: any; spacing: any }) {
@@ -111,6 +117,47 @@ export default function WebsiteVisitsScreen({ route }: Props) {
               >
                 <Text style={{ ...typography.label, color: palette.text }}>{p.title}</Text>
                 <Text style={{ ...typography.label, color: palette.subtext }}>{p.count}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Top Referrers</Text>
+        {summary.top_referrers.length === 0 ? (
+          <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>No referrer data yet.</Text>
+        ) : (
+          <View style={{ marginTop: spacing.xs, gap: spacing.xs }}>
+            {summary.top_referrers.map((r) => (
+              <View
+                key={r.referrer_host}
+                style={{
+                  flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                  borderRadius: spacing.md, borderWidth: 1, borderColor: palette.divider,
+                  backgroundColor: palette.card, padding: spacing.sm,
+                }}
+              >
+                <Text style={{ ...typography.label, color: palette.text }}>{r.referrer_host}</Text>
+                <Text style={{ ...typography.label, color: palette.subtext }}>{r.count}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Devices</Text>
+        {summary.device_breakdown.length === 0 ? (
+          <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>No device data yet.</Text>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' }}>
+            {summary.device_breakdown.map((d) => (
+              <View
+                key={d.device_type}
+                style={{
+                  borderRadius: spacing.md, borderWidth: 1, borderColor: palette.divider,
+                  backgroundColor: palette.card, padding: spacing.sm, minWidth: 100,
+                }}
+              >
+                <Text style={{ ...typography.h3, color: palette.text }}>{d.count}</Text>
+                <Text style={{ ...typography.caption, color: palette.subtext }}>{DEVICE_LABELS[d.device_type] || d.device_type}</Text>
               </View>
             ))}
           </View>
