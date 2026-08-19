@@ -182,6 +182,15 @@ export type RootStackParamList = {
     shopName?: string;
     returnBroadcastProfileKey?: BroadcastProfileKey;
   };
+  WebsiteBuilder: {
+    ownerType: 'shop' | 'health_institution' | 'education_institution' | 'partner' | 'broadcast_channel';
+    ownerId: string;
+    ownerLabel?: string;
+  };
+  WebsitePreview: {
+    websiteId: string;
+    previewUrl?: string;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

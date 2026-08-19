@@ -103,6 +103,8 @@ import HealthInstitutionManagementScreen from './src/screens/health/HealthInstit
 import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
 import InstitutionProfileEditorScreen from './src/screens/health/InstitutionProfileEditorScreen';
 import ProfileLandingEditorScreen from './src/screens/profile/ProfileLandingEditorScreen';
+import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
+import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
 import HealthInstitutionMembersScreen from './src/screens/health/HealthInstitutionMembersScreen';
 import InstitutionServicesCatalogScreen from './src/screens/health/InstitutionServicesCatalogScreen';
@@ -1583,6 +1585,14 @@ function AppContent() {
                     <RootStack.Screen
                       name="ProfileLandingEditor"
                       component={ProfileLandingEditorScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsiteBuilder"
+                      component={WebsiteBuilderScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsitePreview"
+                      component={WebsitePreviewScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"

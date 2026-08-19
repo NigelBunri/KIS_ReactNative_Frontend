@@ -47,4 +47,24 @@ export const SECTION_TYPE_META: SectionTypeMeta[] = [
     title: 'Contact Information Section',
     description: 'Structured contact details for easy reach-out.',
   },
+  {
+    type: 'faqs',
+    title: 'FAQs Section',
+    description: 'Expandable list of frequently asked questions.',
+  },
+  {
+    type: 'social_links',
+    title: 'Social Links Section',
+    description: 'Row of links to your social profiles.',
+  },
+  {
+    type: 'hours',
+    title: 'Hours Section',
+    description: 'Operating hours by day of the week.',
+  },
+  {
+    type: 'kis_content',
+    title: 'Add KIS Content',
+    description: 'Show live courses, products, services, posts, or other KIS content — always up to date automatically.',
+  },
 ];

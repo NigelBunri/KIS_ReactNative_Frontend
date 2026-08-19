@@ -12,6 +12,10 @@ import TestimonialsSection from '@/components/sections/TestimonialsSection';
 import ProgramsSection from '@/components/sections/ProgramsSection';
 import CTASection from '@/components/sections/CTASection';
 import ContactSection from '@/components/sections/ContactSection';
+import FaqsSection from '@/components/sections/FaqsSection';
+import SocialLinksSection from '@/components/sections/SocialLinksSection';
+import HoursSection from '@/components/sections/HoursSection';
+import KisContentSection from '@/components/sections/KisContentSection';
 
 type Props = {
   sections: DynamicLandingSection[];
@@ -42,6 +46,14 @@ const renderSection = (section: DynamicLandingSection, palette: any, typography:
       return <CTASection {...props} />;
     case 'contact_information':
       return <ContactSection {...props} />;
+    case 'faqs':
+      return <FaqsSection {...props} />;
+    case 'social_links':
+      return <SocialLinksSection {...props} />;
+    case 'hours':
+      return <HoursSection {...props} />;
+    case 'kis_content':
+      return <KisContentSection {...props} />;
     default:
       return null;
   }

@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
-import type { SectionType, SectionDataByType } from './types';
+import type { KisContentTargetType, SectionType, SectionDataByType } from './types';
 import BackgroundColorSelector from './BackgroundColorSelector';
+import KisContentPickerModal from './KisContentPickerModal';
 
 type Props = {
   selectedType: SectionType | null;
@@ -17,7 +18,24 @@ type Props = {
   palette: any;
   typography: any;
   spacing: any;
+  /** Only the "kis_content" section type needs these — omit for editors
+   * that don't yet resolve a concrete owner (e.g. the legacy per-kind
+   * ProfileLandingEditorScreen paths); WebsiteBuilderScreen always
+   * supplies both. */
+  kisContentOwnerType?: string;
+  kisContentOwnerId?: string;
 };
+
+const KIS_CONTENT_TARGET_TYPE_OPTIONS: Array<{ value: KisContentTargetType; label: string }> = [
+  { value: 'course', label: 'Courses' },
+  { value: 'product', label: 'Products' },
+  { value: 'shop_service', label: 'Shop Services' },
+  { value: 'health_service', label: 'Health Services' },
+  { value: 'broadcast_channel', label: 'Channels' },
+  { value: 'post', label: 'Posts' },
+  { value: 'event', label: 'Events' },
+  { value: 'testimonial', label: 'Testimonials' },
+];
 
 const SectionHeading = ({ title, subtitle, typography, palette, spacing }: any) => (
   <View style={{ marginBottom: spacing.sm }}>
@@ -46,6 +64,8 @@ const TypeSpecificFields = ({
   palette,
   typography,
   spacing,
+  kisContentOwnerType,
+  kisContentOwnerId,
 }: {
   type: SectionType;
   data: Record<string, any>;
@@ -56,7 +76,10 @@ const TypeSpecificFields = ({
   palette: any;
   typography: any;
   spacing: any;
+  kisContentOwnerType?: string;
+  kisContentOwnerId?: string;
 }) => {
+  const [pickerOpen, setPickerOpen] = useState(false);
   if (type === 'hero_banner') {
     return (
       <>
@@ -230,13 +253,167 @@ const TypeSpecificFields = ({
     );
   }
 
+  if (type === 'contact_information') {
+    return (
+      <>
+        <SectionHeading title="Contact Information" subtitle="How visitors can reach you" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <KISTextInput label="Phone" value={String(data.phone || '')} onChangeText={(v) => onChange(update(data, 'phone', v))} style={{ marginTop: spacing.xs }} />
+        <KISTextInput label="Email" value={String(data.email || '')} onChangeText={(v) => onChange(update(data, 'email', v))} style={{ marginTop: spacing.xs }} />
+        <KISTextInput label="Address" multiline value={String(data.address || '')} onChangeText={(v) => onChange(update(data, 'address', v))} style={{ marginTop: spacing.xs }} />
+      </>
+    );
+  }
+
+  if (type === 'faqs') {
+    return (
+      <>
+        <SectionHeading title="FAQs" subtitle="Use question::answer format, one per line" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <KISTextInput
+          label="Questions & Answers"
+          multiline
+          value={Array.isArray(data.items) ? data.items.map((m: any) => `${m.question || ''}::${m.answer || ''}`).join('\n') : ''}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'items',
+                v.split('\n').map((line) => line.trim()).filter(Boolean).map((line, idx) => {
+                  const [question, answer] = line.split('::');
+                  return { id: `faq_${idx}`, question: (question || '').trim(), answer: (answer || '').trim() };
+                }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
+  if (type === 'social_links') {
+    return (
+      <>
+        <SectionHeading title="Social Links" subtitle="Use platform::url format, one per line" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <KISTextInput
+          label="Links"
+          multiline
+          value={Array.isArray(data.links) ? data.links.map((m: any) => `${m.platform || ''}::${m.url || ''}`).join('\n') : ''}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'links',
+                v.split('\n').map((line) => line.trim()).filter(Boolean).map((line, idx) => {
+                  const [platform, url] = line.split('::');
+                  return { id: `social_${idx}`, platform: (platform || '').trim(), url: (url || '').trim() };
+                }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
+  if (type === 'hours') {
+    return (
+      <>
+        <SectionHeading title="Hours" subtitle="Use day::hours format, one per line" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
+        <KISTextInput
+          label="Operating Hours"
+          multiline
+          value={Array.isArray(data.days) ? data.days.map((m: any) => `${m.day || ''}::${m.hours || ''}`).join('\n') : ''}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'days',
+                v.split('\n').map((line) => line.trim()).filter(Boolean).map((line, idx) => {
+                  const [day, hours] = line.split('::');
+                  return { id: `hours_${idx}`, day: (day || '').trim(), hours: (hours || '').trim() };
+                }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
+  // kis_content — the live-linked section. Target type + explicit picks
+  // (via KisContentPickerModal) or an auto filter; presentation config
+  // controls how resolved items render on the public page.
+  const canPick = !!kisContentOwnerType && !!kisContentOwnerId;
+  const targetIds = Array.isArray(data.target_ids) ? data.target_ids : [];
   return (
     <>
-      <SectionHeading title="Contact Information" subtitle="How visitors can reach you" typography={typography} palette={palette} spacing={spacing} />
-      <KISTextInput label="Section Title" value={String(data.title || '')} onChangeText={(v) => onChange(update(data, 'title', v))} />
-      <KISTextInput label="Phone" value={String(data.phone || '')} onChangeText={(v) => onChange(update(data, 'phone', v))} style={{ marginTop: spacing.xs }} />
-      <KISTextInput label="Email" value={String(data.email || '')} onChangeText={(v) => onChange(update(data, 'email', v))} style={{ marginTop: spacing.xs }} />
-      <KISTextInput label="Address" multiline value={String(data.address || '')} onChangeText={(v) => onChange(update(data, 'address', v))} style={{ marginTop: spacing.xs }} />
+      <SectionHeading title="Add KIS Content" subtitle="Show live courses, products, services, or other KIS content" typography={typography} palette={palette} spacing={spacing} />
+      <KISTextInput label="Heading" value={String(data.heading || '')} onChangeText={(v) => onChange(update(data, 'heading', v))} />
+      <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.sm }}>Content Type</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
+        {KIS_CONTENT_TARGET_TYPE_OPTIONS.map((option) => (
+          <KISButton
+            key={option.value}
+            title={option.label}
+            size="sm"
+            variant={data.target_type === option.value ? 'primary' : 'outline'}
+            onPress={() => onChange(update(data, 'target_type', option.value))}
+          />
+        ))}
+      </View>
+      <View style={{ marginTop: spacing.sm }}>
+        <KISButton
+          title={targetIds.length ? `Selected (${targetIds.length}) — Change` : 'Browse & Select'}
+          variant="outline"
+          disabled={!canPick}
+          onPress={() => setPickerOpen(true)}
+        />
+        {!canPick ? (
+          <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+            Save this website first to browse and select content.
+          </Text>
+        ) : null}
+      </View>
+      {canPick ? (
+        <KisContentPickerModal
+          visible={pickerOpen}
+          targetType={data.target_type}
+          ownerType={kisContentOwnerType as string}
+          ownerId={kisContentOwnerId as string}
+          selectedIds={targetIds}
+          onToggle={(id) => {
+            const next = targetIds.includes(id) ? targetIds.filter((existing: string) => existing !== id) : [...targetIds, id];
+            onChange(update(data, 'target_ids', next));
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      ) : null}
+      <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.sm }}>Display</Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+        {(['grid', 'carousel', 'list'] as const).map((mode) => (
+          <KISButton
+            key={mode}
+            title={mode.charAt(0).toUpperCase() + mode.slice(1)}
+            size="sm"
+            variant={data.presentation?.display_mode === mode ? 'primary' : 'outline'}
+            onPress={() => onChange(update(data, 'presentation', { ...data.presentation, display_mode: mode }))}
+          />
+        ))}
+      </View>
+      <KISTextInput
+        label="Max items to show"
+        value={String(data.presentation?.limit ?? 6)}
+        keyboardType="number-pad"
+        onChangeText={(v) => onChange(update(data, 'presentation', { ...data.presentation, limit: Math.max(1, Math.min(50, Number(v) || 6)) }))}
+        style={{ marginTop: spacing.xs }}
+      />
+      <KISTextInput label={'"View all" button label'} value={String(data.cta_label || '')} onChangeText={(v) => onChange(update(data, 'cta_label', v))} style={{ marginTop: spacing.xs }} />
     </>
   );
 };
@@ -252,6 +429,8 @@ export default function DynamicSectionForm({
   palette,
   typography,
   spacing,
+  kisContentOwnerType,
+  kisContentOwnerId,
 }: Props) {
   const normalized = useMemo<Record<string, any>>(() => draftData || {}, [draftData]);
   const hasSectionBackgroundImage = !!String(normalized.sectionBackgroundImageUrl || '').trim();
@@ -295,6 +474,8 @@ export default function DynamicSectionForm({
         palette={palette}
         typography={typography}
         spacing={spacing}
+        kisContentOwnerType={kisContentOwnerType}
+        kisContentOwnerId={kisContentOwnerId}
       />
       <SectionHeading title="Selected Section Background" subtitle="Image or one of 6 color themes" typography={typography} palette={palette} spacing={spacing} />
       <KISButton title="Select Section Background Image" variant="outline" onPress={onPickSectionBackgroundImage} />

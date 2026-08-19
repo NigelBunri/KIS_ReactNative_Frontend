@@ -6,7 +6,23 @@ export type SectionType =
   | 'testimonials'
   | 'programs_services'
   | 'call_to_action'
-  | 'contact_information';
+  | 'contact_information'
+  | 'faqs'
+  | 'social_links'
+  | 'hours'
+  | 'kis_content';
+
+// Mirrors apps.websites.models.KIS_CONTENT_TARGET_TYPES on the backend —
+// keep in sync.
+export type KisContentTargetType =
+  | 'course'
+  | 'product'
+  | 'shop_service'
+  | 'health_service'
+  | 'broadcast_channel'
+  | 'post'
+  | 'event'
+  | 'testimonial';
 
 export type HeroBannerSectionData = {
   sectionBackgroundImageUrl?: string;
@@ -74,6 +90,43 @@ export type ContactInformationSectionData = {
   address: string;
 };
 
+export type FaqsSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  items: Array<{ id: string; question: string; answer: string }>;
+};
+
+export type SocialLinksSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  links: Array<{ id: string; platform: string; url: string }>;
+};
+
+export type HoursSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  title: string;
+  days: Array<{ id: string; day: string; hours: string }>;
+};
+
+// Live-linked section — references real KIS records by id (target_ids)
+// or an auto filter, resolved server-side on every read. Never stores a
+// copy of the underlying course/product/service/etc — see
+// apps.websites.kis_content_resolvers on the backend.
+export type KisContentSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  heading: string;
+  target_type: KisContentTargetType;
+  target_ids: string[];
+  filter: { category: string | null; featured_only: boolean; ordering: 'recent' | 'popular' | 'alphabetical' | 'manual' };
+  presentation: { display_mode: 'grid' | 'carousel' | 'list'; limit: number; columns: number };
+  cta_label?: string;
+  cta_deep_link?: string;
+};
+
 export type SectionDataByType = {
   hero_banner: HeroBannerSectionData;
   about: AboutSectionData;
@@ -83,6 +136,10 @@ export type SectionDataByType = {
   programs_services: ProgramsServicesSectionData;
   call_to_action: CallToActionSectionData;
   contact_information: ContactInformationSectionData;
+  faqs: FaqsSectionData;
+  social_links: SocialLinksSectionData;
+  hours: HoursSectionData;
+  kis_content: KisContentSectionData;
 };
 
 export type DynamicLandingSection<T extends SectionType = SectionType> = {
@@ -112,6 +169,24 @@ export const createEmptySectionData = (type: SectionType): SectionDataByType[Sec
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'ocean_mist', title: 'Take the Next Step', description: '', buttonText: 'Contact Us', buttonLink: '' };
     case 'contact_information':
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'mint_soft', title: 'Contact', phone: '', email: '', address: '' };
+    case 'faqs':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'sandstone', title: 'Frequently Asked Questions', items: [] };
+    case 'social_links':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'slate_air', title: 'Follow Us', links: [] };
+    case 'hours':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'mint_soft', title: 'Hours', days: [] };
+    case 'kis_content':
+      return {
+        sectionBackgroundImageUrl: '',
+        sectionBackgroundColorKey: 'ocean_mist',
+        heading: '',
+        target_type: 'product',
+        target_ids: [],
+        filter: { category: null, featured_only: false, ordering: 'recent' },
+        presentation: { display_mode: 'grid', limit: 6, columns: 3 },
+        cta_label: '',
+        cta_deep_link: '',
+      };
     default:
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'mint_soft', title: 'About Us', description: '', imageUrl: '', layout: 'image_left' };
   }

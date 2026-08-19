@@ -86,6 +86,7 @@
     "react-native-video": "^6.18.0",
     "react-native-view-shot": "^4.0.3",
     "react-native-webrtc": "^124.0.7",
+    "react-native-webview": "^13.17.0",
     "react-native-worklets": "^0.8.3",
     "slate": "^0.123.0",
     "slate-history": "^0.113.1",

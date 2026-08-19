@@ -128,6 +128,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/education/certificates/share/${token}/`,
     enroll: (id: string) =>
       `${API_BASE_URL}/api/v1/education/contents/${id}/enroll/`,
+    contentAccessRequest: (id: string) =>
+      `${API_BASE_URL}/api/v1/education/contents/${id}/access-request/`,
     itemAction: (contentId: string, itemId: string) =>
       `${API_BASE_URL}/api/v1/education/contents/${contentId}/items/${itemId}/action/`,
     progress: `${API_BASE_URL}/api/v1/education/progress/`,
@@ -438,6 +440,14 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/`,
     educationInstitutionVerificationStatus: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/verification-status/`,
+    educationInstitutionPayoutAccountConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/payout-account/connect/`,
+    educationCourseAccessRequests: (courseId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/courses/${courseId}/access-requests/`,
+    educationInstitutionCourseAccessRequests: (institutionId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/course-access-requests/`,
+    educationCourseAccessRequestAction: (courseId: string, requestId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/courses/${courseId}/access-requests/${requestId}/action/`,
     educationInstitutionVerificationStart: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/verification/start/`,
     educationInstitutionDashboard: (id: string) =>
@@ -826,6 +836,25 @@ const broadcastRoutes = {
     productAuthCheck: (id: string) => `${API_BASE_URL}/api/v1/commerce/product-auth-checks/${id}/`,
     marketplaceComplaints: `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/`,
     marketplaceComplaint: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/`,
+  },
+  websites: {
+    mine: `${API_BASE_URL}/api/v1/websites/mine/`,
+    detail: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/`,
+    publish: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/publish/`,
+    unpublish: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/unpublish/`,
+    previewToken: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/preview-token/`,
+    pages: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/pages/`,
+    pageDetail: (websiteId: string, pageId: string) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/pages/${pageId}/`,
+    pagePublish: (websiteId: string, pageId: string) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/pages/${pageId}/publish/`,
+    pageUnpublish: (websiteId: string, pageId: string) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/pages/${pageId}/unpublish/`,
+    kisContentSearch: (targetType: string) =>
+      `${API_BASE_URL}/api/v1/websites/kis-content/${targetType}/search/`,
+    publicSite: (slug: string) => `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/`,
+    publicPage: (slug: string, pageSlug: string) =>
+      `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/pages/${pageSlug}/`,
   },
 };
 
