@@ -1,15 +1,26 @@
 import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
 import { resolveBackendAssetUrl } from '@/network';
+import EditableText from './EditableText';
 import type { SectionRenderProps } from './types';
 
-export default function AboutSection({ data, palette, typography, spacing }: SectionRenderProps) {
+export default function AboutSection({ data, palette, typography, spacing, onFieldChange }: SectionRenderProps) {
   const uri = data?.imageUrl ? resolveBackendAssetUrl(data.imageUrl) || data.imageUrl : '';
   const imageBlock = uri ? <Image source={{ uri }} style={{ width: '100%', height: 140, borderRadius: spacing.sm }} resizeMode="cover" /> : <View style={{ width: '100%', height: 140, borderRadius: spacing.sm, backgroundColor: palette.surface }} />;
   const textBlock = (
     <View style={{ flex: 1 }}>
-      <Text style={{ ...typography.h3, color: palette.text }}>{data?.title || 'About'}</Text>
-      <Text style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}>{data?.description || ''}</Text>
+      <EditableText
+        value={String(data?.title || 'About')}
+        style={{ ...typography.h3, color: palette.text }}
+        onChangeText={onFieldChange ? (v) => onFieldChange('title', v) : undefined}
+      />
+      <EditableText
+        value={String(data?.description || '')}
+        style={{ ...typography.body, color: palette.subtext, marginTop: spacing.xs }}
+        multiline
+        placeholder="Description"
+        onChangeText={onFieldChange ? (v) => onFieldChange('description', v) : undefined}
+      />
     </View>
   );
   const imageLeft = data?.layout !== 'image_right';

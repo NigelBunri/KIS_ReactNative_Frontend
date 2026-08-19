@@ -1,15 +1,20 @@
 import React from 'react';
 import { Text, View } from 'react-native';
+import EditableText from './EditableText';
 import type { SectionRenderProps } from './types';
 
 // Read-only preview — real submission only happens on the public website
 // (components/website-builder/SectionRenderer.tsx's FormSection there is
 // the actual functional <form>), not inside this editor.
-export default function FormSection({ data, palette, typography, spacing }: SectionRenderProps) {
+export default function FormSection({ data, palette, typography, spacing, onFieldChange }: SectionRenderProps) {
   const fields = Array.isArray(data?.fields) ? data.fields : [];
   return (
     <View style={{ marginTop: spacing.md }}>
-      <Text style={{ ...typography.h3, color: palette.text }}>{data?.title || 'Contact Us'}</Text>
+      <EditableText
+        value={String(data?.title || 'Contact Us')}
+        style={{ ...typography.h3, color: palette.text }}
+        onChangeText={onFieldChange ? (v) => onFieldChange('title', v) : undefined}
+      />
       <View style={{ marginTop: spacing.sm, borderRadius: spacing.sm, borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface, padding: spacing.md, gap: spacing.sm }}>
         {fields.length === 0 ? (
           <Text style={{ ...typography.body, color: palette.subtext }}>No fields yet — add some above.</Text>
@@ -42,7 +47,11 @@ export default function FormSection({ data, palette, typography, spacing }: Sect
             backgroundColor: palette.accentPrimary,
           }}
         >
-          <Text style={{ ...typography.label, color: '#FFFFFF' }}>{data?.submitLabel || 'Submit'}</Text>
+          <EditableText
+            value={String(data?.submitLabel || 'Submit')}
+            style={{ ...typography.label, color: '#FFFFFF' }}
+            onChangeText={onFieldChange ? (v) => onFieldChange('submitLabel', v) : undefined}
+          />
         </View>
       </View>
     </View>

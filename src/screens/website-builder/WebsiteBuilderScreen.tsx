@@ -573,6 +573,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           palette={palette}
           typography={typography}
           spacing={spacing}
+          onDataChange={setSectionDraftData}
         />
 
         <DynamicSectionForm

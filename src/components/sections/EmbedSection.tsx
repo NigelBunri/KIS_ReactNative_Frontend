@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
+import EditableText from './EditableText';
 import type { SectionRenderProps } from './types';
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -13,12 +14,19 @@ const PROVIDER_LABELS: Record<string, string> = {
 // adding a WebView here just for an editor preview isn't worth a new
 // native dependency for what other section previews already treat as a
 // static mockup (see FormSection.tsx).
-export default function EmbedSection({ data, palette, typography, spacing }: SectionRenderProps) {
+export default function EmbedSection({ data, palette, typography, spacing, onFieldChange }: SectionRenderProps) {
   const provider = String(data?.provider || '');
   const url = String(data?.url || '');
   return (
     <View style={{ marginTop: spacing.md }}>
-      {!!data?.title && <Text style={{ ...typography.h3, color: palette.text, marginBottom: spacing.xs }}>{data.title}</Text>}
+      {(!!data?.title || !!onFieldChange) && (
+        <EditableText
+          value={String(data?.title || '')}
+          style={{ ...typography.h3, color: palette.text, marginBottom: spacing.xs }}
+          placeholder="Title"
+          onChangeText={onFieldChange ? (v) => onFieldChange('title', v) : undefined}
+        />
+      )}
       <View
         style={{
           borderRadius: spacing.sm,

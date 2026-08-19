@@ -46,8 +46,14 @@ function SectionDragHandle({ palette, spacing }: { palette: any; spacing: any })
   );
 }
 
-const renderSection = (section: DynamicLandingSection, palette: any, typography: any, spacing: any) => {
-  const props = { data: section.data, palette, typography, spacing };
+const renderSection = (
+  section: DynamicLandingSection,
+  palette: any,
+  typography: any,
+  spacing: any,
+  onFieldChange?: (key: string, value: string) => void,
+) => {
+  const props = { data: section.data, palette, typography, spacing, onFieldChange };
   switch (section.type) {
     case 'hero_banner':
       return <HeroSection {...props} />;
@@ -89,15 +95,22 @@ const renderSection = (section: DynamicLandingSection, palette: any, typography:
  * public page use, so what the owner sees while editing is what actually
  * ships, not a placeholder. Used by WebsiteBuilderScreen's split view. */
 export function LiveSectionPreview({
-  type, data, palette, typography, spacing,
+  type, data, palette, typography, spacing, onDataChange,
 }: {
   type: DynamicLandingSection['type'] | null;
   data: Record<string, any>;
   palette: any; typography: any; spacing: any;
+  /** When provided, text fields render directly editable inside the
+   * preview — typing there writes straight back into the same draft data
+   * object the form below edits, so both stay in sync either way. */
+  onDataChange?: (next: Record<string, any>) => void;
 }) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const previewPalette = React.useMemo(() => buildPreviewPalette(palette, isDark), [isDark, palette]);
+  const onFieldChange = onDataChange
+    ? (key: string, value: string) => onDataChange({ ...data, [key]: value })
+    : undefined;
 
   if (!type) return null;
   return (
@@ -114,9 +127,12 @@ export function LiveSectionPreview({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.sm, borderBottomWidth: 1, borderBottomColor: previewPalette.divider }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: previewPalette.accentPrimary }} />
         <Text style={{ ...typography.label, color: previewPalette.subtext }}>Live Preview</Text>
+        {onFieldChange ? (
+          <Text style={{ ...typography.caption, color: previewPalette.subtext, marginLeft: 'auto' }}>Tap text to edit</Text>
+        ) : null}
       </View>
       <View style={{ padding: spacing.sm }}>
-        {renderSection({ id: 'draft', type, name: '', data } as DynamicLandingSection, previewPalette, typography, spacing)}
+        {renderSection({ id: 'draft', type, name: '', data } as DynamicLandingSection, previewPalette, typography, spacing, onFieldChange)}
       </View>
     </View>
   );

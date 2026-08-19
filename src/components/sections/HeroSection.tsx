@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { resolveBackendAssetUrl } from '@/network';
+import EditableText from './EditableText';
 import type { SectionRenderProps } from './types';
 
 const TITLE_PREVIEW_LIMIT = 70;
@@ -20,7 +21,7 @@ type HeroSectionProps = SectionRenderProps & {
   onPressCta?: () => void;
 };
 
-export default function HeroSection({ data, palette, typography, spacing, onPressCta }: HeroSectionProps) {
+export default function HeroSection({ data, palette, typography, spacing, onPressCta, onFieldChange }: HeroSectionProps) {
   const [titleExpanded, setTitleExpanded] = useState(false);
   const [subtitleExpanded, setSubtitleExpanded] = useState(false);
   const uri = data?.backgroundImageUrl ? resolveBackendAssetUrl(data.backgroundImageUrl) || data.backgroundImageUrl : '';
@@ -48,25 +49,39 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
           style={{ maxHeight: 230 }}
           contentContainerStyle={{ padding: spacing.xs }}
         >
-          {titleExpanded ? (
+          {onFieldChange ? (
+            <EditableText
+              value={title}
+              style={{ ...typography.h2, color: palette.onPrimary }}
+              onChangeText={(v) => onFieldChange('title', v)}
+            />
+          ) : titleExpanded ? (
             <Text style={{ ...typography.h2, color: palette.onPrimary }}>{title}</Text>
           ) : (
             <Text style={{ ...typography.h2, color: palette.onPrimary }}>{titlePreview.text}</Text>
           )}
-          {titlePreview.truncated ? (
+          {!onFieldChange && titlePreview.truncated ? (
             <TouchableOpacity onPress={() => setTitleExpanded((prev) => !prev)} style={{ marginTop: 2 }}>
               <Text style={{ ...typography.caption, color: palette.onPrimary }}>{titleExpanded ? 'less' : '.. and more'}</Text>
             </TouchableOpacity>
           ) : null}
 
-          {subtitleExpanded ? (
+          {onFieldChange ? (
+            <EditableText
+              value={subtitle}
+              style={{ ...typography.body, color: 'rgba(255,255,255,0.92)', marginTop: spacing.xs }}
+              multiline
+              placeholder="Subtitle"
+              onChangeText={(v) => onFieldChange('subtitle', v)}
+            />
+          ) : subtitleExpanded ? (
             <Text style={{ ...typography.body, color: 'rgba(255,255,255,0.92)', marginTop: spacing.xs }}>{subtitle}</Text>
           ) : (
             <Text style={{ ...typography.body, color: 'rgba(255,255,255,0.92)', marginTop: spacing.xs }}>
               {subtitlePreview.text}
             </Text>
           )}
-          {subtitlePreview.truncated ? (
+          {!onFieldChange && subtitlePreview.truncated ? (
             <TouchableOpacity onPress={() => setSubtitleExpanded((prev) => !prev)} style={{ marginTop: 2 }}>
               <Text style={{ ...typography.caption, color: palette.onPrimary }}>{subtitleExpanded ? 'less' : '.. and more'}</Text>
             </TouchableOpacity>
@@ -74,7 +89,7 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
 
           <TouchableOpacity
             activeOpacity={onPressCta ? 0.85 : 1}
-            onPress={onPressCta}
+            onPress={onFieldChange ? undefined : onPressCta}
             style={{
               marginTop: spacing.sm,
               marginBottom: spacing.xs,
@@ -87,7 +102,11 @@ export default function HeroSection({ data, palette, typography, spacing, onPres
               borderColor: 'rgba(255,255,255,0.5)',
             }}
           >
-            <Text style={{ ...typography.label, color: palette.royalInk }}>{data?.ctaText || 'Book Now'}</Text>
+            <EditableText
+              value={String(data?.ctaText || 'Book Now')}
+              style={{ ...typography.label, color: palette.royalInk }}
+              onChangeText={onFieldChange ? (v) => onFieldChange('ctaText', v) : undefined}
+            />
           </TouchableOpacity>
         </ScrollView>
       </LinearGradient>

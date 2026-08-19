@@ -1,12 +1,17 @@
 import React from 'react';
 import { Text, View } from 'react-native';
+import EditableText from './EditableText';
 import type { SectionRenderProps } from './types';
 
-export default function ProgramsSection({ data, palette, typography, spacing }: SectionRenderProps) {
+export default function ProgramsSection({ data, palette, typography, spacing, onFieldChange }: SectionRenderProps) {
   const cards = Array.isArray(data?.cards) ? data.cards : [];
   return (
     <View style={{ marginTop: spacing.md }}>
-      <Text style={{ ...typography.h3, color: palette.text }}>{data?.title || 'Programs & Services'}</Text>
+      <EditableText
+        value={String(data?.title || 'Programs & Services')}
+        style={{ ...typography.h3, color: palette.text }}
+        onChangeText={onFieldChange ? (v) => onFieldChange('title', v) : undefined}
+      />
       <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
         {cards.map((card: any) => (
           <View key={card.id || card.name} style={{ borderRadius: spacing.sm, borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface, padding: spacing.md }}>
