@@ -583,6 +583,30 @@ const TypeSpecificFields = ({
         onChangeText={(v) => onChange(update(data, 'presentation', { ...data.presentation, limit: Math.max(1, Math.min(50, Number(v) || 6)) }))}
         style={{ marginTop: spacing.xs }}
       />
+      <Text style={{ ...typography.label, color: palette.text, marginTop: spacing.sm }}>Order</Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+        {([
+          { value: 'recent', label: 'Newest First' },
+          { value: 'alphabetical', label: 'A–Z' },
+          { value: 'manual', label: 'My Selection Order' },
+        ] as const).map((option) => (
+          <KISButton
+            key={option.value}
+            title={option.label}
+            size="sm"
+            variant={(data.filter?.ordering || 'recent') === option.value ? 'primary' : 'outline'}
+            onPress={() => onChange(update(data, 'filter', { ...data.filter, ordering: option.value }))}
+          />
+        ))}
+      </View>
+      {data.filter?.ordering === 'manual' && targetIds.length === 0 ? (
+        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+          "My Selection Order" needs specific items chosen above — otherwise it falls back to Newest First.
+        </Text>
+      ) : null}
+      <Text style={{ ...typography.caption, color: palette.subtext, marginTop: spacing.xs }}>
+        Visitors can load more beyond the limit above with a "Load more" button, if there's more to show.
+      </Text>
       <KISTextInput label={'"View all" button label'} value={String(data.cta_label || '')} onChangeText={(v) => onChange(update(data, 'cta_label', v))} style={{ marginTop: spacing.xs }} />
     </>
   );
