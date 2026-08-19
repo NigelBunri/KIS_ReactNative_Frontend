@@ -201,6 +201,10 @@ export type RootStackParamList = {
   WebsiteWebhooks: {
     websiteId: string;
   };
+  WebsiteCollaborators: {
+    websiteId: string;
+  };
+  WebsiteJoin: undefined;
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

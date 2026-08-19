@@ -856,6 +856,13 @@ const broadcastRoutes = {
     webhooks: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/webhooks/`,
     webhookDetail: (websiteId: string, webhookId: string) =>
       `${API_BASE_URL}/api/v1/websites/${websiteId}/webhooks/${webhookId}/`,
+    collaborators: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/collaborators/`,
+    collaboratorDetail: (websiteId: string, collaboratorId: string) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/collaborators/${collaboratorId}/`,
+    invites: (websiteId: string) => `${API_BASE_URL}/api/v1/websites/${websiteId}/invites/`,
+    inviteRevoke: (websiteId: string, inviteId: string) =>
+      `${API_BASE_URL}/api/v1/websites/${websiteId}/invites/${inviteId}/revoke/`,
+    redeemInvite: `${API_BASE_URL}/api/v1/websites/redeem-invite/`,
     publicSite: (slug: string) => `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/`,
     publicPage: (slug: string, pageSlug: string) =>
       `${API_BASE_URL}/api/v1/websites/public/sites/${slug}/pages/${pageSlug}/`,
