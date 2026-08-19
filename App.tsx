@@ -112,6 +112,7 @@ import WebsiteCollaboratorsScreen from './src/screens/website-builder/WebsiteCol
 import WebsiteJoinScreen from './src/screens/website-builder/WebsiteJoinScreen';
 import WebsiteVisitsScreen from './src/screens/website-builder/WebsiteVisitsScreen';
 import WebsiteCustomDomainScreen from './src/screens/website-builder/WebsiteCustomDomainScreen';
+import WebsiteTemplatePickerScreen from './src/screens/website-builder/WebsiteTemplatePickerScreen';
 import AvailabilityManagementScreen from './src/screens/health/AvailabilityManagementScreen';
 import HealthInstitutionMembersScreen from './src/screens/health/HealthInstitutionMembersScreen';
 import InstitutionServicesCatalogScreen from './src/screens/health/InstitutionServicesCatalogScreen';
@@ -1628,6 +1629,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="WebsiteCustomDomain"
                       component={WebsiteCustomDomainScreen}
+                    />
+                    <RootStack.Screen
+                      name="WebsiteTemplatePicker"
+                      component={WebsiteTemplatePickerScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"

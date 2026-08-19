@@ -211,6 +211,11 @@ export type RootStackParamList = {
   WebsiteCustomDomain: {
     websiteId: string;
   };
+  WebsiteTemplatePicker: {
+    ownerType: 'shop' | 'health_institution' | 'education_institution' | 'partner' | 'broadcast_channel';
+    ownerId: string;
+    ownerLabel?: string;
+  };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
   PasswordChange: undefined;

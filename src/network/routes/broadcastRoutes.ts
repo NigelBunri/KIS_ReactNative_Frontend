@@ -839,6 +839,12 @@ const broadcastRoutes = {
   },
   websites: {
     mine: `${API_BASE_URL}/api/v1/websites/mine/`,
+    mineWithTemplate: (ownerType: string, ownerId: string, templateId?: string) => {
+      const params = new URLSearchParams({ owner_type: ownerType, owner_id: ownerId });
+      if (templateId) params.set('template_id', templateId);
+      return `${API_BASE_URL}/api/v1/websites/mine/?${params.toString()}`;
+    },
+    templates: (ownerType: string) => `${API_BASE_URL}/api/v1/websites/templates/?owner_type=${ownerType}`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/`,
     publish: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/publish/`,
     unpublish: (id: string) => `${API_BASE_URL}/api/v1/websites/${id}/unpublish/`,
