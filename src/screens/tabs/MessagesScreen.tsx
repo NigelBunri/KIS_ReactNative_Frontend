@@ -369,7 +369,7 @@ const handleStartQuickCall = useCallback(
   [startCall, effectiveCurrentUserId],
 );
 
-const refreshConversations = useCallback(async (force?: boolean) => {
+const refreshConversations = useCallback(async (force?: boolean, refreshCommunities?: boolean) => {
   const currentList = conversationsRef.current;
   const convs = await fetchConversationsForCurrentUser(currentList, effectiveCurrentUserId ?? undefined, !!force);
   if (convs.length === 0 && currentList.length > 0) return;
@@ -385,7 +385,12 @@ const refreshConversations = useCallback(async (force?: boolean) => {
     return c;
   });
   setConversations(merged);
-  if (force) {
+  // Community/group membership almost never changes on a per-message basis,
+  // so it defaults to force's value but callers that force-refresh purely to
+  // get the latest message preview (e.g. every incoming chat.message) opt out
+  // explicitly — otherwise a short burst of messages reloads the full
+  // communities+groups list (N+1 requests) once per message.
+  if (refreshCommunities ?? force) {
     await loadCommunitiesRef.current();
   }
 }, [effectiveCurrentUserId]);
@@ -1202,7 +1207,7 @@ useEffect(() => {
     }
 
     queueMetaRefresh(convId);
-    refreshConversations(true).catch(() => {});
+    refreshConversations(true, false).catch(() => {});
   };
   socket.on('chat.message', onMessage);
   socket.on('conversation.updated', onConversationUpdated);

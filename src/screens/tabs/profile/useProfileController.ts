@@ -962,9 +962,10 @@ export const useProfileController = (opts: {
           if (cached) {
             const cachedPayload = JSON.parse(cached) as ProfilePayload;
             applyProfilePayload(cachedPayload);
-            loadKisWallet(cachedPayload?.account?.wallet_balance_cents);
-            loadWalletLedger();
-            loadBroadcastProfiles();
+            // Wallet/ledger/broadcasts are NOT re-derived here — the network
+            // branch below fetches them moments later regardless of whether
+            // this cache branch runs, so loading them here too just doubled
+            // every /wallet/me, /wallet/ledger, and broadcast-profiles call.
             hasCachedPayload = true;
             setLoading(false);
           }
