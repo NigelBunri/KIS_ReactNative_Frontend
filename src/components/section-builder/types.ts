@@ -200,6 +200,10 @@ export type DynamicLandingSection<T extends SectionType = SectionType> = {
   type: T;
   data: SectionDataByType[T];
   responsive?: { hidden_on?: Array<'mobile' | 'desktop'> };
+  /** Which alternate visual design to render for this section — see
+   * sectionVariants.ts. Absent means "classic" (the original design).
+   * Only section types listed in SECTION_VARIANTS support this. */
+  variant?: string;
 };
 
 const createId = () => `section_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

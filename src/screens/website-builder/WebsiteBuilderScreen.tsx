@@ -20,6 +20,8 @@ import type { RootStackParamList } from '@/navigation/types';
 import DynamicSectionForm from '@/components/section-builder/DynamicSectionForm';
 import SectionPreview, { LiveSectionPreview } from '@/components/section-builder/SectionPreview';
 import SectionTypeSelector from '@/components/section-builder/SectionTypeSelector';
+import SectionDesignPickerModal from '@/components/section-builder/SectionDesignPickerModal';
+import { getSectionVariants, resolveSectionVariant } from '@/components/section-builder/sectionVariants';
 import { SECTION_TYPE_META } from '@/components/section-builder/sectionTypeMeta';
 import {
   createEmptySectionData,
@@ -28,6 +30,7 @@ import {
   type SectionType,
 } from '@/components/section-builder/types';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebsiteBuilder'>;
 
@@ -118,6 +121,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const [sectionDraftData, setSectionDraftData] = useState<Record<string, any>>({});
   const [sectionDraftName, setSectionDraftName] = useState('');
   const [sectionDraftResponsive, setSectionDraftResponsive] = useState<{ hidden_on?: Array<'mobile' | 'desktop'> }>({});
+  const [sectionDraftVariant, setSectionDraftVariant] = useState<string | undefined>(undefined);
+  const [isDesignPickerOpen, setIsDesignPickerOpen] = useState(false);
   const [isSectionTypePickerOpen, setIsSectionTypePickerOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isAddingPage, setIsAddingPage] = useState(false);
@@ -237,6 +242,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
                 name: sectionDraftName || section.name,
                 data: { ...createEmptySectionData(selectedType), ...sectionDraftData } as any,
                 responsive: sectionDraftResponsive,
+                variant: sectionDraftVariant,
               },
         ),
       );
@@ -245,6 +251,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
       created.name = sectionDraftName || created.name;
       created.data = { ...created.data, ...sectionDraftData } as any;
       created.responsive = sectionDraftResponsive;
+      created.variant = sectionDraftVariant;
       setSections((prev) => [...prev, created]);
     }
     setEditingSectionId(null);
@@ -252,7 +259,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     setSectionDraftName('');
     setSectionDraftData({});
     setSectionDraftResponsive({});
-  }, [editingSectionId, sectionDraftData, sectionDraftName, sectionDraftResponsive, selectedType]);
+    setSectionDraftVariant(undefined);
+  }, [editingSectionId, sectionDraftData, sectionDraftName, sectionDraftResponsive, sectionDraftVariant, selectedType]);
 
   const handleEditSection = useCallback((sectionId: string) => {
     const current = sections.find((item) => item.id === sectionId);
@@ -262,6 +270,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     setSectionDraftName(current.name || '');
     setSectionDraftData({ ...(current.data || {}) });
     setSectionDraftResponsive({ ...(current.responsive || {}) });
+    setSectionDraftVariant(current.variant);
   }, [sections]);
 
   const handleDeleteSection = useCallback((sectionId: string) => {
@@ -459,14 +468,23 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
 
   if (loading || !website) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={palette.accentPrimary} />
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+        <ScreenHeader title="Website Builder" onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={palette.accentPrimary} />
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <ScreenHeader
+        title={website.name || ownerLabel || 'Website Builder'}
+        onBack={() => navigation.goBack()}
+        animateBackHint
+      />
+      <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
       <ScrollViewContainer contentContainerStyle={{ padding: spacing.md }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
@@ -609,6 +627,31 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           <KISTextInput label="Section Name" value={sectionDraftName} onChangeText={setSectionDraftName} style={{ marginTop: spacing.sm }} />
         ) : null}
 
+        {selectedType && getSectionVariants(selectedType) ? (
+          <TouchableOpacity
+            onPress={() => setIsDesignPickerOpen(true)}
+            style={{
+              marginTop: spacing.sm,
+              borderWidth: 1,
+              borderColor: palette.divider,
+              borderRadius: spacing.md,
+              backgroundColor: palette.card,
+              padding: spacing.sm,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View>
+              <Text style={{ ...typography.label, color: palette.text }}>Design</Text>
+              <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
+                {resolveSectionVariant(selectedType, sectionDraftVariant).label}
+              </Text>
+            </View>
+            <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+          </TouchableOpacity>
+        ) : null}
+
         <LiveSectionPreview
           type={selectedType}
           data={sectionDraftData}
@@ -643,6 +686,16 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           <KISButton title={editingSectionId ? 'Update Section' : 'Create Section'} onPress={handleAddSection} disabled={!selectedType || saving || uploadingImage} />
         </View>
       </ScrollViewContainer>
-    </SafeAreaView>
+      </SafeAreaView>
+      {selectedType ? (
+        <SectionDesignPickerModal
+          visible={isDesignPickerOpen}
+          sectionType={selectedType}
+          selectedVariant={sectionDraftVariant}
+          onSelect={(variantKey) => { setSectionDraftVariant(variantKey); setIsDesignPickerOpen(false); }}
+          onClose={() => setIsDesignPickerOpen(false)}
+        />
+      ) : null}
+    </View>
   );
 }
