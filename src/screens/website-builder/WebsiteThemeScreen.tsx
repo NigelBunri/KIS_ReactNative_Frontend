@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { patchRequest } from '@/network/patch';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import KISButton from '@/constants/KISButton';
 import {
@@ -20,6 +22,20 @@ type ButtonShape = 'rounded' | 'pill' | 'square';
 type ButtonFill = 'solid' | 'outline';
 
 const DEFAULT_PALETTE: Palette = { primary: '#1a1a2e', secondary: '#e94560', background: '#ffffff', text: '#0f0f1a' };
+
+const uploadLogo = async (asset: any): Promise<string> => {
+  if (!asset?.uri) return '';
+  const form = new FormData();
+  form.append('attachment', {
+    uri: asset.uri,
+    name: asset.fileName || `website-logo-${Date.now()}.jpg`,
+    type: asset.type || 'image/jpeg',
+  } as any);
+  form.append('context', 'website_logo');
+  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form);
+  const file = (res as any)?.data?.attachment ?? (res as any)?.attachment ?? {};
+  return String(file?.url || file?.uri || file?.file_url || file?.fileUrl || asset.uri);
+};
 
 const SWATCHES = [
   '#1a1a2e', '#0f172a', '#e94560', '#f97316', '#16a34a', '#0ea5e9',
@@ -118,10 +134,28 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
   const [preset, setPreset] = useState<TypographyPreset>(initialBranding?.typography?.preset || 'system');
   const [shape, setShape] = useState<ButtonShape>(initialBranding?.buttons?.shape || 'rounded');
   const [fill, setFill] = useState<ButtonFill>(initialBranding?.buttons?.fill || 'solid');
+  const [logoUrl, setLogoUrl] = useState<string>(initialBranding?.logo_url || '');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const setColor = useCallback((key: keyof Palette, hex: string) => {
     setColors((prev) => ({ ...prev, [key]: hex }));
+  }, []);
+
+  const handlePickLogo = useCallback(async () => {
+    setUploadingLogo(true);
+    try {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 });
+      if (result.didCancel) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+      const url = await uploadLogo(asset);
+      if (url) setLogoUrl(url);
+    } catch (error: any) {
+      Alert.alert('Website Theme', error?.message || 'Unable to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -129,7 +163,7 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
     try {
       const res = await patchRequest(
         ROUTES.websites.detail(websiteId),
-        { branding: { palette: colors, typography: { preset }, buttons: { shape, fill } } },
+        { branding: { palette: colors, typography: { preset }, buttons: { shape, fill }, logo_url: logoUrl } },
         { errorMessage: 'Unable to save theme.' },
       );
       if (!res?.success) throw new Error((res as any)?.message || 'Unable to save theme.');
@@ -140,7 +174,7 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [websiteId, colors, preset, shape, fill, navigation]);
+  }, [websiteId, colors, preset, shape, fill, logoUrl, navigation]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -149,6 +183,30 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
         <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
           Colors, typography, and button style — applied across your whole website.
         </Text>
+
+        <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Logo</Text>
+        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
+          Shown in your site's header. Falls back to your site's first letter if no logo is set.
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+          {logoUrl ? (
+            <Image source={{ uri: logoUrl }} style={{ width: 56, height: 56, borderRadius: 10 }} />
+          ) : (
+            <View style={{ width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: palette.divider, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ ...typography.caption, color: palette.subtext }}>None</Text>
+            </View>
+          )}
+          <KISButton
+            title={uploadingLogo ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+            variant="outline"
+            size="sm"
+            onPress={handlePickLogo}
+            disabled={uploadingLogo}
+          />
+          {logoUrl ? (
+            <KISButton title="Remove" variant="outline" size="sm" onPress={() => setLogoUrl('')} />
+          ) : null}
+        </View>
 
         <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Palette</Text>
         <ColorField label="Primary" value={colors.primary} onChange={(hex) => setColor('primary', hex)} palette={palette} typography={typography} spacing={spacing} />

@@ -122,6 +122,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isAddingPage, setIsAddingPage] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState('');
+  const [isRenamingSite, setIsRenamingSite] = useState(false);
+  const [siteNameDraft, setSiteNameDraft] = useState('');
 
   const activePage = useMemo(() => website?.pages.find((p) => p.id === activePageId) || null, [website, activePageId]);
 
@@ -386,6 +388,28 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsitePreview', { websiteId: website.id, previewUrl });
   }, [website, navigation]);
 
+  const handleStartRenameSite = useCallback(() => {
+    if (!website) return;
+    setSiteNameDraft(website.name);
+    setIsRenamingSite(true);
+  }, [website]);
+
+  const handleConfirmRenameSite = useCallback(async () => {
+    if (!website) return;
+    const trimmed = siteNameDraft.trim();
+    if (!trimmed || trimmed === website.name) {
+      setIsRenamingSite(false);
+      return;
+    }
+    const res = await patchRequest(ROUTES.websites.detail(website.id), { name: trimmed }, { errorMessage: 'Unable to rename website.' });
+    if (!res?.success) {
+      Alert.alert('Website Builder', (res as any)?.message || 'Unable to rename website.');
+      return;
+    }
+    setIsRenamingSite(false);
+    await load();
+  }, [website, siteNameDraft, load]);
+
   const handleOpenTheme = useCallback(() => {
     if (!website) return;
     navigation.navigate('WebsiteTheme', { websiteId: website.id, branding: website.branding });
@@ -445,8 +469,26 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollViewContainer contentContainerStyle={{ padding: spacing.md }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ ...typography.h2, color: palette.text }}>{ownerLabel || website.name}</Text>
+          <View style={{ flex: 1 }}>
+            {isRenamingSite ? (
+              <View style={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <KISTextInput
+                    placeholder="Site name"
+                    value={siteNameDraft}
+                    onChangeText={setSiteNameDraft}
+                    onSubmitEditing={handleConfirmRenameSite}
+                    autoFocus
+                  />
+                </View>
+                <KISButton title="Save" size="sm" onPress={handleConfirmRenameSite} disabled={!siteNameDraft.trim()} />
+                <KISButton title="Cancel" size="sm" variant="outline" onPress={() => setIsRenamingSite(false)} />
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleStartRenameSite} accessibilityLabel="Rename website">
+                <Text style={{ ...typography.h2, color: palette.text }}>{website.name || ownerLabel} ✎</Text>
+              </TouchableOpacity>
+            )}
             <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
               {website.status === 'published' ? 'Published' : website.status === 'unpublished' ? 'Unpublished' : 'Draft — not yet published'}
             </Text>
