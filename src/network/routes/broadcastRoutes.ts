@@ -189,6 +189,13 @@ const broadcastRoutes = {
     appShortcutsAnalytics: `${API_BASE_URL}/api/v1/partners/app-shortcuts/analytics/`,
     organizationAppPromote: (id: string, appId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/organization-apps/${appId}/promote/`,
+    // Connects a partner profile to the Shop/Health/Education/Broadcast
+    // institutions the same owner actually manages — distinct from
+    // education.partnerLinks above, which is a coarser per-category
+    // enable/role toggle, not a link to a specific institution record.
+    organizations: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/organizations/`,
+    linkableOrganizations: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/organizations/linkable/`,
+    unlinkOrganization: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/organizations/unlink/`,
     // Location & Attendance
     locationEvents: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/location/events/`,

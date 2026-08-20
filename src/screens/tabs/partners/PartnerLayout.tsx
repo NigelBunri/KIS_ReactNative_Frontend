@@ -60,6 +60,7 @@ type Props = {
   openSection: (sectionKey: string) => void;
   onOpenCreate: (kind: 'community' | 'group' | 'channel') => void;
   onOpenLinks: () => void;
+  onOpenOrganizations: () => void;
   animatePartnerSheet: (open: boolean) => void;
   panels: {
     settingsPanel: any;
@@ -78,6 +79,7 @@ type Props = {
     linksPanel: any;
     complaintsPanel: any;
     appsPanel: any;
+    organizationsPanel: any;
   };
   onLaunchOrganizationApp: (app: PartnerOrganizationApp) => void;
   onOpenOrganizationApps: () => void;
@@ -130,6 +132,7 @@ export default function PartnerLayout({
   openSection,
   onOpenCreate,
   onOpenLinks,
+  onOpenOrganizations,
   animatePartnerSheet,
   panels,
   onOpenInsights,
@@ -247,6 +250,7 @@ export default function PartnerLayout({
         onOpenCreate={onOpenCreate}
         animatePartnerSheet={animatePartnerSheet}
         onOpenLinks={onOpenLinks}
+        onOpenOrganizations={onOpenOrganizations}
       />
 
       <PartnerPanels
@@ -273,6 +277,7 @@ export default function PartnerLayout({
         coursesPanel={panels.coursesPanel}
         linksPanel={panels.linksPanel}
         complaintsPanel={panels.complaintsPanel}
+        organizationsPanel={panels.organizationsPanel}
       />
     </View>
   );

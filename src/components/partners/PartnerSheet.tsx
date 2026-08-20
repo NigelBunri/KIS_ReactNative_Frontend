@@ -28,6 +28,7 @@ type Props = {
   onOpenCreate: (kind: 'community' | 'group' | 'channel') => void;
   animatePartnerSheet: (open: boolean) => void;
   onOpenLinks: () => void;
+  onOpenOrganizations: () => void;
 };
 
 export default function PartnerSheet({
@@ -45,6 +46,7 @@ export default function PartnerSheet({
   onOpenSettingsSection,
   onOpenCreate,
   onOpenLinks,
+  onOpenOrganizations,
   animatePartnerSheet,
 }: Props) {
   const { palette } = useKISTheme();
@@ -248,6 +250,15 @@ export default function PartnerSheet({
                 onPress={() => {
                   animatePartnerSheet(false);
                   onOpenLinks();
+                }}
+              />
+              <KISButton
+                title="My organizations"
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  animatePartnerSheet(false);
+                  onOpenOrganizations();
                 }}
               />
             </View>

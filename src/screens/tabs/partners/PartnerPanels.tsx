@@ -15,8 +15,14 @@ import PartnerSettingsPanel from '@/components/partners/settings/PartnerSettings
 import PartnerLinksPanel from '@/components/partners/PartnerLinksPanel';
 import PartnerCoursesPanel from '@/components/partners/PartnerCoursesPanel';
 import PartnerComplaintsPanel from '@/components/partners/PartnerComplaintsPanel';
+import PartnerOrganizationsPanel from '@/components/partners/PartnerOrganizationsPanel';
 import type { PartnerProfileLink } from '@/screens/broadcast/education/api/education.models';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
+import type {
+  LinkableOrganization,
+  PartnerOrganizationLink,
+  PartnerOrganizationType,
+} from '@/screens/tabs/partners/usePartnerOrganizations';
 
 type Props = {
   selectedPartnerId?: string | null;
@@ -147,6 +153,19 @@ type Props = {
     panelTranslateX: any;
     onClose: () => void;
   };
+  organizationsPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    organizations: PartnerOrganizationLink[];
+    linkable: LinkableOrganization[];
+    loading: boolean;
+    error?: string | null;
+    onLink: (ownerType: PartnerOrganizationType, ownerId: string) => void;
+    onUnlink: (linkId: string) => void;
+    onRefresh: () => void;
+  };
 };
 
 export default function PartnerPanels({
@@ -167,6 +186,7 @@ export default function PartnerPanels({
   coursesPanel,
   linksPanel,
   complaintsPanel,
+  organizationsPanel,
 }: Props) {
   return (
     <>
@@ -321,6 +341,19 @@ export default function PartnerPanels({
         panelWidth={complaintsPanel.panelWidth}
         panelTranslateX={complaintsPanel.panelTranslateX}
         onClose={complaintsPanel.onClose}
+      />
+      <PartnerOrganizationsPanel
+        isOpen={organizationsPanel.isOpen}
+        panelWidth={organizationsPanel.panelWidth}
+        panelTranslateX={organizationsPanel.panelTranslateX}
+        onClose={organizationsPanel.onClose}
+        organizations={organizationsPanel.organizations}
+        linkable={organizationsPanel.linkable}
+        loading={organizationsPanel.loading}
+        error={organizationsPanel.error}
+        onLink={organizationsPanel.onLink}
+        onUnlink={organizationsPanel.onUnlink}
+        onRefresh={organizationsPanel.onRefresh}
       />
     </>
   );

@@ -33,6 +33,8 @@ import { usePartnerCoursesPanel } from './partners/usePartnerCoursesPanel';
 import { usePartnerLinksPanel } from './partners/usePartnerLinksPanel';
 import { usePartnerComplaintsPanel } from './partners/usePartnerComplaintsPanel';
 import usePartnerProfileLinks from './partners/usePartnerProfileLinks';
+import { usePartnerOrganizationsPanel } from './partners/usePartnerOrganizationsPanel';
+import usePartnerOrganizations from './partners/usePartnerOrganizations';
 import { PartnerOrganizationAppsProvider } from '@/context/partners/PartnerOrganizationAppsContext';
 import { useAdminDashboardPanel } from './partners/useAdminDashboardPanel';
 import { useAdminUsersPanel } from './partners/useAdminUsersPanel';
@@ -218,6 +220,15 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     setRole,
     refresh: refreshLinks,
   } = usePartnerProfileLinks(selectedPartner?.id);
+  const {
+    organizations,
+    linkable: linkableOrganizations,
+    loading: organizationsLoading,
+    error: organizationsError,
+    refresh: refreshOrganizations,
+    linkOrganization,
+    unlinkOrganization,
+  } = usePartnerOrganizations(selectedPartner?.id);
   const partnerRole = normalizePartnerRole(
     selectedPartner?.role ??
       selectedPartner?.member_role ??
@@ -391,6 +402,13 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeLinksPanel,
   } = usePartnerLinksPanel(shellContentWidth);
   const complaintsPanel = usePartnerComplaintsPanel(shellContentWidth);
+  const {
+    panelWidth: organizationsPanelWidth,
+    panelTranslateX: organizationsPanelTranslateX,
+    isOpen: isOrganizationsPanelOpen,
+    open: openOrganizationsPanel,
+    close: closeOrganizationsPanel,
+  } = usePartnerOrganizationsPanel(shellContentWidth);
 
   // ── KCAN Admin Panels (superuser / GO only) ──────────────────────────────
   // isKcanAdmin: true if superuser flag is confirmed OR if the backend already
@@ -644,6 +662,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         openSection={openSection}
         onOpenCreate={onOpenCreate}
         onOpenLinks={openLinksPanel}
+        onOpenOrganizations={openOrganizationsPanel}
         animatePartnerSheet={animatePartnerSheet}
         onOpenInsights={openInsights}
         onLaunchOrganizationApp={handleLaunchOrganizationApp}
@@ -770,6 +789,19 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelWidth: complaintsPanel.panelWidth,
             panelTranslateX: complaintsPanel.panelTranslateX,
             onClose: complaintsPanel.close,
+          },
+          organizationsPanel: {
+            isOpen: isOrganizationsPanelOpen,
+            panelWidth: organizationsPanelWidth,
+            panelTranslateX: organizationsPanelTranslateX,
+            onClose: closeOrganizationsPanel,
+            organizations,
+            linkable: linkableOrganizations,
+            loading: organizationsLoading,
+            error: organizationsError,
+            onLink: linkOrganization,
+            onUnlink: unlinkOrganization,
+            onRefresh: refreshOrganizations,
           },
         }}
         isKcanAdmin={isKcanAdmin}
