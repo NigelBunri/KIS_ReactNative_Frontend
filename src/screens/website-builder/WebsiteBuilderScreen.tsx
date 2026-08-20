@@ -41,6 +41,7 @@ type WebsitePageSummary = {
   is_home: boolean;
   status: 'draft' | 'published' | 'unpublished';
   sections: DynamicLandingSection[];
+  seo?: { description?: string; share_image_url?: string; title?: string };
 };
 
 type WebsiteRecord = {
@@ -129,6 +130,9 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const [newPageTitle, setNewPageTitle] = useState('');
   const [isRenamingSite, setIsRenamingSite] = useState(false);
   const [siteNameDraft, setSiteNameDraft] = useState('');
+  const [pageSeoDescription, setPageSeoDescription] = useState('');
+  const [pageSeoImageUrl, setPageSeoImageUrl] = useState('');
+  const [uploadingPageSeoImage, setUploadingPageSeoImage] = useState(false);
 
   const activePage = useMemo(() => website?.pages.find((p) => p.id === activePageId) || null, [website, activePageId]);
 
@@ -142,6 +146,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
       const home = (data.pages || []).find((p: WebsitePageSummary) => p.is_home) || data.pages?.[0];
       setActivePageId(home?.id || null);
       setSections(Array.isArray(home?.sections) ? home.sections : []);
+      setPageSeoDescription(home?.seo?.description || '');
+      setPageSeoImageUrl(home?.seo?.share_image_url || '');
     } catch (error: any) {
       Alert.alert('Website Builder', error?.message || 'Unable to load your website.');
     } finally {
@@ -156,6 +162,8 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const switchPage = useCallback((page: WebsitePageSummary) => {
     setActivePageId(page.id);
     setSections(Array.isArray(page.sections) ? page.sections : []);
+    setPageSeoDescription(page.seo?.description || '');
+    setPageSeoImageUrl(page.seo?.share_image_url || '');
     setSelectedType(null);
     setEditingSectionId(null);
   }, []);
@@ -207,6 +215,26 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
 
   const handleRemoveSectionBackgroundImage = useCallback(() => {
     setSectionDraftData((prev) => ({ ...prev, sectionBackgroundImageUrl: '' }));
+  }, []);
+
+  // The site header's mega-menu flyout (kingdomimpactventures.org's
+  // WebsiteHeader.tsx) shows this page's own description/image when
+  // hovered — sourced from these same SEO fields, previously only used
+  // for <meta> tags with no editor UI to set them at all.
+  const handlePickPageSeoImage = useCallback(async () => {
+    setUploadingPageSeoImage(true);
+    try {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 });
+      if (result.didCancel) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+      const url = await uploadSectionImage(asset, 'website_page_seo');
+      setPageSeoImageUrl(url);
+    } catch (error: any) {
+      Alert.alert('Website Builder', error?.message || 'Unable to pick preview image.');
+    } finally {
+      setUploadingPageSeoImage(false);
+    }
   }, []);
 
   const handlePickGalleryImage = useCallback(async () => {
@@ -298,13 +326,14 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     if (!website || !activePage) return;
     setSaving(true);
     try {
+      const seo = { ...(activePage.seo || {}), description: pageSeoDescription, share_image_url: pageSeoImageUrl };
       const res = await patchRequest(
         ROUTES.websites.pageDetail(website.id, activePage.id),
-        { sections },
+        { sections, seo },
         { errorMessage: 'Unable to save this page.' },
       );
       if (!res?.success) throw new Error((res as any)?.message || 'Unable to save this page.');
-      setWebsite((prev) => prev ? { ...prev, pages: prev.pages.map((p) => (p.id === activePage.id ? { ...p, sections } : p)) } : prev);
+      setWebsite((prev) => prev ? { ...prev, pages: prev.pages.map((p) => (p.id === activePage.id ? { ...p, sections, seo } : p)) } : prev);
       Alert.alert('Website Builder', 'Page saved.');
     } catch (error: any) {
       Alert.alert('Website Builder', error?.message || 'Unable to save this page.');
@@ -576,6 +605,34 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
               />
             </View>
             <KISButton title="Add" size="sm" onPress={handleConfirmAddPage} disabled={!newPageTitle.trim()} />
+          </View>
+        ) : null}
+
+        {activePage ? (
+          <View style={{ marginTop: spacing.md, borderWidth: 1, borderColor: palette.divider, borderRadius: spacing.md, padding: spacing.sm }}>
+            <Text style={{ ...typography.label, color: palette.text }}>Navigation Menu Preview</Text>
+            <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
+              Shown when a visitor hovers this page's link in the site header. Leave blank to keep it a plain link.
+            </Text>
+            <KISTextInput
+              label="Short description"
+              value={pageSeoDescription}
+              onChangeText={setPageSeoDescription}
+              multiline
+              style={{ marginTop: spacing.xs }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+              <KISButton
+                title={pageSeoImageUrl ? 'Change Preview Image' : 'Add Preview Image'}
+                variant="outline"
+                size="sm"
+                onPress={handlePickPageSeoImage}
+                disabled={uploadingPageSeoImage}
+              />
+              {pageSeoImageUrl ? (
+                <KISButton title="Remove" variant="outline" size="sm" onPress={() => setPageSeoImageUrl('')} />
+              ) : null}
+            </View>
           </View>
         ) : null}
 
