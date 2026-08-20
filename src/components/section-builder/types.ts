@@ -13,7 +13,9 @@ export type SectionType =
   | 'form'
   | 'embed'
   | 'kis_video'
-  | 'kis_content';
+  | 'kis_content'
+  | 'slideshow'
+  | 'promo_bar';
 
 // Mirrors apps.websites.models.KIS_CONTENT_TARGET_TYPES on the backend —
 // keep in sync.
@@ -176,6 +178,28 @@ export type KisContentSectionData = {
   cta_deep_link?: string;
 };
 
+// Full-width rotating slides — autoplaying carousel of image+headline
+// pairs, each with its own optional CTA. Distinct from `kis_content`'s
+// carousel display_mode (which shows live product/course cards); this
+// is hand-authored marketing/editorial content, closer to hero_banner
+// but with multiple slides instead of one.
+export type SlideshowSectionData = {
+  sectionBackgroundImageUrl?: string;
+  sectionBackgroundColorKey?: string;
+  slides: Array<{ id: string; imageUrl: string; headline: string; subheadline: string; ctaText: string; ctaLink: string }>;
+  autoplay: boolean;
+  intervalSeconds: number;
+};
+
+// Thin rotating announcement strip, typically pinned above the header
+// (e.g. "Free shipping over $50 · New arrivals every Friday"). Multiple
+// messages cycle automatically; each can optionally link somewhere.
+export type PromoBarSectionData = {
+  sectionBackgroundColorKey?: string;
+  messages: Array<{ id: string; text: string; link?: string }>;
+  intervalSeconds: number;
+};
+
 export type SectionDataByType = {
   hero_banner: HeroBannerSectionData;
   about: AboutSectionData;
@@ -192,6 +216,8 @@ export type SectionDataByType = {
   embed: EmbedSectionData;
   kis_video: KisVideoSectionData;
   kis_content: KisContentSectionData;
+  slideshow: SlideshowSectionData;
+  promo_bar: PromoBarSectionData;
 };
 
 export type DynamicLandingSection<T extends SectionType = SectionType> = {
@@ -260,6 +286,10 @@ export const createEmptySectionData = (type: SectionType): SectionDataByType[Sec
         cta_label: '',
         cta_deep_link: '',
       };
+    case 'slideshow':
+      return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'ocean_mist', slides: [], autoplay: true, intervalSeconds: 5 };
+    case 'promo_bar':
+      return { sectionBackgroundColorKey: 'ocean_mist', messages: [], intervalSeconds: 4 };
     default:
       return { sectionBackgroundImageUrl: '', sectionBackgroundColorKey: 'mint_soft', title: 'About Us', description: '', imageUrl: '', layout: 'image_left' };
   }

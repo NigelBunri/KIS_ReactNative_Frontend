@@ -519,6 +519,97 @@ const TypeSpecificFields = ({
     );
   }
 
+  if (type === 'slideshow') {
+    const slides = Array.isArray(data.slides) ? data.slides : [];
+    return (
+      <>
+        <SectionHeading title="Slideshow" subtitle="Use imageUrl::headline::subheadline::ctaText::ctaLink format, one slide per line" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput
+          label="Slides"
+          multiline
+          value={slides.map((s: any) => `${s.imageUrl || ''}::${s.headline || ''}::${s.subheadline || ''}::${s.ctaText || ''}::${s.ctaLink || ''}`).join('\n')}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'slides',
+                v
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .map((line, idx) => {
+                    const [imageUrl, headline, subheadline, ctaText, ctaLink] = line.split('::');
+                    return {
+                      id: `slide_${idx}`,
+                      imageUrl: (imageUrl || '').trim(),
+                      headline: (headline || '').trim(),
+                      subheadline: (subheadline || '').trim(),
+                      ctaText: (ctaText || '').trim(),
+                      ctaLink: (ctaLink || '').trim(),
+                    };
+                  }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+          <KISButton
+            title={data.autoplay === false ? 'Autoplay Off' : 'Autoplay On'}
+            variant={data.autoplay === false ? 'outline' : 'primary'}
+            size="sm"
+            onPress={() => onChange(update(data, 'autoplay', data.autoplay === false))}
+          />
+        </View>
+        <KISTextInput
+          label="Seconds per slide"
+          value={String(data.intervalSeconds ?? 5)}
+          keyboardType="number-pad"
+          onChangeText={(v) => onChange(update(data, 'intervalSeconds', Math.max(2, Math.min(30, Number(v) || 5))))}
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
+  if (type === 'promo_bar') {
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    return (
+      <>
+        <SectionHeading title="Promo Bar" subtitle="Use text::link format, one message per line (link is optional)" typography={typography} palette={palette} spacing={spacing} />
+        <KISTextInput
+          label="Messages"
+          multiline
+          value={messages.map((m: any) => (m.link ? `${m.text || ''}::${m.link}` : `${m.text || ''}`)).join('\n')}
+          onChangeText={(v) =>
+            onChange(
+              update(
+                data,
+                'messages',
+                v
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .map((line, idx) => {
+                    const [text, link] = line.split('::');
+                    return { id: `promo_${idx}`, text: (text || '').trim(), link: (link || '').trim() || undefined };
+                  }),
+              ),
+            )
+          }
+          style={{ marginTop: spacing.xs }}
+        />
+        <KISTextInput
+          label="Seconds per message"
+          value={String(data.intervalSeconds ?? 4)}
+          keyboardType="number-pad"
+          onChangeText={(v) => onChange(update(data, 'intervalSeconds', Math.max(2, Math.min(30, Number(v) || 4))))}
+          style={{ marginTop: spacing.xs }}
+        />
+      </>
+    );
+  }
+
   // kis_content — the live-linked section. Target type + explicit picks
   // (via KisContentPickerModal) or an auto filter; presentation config
   // controls how resolved items render on the public page.

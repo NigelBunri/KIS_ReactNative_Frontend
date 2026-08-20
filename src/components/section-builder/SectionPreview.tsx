@@ -21,6 +21,8 @@ import FormSection from '@/components/sections/FormSection';
 import EmbedSection from '@/components/sections/EmbedSection';
 import KisVideoSection from '@/components/sections/KisVideoSection';
 import KisContentSection from '@/components/sections/KisContentSection';
+import SlideshowSection from '@/components/sections/SlideshowSection';
+import PromoBarSection from '@/components/sections/PromoBarSection';
 
 type Props = {
   sections: DynamicLandingSection[];
@@ -85,6 +87,10 @@ const renderSection = (
       return <KisVideoSection {...props} />;
     case 'kis_content':
       return <KisContentSection {...props} />;
+    case 'slideshow':
+      return <SlideshowSection {...props} />;
+    case 'promo_bar':
+      return <PromoBarSection {...props} />;
     default:
       return null;
   }

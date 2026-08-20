@@ -82,4 +82,14 @@ export const SECTION_TYPE_META: SectionTypeMeta[] = [
     title: 'Add KIS Content',
     description: 'Show live courses, products, services, posts, or other KIS content — always up to date automatically.',
   },
+  {
+    type: 'slideshow',
+    title: 'Slideshow',
+    description: 'Full-width rotating slides, each with its own image, headline, and button — great for a homepage hero with multiple looks.',
+  },
+  {
+    type: 'promo_bar',
+    title: 'Promo Bar',
+    description: 'A thin rotating announcement strip, e.g. "Free shipping over $50" — usually placed at the very top of the page.',
+  },
 ];
