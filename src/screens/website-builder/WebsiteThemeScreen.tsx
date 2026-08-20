@@ -13,6 +13,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebsiteTheme'>;
 
@@ -177,14 +178,16 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
   }, [websiteId, colors, preset, shape, fill, logoUrl, navigation]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <ScreenHeader
+        title="Theme"
+        subtitle="Colors, typography, and button style"
+        onBack={() => navigation.goBack()}
+        animateBackHint
+      />
+      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
-        <Text style={{ ...typography.h2, color: palette.text }}>Theme</Text>
-        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
-          Colors, typography, and button style — applied across your whole website.
-        </Text>
-
-        <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>Logo</Text>
+        <Text style={{ ...typography.h3, color: palette.text }}>Logo</Text>
         <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
           Shown in your site's header. Falls back to your site's first letter if no logo is set.
         </Text>
@@ -233,6 +236,7 @@ export default function WebsiteThemeScreen({ navigation, route }: Props) {
           <KISButton title="Save Theme" onPress={handleSave} disabled={saving} />
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }

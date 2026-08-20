@@ -154,12 +154,12 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
   );
 
   const handleEditProfilePage = useCallback(() => {
-    if (!dashboardType) return;
-    navigation.navigate('InstitutionProfileEditor', {
-      institutionId,
-      institutionType: dashboardType,
+    navigation.navigate('WebsiteBuilder', {
+      ownerType: 'health_institution',
+      ownerId: institutionId,
+      ownerLabel: institutionName,
     });
-  }, [dashboardType, institutionId, navigation]);
+  }, [institutionId, institutionName, navigation]);
 
   const handleManageAvailability = useCallback(() => {
     if (!dashboardType) return;

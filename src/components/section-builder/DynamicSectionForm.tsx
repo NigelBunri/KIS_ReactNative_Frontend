@@ -19,10 +19,8 @@ type Props = {
   palette: any;
   typography: any;
   spacing: any;
-  /** Only the "kis_content" section type needs these — omit for editors
-   * that don't yet resolve a concrete owner (e.g. the legacy per-kind
-   * ProfileLandingEditorScreen paths); WebsiteBuilderScreen always
-   * supplies both. */
+  /** Only the "kis_content" section type needs these — WebsiteBuilderScreen,
+   * this component's sole caller, always supplies both. */
   kisContentOwnerType?: string;
   kisContentOwnerId?: string;
   /** Owner-controlled per-section visibility, saved alongside `data` as a

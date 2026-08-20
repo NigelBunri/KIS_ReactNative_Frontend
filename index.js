@@ -5,11 +5,23 @@
 import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 import QuickCrypto from 'react-native-quick-crypto';
-import { AppRegistry, View } from 'react-native';
+import { AppRegistry, LogBox } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import App from './App';
 import { name as appName } from './app.json';
 import { installLocalizationRuntime } from './src/languages/runtimePatch';
 import { registerAndroidEvents } from './src/services/calls/callKitService';
+
+// react-native-reorderable-list's documented nested-list pattern
+// (ScrollViewContainer + NestedReorderableList, scrollable={false} —
+// see WebsiteBuilderScreen/SectionPreview) renders its FlatList inside a
+// real Animated.ScrollView, which trips RN's static "VirtualizedLists
+// should never be nested" heuristic. The inner list has scrolling
+// disabled and delegates entirely to the outer ScrollViewContainer via
+// shared gesture coordination, so there's no actual double-scroll/
+// windowing conflict — a known false positive for this exact library
+// combination, not a real bug.
+LogBox.ignoreLogs(['VirtualizedLists should never be nested']);
 
 installLocalizationRuntime();
 
@@ -30,9 +42,9 @@ if (!global.crypto || !global.crypto.subtle) {
 
 function Root() {
   return (
-    <View style={{ marginTop: 40, flex: 1 }}>
+    <GestureHandlerRootView style={{ marginTop: 40, flex: 1 }}>
       <App />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

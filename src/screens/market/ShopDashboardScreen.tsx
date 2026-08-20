@@ -2388,11 +2388,11 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
   );
 
   const handleOpenLandingPage = () => {
-    navigation.navigate('ProfileLandingEditor', {
-      kind: 'market',
-      profileLabel: `${shop?.name || 'Shop'} landing page`,
-      shopId: shop?.id,
-      shopName: shop?.name,
+    if (!shop?.id) return;
+    navigation.navigate('WebsiteBuilder', {
+      ownerType: 'shop',
+      ownerId: shop.id,
+      ownerLabel: shop?.name || 'Shop',
     });
   };
 

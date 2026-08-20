@@ -1,6 +1,6 @@
 // src/components/common/ScreenHeader.tsx
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
@@ -13,6 +13,14 @@ type ScreenHeaderProps = {
   right?: React.ReactNode;
   backgroundColor?: string;
   borderColor?: string;
+  /**
+   * Nudges the back arrow left-and-back a couple times on mount — a
+   * discoverability hint for screens that are otherwise easy to get stuck
+   * on (e.g. reached via a button rather than the usual nav patterns, where
+   * a user might not think to look for a back control at all). Off by
+   * default so it doesn't add motion to every ScreenHeader in the app.
+   */
+  animateBackHint?: boolean;
 };
 
 /**
@@ -29,9 +37,20 @@ export function ScreenHeader({
   right,
   backgroundColor,
   borderColor,
+  animateBackHint,
 }: ScreenHeaderProps) {
   const { palette } = useKISTheme();
   const topInset = useSafeTopInset();
+  const hintOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!animateBackHint || !onBack) return;
+    const nudge = Animated.sequence([
+      Animated.timing(hintOffset, { toValue: -7, duration: 220, useNativeDriver: true }),
+      Animated.timing(hintOffset, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]);
+    Animated.sequence([nudge, Animated.delay(120), nudge]).start();
+  }, [animateBackHint, onBack, hintOffset]);
 
   return (
     <View
@@ -47,7 +66,9 @@ export function ScreenHeader({
       <View style={styles.row}>
         {onBack ? (
           <Pressable onPress={onBack} style={styles.sideSlot} hitSlop={12}>
-            <KISIcon name="arrow-left" size={22} color={palette.text} />
+            <Animated.View style={{ transform: [{ translateX: hintOffset }] }}>
+              <KISIcon name="arrow-left" size={22} color={palette.text} />
+            </Animated.View>
           </Pressable>
         ) : (
           <View style={styles.sideSlot} />

@@ -81,10 +81,6 @@ export type RootStackParamList = {
     institutionType?: HealthInstitutionType;
     employees?: number;
   };
-  InstitutionProfileEditor: {
-    institutionId: string;
-    institutionType: HealthInstitutionType;
-  };
   AvailabilityManagement: {
     institutionId: string;
     institutionType: HealthInstitutionType;
@@ -174,14 +170,6 @@ export type RootStackParamList = {
     notification?: any;
   };
   KISPrinciples: undefined;
-  ProfileLandingEditor: {
-    kind: 'market' | 'education' | 'partner';
-    profileLabel?: string;
-    partnerId?: string;
-    shopId?: string;
-    shopName?: string;
-    returnBroadcastProfileKey?: BroadcastProfileKey;
-  };
   WebsiteBuilder: {
     ownerType: 'shop' | 'health_institution' | 'education_institution' | 'partner' | 'broadcast_channel';
     ownerId: string;

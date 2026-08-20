@@ -523,6 +523,18 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     });
   }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
 
+  const handleOpenLandingPage = useCallback(() => {
+    if (!resolvedInstitutionId) {
+      Alert.alert('Landing page', 'Create the institution first.');
+      return;
+    }
+    navigation.navigate('WebsiteBuilder', {
+      ownerType: 'health_institution',
+      ownerId: resolvedInstitutionId,
+      ownerLabel: form.name || resolvedInstitution?.name || 'Health Institution',
+    });
+  }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
+
   const cycleType = useCallback(() => {
     const index = HEALTH_INSTITUTION_TYPES.findIndex((type) => type === form.type);
     const nextType = HEALTH_INSTITUTION_TYPES[(index + 1) % HEALTH_INSTITUTION_TYPES.length];
@@ -689,6 +701,13 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
                 title={resolvedInstitutionId ? 'Clinical Command Center' : 'Create institution first'}
                 variant="secondary"
                 onPress={resolvedInstitutionId ? handleOpenClinicalCommandCenter : undefined}
+                disabled={!resolvedInstitutionId}
+              />
+              <View style={{ height: HEALTH_THEME_SPACING.sm }} />
+              <KISButton
+                title={resolvedInstitutionId ? 'Manage landing page' : 'Create institution first'}
+                variant="outline"
+                onPress={resolvedInstitutionId ? handleOpenLandingPage : undefined}
                 disabled={!resolvedInstitutionId}
               />
             </View>

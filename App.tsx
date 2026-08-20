@@ -102,8 +102,6 @@ import PartnerRedeemInviteScreen from './src/screens/partners/PartnerRedeemInvit
 import HealthInstitutionDetailScreen from './src/screens/health/HealthInstitutionDetailScreen';
 import HealthInstitutionManagementScreen from './src/screens/health/HealthInstitutionManagementScreen';
 import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
-import InstitutionProfileEditorScreen from './src/screens/health/InstitutionProfileEditorScreen';
-import ProfileLandingEditorScreen from './src/screens/profile/ProfileLandingEditorScreen';
 import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
 import WebsiteThemeScreen from './src/screens/website-builder/WebsiteThemeScreen';
@@ -1609,14 +1607,6 @@ function AppContent() {
                     <RootStack.Screen
                       name="ClinicalCommandCenter"
                       component={ClinicalCommandCenterScreen}
-                    />
-                    <RootStack.Screen
-                      name="InstitutionProfileEditor"
-                      component={InstitutionProfileEditorScreen}
-                    />
-                    <RootStack.Screen
-                      name="ProfileLandingEditor"
-                      component={ProfileLandingEditorScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteBuilder"

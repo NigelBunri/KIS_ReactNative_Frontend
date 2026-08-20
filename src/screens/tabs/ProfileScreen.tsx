@@ -1185,17 +1185,15 @@ export default function ProfileScreen() {
 
   const openMarketLandingBuilder = useCallback(
     (shop?: any) => {
+      if (!shop?.id) return;
       // The management panel is a persistent native Modal — it must be
       // closed before navigating away, otherwise it keeps painting above
       // (and fully occluding) whatever screen we just navigated to.
       closeManagementPanel();
-      rootNavigation?.navigate('ProfileLandingEditor', {
-        kind: 'market',
-        profileLabel: shop?.name
-          ? `${shop.name} landing page`
-          : 'Market Profile',
-        shopId: shop?.id,
-        shopName: shop?.name,
+      rootNavigation?.navigate('WebsiteBuilder', {
+        ownerType: 'shop',
+        ownerId: shop.id,
+        ownerLabel: shop?.name || 'Shop',
       });
     },
     [rootNavigation, closeManagementPanel],
@@ -1212,11 +1210,12 @@ export default function ProfileScreen() {
 
   const openEducationLandingBuilder = useCallback(
     (institution?: any) => {
+      if (!institution?.id) return;
       closeManagementPanel();
-      rootNavigation?.navigate('ProfileLandingEditor', {
-        kind: 'education',
-        profileLabel: institution?.name || 'Education Profile',
-        returnBroadcastProfileKey: 'education',
+      rootNavigation?.navigate('WebsiteBuilder', {
+        ownerType: 'education_institution',
+        ownerId: institution.id,
+        ownerLabel: institution?.name || 'Education Profile',
       });
     },
     [rootNavigation, closeManagementPanel],
@@ -1225,10 +1224,10 @@ export default function ProfileScreen() {
   const openPartnerLandingBuilder = useCallback(
     (partnerId: string, partnerName?: string | null) => {
       if (!partnerId) return;
-      rootNavigation?.navigate('ProfileLandingEditor', {
-        kind: 'partner',
-        partnerId,
-        profileLabel: partnerName || 'Partner Profile',
+      rootNavigation?.navigate('WebsiteBuilder', {
+        ownerType: 'partner',
+        ownerId: partnerId,
+        ownerLabel: partnerName || 'Partner Profile',
       });
     },
     [rootNavigation],

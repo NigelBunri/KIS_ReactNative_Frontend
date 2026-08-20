@@ -433,7 +433,25 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
       );
     }
-    if (activeTab === 'branding') return <ChannelBrandingEditor channel={selectedChannel} onUpdated={refresh} />;
+    if (activeTab === 'branding') {
+      return (
+        <>
+          <ChannelBrandingEditor channel={selectedChannel} onUpdated={refresh} />
+          <Pressable
+            onPress={() =>
+              navigation.navigate('WebsiteBuilder', {
+                ownerType: 'broadcast_channel',
+                ownerId: selectedChannel.id,
+                ownerLabel: selectedChannel.display_name || 'Channel',
+              })
+            }
+            style={[styles.primaryButton, { backgroundColor: palette.text }]}
+          >
+            <Text style={[styles.primaryText, { color: palette.surface }]}>Manage landing page</Text>
+          </Pressable>
+        </>
+      );
+    }
     if (activeTab === 'analytics') {
       return (
         <>

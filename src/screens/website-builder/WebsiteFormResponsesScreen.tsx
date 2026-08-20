@@ -10,6 +10,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebsiteFormResponses'>;
 
@@ -22,7 +23,7 @@ type Submission = {
   created_at: string;
 };
 
-export default function WebsiteFormResponsesScreen({ route }: Props) {
+export default function WebsiteFormResponsesScreen({ route, navigation }: Props) {
   const { websiteId } = route.params;
   const palette = getHealthThemeColors('light');
   const spacing = HEALTH_THEME_SPACING;
@@ -48,20 +49,24 @@ export default function WebsiteFormResponsesScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={palette.accentPrimary} />
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+        <ScreenHeader title="Form Responses" onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={palette.accentPrimary} />
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
-      <View style={{ padding: spacing.md }}>
-        <Text style={{ ...typography.h2, color: palette.text }}>Form Responses</Text>
-        <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
-          {submissions.length} response{submissions.length === 1 ? '' : 's'}
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <ScreenHeader
+        title="Form Responses"
+        subtitle={`${submissions.length} response${submissions.length === 1 ? '' : 's'}`}
+        onBack={() => navigation.goBack()}
+        animateBackHint
+      />
+      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
       <FlatList
         data={submissions}
         keyExtractor={(item) => item.id}
@@ -99,6 +104,7 @@ export default function WebsiteFormResponsesScreen({ route }: Props) {
           </View>
         )}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }

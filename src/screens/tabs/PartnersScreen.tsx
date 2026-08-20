@@ -577,10 +577,10 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       {
         text: 'Landing page builder',
         onPress: () =>
-          rootNavigation?.navigate('ProfileLandingEditor', {
-            kind: 'partner',
-            partnerId: activePartnerId,
-            profileLabel: selectedPartner?.name || 'Partner Profile',
+          rootNavigation?.navigate('WebsiteBuilder', {
+            ownerType: 'partner',
+            ownerId: activePartnerId,
+            ownerLabel: selectedPartner?.name || 'Partner Profile',
           }),
       },
     ]);
