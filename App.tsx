@@ -25,6 +25,7 @@ import {
   AppState,
   DeviceEventEmitter,
   FlatList,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -132,6 +133,7 @@ import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfile
 import { MiniPlayerProvider } from '@/contexts/MiniPlayerContext';
 import MiniPlayer from '@/components/common/MiniPlayer';
 import { initPushHandlers } from './src/push/notifications';
+import { routeDeepLink } from './src/push/deepLinkRouter';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
@@ -889,6 +891,28 @@ function AppContent() {
 
   useEffect(() => {
     initPushHandlers(navigationRef);
+  }, []);
+
+  // kis:// custom-scheme and https://kis.app/... universal links (from the
+  // website's "Open in App" buttons and shared content links) — same
+  // navigator-ready retry as the pendingVerificationPhone effect above,
+  // since a cold-start link can arrive before onReady fires.
+  useEffect(() => {
+    const tryRoute = (url: string | null) => {
+      if (!url) return;
+      const go = () => {
+        if (navigationRef.current?.isReady?.()) {
+          routeDeepLink(url, navigationRef.current);
+        } else {
+          setTimeout(go, 50);
+        }
+      };
+      go();
+    };
+
+    Linking.getInitialURL().then(tryRoute).catch(() => {});
+    const subscription = Linking.addEventListener('url', ({ url }) => tryRoute(url));
+    return () => subscription.remove();
   }, []);
 
   // Quick Lock: seed lastActiveAtRef from persisted storage so cold restarts

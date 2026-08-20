@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -40,6 +40,10 @@ type Props = {
   searchContext?: string;
   onUnavailable?: () => void;
   onAvailable?: () => void;
+  // Set by a deep link (kis:// or https://kis.app/education/courses/<id>,
+  // routed here via BroadcastScreen's actionId param) to auto-open a
+  // specific course/workshop's detail sheet on arrival.
+  openContentId?: string;
 };
 
 const HERO_BADGES: Record<EducationContentType, string> = {
@@ -163,6 +167,7 @@ export default function EducationV2DiscoverPage({
   searchContext = 'Courses',
   onUnavailable,
   onAvailable,
+  openContentId,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -352,6 +357,13 @@ export default function EducationV2DiscoverPage({
     },
     [hydrateDetail],
   );
+
+  const consumedOpenContentId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openContentId || consumedOpenContentId.current === openContentId) return;
+    consumedOpenContentId.current = openContentId;
+    void openDetails({ id: openContentId, type: 'course' } as EducationContentItem);
+  }, [openContentId, openDetails]);
 
   const resumeLearning = useCallback(
     async (progress: EducationProgress) => {

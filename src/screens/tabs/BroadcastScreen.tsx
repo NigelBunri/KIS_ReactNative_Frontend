@@ -139,7 +139,12 @@ export default function BroadcastScreen() {
   // screen's internal sub-tab from outside (BroadcastScreen has no nested
   // navigator for its sub-tabs — activeMainTab is local state — so a route
   // param is the standard react-navigation way to reach in from a sibling).
-  const routeMainTabParam = useRoute<RouteProp<MainTabsParamList, 'Broadcast'>>().params?.mainTab;
+  const broadcastRouteParams = useRoute<RouteProp<MainTabsParamList, 'Broadcast'>>().params;
+  const routeMainTabParam = broadcastRouteParams?.mainTab;
+  // actionId is a deep-link (kis:// / https://kis.app) pass-through — see
+  // src/push/deepLinkRouter.ts — identifying a specific item to auto-open
+  // once the matching sub-tab is active (currently: an education course).
+  const routeActionId = broadcastRouteParams?.actionId;
   useFocusEffect(
     useCallback(() => {
       if (routeMainTabParam && MAIN_TAB_ORDER.includes(routeMainTabParam as BroadcastMainTabId)) {
@@ -724,7 +729,7 @@ export default function BroadcastScreen() {
             />
           )}
           {activeMainTab === 'channels' && <ChannelsDiscoverPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
-          {activeMainTab === 'education' && <BroadcastEducationPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
+          {activeMainTab === 'education' && <BroadcastEducationPage searchTerm={currentSearchTerm} searchContext={currentFilter} openContentId={routeActionId} />}
           {activeMainTab === 'market' && <BroadcastMarketPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
           {activeMainTab === 'healthcare' && <BroadcastHealthcarePage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
         </View>
