@@ -95,6 +95,11 @@ export default function DeviceManagementScreen() {
   const [qrLoading, setQRLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Generate is not idempotent — each call deletes any unused prior code and
+  // mints a new one. Tracks which call is the latest so an out-of-order
+  // response (e.g. a slow first call resolving after a later one already
+  // invalidated it) never overwrites the screen with an already-dead code.
+  const qrRequestIdRef = useRef(0);
 
   // Web/Mobile tab + web pairing state (for parent device)
   const [activeTab, setActiveTab] = useState<'mobile' | 'web'>('mobile');
@@ -102,6 +107,7 @@ export default function DeviceManagementScreen() {
   const [webPairingLoading, setWebPairingLoading] = useState(false);
   const [webCountdown, setWebCountdown] = useState(0);
   const webCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const webPairingRequestIdRef = useRef(0);
 
   // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -171,9 +177,11 @@ export default function DeviceManagementScreen() {
 
   /* ---------- QR generation (parent only) ---------- */
   const loadQR = useCallback(async () => {
+    const requestId = ++qrRequestIdRef.current;
     setQRLoading(true);
     try {
       const res = await getRequest(ROUTES.auth.deviceQRGenerate, { errorMessage: 'Unable to generate QR code.', forceNetwork: true });
+      if (requestId !== qrRequestIdRef.current) return; // superseded by a newer call
       const data = (res?.data ?? res) as QRData;
       if (data?.qr_payload) {
         setQRData(data);
@@ -182,10 +190,11 @@ export default function DeviceManagementScreen() {
         setQRData(null);
       }
     } catch (err: any) {
+      if (requestId !== qrRequestIdRef.current) return;
       setQRData(null);
       setError(err?.message || 'Unable to generate QR code.');
     } finally {
-      setQRLoading(false);
+      if (requestId === qrRequestIdRef.current) setQRLoading(false);
     }
   }, []);
 
@@ -224,9 +233,11 @@ export default function DeviceManagementScreen() {
 
   /* ---------- Web pairing (parent only) ---------- */
   const loadWebPairing = useCallback(async () => {
+    const requestId = ++webPairingRequestIdRef.current;
     setWebPairingLoading(true);
     try {
       const res = await getRequest(ROUTES.auth.deviceWebPairingGenerate, { errorMessage: 'Unable to generate a web sign-in code.', forceNetwork: true });
+      if (requestId !== webPairingRequestIdRef.current) return; // superseded by a newer call
       const data = (res?.data ?? res) as WebPairingData;
       if (data?.code) {
         setWebPairing(data);
@@ -235,10 +246,11 @@ export default function DeviceManagementScreen() {
         setWebPairing(null);
       }
     } catch (err: any) {
+      if (requestId !== webPairingRequestIdRef.current) return;
       setWebPairing(null);
       setError(err?.message || 'Unable to generate a web sign-in code.');
     } finally {
-      setWebPairingLoading(false);
+      if (requestId === webPairingRequestIdRef.current) setWebPairingLoading(false);
     }
   }, []);
 
@@ -570,8 +582,8 @@ export default function DeviceManagementScreen() {
                           <Text style={[styles.countdownText, { color: countdown < 300 ? palette.danger : palette.subtext }]}>
                             Expires in {formatCountdown(countdown)}
                           </Text>
-                          <Pressable onPress={loadQR} style={styles.refreshQRBtn}>
-                            <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
+                          <Pressable onPress={loadQR} style={styles.refreshQRBtn} disabled={qrLoading}>
+                            <Text style={[styles.refreshQRText, { color: qrLoading ? palette.subtext : palette.primary }]}>Refresh</Text>
                           </Pressable>
                         </View>
                         <View style={styles.tokenActionRow}>
@@ -654,8 +666,8 @@ export default function DeviceManagementScreen() {
                           <Text style={[styles.countdownText, { color: webCountdown < 120 ? palette.danger : palette.subtext }]}>
                             Expires in {formatCountdown(webCountdown)}
                           </Text>
-                          <Pressable onPress={loadWebPairing} style={styles.refreshQRBtn}>
-                            <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
+                          <Pressable onPress={loadWebPairing} style={styles.refreshQRBtn} disabled={webPairingLoading}>
+                            <Text style={[styles.refreshQRText, { color: webPairingLoading ? palette.subtext : palette.primary }]}>Refresh</Text>
                           </Pressable>
                         </View>
                         <View style={styles.tokenActionRow}>
