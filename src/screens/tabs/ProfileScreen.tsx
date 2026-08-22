@@ -36,6 +36,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import KISButton from '@/constants/KISButton';
 import { MainTabStateBlock } from '@/components/common/MainTabScaffold';
+import ControlPanelLinkCard from '@/components/ControlPanelLinkCard';
 import Skeleton from '@/components/common/Skeleton';
 import MonetizationSafetyCard from '@/components/dashboard/MonetizationSafetyCard';
 import ProfitabilityCommandCenterCard from '@/components/dashboard/ProfitabilityCommandCenterCard';
@@ -2865,6 +2866,10 @@ export default function ProfileScreen() {
                   items={quickActionItems}
                 />
               </View>
+
+              {Number(accountTier?.tier_rank ?? 0) >= 3 ? (
+                <ControlPanelLinkCard />
+              ) : null}
 
               <RecentActivityTimeline
                 items={recentActivityItems}

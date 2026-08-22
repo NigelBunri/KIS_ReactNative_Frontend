@@ -5,6 +5,7 @@ import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import ReanimatedScroll from 'react-native-reanimated';
 import { PartnerCenterPaneSkeleton } from './PartnersSkeleton';
+import ControlPanelLinkCard from '@/components/ControlPanelLinkCard';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import {
@@ -299,6 +300,11 @@ export default function PartnersCenterPane({
             </Text>
             <KISIcon name="chevron-right" size={15} color={palette.ivory} />
           </Pressable>
+        )}
+        {isKcanAdmin && (
+          <View style={{ marginBottom: 12 }}>
+            <ControlPanelLinkCard isGo />
+          </View>
         )}
         {/* Insights, VerificationStatusCard, and VerificationBadgeRow are now
             inside PartnerDetailHeroCard above — not repeated here. */}
