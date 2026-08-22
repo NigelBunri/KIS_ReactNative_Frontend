@@ -102,6 +102,10 @@ type EducationInstitution = {
   payout_account_status?: string;
   payout_account_name?: string;
   payout_bank_last4?: string;
+  stripe_account_id?: string;
+  stripe_charges_enabled?: boolean;
+  stripe_payouts_enabled?: boolean;
+  stripe_details_submitted?: boolean;
   current_membership?: { role?: string; status?: string } | null;
   branding?: {
     logo_url?: string;
@@ -947,10 +951,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     useState<InstitutionFormState>(EMPTY_FORM);
   const [institutionSubmitting, setInstitutionSubmitting] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [payoutProvider, setPayoutProvider] = useState<'flutterwave' | 'stripe'>('flutterwave');
   const [payoutBankCode, setPayoutBankCode] = useState('');
   const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
   const [payoutBusinessName, setPayoutBusinessName] = useState('');
   const [payoutConnecting, setPayoutConnecting] = useState(false);
+  const [stripeConnecting, setStripeConnecting] = useState(false);
+  const [stripeStatusRefreshing, setStripeStatusRefreshing] = useState(false);
   const [courseAccessRequests, setCourseAccessRequests] = useState<any[]>([]);
   const [courseAccessRequestsLoading, setCourseAccessRequestsLoading] = useState(false);
   const [courseAccessRequestActionId, setCourseAccessRequestActionId] = useState<string | null>(null);
@@ -2319,6 +2326,60 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     payoutBankCode,
     payoutBusinessName,
   ]);
+
+  // Unlike Flutterwave, Stripe never takes bank details directly in this
+  // form — the account is created server-side, then the seller finishes
+  // KYC/bank-linking on Stripe's own hosted onboarding page. This just
+  // requests that page's URL and opens it; there's no in-app form to fill.
+  const handleConnectStripeAccount = useCallback(async () => {
+    if (!editingInstitutionId) return;
+    setStripeConnecting(true);
+    try {
+      const response = await postRequest(
+        ROUTES.broadcasts.educationInstitutionStripeAccountConnect(editingInstitutionId),
+        {},
+        { errorMessage: 'Unable to start Stripe onboarding.' },
+      );
+      // postRequest always wraps the real response body under `.data` —
+      // {success, data, message} — never spreads it onto the top level.
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to start Stripe onboarding.');
+      }
+      const onboardingUrl = response?.data?.onboarding_url;
+      if (!onboardingUrl) {
+        throw new Error('Stripe did not return an onboarding link.');
+      }
+      await Linking.openURL(onboardingUrl);
+    } catch (error: any) {
+      Alert.alert('Payments', error?.message || 'Unable to start Stripe onboarding.');
+    } finally {
+      setStripeConnecting(false);
+    }
+  }, [editingInstitutionId]);
+
+  // Stripe onboarding finishes in the browser, not back inside the app,
+  // so there's no automatic moment to learn it's done — this re-queries
+  // Stripe directly (never trusts client/redirect state) for the user to
+  // call once they've returned from completing it.
+  const handleRefreshStripeStatus = useCallback(async () => {
+    if (!editingInstitutionId) return;
+    setStripeStatusRefreshing(true);
+    try {
+      const response = await getRequest(
+        ROUTES.broadcasts.educationInstitutionStripeAccountConnect(editingInstitutionId),
+        { errorMessage: 'Unable to refresh Stripe status.', forceNetwork: true },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to refresh Stripe status.');
+      }
+      await fetchHub();
+      await fetchDashboard(editingInstitutionId);
+    } catch (error: any) {
+      Alert.alert('Payments', error?.message || 'Unable to refresh Stripe status.');
+    } finally {
+      setStripeStatusRefreshing(false);
+    }
+  }, [editingInstitutionId, fetchDashboard, fetchHub]);
 
   const handlePickInstitutionLogo = useCallback(async () => {
     try {
@@ -7555,45 +7616,104 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 Payments
               </Text>
               <Text style={{ color: palette.subtext, fontSize: 13 }}>
-                Connect a Flutterwave payout account so this institution can
-                accept payment for its paid courses. Settlement splits
+                Connect a payout account so this institution can accept
+                payment for its paid courses. Settlement splits
                 automatically between the institution and the platform on
                 every purchase — you never share a secret API key.
               </Text>
-              <Text style={{ color: palette.text, fontWeight: '700' }}>
-                Status:{' '}
-                {selectedInstitution?.payout_account_status === 'active'
-                  ? `Connected${selectedInstitution?.payout_bank_last4 ? ` (•••• ${selectedInstitution.payout_bank_last4})` : ''}`
-                  : selectedInstitution?.payout_account_status === 'pending'
-                  ? 'Pending'
-                  : 'Not connected'}
-              </Text>
-              <KISTextInput
-                label="Bank code"
-                value={payoutBankCode}
-                onChange={value => setPayoutBankCode(getTextInputValue(value))}
-                placeholder="e.g. 044"
-              />
-              <KISTextInput
-                label="Account number"
-                value={payoutAccountNumber}
-                onChange={value => setPayoutAccountNumber(getTextInputValue(value))}
-                keyboardType="numeric"
-              />
-              <KISTextInput
-                label="Business name (optional)"
-                value={payoutBusinessName}
-                onChange={value => setPayoutBusinessName(getTextInputValue(value))}
-                placeholder={institutionForm.name || 'Defaults to institution name'}
-              />
-              <KISButton
-                title={payoutConnecting ? 'Connecting…' : 'Connect payout account'}
-                size="xs"
-                variant="outline"
-                onPress={() => void handleConnectPayoutAccount()}
-                disabled={payoutConnecting}
-                loading={payoutConnecting}
-              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <KISButton
+                  title="Flutterwave"
+                  size="xs"
+                  variant={payoutProvider === 'flutterwave' ? 'primary' : 'outline'}
+                  onPress={() => setPayoutProvider('flutterwave')}
+                />
+                <KISButton
+                  title="Stripe"
+                  size="xs"
+                  variant={payoutProvider === 'stripe' ? 'primary' : 'outline'}
+                  onPress={() => setPayoutProvider('stripe')}
+                />
+              </View>
+              {payoutProvider === 'flutterwave' ? (
+                <>
+                  <Text style={{ color: palette.text, fontWeight: '700' }}>
+                    Status:{' '}
+                    {selectedInstitution?.payout_account_status === 'active'
+                      ? `Connected${selectedInstitution?.payout_bank_last4 ? ` (•••• ${selectedInstitution.payout_bank_last4})` : ''}`
+                      : selectedInstitution?.payout_account_status === 'pending'
+                      ? 'Pending'
+                      : 'Not connected'}
+                  </Text>
+                  <KISTextInput
+                    label="Bank code"
+                    value={payoutBankCode}
+                    onChange={value => setPayoutBankCode(getTextInputValue(value))}
+                    placeholder="e.g. 044"
+                  />
+                  <KISTextInput
+                    label="Account number"
+                    value={payoutAccountNumber}
+                    onChange={value => setPayoutAccountNumber(getTextInputValue(value))}
+                    keyboardType="numeric"
+                  />
+                  <KISTextInput
+                    label="Business name (optional)"
+                    value={payoutBusinessName}
+                    onChange={value => setPayoutBusinessName(getTextInputValue(value))}
+                    placeholder={institutionForm.name || 'Defaults to institution name'}
+                  />
+                  <KISButton
+                    title={payoutConnecting ? 'Connecting…' : 'Connect payout account'}
+                    size="xs"
+                    variant="outline"
+                    onPress={() => void handleConnectPayoutAccount()}
+                    disabled={payoutConnecting}
+                    loading={payoutConnecting}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: palette.text, fontWeight: '700' }}>
+                    Status:{' '}
+                    {selectedInstitution?.stripe_charges_enabled
+                      ? 'Connected'
+                      : selectedInstitution?.stripe_account_id
+                      ? 'Pending — finish setup on Stripe'
+                      : 'Not connected'}
+                  </Text>
+                  <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                    Stripe handles bank details and identity verification on
+                    its own secure page — you don't enter them here. Tap
+                    below to open it, and once you're done, come back and
+                    tap Refresh status.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <KISButton
+                      title={
+                        stripeConnecting
+                          ? 'Opening…'
+                          : selectedInstitution?.stripe_account_id
+                          ? 'Continue Stripe setup'
+                          : 'Connect with Stripe'
+                      }
+                      size="xs"
+                      variant="outline"
+                      onPress={() => void handleConnectStripeAccount()}
+                      disabled={stripeConnecting}
+                      loading={stripeConnecting}
+                    />
+                    <KISButton
+                      title={stripeStatusRefreshing ? 'Refreshing…' : 'Refresh status'}
+                      size="xs"
+                      variant="outline"
+                      onPress={() => void handleRefreshStripeStatus()}
+                      disabled={stripeStatusRefreshing || !selectedInstitution?.stripe_account_id}
+                      loading={stripeStatusRefreshing}
+                    />
+                  </View>
+                </>
+              )}
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>

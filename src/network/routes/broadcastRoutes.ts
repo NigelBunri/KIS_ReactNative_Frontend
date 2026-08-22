@@ -449,6 +449,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/verification-status/`,
     educationInstitutionPayoutAccountConnect: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/payout-account/connect/`,
+    educationInstitutionStripeAccountConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/stripe-account/connect/`,
     educationCourseAccessRequests: (courseId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/courses/${courseId}/access-requests/`,
     educationInstitutionCourseAccessRequests: (institutionId: string) =>
