@@ -422,6 +422,23 @@ const persistEducationMaterialFile = async (asset: {
   return `file://${targetPath}`;
 };
 
+const LINKED_ITEM_SECTION_KEY: Record<string, EducationModuleKey> = {
+  lesson: 'lessons',
+  material: 'materials',
+  class_session: 'classes',
+  assessment: 'exams',
+  event: 'events',
+  broadcast: 'broadcasts',
+};
+const LINKED_ITEM_TARGET_KEY: Record<string, string> = {
+  lesson: 'lesson_id',
+  material: 'material_id',
+  class_session: 'class_session_id',
+  assessment: 'assessment_id',
+  event: 'event_id',
+  broadcast: 'broadcast_id',
+};
+
 const MODULE_LABELS: Record<string, string> = {
   overview: 'Overview',
   programs: 'Programs',
@@ -1489,23 +1506,6 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     },
     [loadModuleRecords, selectedInstitutionId],
   );
-
-  const LINKED_ITEM_SECTION_KEY: Record<string, EducationModuleKey> = {
-    lesson: 'lessons',
-    material: 'materials',
-    class_session: 'classes',
-    assessment: 'exams',
-    event: 'events',
-    broadcast: 'broadcasts',
-  };
-  const LINKED_ITEM_TARGET_KEY: Record<string, string> = {
-    lesson: 'lesson_id',
-    material: 'material_id',
-    class_session: 'class_session_id',
-    assessment: 'assessment_id',
-    event: 'event_id',
-    broadcast: 'broadcast_id',
-  };
 
   // Generic "create the missing related record without leaving this form"
   // helper, used by every renderLookupSelector/renderMultiLookupSelector
@@ -3001,6 +3001,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     [
       palette.bg,
       palette.divider,
+      palette.royalInk,
       palette.subtext,
       palette.surface,
       palette.text,
@@ -5759,6 +5760,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     palette.surface,
     palette.text,
     renderLookupSelector,
+    renderOptionPicker,
     startLinkedItemCreation,
     updateCourseModuleFormText,
     updateCourseModuleItemFormText,

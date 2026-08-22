@@ -61,7 +61,7 @@ const ACTIVE_ENROLLMENT_STATUSES = new Set(['enrolled', 'completed']);
 
 const hasLearningAccessForItem = (
   item: EducationContentItem | null | undefined,
-  progress?: EducationProgress | null,
+  _progress?: EducationProgress | null,
 ) => {
   if (!item) return false;
   const viewerState = (item as any)?.viewerState || {};
