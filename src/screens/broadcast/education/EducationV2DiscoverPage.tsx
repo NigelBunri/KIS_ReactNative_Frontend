@@ -68,8 +68,7 @@ const hasLearningAccessForItem = (
   ).toLowerCase();
   return (
     Boolean(viewerState?.has_learning_access) ||
-    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus) ||
-    Boolean(progress)
+    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus)
   );
 };
 

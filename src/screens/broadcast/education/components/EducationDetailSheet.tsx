@@ -486,12 +486,10 @@ export default function EducationDetailSheet({
       (content as any)?.viewerState?.enrollment_status ||
       '',
   ).toLowerCase();
-  const enrolled =
-    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus) || Boolean(progressState);
+  const enrolled = ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus);
   const hasLearningAccess =
     Boolean((content as any)?.viewerState?.has_learning_access) ||
-    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus) ||
-    Boolean(progressState);
+    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus);
   const completedItemIds = new Set(progressState?.completedItemIds || []);
   const activeModule =
     outline.find(module => module.id === activeModuleId) || outline[0] || null;
