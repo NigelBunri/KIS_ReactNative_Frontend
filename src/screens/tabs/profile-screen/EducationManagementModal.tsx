@@ -977,6 +977,12 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const [payoutConnecting, setPayoutConnecting] = useState(false);
   const [stripeConnecting, setStripeConnecting] = useState(false);
   const [stripeStatusRefreshing, setStripeStatusRefreshing] = useState(false);
+  const [manageablePartners, setManageablePartners] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [manageablePartnersLoading, setManageablePartnersLoading] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [partnerConnecting, setPartnerConnecting] = useState(false);
   const [courseAccessRequests, setCourseAccessRequests] = useState<any[]>([]);
   const [courseAccessRequestsLoading, setCourseAccessRequestsLoading] = useState(false);
   const [courseAccessRequestActionId, setCourseAccessRequestActionId] = useState<string | null>(null);
@@ -2404,6 +2410,73 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       setStripeStatusRefreshing(false);
     }
   }, [editingInstitutionId, fetchDashboard, fetchHub]);
+
+  const fetchManageablePartners = useCallback(async () => {
+    setManageablePartnersLoading(true);
+    try {
+      const response = await getRequest(ROUTES.broadcasts.partners.list, {
+        errorMessage: 'Unable to load your partner organizations.',
+      });
+      if (!response?.success) return;
+      const results = response?.data?.results ?? response?.data ?? [];
+      const list = Array.isArray(results) ? results : [];
+      setManageablePartners(
+        list
+          .filter((partner: any) => partner?.can_manage)
+          .map((partner: any) => ({ id: String(partner.id), name: String(partner.name || 'Partner') })),
+      );
+    } finally {
+      setManageablePartnersLoading(false);
+    }
+  }, []);
+
+  const handleConnectPartner = useCallback(async () => {
+    if (!editingInstitutionId || !selectedPartnerId) return;
+    setPartnerConnecting(true);
+    try {
+      const response = await postRequest(
+        ROUTES.broadcasts.educationInstitutionPartnerConnect(editingInstitutionId),
+        { partner_id: selectedPartnerId },
+        { errorMessage: 'Unable to connect this partner.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to connect this partner.');
+      }
+      await fetchDashboard(editingInstitutionId);
+      setSelectedPartnerId('');
+      Alert.alert('Partner organization', 'This institution is now managed by the partner organization too.');
+    } catch (error: any) {
+      Alert.alert('Partner organization', error?.message || 'Unable to connect this partner.');
+    } finally {
+      setPartnerConnecting(false);
+    }
+  }, [editingInstitutionId, selectedPartnerId, fetchDashboard]);
+
+  const handleDisconnectPartner = useCallback(async () => {
+    if (!editingInstitutionId) return;
+    setPartnerConnecting(true);
+    try {
+      const response = await deleteRequest(
+        ROUTES.broadcasts.educationInstitutionPartnerConnect(editingInstitutionId),
+        { errorMessage: 'Unable to disconnect this partner.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to disconnect this partner.');
+      }
+      await fetchDashboard(editingInstitutionId);
+      Alert.alert('Partner organization', 'This institution is no longer managed by that partner organization.');
+    } catch (error: any) {
+      Alert.alert('Partner organization', error?.message || 'Unable to disconnect this partner.');
+    } finally {
+      setPartnerConnecting(false);
+    }
+  }, [editingInstitutionId, fetchDashboard]);
+
+  useEffect(() => {
+    if (editingInstitutionId) {
+      void fetchManageablePartners();
+    }
+  }, [editingInstitutionId, fetchManageablePartners]);
 
   const handlePickInstitutionLogo = useCallback(async () => {
     try {
@@ -7867,6 +7940,63 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                     />
                   </View>
                 </>
+              )}
+            </View>
+          ) : null}
+          {editingInstitutionId ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: palette.text, fontWeight: '800' }}>
+                Partner organization
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                Attach this institution to a partner organization you
+                manage — anyone with manager rights on that partner gets
+                the same ability to manage this institution that you have.
+              </Text>
+              <Text style={{ color: palette.text, fontWeight: '700' }}>
+                {(selectedInstitution as any)?.partner_name
+                  ? `Managed by: ${(selectedInstitution as any).partner_name}`
+                  : 'Not connected to a partner'}
+              </Text>
+              {(selectedInstitution as any)?.partner_id ? (
+                <KISButton
+                  title={partnerConnecting ? 'Disconnecting…' : 'Disconnect partner'}
+                  size="xs"
+                  variant="secondary"
+                  onPress={() => void handleDisconnectPartner()}
+                  disabled={partnerConnecting}
+                  loading={partnerConnecting}
+                />
+              ) : manageablePartnersLoading ? (
+                <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                  Loading your partner organizations…
+                </Text>
+              ) : manageablePartners.length ? (
+                <>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {manageablePartners.map(partner => (
+                      <KISButton
+                        key={partner.id}
+                        title={partner.name}
+                        size="xs"
+                        variant={selectedPartnerId === partner.id ? 'primary' : 'outline'}
+                        onPress={() => setSelectedPartnerId(partner.id)}
+                      />
+                    ))}
+                  </View>
+                  <KISButton
+                    title={partnerConnecting ? 'Connecting…' : 'Connect partner'}
+                    size="xs"
+                    variant="outline"
+                    onPress={() => void handleConnectPartner()}
+                    disabled={partnerConnecting || !selectedPartnerId}
+                    loading={partnerConnecting}
+                  />
+                </>
+              ) : (
+                <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                  You don't manage any partner organizations yet.
+                </Text>
               )}
             </View>
           ) : null}

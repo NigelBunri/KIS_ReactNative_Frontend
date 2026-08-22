@@ -8,6 +8,8 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
 import { isTierAtLeast } from '@/services/tierAccess';
 import { useAuth } from '../../../../../App';
 import ChannelAnalyticsPanel from '@/screens/broadcast/channels/studio/ChannelAnalyticsPanel';
@@ -44,12 +46,24 @@ type Props = {
   onCreate: (channel?: BroadcastChannelSummary | null) => void;
 };
 
+type ChannelOwnerType = 'user' | 'shop' | 'health' | 'education' | 'partner';
+
 type ChannelForm = {
   displayName: string;
   handle: string;
   description: string;
   category: string;
+  ownerType: ChannelOwnerType;
+  ownerId: string;
 };
+
+const OWNER_TYPE_OPTIONS: { id: ChannelOwnerType; label: string }[] = [
+  { id: 'user', label: 'Personal' },
+  { id: 'shop', label: 'Shop' },
+  { id: 'health', label: 'Health institution' },
+  { id: 'education', label: 'Education institution' },
+  { id: 'partner', label: 'Partner organization' },
+];
 
 const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -79,6 +93,8 @@ const EMPTY_FORM: ChannelForm = {
   handle: '',
   description: '',
   category: '',
+  ownerType: 'user',
+  ownerId: '',
 };
 
 const normalizeHandle = (value: string) => value.toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
@@ -191,6 +207,64 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     });
   }, []);
 
+  const [ownerOptions, setOwnerOptions] = useState<{ id: string; name: string }[]>([]);
+  const [ownerOptionsLoading, setOwnerOptionsLoading] = useState(false);
+
+  const loadOwnerOptions = useCallback(async (ownerType: ChannelOwnerType) => {
+    if (ownerType === 'user') {
+      setOwnerOptions([]);
+      return;
+    }
+    setOwnerOptionsLoading(true);
+    setOwnerOptions([]);
+    try {
+      if (ownerType === 'shop') {
+        const response = await getRequest(ROUTES.commerce.shops, { errorMessage: '' });
+        const rows = (response as any)?.data?.results ?? (response as any)?.data ?? [];
+        const list = Array.isArray(rows) ? rows : [];
+        setOwnerOptions(
+          list
+            .filter((shop: any) => String(shop?.owner) === String(user?.id))
+            .map((shop: any) => ({ id: String(shop.id), name: String(shop.name || 'Shop') })),
+        );
+      } else if (ownerType === 'health') {
+        const response = await getRequest(ROUTES.healthOps.institutions, { errorMessage: '' });
+        const rows = (response as any)?.data?.results ?? (response as any)?.data ?? [];
+        const list = Array.isArray(rows) ? rows : [];
+        setOwnerOptions(
+          list
+            .filter((institution: any) => institution?.can_manage)
+            .map((institution: any) => ({ id: String(institution.id), name: String(institution.name || 'Institution') })),
+        );
+      } else if (ownerType === 'education') {
+        const response = await getRequest(ROUTES.broadcasts.educationHub, { errorMessage: '' });
+        const list = (response as any)?.data?.institutions ?? [];
+        setOwnerOptions(
+          (Array.isArray(list) ? list : [])
+            .filter((institution: any) => institution?.can_manage)
+            .map((institution: any) => ({ id: String(institution.id), name: String(institution.name || 'Institution') })),
+        );
+      } else if (ownerType === 'partner') {
+        const response = await getRequest(ROUTES.broadcasts.partners.list, { errorMessage: '' });
+        const rows = (response as any)?.data?.results ?? (response as any)?.data ?? [];
+        const list = Array.isArray(rows) ? rows : [];
+        setOwnerOptions(
+          list
+            .filter((partner: any) => partner?.can_manage)
+            .map((partner: any) => ({ id: String(partner.id), name: String(partner.name || 'Partner') })),
+        );
+      }
+    } finally {
+      setOwnerOptionsLoading(false);
+    }
+  }, [user?.id]);
+
+  const handleSelectOwnerType = useCallback((ownerType: ChannelOwnerType) => {
+    setChannelError(null);
+    setChannelForm(prev => ({ ...prev, ownerType, ownerId: '' }));
+    void loadOwnerOptions(ownerType);
+  }, [loadOwnerOptions]);
+
   const handleCreateChannel = useCallback(async () => {
     const displayName = channelForm.displayName.trim();
     const handle = normalizeHandle(channelForm.handle || displayName);
@@ -202,11 +276,16 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       setChannelError('Add a public handle using letters or numbers.');
       return;
     }
+    if (channelForm.ownerType !== 'user' && !channelForm.ownerId) {
+      setChannelError('Choose which shop, institution, or partner this channel belongs to.');
+      return;
+    }
     setCreatingChannel(true);
     setChannelError(null);
     try {
       const created = await createBroadcastChannel({
-        owner_type: 'user',
+        owner_type: channelForm.ownerType,
+        owner_id: channelForm.ownerType !== 'user' ? channelForm.ownerId : undefined,
         display_name: displayName,
         handle,
         description: channelForm.description.trim(),
@@ -377,6 +456,67 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           </Pressable>
         ) : null}
       </View>
+      <Text style={[styles.sectionText, { color: palette.subtext, marginTop: 4 }]}>
+        Who owns this channel?
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 4 }}>
+        {OWNER_TYPE_OPTIONS.map(option => (
+          <Pressable
+            key={option.id}
+            onPress={() => handleSelectOwnerType(option.id)}
+            style={{
+              paddingVertical: 6,
+              paddingHorizontal: 12,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: channelForm.ownerType === option.id ? palette.text : palette.border,
+              backgroundColor: channelForm.ownerType === option.id ? palette.text : palette.card,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '700',
+                color: channelForm.ownerType === option.id ? palette.surface : palette.text,
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {channelForm.ownerType !== 'user' ? (
+        ownerOptionsLoading ? (
+          <Text style={[styles.sectionText, { color: palette.subtext, marginBottom: 8 }]}>
+            Loading your options…
+          </Text>
+        ) : ownerOptions.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            {ownerOptions.map(option => (
+              <Pressable
+                key={option.id}
+                onPress={() => setChannelForm(prev => ({ ...prev, ownerId: option.id }))}
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: channelForm.ownerId === option.id ? palette.primaryStrong : palette.border,
+                  backgroundColor: channelForm.ownerId === option.id ? palette.card : 'transparent',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: palette.text }}>
+                  {option.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.sectionText, { color: palette.subtext, marginBottom: 8 }]}>
+            You don't manage any of these yet.
+          </Text>
+        )
+      ) : null}
       <TextInput
         value={channelForm.displayName}
         onChangeText={text => updateChannelForm('displayName', text)}

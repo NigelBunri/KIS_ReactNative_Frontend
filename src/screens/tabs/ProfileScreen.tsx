@@ -350,6 +350,12 @@ export default function ProfileScreen() {
   const [marketplaceOrdersError, setMarketplaceOrdersError] = useState<
     string | null
   >(null);
+  const [manageableShopPartners, setManageableShopPartners] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [manageableShopPartnersLoading, setManageableShopPartnersLoading] =
+    useState(false);
+  const [shopPartnerConnecting, setShopPartnerConnecting] = useState(false);
   const currentUserId = useMemo(() => {
     const userId = c.profile?.user?.id;
     return userId ? String(userId) : null;
@@ -1641,6 +1647,76 @@ export default function ProfileScreen() {
     setActiveShop(null);
     resetMarketForm();
   }, [resetMarketForm]);
+
+  const fetchManageableShopPartners = useCallback(async () => {
+    setManageableShopPartnersLoading(true);
+    try {
+      const response = await getRequest(ROUTES.broadcasts.partners.list, {
+        errorMessage: 'Unable to load your partner organizations.',
+      });
+      if (!response?.success) return;
+      const results = response?.data?.results ?? response?.data ?? [];
+      const list = Array.isArray(results) ? results : [];
+      setManageableShopPartners(
+        list
+          .filter((partner: any) => partner?.can_manage)
+          .map((partner: any) => ({ id: String(partner.id), name: String(partner.name || 'Partner') })),
+      );
+    } finally {
+      setManageableShopPartnersLoading(false);
+    }
+  }, []);
+
+  const handleConnectShopPartner = useCallback(
+    async (partnerId: string) => {
+      if (!marketForm.id || !partnerId) return;
+      setShopPartnerConnecting(true);
+      try {
+        const response = await postRequest(
+          ROUTES.commerce.shopPartnerConnect(marketForm.id),
+          { partner_id: partnerId },
+          { errorMessage: 'Unable to connect this partner.' },
+        );
+        if (!response?.success) {
+          throw new Error(response?.message || 'Unable to connect this partner.');
+        }
+        setActiveShop((prev: any) => (prev ? { ...prev, ...response.data } : prev));
+        await loadCommerceShops();
+        Alert.alert('Partner organization', 'This shop is now managed by the partner organization too.');
+      } catch (error: any) {
+        Alert.alert('Partner organization', error?.message || 'Unable to connect this partner.');
+      } finally {
+        setShopPartnerConnecting(false);
+      }
+    },
+    [marketForm.id, loadCommerceShops],
+  );
+
+  const handleDisconnectShopPartner = useCallback(async () => {
+    if (!marketForm.id) return;
+    setShopPartnerConnecting(true);
+    try {
+      const response = await deleteRequest(ROUTES.commerce.shopPartnerConnect(marketForm.id), {
+        errorMessage: 'Unable to disconnect this partner.',
+      });
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to disconnect this partner.');
+      }
+      setActiveShop((prev: any) => (prev ? { ...prev, ...response.data } : prev));
+      await loadCommerceShops();
+      Alert.alert('Partner organization', 'This shop is no longer managed by that partner organization.');
+    } catch (error: any) {
+      Alert.alert('Partner organization', error?.message || 'Unable to disconnect this partner.');
+    } finally {
+      setShopPartnerConnecting(false);
+    }
+  }, [marketForm.id, loadCommerceShops]);
+
+  useEffect(() => {
+    if (shopEditorVisible && shopEditorMode === 'edit') {
+      void fetchManageableShopPartners();
+    }
+  }, [shopEditorVisible, shopEditorMode, fetchManageableShopPartners]);
 
   const formatLessonTime = useCallback((value?: string | null) => {
     if (!value) return 'Starts soon';
@@ -3419,6 +3495,11 @@ export default function ProfileScreen() {
           }
           activeShop={activeShop}
           canDeleteShop={canDeleteActiveShop}
+          manageablePartners={manageableShopPartners}
+          manageablePartnersLoading={manageableShopPartnersLoading}
+          partnerConnecting={shopPartnerConnecting}
+          onConnectPartner={handleConnectShopPartner}
+          onDisconnectPartner={handleDisconnectShopPartner}
         />
 
         {/* Bottom Sheet host */}

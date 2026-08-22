@@ -166,6 +166,8 @@ const healthRoutes = {
     institutions: `${API_BASE_URL}/api/v1/health-ops/institutions/`,
     institution: (institutionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/`,
+    institutionPartnerConnect: (institutionId: string) =>
+      `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/partner/`,
     institutionServices: (institutionId: string) =>
       `${API_BASE_URL}/api/v1/health-ops/institutions/${encodeURIComponent(institutionId)}/services/`,
     institutionVerificationStatus: (institutionId: string) =>

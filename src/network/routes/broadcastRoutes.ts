@@ -451,6 +451,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/payout-account/connect/`,
     educationInstitutionStripeAccountConnect: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/stripe-account/connect/`,
+    educationInstitutionPartnerConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/partner/`,
     educationCourseAccessRequests: (courseId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/courses/${courseId}/access-requests/`,
     educationInstitutionCourseAccessRequests: (institutionId: string) =>
@@ -752,6 +754,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/`,
     shopVerificationStart: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/request_verification/`,
+    shopPartnerConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shops/${id}/partner/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
     discovery: `${API_BASE_URL}/api/v1/commerce/discovery/`,
     // Direct-to-S3 presigned-upload handshake for marketplace media — see

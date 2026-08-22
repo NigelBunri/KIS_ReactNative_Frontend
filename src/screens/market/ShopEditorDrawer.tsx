@@ -22,6 +22,11 @@ type ShopEditorDrawerProps = {
   onDelete?: () => void;
   activeShop?: any | null;
   canDeleteShop?: boolean;
+  manageablePartners?: { id: string; name: string }[];
+  manageablePartnersLoading?: boolean;
+  partnerConnecting?: boolean;
+  onConnectPartner?: (partnerId: string) => void;
+  onDisconnectPartner?: () => void;
 };
 
 type ShopImageUpload = {
@@ -39,11 +44,18 @@ export default function ShopEditorDrawer({
   onClose,
   onSave,
   onDelete,
+  activeShop,
   canDeleteShop,
+  manageablePartners,
+  manageablePartnersLoading,
+  partnerConnecting,
+  onConnectPartner,
+  onDisconnectPartner,
 }: ShopEditorDrawerProps) {
   const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const [selectedPartnerId, setSelectedPartnerId] = React.useState('');
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
   const drawerWidth = compactDrawer
     ? responsive.width
@@ -192,6 +204,73 @@ export default function ShopEditorDrawer({
                 </Text>
               )}
             </View>
+            {mode === 'edit' ? (
+              <View style={marketStyles.drawerSection}>
+                <View style={marketStyles.drawerSectionHeader}>
+                  <Text
+                    style={[
+                      marketStyles.drawerSectionTitle,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Partner organization
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    marketStyles.drawerSectionHelper,
+                    { color: palette.subtext },
+                  ]}
+                >
+                  Attach this shop to a partner organization you manage —
+                  anyone with manager rights on that partner gets the same
+                  ability to manage this shop that you have.
+                </Text>
+                <Text style={{ color: palette.text, fontWeight: '700' }}>
+                  {activeShop?.partner_name
+                    ? `Managed by: ${activeShop.partner_name}`
+                    : 'Not connected to a partner'}
+                </Text>
+                {activeShop?.partner_id ? (
+                  <KISButton
+                    title={partnerConnecting ? 'Disconnecting…' : 'Disconnect partner'}
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => onDisconnectPartner?.()}
+                    disabled={partnerConnecting}
+                  />
+                ) : manageablePartnersLoading ? (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Loading your partner organizations…
+                  </Text>
+                ) : manageablePartners && manageablePartners.length > 0 ? (
+                  <>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                      {manageablePartners.map(partner => (
+                        <KISButton
+                          key={partner.id}
+                          title={partner.name}
+                          size="xs"
+                          variant={selectedPartnerId === partner.id ? 'primary' : 'outline'}
+                          onPress={() => setSelectedPartnerId(partner.id)}
+                        />
+                      ))}
+                    </View>
+                    <KISButton
+                      title={partnerConnecting ? 'Connecting…' : 'Connect partner'}
+                      size="sm"
+                      variant="outline"
+                      onPress={() => onConnectPartner?.(selectedPartnerId)}
+                      disabled={partnerConnecting || !selectedPartnerId}
+                    />
+                  </>
+                ) : (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    You don't manage any partner organizations yet.
+                  </Text>
+                )}
+              </View>
+            ) : null}
             <View
               style={[
                 marketStyles.drawerFooter,

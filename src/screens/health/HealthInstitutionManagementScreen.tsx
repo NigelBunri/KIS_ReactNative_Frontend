@@ -39,6 +39,8 @@ import {
 } from './accessControl';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import { nanoid } from 'nanoid/non-secure';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
@@ -414,6 +416,97 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     [actorRole, resolvedInstitution, resolvedInstitutionId],
   );
 
+  // institutions[] above comes from the legacy broadcast-profile blob
+  // (healthProfileService), which predates and doesn't carry partner_id/
+  // partner_name - fetch those fresh from the real HealthInstitution REST
+  // resource once an id resolves, same endpoint every other action on this
+  // screen (services/members/clinical command center) already trusts for
+  // this same resolvedInstitutionId.
+  const [partnerInfo, setPartnerInfo] = useState<{ id: string; name: string } | null>(null);
+  const [manageablePartners, setManageablePartners] = useState<{ id: string; name: string }[]>([]);
+  const [manageablePartnersLoading, setManageablePartnersLoading] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [partnerConnecting, setPartnerConnecting] = useState(false);
+
+  const loadPartnerInfo = useCallback(async () => {
+    if (!resolvedInstitutionId) return;
+    const response = await getRequest(ROUTES.healthOps.institution(resolvedInstitutionId), {
+      errorMessage: '',
+    });
+    const institution = (response as any)?.data?.institution ?? (response as any)?.data ?? {};
+    setPartnerInfo(
+      institution?.partner_id ? { id: String(institution.partner_id), name: String(institution.partner_name || 'Partner') } : null,
+    );
+  }, [resolvedInstitutionId]);
+
+  const loadManageablePartners = useCallback(async () => {
+    setManageablePartnersLoading(true);
+    try {
+      const response = await getRequest(ROUTES.broadcasts.partners.list, {
+        errorMessage: 'Unable to load your partner organizations.',
+      });
+      if (!response?.success) return;
+      const results = (response as any)?.data?.results ?? (response as any)?.data ?? [];
+      const list = Array.isArray(results) ? results : [];
+      setManageablePartners(
+        list
+          .filter((partner: any) => partner?.can_manage)
+          .map((partner: any) => ({ id: String(partner.id), name: String(partner.name || 'Partner') })),
+      );
+    } finally {
+      setManageablePartnersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (resolvedInstitutionId) {
+      void loadPartnerInfo();
+      void loadManageablePartners();
+    }
+  }, [resolvedInstitutionId, loadPartnerInfo, loadManageablePartners]);
+
+  const handleConnectPartner = useCallback(async () => {
+    if (!resolvedInstitutionId || !selectedPartnerId) return;
+    setPartnerConnecting(true);
+    try {
+      const response = await postRequest(
+        ROUTES.healthOps.institutionPartnerConnect(resolvedInstitutionId),
+        { partner_id: selectedPartnerId },
+        { errorMessage: 'Unable to connect this partner.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to connect this partner.');
+      }
+      await loadPartnerInfo();
+      setSelectedPartnerId('');
+      Alert.alert('Partner organization', 'This institution is now managed by the partner organization too.');
+    } catch (error: any) {
+      Alert.alert('Partner organization', error?.message || 'Unable to connect this partner.');
+    } finally {
+      setPartnerConnecting(false);
+    }
+  }, [resolvedInstitutionId, selectedPartnerId, loadPartnerInfo]);
+
+  const handleDisconnectPartner = useCallback(async () => {
+    if (!resolvedInstitutionId) return;
+    setPartnerConnecting(true);
+    try {
+      const response = await deleteRequest(
+        ROUTES.healthOps.institutionPartnerConnect(resolvedInstitutionId),
+        { errorMessage: 'Unable to disconnect this partner.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to disconnect this partner.');
+      }
+      await loadPartnerInfo();
+      Alert.alert('Partner organization', 'This institution is no longer managed by that partner organization.');
+    } catch (error: any) {
+      Alert.alert('Partner organization', error?.message || 'Unable to disconnect this partner.');
+    } finally {
+      setPartnerConnecting(false);
+    }
+  }, [resolvedInstitutionId, loadPartnerInfo]);
+
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
       Alert.alert('Manage institution', 'Provide a name.');
@@ -662,6 +755,73 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
               Your role: {actorRole}. Delete allowed for owner, admin, and manager only.
             </Text>
           </View>
+
+          {resolvedInstitutionId ? (
+            <View
+              style={{
+                marginTop: HEALTH_THEME_SPACING.lg,
+                padding: compact ? HEALTH_THEME_SPACING.sm : HEALTH_THEME_SPACING.md,
+                backgroundColor: palette.card,
+                borderRadius: HEALTH_THEME_SPACING.lg,
+                ...borders.card,
+              }}
+            >
+              <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h3, color: palette.text }}>Partner organization</Text>
+              <Text
+                style={{
+                  ...HEALTH_THEME_TYPOGRAPHY.body,
+                  color: palette.subtext,
+                  marginTop: HEALTH_THEME_SPACING.sm,
+                }}
+              >
+                Attach this institution to a partner organization you
+                manage — anyone with manager rights on that partner gets
+                the same ability to manage this institution that you have.
+              </Text>
+              <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.text, fontWeight: '700', marginTop: HEALTH_THEME_SPACING.sm }}>
+                {partnerInfo ? `Managed by: ${partnerInfo.name}` : 'Not connected to a partner'}
+              </Text>
+              {partnerInfo ? (
+                <View style={{ marginTop: HEALTH_THEME_SPACING.sm }}>
+                  <KISButton
+                    title={partnerConnecting ? 'Disconnecting…' : 'Disconnect partner'}
+                    variant="outline"
+                    onPress={handleDisconnectPartner}
+                    disabled={partnerConnecting}
+                  />
+                </View>
+              ) : manageablePartnersLoading ? (
+                <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.subtext, marginTop: HEALTH_THEME_SPACING.sm }}>
+                  Loading your partner organizations…
+                </Text>
+              ) : manageablePartners.length ? (
+                <>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: HEALTH_THEME_SPACING.sm }}>
+                    {manageablePartners.map(partner => (
+                      <KISButton
+                        key={partner.id}
+                        title={partner.name}
+                        size="sm"
+                        variant={selectedPartnerId === partner.id ? 'secondary' : 'outline'}
+                        onPress={() => setSelectedPartnerId(partner.id)}
+                      />
+                    ))}
+                  </View>
+                  <View style={{ marginTop: HEALTH_THEME_SPACING.sm }}>
+                    <KISButton
+                      title={partnerConnecting ? 'Connecting…' : 'Connect partner'}
+                      onPress={handleConnectPartner}
+                      disabled={partnerConnecting || !selectedPartnerId}
+                    />
+                  </View>
+                </>
+              ) : (
+                <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.subtext, marginTop: HEALTH_THEME_SPACING.sm }}>
+                  You don't manage any partner organizations yet.
+                </Text>
+              )}
+            </View>
+          ) : null}
 
           <View
             style={{
