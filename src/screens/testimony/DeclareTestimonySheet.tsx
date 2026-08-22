@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +12,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
+import DocumentPicker from 'react-native-document-picker';
+import Video from 'react-native-video';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +25,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
+import { uploadTestimonyMedia, type TestimonyUploadProgress } from '@/services/uploadTestimonyMedia';
 
 const CATEGORY_LABELS: Record<string, string> = {
   health: 'Health & Medical',
@@ -61,6 +66,18 @@ export default function DeclareTestimonySheet() {
   const [openToContact, setOpenToContact] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Existing attachment (when editing) — mediaKind/existingMediaUrl reflect
+  // what's already saved; pendingFile is a newly picked, not-yet-uploaded
+  // replacement. Only one attachment per testimony, so picking a new file
+  // simply replaces whichever is currently set.
+  const [mediaKind, setMediaKind] = useState<'none' | 'video' | 'file'>('none');
+  const [existingMediaUrl, setExistingMediaUrl] = useState('');
+  const [pendingFile, setPendingFile] = useState<{
+    uri: string; name?: string | null; type?: string | null; size?: number | null; pickedKind: 'video' | 'file';
+  } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<TestimonyUploadProgress | null>(null);
+
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   useEffect(() => {
@@ -73,23 +90,63 @@ export default function DeclareTestimonySheet() {
           setTitle(d.title ?? '');
           setStory(d.story ?? '');
           setOpenToContact(d.open_to_contact !== false);
+          setMediaKind(d.media_kind ?? 'none');
+          setExistingMediaUrl(d.safe_resource_url ?? '');
         }
       })
       .catch(() => {});
   }, [editId]);
 
-  const canSubmit = Boolean(category && title.trim());
+  const canSubmit = Boolean(category && title.trim()) && !uploading;
+
+  const handlePickVideo = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({ mediaType: 'video', videoQuality: 'medium' });
+      if (result.didCancel) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+      setPendingFile({ uri: asset.uri, name: asset.fileName, type: asset.type, size: asset.fileSize, pickedKind: 'video' });
+    } catch (error: any) {
+      Alert.alert('Testimony', error?.message || 'Unable to pick video.');
+    }
+  }, []);
+
+  const handlePickFile = useCallback(async () => {
+    try {
+      const document = await DocumentPicker.pickSingle({ type: [DocumentPicker.types.allFiles], copyTo: 'documentDirectory' });
+      const uri = document.fileCopyUri || document.uri;
+      setPendingFile({ uri, name: document.name, type: document.type, size: document.size, pickedKind: 'file' });
+    } catch (error: any) {
+      if (DocumentPicker.isCancel?.(error)) return;
+      Alert.alert('Testimony', error?.message || 'Unable to pick file.');
+    }
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    const payload = {
-      category,
-      title: title.trim(),
-      story: story.trim(),
-      open_to_contact: openToContact,
-    };
     try {
+      let resourceAttachment: { media_id: string } | undefined;
+      if (pendingFile) {
+        setUploading(true);
+        try {
+          const uploaded = await uploadTestimonyMedia({
+            file: { uri: pendingFile.uri, name: pendingFile.name, type: pendingFile.type, size: pendingFile.size },
+            onProgress: setUploadProgress,
+          });
+          resourceAttachment = { media_id: uploaded.mediaId };
+        } finally {
+          setUploading(false);
+          setUploadProgress(null);
+        }
+      }
+      const payload: Record<string, unknown> = {
+        category,
+        title: title.trim(),
+        story: story.trim(),
+        open_to_contact: openToContact,
+      };
+      if (resourceAttachment) payload.resource_attachment = resourceAttachment;
       const res = isEdit && editId
         ? await patchRequest(ROUTES.testimony.testimonyDetail(editId), payload)
         : await postRequest(ROUTES.testimony.testimonies, payload);
@@ -109,7 +166,7 @@ export default function DeclareTestimonySheet() {
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, category, title, story, openToContact, isEdit, editId, navigation]);
+  }, [canSubmit, category, title, story, openToContact, isEdit, editId, navigation, pendingFile]);
 
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, }]} edges={['top']}>
@@ -179,6 +236,60 @@ export default function DeclareTestimonySheet() {
           textAlignVertical="top"
         />
 
+        <Text style={[styles.sectionLabel, { color: palette.text }]}>Video or file (optional)</Text>
+        {pendingFile ? (
+          <View style={[styles.mediaPreviewBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            {pendingFile.pickedKind === 'video' ? (
+              <Video source={{ uri: pendingFile.uri }} style={styles.videoPreview} controls paused resizeMode="cover" />
+            ) : (
+              <Text style={[styles.mediaFileName, { color: palette.text }]} numberOfLines={1}>
+                {pendingFile.name || 'Selected file'}
+              </Text>
+            )}
+            <Pressable onPress={() => setPendingFile(null)} style={styles.mediaRemoveBtn}>
+              <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>Remove</Text>
+            </Pressable>
+          </View>
+        ) : mediaKind !== 'none' && existingMediaUrl ? (
+          <View style={[styles.mediaPreviewBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            {mediaKind === 'video' ? (
+              <Video source={{ uri: existingMediaUrl }} style={styles.videoPreview} controls paused resizeMode="cover" />
+            ) : (
+              <Text style={[styles.mediaFileName, { color: palette.text }]} numberOfLines={1}>
+                Attached file
+              </Text>
+            )}
+            <Text style={[styles.mediaHint, { color: palette.subtext }]}>Pick a new video or file below to replace it.</Text>
+          </View>
+        ) : null}
+        {uploading ? (
+          <View style={styles.uploadRow}>
+            <ActivityIndicator size="small" color={palette.primary} />
+            <Text style={[styles.mediaHint, { color: palette.subtext }]}>
+              {uploadProgress?.status === 'uploading'
+                ? `Uploading… ${Math.round((uploadProgress.progress || 0) * 100)}%`
+                : uploadProgress?.status === 'confirming'
+                ? 'Confirming…'
+                : 'Preparing…'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.mediaButtonRow}>
+            <Pressable
+              onPress={handlePickVideo}
+              style={[styles.mediaPickBtn, { borderColor: palette.border, backgroundColor: palette.surface }]}
+            >
+              <Text style={[styles.mediaPickBtnText, { color: palette.text }]}>🎥 Add video</Text>
+            </Pressable>
+            <Pressable
+              onPress={handlePickFile}
+              style={[styles.mediaPickBtn, { borderColor: palette.border, backgroundColor: palette.surface }]}
+            >
+              <Text style={[styles.mediaPickBtnText, { color: palette.text }]}>📎 Add file</Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={[styles.contactRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.contactLabel, { color: palette.text }]}>I'm open to being contacted</Text>
@@ -203,7 +314,7 @@ export default function DeclareTestimonySheet() {
           ]}
         >
           <Text style={styles.submitBtnText}>
-            {submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Share Testimony'}
+            {uploading ? 'Uploading…' : submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Share Testimony'}
           </Text>
         </Pressable>
       </ScrollView>
@@ -230,5 +341,14 @@ function makeStyles(palette: any) {
     contactSub: { fontSize: 13, marginTop: 2 },
     submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
     submitBtnText: { color: palette.onPrimary, fontWeight: '800', fontSize: 16 },
+    mediaButtonRow: { flexDirection: 'row', gap: 10 },
+    mediaPickBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+    mediaPickBtnText: { fontWeight: '700', fontSize: 14 },
+    mediaPreviewBox: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
+    videoPreview: { width: '100%', height: 180, borderRadius: 10, backgroundColor: '#000' },
+    mediaFileName: { fontSize: 14, fontWeight: '600' },
+    mediaHint: { fontSize: 12 },
+    mediaRemoveBtn: { alignSelf: 'flex-start' },
+    uploadRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   });
 }
