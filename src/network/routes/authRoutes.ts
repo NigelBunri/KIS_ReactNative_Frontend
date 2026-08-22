@@ -19,6 +19,7 @@ const authRoutes = {
     revokeDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/`,
     deviceQRGenerate: `${API_BASE_URL}/api/v1/auth/devices/qr/`,
     deviceQRLogin: `${API_BASE_URL}/api/v1/auth/devices/qr-login/`,
+    deviceWebPairingGenerate: `${API_BASE_URL}/api/v1/auth/devices/web-pairing/`,
     transferParentDevice: `${API_BASE_URL}/api/v1/auth/devices/transfer-parent/`,
     revokeAllSecondary: `${API_BASE_URL}/api/v1/auth/devices/revoke-all-secondary/`,
     renameDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/rename/`,

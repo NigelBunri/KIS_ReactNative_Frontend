@@ -367,6 +367,31 @@ export default function EducationV2DiscoverPage({
     [hydrateDetail],
   );
 
+  // Memoized so identity only changes when the underlying data changes —
+  // an inline object literal here would get a new reference on every
+  // parent re-render, which re-fires EducationDetailSheet's content-sync
+  // effect and snaps its local "current item" state back to whatever this
+  // prop held, even when nothing about the course actually changed.
+  const detailSheetItem = useMemo(
+    () =>
+      detailItem
+        ? ({ ...detailItem, detailLoading } as EducationContentItem & {
+            detailLoading?: boolean;
+          })
+        : null,
+    [detailItem, detailLoading],
+  );
+
+  // Refetches the open course's own detail (progress/current-item/next-item),
+  // not just the discovery catalog list — advancing to the next item only
+  // takes effect once this resolves and detailItem is updated with it.
+  const refreshDetailProgress = useCallback(async () => {
+    if (detailItem?.id) {
+      await hydrateDetail(detailItem.id);
+    }
+    void refresh();
+  }, [detailItem?.id, hydrateDetail, refresh]);
+
   const consumedOpenContentId = useRef<string | null>(null);
   useEffect(() => {
     if (!openContentId || consumedOpenContentId.current === openContentId) return;
@@ -1670,20 +1695,14 @@ export default function EducationV2DiscoverPage({
 
       <EducationDetailSheet
         visible={detailVisible}
-        item={
-          detailItem
-            ? ({ ...detailItem, detailLoading } as EducationContentItem & {
-                detailLoading?: boolean;
-              })
-            : null
-        }
+        item={detailSheetItem}
         onClose={() => {
           setDetailVisible(false);
           setDetailLoading(false);
         }}
         onEnroll={item => enrollCourse(item)}
         onPreview={item => previewCourse(item)}
-        onRefreshProgress={refresh}
+        onRefreshProgress={refreshDetailProgress}
       />
 
       <EducationEnrollmentSheet

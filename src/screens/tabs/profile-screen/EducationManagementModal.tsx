@@ -3797,7 +3797,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             <Text style={{ color: palette.text, fontWeight: '800' }}>
               {label}
             </Text>
-            {onCreateNew && options.length ? (
+            {onCreateNew ? (
               <KISButton
                 title="+ New"
                 size="xs"
@@ -4015,7 +4015,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
             <Text style={{ color: palette.text, fontWeight: '800' }}>
               {label}
             </Text>
-            {onCreateNew && options.length ? (
+            {onCreateNew ? (
               <KISButton
                 title="+ New"
                 size="xs"

@@ -49,6 +49,13 @@ type QRData = {
   nonce: string;
 };
 
+type WebPairingData = {
+  code: string;
+  qr_payload: string;
+  expires_at: string;
+  nonce: string;
+};
+
 const formatLastSeen = (value?: string) => {
   if (!value) return 'Unknown';
   const date = new Date(value);
@@ -88,6 +95,13 @@ export default function DeviceManagementScreen() {
   const [qrLoading, setQRLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Web/Mobile tab + web pairing state (for parent device)
+  const [activeTab, setActiveTab] = useState<'mobile' | 'web'>('mobile');
+  const [webPairing, setWebPairing] = useState<WebPairingData | null>(null);
+  const [webPairingLoading, setWebPairingLoading] = useState(false);
+  const [webCountdown, setWebCountdown] = useState(0);
+  const webCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -207,6 +221,64 @@ export default function DeviceManagementScreen() {
     if (!qrData?.qr_payload) return;
     void Share.share({ message: qrData.qr_payload });
   }, [qrData]);
+
+  /* ---------- Web pairing (parent only) ---------- */
+  const loadWebPairing = useCallback(async () => {
+    setWebPairingLoading(true);
+    try {
+      const res = await getRequest(ROUTES.auth.deviceWebPairingGenerate, { errorMessage: 'Unable to generate a web sign-in code.', forceNetwork: true });
+      const data = (res?.data ?? res) as WebPairingData;
+      if (data?.code) {
+        setWebPairing(data);
+        setWebCountdown(secondsUntil(data.expires_at));
+      } else {
+        setWebPairing(null);
+      }
+    } catch (err: any) {
+      setWebPairing(null);
+      setError(err?.message || 'Unable to generate a web sign-in code.');
+    } finally {
+      setWebPairingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isParent || activeTab !== 'web') return;
+    void loadWebPairing();
+  }, [isParent, activeTab, loadWebPairing]);
+
+  useEffect(() => {
+    if (!webPairing) return;
+    if (webCountdownRef.current) clearInterval(webCountdownRef.current);
+    webCountdownRef.current = setInterval(() => {
+      setWebCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(webCountdownRef.current!);
+          void loadWebPairing(); // auto-refresh when expired
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (webCountdownRef.current) clearInterval(webCountdownRef.current); };
+  }, [webPairing, loadWebPairing]);
+
+  const copyWebCode = useCallback(() => {
+    if (!webPairing?.code) return;
+    Clipboard.setString(webPairing.code);
+    Alert.alert('Copied', 'Web sign-in code copied. Paste it at kingdomimpactventures.org/pair.');
+  }, [webPairing]);
+
+  const copyWebLink = useCallback(() => {
+    if (!webPairing?.qr_payload) return;
+    Clipboard.setString(webPairing.qr_payload);
+    Alert.alert('Copied', 'Web sign-in link copied.');
+  }, [webPairing]);
+
+  const shareWebLink = useCallback(() => {
+    if (!webPairing?.qr_payload) return;
+    void Share.share({ message: webPairing.qr_payload });
+  }, [webPairing]);
 
   /* ---------- Actions ---------- */
   const handleRevoke = useCallback((device: Device) => {
@@ -419,6 +491,10 @@ export default function DeviceManagementScreen() {
   const secondaryDevices = useMemo(() => devices.filter(d => !d.is_parent), [devices]);
   const hasSecondary = secondaryDevices.length > 0;
 
+  const mobileDevices = useMemo(() => devices.filter(d => d.platform !== 'web'), [devices]);
+  const webDevices = useMemo(() => devices.filter(d => d.platform === 'web'), [devices]);
+  const listData = activeTab === 'web' ? webDevices : mobileDevices;
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
@@ -430,8 +506,27 @@ export default function DeviceManagementScreen() {
         <View style={{ width: 44 }} />
       </View>
 
+      <View style={[styles.tabSwitch, { borderColor: palette.divider }]}>
+        <Pressable
+          style={[styles.tabBtn, activeTab === 'mobile' && { backgroundColor: palette.primary }]}
+          onPress={() => setActiveTab('mobile')}
+        >
+          <Text style={[styles.tabBtnText, { color: activeTab === 'mobile' ? palette.onPrimary : palette.subtext }]}>
+            Mobile
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabBtn, activeTab === 'web' && { backgroundColor: palette.primary }]}
+          onPress={() => setActiveTab('web')}
+        >
+          <Text style={[styles.tabBtnText, { color: activeTab === 'web' ? palette.onPrimary : palette.subtext }]}>
+            Web
+          </Text>
+        </Pressable>
+      </View>
+
       <FlatList
-        data={devices}
+        data={listData}
         keyExtractor={item => String(item.id)}
         renderItem={renderDevice}
         contentContainerStyle={{ padding: responsive.pageGutter, gap: 12, paddingBottom: responsive.pageGutter * 2, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
@@ -440,89 +535,165 @@ export default function DeviceManagementScreen() {
         }
         ListHeaderComponent={
           <>
-            {/* ── QR Panel (parent device only) ─────────────────────── */}
-            {isParent && (
-              <View style={[styles.qrPanel, { backgroundColor: palette.card, borderColor: palette.primary }]}>
-                <View style={styles.qrPanelHeader}>
-                  <KISIcon name="lock" size={18} color={palette.primary} />
-                  <Text style={[styles.qrPanelTitle, { color: palette.text }]}>
-                    Link a new device
-                  </Text>
-                </View>
-                <Text style={[styles.qrPanelSub, { color: palette.subtext }]}>
-                  On the new device, open KIS → Login → "Log in as secondary device", then scan this code. The code rotates every 3 hours and is single-use.
-                </Text>
-
-                {qrLoading ? (
-                  <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
-                    <ActivityIndicator color={palette.primary} size="large" />
-                  </View>
-                ) : qrData ? (
-                  <>
-                    <View style={[styles.qrWrap, { backgroundColor: palette.ivory }]}>
-                      {/* QR code content is never displayed as text — only as a visual QR */}
-                      <QRCode
-                        value={qrData.qr_payload}
-                        size={200}
-                        backgroundColor={palette.ivory}
-                        color={palette.royalInk}
-                      />
-                    </View>
-                    <View style={styles.countdownRow}>
-                      <KISIcon name="bell" size={12} color={countdown < 300 ? palette.danger : palette.subtext} />
-                      <Text style={[styles.countdownText, { color: countdown < 300 ? palette.danger : palette.subtext }]}>
-                        Expires in {formatCountdown(countdown)}
+            {activeTab === 'mobile' ? (
+              <>
+                {/* ── QR Panel (parent device only) ─────────────────────── */}
+                {isParent && (
+                  <View style={[styles.qrPanel, { backgroundColor: palette.card, borderColor: palette.primary }]}>
+                    <View style={styles.qrPanelHeader}>
+                      <KISIcon name="lock" size={18} color={palette.primary} />
+                      <Text style={[styles.qrPanelTitle, { color: palette.text }]}>
+                        Link a new device
                       </Text>
-                      <Pressable onPress={loadQR} style={styles.refreshQRBtn}>
-                        <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
-                      </Pressable>
                     </View>
-                    <View style={styles.tokenActionRow}>
-                      <Pressable onPress={copyQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
-                        <Text style={[styles.tokenActionText, { color: palette.primary }]}>Copy token</Text>
-                      </Pressable>
-                      <Pressable onPress={shareQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
-                        <Text style={[styles.tokenActionText, { color: palette.primary }]}>Share token</Text>
-                      </Pressable>
-                    </View>
-                  </>
-                ) : (
-                  <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
-                    <Text style={{ color: palette.subtext, fontWeight: '600' }}>QR code unavailable</Text>
-                    <Pressable onPress={loadQR}>
-                      <Text style={{ color: palette.primary, fontWeight: '700', marginTop: 8 }}>Retry</Text>
-                    </Pressable>
+                    <Text style={[styles.qrPanelSub, { color: palette.subtext }]}>
+                      On the new device, open KIS → Login → "Log in as secondary device", then scan this code. The code rotates every 3 hours and is single-use.
+                    </Text>
+
+                    {qrLoading ? (
+                      <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
+                        <ActivityIndicator color={palette.primary} size="large" />
+                      </View>
+                    ) : qrData ? (
+                      <>
+                        <View style={[styles.qrWrap, { backgroundColor: palette.ivory }]}>
+                          {/* QR code content is never displayed as text — only as a visual QR */}
+                          <QRCode
+                            value={qrData.qr_payload}
+                            size={200}
+                            backgroundColor={palette.ivory}
+                            color={palette.royalInk}
+                          />
+                        </View>
+                        <View style={styles.countdownRow}>
+                          <KISIcon name="bell" size={12} color={countdown < 300 ? palette.danger : palette.subtext} />
+                          <Text style={[styles.countdownText, { color: countdown < 300 ? palette.danger : palette.subtext }]}>
+                            Expires in {formatCountdown(countdown)}
+                          </Text>
+                          <Pressable onPress={loadQR} style={styles.refreshQRBtn}>
+                            <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
+                          </Pressable>
+                        </View>
+                        <View style={styles.tokenActionRow}>
+                          <Pressable onPress={copyQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                            <Text style={[styles.tokenActionText, { color: palette.primary }]}>Copy token</Text>
+                          </Pressable>
+                          <Pressable onPress={shareQRToken} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                            <Text style={[styles.tokenActionText, { color: palette.primary }]}>Share token</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
+                        <Text style={{ color: palette.subtext, fontWeight: '600' }}>QR code unavailable</Text>
+                        <Pressable onPress={loadQR}>
+                          <Text style={{ color: palette.primary, fontWeight: '700', marginTop: 8 }}>Retry</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 )}
-              </View>
-            )}
 
-            {/* ── Revoke all secondary button ────────────────────────── */}
-            {isParent && hasSecondary && (
-              <Pressable
-                style={[styles.revokeAllBtn, { borderColor: palette.danger }]}
-                onPress={handleRevokeAll}
-              >
-                <KISIcon name="warning" size={16} color={palette.danger} />
-                <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 14 }}>
-                  Log out all secondary devices
-                </Text>
-              </Pressable>
-            )}
+                {/* ── Revoke all secondary button ────────────────────────── */}
+                {isParent && hasSecondary && (
+                  <Pressable
+                    style={[styles.revokeAllBtn, { borderColor: palette.danger }]}
+                    onPress={handleRevokeAll}
+                  >
+                    <KISIcon name="warning" size={16} color={palette.danger} />
+                    <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 14 }}>
+                      Log out all secondary devices
+                    </Text>
+                  </Pressable>
+                )}
 
-            {/* ── Not parent info ────────────────────────────────────── */}
-            {!isParent && currentDevice && (
-              <View style={[styles.infoBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-                <KISIcon name="info" size={16} color={palette.subtext} />
-                <Text style={[styles.infoBoxText, { color: palette.subtext }]}>
-                  This is a secondary device. To add more devices or manage others, use your primary device.
-                  {currentDevice.parent_device_name ? ` Primary: ${currentDevice.parent_device_name}` : ''}
-                </Text>
-              </View>
+                {/* ── Not parent info ────────────────────────────────────── */}
+                {!isParent && currentDevice && (
+                  <View style={[styles.infoBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                    <KISIcon name="info" size={16} color={palette.subtext} />
+                    <Text style={[styles.infoBoxText, { color: palette.subtext }]}>
+                      This is a secondary device. To add more devices or manage others, use your primary device.
+                      {currentDevice.parent_device_name ? ` Primary: ${currentDevice.parent_device_name}` : ''}
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* ── Web pairing panel (parent device only) ─────────────── */}
+                {isParent ? (
+                  <View style={[styles.qrPanel, { backgroundColor: palette.card, borderColor: palette.primary }]}>
+                    <View style={styles.qrPanelHeader}>
+                      <KISIcon name="desktop" size={18} color={palette.primary} />
+                      <Text style={[styles.qrPanelTitle, { color: palette.text }]}>
+                        Sign in on a computer
+                      </Text>
+                    </View>
+                    <Text style={[styles.qrPanelSub, { color: palette.subtext }]}>
+                      Scan this code, or go to kingdomimpactventures.org/pair and type the code below. It expires in
+                      10 minutes and works once. You can have several computers signed in at the same time.
+                    </Text>
+
+                    {webPairingLoading ? (
+                      <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
+                        <ActivityIndicator color={palette.primary} size="large" />
+                      </View>
+                    ) : webPairing ? (
+                      <>
+                        <View style={[styles.qrWrap, { backgroundColor: palette.ivory }]}>
+                          <QRCode
+                            value={webPairing.qr_payload}
+                            size={200}
+                            backgroundColor={palette.ivory}
+                            color={palette.royalInk}
+                          />
+                        </View>
+                        <Text style={[styles.webCodeText, { color: palette.text }]}>{webPairing.code}</Text>
+                        <View style={styles.countdownRow}>
+                          <KISIcon name="bell" size={12} color={webCountdown < 120 ? palette.danger : palette.subtext} />
+                          <Text style={[styles.countdownText, { color: webCountdown < 120 ? palette.danger : palette.subtext }]}>
+                            Expires in {formatCountdown(webCountdown)}
+                          </Text>
+                          <Pressable onPress={loadWebPairing} style={styles.refreshQRBtn}>
+                            <Text style={[styles.refreshQRText, { color: palette.primary }]}>Refresh</Text>
+                          </Pressable>
+                        </View>
+                        <View style={styles.tokenActionRow}>
+                          <Pressable onPress={copyWebCode} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                            <Text style={[styles.tokenActionText, { color: palette.primary }]}>Copy code</Text>
+                          </Pressable>
+                          <Pressable onPress={copyWebLink} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                            <Text style={[styles.tokenActionText, { color: palette.primary }]}>Copy link</Text>
+                          </Pressable>
+                          <Pressable onPress={shareWebLink} style={[styles.tokenActionBtn, { borderColor: palette.divider }]}>
+                            <Text style={[styles.tokenActionText, { color: palette.primary }]}>Share link</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={[styles.qrPlaceholder, { backgroundColor: palette.surface }]}>
+                        <Text style={{ color: palette.subtext, fontWeight: '600' }}>Code unavailable</Text>
+                        <Pressable onPress={loadWebPairing}>
+                          <Text style={{ color: palette.primary, fontWeight: '700', marginTop: 8 }}>Retry</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={[styles.infoBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                    <KISIcon name="info" size={16} color={palette.subtext} />
+                    <Text style={[styles.infoBoxText, { color: palette.subtext }]}>
+                      This is a secondary device, so it can't create a web session. Use your primary device to sign in
+                      on a computer.
+                      {currentDevice?.parent_device_name ? ` Primary: ${currentDevice.parent_device_name}` : ''}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
 
             <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
-              {devices.length} device{devices.length === 1 ? '' : 's'}
+              {listData.length} {activeTab === 'web' ? 'web session' : 'device'}{listData.length === 1 ? '' : 's'}
             </Text>
           </>
         }
@@ -540,7 +711,9 @@ export default function DeviceManagementScreen() {
             </View>
           ) : (
             <View style={styles.centered}>
-              <Text style={{ color: palette.subtext, fontWeight: '500' }}>No devices found.</Text>
+              <Text style={{ color: palette.subtext, fontWeight: '500' }}>
+                {activeTab === 'web' ? 'No web sessions yet.' : 'No devices found.'}
+              </Text>
             </View>
           )
         }
@@ -563,6 +736,24 @@ const createStyles = () =>
     backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 17, fontWeight: '700' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
+
+    /* Web/Mobile tab switch */
+    tabSwitch: {
+      flexDirection: 'row',
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+    tabBtnText: { fontSize: 14, fontWeight: '700' },
+    webCodeText: {
+      textAlign: 'center',
+      fontSize: 20,
+      fontWeight: '900',
+      letterSpacing: 3,
+    },
 
     /* QR panel */
     qrPanel: {
