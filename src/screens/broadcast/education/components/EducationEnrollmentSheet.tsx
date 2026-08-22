@@ -118,6 +118,12 @@ export default function EducationEnrollmentSheet({
             <Text style={{ marginTop: 12, color: palette.subtext }}>
               {content.summary}
             </Text>
+            {!pricing?.isFree && !(isPrivate && !accessApproved) ? (
+              <Text style={{ color: palette.subtext, marginTop: 10, fontSize: 12 }}>
+                You'll be charged {priceLabel} through a secure checkout. You
+                can review the total before anything is charged.
+              </Text>
+            ) : null}
             {isPrivate && !accessApproved ? (
               <Text style={{ color: palette.subtext, marginTop: 10 }}>
                 {accessRequestStatus === 'pending'
@@ -141,18 +147,36 @@ export default function EducationEnrollmentSheet({
                 <KISButton
                   title="Join for free"
                   onPress={() => onFreeEnroll(content)}
+                  disabled={paymentState === 'processing'}
+                  loading={paymentState === 'processing'}
                 />
               ) : (
                 <KISButton
-                  title="Book my spot"
+                  title={
+                    paymentState === 'processing'
+                      ? 'Processing…'
+                      : `Pay ${priceLabel}`
+                  }
                   onPress={() => onCheckout(content)}
+                  disabled={paymentState === 'processing'}
+                  loading={paymentState === 'processing'}
                 />
               )}
-              <KISButton title="Not now" variant="secondary" onPress={onClose} />
+              <KISButton
+                title="Not now"
+                variant="secondary"
+                onPress={onClose}
+                disabled={paymentState === 'processing'}
+              />
             </View>
             {paymentState === 'processing' ? (
-              <Text style={{ color: palette.primary, marginTop: 14 }}>
-                Processing payment…
+              <Text style={{ color: palette.primary, marginTop: 14, fontWeight: '600' }}>
+                Processing your payment — please don't close the app.
+              </Text>
+            ) : null}
+            {paymentState === 'error' ? (
+              <Text style={{ color: palette.danger, marginTop: 14 }}>
+                That didn't go through and you were not charged. You can try again above.
               </Text>
             ) : null}
             {paymentState === 'success' && receiptUrl ? (

@@ -950,6 +950,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const [institutionForm, setInstitutionForm] =
     useState<InstitutionFormState>(EMPTY_FORM);
   const [institutionSubmitting, setInstitutionSubmitting] = useState(false);
+  const [enrollmentActionBusyId, setEnrollmentActionBusyId] = useState<string | null>(null);
+  const [bookingActionBusyId, setBookingActionBusyId] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [payoutProvider, setPayoutProvider] = useState<'flutterwave' | 'stripe'>('flutterwave');
   const [payoutBankCode, setPayoutBankCode] = useState('');
@@ -2254,21 +2256,31 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       if (!response?.success) {
         throw new Error(response?.message || 'Unable to save institution.');
       }
+      const createdInstitution = response?.data?.institution ?? response?.data ?? null;
       const institutionId =
-        response?.data?.institution?.id ??
-        response?.data?.id ??
-        editingInstitutionId ??
-        null;
+        createdInstitution?.id ?? editingInstitutionId ?? null;
       await fetchHub();
       if (institutionId) {
         setSelectedInstitutionId(institutionId);
         await fetchDashboard(institutionId);
       }
-      closeForm();
-      Alert.alert(
-        'Institution',
-        editingInstitutionId ? 'Institution updated.' : 'Institution created.',
-      );
+      if (editingInstitutionId) {
+        closeForm();
+        Alert.alert('Institution', 'Institution updated.');
+      } else {
+        // Stay on this form in edit mode (rather than closeForm()'s usual
+        // return to the hub) so the Payments section below - only
+        // rendered once editingInstitutionId is set - is immediately
+        // visible. Without this, a first-time creator has no prompt to
+        // connect a payout account until they separately find their way
+        // back to Edit later, and could publish paid courses no one can
+        // actually pay for in the meantime.
+        openEditInstitution(createdInstitution);
+        Alert.alert(
+          'Institution created',
+          'Next, connect Flutterwave or Stripe below so learners can actually pay you for paid courses.',
+        );
+      }
     } catch (error: any) {
       Alert.alert(
         'Institution',
@@ -2284,6 +2296,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     fetchDashboard,
     fetchHub,
     institutionForm,
+    openEditInstitution,
   ]);
 
   const handleConnectPayoutAccount = useCallback(async () => {
@@ -2374,6 +2387,17 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       }
       await fetchHub();
       await fetchDashboard(editingInstitutionId);
+      // Refreshing the status was previously silent — the small "Status:
+      // Connected" text re-rendering below was the only feedback, easy to
+      // miss for someone anxiously checking whether their onboarding
+      // actually went through. An explicit confirmation either way closes
+      // that gap.
+      Alert.alert(
+        'Payments',
+        response?.data?.stripe_charges_enabled
+          ? "You're all set — this institution can now accept Stripe payments."
+          : 'Stripe onboarding is not finished yet. Complete every step in the Stripe form, then refresh again.',
+      );
     } catch (error: any) {
       Alert.alert('Payments', error?.message || 'Unable to refresh Stripe status.');
     } finally {
@@ -2803,15 +2827,27 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       await loadModuleRecords(activeModuleKey, selectedInstitutionId);
       await fetchDashboard(selectedInstitutionId);
       closeModuleEditor();
-      if (
+      const wasCreatingViaLookup =
         pendingLookupCreate &&
         !editingModuleItemId &&
-        pendingLookupCreate.createModuleKey === activeModuleKey
-      ) {
+        pendingLookupCreate.createModuleKey === activeModuleKey;
+      if (wasCreatingViaLookup) {
         const newItemId = String(response?.data?.id || '');
         const { onComplete } = pendingLookupCreate;
         setPendingLookupCreate(null);
         if (newItemId) onComplete(newItemId);
+      } else {
+        // handleSaveInstitution already confirms its own save - every
+        // other content type in this modal (course/lesson/material/
+        // assessment/etc, all funneled through this one handler) closed
+        // silently on success instead, indistinguishable from a cancel
+        // unless the user happened to notice the new row in the list.
+        Alert.alert(
+          MODULE_LABELS[activeModuleKey],
+          editingModuleItemId
+            ? `${MODULE_LABELS[activeModuleKey]} updated.`
+            : `${MODULE_LABELS[activeModuleKey]} created.`,
+        );
       }
     } catch (error: any) {
       Alert.alert(
@@ -3237,12 +3273,16 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     ],
   );
 
-  const handleEnrollmentAction = useCallback(
+  const runEnrollmentAction = useCallback(
     async (
       enrollmentId: string,
       action: 'pending' | 'enroll' | 'waitlist' | 'cancel' | 'complete',
     ) => {
-      if (!selectedInstitutionId) return;
+      // Re-entry guard: without this, a double-tap on "Cancel"/"Complete"
+      // fired the same action twice with no visual lock, since these
+      // buttons previously had no disabled/loading state at all.
+      if (!selectedInstitutionId || enrollmentActionBusyId) return;
+      setEnrollmentActionBusyId(enrollmentId);
       try {
         const response = await postRequest(
           ROUTES.broadcasts.educationInstitutionEnrollmentAction(
@@ -3271,16 +3311,27 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           await loadModuleRecords(activeModuleKey, selectedInstitutionId);
         }
         await fetchDashboard(selectedInstitutionId);
+        const successCopy: Record<typeof action, string> = {
+          pending: 'Enrollment set to pending.',
+          enroll: 'Enrollment confirmed.',
+          waitlist: 'Enrollment moved to the waitlist.',
+          cancel: 'Enrollment cancelled.',
+          complete: 'Enrollment marked complete.',
+        };
+        Alert.alert('Enrollments', successCopy[action]);
       } catch (error: any) {
         Alert.alert(
           'Enrollments',
           error?.message || `Unable to ${action} enrollment.`,
         );
+      } finally {
+        setEnrollmentActionBusyId(null);
       }
     },
     [
       activeModuleKey,
       detailPayload,
+      enrollmentActionBusyId,
       fetchDashboard,
       loadModuleRecords,
       openDetailForModule,
@@ -3289,7 +3340,35 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
     ],
   );
 
-  const handleBookingAction = useCallback(
+  const handleEnrollmentAction = useCallback(
+    (
+      enrollmentId: string,
+      action: 'pending' | 'enroll' | 'waitlist' | 'cancel' | 'complete',
+    ) => {
+      if (action !== 'cancel') {
+        void runEnrollmentAction(enrollmentId, action);
+        return;
+      }
+      // Cancelling an enrollment revokes a learner's access - unlike a
+      // simple draft save, this directly affects someone else's account
+      // and is worth one tap of friction to avoid a slip.
+      Alert.alert(
+        'Cancel enrollment',
+        'This learner will lose access immediately. Cancel this enrollment?',
+        [
+          { text: 'Keep enrollment', style: 'cancel' },
+          {
+            text: 'Cancel enrollment',
+            style: 'destructive',
+            onPress: () => void runEnrollmentAction(enrollmentId, action),
+          },
+        ],
+      );
+    },
+    [runEnrollmentAction],
+  );
+
+  const runBookingAction = useCallback(
     async (
       bookingId: string,
       action:
@@ -3300,7 +3379,11 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         | 'cancel'
         | 'expire',
     ) => {
-      if (!selectedInstitutionId) return;
+      // Same re-entry guard as runEnrollmentAction - these buttons had no
+      // disabled/loading state, so a double-tap on "Cancel"/"Expire" could
+      // fire the same request twice.
+      if (!selectedInstitutionId || bookingActionBusyId) return;
+      setBookingActionBusyId(bookingId);
       try {
         const response = await postRequest(
           ROUTES.broadcasts.educationInstitutionBookingAction(
@@ -3327,15 +3410,27 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
           await loadModuleRecords(activeModuleKey, selectedInstitutionId);
         }
         await fetchDashboard(selectedInstitutionId);
+        const successCopy: Record<typeof action, string> = {
+          pending: 'Booking set to pending.',
+          payment_pending: 'Booking marked as awaiting payment.',
+          confirm: 'Booking confirmed.',
+          waitlist: 'Booking moved to the waitlist.',
+          cancel: 'Booking cancelled.',
+          expire: 'Booking expired.',
+        };
+        Alert.alert('Bookings', successCopy[action]);
       } catch (error: any) {
         Alert.alert(
           'Bookings',
           error?.message || `Unable to ${action} booking.`,
         );
+      } finally {
+        setBookingActionBusyId(null);
       }
     },
     [
       activeModuleKey,
+      bookingActionBusyId,
       detailPayload,
       fetchDashboard,
       loadModuleRecords,
@@ -3343,6 +3438,42 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
       screen,
       selectedInstitutionId,
     ],
+  );
+
+  const handleBookingAction = useCallback(
+    (
+      bookingId: string,
+      action:
+        | 'pending'
+        | 'payment_pending'
+        | 'confirm'
+        | 'waitlist'
+        | 'cancel'
+        | 'expire',
+    ) => {
+      if (action !== 'cancel' && action !== 'expire') {
+        void runBookingAction(bookingId, action);
+        return;
+      }
+      // Cancelling/expiring a booking can affect a buyer who may have
+      // already paid - one confirmation tap to avoid a slip, matching the
+      // existing confirm-before-delete pattern used for institution delete.
+      Alert.alert(
+        action === 'cancel' ? 'Cancel booking' : 'Expire booking',
+        action === 'cancel'
+          ? 'This booking will be cancelled. If the buyer already paid, refund them separately through your payout provider.'
+          : 'This booking will be marked expired and the seat released.',
+        [
+          { text: 'Go back', style: 'cancel' },
+          {
+            text: action === 'cancel' ? 'Cancel booking' : 'Expire booking',
+            style: 'destructive',
+            onPress: () => void runBookingAction(bookingId, action),
+          },
+        ],
+      );
+    },
+    [runBookingAction],
   );
 
   const handleToggleLandingVisibility = useCallback(
@@ -5033,6 +5164,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         throw new Error(response?.message || 'Unable to save course module.');
       await refreshActiveCourseDetail();
       closeCourseModuleEditor();
+      Alert.alert(
+        'Course modules',
+        editingCourseModuleId ? 'Module updated.' : 'Module created.',
+      );
     } catch (error: any) {
       Alert.alert(
         'Course modules',
@@ -5143,6 +5278,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         throw new Error(response?.message || 'Unable to save module item.');
       await refreshActiveCourseDetail();
       closeCourseModuleItemEditor();
+      Alert.alert(
+        'Module items',
+        editingCourseModuleItemId ? 'Item updated.' : 'Item added to module.',
+      );
     } catch (error: any) {
       Alert.alert(
         'Module items',
@@ -5879,6 +6018,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const renderEnrollmentActionsBlock = useCallback(
     (enrollment: any) => {
       if (!enrollment?.id) return null;
+      const rowBusy = enrollmentActionBusyId === enrollment.id;
       return (
         <View style={{ gap: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '800' }}>
@@ -5890,6 +6030,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Enroll"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
+                loading={rowBusy}
                 onPress={() =>
                   void handleEnrollmentAction(enrollment.id, 'enroll')
                 }
@@ -5900,6 +6042,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Waitlist"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
                 onPress={() =>
                   void handleEnrollmentAction(enrollment.id, 'waitlist')
                 }
@@ -5910,6 +6053,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Complete"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
                 onPress={() =>
                   void handleEnrollmentAction(enrollment.id, 'complete')
                 }
@@ -5920,6 +6064,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Cancel"
                 size="xs"
                 variant="secondary"
+                disabled={rowBusy}
                 onPress={() =>
                   void handleEnrollmentAction(enrollment.id, 'cancel')
                 }
@@ -5929,12 +6074,13 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         </View>
       );
     },
-    [handleEnrollmentAction, palette.text],
+    [enrollmentActionBusyId, handleEnrollmentAction, palette.text],
   );
 
   const renderBookingActionsBlock = useCallback(
     (booking: any) => {
       if (!booking?.id) return null;
+      const rowBusy = bookingActionBusyId === booking.id;
       return (
         <View style={{ gap: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '800' }}>
@@ -5946,6 +6092,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Confirm"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
+                loading={rowBusy}
                 onPress={() => void handleBookingAction(booking.id, 'confirm')}
               />
             ) : null}
@@ -5954,6 +6102,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Mark payment pending"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
                 onPress={() =>
                   void handleBookingAction(booking.id, 'payment_pending')
                 }
@@ -5964,6 +6113,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Waitlist"
                 size="xs"
                 variant="outline"
+                disabled={rowBusy}
                 onPress={() => void handleBookingAction(booking.id, 'waitlist')}
               />
             ) : null}
@@ -5972,6 +6122,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Cancel"
                 size="xs"
                 variant="secondary"
+                disabled={rowBusy}
                 onPress={() => void handleBookingAction(booking.id, 'cancel')}
               />
             ) : null}
@@ -5980,6 +6131,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                 title="Expire"
                 size="xs"
                 variant="secondary"
+                disabled={rowBusy}
                 onPress={() => void handleBookingAction(booking.id, 'expire')}
               />
             ) : null}
@@ -5987,7 +6139,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
         </View>
       );
     },
-    [handleBookingAction, palette.text],
+    [bookingActionBusyId, handleBookingAction, palette.text],
   );
 
   const renderStaffAssignmentCards = useCallback(
@@ -8580,8 +8732,8 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
                                 {selectedInstitution?.payout_account_status !== 'active' ? (
                                   <Text style={{ color: palette.danger ?? palette.primaryStrong, fontSize: 12 }}>
                                     ⚠ This institution has no active payout account connected yet.
-                                    Learners won't be able to complete payment until one is connected
-                                    in Institution settings → Payments.
+                                    Learners won't be able to complete payment until one is connected —
+                                    tap "Edit Institution" from the hub, then scroll to Payments.
                                   </Text>
                                 ) : null}
                               </>

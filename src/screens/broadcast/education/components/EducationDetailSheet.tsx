@@ -685,7 +685,7 @@ export default function EducationDetailSheet({
   const handleOpenItem = async (
     learningItem: EducationCourseOutlineItem & { module_id?: string },
   ) => {
-    if (!hasLearningAccess) {
+    if (!hasLearningAccess && !learningItem?.is_preview) {
       Alert.alert('Education', 'Enroll first to open course content.');
       return;
     }
@@ -2211,6 +2211,8 @@ export default function EducationDetailSheet({
                       (progressState?.currentItemId || selectedItem?.id) ===
                       learningItem.id;
                     const isDone = completedItemIds.has(learningItem.id);
+                    const isPreviewItem =
+                      !hasLearningAccess && Boolean((learningItem as any)?.is_preview);
                     return (
                       <Pressable
                         key={learningItem.id}
@@ -2223,7 +2225,7 @@ export default function EducationDetailSheet({
                           learningItem.type,
                         )} ${learningItem.title}`}
                         onPress={() => {
-                          if (!hasLearningAccess) {
+                          if (!hasLearningAccess && !isPreviewItem) {
                             onEnroll(content);
                             return;
                           }
@@ -2309,11 +2311,17 @@ export default function EducationDetailSheet({
                           </Text>
                           <View style={{ flexDirection: compactSheet ? 'column' : 'row', gap: 8 }}>
                             <KISButton
-                              title={hasLearningAccess ? 'Open' : 'Enroll'}
+                              title={
+                                hasLearningAccess
+                                  ? 'Open'
+                                  : isPreviewItem
+                                  ? 'Free preview'
+                                  : 'Enroll'
+                              }
                               size="xs"
                               variant="outline"
                               onPress={() => {
-                                if (!hasLearningAccess) {
+                                if (!hasLearningAccess && !isPreviewItem) {
                                   onEnroll(content);
                                   return;
                                 }
@@ -2460,7 +2468,8 @@ export default function EducationDetailSheet({
               </View>
             ) : null}
 
-            {workspaceSection === 'current' && hasLearningAccess
+            {workspaceSection === 'current' &&
+            (hasLearningAccess || Boolean((selectedItem as any)?.is_preview))
               ? renderConsumptionPanel()
               : null}
             {workspaceSection === 'current' &&

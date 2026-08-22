@@ -3,6 +3,8 @@ import { useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  AppStateStatus,
   FlatList,
   Pressable,
   RefreshControl,
@@ -191,6 +193,14 @@ export default function EducationV2DiscoverPage({
   >('idle');
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [requestingAccess, setRequestingAccess] = useState(false);
+  // Mirrors useProfileController's pendingPaymentReturnRef pattern for
+  // tier-upgrade checkout: the app has no way to know a Flutterwave/Stripe
+  // checkout finished until the buyer comes back from the external
+  // browser, which surfaces as an AppState transition to "active". Without
+  // this, the buyer was told "refresh this education item" manually and
+  // had to trust nothing broke - this makes that automatic.
+  const pendingEducationPaymentReturnRef = useRef(false);
+  const pendingEducationPaymentContentIdRef = useRef<string | null>(null);
   const [expandedList, setExpandedList] =
     useState<ExpandedEducationList | null>(null);
   const [loadingInstitutionId, setLoadingInstitutionId] = useState<string | null>(null);
@@ -364,6 +374,25 @@ export default function EducationV2DiscoverPage({
     void openDetails({ id: openContentId, type: 'course' } as EducationContentItem);
   }, [openContentId, openDetails]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState !== 'active' || !pendingEducationPaymentReturnRef.current) {
+          return;
+        }
+        pendingEducationPaymentReturnRef.current = false;
+        const contentId = pendingEducationPaymentContentIdRef.current;
+        pendingEducationPaymentContentIdRef.current = null;
+        void refresh();
+        if (contentId) {
+          void hydrateDetail(contentId);
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [refresh, hydrateDetail]);
+
   const resumeLearning = useCallback(
     async (progress: EducationProgress) => {
       const seed = {
@@ -389,8 +418,13 @@ export default function EducationV2DiscoverPage({
     setReceiptUrl(null);
   };
 
-  const previewCourse = (item: EducationContentItem) => {
-    Alert.alert('Preview lesson', `Playing preview for “${item.title}”.`);
+  const previewCourse = async (item: EducationContentItem) => {
+    // openDetails hydrates the real course detail/outline; the outline's
+    // Path tab now lets a non-enrolled viewer open any lesson the
+    // institution marked as a free preview (is_preview), so this opens
+    // real content instead of the old fake "Playing preview..." alert
+    // that never showed anything.
+    await openDetails(item);
   };
 
   const handleEnrollmentRequest = useCallback(
@@ -411,6 +445,19 @@ export default function EducationV2DiscoverPage({
         Alert.alert(
           'Education',
           response?.message || 'Unable to complete this education action.',
+        );
+        return;
+      }
+      if (response?.queued) {
+        // queueableJsonRequest reports success:true for a request that was
+        // only saved locally (offline, or after a 5xx/408/429) and will be
+        // retried later - the enrollment/payment has NOT actually happened
+        // server-side yet. Showing "Booked"/"Enrolled" here would tell a
+        // buyer they paid when no charge or booking exists yet.
+        setPaymentState('processing');
+        Alert.alert(
+          'Still connecting',
+          'Your request will be sent automatically once your connection is stable. You have not been charged yet.',
         );
         return;
       }
@@ -462,10 +509,14 @@ export default function EducationV2DiscoverPage({
         if (directPayment.paymentUrl) {
           try {
             const opened = await openDirectPaymentUrl(directPayment.paymentUrl);
+            if (opened) {
+              pendingEducationPaymentReturnRef.current = true;
+              pendingEducationPaymentContentIdRef.current = item.id;
+            }
             Alert.alert(
               opened ? 'Checkout opened' : 'Payment pending',
               opened
-                ? 'Return to KIS after payment, then refresh this education item.'
+                ? "Complete payment in the browser, then come back to KIS - we'll refresh this automatically."
                 : 'The secure checkout link is not available on this device. Refresh after payment is confirmed.',
             );
           } catch (error: any) {
