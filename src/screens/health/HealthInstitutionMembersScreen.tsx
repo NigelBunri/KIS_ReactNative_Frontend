@@ -826,7 +826,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
                 <Text style={{ ...typography.body, color: palette.subtext }}>No members added yet.</Text>
               ) : null}
             </View>
-            <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ marginTop: spacing.md, flexDirection: 'column', gap: spacing.sm }}>
               <KISButton
                 title={saving ? 'Saving...' : 'Save Members, Roles & Settings'}
                 loading={saving}
