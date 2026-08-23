@@ -1264,7 +1264,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: sp.md, paddingVertical: 8, gap: 6, flexDirection: 'row' }}
+        contentContainerStyle={{ paddingHorizontal: sp.md, paddingVertical: 6, gap: 6, flexDirection: 'row' }}
       >
         {TABS.map((t) => {
           const isActive = tab === t.id;
@@ -1280,26 +1280,26 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                 borderColor: isActive ? palette.primary : palette.divider,
                 backgroundColor: isActive ? palette.cardAccent : palette.surface,
                 borderRadius: 999,
-                paddingHorizontal: 14,
-                paddingVertical: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
               }}
             >
-              <KISIcon name={t.icon as any} size={14} color={isActive ? palette.accentPrimary : palette.subtext} />
-              <Text style={{ color: isActive ? palette.accentPrimary : palette.subtext, fontWeight: '800', fontSize: 13 }}>
+              <KISIcon name={t.icon as any} size={13} color={isActive ? palette.accentPrimary : palette.subtext} />
+              <Text style={{ color: isActive ? palette.accentPrimary : palette.subtext, fontWeight: '800', fontSize: 12 }}>
                 {t.label}
               </Text>
               {t.id === 'consultations' && todayAppts.length > 0 && (
                 <View
                   style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 9,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
                     backgroundColor: kisPalette.error,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900', fontSize: 10 }}>{todayAppts.length}</Text>
+                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900', fontSize: 9 }}>{todayAppts.length}</Text>
                 </View>
               )}
             </Pressable>

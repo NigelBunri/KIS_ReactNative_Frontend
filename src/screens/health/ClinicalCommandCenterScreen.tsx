@@ -1740,9 +1740,9 @@ const tabStyles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
     justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
