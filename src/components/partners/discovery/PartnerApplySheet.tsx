@@ -18,6 +18,8 @@ type Props = {
   onChangeJobId: (value: string | null) => void;
   onChangeMessage: (value: string) => void;
   onChangeRole: (value: string) => void;
+  shareProfile: boolean;
+  onChangeShareProfile: (value: boolean) => void;
   onCancel: () => void;
   onSubmit: () => void;
 };
@@ -32,6 +34,8 @@ export default function PartnerApplySheet({
   onChangeJobId,
   onChangeMessage,
   onChangeRole,
+  shareProfile,
+  onChangeShareProfile,
   onCancel,
   onSubmit,
 }: Props) {
@@ -160,6 +164,24 @@ export default function PartnerApplySheet({
           textAlignVertical: 'top',
         }}
       />
+      <Pressable
+        onPress={() => onChangeShareProfile(!shareProfile)}
+        style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 }}
+      >
+        <View
+          style={{
+            width: 18, height: 18, borderRadius: 4, borderWidth: 2, borderColor: palette.borderMuted,
+            backgroundColor: shareProfile ? palette.primaryStrong : 'transparent',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {shareProfile ? <Text style={{ color: palette.onPrimary, fontSize: 12, fontWeight: '900' }}>✓</Text> : null}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: palette.text, fontSize: 12, fontWeight: '600' }}>Share my profile as your CV</Text>
+          <Text style={{ color: palette.subtext, fontSize: 11 }}>Headline, bio, experience, education, and skills</Text>
+        </View>
+      </Pressable>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
         <Pressable
           onPress={onCancel}

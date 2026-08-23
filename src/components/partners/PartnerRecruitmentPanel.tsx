@@ -18,6 +18,7 @@ import { postRequest } from '@/network/post';
 import { PartnerJobPost } from '@/components/partners/partnersTypes';
 import PartnerRecruitmentJobList from '@/components/partners/recruitment/PartnerRecruitmentJobList';
 import PartnerRecruitmentForm from '@/components/partners/recruitment/PartnerRecruitmentForm';
+import PartnerApplicationsReview, { type Application } from '@/components/partners/recruitment/PartnerApplicationsReview';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = {
@@ -43,6 +44,7 @@ export default function PartnerRecruitmentPanel({
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [jobs, setJobs] = useState<PartnerJobPost[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(false);
   const [communities, setCommunities] = useState<Option[]>([]);
   const [groups, setGroups] = useState<Option[]>([]);
@@ -81,6 +83,15 @@ export default function PartnerRecruitmentPanel({
     setJobs(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
+  const loadApplications = useCallback(async () => {
+    if (!partnerId) return;
+    const res = await getRequest(ROUTES.partners.applications(partnerId), {
+      errorMessage: 'Unable to load applications.',
+    });
+    const list = (res?.data ?? res ?? []) as Application[];
+    setApplications(Array.isArray(list) ? list : []);
+  }, [partnerId]);
+
   const loadSpaces = useCallback(async () => {
     if (!partnerId) return;
     const [communitiesRes, groupsRes, channelsRes] = await Promise.all([
@@ -117,9 +128,9 @@ export default function PartnerRecruitmentPanel({
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
-    Promise.all([loadJobs(), loadSpaces()])
+    Promise.all([loadJobs(), loadApplications(), loadSpaces()])
       .finally(() => setLoading(false));
-  }, [isOpen, loadJobs, loadSpaces]);
+  }, [isOpen, loadJobs, loadApplications, loadSpaces]);
 
   const resetForm = () => {
     setTitle('');
@@ -159,6 +170,18 @@ export default function PartnerRecruitmentPanel({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onApproveApplication = async (application: Application) => {
+    if (!partnerId) return;
+    await postRequest(ROUTES.partners.approveApplication(partnerId, application.id), {});
+    setApplications(prev => prev.map(a => (a.id === application.id ? { ...a, status: 'approved' } : a)));
+  };
+
+  const onRejectApplication = async (application: Application) => {
+    if (!partnerId) return;
+    await postRequest(ROUTES.partners.rejectApplication(partnerId, application.id), {});
+    setApplications(prev => prev.map(a => (a.id === application.id ? { ...a, status: 'rejected' } : a)));
   };
 
   if (!isOpen) return null;
@@ -229,6 +252,12 @@ export default function PartnerRecruitmentPanel({
             contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
             showsVerticalScrollIndicator={false}
           >
+            <PartnerApplicationsReview
+              palette={palette}
+              applications={applications}
+              onApprove={onApproveApplication}
+              onReject={onRejectApplication}
+            />
             <PartnerRecruitmentJobList palette={palette} jobs={jobs} />
             <PartnerRecruitmentForm
               palette={palette}

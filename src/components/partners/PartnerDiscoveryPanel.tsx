@@ -57,6 +57,7 @@ export default function PartnerDiscoveryPanel({
   const [applyTarget, setApplyTarget] = useState<PartnerDiscover | null>(null);
   const [applyMessage, setApplyMessage] = useState('');
   const [applyRole, setApplyRole] = useState('');
+  const [shareProfile, setShareProfile] = useState(true);
   const [jobPosts, setJobPosts] = useState<PartnerJobPost[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState('');
@@ -148,12 +149,13 @@ export default function PartnerDiscoveryPanel({
         job_post: selectedJobId,
         message: applyMessage.trim(),
         answers: applyRole.trim() ? { desired_role: applyRole.trim() } : {},
-        profile_visible: true,
+        profile_visible: shareProfile,
       });
       Alert.alert('Application sent', 'The partner will review your request.');
       setApplyTarget(null);
       setApplyMessage('');
       setApplyRole('');
+      setShareProfile(true);
       loadPartners();
     } catch (e: any) {
       Alert.alert('Application failed', e?.message ?? 'Please try again.');
@@ -326,6 +328,8 @@ export default function PartnerDiscoveryPanel({
             onChangeJobId={setSelectedJobId}
             onChangeMessage={setApplyMessage}
             onChangeRole={setApplyRole}
+            shareProfile={shareProfile}
+            onChangeShareProfile={setShareProfile}
             onCancel={() => setApplyTarget(null)}
             onSubmit={onApply}
           />

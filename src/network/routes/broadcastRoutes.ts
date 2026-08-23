@@ -154,8 +154,11 @@ const broadcastRoutes = {
     apply: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/apply/`,
     subscribe: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/subscribe/`,
+    applications: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/applications/`,
     approveApplication: (id: string, appId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/applications/${appId}/approve/`,
+    rejectApplication: (id: string, appId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/applications/${appId}/reject/`,
     jobs: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/jobs/`,
     jobDetail: (id: string, jobId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/jobs/${jobId}/`,
