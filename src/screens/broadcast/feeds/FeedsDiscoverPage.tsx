@@ -125,12 +125,27 @@ export default function FeedsDiscoverPage({
     return nonHealthcare;
   }, [items, searchTerm]);
 
+  // Market/course content has its own dedicated Broadcast sub-tabs
+  // (Market, Education) — it shouldn't also surface unprompted in the
+  // general Feeds categories. It's still reachable here via the explicit
+  // "Market"/"Education" chips below, which deliberately opt into it.
+  const generalFeed = useMemo(
+    () =>
+      filteredFeed.filter(item => {
+        const type = String(item.source_type || '').toLowerCase();
+        return !['market', 'market_product', 'market_service', 'education', 'lesson', 'broadcast_education', 'education_broadcast', 'education_course', 'education_profile'].includes(type);
+      }),
+    [filteredFeed],
+  );
+
   const displayItems = useMemo(() => {
     const context = (searchContext ?? '').trim().toLowerCase();
     const category = showTrendingOnly ? 'trending' : activeCategory;
 
-    // Apply search context first
-    let base = filteredFeed;
+    // Apply search context first — market/education content is excluded by
+    // default (generalFeed) except when the user explicitly asks for it via
+    // those two category chips, which use the unfiltered feed instead.
+    let base = category === 'market' || category === 'education' ? filteredFeed : generalFeed;
     if (context === 'saved') return base.filter(item => Boolean(item.viewer_saved));
 
     // Date range filter
@@ -206,11 +221,11 @@ export default function FeedsDiscoverPage({
         }
         return base;
     }
-  }, [filteredFeed, searchContext, showTrendingOnly, activeCategory, filterSort, filterDatePreset, filterDuration]);
+  }, [filteredFeed, generalFeed, searchContext, showTrendingOnly, activeCategory, filterSort, filterDatePreset, filterDuration]);
 
   const liveItems = useMemo(
-    () => filteredFeed.filter(item => Boolean(item.is_live)),
-    [filteredFeed],
+    () => generalFeed.filter(item => Boolean(item.is_live)),
+    [generalFeed],
   );
 
   const handleTrendingSeeAll = () => {
