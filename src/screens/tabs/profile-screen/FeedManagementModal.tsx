@@ -341,6 +341,13 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
     onRemoveAttachment,
   } = props;
 
+  // Broadcast Workspace hub + two secondary tool screens (Channel Studio,
+  // Style options) — mirrors EducationManagementModal.tsx's screen state
+  // machine so heavy sub-workflows (Channel Studio: ~850 lines; the
+  // per-media-type styling form) aren't mounted inline on the default
+  // hub view, only when the user explicitly opens them.
+  const [screen, setScreen] = useState<'hub' | 'channelStudio' | 'styleOptions'>('hub');
+
   const numberOfBroadcastFeeds = feeds.filter(
     (feed: any) => feed.is_broadcast === true,
   ).length;
@@ -374,6 +381,88 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
   const studioGlow = alpha(palette.primaryStrong, '18');
   const premiumBorder = alpha(palette.primaryStrong, '30');
   const mutedWash = alpha(palette.subtext, '10');
+
+  if (screen === 'channelStudio') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[styles.managementPanelBody, modalStyles.panelContent]}
+        >
+          <View
+            style={[modalStyles.sectionCard, { borderColor: premiumBorder, backgroundColor: palette.card }]}
+          >
+            <View style={modalStyles.sectionHeader}>
+              <View style={modalStyles.sectionTitleRow}>
+                <View style={[modalStyles.sectionMark, { backgroundColor: palette.primaryStrong }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
+                    Channel Studio
+                  </Text>
+                  <Text style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}>
+                    Select a channel, create inside it, and control what is broadcast live.
+                  </Text>
+                </View>
+                <KISButton
+                  title="← Back"
+                  size="xs"
+                  variant="outline"
+                  onPress={() => setScreen('hub')}
+                />
+              </View>
+            </View>
+            <ChannelStudioScreen
+              legacyFeeds={feeds}
+              liveCount={numberOfBroadcastFeeds}
+              expiresAt={expiresAt}
+              onCreate={onOpenAdvancedComposer}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  if (screen === 'styleOptions') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[styles.managementPanelBody, modalStyles.panelContent]}
+        >
+          <View
+            style={[modalStyles.sectionCard, { borderColor: premiumBorder, backgroundColor: palette.card }]}
+          >
+            <View style={modalStyles.sectionHeader}>
+              <View style={modalStyles.sectionTitleRow}>
+                <View style={[modalStyles.sectionMark, { backgroundColor: palette.primaryStrong }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
+                    Style Options
+                  </Text>
+                  <Text style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}>
+                    Styling for the current {panelFeedMediaType} broadcast item.
+                  </Text>
+                </View>
+                <KISButton
+                  title="← Back"
+                  size="xs"
+                  variant="outline"
+                  onPress={() => setScreen('hub')}
+                />
+              </View>
+            </View>
+            <TypeSpecificForm
+              mediaType={panelFeedMediaType}
+              options={panelFeedMediaOptions}
+              palette={palette}
+              onUpdate={onUpdateMediaOptions}
+              attachmentCandidates={attachmentCandidates}
+              textPreviewContent={panelFeedItemSummary}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -488,38 +577,31 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         </View>
       </View>
 
-      <View
+      <Pressable
+        onPress={() => setScreen('channelStudio')}
         style={[
-          modalStyles.sectionCard,
-          {
-            borderColor: premiumBorder,
-            backgroundColor: palette.card,
-          },
+          modalStyles.toolRow,
+          { borderColor: palette.divider, backgroundColor: palette.surface },
         ]}
       >
-        <View style={modalStyles.sectionTitleRow}>
-          <View
-            style={[
-              modalStyles.sectionMark,
-              { backgroundColor: palette.primaryStrong },
-            ]}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={[modalStyles.sectionTitle, { color: palette.text }]}>
-              Channel Control Room
-            </Text>
-            <Text style={[modalStyles.sectionSubtitle, { color: palette.subtext }]}>
-              Select a channel, create inside it, and control what is broadcast live.
-            </Text>
-          </View>
+        <View
+          style={[
+            modalStyles.feedIconFrame,
+            { backgroundColor: studioTint, borderColor: premiumBorder },
+          ]}
+        >
+          <KISIcon name="grid" size={17} color={palette.primaryStrong} />
         </View>
-        <ChannelStudioScreen
-          legacyFeeds={feeds}
-          liveCount={numberOfBroadcastFeeds}
-          expiresAt={expiresAt}
-          onCreate={onOpenAdvancedComposer}
-        />
-      </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[modalStyles.toolRowTitle, { color: palette.text }]}>
+            Channel Studio
+          </Text>
+          <Text style={[modalStyles.toolRowSubtitle, { color: palette.subtext }]}>
+            Manage channels, content, analytics, and go live.
+          </Text>
+        </View>
+        <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+      </Pressable>
 
       <View
         style={[
@@ -1054,14 +1136,31 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
           style={{ minHeight: 80 }}
         />
 
-        <TypeSpecificForm
-          mediaType={panelFeedMediaType}
-          options={panelFeedMediaOptions}
-          palette={palette}
-          onUpdate={onUpdateMediaOptions}
-          attachmentCandidates={attachmentCandidates}
-          textPreviewContent={panelFeedItemSummary}
-        />
+        <Pressable
+          onPress={() => setScreen('styleOptions')}
+          style={[
+            modalStyles.toolRow,
+            { borderColor: palette.divider, backgroundColor: palette.surface },
+          ]}
+        >
+          <View
+            style={[
+              modalStyles.feedIconFrame,
+              { backgroundColor: studioTint, borderColor: premiumBorder },
+            ]}
+          >
+            <KISIcon name="sparkles" size={17} color={palette.primaryStrong} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[modalStyles.toolRowTitle, { color: palette.text }]}>
+              Style options
+            </Text>
+            <Text style={[modalStyles.toolRowSubtitle, { color: palette.subtext }]}>
+              Thumbnail, layout, and formatting for this {panelFeedMediaType} item.
+            </Text>
+          </View>
+          <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+        </Pressable>
 
         <View style={modalStyles.formActions}>
           <KISButton
@@ -1728,6 +1827,23 @@ const modalStyles = StyleSheet.create({
   sectionBadgeText: {
     fontSize: 11,
     fontWeight: '900',
+  },
+  toolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  toolRowTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  toolRowSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
   },
   emptyStateCard: {
     borderWidth: 1,

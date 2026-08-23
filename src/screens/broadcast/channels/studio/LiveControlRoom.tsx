@@ -455,7 +455,19 @@ function BroadcasterPanel({
     });
     setServiceState(liveStreamingService.state);
     setHealthStats(liveStreamingService.stats);
-    return () => { unsub1(); unsub2(); unsub3(); };
+    return () => {
+      unsub1(); unsub2(); unsub3();
+      // Leaving this screen (back navigation, tab switch) while still
+      // live/connecting previously left the device camera/mic captured
+      // and the WebRTC peer connection open with no UI left to stop it —
+      // only the explicit "End Stream" button called stopBroadcast().
+      // liveStreamingService.state reads the singleton's current state
+      // directly, not stale closure state, so this is accurate at the
+      // actual moment of unmount.
+      if (liveStreamingService.state === 'live' || liveStreamingService.state === 'connecting') {
+        void liveStreamingService.stopBroadcast();
+      }
+    };
   }, []);
 
   // Fetch stream key for RTMP/OBS section

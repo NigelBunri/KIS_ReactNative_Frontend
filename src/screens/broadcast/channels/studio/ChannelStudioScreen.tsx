@@ -88,6 +88,23 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'settings', label: 'Settings' },
 ];
 
+// Groups the 20 studio tabs into 5 labeled categories so the tab strip
+// shows ~4-5 items at a time instead of all 20 at once — the individual
+// tab panels themselves are unchanged, only how many are visible in the
+// strip simultaneously.
+type StudioTabCategory = 'content' | 'live' | 'growth' | 'brand' | 'protect';
+
+const TAB_CATEGORIES: Array<{ id: StudioTabCategory; label: string; tabs: StudioTab[] }> = [
+  { id: 'content', label: 'Content', tabs: ['dashboard', 'content', 'create', 'playlists'] },
+  { id: 'live', label: 'Live', tabs: ['live', 'analytics', 'traffic', 'impressions'] },
+  { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards'] },
+  { id: 'brand', label: 'Brand', tabs: ['branding', 'subtitles', 'chapters', 'endscreens'] },
+  { id: 'protect', label: 'Protect', tabs: ['moderation', 'copyright', 'settings'] },
+];
+
+const categoryForTab = (tab: StudioTab): StudioTabCategory =>
+  TAB_CATEGORIES.find(category => category.tabs.includes(tab))?.id ?? 'content';
+
 const EMPTY_FORM: ChannelForm = {
   displayName: '',
   handle: '',
@@ -166,6 +183,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const { user } = useAuth();
   const canUseLiveStreaming = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
+  const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab('dashboard'));
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [contents, setContents] = useState<BroadcastChannelContent[]>([]);
@@ -764,11 +782,28 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </ScrollView>
       ) : null}
       {createFormVisible && (selectedChannel || lastCreatedHandle) ? renderCreateChannelForm() : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 10 : 14 }]}> 
-        {TABS.map(tab => {
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryTabs, { paddingTop: compact ? 10 : 14 }]}>
+        {TAB_CATEGORIES.map(category => {
+          const active = activeCategory === category.id;
+          return (
+            <Pressable
+              key={category.id}
+              onPress={() => {
+                setActiveCategory(category.id);
+                setActiveTab(category.tabs[0]);
+              }}
+              style={[styles.categoryTab, { backgroundColor: active ? palette.primary : palette.surface, borderColor: active ? palette.primary : palette.border }]}
+            >
+              <Text style={{ color: active ? palette.onPrimary ?? '#fff' : palette.text, fontWeight: '900', fontSize: 11 }}>{category.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 10 : 14 }]}>
+        {TABS.filter(tab => activeCategory === categoryForTab(tab.id)).map(tab => {
           const active = activeTab === tab.id;
           return (
-            <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tab, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12, paddingVertical: compact ? 7 : 9 }]}> 
+            <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tab, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12, paddingVertical: compact ? 7 : 9 }]}>
               <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 11 }}>{tab.label}</Text>
             </Pressable>
           );
@@ -821,6 +856,8 @@ const styles = StyleSheet.create({
   creditSafetyCopy: { fontSize: 10, lineHeight: 15, fontWeight: '800' },
   channelPills: { gap: 8, paddingTop: 14 },
   channelPill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  categoryTabs: { gap: 6 },
+  categoryTab: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   tabs: { gap: 8, paddingVertical: 14 },
   tab: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
