@@ -9,6 +9,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -40,6 +41,7 @@ type Connection = {
   from_user_id?: string;
   to_user_id?: string;
   status?: string;
+  conversation_id?: string | null;
   from_user?: {
     id: string;
     display_name?: string;
@@ -59,6 +61,8 @@ type SuggestedUser = {
   display_name?: string;
   avatar_url?: string | null;
   headline?: string | null;
+  industry?: string | null;
+  connection_status?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
 };
 
 const getInitials = (name?: string | null) => {
@@ -81,6 +85,10 @@ export default function ConnectionsScreen() {
   const [myConnections, setMyConnections] = useState<Connection[]>([]);
   const [requests, setRequests] = useState<Connection[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedUser[]>([]);
+  const [nameQuery, setNameQuery] = useState('');
+  const [jobQuery, setJobQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SuggestedUser[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -109,6 +117,32 @@ export default function ConnectionsScreen() {
     const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
     setSuggestions(Array.isArray(list) ? list : []);
   }, []);
+
+  const runSearch = useCallback(async (name: string, job: string) => {
+    if (!name.trim() && !job.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const params = new URLSearchParams();
+      if (name.trim()) params.set('q', name.trim());
+      if (job.trim()) params.set('job', job.trim());
+      const res = await getRequest(`${ROUTES.connections.search}?${params.toString()}`, {
+        errorMessage: 'Unable to search people.',
+      });
+      const list = res?.data ?? res ?? [];
+      setSearchResults(Array.isArray(list) ? list : []);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'discover') return;
+    const timer = setTimeout(() => runSearch(nameQuery, jobQuery), 350);
+    return () => clearTimeout(timer);
+  }, [activeTab, nameQuery, jobQuery, runSearch]);
 
   const loadTab = useCallback(async (tab: TabKey, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -216,9 +250,13 @@ export default function ConnectionsScreen() {
           <Pressable
             style={[styles.smallBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
             onPress={() => {
+              // The chat.open listener (AppNavigator.tsx) reads
+              // conversationId, not userId — accepted connections always
+              // have one (created server-side at accept time).
+              if (!item.conversation_id) return;
               const otherUser = getOtherUser(item);
               DeviceEventEmitter.emit('chat.open', {
-                userId: otherUser?.id ?? '',
+                conversationId: item.conversation_id,
                 name: otherUser?.display_name ?? '',
                 kind: 'dm',
               });
@@ -292,7 +330,11 @@ export default function ConnectionsScreen() {
     const name = item.display_name ?? 'Unknown';
     const initials = getInitials(name);
     const isLoading = actionLoadingId === item.id;
-    const isPending = pendingConnections.has(item.id);
+    const remoteStatus = item.connection_status;
+    const isPending = pendingConnections.has(item.id) || remoteStatus === 'pending_sent' || remoteStatus === 'pending_received';
+    const isConnected = remoteStatus === 'accepted';
+    const disabled = isLoading || isPending || isConnected;
+    const label = isConnected ? 'Connected' : isPending ? 'Pending' : 'Connect';
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
         {item.avatar_url ? (
@@ -314,18 +356,18 @@ export default function ConnectionsScreen() {
           style={[
             styles.smallBtn,
             {
-              backgroundColor: isPending ? palette.surface : palette.primary,
+              backgroundColor: disabled ? palette.surface : palette.primary,
               borderColor: palette.border,
             },
           ]}
-          onPress={() => !isPending && handleConnect(item)}
-          disabled={isLoading || isPending}
+          onPress={() => !disabled && handleConnect(item)}
+          disabled={disabled}
         >
           {isLoading ? (
             <ActivityIndicator size="small" color={palette.onPrimary} />
           ) : (
-            <Text style={[styles.smallBtnText, { color: isPending ? palette.subtext : palette.onPrimary }]}>
-              {isPending ? 'Pending' : 'Connect'}
+            <Text style={[styles.smallBtnText, { color: disabled ? palette.subtext : palette.onPrimary }]}>
+              {label}
             </Text>
           )}
         </Pressable>
@@ -333,10 +375,12 @@ export default function ConnectionsScreen() {
     );
   };
 
+  const discoverData = searchResults !== null ? searchResults : suggestions;
+
   const activeData =
     activeTab === 'mine' ? myConnections :
     activeTab === 'requests' ? requests :
-    suggestions;
+    discoverData;
 
   const activeRender =
     activeTab === 'mine' ? renderMyConnection :
@@ -372,6 +416,34 @@ export default function ConnectionsScreen() {
           );
         })}
       </View>
+
+      {activeTab === 'discover' ? (
+        <View style={styles.searchRow}>
+          <View style={[styles.searchInputWrap, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <KISIcon name="search" size={16} color={palette.subtext} />
+            <TextInput
+              value={nameQuery}
+              onChangeText={setNameQuery}
+              placeholder="Search by name"
+              placeholderTextColor={palette.subtext}
+              style={[styles.searchInput, { color: palette.text }]}
+              returnKeyType="search"
+            />
+          </View>
+          <View style={[styles.searchInputWrap, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <KISIcon name="briefcase" size={16} color={palette.subtext} />
+            <TextInput
+              value={jobQuery}
+              onChangeText={setJobQuery}
+              placeholder="Search by job or industry"
+              placeholderTextColor={palette.subtext}
+              style={[styles.searchInput, { color: palette.text }]}
+              returnKeyType="search"
+            />
+          </View>
+          {searching ? <ActivityIndicator size="small" color={palette.primary} /> : null}
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.center}>
@@ -435,6 +507,27 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 8,
+  },
+  searchInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    height: 40,
+    gap: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
   },
   center: {
     flex: 1,

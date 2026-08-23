@@ -154,6 +154,7 @@ const socialRoutes = {
     list: `${API_BASE_URL}/api/v1/connections/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/connections/${id}/`,
     peopleYouMayKnow: `${API_BASE_URL}/api/v1/connections/people-you-may-know/`,
+    search: `${API_BASE_URL}/api/v1/connections/search/`,
   },
 };
 
