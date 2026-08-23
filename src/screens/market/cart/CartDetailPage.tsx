@@ -269,7 +269,18 @@ const CartDetailPage = () => {
   }, [paymentProcessing, refreshPendingOrder]);
 
   const handleCheckout = useCallback(async () => {
-    if (!shopId || !items.length || checkingOut || paymentProcessing) return;
+    if (checkingOut || paymentProcessing) return;
+    if (!shopId || !items.length) {
+      // This used to be a silent no-op — tapping "Checkout" with no visible
+      // feedback looks identical to a broken button.
+      Alert.alert(
+        'Cart is empty',
+        !shopId
+          ? 'This cart is missing its shop reference. Please go back and open the cart again.'
+          : 'Add at least one item to your cart before checking out.',
+      );
+      return;
+    }
 
     // Validate shipping address for physical products
     if (hasPhysicalProducts && !shippingFieldsFilled) {
