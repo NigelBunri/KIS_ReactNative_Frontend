@@ -60,7 +60,6 @@ type Props = {
   item: EducationContentItem | null;
   onClose: () => void;
   onEnroll: (item: EducationContentItem) => void;
-  onPreview: (item: EducationContentItem) => void;
   onRefreshProgress?: () => void | Promise<void>;
 };
 
@@ -396,7 +395,6 @@ export default function EducationDetailSheet({
   item,
   onClose,
   onEnroll,
-  onPreview,
   onRefreshProgress,
 }: Props) {
   const { palette } = useKISTheme();
@@ -421,6 +419,10 @@ export default function EducationDetailSheet({
   const content = item as LearnerContent | null;
   const outline = useMemo(() => content?.courseOutline || [], [content]);
   const flatItems = useMemo(() => flattenOutline(outline), [outline]);
+  const firstPreviewItem = useMemo(
+    () => flatItems.find(row => (row as any)?.is_preview) || null,
+    [flatItems],
+  );
   const [progressState, setProgressState] = useState<EducationProgress | null>(
     content?.progress || null,
   );
@@ -3021,12 +3023,12 @@ export default function EducationDetailSheet({
           >
             <KISButton title="Close" variant="secondary" onPress={onClose} />
             <View style={{ flexDirection: compactSheet ? 'column' : 'row', gap: 8 }}>
-              {!enrolled ? null : (
+              {enrolled || !firstPreviewItem ? null : (
                 <KISButton
                   title="Preview"
                   size="sm"
                   variant="outline"
-                  onPress={() => onPreview(content)}
+                  onPress={() => handleOpenItem(firstPreviewItem)}
                 />
               )}
               <KISButton

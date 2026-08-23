@@ -443,15 +443,6 @@ export default function EducationV2DiscoverPage({
     setReceiptUrl(null);
   };
 
-  const previewCourse = async (item: EducationContentItem) => {
-    // openDetails hydrates the real course detail/outline; the outline's
-    // Path tab now lets a non-enrolled viewer open any lesson the
-    // institution marked as a free preview (is_preview), so this opens
-    // real content instead of the old fake "Playing preview..." alert
-    // that never showed anything.
-    await openDetails(item);
-  };
-
   const handleEnrollmentRequest = useCallback(
     async (item: EducationContentItem) => {
       setPaymentState('processing');
@@ -1701,7 +1692,6 @@ export default function EducationV2DiscoverPage({
           setDetailLoading(false);
         }}
         onEnroll={item => enrollCourse(item)}
-        onPreview={item => previewCourse(item)}
         onRefreshProgress={refreshDetailProgress}
       />
 
