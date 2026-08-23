@@ -192,7 +192,6 @@ export default function BroadcastFeedVideoPreview({
         style={[
           styles.unavailableWrap,
           { backgroundColor: palette.bar },
-          // containerStyle,
         ]}
       >
         <Text style={[styles.title, { color: palette.danger }]}>
