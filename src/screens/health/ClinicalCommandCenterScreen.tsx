@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,6 +28,8 @@ import {
 } from '@/theme/health';
 import { useKISTheme } from '@/theme/useTheme';
 import type { KISPalette } from '@/theme/constants';
+import { HealthCard, StatTile, SectionHeader, HealthTabBar, EmptyState, StatusPill, HealthActionModal } from '@/components/health';
+import type { HealthTab } from '@/components/health';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ClinicalCommandCenter'>;
 
@@ -102,77 +103,8 @@ const NEXT_PHASE: Record<WorkflowPhase, WorkflowPhase | null> = {
 // ─── small shared components ──────────────────────────────────────────────
 
 function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <View style={[badgeStyles.container, { backgroundColor: color + '22', borderColor: color + '66' }]}>
-      <Text style={[badgeStyles.text, { color }]}>{label}</Text>
-    </View>
-  );
+  return <StatusPill label={label} color={color} compact />;
 }
-
-const badgeStyles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 99,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  text: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-});
-
-function StatCard({
-  label,
-  value,
-  accentColor,
-  palette,
-}: {
-  label: string;
-  value: string | number;
-  accentColor: string;
-  palette: ReturnType<typeof getHealthThemeColors>;
-}) {
-  return (
-    <View
-      style={[
-        statStyles.card,
-        {
-          backgroundColor: palette.card,
-          borderColor: accentColor + '44',
-        },
-      ]}
-    >
-      <Text style={[statStyles.value, { color: accentColor, fontSize: HEALTH_THEME_TYPOGRAPHY.h2.fontSize }]}>{value}</Text>
-      <Text style={[statStyles.label, { color: palette.subtext, fontSize: HEALTH_THEME_TYPOGRAPHY.caption.fontSize }]}>{label}</Text>
-    </View>
-  );
-}
-
-const statStyles = StyleSheet.create({
-  card: {
-    flex: 1,
-    minWidth: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 4,
-  },
-  value: {
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-});
 
 // ─── task filter chips ────────────────────────────────────────────────────
 
@@ -499,35 +431,14 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
   // ─── render tabs ──────────────────────────────────────────────────────────
 
   const renderTabBar = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[tabStyles.bar, { borderBottomColor: palette.divider }]}
-    >
-      {TABS.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            onPress={() => setActiveTab(tab.id)}
-            style={[
-              tabStyles.tab,
-              isActive && { borderBottomColor: palette.accentPrimary },
-            ]}
-          >
-            <Text
-              style={[
-                tabStyles.tabText,
-                { color: isActive ? palette.accentPrimary : palette.subtext },
-                isActive && { fontWeight: '700' },
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    <HealthTabBar
+      palette={palette}
+      accentColor={palette.accentPrimary}
+      badgeColor={kisPalette.error}
+      activeTabId={activeTab}
+      onChange={(id) => setActiveTab(id as TabId)}
+      tabs={TABS.map((t): HealthTab => ({ id: t.id, label: t.label }))}
+    />
   );
 
   // ─── overview ─────────────────────────────────────────────────────────────
@@ -558,179 +469,149 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           />
         }
       >
-        <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text, marginBottom: HEALTH_THEME_SPACING.sm }]}>
-          At a glance
-        </Text>
-        <View style={sharedStyles.statsRow}>
-          <StatCard label="Open Tasks" value={openTasks} accentColor={kisPalette.danger} palette={palette} />
-          <StatCard label="Active Escalations" value={activeEscalations} accentColor={kisPalette.gold} palette={palette} />
-        </View>
-        <View style={sharedStyles.statsRow}>
-          <StatCard label="Triage Queue" value={triageLength} accentColor={kisPalette.gold} palette={palette} />
-          <StatCard label="Pending Referrals" value={pendingReferrals} accentColor={kisPalette.primary} palette={palette} />
-        </View>
+        {/* ── Today's snapshot ── */}
+        <HealthCard palette={palette} style={{ gap: HEALTH_THEME_SPACING.sm }}>
+          <SectionHeader palette={palette} title="Today's Snapshot" />
+          <View style={sharedStyles.statsRow}>
+            <StatTile label="Open Tasks" value={openTasks} color={kisPalette.danger} palette={palette} />
+            <StatTile label="Active Escalations" value={activeEscalations} color={kisPalette.gold} palette={palette} />
+          </View>
+          <View style={sharedStyles.statsRow}>
+            <StatTile label="Triage Queue" value={triageLength} color={kisPalette.gold} palette={palette} />
+            <StatTile label="Pending Referrals" value={pendingReferrals} color={kisPalette.primary} palette={palette} />
+          </View>
+        </HealthCard>
 
-        <Text
-          style={[
-            HEALTH_THEME_TYPOGRAPHY.h3,
-            { color: palette.text, marginTop: HEALTH_THEME_SPACING.lg, marginBottom: HEALTH_THEME_SPACING.sm },
-          ]}
-        >
-          Recent clinical events
-        </Text>
-        {events.length === 0 ? (
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext }]}>
-            No recent events.
-          </Text>
-        ) : (
-          events.slice(0, 15).map((ev, idx) => (
-            <View
-              key={ev.id ?? idx}
-              style={[
-                sharedStyles.listItem,
-                {
-                  backgroundColor: palette.card,
-                  borderColor: palette.divider,
-                },
-              ]}
-            >
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.text, fontWeight: '600' }]}>
-                {ev.title ?? ev.event_type ?? ev.type ?? 'Event'}
-              </Text>
-              {(ev.description ?? ev.detail) ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 2 }]}>
-                  {ev.description ?? ev.detail}
-                </Text>
-              ) : null}
-              {ev.created_at ?? ev.timestamp ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
-                  {elapsedLabel(ev.created_at ?? ev.timestamp)}
-                </Text>
-              ) : null}
-            </View>
-          ))
-        )}
-
-        {/* ── Analytics section ── */}
-        <Text
-          style={[
-            HEALTH_THEME_TYPOGRAPHY.h3,
-            { color: palette.text, marginTop: HEALTH_THEME_SPACING.lg, marginBottom: HEALTH_THEME_SPACING.sm },
-          ]}
-        >
-          Analytics
-        </Text>
-        {analyticsLoading ? (
-          <ActivityIndicator color={palette.accentPrimary} style={{ marginVertical: 8 }} />
-        ) : analyticsData ? (
-          <>
-            <View style={sharedStyles.statsRow}>
-              <StatCard
-                label="Total Patients"
-                value={
-                  analyticsData.total_patients ??
-                  analyticsData.totalPatients ??
-                  analyticsData.patient_count ??
-                  '—'
-                }
-                accentColor={kisPalette.primary}
-                palette={palette}
-              />
-              <StatCard
-                label="Satisfaction Score"
-                value={
-                  analyticsData.satisfaction_score != null
-                    ? `${Number(analyticsData.satisfaction_score).toFixed(1)}`
-                    : analyticsData.avg_satisfaction != null
-                    ? `${Number(analyticsData.avg_satisfaction).toFixed(1)}`
-                    : '—'
-                }
-                accentColor={kisPalette.success}
-                palette={palette}
-              />
-            </View>
-            <View style={sharedStyles.statsRow}>
-              <StatCard
-                label="Outcome Benchmark"
-                value={
-                  analyticsData.outcome_benchmark ??
-                  analyticsData.benchmark_score ??
-                  analyticsData.outcomes ??
-                  '—'
-                }
-                accentColor={kisPalette.primary}
-                palette={palette}
-              />
-              <StatCard
-                label="Reports"
-                value={
-                  Array.isArray(analyticsData.reports)
-                    ? analyticsData.reports.length
-                    : analyticsData.report_count ?? analyticsData.count ?? '—'
-                }
-                accentColor={kisPalette.gold}
-                palette={palette}
-              />
-            </View>
-          </>
-        ) : (
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext }]}>
-            No analytics data available.
-          </Text>
-        )}
-
-        {/* ── Compliance section ── */}
-        <Text
-          style={[
-            HEALTH_THEME_TYPOGRAPHY.h3,
-            { color: palette.text, marginTop: HEALTH_THEME_SPACING.lg, marginBottom: HEALTH_THEME_SPACING.sm },
-          ]}
-        >
-          Compliance
-        </Text>
-        {complianceLoading ? (
-          <ActivityIndicator color={palette.accentPrimary} style={{ marginVertical: 8 }} />
-        ) : complianceData ? (
-          <>
-            <View style={sharedStyles.statsRow}>
-              <StatCard
-                label="Audit Logs"
-                value={complianceData.auditLogs?.length ?? 0}
-                accentColor={kisPalette.gold}
-                palette={palette}
-              />
-              <StatCard
-                label="Credentials"
-                value={complianceData.credentials?.length ?? 0}
-                accentColor={kisPalette.primary}
-                palette={palette}
-              />
-            </View>
-            {complianceData.credentials?.length > 0 && (
+        <HealthCard palette={palette} style={{ marginTop: HEALTH_THEME_SPACING.md, gap: HEALTH_THEME_SPACING.sm }}>
+          <SectionHeader palette={palette} title="Recent Clinical Events" />
+          {events.length === 0 ? (
+            <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="pulse-outline" message="No recent events." />
+          ) : (
+            events.slice(0, 15).map((ev, idx) => (
               <View
+                key={ev.id ?? idx}
                 style={[
                   sharedStyles.listItem,
-                  { backgroundColor: palette.card, borderColor: palette.divider, marginTop: 4 },
+                  {
+                    backgroundColor: palette.cardAccent,
+                    borderColor: palette.divider,
+                  },
                 ]}
               >
                 <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.text, fontWeight: '600' }]}>
-                  Credential status
+                  {ev.title ?? ev.event_type ?? ev.type ?? 'Event'}
                 </Text>
-                {complianceData.credentials.slice(0, 3).map((cred: any, idx: number) => (
-                  <Text key={cred.id ?? idx} style={[sharedStyles.meta, { color: palette.subtext, marginTop: 2 }]}>
-                    {cred.name ?? cred.credential_type ?? `Credential ${idx + 1}`}
-                    {cred.status ? ` · ${cred.status}` : ''}
-                    {cred.expires_at ? ` · expires ${cred.expires_at}` : ''}
+                {(ev.description ?? ev.detail) ? (
+                  <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 2 }]}>
+                    {ev.description ?? ev.detail}
                   </Text>
-                ))}
+                ) : null}
+                {ev.created_at ?? ev.timestamp ? (
+                  <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
+                    {elapsedLabel(ev.created_at ?? ev.timestamp)}
+                  </Text>
+                ) : null}
               </View>
-            )}
-          </>
-        ) : (
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext }]}>
-            No compliance data available.
-          </Text>
-        )}
+            ))
+          )}
+        </HealthCard>
+
+        {/* ── Analytics section ── */}
+        <HealthCard palette={palette} style={{ marginTop: HEALTH_THEME_SPACING.md, gap: HEALTH_THEME_SPACING.sm }}>
+          <SectionHeader palette={palette} title="Analytics" />
+          {analyticsLoading ? (
+            <ActivityIndicator color={palette.accentPrimary} style={{ marginVertical: 8 }} />
+          ) : analyticsData ? (
+            <>
+              <View style={sharedStyles.statsRow}>
+                <StatTile
+                  palette={palette}
+                  label="Total Patients"
+                  value={
+                    analyticsData.total_patients ??
+                    analyticsData.totalPatients ??
+                    analyticsData.patient_count ??
+                    '—'
+                  }
+                  color={kisPalette.primary}
+                />
+                <StatTile
+                  palette={palette}
+                  label="Satisfaction Score"
+                  value={
+                    analyticsData.satisfaction_score != null
+                      ? `${Number(analyticsData.satisfaction_score).toFixed(1)}`
+                      : analyticsData.avg_satisfaction != null
+                      ? `${Number(analyticsData.avg_satisfaction).toFixed(1)}`
+                      : '—'
+                  }
+                  color={kisPalette.success}
+                />
+              </View>
+              <View style={sharedStyles.statsRow}>
+                <StatTile
+                  palette={palette}
+                  label="Outcome Benchmark"
+                  value={
+                    analyticsData.outcome_benchmark ??
+                    analyticsData.benchmark_score ??
+                    analyticsData.outcomes ??
+                    '—'
+                  }
+                  color={kisPalette.primary}
+                />
+                <StatTile
+                  palette={palette}
+                  label="Reports"
+                  value={
+                    Array.isArray(analyticsData.reports)
+                      ? analyticsData.reports.length
+                      : analyticsData.report_count ?? analyticsData.count ?? '—'
+                  }
+                  color={kisPalette.gold}
+                />
+              </View>
+            </>
+          ) : (
+            <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="bar-chart-outline" message="No analytics data available." />
+          )}
+        </HealthCard>
+
+        {/* ── Compliance section ── */}
+        <HealthCard palette={palette} style={{ marginTop: HEALTH_THEME_SPACING.md, gap: HEALTH_THEME_SPACING.sm }}>
+          <SectionHeader palette={palette} title="Compliance" />
+          {complianceLoading ? (
+            <ActivityIndicator color={palette.accentPrimary} style={{ marginVertical: 8 }} />
+          ) : complianceData ? (
+            <>
+              <View style={sharedStyles.statsRow}>
+                <StatTile label="Audit Logs" value={complianceData.auditLogs?.length ?? 0} color={kisPalette.gold} palette={palette} />
+                <StatTile label="Credentials" value={complianceData.credentials?.length ?? 0} color={kisPalette.primary} palette={palette} />
+              </View>
+              {complianceData.credentials?.length > 0 && (
+                <View
+                  style={[
+                    sharedStyles.listItem,
+                    { backgroundColor: palette.cardAccent, borderColor: palette.divider, marginTop: 4 },
+                  ]}
+                >
+                  <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.text, fontWeight: '600' }]}>
+                    Credential status
+                  </Text>
+                  {complianceData.credentials.slice(0, 3).map((cred: any, idx: number) => (
+                    <Text key={cred.id ?? idx} style={[sharedStyles.meta, { color: palette.subtext, marginTop: 2 }]}>
+                      {cred.name ?? cred.credential_type ?? `Credential ${idx + 1}`}
+                      {cred.status ? ` · ${cred.status}` : ''}
+                      {cred.expires_at ? ` · expires ${cred.expires_at}` : ''}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="shield-checkmark-outline" message="No compliance data available." />
+          )}
+        </HealthCard>
       </ScrollView>
     );
   };
@@ -746,7 +627,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           setSelectedTask(item);
           setTaskModalVisible(true);
         }}
-        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider }]}
+        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow, shadowOpacity: 0.3 }]}
       >
         <View style={sharedStyles.rowBetween}>
           <Text
@@ -832,9 +713,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             />
           }
           ListEmptyComponent={
-            <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, textAlign: 'center', marginTop: 32 }]}>
-              No tasks found.
-            </Text>
+            <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="checkbox-outline" message="No tasks found." />
           }
         />
       </>
@@ -851,7 +730,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           setSelectedEscalation(item);
           setEscalationModalVisible(true);
         }}
-        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider }]}
+        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow, shadowOpacity: 0.3 }]}
       >
         <View style={sharedStyles.rowBetween}>
           <Text
@@ -899,9 +778,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           />
         }
         ListEmptyComponent={
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, textAlign: 'center', marginTop: 32 }]}>
-            No escalations found.
-          </Text>
+          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="alert-circle-outline" message="No escalations found." />
         }
       />
     );
@@ -918,7 +795,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           setSelectedTriage(item);
           setTriageModalVisible(true);
         }}
-        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider }]}
+        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow, shadowOpacity: 0.3 }]}
       >
         <View style={sharedStyles.rowBetween}>
           <Text
@@ -927,14 +804,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           >
             {item.patient_name ?? item.patientName ?? 'Patient'}
           </Text>
-          <View
-            style={[
-              triageStyles.levelBadge,
-              { backgroundColor: levelColor + '22', borderColor: levelColor + '66' },
-            ]}
-          >
-            <Text style={[triageStyles.levelText, { color: levelColor }]}>L{level}</Text>
-          </View>
+          <StatusPill label={`L${level}`} color={levelColor} compact />
         </View>
         {item.chief_complaint ?? item.chiefComplaint ? (
           <Text style={[sharedStyles.meta, { color: palette.subtext }]}>
@@ -980,9 +850,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           />
         }
         ListEmptyComponent={
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, textAlign: 'center', marginTop: 32 }]}>
-            Triage queue is empty.
-          </Text>
+          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="pulse-outline" message="Triage queue is empty." />
         }
       />
     );
@@ -998,7 +866,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           setSelectedReferral(item);
           setReferralModalVisible(true);
         }}
-        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider }]}
+        style={[sharedStyles.listItem, { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow, shadowOpacity: 0.3 }]}
       >
         <View style={sharedStyles.rowBetween}>
           <Text
@@ -1049,9 +917,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           />
         }
         ListEmptyComponent={
-          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, textAlign: 'center', marginTop: 32 }]}>
-            No referrals found.
-          </Text>
+          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="share-outline" message="No referrals found." />
         }
       />
     );
@@ -1126,7 +992,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
       <View
         style={[
           sharedStyles.listItem,
-          { backgroundColor: palette.card, borderColor: palette.divider },
+          { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow, shadowOpacity: 0.3 },
         ]}
       >
         <View style={sharedStyles.rowBetween}>
@@ -1212,14 +1078,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           </Text>
         }
         ListEmptyComponent={
-          <Text
-            style={[
-              HEALTH_THEME_TYPOGRAPHY.body,
-              { color: palette.subtext, textAlign: 'center', marginTop: 32 },
-            ]}
-          >
-            No active workflow sessions.
-          </Text>
+          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="git-network-outline" message="No active workflow sessions." />
         }
       />
     );
@@ -1232,81 +1091,61 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
     const priority: string = (selectedTask.priority ?? 'low').toLowerCase();
     const isComplete = selectedTask.status === 'completed';
     return (
-      <Modal
+      <HealthActionModal
+        palette={palette}
         visible={taskModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setTaskModalVisible(false)}
-      >
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
-            <View style={modalStyles.header}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
-                Task detail
-              </Text>
-              <TouchableOpacity onPress={() => setTaskModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <KISIcon name="close" size={22} color={palette.text} />
-              </TouchableOpacity>
+        title="Task detail"
+        onClose={() => setTaskModalVisible(false)}
+        footer={
+          !isComplete ? (
+            <TouchableOpacity
+              onPress={handleMarkTaskComplete}
+              disabled={taskUpdating}
+              style={[modalStyles.actionButton, { backgroundColor: palette.accentPrimary }]}
+            >
+              {taskUpdating ? (
+                <ActivityIndicator color={palette.bg} />
+              ) : (
+                <Text style={[modalStyles.actionButtonText, { color: palette.bg }]}>Mark Complete</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={[
+                modalStyles.actionButton,
+                { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1 },
+              ]}
+            >
+              <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>Completed</Text>
             </View>
-            <ScrollView contentContainerStyle={modalStyles.body}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
-                {selectedTask.title ?? selectedTask.name ?? 'Task'}
-              </Text>
-              <View style={{ marginVertical: 8 }}>
-                <Badge label={priority} color={PRIORITY_COLORS[priority] ?? kisPalette.subtext} />
-              </View>
-              {selectedTask.description ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
-                  {selectedTask.description}
-                </Text>
-              ) : null}
-              {selectedTask.assignee ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
-                  Assigned to: {selectedTask.assignee}
-                </Text>
-              ) : null}
-              <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                Status: {String(selectedTask.status ?? '').replace('_', ' ')}
-              </Text>
-              {selectedTask.due_date ?? selectedTask.dueDate ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                  Due: {selectedTask.due_date ?? selectedTask.dueDate}
-                </Text>
-              ) : null}
-              {!isComplete && (
-                <TouchableOpacity
-                  onPress={handleMarkTaskComplete}
-                  disabled={taskUpdating}
-                  style={[
-                    modalStyles.actionButton,
-                    { backgroundColor: palette.accentPrimary, marginTop: 24 },
-                  ]}
-                >
-                  {taskUpdating ? (
-                    <ActivityIndicator color={palette.bg} />
-                  ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: palette.bg }]}>
-                      Mark Complete
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              {isComplete && (
-                <View
-                  style={[
-                    modalStyles.actionButton,
-                    { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1, marginTop: 24 },
-                  ]}
-                >
-                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>
-                    Completed
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+          )
+        }
+      >
+        <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
+          {selectedTask.title ?? selectedTask.name ?? 'Task'}
+        </Text>
+        <View style={{ marginVertical: 8 }}>
+          <Badge label={priority} color={PRIORITY_COLORS[priority] ?? kisPalette.subtext} />
+        </View>
+        {selectedTask.description ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
+            {selectedTask.description}
+          </Text>
+        ) : null}
+        {selectedTask.assignee ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
+            Assigned to: {selectedTask.assignee}
+          </Text>
+        ) : null}
+        <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+          Status: {String(selectedTask.status ?? '').replace('_', ' ')}
+        </Text>
+        {selectedTask.due_date ?? selectedTask.dueDate ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+            Due: {selectedTask.due_date ?? selectedTask.dueDate}
+          </Text>
+        ) : null}
+      </HealthActionModal>
     );
   };
 
@@ -1316,100 +1155,78 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
     const isAcknowledged = ['acknowledged', 'resolved'].includes(selectedEscalation.status ?? '');
     const isResolved = selectedEscalation.status === 'resolved';
     return (
-      <Modal
+      <HealthActionModal
+        palette={palette}
         visible={escalationModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setEscalationModalVisible(false)}
-      >
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
-            <View style={modalStyles.header}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
-                Escalation detail
-              </Text>
-              <TouchableOpacity onPress={() => setEscalationModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <KISIcon name="close" size={22} color={palette.text} />
+        title="Escalation detail"
+        onClose={() => setEscalationModalVisible(false)}
+        footer={
+          <>
+            {!isAcknowledged && (
+              <TouchableOpacity
+                onPress={() => handleEscalationAction('acknowledged')}
+                disabled={escalationUpdating}
+                style={[modalStyles.actionButton, { backgroundColor: kisPalette.primary }]}
+              >
+                {escalationUpdating ? (
+                  <ActivityIndicator color={kisPalette.onPrimary} />
+                ) : (
+                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>Acknowledge</Text>
+                )}
               </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={modalStyles.body}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
-                {selectedEscalation.patient_name ?? selectedEscalation.patientName ??
-                  selectedEscalation.case_name ?? selectedEscalation.caseName ?? 'Patient'}
-              </Text>
-              <View style={{ marginVertical: 8 }}>
-                <Badge label={severity} color={SEVERITY_COLORS[severity] ?? kisPalette.subtext} />
+            )}
+            {!isResolved && (
+              <TouchableOpacity
+                onPress={() => handleEscalationAction('resolved')}
+                disabled={escalationUpdating}
+                style={[modalStyles.actionButton, { backgroundColor: kisPalette.success, marginTop: !isAcknowledged ? 12 : 0 }]}
+              >
+                {escalationUpdating ? (
+                  <ActivityIndicator color={kisPalette.onPrimary} />
+                ) : (
+                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>Resolve</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {isResolved && (
+              <View
+                style={[
+                  modalStyles.actionButton,
+                  { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1 },
+                ]}
+              >
+                <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>Resolved</Text>
               </View>
-              {selectedEscalation.description ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
-                  {selectedEscalation.description}
-                </Text>
-              ) : null}
-              {selectedEscalation.escalated_by ?? selectedEscalation.escalatedBy ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
-                  Escalated by: {selectedEscalation.escalated_by ?? selectedEscalation.escalatedBy}
-                </Text>
-              ) : null}
-              <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                Status: {String(selectedEscalation.status ?? '')}
-              </Text>
-              {selectedEscalation.created_at ?? selectedEscalation.escalated_at ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                  {elapsedLabel(selectedEscalation.created_at ?? selectedEscalation.escalated_at)}
-                </Text>
-              ) : null}
-              {!isAcknowledged && (
-                <TouchableOpacity
-                  onPress={() => handleEscalationAction('acknowledged')}
-                  disabled={escalationUpdating}
-                  style={[
-                    modalStyles.actionButton,
-                    { backgroundColor: kisPalette.primary, marginTop: 24 },
-                  ]}
-                >
-                  {escalationUpdating ? (
-                    <ActivityIndicator color={kisPalette.onPrimary} />
-                  ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>
-                      Acknowledge
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              {!isResolved && (
-                <TouchableOpacity
-                  onPress={() => handleEscalationAction('resolved')}
-                  disabled={escalationUpdating}
-                  style={[
-                    modalStyles.actionButton,
-                    { backgroundColor: kisPalette.success, marginTop: 12 },
-                  ]}
-                >
-                  {escalationUpdating ? (
-                    <ActivityIndicator color={kisPalette.onPrimary} />
-                  ) : (
-                    <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>
-                      Resolve
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              {isResolved && (
-                <View
-                  style={[
-                    modalStyles.actionButton,
-                    { backgroundColor: `${kisPalette.success}22`, borderColor: `${kisPalette.success}66`, borderWidth: 1, marginTop: 24 },
-                  ]}
-                >
-                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.success }]}>
-                    Resolved
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+            )}
+          </>
+        }
+      >
+        <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
+          {selectedEscalation.patient_name ?? selectedEscalation.patientName ??
+            selectedEscalation.case_name ?? selectedEscalation.caseName ?? 'Patient'}
+        </Text>
+        <View style={{ marginVertical: 8 }}>
+          <Badge label={severity} color={SEVERITY_COLORS[severity] ?? kisPalette.subtext} />
+        </View>
+        {selectedEscalation.description ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
+            {selectedEscalation.description}
+          </Text>
+        ) : null}
+        {selectedEscalation.escalated_by ?? selectedEscalation.escalatedBy ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
+            Escalated by: {selectedEscalation.escalated_by ?? selectedEscalation.escalatedBy}
+          </Text>
+        ) : null}
+        <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+          Status: {String(selectedEscalation.status ?? '')}
+        </Text>
+        {selectedEscalation.created_at ?? selectedEscalation.escalated_at ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+            {elapsedLabel(selectedEscalation.created_at ?? selectedEscalation.escalated_at)}
+          </Text>
+        ) : null}
+      </HealthActionModal>
     );
   };
 
@@ -1418,210 +1235,185 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
     const level: number = Number(selectedTriage.triage_level ?? selectedTriage.triageLevel ?? 5);
     const levelColor = TRIAGE_COLORS[level] ?? kisPalette.subtext;
     return (
-      <Modal
+      <HealthActionModal
+        palette={palette}
         visible={triageModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setTriageModalVisible(false)}
-      >
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
-            <View style={modalStyles.header}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
-                Triage detail
-              </Text>
-              <TouchableOpacity onPress={() => setTriageModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <KISIcon name="close" size={22} color={palette.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={modalStyles.body}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
-                {selectedTriage.patient_name ?? selectedTriage.patientName ?? 'Patient'}
-              </Text>
-              <View style={[triageStyles.levelBadge, { backgroundColor: levelColor + '22', borderColor: levelColor + '66', marginVertical: 8 }]}>
-                <Text style={[triageStyles.levelText, { color: levelColor }]}>
-                  Triage Level {level}
-                </Text>
-              </View>
-              {selectedTriage.chief_complaint ?? selectedTriage.chiefComplaint ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
-                  Chief complaint: {selectedTriage.chief_complaint ?? selectedTriage.chiefComplaint}
-                </Text>
-              ) : null}
-              {selectedTriage.wait_time ?? selectedTriage.waitTime ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
-                  Wait time: {selectedTriage.wait_time ?? selectedTriage.waitTime}
-                </Text>
-              ) : null}
-              {selectedTriage.assigned_clinician ?? selectedTriage.assignedClinician ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                  Clinician: {selectedTriage.assigned_clinician ?? selectedTriage.assignedClinician}
-                </Text>
-              ) : null}
-              {selectedTriage.notes ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
-                  {selectedTriage.notes}
-                </Text>
-              ) : null}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!selectedTriage?.id) return;
-                    Alert.alert(
-                      'Update triage level',
-                      'Select new acuity level:',
-                      [
-                        {
-                          text: 'Routine',
-                          onPress: async () => {
-                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'routine' }).catch(() => undefined);
-                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'routine' } : t));
-                            setTriageModalVisible(false);
-                          },
-                        },
-                        {
-                          text: 'Elevated',
-                          onPress: async () => {
-                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'elevated' }).catch(() => undefined);
-                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'elevated' } : t));
-                            setTriageModalVisible(false);
-                          },
-                        },
-                        {
-                          text: 'Urgent',
-                          style: 'destructive',
-                          onPress: async () => {
-                            await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'urgent' }).catch(() => undefined);
-                            setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'urgent' } : t));
-                            setTriageModalVisible(false);
-                          },
-                        },
-                        { text: 'Cancel', style: 'cancel' },
-                      ],
-                    );
-                  }}
-                  style={{ flex: 1, backgroundColor: kisPalette.gold + '22', borderWidth: 1, borderColor: kisPalette.gold, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                >
-                  <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.gold }]}>Update Level</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!selectedTriage?.id) return;
-                    Alert.prompt(
-                      'Reassign clinician',
-                      'Enter clinician name or ID:',
-                      async (clinicianName: string) => {
-                        if (!clinicianName?.trim()) return;
-                        const meta = { ...(selectedTriage.metadata ?? {}), reassigned_to: clinicianName.trim() };
-                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { metadata: meta }).catch(() => undefined);
-                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, metadata: meta } : t));
+        title="Triage detail"
+        onClose={() => setTriageModalVisible(false)}
+        footer={
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedTriage?.id) return;
+                Alert.alert(
+                  'Update triage level',
+                  'Select new acuity level:',
+                  [
+                    {
+                      text: 'Routine',
+                      onPress: async () => {
+                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'routine' }).catch(() => undefined);
+                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'routine' } : t));
                         setTriageModalVisible(false);
                       },
-                      'plain-text',
-                    );
-                  }}
-                  style={{ flex: 1, backgroundColor: kisPalette.info + '22', borderWidth: 1, borderColor: kisPalette.info, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                >
-                  <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.info }]}>Reassign</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+                    },
+                    {
+                      text: 'Elevated',
+                      onPress: async () => {
+                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'elevated' }).catch(() => undefined);
+                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'elevated' } : t));
+                        setTriageModalVisible(false);
+                      },
+                    },
+                    {
+                      text: 'Urgent',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'urgent' }).catch(() => undefined);
+                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'urgent' } : t));
+                        setTriageModalVisible(false);
+                      },
+                    },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                );
+              }}
+              style={{ flex: 1, backgroundColor: kisPalette.gold + '22', borderWidth: 1, borderColor: kisPalette.gold, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+            >
+              <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.gold }]}>Update Level</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedTriage?.id) return;
+                Alert.prompt(
+                  'Reassign clinician',
+                  'Enter clinician name or ID:',
+                  async (clinicianName: string) => {
+                    if (!clinicianName?.trim()) return;
+                    const meta = { ...(selectedTriage.metadata ?? {}), reassigned_to: clinicianName.trim() };
+                    await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { metadata: meta }).catch(() => undefined);
+                    setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, metadata: meta } : t));
+                    setTriageModalVisible(false);
+                  },
+                  'plain-text',
+                );
+              }}
+              style={{ flex: 1, backgroundColor: kisPalette.info + '22', borderWidth: 1, borderColor: kisPalette.info, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+            >
+              <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.info }]}>Reassign</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
+          {selectedTriage.patient_name ?? selectedTriage.patientName ?? 'Patient'}
+        </Text>
+        <View style={{ marginVertical: 8 }}>
+          <StatusPill label={`Triage Level ${level}`} color={levelColor} />
+        </View>
+        {selectedTriage.chief_complaint ?? selectedTriage.chiefComplaint ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 8 }]}>
+            Chief complaint: {selectedTriage.chief_complaint ?? selectedTriage.chiefComplaint}
+          </Text>
+        ) : null}
+        {selectedTriage.wait_time ?? selectedTriage.waitTime ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
+            Wait time: {selectedTriage.wait_time ?? selectedTriage.waitTime}
+          </Text>
+        ) : null}
+        {selectedTriage.assigned_clinician ?? selectedTriage.assignedClinician ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+            Clinician: {selectedTriage.assigned_clinician ?? selectedTriage.assignedClinician}
+          </Text>
+        ) : null}
+        {selectedTriage.notes ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
+            {selectedTriage.notes}
+          </Text>
+        ) : null}
+      </HealthActionModal>
     );
   };
 
   const renderReferralModal = () => {
     if (!selectedReferral) return null;
     const status: string = (selectedReferral.status ?? 'pending').toLowerCase();
+    const isPending = status === 'pending';
     return (
-      <Modal
+      <HealthActionModal
+        palette={palette}
         visible={referralModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setReferralModalVisible(false)}
-      >
-        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
-            <View style={modalStyles.header}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text, flex: 1 }]}>
-                Referral detail
-              </Text>
-              <TouchableOpacity onPress={() => setReferralModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <KISIcon name="close" size={22} color={palette.text} />
+        title="Referral detail"
+        onClose={() => setReferralModalVisible(false)}
+        footer={
+          isPending ? (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'accepted' });
+                    setReferrals((prev) =>
+                      prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'accepted' } : r)),
+                    );
+                    setSelectedReferral((prev: any) => ({ ...prev, status: 'accepted' }));
+                    setReferralModalVisible(false);
+                  } catch (e: any) {
+                    Alert.alert('Accept referral', e?.message || 'Failed to accept referral. Please try again.');
+                  }
+                }}
+                style={{ flex: 1, backgroundColor: kisPalette.success + '22', borderWidth: 1, borderColor: kisPalette.success, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.success }]}>Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'declined' });
+                    setReferrals((prev) =>
+                      prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'declined' } : r)),
+                    );
+                    setSelectedReferral((prev: any) => ({ ...prev, status: 'declined' }));
+                    setReferralModalVisible(false);
+                  } catch (e: any) {
+                    Alert.alert('Decline referral', e?.message || 'Failed to decline referral. Please try again.');
+                  }
+                }}
+                style={{ flex: 1, backgroundColor: kisPalette.danger + '22', borderWidth: 1, borderColor: kisPalette.danger, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.danger }]}>Decline</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={modalStyles.body}>
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
-                {selectedReferral.patient_name ?? selectedReferral.patientName ?? 'Patient'}
-              </Text>
-              <View style={{ marginVertical: 8 }}>
-                <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? kisPalette.subtext} />
-              </View>
-              <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
-                From: {selectedReferral.from_clinician ?? selectedReferral.fromClinician ?? '—'}
-              </Text>
-              <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
-                To: {selectedReferral.to_clinician ?? selectedReferral.toClinician ?? '—'}
-              </Text>
-              {selectedReferral.reason ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
-                  Reason: {selectedReferral.reason}
-                </Text>
-              ) : null}
-              {selectedReferral.date ?? selectedReferral.created_at ? (
-                <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
-                  Date: {selectedReferral.date ?? selectedReferral.created_at}
-                </Text>
-              ) : null}
-              {selectedReferral.notes ? (
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
-                  {selectedReferral.notes}
-                </Text>
-              ) : null}
-              {(selectedReferral.status ?? 'pending').toLowerCase() === 'pending' && (
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      try {
-                        await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'accepted' });
-                        setReferrals((prev) =>
-                          prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'accepted' } : r)),
-                        );
-                        setSelectedReferral((prev: any) => ({ ...prev, status: 'accepted' }));
-                        setReferralModalVisible(false);
-                      } catch (e: any) {
-                        Alert.alert('Accept referral', e?.message || 'Failed to accept referral. Please try again.');
-                      }
-                    }}
-                    style={{ flex: 1, backgroundColor: kisPalette.success + '22', borderWidth: 1, borderColor: kisPalette.success, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                  >
-                    <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.success }]}>Accept</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      try {
-                        await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'declined' });
-                        setReferrals((prev) =>
-                          prev.map((r) => (r.id === selectedReferral.id ? { ...r, status: 'declined' } : r)),
-                        );
-                        setSelectedReferral((prev: any) => ({ ...prev, status: 'declined' }));
-                        setReferralModalVisible(false);
-                      } catch (e: any) {
-                        Alert.alert('Decline referral', e?.message || 'Failed to decline referral. Please try again.');
-                      }
-                    }}
-                    style={{ flex: 1, backgroundColor: kisPalette.danger + '22', borderWidth: 1, borderColor: kisPalette.danger, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                  >
-                    <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.danger }]}>Decline</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+          ) : undefined
+        }
+      >
+        <Text style={[HEALTH_THEME_TYPOGRAPHY.h3, { color: palette.text }]}>
+          {selectedReferral.patient_name ?? selectedReferral.patientName ?? 'Patient'}
+        </Text>
+        <View style={{ marginVertical: 8 }}>
+          <Badge label={status} color={REFERRAL_STATUS_COLORS[status] ?? kisPalette.subtext} />
+        </View>
+        <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
+          From: {selectedReferral.from_clinician ?? selectedReferral.fromClinician ?? '—'}
+        </Text>
+        <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 4 }]}>
+          To: {selectedReferral.to_clinician ?? selectedReferral.toClinician ?? '—'}
+        </Text>
+        {selectedReferral.reason ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
+            Reason: {selectedReferral.reason}
+          </Text>
+        ) : null}
+        {selectedReferral.date ?? selectedReferral.created_at ? (
+          <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 8 }]}>
+            Date: {selectedReferral.date ?? selectedReferral.created_at}
+          </Text>
+        ) : null}
+        {selectedReferral.notes ? (
+          <Text style={[HEALTH_THEME_TYPOGRAPHY.body, { color: palette.subtext, marginTop: 12 }]}>
+            {selectedReferral.notes}
+          </Text>
+        ) : null}
+      </HealthActionModal>
     );
   };
 
@@ -1697,10 +1489,13 @@ const sharedStyles = StyleSheet.create({
     paddingBottom: 32,
   },
   listItem: {
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     padding: 14,
     marginBottom: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
   },
   rowBetween: {
     flexDirection: 'row',
@@ -1733,26 +1528,6 @@ const headerStyles = StyleSheet.create({
   },
 });
 
-const tabStyles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tab: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
-
 const chipStyles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
@@ -1768,32 +1543,7 @@ const chipStyles = StyleSheet.create({
   },
 });
 
-const triageStyles = StyleSheet.create({
-  levelBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 99,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  levelText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-});
-
 const modalStyles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  body: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
   actionButton: {
     borderRadius: 12,
     paddingVertical: 14,

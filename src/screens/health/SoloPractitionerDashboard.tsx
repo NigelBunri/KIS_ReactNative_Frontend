@@ -28,6 +28,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
+import { HealthCard, StatTile, SectionHeader, HealthTabBar, EmptyState, StatusPill } from '@/components/health';
+import type { HealthTab } from '@/components/health';
 
 type Specialty =
   | 'general_practice'
@@ -152,6 +154,7 @@ const STATUS_LABEL = {
 const apptStatusColor = (status: AppointmentStatus, p: any): string =>
   ({ pending: p.gold, confirmed: p.primary, in_progress: p.success, completed: p.subtext, cancelled: p.danger } as Record<AppointmentStatus, string>)[status] ?? p.subtext;
 
+
 function PulseDot({ color }: { color: string }) {
   const anim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -172,40 +175,6 @@ function PulseDot({ color }: { color: string }) {
         transform: [{ scale: anim }],
       }}
     />
-  );
-}
-
-function StatCard({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
-  const scheme = useColorScheme();
-  const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: palette.surface,
-        borderRadius: 18,
-        padding: 14,
-        alignItems: 'center',
-        gap: 6,
-        borderWidth: 1,
-        borderColor: palette.divider,
-      }}
-    >
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          backgroundColor: color + '22',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <KISIcon name={icon as any} size={18} color={color} />
-      </View>
-      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 20 }}>{value}</Text>
-      <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 11, textAlign: 'center' }}>{label}</Text>
-    </View>
   );
 }
 
@@ -395,16 +364,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
     <ScrollView contentContainerStyle={{ padding: sp.md, gap: sp.md, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
       {/* Status header */}
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderRadius: 22,
-          padding: sp.md,
-          borderWidth: 1,
-          borderColor: palette.divider,
-          gap: sp.sm,
-        }}
-      >
+      <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 22, gap: sp.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ gap: 4 }}>
             <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}>
@@ -450,23 +410,26 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             </Pressable>
           ))}
         </View>
-      </View>
+      </HealthCard>
 
       {/* Quick stats */}
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <StatCard
+        <StatTile
+          palette={palette}
           label="Today's Queue"
           value={String(todayAppts.length)}
           icon="calendar-outline"
           color={kisPalette.info}
         />
-        <StatCard
+        <StatTile
+          palette={palette}
           label="Total Consults"
           value={String(profile.totalConsultations ?? 0)}
           icon="people-outline"
           color={kisPalette.success}
         />
-        <StatCard
+        <StatTile
+          palette={palette}
           label="Rating"
           value={profile.rating ? profile.rating.toFixed(1) : '—'}
           icon="star-outline"
@@ -475,17 +438,8 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
       </View>
 
       {/* Quick actions */}
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderRadius: 22,
-          padding: sp.md,
-          borderWidth: 1,
-          borderColor: palette.divider,
-          gap: sp.sm,
-        }}
-      >
-        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Start a Session</Text>
+      <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 22, gap: sp.sm }}>
+        <SectionHeader palette={palette} title="Start a Session" />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
             onPress={() => startVideoSession()}
@@ -545,21 +499,12 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             <Text style={{ color: kisPalette.primaryStrong, fontWeight: '900', fontSize: 13 }}>Clinical</Text>
           </Pressable>
         </View>
-      </View>
+      </HealthCard>
 
       {/* Today's appointments */}
       {todayAppts.length > 0 && (
-        <View
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 22,
-            padding: sp.md,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            gap: sp.sm,
-          }}
-        >
-          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Upcoming Today</Text>
+        <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 22, gap: sp.sm }}>
+          <SectionHeader palette={palette} title="Upcoming Today" />
           {todayAppts.slice(0, 4).map((a) => (
             <View
               key={a.id}
@@ -567,7 +512,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                backgroundColor: palette.card,
+                backgroundColor: palette.cardAccent,
                 borderRadius: 14,
                 padding: 12,
               }}
@@ -600,21 +545,12 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               </Pressable>
             </View>
           ))}
-        </View>
+        </HealthCard>
       )}
 
       {/* E-Consultation features */}
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderRadius: 22,
-          padding: sp.md,
-          borderWidth: 1,
-          borderColor: palette.divider,
-          gap: sp.sm,
-        }}
-      >
-        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>E-Consultation Features</Text>
+      <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 22, gap: sp.sm }}>
+        <SectionHeader palette={palette} title="E-Consultation Features" />
         {[
           { icon: 'videocam-outline', label: 'Secure Video Calls', desc: 'HIPAA-compliant video sessions', color: kisPalette.info },
           { icon: 'document-text-outline', label: 'E-Prescriptions', desc: 'Write and send digital prescriptions', color: kisPalette.success },
@@ -641,74 +577,36 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             </View>
           </View>
         ))}
-      </View>
+      </HealthCard>
 
     </ScrollView>
   );
 
   const renderConsultations = () => (
     <ScrollView contentContainerStyle={{ padding: sp.md, gap: sp.sm, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18, marginBottom: 4 }}>Consultation Queue</Text>
+      <SectionHeader palette={palette} title="Consultation Queue" />
 
       {appointments.length === 0 ? (
-        <View
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 20,
-            padding: 32,
-            alignItems: 'center',
-            gap: 12,
-            borderWidth: 1,
-            borderColor: palette.divider,
-          }}
-        >
-          <KISIcon name="people-outline" size={40} color={palette.subtext} />
-          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>No consultations yet</Text>
-          <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
-            Set your availability to start receiving consultation requests.
-          </Text>
-          <Pressable
-            onPress={() => setAvailability('online')}
-            style={{
-              backgroundColor: kisPalette.success,
-              borderRadius: 12,
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-            }}
-          >
-            <Text style={{ color: kisPalette.onPrimary, fontWeight: '900' }}>Go Online</Text>
-          </Pressable>
-        </View>
+        <HealthCard palette={palette} padding={0} style={{ borderRadius: 20 }}>
+          <EmptyState
+            palette={palette}
+            accentColor={kisPalette.success}
+            icon="people-outline"
+            title="No consultations yet"
+            message="Set your availability to start receiving consultation requests."
+            ctaLabel="Go Online"
+            onCtaPress={() => setAvailability('online')}
+          />
+        </HealthCard>
       ) : (
         appointments.map((a) => (
-          <View
-            key={a.id}
-            style={{
-              backgroundColor: palette.surface,
-              borderRadius: 18,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: apptStatusColor(a.status, kisPalette) + '55',
-              gap: 10,
-            }}
-          >
+          <HealthCard key={a.id} palette={palette} padding={14} accentColor={apptStatusColor(a.status, kisPalette)} style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ gap: 2 }}>
                 <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>{a.patientName}</Text>
                 <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 13 }}>{a.serviceType}</Text>
               </View>
-              <View
-                style={{
-                  backgroundColor: apptStatusColor(a.status, kisPalette) + '22',
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                }}
-              >
-                <Text style={{ color: apptStatusColor(a.status, kisPalette), fontWeight: '900', fontSize: 11 }}>
-                  {a.status.replace(/_/g, ' ').toUpperCase()}
-                </Text>
-              </View>
+              <StatusPill label={a.status.replace(/_/g, ' ')} color={apptStatusColor(a.status, kisPalette)} />
             </View>
 
             {a.scheduledAt && (
@@ -754,7 +652,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
                 </Pressable>
               </View>
             )}
-          </View>
+          </HealthCard>
         ))
       )}
     </ScrollView>
@@ -762,40 +660,31 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
   const renderServices = () => (
     <ScrollView contentContainerStyle={{ padding: sp.md, gap: sp.sm, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18 }}>Service Catalog</Text>
-        <Pressable
-          onPress={() => {
-            setServiceDraft({ key: `service_${Date.now()}`, icon: 'briefcase-outline', durationMin: 30, priceUSD: 50 });
-            setEditingService(null);
-          }}
-          style={{
-            backgroundColor: palette.cardAccent,
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderWidth: 1,
-            borderColor: palette.primary,
-          }}
-        >
-          <Text style={{ color: palette.accentPrimary, fontWeight: '900', fontSize: 13 }}>+ Add</Text>
-        </Pressable>
-      </View>
+      <SectionHeader
+        palette={palette}
+        title="Service Catalog"
+        trailing={
+          <Pressable
+            onPress={() => {
+              setServiceDraft({ key: `service_${Date.now()}`, icon: 'briefcase-outline', durationMin: 30, priceUSD: 50 });
+              setEditingService(null);
+            }}
+            style={{
+              backgroundColor: palette.cardAccent,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderWidth: 1,
+              borderColor: palette.primary,
+            }}
+          >
+            <Text style={{ color: palette.accentPrimary, fontWeight: '900', fontSize: 13 }}>+ Add</Text>
+          </Pressable>
+        }
+      />
 
       {profile.services.map((service) => (
-        <View
-          key={service.key}
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 18,
-            padding: 14,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 14,
-          }}
-        >
+        <HealthCard key={service.key} palette={palette} padding={14} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <View
             style={{
               width: 48,
@@ -825,7 +714,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           >
             <KISIcon name="pencil-outline" size={18} color={palette.subtext} />
           </Pressable>
-        </View>
+        </HealthCard>
       ))}
     </ScrollView>
   );
@@ -838,16 +727,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18, marginBottom: 4 }}>My Schedule</Text>
 
         {/* Week view */}
-        <View
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 20,
-            padding: sp.md,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            gap: sp.sm,
-          }}
-        >
+        <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 20, gap: sp.sm }}>
           <Text style={{ color: palette.subtext, fontWeight: '800', fontSize: 12, letterSpacing: 0.8 }}>THIS WEEK</Text>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {days.map((day, idx) => {
@@ -898,20 +778,11 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               );
             })}
           </View>
-        </View>
+        </HealthCard>
 
         {/* Today's time slots */}
-        <View
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 20,
-            padding: sp.md,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            gap: sp.sm,
-          }}
-        >
-          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 16 }}>Today's Slots</Text>
+        <HealthCard palette={palette} padding={sp.md} style={{ borderRadius: 20, gap: sp.sm }}>
+          <SectionHeader palette={palette} title="Today's Slots" />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {profile.todaySlots.map((slot) => {
               const isBooked = todayAppts.some(
@@ -987,7 +858,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           >
             <Text style={{ color: palette.subtext, fontWeight: '800' }}>Edit availability</Text>
           </Pressable>
-        </View>
+        </HealthCard>
 
       </ScrollView>
     );
@@ -1027,17 +898,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         { label: 'License Number', field: 'licenseNumber', placeholder: 'License / Registration number' },
         { label: 'Bio', field: 'bio', placeholder: 'Tell patients about your experience and approach...' },
       ].map((item) => (
-        <View
-          key={item.field}
-          style={{
-            backgroundColor: palette.surface,
-            borderRadius: 18,
-            padding: sp.md,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            gap: 6,
-          }}
-        >
+        <HealthCard key={item.field} palette={palette} padding={sp.md} style={{ gap: 6 }}>
           <Text style={{ color: palette.subtext, fontWeight: '800', fontSize: 12 }}>{item.label}</Text>
           {editingProfile ? (
             <TextInput
@@ -1061,20 +922,11 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
               {String((profile as any)[item.field] || item.placeholder)}
             </Text>
           )}
-        </View>
+        </HealthCard>
       ))}
 
       {/* Specialty picker */}
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderRadius: 18,
-          padding: sp.md,
-          borderWidth: 1,
-          borderColor: palette.divider,
-          gap: 10,
-        }}
-      >
+      <HealthCard palette={palette} padding={sp.md} style={{ gap: 10 }}>
         <Text style={{ color: palette.subtext, fontWeight: '800', fontSize: 12 }}>Specialty</Text>
         {editingProfile ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -1105,7 +957,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
             {SPECIALTIES.find((s) => s.value === profile.specialty)?.label ?? profile.specialty}
           </Text>
         )}
-      </View>
+      </HealthCard>
 
       {/* Partner account CTA */}
       <Pressable
@@ -1261,51 +1113,19 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
       </View>
 
       {/* Tab bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: sp.md, paddingVertical: 6, gap: 6, flexDirection: 'row' }}
-      >
-        {TABS.map((t) => {
-          const isActive = tab === t.id;
-          return (
-            <Pressable
-              key={t.id}
-              onPress={() => setTab(t.id)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                borderWidth: 1.5,
-                borderColor: isActive ? palette.primary : palette.divider,
-                backgroundColor: isActive ? palette.cardAccent : palette.surface,
-                borderRadius: 999,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-              }}
-            >
-              <KISIcon name={t.icon as any} size={13} color={isActive ? palette.accentPrimary : palette.subtext} />
-              <Text style={{ color: isActive ? palette.accentPrimary : palette.subtext, fontWeight: '800', fontSize: 12 }}>
-                {t.label}
-              </Text>
-              {t.id === 'consultations' && todayAppts.length > 0 && (
-                <View
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 8,
-                    backgroundColor: kisPalette.error,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: kisPalette.onPrimary, fontWeight: '900', fontSize: 9 }}>{todayAppts.length}</Text>
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <HealthTabBar
+        palette={palette}
+        accentColor={palette.accentPrimary}
+        badgeColor={kisPalette.error}
+        activeTabId={tab}
+        onChange={(id) => setTab(id as TabId)}
+        tabs={TABS.map((t): HealthTab => ({
+          id: t.id,
+          label: t.label,
+          icon: t.icon,
+          badgeCount: t.id === 'consultations' ? todayAppts.length : undefined,
+        }))}
+      />
 
       {/* Content */}
       <View style={{ flex: 1 }}>
