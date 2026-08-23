@@ -11,11 +11,13 @@ import { computeRetryDelayMs } from '@/services/performanceOfflineService';
 
 const MAX_PUT_RETRIES = 2;
 
-const isTransientError = (err: any): boolean => {
+// See src/network/post/index.tsx's isTransientError for why FormData
+// (media attachment) requests are excluded from AbortError retry.
+const isTransientError = (err: any, isFormData: boolean): boolean => {
   const name = String(err?.name ?? '');
   const msg = String(err?.message ?? '').toLowerCase();
+  if (name === 'AbortError') return !isFormData;
   return (
-    name === 'AbortError' ||
     msg.includes('network request failed') ||
     msg.includes('failed to fetch') ||
     msg.includes('networkerror') ||
@@ -34,7 +36,7 @@ const sanitizeFileData = (obj: any): any => {
   return obj;
 };
 
-const fetchPutWithRetry = async (execute: () => Promise<Response>): Promise<Response> => {
+const fetchPutWithRetry = async (execute: () => Promise<Response>, isFormData: boolean): Promise<Response> => {
   let lastError: any;
   for (let attempt = 0; attempt <= MAX_PUT_RETRIES; attempt++) {
     if (attempt > 0) {
@@ -44,7 +46,7 @@ const fetchPutWithRetry = async (execute: () => Promise<Response>): Promise<Resp
       return await execute();
     } catch (err: any) {
       lastError = err;
-      if (!isTransientError(err) || attempt >= MAX_PUT_RETRIES) throw err;
+      if (!isTransientError(err, isFormData) || attempt >= MAX_PUT_RETRIES) throw err;
     }
   }
   throw lastError;
@@ -87,7 +89,7 @@ export const putData = async (
 
     const payload = isFormData ? data : sanitizeFileData(data);
 
-    const response = await fetchPutWithRetry(() => apiService.put(url, payload, baseHeaders));
+    const response = await fetchPutWithRetry(() => apiService.put(url, payload, baseHeaders), isFormData);
     const responseData = await response.json().catch(() => ({}));
 
     if (response.ok) {
@@ -99,7 +101,7 @@ export const putData = async (
       const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...baseHeaders, Authorization: `Bearer ${newToken}` };
-        const retryResponse = await fetchPutWithRetry(() => apiService.put(url, payload, retryHeaders));
+        const retryResponse = await fetchPutWithRetry(() => apiService.put(url, payload, retryHeaders), isFormData);
         const retryData = await retryResponse.json().catch(() => ({}));
         if (retryResponse.ok) {
           return { success: true, data: retryData, message: successMsg };

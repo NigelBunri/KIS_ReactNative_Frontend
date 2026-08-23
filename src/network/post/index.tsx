@@ -14,11 +14,19 @@ import { formatApiError } from '../formatApiError';
 
 const MAX_POST_RETRIES = 2;
 
-const isTransientError = (err: any): boolean => {
+// A timed-out/aborted upload (isFormData=true — media attachments) is
+// excluded from "transient" here: retrying it re-attempts the exact same
+// large body over the exact same connection, which almost always times
+// out again for the same reason. Blindly retrying compounded a single
+// slow-but-legitimate media upload into what felt like minutes of
+// "hanging" before broadcast item creation finally failed. Small JSON
+// payloads still retry on AbortError — a timeout there really is more
+// likely a one-off blip.
+const isTransientError = (err: any, isFormData: boolean): boolean => {
   const name = String(err?.name ?? '');
   const msg = String(err?.message ?? '').toLowerCase();
+  if (name === 'AbortError') return !isFormData;
   return (
-    name === 'AbortError' ||
     msg.includes('network request failed') ||
     msg.includes('failed to fetch') ||
     msg.includes('networkerror') ||
@@ -28,6 +36,7 @@ const isTransientError = (err: any): boolean => {
 
 const fetchPostWithRetry = async (
   execute: () => Promise<Response>,
+  isFormData: boolean,
 ): Promise<Response> => {
   let lastError: any;
   for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
@@ -39,7 +48,7 @@ const fetchPostWithRetry = async (
     } catch (err: any) {
       lastError = err;
       // Only retry transient network errors — NOT 5xx (server may have processed already)
-      if (!isTransientError(err) || attempt >= MAX_POST_RETRIES) throw err;
+      if (!isTransientError(err, isFormData) || attempt >= MAX_POST_RETRIES) throw err;
     }
   }
   throw lastError;
@@ -108,7 +117,7 @@ export const postRequest = async (
     // ❗ Do NOT sanitize FormData or convert it
     const payload = isFormData ? data : sanitizeFileData(data);
 
-    const response = await fetchPostWithRetry(() => apiService.post(url, payload, headers));
+    const response = await fetchPostWithRetry(() => apiService.post(url, payload, headers), isFormData);
     const responseData = await response.json().catch(() => ({}));
     const unwrapPayload = (payload: any) => {
       if (
@@ -142,7 +151,7 @@ export const postRequest = async (
       const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
-        const retryResponse = await fetchPostWithRetry(() => apiService.post(url, payload, retryHeaders));
+        const retryResponse = await fetchPostWithRetry(() => apiService.post(url, payload, retryHeaders), isFormData);
         const retryData = await retryResponse.json().catch(() => ({}));
         if (retryResponse.ok) {
           return { success: true, data: unwrapPayload(retryData), message: successMessage };

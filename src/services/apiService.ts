@@ -47,11 +47,19 @@ const assertSecureRequestUrl = (url: string): void => {
 };
 
 const REQUEST_TIMEOUT_MS = 45_000;
+// FormData bodies (media attachments — photos, video, audio, documents)
+// routinely take well over 45s to upload on an ordinary mobile connection,
+// not just a stalled one. Using the same short timeout as a small JSON
+// payload made large-but-healthy uploads abort mid-transfer, which the
+// post/patch retry logic then retried 2 more times against the identical
+// slow connection — the compounding cause of broadcast-item creation
+// appearing to "hang" for minutes before finally failing.
+const UPLOAD_TIMEOUT_MS = 120_000;
 
-const safeFetch = (url: string, init: RequestInit) => {
+const safeFetch = (url: string, init: RequestInit, timeoutMs: number = REQUEST_TIMEOUT_MS) => {
   assertSecureRequestUrl(url);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { ...init, signal: controller.signal }).finally(() =>
     clearTimeout(timer),
   );
@@ -76,7 +84,7 @@ const apiService = {
         : body != null
         ? JSON.stringify(body)
         : undefined,
-    });
+    }, isFormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   },
 
   put: (url: string, body?: any, headers?: HeadersInit) => {
@@ -90,7 +98,7 @@ const apiService = {
         : body != null
         ? JSON.stringify(body)
         : undefined,
-    });
+    }, isFormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   },
 
   patch: (url: string, body?: any, headers?: HeadersInit) => {
@@ -104,7 +112,7 @@ const apiService = {
         : body != null
         ? JSON.stringify(body)
         : undefined,
-    });
+    }, isFormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   },
 
   delete: (url: string, headers?: HeadersInit) =>

@@ -14,11 +14,16 @@ import { formatApiError } from '../formatApiError';
 
 const MAX_PATCH_RETRIES = 2;
 
-const isTransientError = (err: any): boolean => {
+// See src/network/post/index.tsx's isTransientError for why FormData
+// (media attachment) requests are excluded from AbortError retry — a
+// timed-out large upload retrying the identical body over the identical
+// connection almost always times out again, compounding into what looks
+// like broadcast-item edits "hanging" for minutes before failing.
+const isTransientError = (err: any, isFormData: boolean): boolean => {
   const name = String(err?.name ?? '');
   const msg = String(err?.message ?? '').toLowerCase();
+  if (name === 'AbortError') return !isFormData;
   return (
-    name === 'AbortError' ||
     msg.includes('network request failed') ||
     msg.includes('failed to fetch') ||
     msg.includes('networkerror') ||
@@ -37,7 +42,7 @@ const sanitizeFileData = (obj: any): any => {
   return obj;
 };
 
-const fetchPatchWithRetry = async (execute: () => Promise<Response>): Promise<Response> => {
+const fetchPatchWithRetry = async (execute: () => Promise<Response>, isFormData: boolean): Promise<Response> => {
   let lastError: any;
   for (let attempt = 0; attempt <= MAX_PATCH_RETRIES; attempt++) {
     if (attempt > 0) {
@@ -47,7 +52,7 @@ const fetchPatchWithRetry = async (execute: () => Promise<Response>): Promise<Re
       return await execute();
     } catch (err: any) {
       lastError = err;
-      if (!isTransientError(err) || attempt >= MAX_PATCH_RETRIES) throw err;
+      if (!isTransientError(err, isFormData) || attempt >= MAX_PATCH_RETRIES) throw err;
     }
   }
   throw lastError;
@@ -84,7 +89,7 @@ export const patchRequest = async (
     const headers = { ...baseHeaders, ...(options.headers ?? {}) };
     const payload = isFormData ? data : sanitizeFileData(data);
 
-    const response = await fetchPatchWithRetry(() => apiService.patch(url, payload, headers));
+    const response = await fetchPatchWithRetry(() => apiService.patch(url, payload, headers), isFormData);
     const responseData = await response.json().catch(() => ({}));
 
     if (response.ok) {
@@ -100,7 +105,7 @@ export const patchRequest = async (
       const newToken = await refreshAccessToken(token);
       if (newToken) {
         const retryHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
-        const retryResponse = await fetchPatchWithRetry(() => apiService.patch(url, payload, retryHeaders));
+        const retryResponse = await fetchPatchWithRetry(() => apiService.patch(url, payload, retryHeaders), isFormData);
         const retryData = await retryResponse.json().catch(() => ({}));
         if (retryResponse.ok) {
           return { success: true, data: retryData, message: options.successMessage || '' };
