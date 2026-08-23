@@ -2944,7 +2944,10 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
 
   const renderMaterialPreviewCard = useCallback(
     (material: any) => {
-      const resourceUrl = toText(material?.resource_url);
+      // resource_url is the raw private S3 key — 403s on a private bucket.
+      // safe_resource_url is the backend-resolved, signed URL that actually
+      // loads (same bug as the course-taking viewer had).
+      const resourceUrl = toText(material?.safe_resource_url || material?.resource_url);
       const mime = inferMaterialMimeType({
         mime:
           material?.resource_mime_type ||

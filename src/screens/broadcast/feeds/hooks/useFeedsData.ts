@@ -225,6 +225,39 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       }
       applyItems(shuffleFeedItems(visibleResults));
       nextUrlRef.current = page.next ?? null;
+
+      // staleWhileRevalidate only ever did the "stale" half — a cache hit
+      // this old can carry presigned S3 video/PDF URLs that expired days
+      // ago (they're only valid ~1hr), so a single transient network blip
+      // could leave dead video links on screen indefinitely with nothing
+      // ever re-fetching. If this response was a stale fallback, force one
+      // real network refetch shortly after to replace it with live data
+      // (and live, unexpired signed URLs).
+      if ((res as any)?.stale) {
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          getRequest(url, { errorMessage: 'Unable to refresh feeds.', forceNetwork: true })
+            .then(freshRes => {
+              if (!mountedRef.current || !freshRes?.success) return;
+              const freshPayload = freshRes?.data ?? freshRes;
+              const freshPage = normalizePaginated<BroadcastFeedItem>(freshPayload);
+              const freshResults = (freshPage.results ?? [])
+                .map(item => normalizeFeedItem(item))
+                .filter(item => !isHealthcareFeedItem(item));
+              if (freshResults.length === 0) return;
+              const freshSeen = new Set<string>();
+              const dedupedFresh = freshResults.filter(item => {
+                const key = String(item.id);
+                if (freshSeen.has(key)) return false;
+                freshSeen.add(key);
+                return true;
+              });
+              applyItems(shuffleFeedItems(dedupedFresh));
+              nextUrlRef.current = freshPage.next ?? null;
+            })
+            .catch(() => {});
+        }, 400);
+      }
     } finally {
       if (mountedRef.current) {
         setLoading(false);

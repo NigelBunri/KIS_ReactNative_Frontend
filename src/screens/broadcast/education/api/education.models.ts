@@ -179,6 +179,7 @@ export interface EducationLessonContentPayload {
     title: string;
     kind: string;
     resource_url?: string;
+    safe_resource_url?: string;
     resource_name?: string;
     resource_mime_type?: string;
     is_downloadable?: boolean;
@@ -189,6 +190,7 @@ export interface EducationMaterialContentPayload {
   material_id: string;
   kind: string;
   resource_url?: string;
+  safe_resource_url?: string;
   resource_name?: string;
   resource_mime_type?: string;
   storage_path?: string;

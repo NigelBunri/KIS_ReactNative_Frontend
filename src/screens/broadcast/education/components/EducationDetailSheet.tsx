@@ -866,7 +866,11 @@ export default function EducationDetailSheet({
     materialPayload: any,
     options?: { heading?: string; title?: string; summary?: string },
   ) => {
-    const resourceUrl = materialPayload?.resource_url;
+    // resource_url is the raw private S3 object key/unsigned path — it
+    // 403s on a private bucket. safe_resource_url (backend-resolved,
+    // signed) is what actually plays/opens; this component was never
+    // updated to use it even after that field was added.
+    const resourceUrl = materialPayload?.safe_resource_url || materialPayload?.resource_url;
     const mime = inferMaterialMime(materialPayload);
     const kind = inferMaterialKind(materialPayload);
     const mediaSource = buildMediaSource(resourceUrl, mediaHeaders);
