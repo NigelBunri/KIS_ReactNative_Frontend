@@ -1,19 +1,27 @@
 import React from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
-import { PartnerDiscover } from '@/components/partners/partnersTypes';
+import { PartnerDiscover, PartnerJobPost } from '@/components/partners/partnersTypes';
+
+const humanizeJobType = (value?: string | null) =>
+  String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (letter) => letter.toUpperCase());
+
+const formatSalaryRange = (job: PartnerJobPost) => {
+  if (!job.salary_min && !job.salary_max) return null;
+  const currency = job.salary_currency || 'USD';
+  if (job.salary_min && job.salary_max) {
+    return `${currency} ${job.salary_min.toLocaleString()}–${job.salary_max.toLocaleString()}`;
+  }
+  return `${currency} ${(job.salary_min ?? job.salary_max)!.toLocaleString()}+`;
+};
 
 type Props = {
   palette: any;
   target: PartnerDiscover;
   message: string;
   role: string;
-  jobPosts: Array<{
-    id: string | number;
-    title: string;
-    description?: string | null;
-    requirements?: string | null;
-    steps?: string[] | null;
-  }>;
+  jobPosts: PartnerJobPost[];
   selectedJobId: string | null;
   onChangeJobId: (value: string | null) => void;
   onChangeMessage: (value: string) => void;
@@ -123,25 +131,73 @@ export default function PartnerApplySheet({
             <View style={{ marginTop: 6 }}>
               {jobPosts
                 .filter((job) => String(job.id) === selectedJobId)
-                .map((job) => (
-                  <View key={String(job.id)}>
-                    {job.description ? (
-                      <Text style={{ color: palette.subtext, fontSize: 11 }}>
-                        {job.description}
-                      </Text>
-                    ) : null}
-                    {job.requirements ? (
-                      <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 4 }}>
-                        Requirements: {job.requirements}
-                      </Text>
-                    ) : null}
-                    {job.steps && job.steps.length > 0 ? (
-                      <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 4 }}>
-                        Steps: {job.steps.join(' -> ')}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                .map((job) => {
+                  const salaryRange = formatSalaryRange(job);
+                  const locationLabel = job.is_remote ? 'Remote' : job.location || null;
+                  const metaLine = [humanizeJobType(job.job_type), locationLabel, salaryRange]
+                    .filter(Boolean)
+                    .join(' · ');
+                  return (
+                    <View
+                      key={String(job.id)}
+                      style={{
+                        borderWidth: 2,
+                        borderColor: palette.borderMuted,
+                        borderRadius: 10,
+                        padding: 10,
+                        gap: 6,
+                      }}
+                    >
+                      {metaLine ? (
+                        <Text style={{ color: palette.primaryStrong, fontSize: 12, fontWeight: '700' }}>
+                          {metaLine}
+                        </Text>
+                      ) : null}
+                      {job.description ? (
+                        <View>
+                          <Text style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}>About the role</Text>
+                          <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>
+                            {job.description}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {job.requirements ? (
+                        <View>
+                          <Text style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}>Requirements</Text>
+                          <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>
+                            {job.requirements}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {job.tags && job.tags.length > 0 ? (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                          {job.tags.map((tag) => (
+                            <View
+                              key={tag}
+                              style={{
+                                borderWidth: 1,
+                                borderColor: palette.borderMuted,
+                                borderRadius: 999,
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                              }}
+                            >
+                              <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '600' }}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                      {job.steps && job.steps.length > 0 ? (
+                        <View>
+                          <Text style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}>Hiring process</Text>
+                          <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>
+                            {job.steps.join(' → ')}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
             </View>
           ) : null}
         </View>

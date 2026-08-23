@@ -114,6 +114,13 @@ export type PartnerJobPost = {
   title: string;
   description?: string | null;
   requirements?: string | null;
+  location?: string | null;
+  is_remote?: boolean;
+  job_type?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  tags?: string[];
   steps?: string[];
   auto_assign?: {
     communities?: string[];

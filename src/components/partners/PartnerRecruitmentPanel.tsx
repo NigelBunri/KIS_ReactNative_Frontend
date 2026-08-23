@@ -54,6 +54,13 @@ export default function PartnerRecruitmentPanel({
   const [description, setDescription] = useState('');
   const [requirements, setRequirements] = useState('');
   const [stepsText, setStepsText] = useState('');
+  const [location, setLocation] = useState('');
+  const [isRemote, setIsRemote] = useState(false);
+  const [jobType, setJobType] = useState('full_time');
+  const [salaryMin, setSalaryMin] = useState('');
+  const [salaryMax, setSalaryMax] = useState('');
+  const [salaryCurrency, setSalaryCurrency] = useState('USD');
+  const [tagsText, setTagsText] = useState('');
   const [assignCommunities, setAssignCommunities] = useState<string[]>([]);
   const [assignGroups, setAssignGroups] = useState<string[]>([]);
   const [assignChannels, setAssignChannels] = useState<string[]>([]);
@@ -137,6 +144,13 @@ export default function PartnerRecruitmentPanel({
     setDescription('');
     setRequirements('');
     setStepsText('');
+    setLocation('');
+    setIsRemote(false);
+    setJobType('full_time');
+    setSalaryMin('');
+    setSalaryMax('');
+    setSalaryCurrency('USD');
+    setTagsText('');
     setAssignCommunities([]);
     setAssignGroups([]);
     setAssignChannels([]);
@@ -148,12 +162,25 @@ export default function PartnerRecruitmentPanel({
       Alert.alert('Missing title', 'Please add a job title.');
       return;
     }
+    const minCents = salaryMin.trim() ? Math.round(Number(salaryMin.trim()) * 100) : null;
+    const maxCents = salaryMax.trim() ? Math.round(Number(salaryMax.trim()) * 100) : null;
+    const tags = tagsText
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
     setSubmitting(true);
     try {
       await postRequest(ROUTES.partners.jobs(partnerId), {
         title: title.trim(),
         description: description.trim(),
         requirements: requirements.trim(),
+        location: isRemote ? '' : location.trim(),
+        is_remote: isRemote,
+        job_type: jobType,
+        salary_min_cents: minCents,
+        salary_max_cents: maxCents,
+        salary_currency: salaryCurrency.trim().toUpperCase() || 'USD',
+        tags,
         steps,
         auto_assign: {
           communities: assignCommunities,
@@ -265,6 +292,13 @@ export default function PartnerRecruitmentPanel({
               description={description}
               requirements={requirements}
               stepsText={stepsText}
+              location={location}
+              isRemote={isRemote}
+              jobType={jobType}
+              salaryMin={salaryMin}
+              salaryMax={salaryMax}
+              salaryCurrency={salaryCurrency}
+              tagsText={tagsText}
               communities={communities}
               groups={groups}
               channels={channels}
@@ -276,6 +310,13 @@ export default function PartnerRecruitmentPanel({
               onChangeDescription={setDescription}
               onChangeRequirements={setRequirements}
               onChangeStepsText={setStepsText}
+              onChangeLocation={setLocation}
+              onToggleRemote={() => setIsRemote((prev) => !prev)}
+              onChangeJobType={setJobType}
+              onChangeSalaryMin={setSalaryMin}
+              onChangeSalaryMax={setSalaryMax}
+              onChangeSalaryCurrency={setSalaryCurrency}
+              onChangeTagsText={setTagsText}
               onToggleCommunity={(id) =>
                 setAssignCommunities(toggleId(assignCommunities, id))
               }
