@@ -39,6 +39,7 @@ import ChannelsDiscoverPage from '../broadcast/channels/ChannelsDiscoverPage';
 import BroadcastEducationPage from '../broadcast/pages/BroadcastEducationPage';
 import BroadcastMarketPage from '../broadcast/pages/BroadcastMarketPage';
 import BroadcastHealthcarePage from '../broadcast/pages/BroadcastHealthcarePage';
+import BroadcastJobsPage from '../broadcast/pages/BroadcastJobsPage';
 import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
 import {
@@ -89,6 +90,12 @@ const FILTER_OPTIONS: Record<BroadcastMainTabId, BroadcastFilterOption[]> = {
     { key: 'today', label: 'Today', description: 'Ready now' },
     { key: 'past', label: 'Past', description: 'Recent history' },
   ],
+  jobs: [
+    { key: 'all', label: 'All', description: 'Every open role' },
+    { key: 'remote', label: 'Remote', description: 'Work from anywhere' },
+    { key: 'full_time', label: 'Full time', description: 'Full-time roles' },
+    { key: 'part_time', label: 'Part time', description: 'Part-time roles' },
+  ],
 };
 
 const SEARCH_PLACEHOLDERS: Record<BroadcastMainTabId, string> = {
@@ -97,6 +104,7 @@ const SEARCH_PLACEHOLDERS: Record<BroadcastMainTabId, string> = {
   education: 'Search courses & lessons',
   market: 'Search marketplace drops',
   healthcare: 'Search providers & services',
+  jobs: 'Search job openings',
 };
 
 const PROFILE_KEY_BY_TAB: Record<BroadcastMainTabId, BroadcastProfileKey> = {
@@ -105,6 +113,7 @@ const PROFILE_KEY_BY_TAB: Record<BroadcastMainTabId, BroadcastProfileKey> = {
   education: 'education',
   market: 'market',
   healthcare: 'health',
+  jobs: 'broadcast_feed',
 };
 
 const MAIN_TAB_ORDER: BroadcastMainTabId[] = [
@@ -113,6 +122,7 @@ const MAIN_TAB_ORDER: BroadcastMainTabId[] = [
   'education',
   'market',
   'healthcare',
+  'jobs',
 ];
 
 const TAB_SWIPE_DISTANCE = 104;
@@ -160,6 +170,7 @@ export default function BroadcastScreen() {
     education: '',
     market: '',
     healthcare: '',
+    jobs: '',
   });
   const [filterVisible, setFilterVisible] = useState(false);
   const [visionVisible, setVisionVisible] = useState(false);
@@ -334,6 +345,13 @@ export default function BroadcastScreen() {
   const navigation =
     useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Broadcast'>>();
   const handleCreate = useCallback(() => {
+    if (activeMainTab === 'jobs') {
+      // Posting a job is partner-scoped and manager-gated (PartnerRecruitmentPanel,
+      // opened from partner management) — there's no generic per-user "create a
+      // job profile" flow the way the other tabs have, so route to Partners instead.
+      navigation.navigate('Partners');
+      return;
+    }
     const profileKey = PROFILE_KEY_BY_TAB[activeMainTab];
     navigation.navigate('Profile', { broadcastProfileKey: profileKey });
   }, [activeMainTab, navigation]);
@@ -732,6 +750,7 @@ export default function BroadcastScreen() {
           {activeMainTab === 'education' && <BroadcastEducationPage searchTerm={currentSearchTerm} searchContext={currentFilter} openContentId={routeActionId} />}
           {activeMainTab === 'market' && <BroadcastMarketPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
           {activeMainTab === 'healthcare' && <BroadcastHealthcarePage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
+          {activeMainTab === 'jobs' && <BroadcastJobsPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
         </View>
 
       </Animated.ScrollView>

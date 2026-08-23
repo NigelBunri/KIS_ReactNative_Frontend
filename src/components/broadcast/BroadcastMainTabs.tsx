@@ -11,7 +11,8 @@ export type BroadcastMainTabId =
   | 'channels'
   | 'education'
   | 'market'
-  | 'healthcare';
+  | 'healthcare'
+  | 'jobs';
 
 type TabDef = { id: BroadcastMainTabId; label: string; icon: string };
 
@@ -26,6 +27,7 @@ const TABS: TabDef[] = [
   { id: 'education', label: 'Education', icon: 'book' },
   { id: 'market', label: 'Market', icon: 'store' },
   { id: 'healthcare', label: 'Healthcare', icon: 'heart' },
+  { id: 'jobs', label: 'Jobs', icon: 'briefcase' },
 ];
 
 export default function BroadcastMainTabs({ value, onChange }: Props) {

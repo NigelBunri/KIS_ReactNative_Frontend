@@ -159,6 +159,7 @@ const broadcastRoutes = {
     jobs: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/jobs/`,
     jobDetail: (id: string, jobId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/jobs/${jobId}/`,
+    globalJobs: `${API_BASE_URL}/api/v1/partners/jobs/`,
     settingsCatalog: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/settings-catalog/`,
     settings: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/settings/`,

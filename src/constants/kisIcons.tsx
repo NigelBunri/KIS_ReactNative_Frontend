@@ -142,6 +142,7 @@ export type KISIconName =
   | 'arrow-down-left'   // incoming / missed call direction arrow
   | 'arrow-up-right'    // outgoing call direction arrow
   | 'refresh-cw'        // refresh (calls tab, call controls)
+  | 'briefcase'         // jobs (broadcast jobs tab)
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -161,6 +162,7 @@ const ion: IonMap = {
   person: { filled: 'person', outline: 'person-outline' },
   user: { filled: 'person', outline: 'person-outline' },
   users: { filled: 'people', outline: 'people-outline' },
+  briefcase: { filled: 'briefcase', outline: 'briefcase-outline' },
 
   // UI
   home: { filled: 'home', outline: 'home-outline' },
