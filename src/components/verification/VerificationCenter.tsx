@@ -332,6 +332,19 @@ export function VerificationCenterSheet({
               subtitle="Public badges are issued only after review. This screen sends private media references, not raw documents."
             />
 
+            {summary?.latest_case?.show_rejection_notice ? (
+              <View style={[styles.rejectionBox, { backgroundColor: `${palette.danger}14`, borderColor: palette.danger }]}>
+                <Text style={[styles.blockTitle, { color: palette.danger }]}>
+                  Your verification was not successful, please try again.
+                </Text>
+                {summary.latest_case.reviewer_notes ? (
+                  <Text style={[styles.statusBody, { color: palette.danger }]}>
+                    {summary.latest_case.reviewer_notes}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
             {loading ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color={palette.primaryStrong} />
@@ -528,6 +541,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   providerBox: { borderRadius: 20, borderWidth: 1, padding: 14, gap: 10 },
+  rejectionBox: { borderRadius: 20, borderWidth: 1, padding: 14, gap: 8 },
   blockTitle: { fontSize: 14, fontWeight: '900' },
   evidenceUploadRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   uploadedRef: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, fontWeight: '700' },

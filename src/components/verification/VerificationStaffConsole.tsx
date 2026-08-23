@@ -10,6 +10,7 @@ import {
   fetchUnifiedTrustOverview,
   issueVerificationStaffBadge,
   revokeVerificationStaffBadge,
+  reviewVerificationStaffCase,
   updateVerificationStaffCaseStatus,
   type UnifiedTrustOverview,
   type VerificationStaffAuditEvent,
@@ -181,6 +182,32 @@ export function VerificationStaffConsole({
     }
   };
 
+  // Approve/reject-with-reason only exists on the backend for user
+  // (identity) verification cases — StaffUserVerificationReviewView /
+  // review_user_case() explicitly scope to subject_type=user and issue
+  // user-specific badges. Shop/health/education/partner cases stay on
+  // updateStatus above (in_review/needs_more_info/cancelled) until a
+  // matching generic-subject review endpoint exists server-side.
+  const reviewCase = async (action: 'approve' | 'reject') => {
+    if (!selectedCase?.id) return;
+    if (action === 'reject' && !notes.trim()) {
+      setMessage('Add a reason before rejecting — the submitter will see this note.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await reviewVerificationStaffCase(selectedCase.id, { action, notes: notes.trim() });
+      setMessage(action === 'approve' ? 'Verification approved.' : 'Verification rejected.');
+      setNotes('');
+      await load();
+    } catch (error: any) {
+      setMessage(error?.message || 'Unable to review verification case.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -303,6 +330,12 @@ export function VerificationStaffConsole({
                   multiline
                   style={[styles.notes, { color: palette.text, borderColor: palette.divider, backgroundColor: palette.card }]}
                 />
+                {selectedCase.subject?.subject_type === 'user' ? (
+                  <View style={styles.actionRow}>
+                    <KISButton title="Approve" size="sm" disabled={busy} onPress={() => reviewCase('approve')} />
+                    <KISButton title="Reject" size="sm" variant="danger" disabled={busy} onPress={() => reviewCase('reject')} />
+                  </View>
+                ) : null}
                 <View style={styles.actionRow}>
                   <KISButton title="In review" size="sm" variant="secondary" disabled={busy} onPress={() => updateStatus('in_review')} />
                   <KISButton title="Need info" size="sm" variant="outline" disabled={busy} onPress={() => updateStatus('needs_more_info')} />

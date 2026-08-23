@@ -25,6 +25,10 @@ export type VerificationCaseSummary = {
   submitted_at?: string | null;
   reviewed_at?: string | null;
   reviewer_notes?: string | null;
+  // True only while a rejected case is within its post-rejection notice
+  // window (server-enforced, currently 3 days) — reviewer_notes is only
+  // populated on the response while this is true.
+  show_rejection_notice?: boolean;
   metadata?: Record<string, any> | null;
 };
 
