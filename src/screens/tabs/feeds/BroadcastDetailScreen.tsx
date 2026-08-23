@@ -38,6 +38,18 @@ import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const REACTION_EVENT = 'broadcast.reaction';
 
+// Matches attachmentPreview.ts's getAttachmentPreviewInfo() key set —
+// this screen previously only checked file/url-style keys (fileUrl, url,
+// uri, file_url, path, previewUrl, preview_url), missing every
+// thumbnail-style key (thumbnail_url, thumb_url, thumbnail, thumb,
+// thumbUrl). Education/market/health feed items commonly store their
+// cover image under those thumbnail keys rather than a file/url key —
+// FeedItemCard.tsx (which uses the shared helper) rendered their
+// thumbnail fine, but this screen's narrower picker returned nothing,
+// so attachmentUrls came back empty, the item fell into the text-only
+// branch, and even lost its caption overlay (gated on !isTextOnlyFeed) —
+// the "small card floating in a black screen" full-screen bug reported
+// for non-broadcast items.
 const pickAttachmentUrl = (attachment: any): string | undefined => {
   if (!attachment) return undefined;
   if (typeof attachment === 'string') return attachment;
@@ -48,7 +60,14 @@ const pickAttachmentUrl = (attachment: any): string | undefined => {
     attachment.file_url ??
     attachment.path ??
     attachment.previewUrl ??
-    attachment.preview_url
+    attachment.preview_url ??
+    attachment.thumbUrl ??
+    attachment.thumb_url ??
+    attachment.thumbnail_url ??
+    attachment.thumbnailUrl ??
+    attachment.thumbnail ??
+    attachment.thumb ??
+    attachment.value
   );
 };
 
