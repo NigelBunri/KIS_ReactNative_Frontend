@@ -1242,11 +1242,17 @@ export default function ProfileScreen() {
 
   const handleViewInstitution = useCallback(
     (inst: any) => {
-      if (!inst?.id || !inst?.type) return;
+      // Institution objects carry the type under institution_type — `type`
+      // is only ever a fallback (see InstitutionsListScreen.tsx's own
+      // institution_type ?? type usage) — requiring `inst.type` alone made
+      // this silently no-op for institutions where only institution_type
+      // was populated, while Edit (no such guard) kept working.
+      const institutionType = inst?.institution_type ?? inst?.type;
+      if (!inst?.id || !institutionType) return;
       closeManagementPanel();
       rootNavigation?.navigate('HealthInstitutionDetail', {
         institutionId: inst.id,
-        institutionType: inst.type,
+        institutionType,
         institutionName: inst.name,
       });
     },

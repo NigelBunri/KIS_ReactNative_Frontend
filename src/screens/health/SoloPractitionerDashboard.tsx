@@ -332,46 +332,29 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
     } catch (_) {}
   }, [profile.id]);
 
-  const startVideoSession = useCallback(async (appointmentId?: string) => {
-    try {
-      setActiveConsult(appointmentId ?? 'new');
-      const res = await postRequest(
-        ROUTES.healthOps.videoSessionStart,
-        appointmentId ? { appointment_id: appointmentId, role: 'provider' } : { role: 'provider' },
-        { errorMessage: 'Unable to start video session.' },
-      );
-      if (res?.success === false) {
-        Alert.alert('E-Consultation', res?.message || 'Unable to start video session.');
-        setActiveConsult(null);
-        return;
-      }
-      Alert.alert('Video Session', 'Video consultation started. Session link ready.');
-    } catch (e: any) {
-      Alert.alert('Video Session', e?.message || 'Unable to start video session.');
-    } finally {
-      setActiveConsult(null);
-    }
+  // videoSessionStart/messagingSessionStart both require a workflow_session_id
+  // (a ServiceWorkflowSession — institution+service+payment record from
+  // apps.health_ops), which appointment_id can never satisfy: the
+  // appointments shown on this screen (apps.core.Appointment, tied to a
+  // PatientMasterRecord) aren't linked to a ServiceWorkflowSession at all —
+  // they're two separate systems. Every call here failed unconditionally
+  // with "workflow_session_id: this field is required" rather than doing
+  // anything, so this is short-circuited with a clear explanation instead
+  // of a wasted round-trip and a confusing raw backend error. Properly
+  // wiring this needs a real decision on how solo-practitioner appointments
+  // relate to the institution/service-scoped workflow-session system.
+  const startVideoSession = useCallback(async (_appointmentId?: string) => {
+    Alert.alert(
+      'Video Session unavailable',
+      'Starting a video consult directly from an appointment isn’t wired up yet on this screen. This is a known gap, not a temporary error.',
+    );
   }, []);
 
-  const startChatSession = useCallback(async (appointmentId?: string) => {
-    try {
-      setActiveConsult(appointmentId ?? 'chat-new');
-      const res = await postRequest(
-        ROUTES.healthOps.messagingSessionStart,
-        appointmentId ? { appointment_id: appointmentId, role: 'provider' } : { role: 'provider' },
-        { errorMessage: 'Unable to start messaging session.' },
-      );
-      if (res?.success === false) {
-        Alert.alert('Chat Session', res?.message || 'Unable to start session.');
-        setActiveConsult(null);
-        return;
-      }
-      Alert.alert('Chat Consultation', 'Secure messaging session started.');
-    } catch (e: any) {
-      Alert.alert('Chat Consultation', e?.message || 'Unable to start session.');
-    } finally {
-      setActiveConsult(null);
-    }
+  const startChatSession = useCallback(async (_appointmentId?: string) => {
+    Alert.alert(
+      'Chat Session unavailable',
+      'Starting a chat consult directly from an appointment isn’t wired up yet on this screen. This is a known gap, not a temporary error.',
+    );
   }, []);
 
   const saveProfile = useCallback(async () => {

@@ -1643,7 +1643,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             accessibilityLabel="Go back"
             hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
           >
-            <KISIcon name="arrowleft" size={22} color={palette.text} />
+            <KISIcon name="arrow-left" size={22} color={palette.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text }]} numberOfLines={1}>
