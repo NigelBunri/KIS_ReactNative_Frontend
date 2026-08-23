@@ -25,19 +25,12 @@ import {
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 
 type Props = {
   searchTerm?: string;
   searchContext?: string;
 };
-
-const initialsFor = (channel: BroadcastChannelSummary) =>
-  String(channel.display_name || channel.handle || 'KC')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase())
-    .join('') || 'KC';
 
 const compactNumber = (value?: number) => {
   const num = Number(value || 0);
@@ -45,48 +38,6 @@ const compactNumber = (value?: number) => {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return String(num);
 };
-
-function ChannelAvatar({
-  channel,
-  size = 48,
-}: {
-  channel: BroadcastChannelSummary;
-  size?: number;
-}) {
-  const { palette, tone } = useKISTheme();
-  if (channel.avatar_url) {
-    return (
-      <Image
-        source={{ uri: channel.avatar_url }}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: 2,
-          borderColor: palette.ivory,
-        }}
-      />
-    );
-  }
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: palette.primarySoft,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: palette.ivory,
-      }}
-    >
-      <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: size * 0.33 }}>
-        {initialsFor(channel)}
-      </Text>
-    </View>
-  );
-}
 
 function StatPill({ label, value }: { label: string; value: string }) {
   const { palette, tone } = useKISTheme();

@@ -5,6 +5,14 @@ export type BroadcastChannelSummary = {
   description?: string;
   avatar_url?: string;
   banner_url?: string;
+  // Server-computed display avatar — always prefer these over avatar_url:
+  // GO's own channels resolve to the official KIS logo, user channels to
+  // the owner's profile photo (or initials), org channels to the org's own
+  // image (or initials). See apps/broadcasts/serializers.py's
+  // _resolve_channel_avatar. avatar_kind is 'logo' | 'photo' | 'initials'.
+  avatar_kind?: 'logo' | 'photo' | 'initials';
+  avatar_display_url?: string;
+  avatar_initials?: string;
   category?: string;
   language?: string;
   country?: string;

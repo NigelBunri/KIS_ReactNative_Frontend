@@ -31,6 +31,7 @@ import SubscribeBellButton from '@/screens/broadcast/channels/components/Subscri
 import PlaylistRail from '@/screens/broadcast/channels/components/PlaylistRail';
 import { fetchPublicChannelLanding } from '@/services/publicGrowthService';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
@@ -62,14 +63,6 @@ const compactNumber = (value?: number) => {
   return String(num);
 };
 
-const initialsFor = (channel?: BroadcastChannelSummary | null) =>
-  String(channel?.display_name || channel?.handle || 'KC')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase())
-    .join('') || 'KC';
-
 const assetUrlFor = (content: BroadcastChannelContent) =>
   resolveBackendAssetUrl(
     content.thumbnail_url ||
@@ -92,26 +85,6 @@ const contentLabel = (type?: string) => {
       return String(type || 'Post').replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
   }
 };
-
-function ChannelAvatar({ channel, size }: { channel?: BroadcastChannelSummary | null; size: number }) {
-  const { palette } = useKISTheme();
-  const url = channel?.avatar_url ? resolveBackendAssetUrl(channel.avatar_url) : '';
-  if (url) {
-    return (
-      <PermanentRemoteImage
-        uri={url}
-        domain="Broadcast"
-        stableKey={`channel_avatar_${channel?.id ?? channel?.handle ?? url}_${url}`}
-        containerStyle={{ width: size, height: size, borderRadius: size / 2 }}
-      />
-    );
-  }
-  return (
-    <View style={[styles.avatarFallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.primarySoft, borderColor: palette.surface }]}>
-      <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: Math.max(16, size * 0.28) }}>{initialsFor(channel)}</Text>
-    </View>
-  );
-}
 
 const formatDuration = (seconds?: number) => {
   if (!seconds || seconds <= 0) return null;
