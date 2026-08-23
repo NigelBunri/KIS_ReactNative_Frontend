@@ -16,13 +16,14 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { postRequest } from '@/network/post';
+import { postRequest, generateIdempotencyKey } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
 import type { RouteProp } from '@react-navigation/native';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import { backendCentsToUsd, formatUsdAmount } from '@/utils/currency';
+import { getDirectPaymentInfo, openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import {
   createDefaultAvailability,
@@ -741,6 +742,12 @@ const ServiceBookingScreen = () => {
         payload,
         {
           errorMessage: 'Unable to confirm booking.',
+          // A dropped connection or the network layer's own retry-on-
+          // timeout must not read as "the slot is already booked" when the
+          // first attempt actually succeeded — this key lets the backend
+          // recognize a retried request and return the existing booking
+          // instead of re-running the slot-capacity check against it.
+          idempotencyKey: generateIdempotencyKey(`service_booking_${service.id}`),
         },
       );
       if (response?.success === false) {
@@ -1397,6 +1404,8 @@ const ServiceBookingScreen = () => {
         </View>
       );
     }
+    const directPayment = getDirectPaymentInfo(bookingResult, bookingResult?.payment);
+    const depositCents = Number(bookingResult?.deposit_cents ?? 0);
     return (
       <View style={{ alignItems: 'center', gap: 12 }}>
         <Text
@@ -1414,13 +1423,25 @@ const ServiceBookingScreen = () => {
         <Text
           style={{ color: palette.subtext, textAlign: 'center', maxWidth: 260 }}
         >
-          {Number(bookingResult?.deposit_cents ?? 0) > 0
+          {depositCents > 0
             ? `Your USD payment request for ${formatUsdAmount(
-                backendCentsToUsd(bookingResult?.deposit_cents ?? 0),
+                backendCentsToUsd(depositCents),
               )} is pending direct provider checkout, and the shop owner has been notified.`
             : 'Your booking request has been sent and the shop owner has been notified.'}
         </Text>
-        <KISButton title="Done" onPress={() => navigation.goBack()} />
+        {depositCents > 0 && directPayment.paymentUrl ? (
+          <KISButton
+            title="Pay now"
+            onPress={() => {
+              void openDirectPaymentUrl(directPayment.paymentUrl);
+            }}
+          />
+        ) : null}
+        <KISButton
+          title="Done"
+          variant={depositCents > 0 && directPayment.paymentUrl ? 'outline' : undefined}
+          onPress={() => navigation.goBack()}
+        />
       </View>
     );
   };
