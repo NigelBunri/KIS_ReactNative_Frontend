@@ -181,7 +181,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
-  const canUseLiveStreaming = isTierAtLeast(user?.profile?.tier ?? null, 'partner');
+  // Tier lives at the top level of the /users/me/ response (UserSerializer),
+  // not nested under profile - ProfileSerializer has no tier field at all,
+  // so user?.profile?.tier was always undefined regardless of the account's
+  // real tier, meaning this always evaluated as Free and blocked every
+  // Partner/Partner Pro account from live streaming. AdminUserManagementScreen.tsx
+  // and AdminUsersPanel.tsx already read user.tier directly - matching that.
+  const canUseLiveStreaming = isTierAtLeast(user?.tier ?? null, 'partner');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab('dashboard'));
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
@@ -650,6 +656,19 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             <Text style={[styles.upgradeText, { color: palette.subtext }]}>
               Live streaming is available on Partner plans and above. Upgrade your account to schedule and broadcast live streams to your subscribers.
             </Text>
+            {/* Previously a dead end - text only, no way to actually act on
+                it. Upgrading itself (tier lookup, discount/reward
+                application, Flutterwave checkout) lives in
+                useProfileController.upgradeTier, which needs profile/tiers
+                data this screen doesn't have - rather than duplicate that
+                payment logic here, this hands off to the Profile tab where
+                the real, working "Upgrade" entry point already is. */}
+            <Pressable
+              onPress={() => navigation.navigate('MainTabs')}
+              style={[styles.primaryButton, { backgroundColor: palette.text, marginTop: 14 }]}
+            >
+              <Text style={[styles.primaryText, { color: palette.surface }]}>Go to Profile to upgrade</Text>
+            </Pressable>
           </View>
         );
       }
