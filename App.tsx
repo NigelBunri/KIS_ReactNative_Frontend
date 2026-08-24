@@ -130,7 +130,7 @@ import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
 import { MiniPlayerProvider } from '@/contexts/MiniPlayerContext';
 import MiniPlayer from '@/components/common/MiniPlayer';
-import { initPushHandlers } from './src/push/notifications';
+import { initPushHandlers, reregisterPushTokensForCurrentUser } from './src/push/notifications';
 import { routeDeepLink } from './src/push/deepLinkRouter';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
@@ -890,6 +890,19 @@ function AppContent() {
   useEffect(() => {
     initPushHandlers(navigationRef);
   }, []);
+
+  // Re-associate this device's push/VoIP tokens with whoever is now signed
+  // in. initPushHandlers above only registers once per app process (mount);
+  // without this, a logout followed by a different user logging in during
+  // the same session would leave the backend still routing this device's
+  // notifications to the PREVIOUS account until Firebase happened to rotate
+  // the token on its own. This also fires on the very first mount's
+  // isAuth=false→true transition, duplicating initPushHandlers' own first
+  // registration — harmless, since both backends upsert on
+  // (user, device, token) rather than erroring on a repeat.
+  useEffect(() => {
+    if (isAuth) void reregisterPushTokensForCurrentUser();
+  }, [isAuth]);
 
   // kis:// custom-scheme and https://kis.app/... universal links (from the
   // website's "Open in App" buttons and shared content links) — same

@@ -117,6 +117,45 @@ export async function unregisterPushToken(): Promise<void> {
 }
 
 /**
+ * Re-associates whatever push/VoIP tokens this install already holds with
+ * the CURRENTLY signed-in user — call this right after login completes.
+ *
+ * initPushHandlers() only ever registers tokens once, in a mount-time
+ * effect that runs before any user is necessarily signed in. That's fine
+ * for a fresh install's first login, but if a user logs out and a
+ * DIFFERENT user logs into the same app session (no restart in between),
+ * that one-time effect never re-fires — so the new user's login never
+ * re-POSTs the token, and the backend keeps associating this device's
+ * token with the PREVIOUS account until the FCM SDK happens to rotate the
+ * token on its own (unpredictable, can be days). Both backends key
+ * registration on the caller's authenticated user_id (see
+ * DeviceTokensService.upsert in Nest, NotificationDeviceTokenViewSet in
+ * Django), so re-POSTing on every login — not just once per app process —
+ * is what actually reassigns a shared/reused device to its new owner.
+ * Reads the already-known tokens back out of storage rather than
+ * re-requesting permission or hitting Firebase again.
+ */
+export async function reregisterPushTokensForCurrentUser(): Promise<void> {
+  try {
+    const [fcmToken, apnsToken] = await Promise.all([
+      AsyncStorage.getItem('fcm_token'),
+      AsyncStorage.getItem('apns_token'),
+    ]);
+    if (fcmToken) {
+      await registerPushToken({ pushToken: fcmToken, apnsToken });
+    }
+  } catch { /* silent — next token refresh or app restart will retry */ }
+
+  if (Platform.OS === 'ios') {
+    try {
+      const VoipTokenModule = NativeModules?.VoipTokenModule;
+      const voipToken = await VoipTokenModule?.getVoipToken?.();
+      if (voipToken) await registerVoipPushToken(voipToken);
+    } catch { /* Native module not present, or no VoIP token yet — no-op. */ }
+  }
+}
+
+/**
  * Reads the VoIP token captured natively by AppDelegate.swift's
  * PKPushRegistryDelegate (via the VoipTokenModule bridge) and registers it,
  * then keeps it in sync on rotation. iOS-only — Android has no PushKit
@@ -206,8 +245,16 @@ export async function initPushHandlers(navigation?: any) {
       // Retry any previously failed push token registration first
       await retryPendingPushToken();
       await registerPushToken({ pushToken: fcmToken, apnsToken });
-      initVoipPushToken();
     } catch {}
+
+    // PushKit VoIP token init is intentionally OUTSIDE the FCM try block above.
+    // getToken() can legitimately throw here — iOS FCM requires an APNs token
+    // to already be attached to FIRMessaging (see RNFBMessagingModule's
+    // getToken), which arrives asynchronously from Apple and can easily still
+    // be in flight this early in app launch. That's an FCM-only race; VoIP/
+    // PushKit has nothing to do with Firebase and must not be skipped because
+    // of it.
+    initVoipPushToken();
 
     // A rotated FCM token was previously only ever picked up on the next
     // cold start (only getToken() at mount was read) — mid-session
