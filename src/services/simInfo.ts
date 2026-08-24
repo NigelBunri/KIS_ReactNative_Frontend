@@ -4,7 +4,7 @@ import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 const { KISSimInfoModule } = NativeModules;
 
 /**
- * Best-effort read of this device's own SIM phone number. Android only —
+ * Best-effort read of this device's own SIM phone number. Android only -
  * iOS has no API for an app to read its own device's number, so this always
  * resolves null there. Even on Android, many carriers/OEMs don't expose it,
  * so a null result means "unknown", never "no SIM" or "verification failed".

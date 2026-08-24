@@ -38,7 +38,7 @@ if (CALLKIT_ENABLED) {
   try {
     RNCallKeep = require('react-native-callkeep').default;
   } catch {
-    // Package not installed — falls back to in-app UI.
+    // Package not installed - falls back to in-app UI.
   }
 }
 
@@ -48,8 +48,8 @@ export const callKeepAvailable = !!RNCallKeep;
 // (declared in AndroidManifest.xml) needs to route native call-UI actions
 // (answer/decline from the lock screen) back into JS while the app isn't
 // running. Per react-native-callkeep's own setup requirement, this must run
-// unconditionally at JS entry (index.js) — not gated behind auth/socket
-// mount — so it's registered even in a headless JS invocation triggered by a
+// unconditionally at JS entry (index.js) - not gated behind auth/socket
+// mount - so it's registered even in a headless JS invocation triggered by a
 // killed-state FCM message.
 export function registerAndroidEvents(): void {
   if (!RNCallKeep || Platform.OS !== 'android') return;

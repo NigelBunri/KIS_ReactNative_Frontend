@@ -19,7 +19,7 @@ import {
 
 type QueueState = { pending: number; failed: number; total: number };
 
-// Long enough to read, short enough to not linger — the underlying queue
+// Long enough to read, short enough to not linger - the underlying queue
 // state isn't lost when this auto-hides, it just stops being shown; the
 // next queue-updated event (or a pull-to-refresh style resurfacing) brings
 // it back if items are still stuck.
@@ -53,7 +53,7 @@ export default function SyncQueueBanner() {
           clearTimer.current = null;
         }
         if (payload.total === 0) {
-          // Queue emptied — hide after a brief "all done" beat.
+          // Queue emptied - hide after a brief "all done" beat.
           clearHideTimer();
           clearTimer.current = setTimeout(() => setState(null), EMPTY_QUEUE_CLEAR_DELAY_MS);
           setState(payload);
@@ -73,7 +73,7 @@ export default function SyncQueueBanner() {
 
   const isVisible = !!state && state.total > 0 && !dismissed;
 
-  // Auto-hide after AUTO_HIDE_MS — but never while an actual retry request
+  // Auto-hide after AUTO_HIDE_MS - but never while an actual retry request
   // is in flight, and never for the brief "all synced" success beat (that
   // already has its own shorter, fixed-length timer above).
   useEffect(() => {

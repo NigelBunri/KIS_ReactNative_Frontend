@@ -64,7 +64,7 @@ export class VirtualBgProcessor {
         this.frameUri = uri;
         this._callbacks.forEach(cb => cb(uri));
       } catch {
-        // View may not be mounted yet — suppress
+        // View may not be mounted yet - suppress
       } finally {
         this._capturing = false;
       }

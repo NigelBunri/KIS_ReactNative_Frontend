@@ -14,6 +14,7 @@
 		5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A6835689303C833600A85D38 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A6835688303C833600A85D38 /* GoogleService-Info.plist */; };
 		DACE8D9A061DE2933D44340F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3F069872D1B686B57B9DBA0 /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
@@ -55,6 +56,7 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = KIS/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = KIS/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A3F069872D1B686B57B9DBA0 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		A6835688303C833600A85D38 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C4F539924D0986C67C118F7B /* RTCScreenSharingExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RTCScreenSharingExtension.entitlements; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RTCScreenSharingExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,6 +85,7 @@
 		13B07FAE1A68108700A75B9A /* KIS */ = {
 			isa = PBXGroup;
 			children = (
+				A6835688303C833600A85D38 /* GoogleService-Info.plist */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
@@ -149,7 +152,6 @@
 				1B90FCDD6FAD01BBFEA7C0B1 /* Info.plist */,
 				C4F539924D0986C67C118F7B /* RTCScreenSharingExtension.entitlements */,
 			);
-			name = RTCScreenSharingExtension;
 			path = RTCScreenSharingExtension;
 			sourceTree = "<group>";
 		};
@@ -244,6 +246,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
+				A6835689303C833600A85D38 /* GoogleService-Info.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -383,6 +386,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K692889KRM;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = KIS/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -396,7 +400,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kis;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis;
 				PRODUCT_NAME = KIS;
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -414,6 +418,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K692889KRM;
 				INFOPLIST_FILE = KIS/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -426,7 +431,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kis;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis;
 				PRODUCT_NAME = KIS;
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

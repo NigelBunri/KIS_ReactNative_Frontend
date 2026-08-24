@@ -4,7 +4,7 @@ import { PanResponder } from 'react-native';
 import { withSpring, type SharedValue } from 'react-native-reanimated';
 
 /** Common imperative handle shape for content views a header-drag dispatcher
- * scrolls — implemented by plain ScrollView refs (native `scrollTo` already
+ * scrolls - implemented by plain ScrollView refs (native `scrollTo` already
  * matches this shape) and by forwardRef'd FlatList/SectionList wrappers
  * (e.g. via `getScrollResponder()?.scrollTo(...)`). */
 export type ScrollableHandle = {
@@ -14,7 +14,7 @@ export type ScrollableHandle = {
 /**
  * Lets a screen's gold header be dragged directly (not just scrolled via its
  * content list) to collapse/expand, while keeping the underlying content in
- * lockstep — the header commonly lives outside the screen's own content tree
+ * lockstep - the header commonly lives outside the screen's own content tree
  * (registered with the shared Golden Section host), so a drag starting on it
  * has no native scroll gesture to move the page; without the `onScrollTo`
  * callback here, the header would collapse/expand while the content
@@ -48,7 +48,7 @@ export function useHeaderDragToScroll({
           const distance = Math.max(collapseDistance.value, 1);
           const nextOffset = Math.max(0, Math.min(distance, gestureStartOffsetRef.current - gesture.dy));
           scrollY.value = nextOffset;
-          // Move the real content scroll 1:1 with the finger, immediately —
+          // Move the real content scroll 1:1 with the finger, immediately -
           // this is what makes dragging the header feel like dragging the
           // page itself, instead of only collapsing the header in place.
           onScrollTo(nextOffset, false);
@@ -62,7 +62,7 @@ export function useHeaderDragToScroll({
           scrollY.value = withSpring(target, { damping: 16, stiffness: 140 });
           // Let the ScrollView's own native scroll animation carry the
           // content to the same resting offset, rather than trying to mirror
-          // the spring frame-by-frame — both land on `target` at roughly the
+          // the spring frame-by-frame - both land on `target` at roughly the
           // same time, which reads as one unified motion.
           onScrollTo(target, true);
         },

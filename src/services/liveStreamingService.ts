@@ -291,7 +291,7 @@ class LiveStreamingService {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       }).catch((err: any) => {
-        // The broadcaster is already tearing down locally either way — a
+        // The broadcaster is already tearing down locally either way - a
         // failed DELETE just means the media server may be left with an
         // orphaned ingest session, so this is diagnostic-only, not
         // something the user needs to react to.
@@ -371,7 +371,7 @@ class LiveStreamingService {
 
   // A single dropped candidate rarely matters (ICE negotiation is resilient
   // to some loss), but a *run* of failures means trickle-ICE is broken and
-  // the connection may never complete — that's exactly the silent-stuck-
+  // the connection may never complete - that's exactly the silent-stuck-
   // on-"CONNECTING" failure mode this previously produced with no
   // diagnostics. Log every failure, but only surface a user-facing error
   // once a burst crosses this threshold, not per-candidate.
@@ -388,7 +388,7 @@ class LiveStreamingService {
         this.consecutiveIceTrickleFailures ===
         LiveStreamingService.ICE_TRICKLE_FAILURE_ALERT_THRESHOLD
       ) {
-        this.emitError(new Error('Connection is unstable — network candidates are failing to reach the server.'));
+        this.emitError(new Error('Connection is unstable - network candidates are failing to reach the server.'));
       }
     }
   }
@@ -451,10 +451,10 @@ class LiveStreamingService {
       this.consecutiveStatsFailures += 1;
       if (__DEV__) console.warn('[liveStreamingService] getStats() failed', err);
       // getStats() failing repeatedly means the health bar is showing
-      // stale numbers with no indication they've stopped updating —
+      // stale numbers with no indication they've stopped updating -
       // surface that once, rather than freezing silently forever.
       if (this.consecutiveStatsFailures === 3) {
-        this.emitError(new Error('Unable to read connection stats — the health indicators may be out of date.'));
+        this.emitError(new Error('Unable to read connection stats - the health indicators may be out of date.'));
       }
     }
   }

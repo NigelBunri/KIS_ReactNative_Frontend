@@ -4,7 +4,7 @@
 // is cold-starting (Render free tier sleeps after 15 min inactivity).
 //
 // IDs are prefixed "local_" so the app can tell them apart from real server
-// IDs — once the API responds the real data replaces these.
+// IDs - once the API responds the real data replaces these.
 
 import kjvBible from '@/assets/bible/kjv.json';
 import type { BibleBook, BibleTranslation } from '@/screens/tabs/bible/useBibleData';
@@ -17,7 +17,7 @@ export const LOCAL_KJV_TRANSLATION: BibleTranslation = {
   is_public: true,
 };
 
-// Chapter counts per book — used when the chapters API is unreachable so the
+// Chapter counts per book - used when the chapters API is unreachable so the
 // chapter picker still works while the server wakes up.
 export const BOOK_CHAPTER_COUNTS: Record<string, number> = {
   GENESIS: 50, EXODUS: 40, LEVITICUS: 27, NUMBERS: 36, DEUTERONOMY: 34,
@@ -107,7 +107,7 @@ export const LOCAL_BIBLE_BOOKS: BibleBook[] = [
   { id: 'local_66', code: 'REVELATION',       name: 'Revelation',       testament: 'NT' },
 ];
 
-/** Build a chapters array from the local count table — used when the server is unreachable. */
+/** Build a chapters array from the local count table - used when the server is unreachable. */
 export function localChaptersForBook(bookCode: string): Array<{ id: string; number: number }> {
   const count = BOOK_CHAPTER_COUNTS[bookCode] ?? 0;
   return Array.from({ length: count }, (_, i) => ({
@@ -121,7 +121,7 @@ export const isLocalId = (id: string) => String(id).startsWith('local_');
 
 // ─── Bundled verse text ────────────────────────────────────────────────────
 // Included so the reader is never blank when the server is cold-starting.
-// KJV is public domain — no licensing concerns.
+// KJV is public domain - no licensing concerns.
 
 type BundledBibleJson = Record<string, Record<string, Record<string, string>>>;
 const BUNDLED_KJV_BIBLE = kjvBible as BundledBibleJson;

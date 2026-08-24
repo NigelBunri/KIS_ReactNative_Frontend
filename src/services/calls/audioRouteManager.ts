@@ -19,7 +19,7 @@ const getARPlayer = () => {
   return _arPlayer;
 };
 
-// System ringtone URI — Android only (content://settings/system/ringtone).
+// System ringtone URI - Android only (content://settings/system/ringtone).
 // iOS: InCallManager handles it natively; without it we rely on Vibration alone.
 const SYSTEM_RINGTONE_URI = Platform.select({
   android: 'content://settings/system/ringtone',
@@ -129,7 +129,7 @@ class AudioRouteManager {
 
   // ─── Ringback (caller) ──────────────────────────────────────────────────────
   // Soft "bip bip bip" tone so the caller knows the remote phone is ringing.
-  // NOT the full ringtone — that would be confusing (both sides ringing equally).
+  // NOT the full ringtone - that would be confusing (both sides ringing equally).
 
   startRingback() {
     if (this._ringbackActive) return;
@@ -145,7 +145,7 @@ class AudioRouteManager {
     }
 
     // Fallback without InCallManager: subtle vibration pulse only.
-    // We deliberately avoid playing the system ringtone here — it would make
+    // We deliberately avoid playing the system ringtone here - it would make
     // the caller's phone ring loudly, identical to the receiver's experience.
     Vibration.vibrate(RINGBACK_VIBRATE_PATTERN, true);
   }

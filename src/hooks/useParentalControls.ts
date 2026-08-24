@@ -61,7 +61,7 @@ export function useParentalControls(memberId?: string | null) {
       _memCache = { data, ts: Date.now() };
       await AsyncStorage.setItem(`${CACHE_KEY}:${memberId}`, JSON.stringify(_memCache));
     } catch {
-      // Non-fatal — defaults permit everything (adult mode)
+      // Non-fatal - defaults permit everything (adult mode)
     } finally {
       setLoading(false);
     }

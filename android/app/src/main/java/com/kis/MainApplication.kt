@@ -25,7 +25,7 @@ class MainApplication : Application(), ReactApplication {
     loadReactNative(this)
     // react-native-callkeep registration with the Android Telecom framework is
     // handled entirely by the JS layer when the app calls RNCallKeep.setup(config).
-    // No native-side setup call is needed here — auto-linking wires the module in
+    // No native-side setup call is needed here - auto-linking wires the module in
     // automatically via PackageList above.
   }
 }

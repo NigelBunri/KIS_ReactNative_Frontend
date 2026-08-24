@@ -1,5 +1,5 @@
 // src/services/calls/callService.ts
-// Stateful call service — wraps webRTCService with higher-level operations
+// Stateful call service - wraps webRTCService with higher-level operations
 // (screen share toggle, DTLS fingerprint extraction, etc.)
 
 import { webRTCService } from './webRTCService';
@@ -17,7 +17,7 @@ const _screenShareState: Record<string, boolean> = {};
  * On first call (sharing off → on):
  *   1. Tries `mediaDevices.getDisplayMedia` (react-native-webrtc ≥ 106 + OS support).
  *   2. Throws `Error('SCREEN_SHARE_UNAVAILABLE')` if getDisplayMedia is unavailable
- *      or fails — callers must surface this to the user rather than silently
+ *      or fails - callers must surface this to the user rather than silently
  *      swapping in the camera, which would misrepresent what's being shared.
  *   3. Replaces the video sender track in all active peer connections.
  *   4. Emits `call.screen_share` with `{ conversationId, enabled: true }` via the socket.
@@ -46,7 +46,7 @@ export async function toggleScreenShare(
     const localStream = webRTCService.getLocalStream();
 
     // Stop ONLY the screen-capture track. Previously this stopped EVERY video
-    // track on the local stream — which includes the camera track (it is never
+    // track on the local stream - which includes the camera track (it is never
     // removed from the local stream during screen share). That killed the camera
     // permanently, so restoring _originalVideoTrack below put a dead track back
     // on the senders and the local participant went black after un-sharing.

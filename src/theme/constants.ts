@@ -38,11 +38,11 @@ export const KIS_COLORS = {
   // Base swatches per tone (kept compatible with existing keys)
   dark: {
     orange: '#9A6A14',
-    // Near-black with the faintest warm undertone — less purple than before,
+    // Near-black with the faintest warm undertone - less purple than before,
     // so content areas feel calm rather than atmospheric.
     bg: '#0A090F',
     card: '#111117',            // neutral dark, not purple-tinted
-    text: '#F0EBE1',            // softer cream — readable but less glaring
+    text: '#F0EBE1',            // softer cream - readable but less glaring
     subtext: '#9E9AA8',         // neutral grey-purple, not lavender
     inputBg: '#16141C',
     inputBorder: '#8A5A12',
@@ -55,7 +55,7 @@ export const KIS_COLORS = {
 
   light: {
     orange: '#7A4B3E',
-    // Soft warm neutral instead of stark white — easier on the eyes.
+    // Soft warm neutral instead of stark white - easier on the eyes.
     bg: '#F8F6F3',
     card: '#F2EFE9',            // neutral warm cream, less yellow than before
     text: '#2A2420',            // dark neutral brown, less red
@@ -64,7 +64,7 @@ export const KIS_COLORS = {
     inputBorder: '#C9A87A',     // slightly softened gold border
     divider: '#DDD8D0',         // neutral warm grey, not amber
 
-    // Less orange chrome — warm neutral that doesn't compete with the gold headers.
+    // Less orange chrome - warm neutral that doesn't compete with the gold headers.
     chrome: '#EDE8E0',
     bar: '#F8F6F3',
     shadow: 'rgba(60,45,35,0.18)',
@@ -155,7 +155,7 @@ export type KISPalette = {
   focusRing: string;
 
   // Brand tints/intensities used in UI
-  primaryWeak: string;    // very light tint — subtler than primarySoft
+  primaryWeak: string;    // very light tint - subtler than primarySoft
   primarySoft: string;
   primaryStrong: string;
 
@@ -215,10 +215,10 @@ export const createPalette = (tone: KISTone): KISPalette => {
   const c = KIS_COLORS;
   const base = tone === 'dark' ? c.dark : c.light;
 
-  // Elevated surface — neutral, not purple-saturated in dark mode
+  // Elevated surface - neutral, not purple-saturated in dark mode
   const elevated = tone === 'dark' ? '#1C1A22' : '#EDE9E2';
 
-  // KIS brand colors — same hex in both themes for fills and accents
+  // KIS brand colors - same hex in both themes for fills and accents
   const coffeePrimary = '#7A4B3E';
   const coffeeStrong = '#5A372D';
   const tanGold = '#D9A875';
@@ -229,7 +229,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
 
   // In dark mode, fills use the same coffee-brown/tan-gold as light theme (paired with
   // white text via onPrimary). For bare text/icons drawn directly on the near-black bg,
-  // tanGold (#D9A875) is the right choice — it IS the light theme's gold and passes
+  // tanGold (#D9A875) is the right choice - it IS the light theme's gold and passes
   // 9.5:1 contrast against #09070D, so it looks identical to what you see in light mode.
   const goldOnDark = tanGold;
 
@@ -333,7 +333,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
     mutedText: base.subtext,     // 🆕 keeps request banners aligned with subtext
     inverseText: tone === 'dark' ? c.brand.royalInk : '#FFFFFF',
 
-    // Inputs & borders — tan-gold (#D9A875) is the light-theme border color and reads
+    // Inputs & borders - tan-gold (#D9A875) is the light-theme border color and reads
     // well at 9.5:1 on dark bg, so we use it directly in both themes.
     inputBg: base.inputBg,
     inputBorder: tone === 'dark' ? tanGold : base.inputBorder,
@@ -341,7 +341,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
     borderMuted: tone === 'dark' ? 'rgba(217,168,117,0.38)' : coffeeDivider,
     divider: tone === 'dark' ? 'rgba(231,199,161,0.30)' : base.divider,
 
-    // Brand — same brown-gold hex in both themes
+    // Brand - same brown-gold hex in both themes
     primary: coffeePrimary,
     secondary: tone === 'dark' ? c.brand.secondary : coffeeStrong,
     gradientStart: tone === 'dark' ? c.brand.gradientStart : '#F2D8B8',
@@ -369,7 +369,7 @@ export const createPalette = (tone: KISTone): KISPalette => {
     royalPanel: tone === 'dark' ? '#1A1226' : lightRoyalPurple,
     royalPanelText: tone === 'dark' ? c.brand.goldHighlight : '#FFFFFF',
     royalPanelSubtext: tone === 'dark' ? c.brand.goldSoft : '#F8F1E3',
-    // goldReadable: tan-gold text on dark bg (9.5:1 contrast) — same color family as light theme
+    // goldReadable: tan-gold text on dark bg (9.5:1 contrast) - same color family as light theme
     goldReadable: tone === 'dark' ? goldOnDark : '#5E3B0A',
     onGold,
     goldBorder: tone === 'dark' ? tanGold : '#B9852E',
@@ -452,7 +452,7 @@ export const KIS_TOKENS = {
   },
 
   /** Breathing room added below the real safe-area top inset for screen
-   *  headers. Never hardcode top spacing — always `insets.top + this`. */
+   *  headers. Never hardcode top spacing - always `insets.top + this`. */
   SCREEN_HEADER_TOP_PADDING: 12,
 
   radius: {

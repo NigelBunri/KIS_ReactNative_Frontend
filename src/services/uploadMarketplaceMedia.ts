@@ -1,16 +1,16 @@
 // src/services/uploadMarketplaceMedia.ts
 //
-// The ONE upload helper every marketplace screen must use — shop logo,
+// The ONE upload helper every marketplace screen must use - shop logo,
 // product main/gallery images, service images, complaint attachments.
 // Mirrors src/screens/tabs/profile/profileImageUpload.ts's three-step
 // handshake (initiate -> PUT to S3 -> confirm) and reuses the exact same
 // upload-id resolution/validation logic chat and profile uploads use
-// (src/network/uploadIntentContract.ts) — a storage key is never used as
+// (src/network/uploadIntentContract.ts) - a storage key is never used as
 // the confirm id here either.
 //
 // Callers attach the resulting `mediaId` to their create/update request
 // (e.g. `main_image_media_id`) or to a dedicated attach endpoint
-// (`POST /shops/:id/image/attach/`, etc.) — see apps/commerce/media_uploads.py
+// (`POST /shops/:id/image/attach/`, etc.) - see apps/commerce/media_uploads.py
 // on the backend for the full contract.
 
 import ImageResizer from 'react-native-image-resizer';
@@ -58,7 +58,7 @@ const isCompressibleImage = (type?: string | null) => {
 
 const withJpegExtension = (name: string) => (name || `upload_${Date.now()}`).replace(/\.[^.]+$/, '') + '.jpg';
 
-// Resize + re-encode to JPEG on-device before it ever leaves the phone —
+// Resize + re-encode to JPEG on-device before it ever leaves the phone -
 // same rationale as profileImageUpload.ts's compressProfileImage: sidesteps
 // HEIC decoding differences and keeps upload size predictable. Non-image
 // files (a complaint's PDF receipt, for instance) pass through untouched.
@@ -98,7 +98,7 @@ function uploadBytesToPresignedUrl(
     Object.entries(headers || {}).forEach(([key, value]) => {
       xhr.setRequestHeader(key, String(value));
     });
-    // No Authorization header — the presigned URL query string is the only
+    // No Authorization header - the presigned URL query string is the only
     // credential S3 sees, never the app's Django bearer token.
     const onAbort = () => xhr.abort();
     if (signal) {
@@ -148,7 +148,7 @@ function uploadBytesToPresignedUrl(
 
 /**
  * Uploads a file for a marketplace purpose and returns a confirmed,
- * stable `mediaId` — never a storage key, never a raw file. Callers pass
+ * stable `mediaId` - never a storage key, never a raw file. Callers pass
  * that mediaId to their create/update request (`*_media_id` fields) or to
  * the matching `/attach/` endpoint. Throws on any failure; the caller owns
  * retry (just call this again) and duplicate-tap prevention (disable the

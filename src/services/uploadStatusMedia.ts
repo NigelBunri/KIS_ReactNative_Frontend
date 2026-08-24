@@ -5,16 +5,16 @@
 // src/services/uploadMarketplaceMedia.ts's three-step handshake
 // (initiate -> PUT to S3 -> confirm) and reuses the exact same upload-id
 // resolution/validation logic every other upload surface uses
-// (src/network/uploadIntentContract.ts) — a storage key is never used as
+// (src/network/uploadIntentContract.ts) - a storage key is never used as
 // the confirm id here either.
 //
 // Unlike marketplace uploads, status media has no pre-existing target to
 // authorize against, so this calls the generic
 // POST /api/v1/media/uploads/initiate/ directly with
-// context=status_image|status_video|status_audio — see
+// context=status_image|status_video|status_audio - see
 // apps/media/upload_intent.py + apps/statuses/status_media.py on the
 // backend. Callers pass the resulting `mediaId` as `media_id` on
-// POST /api/v1/statuses/ (StatusCreateSerializer) — never the storage key.
+// POST /api/v1/statuses/ (StatusCreateSerializer) - never the storage key.
 
 import ImageResizer from 'react-native-image-resizer';
 import RNFS from 'react-native-fs';
@@ -49,7 +49,7 @@ const isCompressibleImage = (type?: string | null) => {
 
 const withJpegExtension = (name: string) => (name || `status_${Date.now()}`).replace(/\.[^.]+$/, '') + '.jpg';
 
-// Voice recordings (UpdatesTab.tsx's stopRecording) never carry a size —
+// Voice recordings (UpdatesTab.tsx's stopRecording) never carry a size -
 // unlike react-native-image-picker assets, that object is built by hand
 // from the recorder's output path with no fileSize field at all. Without
 // this, size_bytes would be sent as 0 and the backend's initiate validation
@@ -65,7 +65,7 @@ async function resolveFileSize(uri: string, declaredSize?: number | null): Promi
 }
 
 // Resize + re-encode images on-device before they leave the phone, same as
-// every other image upload surface (profile, marketplace) — sidesteps HEIC
+// every other image upload surface (profile, marketplace) - sidesteps HEIC
 // decoding differences and keeps upload size predictable. Video and audio
 // status media pass through untouched: no compression/transcoding pipeline
 // exists for either in this codebase today, so none is invented here.
@@ -91,7 +91,7 @@ async function prepareFile(file: PickedFile, purpose: StatusMediaPurpose): Promi
 }
 
 // XHR (not fetch) so progress is observable via xhr.upload.onprogress, and
-// so an AbortSignal can actually cancel an in-flight upload — same pattern
+// so an AbortSignal can actually cancel an in-flight upload - same pattern
 // as uploadMarketplaceMedia.ts.
 function uploadBytesToPresignedUrl(
   uploadUrl: string,
@@ -107,7 +107,7 @@ function uploadBytesToPresignedUrl(
     Object.entries(headers || {}).forEach(([key, value]) => {
       xhr.setRequestHeader(key, String(value));
     });
-    // No Authorization header — the presigned URL query string is the only
+    // No Authorization header - the presigned URL query string is the only
     // credential S3 sees, never the app's Django bearer token.
     const onAbort = () => xhr.abort();
     if (signal) {
@@ -157,7 +157,7 @@ function uploadBytesToPresignedUrl(
 
 /**
  * Uploads a status image/video/audio file and returns a confirmed, stable
- * `mediaId` — never a storage key, never a raw file. Callers pass that
+ * `mediaId` - never a storage key, never a raw file. Callers pass that
  * mediaId as `media_id` on the status create request. Throws on any
  * failure; the caller owns retry (just call this again) and duplicate-tap
  * prevention (disable the publish control while a call is in flight).

@@ -17,7 +17,7 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   mediasoupClient = require('mediasoup-client');
 } catch {
-  // mediasoup-client not installed — SFU path unavailable
+  // mediasoup-client not installed - SFU path unavailable
 }
 
 export const sfuAvailable = !!mediasoupClient;
@@ -93,7 +93,7 @@ class SfuService {
 
     // 7. Listen for new producers.
     // The backend broadcasts sfu.producer.new to the whole conv room, including
-    // the producer's own socket. Skip our own producers — consuming them would
+    // the producer's own socket. Skip our own producers - consuming them would
     // echo our own audio/video back to us. (existingProducers in step 6 is
     // already server-side filtered, but this live broadcast is not.)
     socket.on('sfu.producer.new', async (payload: any) => {

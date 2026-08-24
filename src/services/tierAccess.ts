@@ -8,7 +8,7 @@ export type AccountTierShape = {
   id?: string | number;
 };
 
-// Canonical tier ordering — must match backend TIER_HIERARCHY exactly.
+// Canonical tier ordering - must match backend TIER_HIERARCHY exactly.
 // 'basic' was renamed to 'free'; 'market pro' was an alias for 'business pro'.
 // Both are handled as aliases so old data still resolves correctly.
 const TIER_ORDER = ['free', 'pro', 'business', 'business pro', 'partner', 'partner pro'];

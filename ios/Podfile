@@ -39,7 +39,6 @@ setup_permissions([
   'Siri',
   'FaceID',
   'Notifications',
-  'BackgroundRefresh',
 ])
 
 linkage = ENV['USE_FRAMEWORKS']

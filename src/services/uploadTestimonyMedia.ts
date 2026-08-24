@@ -3,15 +3,15 @@
 // Upload helper for a testimony's optional video/file attachment. Mirrors
 // src/services/uploadStatusMedia.ts's three-step handshake (initiate -> PUT
 // to S3 -> confirm) and reuses the exact same upload-id resolution logic
-// every other upload surface uses (src/network/uploadIntentContract.ts) —
+// every other upload surface uses (src/network/uploadIntentContract.ts) -
 // a storage key is never used as the confirm id here either.
 //
 // No pre-existing target to authorize against (same as status media), so
 // this calls the generic POST /api/v1/media/uploads/initiate/ directly with
-// context=testimony_media — see apps/media/upload_intent.py +
+// context=testimony_media - see apps/media/upload_intent.py +
 // apps/testimony/media.py on the backend. Callers pass the resulting
 // `mediaId` as `resource_attachment: { media_id: mediaId }` on
-// POST/PATCH /testimonies/ (UserTestimonySerializer) — never the storage key.
+// POST/PATCH /testimonies/ (UserTestimonySerializer) - never the storage key.
 
 import ImageResizer from 'react-native-image-resizer';
 import RNFS from 'react-native-fs';
@@ -55,7 +55,7 @@ async function resolveFileSize(uri: string, declaredSize?: number | null): Promi
 }
 
 // Images get resized/re-encoded on-device same as every other image upload
-// surface; video/PDF/doc attachments pass through untouched — no
+// surface; video/PDF/doc attachments pass through untouched - no
 // compression/transcoding pipeline exists for those in this codebase.
 async function prepareFile(file: PickedFile): Promise<PreparedFile> {
   if (!isCompressibleImage(file.type)) {
@@ -142,7 +142,7 @@ function uploadBytesToPresignedUrl(
 
 /**
  * Uploads a testimony's video/file attachment and returns a confirmed,
- * stable `mediaId` — never a storage key, never a raw file. Callers pass
+ * stable `mediaId` - never a storage key, never a raw file. Callers pass
  * that mediaId as `resource_attachment: { media_id: mediaId }` on the
  * testimony create/update request. Throws on any failure; the caller owns
  * retry (just call this again) and duplicate-tap prevention (disable the

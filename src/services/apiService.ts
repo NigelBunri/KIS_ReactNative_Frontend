@@ -47,12 +47,12 @@ const assertSecureRequestUrl = (url: string): void => {
 };
 
 const REQUEST_TIMEOUT_MS = 45_000;
-// FormData bodies (media attachments — photos, video, audio, documents)
+// FormData bodies (media attachments - photos, video, audio, documents)
 // routinely take well over 45s to upload on an ordinary mobile connection,
 // not just a stalled one. Using the same short timeout as a small JSON
 // payload made large-but-healthy uploads abort mid-transfer, which the
 // post/patch retry logic then retried 2 more times against the identical
-// slow connection — the compounding cause of broadcast-item creation
+// slow connection - the compounding cause of broadcast-item creation
 // appearing to "hang" for minutes before finally failing.
 const UPLOAD_TIMEOUT_MS = 120_000;
 

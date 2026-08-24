@@ -27,7 +27,7 @@ export type CallParticipant = {
   userId: string;
   displayName: string;
   avatarUrl?: string | null;
-  stream?: any | null; // RTCMediaStream — typed as any to avoid hard dep
+  stream?: any | null; // RTCMediaStream - typed as any to avoid hard dep
   isLocal: boolean;
   isMuted: boolean;
   isVideoOff: boolean;
@@ -98,7 +98,7 @@ export type CallSession = {
   isRecording?: boolean;
   liveStartedAt?: string;
 
-  /** DTLS-SRTP fingerprint for the call — populated once the first peer reaches connected state. */
+  /** DTLS-SRTP fingerprint for the call - populated once the first peer reaches connected state. */
   dtlsFingerprint?: string;
 
   // Standalone / scheduled call fields

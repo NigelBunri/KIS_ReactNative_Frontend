@@ -9,7 +9,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Note: This runs in a headless JS task — no React hooks.
+// Note: This runs in a headless JS task - no React hooks.
 export async function handleBackgroundCallMessage(message: any) {
   const data = message?.data ?? {};
   if (data.type !== 'incoming_call') return;

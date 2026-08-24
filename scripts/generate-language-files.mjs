@@ -6,12 +6,12 @@
  * every other language's translation file lives on the backend and is
  * downloaded to the device on first selection (see
  * src/languages/remoteLanguageCache.ts and apps/localization in the backend
- * repo) — this script no longer writes xx.json files into this folder.
+ * repo) - this script no longer writes xx.json files into this folder.
  *
  * If a language's *.json happens to already exist in this folder (legacy
  * local copies kept around for editing), the script will still refresh it
  * in place using the same merge rules as before, purely as a convenience
- * for translators — but the app itself no longer reads or bundles it.
+ * for translators - but the app itself no longer reads or bundles it.
  *
  * ADDING A NEW LANGUAGE
  * ─────────────────────

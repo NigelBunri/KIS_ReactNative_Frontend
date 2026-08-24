@@ -22,7 +22,7 @@ export type ShortcutResult = {
   state: ShortcutState;
   shortcutId?: string;
   error?: string;
-  // true when the service already showed its own alert — screen should not add a second one
+  // true when the service already showed its own alert - screen should not add a second one
   handled?: boolean;
 };
 
@@ -92,7 +92,7 @@ async function createIOSShortcut(options: ShortcutOptions): Promise<ShortcutResu
   const deepLink = options.deepLink || `kis://org-app/${options.appId || options.partnerId}`;
 
   // Check whether the kis:// scheme is registered on this device.
-  // It only registers at install time — if the app was installed before this
+  // It only registers at install time - if the app was installed before this
   // feature was added, iOS won't know about it until the app is reinstalled.
   let schemeReady = false;
   try {
@@ -102,36 +102,36 @@ async function createIOSShortcut(options: ShortcutOptions): Promise<ShortcutResu
   }
 
   if (!schemeReady) {
-    // Scheme not registered yet — the app must be reinstalled.
+    // Scheme not registered yet - the app must be reinstalled.
     Alert.alert(
       'One-time setup required',
-      'To enable home screen shortcuts, the KIS app needs to be reinstalled once so iOS can register the required link.\n\nSteps:\n\n1. Delete KIS from your iPhone\n\n2. Reinstall it from the App Store (or rebuild from Xcode)\n\n3. Come back here and tap "Pin to Home Screen" again — it will work after that.',
+      'To enable home screen shortcuts, the KIS app needs to be reinstalled once so iOS can register the required link.\n\nSteps:\n\n1. Delete KIS from your iPhone\n\n2. Reinstall it from the App Store (or rebuild from Xcode)\n\n3. Come back here and tap "Pin to Home Screen" again - it will work after that.',
       [{ text: 'OK', style: 'default' }],
     );
     // handled: true so the screen does not show a second "Could not create shortcut" alert
     return { state: 'error', error: 'URL scheme not registered. App reinstall required.', handled: true };
   }
 
-  // Scheme is registered — proceed with Shortcuts app instructions.
+  // Scheme is registered - proceed with Shortcuts app instructions.
   Clipboard.setString(deepLink);
   void registerShortcutOnServer(options, false);
 
   Alert.alert(
     `Add "${options.label}" to Home Screen`,
-    `The link has been copied to your clipboard.\n\nSteps:\n\n1. Open the Shortcuts app (search for it — it comes with every iPhone)\n\n2. Tap + (top right) to create a new shortcut\n\n3. Tap "Add Action" → search "Open URLs" → select it\n\n4. Tap the URL field and paste — the link is already copied\n\n5. Tap the share icon at the top → "Add to Home Screen"\n\n6. Name it "${options.label}" → tap Add\n\nThe icon opens directly into this app inside KIS.`,
+    `The link has been copied to your clipboard.\n\nSteps:\n\n1. Open the Shortcuts app (search for it - it comes with every iPhone)\n\n2. Tap + (top right) to create a new shortcut\n\n3. Tap "Add Action" → search "Open URLs" → select it\n\n4. Tap the URL field and paste - the link is already copied\n\n5. Tap the share icon at the top → "Add to Home Screen"\n\n6. Name it "${options.label}" → tap Add\n\nThe icon opens directly into this app inside KIS.`,
     [
       {
         text: 'Open Shortcuts',
         onPress: () =>
           Linking.openURL('shortcuts://').catch(() =>
-            Alert.alert('Search for "Shortcuts" in your iPhone app library — it is pre-installed.'),
+            Alert.alert('Search for "Shortcuts" in your iPhone app library - it is pre-installed.'),
           ),
       },
       { text: 'Done', style: 'default' },
     ],
   );
 
-  // handled: true — the detailed instructions alert above is all the user needs; the
+  // handled: true - the detailed instructions alert above is all the user needs; the
   // screen should not stack a second "Shortcut created" alert on top of it.
   return { state: 'success', handled: true };
 }

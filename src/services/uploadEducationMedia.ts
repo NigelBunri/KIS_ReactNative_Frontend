@@ -1,18 +1,18 @@
 // src/services/uploadEducationMedia.ts
 //
-// The ONE upload helper Education screens must use — institution logo,
+// The ONE upload helper Education screens must use - institution logo,
 // program/course/lesson/class/material/assessment/event cover images, and
 // material resource attachments (documents/video/audio/images). Mirrors
 // src/services/uploadMarketplaceMedia.ts's three-step handshake
 // (initiate -> PUT to S3 -> confirm) and reuses the exact same upload-id
 // resolution/validation logic every other upload surface uses
-// (src/network/uploadIntentContract.ts) — a storage key is never used as
+// (src/network/uploadIntentContract.ts) - a storage key is never used as
 // the confirm id here either.
 //
 // Callers attach the resulting `mediaId` as an attachment object
-// (`{ media_id: mediaId }`) on the relevant field — `logo_attachment` for
+// (`{ media_id: mediaId }`) on the relevant field - `logo_attachment` for
 // institution branding, `cover_image_attachment` for module cover images,
-// `resource_attachment` for material files — see
+// `resource_attachment` for material files - see
 // apps/broadcasts/education_media.py on the backend for the full contract.
 // The backend re-resolves and safety-scans the media server-side; it never
 // trusts a client-supplied url/mime/quarantine flag.
@@ -53,7 +53,7 @@ const isCompressibleImage = (type?: string | null) => {
 
 const withJpegExtension = (name: string) => (name || `upload_${Date.now()}`).replace(/\.[^.]+$/, '') + '.jpg';
 
-// Only cover-image/logo contexts are compressed on-device — a material
+// Only cover-image/logo contexts are compressed on-device - a material
 // resource (PDF, video, audio) must reach S3 byte-for-byte.
 async function prepareFile(file: PickedFile, context: EducationUploadContext): Promise<PreparedFile> {
   const shouldCompress = context !== 'education_material' && isCompressibleImage(file.type);
@@ -108,7 +108,7 @@ function uploadBytesToPresignedUrl(
     Object.entries(headers || {}).forEach(([key, value]) => {
       xhr.setRequestHeader(key, String(value));
     });
-    // No Authorization header — the presigned URL query string is the only
+    // No Authorization header - the presigned URL query string is the only
     // credential S3 sees, never the app's Django bearer token.
     const onAbort = () => xhr.abort();
     if (signal) {
@@ -158,7 +158,7 @@ function uploadBytesToPresignedUrl(
 
 /**
  * Uploads a file for an education purpose and returns a confirmed, stable
- * `mediaId` — never a storage key, never a raw file. Callers pass that
+ * `mediaId` - never a storage key, never a raw file. Callers pass that
  * mediaId as `{ media_id: mediaId }` on the relevant attachment field.
  * Throws on any failure; the caller owns retry (just call this again) and
  * duplicate-tap prevention (disable the submit control while a call is in

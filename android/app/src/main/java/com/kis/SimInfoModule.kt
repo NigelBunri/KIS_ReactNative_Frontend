@@ -14,8 +14,8 @@ import com.facebook.react.bridge.ReactMethod
 /**
  * Best-effort read of the device's own SIM line number, used to recognize a
  * device as the account's primary device after reinstall without requiring
- * QR re-linking. There is no iOS equivalent — Apple does not expose an app's
- * own phone number — so this module is Android-only by design.
+ * QR re-linking. There is no iOS equivalent - Apple does not expose an app's
+ * own phone number - so this module is Android-only by design.
  *
  * TelephonyManager.line1Number is notoriously unreliable across carriers/OEMs
  * (many return null or empty regardless of permission), so callers must treat
@@ -47,7 +47,7 @@ class SimInfoModule(private val reactContext: ReactApplicationContext) :
             val number = tm?.line1Number
             promise.resolve(if (number.isNullOrBlank()) null else number)
         } catch (e: SecurityException) {
-            // Some OEMs throw despite a granted permission — treat as unknown.
+            // Some OEMs throw despite a granted permission - treat as unknown.
             promise.resolve(null)
         } catch (e: Exception) {
             promise.resolve(null)

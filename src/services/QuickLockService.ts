@@ -9,7 +9,7 @@ const KEY_PIN = 'kis_quick_lock_pin';
 const KEY_TIMEOUT = 'kis_quick_lock_timeout_minutes';
 // Cached mirror of the server-authoritative "does this account have a PIN"
 // fact (see UserSerializer.has_pin), used only as an offline fallback when
-// /users/me/ can't be reached — never treated as a competing source of truth.
+// /users/me/ can't be reached - never treated as a competing source of truth.
 const KEY_HAS_PIN_CACHE = 'kis_quick_lock_has_pin_cache';
 
 const DEFAULT_TIMEOUT_MINUTES = 5;
@@ -85,7 +85,7 @@ export async function clearPIN(): Promise<void> {
 /**
  * Wipes all device-local Quick Lock state (PIN, cached has-pin flag, lock
  * timeout, last-active timestamp) without touching the backend record.
- * Must run on logout — otherwise the next account to sign in on this
+ * Must run on logout - otherwise the next account to sign in on this
  * device inherits the previous account's local PIN/timeout and could be
  * unlocked with, or challenged by, someone else's PIN.
  */

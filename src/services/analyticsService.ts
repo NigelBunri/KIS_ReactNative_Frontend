@@ -68,7 +68,7 @@ export async function flushPendingAnalytics(): Promise<void> {
         await flushPendingAnalytics();
       }
     } catch {
-      // NetInfo unavailable — skip auto-flush
+      // NetInfo unavailable - skip auto-flush
     }
   } catch { /* silent */ }
 })();

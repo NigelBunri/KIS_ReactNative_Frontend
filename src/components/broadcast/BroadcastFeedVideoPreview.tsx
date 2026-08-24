@@ -28,12 +28,12 @@ type Props = {
   videoStyle?: StyleProp<any>;
   autoPlay?: boolean;
   posterOverride?: string | null;
-  // See VideoPlayer.tsx's forceTextureView doc — pass true from callers
+  // See VideoPlayer.tsx's forceTextureView doc - pass true from callers
   // that wrap this component in a transformed/animated ancestor (e.g. a
   // swipeable full-screen viewer), where Android's default SurfaceView
   // rendering can silently fail to composite the video frame.
   forceTextureView?: boolean;
-  // See VideoPlayer.tsx's externalPause doc — pass true when the screen
+  // See VideoPlayer.tsx's externalPause doc - pass true when the screen
   // hosting this preview has lost navigation focus or the app has
   // backgrounded, so audio doesn't keep playing off-screen.
   externalPause?: boolean;
@@ -137,7 +137,7 @@ export default function BroadcastFeedVideoPreview({
         return;
       }
       console.warn(
-        '[BroadcastFeedVideoPreview] all sources failed — final failure',
+        '[BroadcastFeedVideoPreview] all sources failed - final failure',
         JSON.stringify({
           message: nextMessage,
           lastSource: describeBroadcastFeedVideoSource(currentSource),

@@ -131,7 +131,7 @@ export const fetchMainTabBadgeCounts = async (currentUserId?: string | null): Pr
 
   // fetchUnreadInAppNotificationsCount() previously ran alongside
   // fetchInAppNotifications() here, but it calls fetchInAppNotifications()
-  // internally — every fallback-triggered badge refresh was hitting
+  // internally - every fallback-triggered badge refresh was hitting
   // /notifications/ twice in parallel for the same data. The unread count
   // is just the unread subset of the list we already fetch below.
   const [notifications, conversations, missedBibleSchedules] = await Promise.all([

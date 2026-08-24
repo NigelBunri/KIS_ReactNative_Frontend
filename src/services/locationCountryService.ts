@@ -137,7 +137,7 @@ export const callingCodeForCountry = (countryIso: string | null | undefined) => 
 };
 
 export const ensureLocationPermission = async (requestIfNeeded: boolean) => {
-  // Check current status first — no dialog shown here
+  // Check current status first - no dialog shown here
   let status = await check(FINE_PERMISSION);
 
   if (status === RESULTS.GRANTED || status === RESULTS.LIMITED) {
@@ -212,7 +212,7 @@ export const reverseGeocodeCountryIso = async (latitude: number, longitude: numb
   }
 };
 
-/** Detect country from IP address — no location permission needed. */
+/** Detect country from IP address - no location permission needed. */
 export const detectCountryFromIP = async (): Promise<string> => {
   const apis = [
     async () => {
@@ -246,7 +246,7 @@ export const resolveLocationCountry = async (requestIfNeeded: boolean) => {
     try {
       coords = await getCurrentCoordinates(permission.coarse);
     } catch (err: any) {
-      // error.code === 2 means POSITION_UNAVAILABLE — device location service is OFF
+      // error.code === 2 means POSITION_UNAVAILABLE - device location service is OFF
       if (err?.code === 2) {
         locationServiceOff = true;
       }
@@ -269,7 +269,7 @@ export const resolveLocationCountry = async (requestIfNeeded: boolean) => {
     }
   }
 
-  // GPS unavailable or service off — try silent IP-based detection
+  // GPS unavailable or service off - try silent IP-based detection
   const isoFromIP = await detectCountryFromIP();
   if (isoFromIP) {
     const callingCode = callingCodeForCountry(isoFromIP);
@@ -283,7 +283,7 @@ export const resolveLocationCountry = async (requestIfNeeded: boolean) => {
     };
   }
 
-  // Nothing worked — try the last known cached country before giving up entirely
+  // Nothing worked - try the last known cached country before giving up entirely
   const cached = await getLastCachedLocationCountry();
   if (cached?.iso && CALLING_CODE_BY_ISO[cached.iso]) {
     return {
@@ -295,7 +295,7 @@ export const resolveLocationCountry = async (requestIfNeeded: boolean) => {
     };
   }
 
-  // Nothing worked — surface the most specific error
+  // Nothing worked - surface the most specific error
   if (locationServiceOff) {
     throw new LocationCountryError(
       'location_service_off',

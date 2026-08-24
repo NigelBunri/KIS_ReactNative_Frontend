@@ -108,7 +108,7 @@ const parseVideoUrl = (value: string) => {
   if (!normalized) return null;
   try {
     const parsed = new URL(normalized);
-    // Hermes URL parser may append a trailing slash to file paths — strip it.
+    // Hermes URL parser may append a trailing slash to file paths - strip it.
     if (parsed.pathname !== '/' && parsed.pathname.endsWith('/')) {
       parsed.pathname = parsed.pathname.replace(/\/+$/, '');
     }

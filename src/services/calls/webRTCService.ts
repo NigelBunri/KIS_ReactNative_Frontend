@@ -5,7 +5,7 @@ let RNW: any = null;
 try {
   RNW = require('react-native-webrtc');
 } catch {
-  // Library not installed — calls show UI but media won't connect.
+  // Library not installed - calls show UI but media won't connect.
 }
 
 export const webRTCAvailable = !!RNW;
@@ -24,16 +24,16 @@ const VIDEO_CONSTRAINTS: Record<number, any> = {
   4: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
   3: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } },
   2: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 15 } },
-  1: null, // audio-only — video track disabled
+  1: null, // audio-only - video track disabled
 };
 
 /**
  * Inject loss-tolerance parameters into an SDP string.
  *
  * Two layers of protection:
- *  1. Opus in-band FEC (useinbandfec=1) — codec-level concealment; recovers
+ *  1. Opus in-band FEC (useinbandfec=1) - codec-level concealment; recovers
  *     single-packet losses with no extra bandwidth.
- *  2. RED (Redundant Audio Data, RFC 2198) — wraps each Opus frame with the
+ *  2. RED (Redundant Audio Data, RFC 2198) - wraps each Opus frame with the
  *     previous frame as redundancy; recovers consecutive losses.
  *     RED is listed with a lower priority than Opus on the m= line so it
  *     works even with endpoints that don't support it (they just pick Opus).
@@ -113,13 +113,13 @@ class WebRTCService {
   private peers = new Map<string, any>(); // peerId → RTCPeerConnection
   private statsIntervals = new Map<string, ReturnType<typeof setInterval>>();
   private iceServers: any[] = DEFAULT_ICE_SERVERS;
-  // Candidates that arrived before setRemoteDescription — flushed once remote SDP is set.
+  // Candidates that arrived before setRemoteDescription - flushed once remote SDP is set.
   private iceCandidateQueues = new Map<string, any[]>();
   // Debounce ICE restart per peer to avoid rapid repeated renegotiation
   private iceRestartDebounce = new Map<string, ReturnType<typeof setTimeout>>();
-  // Audio-only mode — video track disabled globally
+  // Audio-only mode - video track disabled globally
   private _isAudioOnlyMode = false;
-  // Per-peer quality history — keyed by peerId; value is the last observed quality
+  // Per-peer quality history - keyed by peerId; value is the last observed quality
   private _peerQuality = new Map<string, 1 | 2 | 3 | 4>();
   // Consecutive poor-quality readings (using the worst peer) before stepping down
   private _poorQualityCount = 0;
@@ -130,7 +130,7 @@ class WebRTCService {
   private _streamStarting = false;
   // Guard closeAll re-entrancy
   private _closed = false;
-  // Generation counter — incremented on every closeAll() call.
+  // Generation counter - incremented on every closeAll() call.
   // In-flight async callbacks (stats, ICE) compare against this and bail out
   // if the value has changed, preventing use-after-free of closed native peers.
   private _generation = 0;
@@ -238,7 +238,7 @@ class WebRTCService {
     }
   }
 
-  /** Toggle noise cancellation — re-acquires the audio track with updated constraints. */
+  /** Toggle noise cancellation - re-acquires the audio track with updated constraints. */
   async setNoiseCancellation(enabled: boolean): Promise<void> {
     this._noiseCancellationOn = enabled;
     if (!webRTCAvailable || !this.localStream) return;
@@ -298,7 +298,7 @@ class WebRTCService {
     if (worstQuality < prevAggregate) {
       this._poorQualityCount++;
     } else if (worstQuality > prevAggregate) {
-      // Quality improved — reset counter and update immediately
+      // Quality improved - reset counter and update immediately
       this._poorQualityCount = 0;
       this._networkQuality = worstQuality;
       if (this._isAudioOnlyMode && worstQuality >= 3) {
@@ -307,7 +307,7 @@ class WebRTCService {
       }
       return;
     } else {
-      // Same quality — only keep incrementing if already poor
+      // Same quality - only keep incrementing if already poor
       if (worstQuality <= 2) this._poorQualityCount++;
     }
 
@@ -427,7 +427,7 @@ class WebRTCService {
   async handleOffer(peerId: string, remoteOffer: any): Promise<any | null> {
     if (!webRTCAvailable) return null;
     if (!this.localStream) {
-      console.warn('[WebRTC] handleOffer called before localStream is ready — SDP answer may have no tracks');
+      console.warn('[WebRTC] handleOffer called before localStream is ready - SDP answer may have no tracks');
     }
     try {
       const pc = this.ensurePeer(peerId);
@@ -468,12 +468,12 @@ class WebRTCService {
     if (!webRTCAvailable) return;
     const pc = this.peers.get(peerId);
     if (!pc || !pc.remoteDescription) {
-      // Remote description not set yet — queue so the candidate isn't lost.
+      // Remote description not set yet - queue so the candidate isn't lost.
       const queue = this.iceCandidateQueues.get(peerId) ?? [];
       // Drop oldest candidate when the queue is full to prevent memory growth.
       if (queue.length >= MAX_ICE_QUEUE) {
         queue.shift();
-        console.warn(`[WebRTC] ICE queue full for peer ${peerId} — dropping oldest candidate`);
+        console.warn(`[WebRTC] ICE queue full for peer ${peerId} - dropping oldest candidate`);
       }
       queue.push(candidate);
       this.iceCandidateQueues.set(peerId, queue);
@@ -517,7 +517,7 @@ class WebRTCService {
       try {
         const statsReport = await pc.getStats();
 
-        // Guard again after the await — closeAll() may have fired during getStats().
+        // Guard again after the await - closeAll() may have fired during getStats().
         if (this._generation !== startGen) return;
 
         let packetsLost = 0;
@@ -541,7 +541,7 @@ class WebRTCService {
         this.onSpeaking(peerId, audioLevel > 0.02);
         this.applyNetworkQuality(peerId, nq);
       } catch {
-        // getStats() can throw if the peer was closed mid-flight — safe to ignore.
+        // getStats() can throw if the peer was closed mid-flight - safe to ignore.
       }
     }, 2500);
     this.statsIntervals.set(peerId, interval);

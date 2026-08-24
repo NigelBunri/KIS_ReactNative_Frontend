@@ -3,21 +3,21 @@ import { Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Every screen in the app reads its top spacing through this hook, so this is
-// the one dial for nudging that spacing app-wide — change it here instead of
+// the one dial for nudging that spacing app-wide - change it here instead of
 // hardcoding a literal in any individual screen.
 //
 // The 5 main-tab screens (Messages, Bible, Broadcast, Partners, Profile) opt
-// out of this dial — they read useRawTopInset() directly — so they keep
+// out of this dial - they read useRawTopInset() directly - so they keep
 // their own hand-tuned gold-header spacing when this changes.
 const GLOBAL_TOP_PADDING = 20;
 
 // react-native-safe-area-context misreports the Android top inset as a
 // near-zero garbage value on Android 15+ (API 35+), where the OS itself force-
-// enables edge-to-edge regardless of app config — a long-standing upstream
+// enables edge-to-edge regardless of app config - a long-standing upstream
 // bug (github.com/AppAndFlow/react-native-safe-area-context/issues/634) that
 // affects real devices (Samsung Galaxy S21 among them) and emulators alike.
 // StatusBar.currentHeight is accurate there instead, so this only substitutes
-// it above API 35 — it's the unreliable one on older Android.
+// it above API 35 - it's the unreliable one on older Android.
 const ANDROID_BROKEN_INSET_SDK = 35;
 
 /**
@@ -39,7 +39,7 @@ export function useRawTopInset(): number {
 
 /**
  * useRawTopInset() plus GLOBAL_TOP_PADDING. Single source of truth so screens
- * never hardcode a top-spacing literal — hardcoded values under-compensate on
+ * never hardcode a top-spacing literal - hardcoded values under-compensate on
  * Dynamic Island devices (~59pt) and over-compensate on older/Android devices
  * (~20-25pt).
  */

@@ -21,7 +21,7 @@ class MainActivity : ReactActivity() {
     // (API 35+). A raw WindowCompat.setDecorFitsSystemWindows(window, false)
     // call was tried here first but left react-native-safe-area-context
     // reporting a near-zero top inset (~1px) on a physical Galaxy S21 instead
-    // of the real status bar height — it doesn't fully wire up WindowInsets
+    // of the real status bar height - it doesn't fully wire up WindowInsets
     // dispatch on all API levels. androidx.activity's enableEdgeToEdge()
     // does the complete, version-aware setup (status/nav bar transparency,
     // insets dispatch, icon contrast) that safe-area-context actually needs.
@@ -38,6 +38,6 @@ class MainActivity : ReactActivity() {
     super.onNewIntent(intent)
     // React Native's own intent handling (via the bridge) picks up the intent
     // automatically when super.onNewIntent is called. No additional native
-    // callkeep forwarding is needed — the JS module listens via the RN bridge.
+    // callkeep forwarding is needed - the JS module listens via the RN bridge.
   }
 }
