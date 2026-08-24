@@ -1,4 +1,4 @@
-package com.kis
+package com.kingdom.impact
 
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -44,7 +44,7 @@ class ShortcutModule(private val reactContext: ReactApplicationContext) :
         val iconUrl = options.getString("iconUrl")
 
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)).apply {
-            setClassName(reactContext, "com.kis.MainActivity")
+            setClassName(reactContext.packageName, "${reactContext.packageName}.MainActivity")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
@@ -87,7 +87,7 @@ class ShortcutModule(private val reactContext: ReactApplicationContext) :
         val deepLink = options.getString("deepLink") ?: "kis://home"
 
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)).apply {
-            setClassName(reactContext, "com.kis.MainActivity")
+            setClassName(reactContext.packageName, "${reactContext.packageName}.MainActivity")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 

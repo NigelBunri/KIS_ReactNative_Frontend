@@ -3,6 +3,7 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import PushKit
+import FirebaseCore
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,6 +19,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Must run before anything (native or JS, via @react-native-firebase) touches
+    // Firebase — react-native-firebase's iOS module never calls this itself, it
+    // only registers the library and expects host apps to configure the default
+    // app. Without this, FIRMessaging has no default FIRApp to attach to, so
+    // APNs-token forwarding and FCM token retrieval fail even though RNFB's own
+    // remote-notification registration (RNFBMessaging+NSNotificationCenter,
+    // triggered on UIApplicationDidFinishLaunchingNotification) already runs
+    // automatically. Guarded so a second call (there is none today, but a future
+    // extension target or re-entrant launch path would be harmless either way)
+    // never creates a duplicate default app.
+    if FirebaseApp.app() == nil {
+      FirebaseApp.configure()
+    }
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

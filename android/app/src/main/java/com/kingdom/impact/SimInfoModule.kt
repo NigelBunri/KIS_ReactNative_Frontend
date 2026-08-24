@@ -1,4 +1,4 @@
-package com.kis
+package com.kingdom.impact
 
 import android.Manifest
 import android.content.Context

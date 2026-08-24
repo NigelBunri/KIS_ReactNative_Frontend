@@ -1,4 +1,4 @@
-package com.kis
+package com.kingdom.impact
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

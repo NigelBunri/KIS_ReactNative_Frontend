@@ -11,7 +11,9 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1F5B2BB5783FF4FC6DAA5FB0 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D479AB9881473D785F039A7 /* SampleHandler.swift */; };
 		304D811954FCDEC0B8323B77 /* RTCScreenSharingExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4FC4C9F8B9430993A38C5D94 /* VoipTokenModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */; };
 		5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		65379F83ECA9ECEF091B0A9A /* VoipTokenModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD9F51B5CB790C01348379D /* VoipTokenModule.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		A6835689303C833600A85D38 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A6835688303C833600A85D38 /* GoogleService-Info.plist */; };
@@ -54,9 +56,11 @@
 		5709B34CF0A7D63546082F79 /* Pods-KIS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KIS.release.xcconfig"; path = "Target Support Files/Pods-KIS/Pods-KIS.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-KIS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-KIS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = KIS/AppDelegate.swift; sourceTree = "<group>"; };
+		7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = VoipTokenModule.m; path = KIS/VoipTokenModule.m; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = KIS/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A3F069872D1B686B57B9DBA0 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		A6835688303C833600A85D38 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		BBD9F51B5CB790C01348379D /* VoipTokenModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoipTokenModule.swift; path = KIS/VoipTokenModule.swift; sourceTree = "<group>"; };
 		C4F539924D0986C67C118F7B /* RTCScreenSharingExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RTCScreenSharingExtension.entitlements; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RTCScreenSharingExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +96,8 @@
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				1B6B951D133126018D6E3493 /* KIS.entitlements */,
+				BBD9F51B5CB790C01348379D /* VoipTokenModule.swift */,
+				7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */,
 			);
 			name = KIS;
 			sourceTree = "<group>";
@@ -355,6 +361,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				65379F83ECA9ECEF091B0A9A /* VoipTokenModule.swift in Sources */,
+				4FC4C9F8B9430993A38C5D94 /* VoipTokenModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,11 +455,12 @@
 				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K692889KRM;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kis.RTCScreenSharingExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis.RTCScreenSharingExtension;
 				PRODUCT_NAME = RTCScreenSharingExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -612,11 +621,12 @@
 				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K692889KRM;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kis.RTCScreenSharingExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis.RTCScreenSharingExtension;
 				PRODUCT_NAME = RTCScreenSharingExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

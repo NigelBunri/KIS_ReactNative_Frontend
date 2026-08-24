@@ -1,4 +1,4 @@
-package com.kis
+package com.kingdom.impact
 
 import android.app.Application
 import com.facebook.react.PackageList
