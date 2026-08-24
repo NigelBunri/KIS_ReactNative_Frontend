@@ -961,6 +961,7 @@ export default function ProfileScreen() {
       const prepared = await prepareBroadcastVideoPayload(payload);
       if (!prepared) return;
 
+      try {
       const composerType = prepared.composerType ?? 'text';
       const mediaType: FeedMediaType =
         composerType === 'image'
@@ -1032,6 +1033,19 @@ export default function ProfileScreen() {
       setAdvancedFeedComposerVisible(false);
       setAdvancedFeedChannelContext(null);
       Alert.alert('Broadcast item', 'Advanced feed item saved to your queue.');
+      } catch (error: any) {
+        // Previously unguarded - c.addBroadcastFeedEntry throws on any
+        // failure (network error, validation, backend error), and with no
+        // catch here the whole handler silently rejected: the composer
+        // never closed, no alert ever showed, and the "Create" flow simply
+        // appeared to do nothing when the request failed. Mirrors the
+        // identical try/catch already used by the sibling
+        // handleSubmitFeedItem a few lines above for the basic composer.
+        Alert.alert(
+          'Broadcast item',
+          error?.message || 'Unable to save this item.',
+        );
+      }
     },
     [c],
   );
