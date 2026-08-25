@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>KIS</string>
+	<string>Kingdom Impact Social (KIS)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -78,6 +78,8 @@
 	<string>KIS may use your contacts to help you discover and connect with friends.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>KIS uses Face ID to securely authenticate you.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>KIS uses your location to improve recommendations and nearby content.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>KIS uses your location to improve recommendations and nearby content.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -106,7 +108,6 @@
 	<array>
 		<string>voip</string>
 		<string>audio</string>
-		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
 	<key>UIFileSharingEnabled</key>

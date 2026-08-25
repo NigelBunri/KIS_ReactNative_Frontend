@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "499510593214",
-    "project_id": "kispushnotification",
-    "storage_bucket": "kispushnotification.firebasestorage.app"
+    "project_number": "682684468871",
+    "project_id": "kingdom-impact-social",
+    "storage_bucket": "kingdom-impact-social.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:499510593214:android:ad1f2c2b124606ada840ef",
+        "mobilesdk_app_id": "1:682684468871:android:6a553d381f27146cd7b222",
+        "android_client_info": {
+          "package_name": "com.kingdom.impact"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJWvYA7P2J-YWqu9vdu9-R2cbLXRyVdO0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:682684468871:android:27e2c3f763c65321d7b222",
         "android_client_info": {
           "package_name": "com.kis"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDRKdfNbPi0AZIRusK7hAn9iNcwufBTLLc"
+          "current_key": "AIzaSyAJWvYA7P2J-YWqu9vdu9-R2cbLXRyVdO0"
         }
       ],
       "services": {
