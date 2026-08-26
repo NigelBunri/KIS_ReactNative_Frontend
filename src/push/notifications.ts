@@ -199,7 +199,6 @@ export async function initPushHandlers(navigation?: any) {
     const getApps = appMod?.getApps;
     const getApp = appMod?.getApp;
     const getMessaging = messagingMod?.getMessaging;
-    const requestPermission = messagingMod?.requestPermission;
     const getToken = messagingMod?.getToken;
     const getAPNSToken = messagingMod?.getAPNSToken;
     const setBackgroundMessageHandler = messagingMod?.setBackgroundMessageHandler;
@@ -225,22 +224,20 @@ export async function initPushHandlers(navigation?: any) {
     const messaging = getMessaging(getApp());
 
     // Pulled out so it can be retried later (see the AppState listener
-    // below), not just once at cold start. getToken()/getAPNSToken() most
-    // commonly fail on iOS because notification permission hasn't been
-    // granted yet — requestPermission()'s result used to be discarded
-    // entirely and every failure here was a silent, permanent no-op for
-    // the rest of the app process, with nothing logged to explain why a
-    // device never had a token. That's exactly what happened in practice:
-    // a device with notification permission denied registered a VoIP
-    // token fine (PushKit doesn't require notification authorization) but
-    // never once got an FCM token, with zero visibility into why.
+    // below), not just once at cold start. Deliberately does NOT call
+    // requestPermission() itself — NotificationPermissionModal owns asking
+    // for permission (with context, only on explicit user tap) so this
+    // doesn't race a second, unexplained system dialog against it. This
+    // just tries to fetch a token assuming permission may or may not be
+    // granted yet; getToken()/getAPNSToken() fail harmlessly if it isn't,
+    // and the AppState retry below picks it up once the user grants it
+    // (via the modal or Settings) without needing a relaunch. Previously
+    // this whole block was a bare catch{} with no logging — a device with
+    // permission denied would register a VoIP token fine (PushKit doesn't
+    // need notification authorization) but silently never get an FCM
+    // token, with zero visibility into why.
     const attemptFcmTokenAcquisition = async (): Promise<boolean> => {
       try {
-        let authStatus: unknown = 'unknown';
-        if (typeof requestPermission === 'function') {
-          authStatus = await requestPermission(messaging);
-        }
-
         const fcmToken =
           typeof getToken === 'function' ? await getToken(messaging) : null;
         const apnsToken =
@@ -248,9 +245,8 @@ export async function initPushHandlers(navigation?: any) {
 
         if (!fcmToken) {
           console.warn(
-            `[push] no FCM token obtained (authStatus=${JSON.stringify(authStatus)}). ` +
-            'Most common cause on iOS: notification permission not granted. ' +
-            'Will retry when the app returns to the foreground.',
+            '[push] no FCM token obtained — most likely notification permission ' +
+            'is not granted yet. Will retry when the app returns to the foreground.',
           );
           return false;
         }

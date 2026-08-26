@@ -135,6 +135,7 @@ import { routeDeepLink } from './src/push/deepLinkRouter';
 import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
+import NotificationPermissionModal from './src/push/NotificationPermissionModal';
 import { getAccessToken, AUTH_SESSION_EXPIRED_EVENT } from './src/security/authStorage';
 import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
@@ -1888,6 +1889,7 @@ function AppContent() {
             </View>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
+          <NotificationPermissionModal />
           {showQuickLock && isAuth ? (
             <QuickLockScreen onDismiss={() => {
               setShowQuickLock(false);
