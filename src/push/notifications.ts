@@ -201,6 +201,7 @@ export async function initPushHandlers(navigation?: any) {
     const getMessaging = messagingMod?.getMessaging;
     const getToken = messagingMod?.getToken;
     const getAPNSToken = messagingMod?.getAPNSToken;
+    const registerDeviceForRemoteMessages = messagingMod?.registerDeviceForRemoteMessages;
     const setBackgroundMessageHandler = messagingMod?.setBackgroundMessageHandler;
     const onMessage = messagingMod?.onMessage;
     const onNotificationOpenedApp = messagingMod?.onNotificationOpenedApp;
@@ -238,6 +239,20 @@ export async function initPushHandlers(navigation?: any) {
     // token, with zero visibility into why.
     const attemptFcmTokenAcquisition = async (): Promise<boolean> => {
       try {
+        // requestPermission() (removed above) used to also silently trigger
+        // iOS's UIApplication.registerForRemoteNotifications() as a side
+        // effect — that's a separate step from notification *authorization*
+        // and is what actually gets an APNs device token assigned, which
+        // FCM's getToken() needs to exchange for an FCM token. Asking for
+        // authorization via react-native-permissions instead (in the modal)
+        // has no knowledge of Firebase and never triggers this, so without
+        // calling it explicitly here, getToken() would keep returning
+        // nothing forever even with permission fully granted. Safe/idempotent
+        // to call unconditionally — a no-op on Android and on repeat calls.
+        if (typeof registerDeviceForRemoteMessages === 'function') {
+          await registerDeviceForRemoteMessages(messaging);
+        }
+
         const fcmToken =
           typeof getToken === 'function' ? await getToken(messaging) : null;
         const apnsToken =
