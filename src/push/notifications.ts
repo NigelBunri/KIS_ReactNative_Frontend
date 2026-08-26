@@ -1,4 +1,4 @@
-import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
+import { AppState, DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
@@ -224,28 +224,70 @@ export async function initPushHandlers(navigation?: any) {
 
     const messaging = getMessaging(getApp());
 
-    try {
-      if (typeof requestPermission === 'function') {
-        await requestPermission(messaging);
-      }
-    } catch {}
+    // Pulled out so it can be retried later (see the AppState listener
+    // below), not just once at cold start. getToken()/getAPNSToken() most
+    // commonly fail on iOS because notification permission hasn't been
+    // granted yet — requestPermission()'s result used to be discarded
+    // entirely and every failure here was a silent, permanent no-op for
+    // the rest of the app process, with nothing logged to explain why a
+    // device never had a token. That's exactly what happened in practice:
+    // a device with notification permission denied registered a VoIP
+    // token fine (PushKit doesn't require notification authorization) but
+    // never once got an FCM token, with zero visibility into why.
+    const attemptFcmTokenAcquisition = async (): Promise<boolean> => {
+      try {
+        let authStatus: unknown = 'unknown';
+        if (typeof requestPermission === 'function') {
+          authStatus = await requestPermission(messaging);
+        }
 
-    try {
-      const fcmToken =
-        typeof getToken === 'function' ? await getToken(messaging) : null;
-      if (fcmToken) {
+        const fcmToken =
+          typeof getToken === 'function' ? await getToken(messaging) : null;
+        const apnsToken =
+          typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
+
+        if (!fcmToken) {
+          console.warn(
+            `[push] no FCM token obtained (authStatus=${JSON.stringify(authStatus)}). ` +
+            'Most common cause on iOS: notification permission not granted. ' +
+            'Will retry when the app returns to the foreground.',
+          );
+          return false;
+        }
+
         await AsyncStorage.setItem('fcm_token', fcmToken);
         await AsyncStorage.setItem('push_token', fcmToken);
+        if (apnsToken) {
+          await AsyncStorage.setItem('apns_token', apnsToken);
+        }
+        await retryPendingPushToken();
+        await registerPushToken({ pushToken: fcmToken, apnsToken });
+        return true;
+      } catch (e: any) {
+        console.warn('[push] FCM token acquisition failed', e?.message ?? e);
+        return false;
       }
-      const apnsToken =
-        typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
-      if (apnsToken) {
-        await AsyncStorage.setItem('apns_token', apnsToken);
-      }
-      // Retry any previously failed push token registration first
-      await retryPendingPushToken();
-      await registerPushToken({ pushToken: fcmToken, apnsToken });
-    } catch {}
+    };
+
+    const gotToken = await attemptFcmTokenAcquisition();
+
+    // Self-heal without requiring a full app relaunch: the most common way
+    // a user resolves "notification permission denied" is backgrounding
+    // the app, granting it in Settings, then returning — retry then.
+    if (!gotToken) {
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') return;
+        AsyncStorage.getItem('fcm_token').then((existing) => {
+          if (existing) {
+            sub.remove();
+            return;
+          }
+          attemptFcmTokenAcquisition().then((ok) => {
+            if (ok) sub.remove();
+          });
+        });
+      });
+    }
 
     // PushKit VoIP token init is intentionally OUTSIDE the FCM try block above.
     // getToken() can legitimately throw here — iOS FCM requires an APNs token

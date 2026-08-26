@@ -241,13 +241,18 @@ export function useChatMessaging({
 
   const sendOverNetworkImplRef =
     useRef<SendOverNetworkFn | null>(null);
-  const historySyncRef = useRef<number>(0);
+  // Keyed per conversationId — this hook instance is shared across every
+  // conversation the user opens in a session (the chat screen is kept
+  // mounted and only hidden, not remounted, when navigating away), so a
+  // single shared timestamp here meant a sync in one chat could throttle
+  // away a legitimate sync in a completely different chat, silently
+  // dropping messages that arrived while that other chat wasn't open.
+  const historySyncRef = useRef<Record<string, number>>({});
   const flushInFlightRef = useRef(false);
   const historyLoadRef = useRef(false);
   const lastKnownSeqRef = useRef<Record<string, number>>({});
   const decryptInFlightRef = useRef<Set<string>>(new Set());
   const decryptFailedAtRef = useRef<Map<string, number>>(new Map());
-  const decryptSkippedRef = useRef<Set<string>>(new Set());
   const staleSignalDecryptsRef = useRef<Set<string>>(new Set());
   const staleSignalDecryptsLoadedRef = useRef(false);
 
@@ -500,7 +505,6 @@ export function useChatMessaging({
       ].join(':');
       const failedAt = decryptFailedAtRef.current.get(decryptKey) ?? 0;
       if (
-        decryptSkippedRef.current.has(decryptKey) ||
         decryptInFlightRef.current.has(decryptKey) ||
         Date.now() - failedAt < 5_000
       ) {
@@ -687,10 +691,13 @@ export function useChatMessaging({
           if (existing?.text && existing.text !== 'Encrypted message') {
             return;
           }
-          decryptSkippedRef.current.add(decryptKey);
+          // Falls through to the failedAt cooldown above (5s) instead of a
+          // permanent block, so this retries on a later resync/reconnect
+          // once the sender/recipient sessions catch up, rather than
+          // leaving the message stuck behind the 🔒 icon for the rest of
+          // the session.
           return;
         } else if (isBadMacDecryptError(error)) {
-          decryptSkippedRef.current.add(decryptKey);
           if (__DEV__ && DEBUG_STALE_DECRYPTS) {
             console.warn('[useChatMessaging] stale encrypted message skipped', {
               messageId: mapped.serverId ?? mapped.id ?? mapped.clientId,
@@ -1257,12 +1264,12 @@ export function useChatMessaging({
   ]);
 
   const syncHistory = useCallback(() => {
-    const now = Date.now();
-    if (now - historySyncRef.current < 3000) return;
-    historySyncRef.current = now;
-
     const convId = conversationIdRef.current ?? conversationId;
     if (!convId) return;
+
+    const now = Date.now();
+    if (now - (historySyncRef.current[convId] ?? 0) < 3000) return;
+    historySyncRef.current[convId] = now;
 
     const byCreatedAt = (a: string, b: string) =>
       Date.parse(a) - Date.parse(b);
@@ -1852,6 +1859,27 @@ export function useChatMessaging({
     });
     return () => sub.remove();
   }, [socket, isConnected, attemptFlushQueue, syncHistory]);
+
+  // Leave this conversation's room while backgrounded and rejoin on return.
+  // The server only skips push notifications for a recipient who is
+  // currently joined to the room (see chat.join/chat.leave), so without
+  // this the socket would stay joined the whole time the app is
+  // backgrounded (sockets survive backgrounding for a while), and the
+  // recipient would silently never get a push for messages sent while
+  // their phone was in their pocket.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (!conversationId) return;
+      if (state === 'background' || state === 'inactive') {
+        leaveConversation(conversationId);
+      } else if (state === 'active') {
+        if (!socket || !(isConnected || socket.connected)) return;
+        joinConversation(conversationId);
+        syncHistory();
+      }
+    });
+    return () => sub.remove();
+  }, [conversationId, socket, isConnected, joinConversation, leaveConversation, syncHistory]);
 
   // Flush immediately when network comes back — before the socket reconnects
   // so the socket-reconnect flush doesn't have to wait for the backoff timer.
