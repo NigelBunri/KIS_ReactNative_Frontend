@@ -10,6 +10,20 @@ import { ensureDeviceId } from '@/security/e2ee';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 
+// TEMPORARY diagnostic helper — piggybacks on the tokens/register endpoint
+// (unvalidated token field) to report where push init actually exits, since
+// this RN version's console output isn't visible to us on-device. Remove
+// once the FCM-token root cause is confirmed fixed.
+const reportDiag = async (reason: string) => {
+  try {
+    const diagDeviceId = `${await ensureDeviceId()}_diag`;
+    await postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: `DIAG:${reason}:${Date.now()}`, platform: Platform.OS, deviceId: diagDeviceId },
+    ).catch(() => {});
+  } catch {}
+};
+
 const registerPushToken = async (payload: {
   pushToken?: string | null;
   apnsToken?: string | null;
@@ -213,12 +227,13 @@ export async function initPushHandlers(navigation?: any) {
       typeof getApp !== 'function' ||
       typeof getMessaging !== 'function'
     ) {
+      await reportDiag('modular-exports-missing');
       return;
     }
 
     const apps = getApps();
     if (!Array.isArray(apps) || apps.length === 0) {
-      if (__DEV__) console.log('[push] firebase app not initialized; skipping messaging bootstrap');
+      await reportDiag('no-firebase-app-registered');
       return;
     }
 
@@ -271,21 +286,7 @@ export async function initPushHandlers(navigation?: any) {
         }
 
         if (!fcmToken) {
-          console.warn(
-            '[push] no FCM token obtained after retrying — most likely ' +
-            'notification permission is not granted yet. Will retry again ' +
-            'when the app returns to the foreground.',
-          );
-          // TEMPORARY diagnostic: console output isn't visible to us on this
-          // device/RN version, so report to the one place we do have log
-          // visibility (the Nest server), piggybacking on the existing
-          // registration endpoint with a clearly-marked non-token value.
-          // Remove once the root cause is confirmed fixed.
-          const diagDeviceId = `${await ensureDeviceId()}_diag`;
-          postRequest(
-            `${NEST_API_BASE_URL}/notifications/tokens/register`,
-            { token: `DIAG:no-token-after-retries:${Date.now()}`, platform: Platform.OS, deviceId: diagDeviceId },
-          ).catch(() => {});
+          await reportDiag('no-token-after-retries');
           return false;
         }
 
@@ -296,16 +297,10 @@ export async function initPushHandlers(navigation?: any) {
         }
         await retryPendingPushToken();
         await registerPushToken({ pushToken: fcmToken, apnsToken });
+        await reportDiag('success');
         return true;
       } catch (e: any) {
-        console.warn('[push] FCM token acquisition failed', e?.message ?? e);
-        // TEMPORARY diagnostic — see note above. Remove once root-caused.
-        const diagDeviceId = `${await ensureDeviceId()}_diag`;
-        const msg = String(e?.message ?? e ?? 'unknown').slice(0, 200);
-        postRequest(
-          `${NEST_API_BASE_URL}/notifications/tokens/register`,
-          { token: `DIAG:threw:${msg}:${Date.now()}`, platform: Platform.OS, deviceId: diagDeviceId },
-        ).catch(() => {});
+        await reportDiag(`threw:${String(e?.message ?? e ?? 'unknown').slice(0, 150)}`);
         return false;
       }
     };
@@ -536,6 +531,6 @@ export async function initPushHandlers(navigation?: any) {
       } catch {}
     }
   } catch (err: any) {
-    if (__DEV__) console.log('[push] messaging not available:', err?.message);
+    await reportDiag(`outer-catch:${String(err?.message ?? err ?? 'unknown').slice(0, 150)}`);
   }
 }
