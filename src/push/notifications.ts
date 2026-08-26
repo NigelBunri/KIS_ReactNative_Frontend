@@ -276,6 +276,16 @@ export async function initPushHandlers(navigation?: any) {
             'notification permission is not granted yet. Will retry again ' +
             'when the app returns to the foreground.',
           );
+          // TEMPORARY diagnostic: console output isn't visible to us on this
+          // device/RN version, so report to the one place we do have log
+          // visibility (the Nest server), piggybacking on the existing
+          // registration endpoint with a clearly-marked non-token value.
+          // Remove once the root cause is confirmed fixed.
+          const diagDeviceId = `${await ensureDeviceId()}_diag`;
+          postRequest(
+            `${NEST_API_BASE_URL}/notifications/tokens/register`,
+            { token: `DIAG:no-token-after-retries:${Date.now()}`, platform: Platform.OS, deviceId: diagDeviceId },
+          ).catch(() => {});
           return false;
         }
 
@@ -289,6 +299,13 @@ export async function initPushHandlers(navigation?: any) {
         return true;
       } catch (e: any) {
         console.warn('[push] FCM token acquisition failed', e?.message ?? e);
+        // TEMPORARY diagnostic — see note above. Remove once root-caused.
+        const diagDeviceId = `${await ensureDeviceId()}_diag`;
+        const msg = String(e?.message ?? e ?? 'unknown').slice(0, 200);
+        postRequest(
+          `${NEST_API_BASE_URL}/notifications/tokens/register`,
+          { token: `DIAG:threw:${msg}:${Date.now()}`, platform: Platform.OS, deviceId: diagDeviceId },
+        ).catch(() => {});
         return false;
       }
     };
