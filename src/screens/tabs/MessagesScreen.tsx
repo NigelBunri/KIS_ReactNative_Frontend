@@ -379,10 +379,22 @@ const refreshConversations = useCallback(async (force?: boolean, refreshCommunit
   const merged = convs.map(c => {
     const cId = String((c as any).conversationId ?? c.id ?? '');
     const localUnread = meta[cId]?.unreadCount;
+    let next = c;
     if (typeof localUnread === 'number' && localUnread === 0 && (c.unreadCount ?? 0) > 0) {
-      return { ...c, unreadCount: 0 };
+      next = { ...next, unreadCount: 0 };
     }
-    return c;
+    // A realtime socket update (conversation.updated) can land, then this
+    // REST refetch's response reflects a server/replica that hasn't caught
+    // up to that same write yet — overwriting the just-applied preview back
+    // to something stale for a moment. Keep whichever preview is actually
+    // newer rather than trusting the refetch unconditionally.
+    const localAt = meta[cId]?.lastAt;
+    const localTs = localAt ? Date.parse(localAt) : NaN;
+    const serverTs = c.lastAt ? Date.parse(c.lastAt) : NaN;
+    if (!Number.isNaN(localTs) && (Number.isNaN(serverTs) || localTs > serverTs)) {
+      next = { ...next, lastMessage: meta[cId]?.lastMessage ?? next.lastMessage, lastAt: localAt };
+    }
+    return next;
   });
   setConversations(merged);
   // Community/group membership almost never changes on a per-message basis,
