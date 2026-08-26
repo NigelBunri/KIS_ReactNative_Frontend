@@ -253,15 +253,28 @@ export async function initPushHandlers(navigation?: any) {
           await registerDeviceForRemoteMessages(messaging);
         }
 
-        const fcmToken =
-          typeof getToken === 'function' ? await getToken(messaging) : null;
-        const apnsToken =
-          typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
+        // Registering doesn't mean the APNs device token has arrived yet —
+        // that's a genuinely async round trip to Apple's servers (delivered
+        // natively via didRegisterForRemoteNotificationsWithDeviceToken),
+        // easily still in flight for a few seconds right after registering.
+        // Poll briefly instead of giving up on the first null, so a single
+        // attempt succeeds without needing the user to background/foreground
+        // the app repeatedly to "get lucky" on the timing.
+        let fcmToken: string | null = null;
+        let apnsToken: string | null = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          fcmToken = typeof getToken === 'function' ? await getToken(messaging) : null;
+          apnsToken =
+            typeof getAPNSToken === 'function' ? await getAPNSToken(messaging) : null;
+          if (fcmToken) break;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
 
         if (!fcmToken) {
           console.warn(
-            '[push] no FCM token obtained — most likely notification permission ' +
-            'is not granted yet. Will retry when the app returns to the foreground.',
+            '[push] no FCM token obtained after retrying — most likely ' +
+            'notification permission is not granted yet. Will retry again ' +
+            'when the app returns to the foreground.',
           );
           return false;
         }
