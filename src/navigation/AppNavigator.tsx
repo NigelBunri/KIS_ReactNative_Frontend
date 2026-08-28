@@ -138,16 +138,29 @@ function AnimatedKISTabBar({
     return null;
   }
 
+  // Height this bar actually occupies on screen — kept in one place so the
+  // spacer below and the bar's own paddingBottom never drift apart.
+  const barTotalHeight = tabBarHeight + Math.max(insets.bottom, 0);
+
   return (
-    <View
-      style={[
-        styles.wrap,
-        {
-          backgroundColor: barBg,
-          paddingBottom: Math.max(insets.bottom, 0),
-          paddingHorizontal: responsive.isWatch ? 2 : 6,
-        },
-      ]}
+    <>
+      {/* Non-visual spacer: absolute positioning below removes the real bar
+          from BottomTabView's flex column, so without this, its flex:1
+          screens container would expand to fill the space the bar used to
+          occupy and screen content would render underneath it. This spacer
+          reserves that same space in normal flow, so every screen keeps
+          exactly the layout it has today. */}
+      <View style={{ height: barTotalHeight }} pointerEvents="none" />
+      <View
+        style={[
+          styles.wrap,
+          styles.fixedWrap,
+          {
+            backgroundColor: barBg,
+            paddingBottom: Math.max(insets.bottom, 0),
+            paddingHorizontal: responsive.isWatch ? 2 : 6,
+          },
+        ]}
     >
       {/* Luxury gold shimmer separator line */}
       <LinearGradient
@@ -271,7 +284,8 @@ function AnimatedKISTabBar({
           );
         })}
       </View>
-    </View>
+      </View>
+    </>
   );
 }
 
@@ -841,6 +855,22 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: -5 },
     elevation: Platform.OS === 'android' ? 10 : 0,
+  },
+  // Pins the bar to the true bottom of BottomTabView's own box, independent
+  // of anything above it (including App.tsx's GoldenSection header, whose
+  // height changes while a screen loads and used to shift this bar since it
+  // was previously a normal flex sibling). zIndex is deliberately modest —
+  // AppNavigator's chat-room / community-room TabletDialogOverlay screens
+  // already render as later siblings one level up, in MainTabs' own JSX,
+  // with their own much higher zIndex (1000+), so they still paint over
+  // this bar exactly as before; this value only needs to clear ordinary
+  // screen content directly behind it.
+  fixedWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
   separator: {
     height: 1.5,

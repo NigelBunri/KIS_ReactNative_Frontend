@@ -1,0 +1,17 @@
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.mm
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.mm
+@@ -83,12 +83,12 @@
+   return constants;
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboMessaging::Constants::Builder>)
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboMessaging::Constants>)
+     constantsToExport {
+   return [_RCTTypedModuleConstants newWithUnsafeDictionary:[self messagingConstantsDictionary]];
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboMessaging::Constants::Builder>)getConstants {
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboMessaging::Constants>)getConstants {
+   return [self constantsToExport];
+ }
+ 

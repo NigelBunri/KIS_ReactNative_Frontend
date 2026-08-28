@@ -409,7 +409,7 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: palette.bg, marginTop: topInset }}
+      style={{ flex: 1, backgroundColor: palette.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView

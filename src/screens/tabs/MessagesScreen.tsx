@@ -1941,7 +1941,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: topInset + 38,
+                paddingTop: topInset,
               },
             ]}
           >
@@ -2052,7 +2052,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               {
                 backgroundColor: 'transparent',
                 borderBottomColor: 'transparent',
-                paddingTop: topInset + 38,
+                paddingTop: topInset,
               },
             ]}
           >

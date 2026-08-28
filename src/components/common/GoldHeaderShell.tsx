@@ -16,19 +16,29 @@ type GoldHeaderShellProps = {
  * radius everywhere. Each screen supplies its own shape (shadow, extra
  * radius overrides), decorations (sheen/halo), and content via `style` /
  * children, exactly as before; only the gradient definition is centralized.
+ *
+ * The gradient is an absolutely-filled backdrop, not the flow element itself
+ * (compare NetworkStatusPill, which similarly opts out of document flow and
+ * computes its own position directly instead of inheriting one). This outer
+ * View's height comes only from its normal-flow child (the content wrapper
+ * below); the gradient then stretches to match those exact bounds — so it
+ * bleeds behind the status bar and clears it for content automatically,
+ * with no per-device offset to hand-tune, unlike the old negative-marginTop
+ * approach this replaces.
  */
 export function GoldHeaderShell({ children, style, colors }: GoldHeaderShellProps) {
   return (
-    <LinearGradient
-      colors={(colors ?? KIS_ROYAL_GRADIENTS.goldHeader) as string[]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.base, style]}
-    >
+    <View style={[styles.base, style]}>
+      <LinearGradient
+        colors={(colors ?? KIS_ROYAL_GRADIENTS.goldHeader) as string[]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
       <View style={{ marginTop: 20 }}>
         {children}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 

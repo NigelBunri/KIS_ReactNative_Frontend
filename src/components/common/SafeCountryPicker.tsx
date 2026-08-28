@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import CountryPicker from 'react-native-country-picker-modal';
 import type { CountryCode, Country } from 'react-native-country-picker-modal';
@@ -43,7 +43,7 @@ const SafeCountryPicker: React.FC<Props> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <SafeAreaView style={styles.safeArea}>
           <CountryPicker
             visible

@@ -46,24 +46,24 @@ export default function BroadcastSearchRow({
       style={[
         styles.container,
         {
-          backgroundColor: 'rgba(23,17,31,0.26)',
+          backgroundColor: palette.card,
           borderColor: filterActive
             ? 'rgba(255,244,184,0.44)'
-            : 'rgba(255,244,184,0.24)',
+            : palette.inputBorder,
           shadowColor: '#000',
         },
       ]}
     >
       {/* ── Search icon ──────────────────────────────────────────────────── */}
       <View style={styles.iconWrap}>
-        <KISIcon name="search" size={16} color="rgba(255,244,184,0.85)" />
+        <KISIcon name="search" size={16} color={palette.text} />
       </View>
 
       {/* ── Text input ───────────────────────────────────────────────────── */}
       <TextInput
-        style={[styles.input, { fontSize, color: 'rgba(255,244,184,0.95)' }]}
+        style={[styles.input, { fontSize, color: palette.text }]}
         placeholder={searchPlaceholder}
-        placeholderTextColor="rgba(255,244,184,0.55)"
+        placeholderTextColor={palette.subtext}
         value={searchValue}
         onChangeText={onSearchChange}
         returnKeyType="search"
@@ -73,7 +73,7 @@ export default function BroadcastSearchRow({
       />
 
       {/* ── Vertical separator ───────────────────────────────────────────── */}
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: palette.inputBorder }]} />
 
       {/* ── Filter pill ──────────────────────────────────────────────────── */}
       <Pressable
@@ -83,7 +83,7 @@ export default function BroadcastSearchRow({
           {
             borderColor: filterActive
               ? 'rgba(255,244,184,0.5)'
-              : 'rgba(255,244,184,0.22)',
+              : palette.inputBorder,
             backgroundColor: filterActive
               ? 'rgba(255,244,184,0.18)'
               : 'transparent',
@@ -94,10 +94,10 @@ export default function BroadcastSearchRow({
         accessibilityRole="button"
         accessibilityLabel={`Filter: ${filterLabel}`}
       >
-        <KISIcon name="filter" size={14} color="rgba(255,244,184,0.9)" />
+        <KISIcon name="filter" size={14} color={filterActive ? 'rgba(255,244,184,0.9)' : palette.text} />
         {!responsive.isWatch && (
           <Text
-            style={[styles.filterText, { fontSize }]}
+            style={[styles.filterText, { fontSize, color: filterActive ? 'rgba(255,244,184,0.9)' : palette.text }]}
             numberOfLines={1}
           >
             {filterLabel}

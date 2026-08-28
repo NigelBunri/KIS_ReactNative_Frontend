@@ -122,15 +122,15 @@
         android:name="io.wazo.callkeep.RNCallKeepBackgroundMessagingService"
         android:exported="false" />
 
-      <!-- Boot completed receiver: re-registers phone account after device reboot -->
-      <receiver
-        android:name="io.wazo.callkeep.RNCallKeepProviderReceiver"
-        android:exported="false">
-        <intent-filter>
-            <action android:name="android.intent.action.BOOT_COMPLETED" />
-            <action android:name="android.intent.action.USER_UNLOCKED" />
-        </intent-filter>
-      </receiver>
+      <!-- A boot-completed receiver ("io.wazo.callkeep.RNCallKeepProviderReceiver")
+           used to be declared here to re-register the phone account after a
+           device reboot, but that class does not exist in react-native-callkeep
+           4.3.16 (nor was a custom one ever added to this app's own Kotlin/Java
+           sources) — it was a dead reference to a class that was never built.
+           Android fatally crashed the ENTIRE app process with
+           ClassNotFoundException every time it tried to deliver BOOT_COMPLETED
+           or USER_UNLOCKED to it, i.e. on every reboot/unlock for every real
+           user. Removed until a real receiver class backs it. -->
 
       <!-- ─── Firebase Cloud Messaging ──────────────────────────────────────── -->
       <!-- Receives push notifications (incoming call alerts) when app is killed.-->

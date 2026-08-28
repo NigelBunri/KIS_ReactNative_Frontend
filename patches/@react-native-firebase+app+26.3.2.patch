@@ -1,0 +1,33 @@
+--- a/node_modules/@react-native-firebase/app/ios/RNFBApp/RNFBAppModule.mm
++++ b/node_modules/@react-native-firebase/app/ios/RNFBApp/RNFBAppModule.mm
+@@ -102,11 +102,11 @@
+   return constants;
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboApp::Constants::Builder>)constantsToExport {
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboApp::Constants>)constantsToExport {
+   return [_RCTTypedModuleConstants newWithUnsafeDictionary:[self appConstantsDictionary]];
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboApp::Constants::Builder>)getConstants {
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboApp::Constants>)getConstants {
+   return [self constantsToExport];
+ }
+ 
+--- a/node_modules/@react-native-firebase/app/ios/RNFBApp/RNFBUtilsModule.mm
++++ b/node_modules/@react-native-firebase/app/ios/RNFBApp/RNFBUtilsModule.mm
+@@ -69,12 +69,12 @@
+   return [constants copy];
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboUtils::Constants::Builder>)
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboUtils::Constants>)
+     constantsToExport {
+   return [_RCTTypedModuleConstants newWithUnsafeDictionary:[self utilsConstantsDictionary]];
+ }
+ 
+-- (facebook::react::ModuleConstants<JS::NativeRNFBTurboUtils::Constants::Builder>)getConstants {
++- (facebook::react::ModuleConstants<JS::NativeRNFBTurboUtils::Constants>)getConstants {
+   return [self constantsToExport];
+ }
+ 

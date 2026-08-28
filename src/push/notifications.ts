@@ -204,11 +204,16 @@ function resolveNav(nav?: any): any {
 export async function initPushHandlers(navigation?: any) {
   try {
     // Optional dependency: only runs if Firebase app + messaging are installed.
-    // Use the modular API to avoid deprecated namespaced calls.
+    // Use the modular API to avoid deprecated namespaced calls. Import from
+    // the package root, NOT a deep path like '<pkg>/lib/modular' — that path
+    // predates @react-native-firebase's move to a strict package.json
+    // "exports" map (v24+), which only allows the root entry point. Every
+    // v26+ package re-exports the full modular API from its root already, so
+    // the deep path isn't needed; it just throws "Cannot find module".
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const appMod = require('@react-native-firebase/app/lib/modular');
+    const appMod = require('@react-native-firebase/app');
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const messagingMod = require('@react-native-firebase/messaging/lib/modular');
+    const messagingMod = require('@react-native-firebase/messaging');
 
     const getApps = appMod?.getApps;
     const getApp = appMod?.getApp;

@@ -716,7 +716,7 @@ function PartnerCompactGoldBar({
     <View
       style={[
         localHeaderStyles.compactRow,
-        { paddingTop: topInset * 2.6, paddingHorizontal: pageGutter },
+        { paddingTop: topInset, paddingHorizontal: pageGutter },
       ]}
     >
       <View

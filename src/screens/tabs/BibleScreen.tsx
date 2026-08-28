@@ -249,7 +249,7 @@ export default function BibleScreen() {
         <View style={[styles.headerHalo, {marginTop: topInset}]} />
 
         {/* ── Always-visible header bar ─────────────────────────────────── */}
-        <View style={[styles.headerBar, { paddingTop: topInset + (compactBible ? 34 : 40) }]}>
+        <View style={[styles.headerBar, { paddingTop: topInset }]}>
           {/* Left: icon + eyebrow + title */}
           <View style={styles.headerTitleGroup}>
             <View style={styles.headerIconCircle}>

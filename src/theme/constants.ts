@@ -88,6 +88,13 @@ export const KIS_ROYAL_GRADIENTS = {
   purpleLight: ['#EEE4FA', '#6E35B7', '#2A0F45'],
   purpleDark: ['#2A0F45', '#4B1D78', '#09070D'],
   creamSurface: ['#FFFFFF', '#FFFBF2', '#F8F1E3'],
+  // Subtle brand wash for the 5 main-tab header sections: gold fading into
+  // royal purple, keeping lightness roughly constant across the gradient (in
+  // each theme) so a single flat text color (palette.text/subtext) stays
+  // readable everywhere on it, unlike goldHeader's high-contrast swing which
+  // needed a dedicated always-white "onGold" text color.
+  brandHeaderLight: ['#FFF2C7', '#F7ECEF', '#EEE4FA'] as const,
+  brandHeaderDark: ['#3A2A12', '#2A1E27', '#1E1536'] as const,
 } as const;
 
 /** Semantic palette derived each render; change here, not in components. */

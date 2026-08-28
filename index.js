@@ -42,7 +42,7 @@ if (!global.crypto || !global.crypto.subtle) {
 
 function Root() {
   return (
-    <GestureHandlerRootView style={{ marginTop: 40, flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <App />
     </GestureHandlerRootView>
   );

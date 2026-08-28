@@ -39,7 +39,20 @@ import {
  */
 export function useCollapsingGoldHeader(collapseDistance: number) {
   const scrollY = useSharedValue(0);
-  const naturalHeight = useSharedValue(0);
+  // Seeded to collapseDistance, not 0. On every first focus of a session
+  // (see GoldenSectionContext's per-owner remount), this card renders for at
+  // least one frame before onHeaderLayout has ever measured it — a 0 seed
+  // meant that frame rendered at maxHeight: 0, then snapped to the real
+  // measured height the instant layout ran. Since this whole card sits
+  // inside App.tsx's shared GoldenSection, a normal-flow sibling above the
+  // entire NavigationContainer (see GoldHeaderShell.tsx), that snap resized
+  // the space available to the tab navigator below it, visibly moving the
+  // bottom tab bar on every screen's startup. collapseDistance is already
+  // hand-tuned per screen to roughly match this same card's real height (see
+  // each call site), making it a much closer estimate than a flat 0 — same
+  // fix shape as ProfileDashboardBlocks.tsx's hand-rolled equivalent, which
+  // seeds from an estimate instead of 0 for the same reason.
+  const naturalHeight = useSharedValue(collapseDistance);
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (e) => {

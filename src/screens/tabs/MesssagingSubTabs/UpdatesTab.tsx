@@ -553,7 +553,14 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     setRecordingMs(0);
     setIsRecording(true);
     const recordingPath = `${RNFS.CachesDirectoryPath}/kis-status-${Date.now()}.m4a`;
-    const path = await recorderRef.current.startRecorder(`file://${recordingPath}`);
+    // Android's native module passes this straight to MediaRecorder.setOutputFile(),
+    // which expects a plain filesystem path, not a URI — a "file://" prefix there
+    // produces a bogus literal path, silently corrupting the recording (see the
+    // identical fix + explanation in HoldToLockComposer.tsx's startRecording()).
+    // iOS's native module explicitly detects and correctly parses "file://", so
+    // only add it there.
+    const recorderPath = Platform.OS === 'android' ? recordingPath : `file://${recordingPath}`;
+    const path = await recorderRef.current.startRecorder(recorderPath);
     const uri =
       typeof path === 'string' && path.startsWith('file://')
         ? path

@@ -41,6 +41,15 @@ setup_permissions([
   'Notifications',
 ])
 
+# @react-native-firebase 26+ defaults to resolving Firebase via Swift Package
+# Manager, but this project deliberately pins Firebase to CocoaPods (see the
+# explicit `pod 'FirebaseX', :modular_headers => true` lines below) — mixing
+# the two makes RNFBApp/RNFBMessaging pull in their own SPM copy of Firebase
+# alongside the CocoaPods one, which collides at link time under static
+# linkage ("SPM + static linkage is not supported"). Opt back into the
+# CocoaPods-only resolution this Podfile already expects.
+$RNFirebaseDisableSPM = true
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green

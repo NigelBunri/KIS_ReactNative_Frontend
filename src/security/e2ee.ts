@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EncryptedStorage from 'react-native-encrypted-storage';
+import { NativeModules, Platform } from 'react-native';
 import { fromByteArray, toByteArray } from 'base64-js';
 import { Buffer } from 'buffer';
 import * as libsignal from '@privacyresearch/libsignal-protocol-typescript';
@@ -228,24 +229,47 @@ const signalStore = new SignalProtocolStore();
 
 const createDeviceId = () => `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+const { KISDeviceIdModule } = NativeModules;
+
+// Settings.Secure.ANDROID_ID survives an app uninstall/reinstall (it's OS
+// state scoped to this app's signing key, not app storage) unlike a
+// randomly-generated id kept only in AsyncStorage/EncryptedStorage. Seeding
+// a fresh device_id from it means a reinstalled Android app resolves back to
+// the SAME device_id the backend already has on file as this account's
+// primary device, instead of looking like an unrecognized new device and
+// requiring QR re-linking - the same guarantee iOS already gets from
+// Keychain persistence (see readSecureDeviceId/writeSecureDeviceId below).
+// It does not survive a factory reset or a change of app signing key; those
+// still fall back to QR re-linking / account recovery, same as today.
+const getStableAndroidId = async (): Promise<string | null> => {
+  if (Platform.OS !== 'android' || !KISDeviceIdModule?.getAndroidId) return null;
+  try {
+    const id = await KISDeviceIdModule.getAndroidId();
+    return typeof id === 'string' && id.trim() ? `android_${id.trim()}` : null;
+  } catch {
+    return null;
+  }
+};
+
 // iOS Keychain entries survive app deletion by default, so persisting the
 // device_id there means reinstalling on the same physical iPhone keeps the
 // same device_id — the backend still recognizes it as the primary device,
 // no QR re-link needed.
 //
-// Android has no equivalent: EncryptedStorage there is backed by
+// Android has no storage equivalent: EncryptedStorage there is backed by
 // EncryptedSharedPreferences + Android Keystore, both of which live inside
 // the app's own private data directory and are wiped by the OS on uninstall
 // *and* on "clear app storage" — same as plain AsyncStorage. Using
 // EncryptedStorage on Android still closes a real gap (device_id was
 // previously the one identity value plain AsyncStorage held while
 // everything else sensitive already used EncryptedStorage) but it does NOT
-// make device_id survive reinstall. Primary-device recognition after an
-// Android reinstall still has to come from either the best-effort SIM-number
-// check (services/simInfo.ts, unreliable — permission often denied, many
-// OEMs don't expose it) or the account-recovery flow (ParentRecoveryScreen),
-// not from storage persistence — don't reintroduce the old comment's premise
-// that this fixes reinstall.
+// itself make device_id survive reinstall — that's what getStableAndroidId()
+// above is for (OS-level ANDROID_ID, not app storage). If that ever returns
+// null (very old/unusual devices, or the native call failing), primary-device
+// recognition after an Android reinstall falls back to the best-effort
+// SIM-number check (services/simInfo.ts, unreliable — permission often
+// denied, many OEMs don't expose it) or the account-recovery flow
+// (ParentRecoveryScreen).
 const readSecureDeviceId = async (): Promise<string | null> => {
   try {
     return await EncryptedStorage.getItem(DEVICE_ID_KEY);
@@ -267,9 +291,10 @@ export const ensureDeviceId = async (): Promise<string> => {
   let deviceId = await readSecureDeviceId();
   if (!deviceId) {
     // Migrate a value from an older app version that only used AsyncStorage,
-    // before falling back to generating a brand-new id.
+    // then try the stable Android-only id (survives reinstall), before
+    // falling back to a random one (iOS, or if that native call fails).
     deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
-    if (!deviceId) deviceId = createDeviceId();
+    if (!deviceId) deviceId = (await getStableAndroidId()) ?? createDeviceId();
     await writeSecureDeviceId(deviceId);
   }
   // EncryptedStorage is the source of truth, but every network request

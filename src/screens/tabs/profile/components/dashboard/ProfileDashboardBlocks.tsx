@@ -444,7 +444,7 @@ export const ProfileHeroCard = ({
         style={[
           dashboardStyles.stickyRow,
           stickyBarStyle,
-          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset + 40, paddingHorizontal: 16 },
+          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset, paddingHorizontal: 16 },
         ]}
       >
         <View style={dashboardStyles.stickyAvatarWrap}>

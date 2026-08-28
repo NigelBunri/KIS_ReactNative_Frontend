@@ -483,13 +483,12 @@ export default function BroadcastScreen() {
               collapse itself), not two independently-timed animations
               fighting each other (that mismatch was the previous "too much
               gap" / "not smooth" bug). */}
-          <View style={{ paddingTop: topInset + 25}}>
+          <View style={{ paddingTop: topInset }}>
             {/* ── STICKY: header bar — never collapses, matches the sticky-row ── */}
             {/* pattern shared by every Golden Section now. ────────────────── */}
             <View
               style={{
                 paddingHorizontal: responsive.pageGutter,
-                paddingTop: compactBroadcast ? 14 : 18,
               }}
             >
               <View style={styles.headerSection}>
