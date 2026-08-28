@@ -390,6 +390,11 @@ export type ChatMessage = {
   isStarred?: boolean;
   isPinned?: boolean;
 
+  /** Message-level view-once (e.g. view-once text): auto-hides for the recipient after they open it. */
+  viewOnce?: boolean;
+  /** ISO timestamp set once the recipient has opened a view-once message. */
+  viewedAt?: string;
+
   reactions?: Record<string, string[]>;
 
   /** Disappearing message — auto-delete after this many seconds from send */

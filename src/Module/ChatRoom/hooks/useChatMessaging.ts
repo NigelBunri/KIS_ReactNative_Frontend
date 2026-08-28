@@ -615,6 +615,7 @@ export function useChatMessaging({
             sticker: parsed?.sticker ?? mapped.sticker,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
+            viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
           };
           await saveDecryptedMessage(String(currentUserId), mapped, decryptedPatch);
           await patchDecryptedMessage(String(mapped.serverId ?? mapped.id), decryptedPatch);
@@ -658,6 +659,7 @@ export function useChatMessaging({
             sticker: parsed?.sticker ?? mapped.sticker,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
+            viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
           };
           await saveDecryptedMessage(String(currentUserId), mapped, decryptedPatch);
           await patchDecryptedMessage(String(mapped.serverId ?? mapped.id), decryptedPatch);
@@ -1050,6 +1052,8 @@ export function useChatMessaging({
           : undefined,
         linkPreview: serverMsg.linkPreview ?? serverMsg.link_preview ?? undefined,
         callEvent: serverMsg.callEvent ?? serverMsg.call_event ?? undefined,
+        viewOnce: !!(serverMsg.viewOnce ?? serverMsg.view_once),
+        viewedAt: serverMsg.viewedAt ?? serverMsg.viewed_at ?? undefined,
       } as ChatMessage & { senderAvatar?: string };
     },
     [storageRoomId, currentUserId, normalizeReactions, conversationId],
@@ -1592,6 +1596,7 @@ export function useChatMessaging({
               url: (message.voice as any).url ?? (message.voice as any).uri,
             }
           : null,
+        viewOnce: message.viewOnce ?? undefined,
       };
 
       await saveDecryptedMessage(
@@ -1599,6 +1604,30 @@ export function useChatMessaging({
         message,
         basePayload,
       ).catch(() => {});
+
+      // Storage-reference-only echo of voice.* that must survive outside the
+      // encrypted envelope even though everything else (text, styledText,
+      // the audio's own display name, etc.) stays sealed inside it. The
+      // server needs this in plaintext for exactly one reason: re-signing
+      // an expired playback URL (GET .../voice/playback-url, see
+      // voice-playback.service.ts) is a server-initiated call to Django
+      // that happens long after send, with no access to this client's E2EE
+      // keys to decrypt anything — it can only act on what's sitting in the
+      // persisted Mongo document. Without this, every voice note's
+      // playback URL becomes unrefreshable (a 404) the moment its signed
+      // URL TTL (CHAT_VOICE_PLAYBACK_TTL_SECONDS, 15 min) expires, in every
+      // conversation that has E2EE on — i.e. nearly all of them. This is a
+      // storage locator, not message content: it reveals nothing about
+      // the audio itself, same trust level as the attachment id already
+      // visible in Attachment.url/storageKey outside E2EE.
+      const voicePlaintextEcho =
+        message.kind === 'voice' && message.voice
+          ? {
+              mediaAssetId: (message.voice as any).mediaAssetId,
+              objectKey: (message.voice as any).objectKey,
+              durationMs: (message.voice as any).durationMs,
+            }
+          : undefined;
 
       let payloadToSend: any;
       const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
@@ -1636,6 +1665,7 @@ export function useChatMessaging({
               previewText: 'Encrypted message',
               encrypted: true,
               encryptionMeta,
+              ...(voicePlaintextEcho ? { voice: voicePlaintextEcho } : {}),
             };
           } catch (encryptErr) {
             if (String((encryptErr as any)?.message ?? '').includes('Missing E2EE bundle')) {
@@ -1657,6 +1687,7 @@ export function useChatMessaging({
                     previewText: 'Encrypted message',
                     encrypted: true,
                     encryptionMeta,
+                    ...(voicePlaintextEcho ? { voice: voicePlaintextEcho } : {}),
                   };
                 } else {
                   throw new Error(`E2EE recipient envelope missing after repair: ${encryptedRecipientCount}/${recipientIds.length}`);
@@ -2139,8 +2170,53 @@ export function useChatMessaging({
       replaceMessagesRef.current(next);
     };
 
+    // View-once "opened" — broadcast to the whole room (including the
+    // opener's own other devices) once the server has actually stripped
+    // and persisted the content server-side (see markViewOnceOpened on the
+    // Nest side). Deliberately NOT isDeleted, unlike onDelete above — that
+    // renders "Message deleted"; a view-once message must keep rendering
+    // "Opened" (MessageBubble's isTopLevelViewOnce + topLevelViewOnceViewed
+    // branch) for every participant, not just the person who tapped it.
+    // The opener's own device receives this too (it already applied the
+    // same strip optimistically in ChatRoomPage.tsx's handleViewOnce); this
+    // just re-confirms the now server-persisted state, a no-op in effect.
+    const onViewOnceOpened = (serverMsg: any) => {
+      const activeConv = conversationIdRef.current;
+      if (
+        !activeConv ||
+        String(serverMsg.conversationId) !== String(activeConv)
+      ) {
+        return;
+      }
+
+      const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
+
+      const next = messagesRef.current.map((m) =>
+        m.serverId === id || m.id === id
+          ? {
+              ...m,
+              viewOnce: true,
+              viewedAt: serverMsg.viewedAt ?? new Date().toISOString(),
+              text: '',
+              styledText: undefined,
+              voice: undefined,
+              sticker: undefined,
+              attachments: [],
+              media: undefined,
+              contacts: undefined,
+              poll: undefined,
+              event: undefined,
+              linkPreview: undefined,
+            }
+          : m,
+      );
+
+      replaceMessagesRef.current(next);
+    };
+
     socket.on('chat.edit', onEdit);
     socket.on('chat.delete', onDelete);
+    socket.on('chat.view_once', onViewOnceOpened);
 
     const onReaction = (serverMsg: any) => {
       const activeConv = conversationIdRef.current;
@@ -2223,6 +2299,7 @@ export function useChatMessaging({
       socket.off('chat.message_receipt', onReceipt);
       socket.off('chat.edit', onEdit);
       socket.off('chat.delete', onDelete);
+      socket.off('chat.view_once', onViewOnceOpened);
       socket.off('chat.message_reaction', onReaction);
       socket.off('chat.pin', onPin);
       socket.off('chat.message_pinned', onPin);

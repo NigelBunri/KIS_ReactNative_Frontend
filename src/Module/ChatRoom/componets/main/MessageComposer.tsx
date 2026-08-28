@@ -142,7 +142,7 @@ type MessageComposerProps = {
   palette: any;
   disabled?: boolean;
 
-  onSendVoice?: (payload: { uri: string; durationMs: number }) => void;
+  onSendVoice?: (payload: { uri: string; durationMs: number; viewOnce?: boolean }) => void;
   onChooseTextBackground?: (backgroundColor: string) => void;
 
   onSendSticker?: (sticker: Sticker) => void;
@@ -516,11 +516,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
     setIsSending(true);
     onSend();
-    // Reset view-once after send
-    if (viewOnce) {
-      setViewOnce(false);
-      onViewOnceChange?.(false);
-    }
+    resetViewOnceAfterSend();
     // Clear link preview after send
     setComposerLinkPreview(null);
     setLinkPreviewDismissed(false);
@@ -536,6 +532,20 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         conversation_id: conversationIdForMentions,
       });
     }
+  };
+
+  // Shared by every send path (text, attachment, voice) — the view-once
+  // toggle is a single composer-wide flag, not per-message-kind, so any
+  // send consumes it the same way.
+  const resetViewOnceAfterSend = () => {
+    if (!viewOnce) return;
+    setViewOnce(false);
+    onViewOnceChange?.(false);
+  };
+
+  const handleVoiceRecorded = (payload: { uri: string; durationMs: number }) => {
+    onSendVoice?.({ ...payload, ...(viewOnce ? { viewOnce } : {}) });
+    resetViewOnceAfterSend();
   };
 
   /* ----------------------------- PANEL TOGGLING --------------------------- */
@@ -1052,7 +1062,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               onPress={toggleViewOnce}
             >
               <KISIcon
-                name={viewOnce ? 'eye' : 'eye-closed'}
+                name={viewOnce ? 'eye-closed' : 'eye'}
                 size={composerIconGlyph}
                 color={viewOnce ? palette.onPrimary : palette.subtext}
               />
@@ -1098,7 +1108,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         ) : (
           <HoldToLockComposer
             palette={palette}
-            onSendVoice={onSendVoice}
+            onSendVoice={handleVoiceRecorded}
             setIsRecording={setIsRecording}
           />
         )}
@@ -1120,9 +1130,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         onSendFiles={async (files, callbacks) => {
           const res = await onSendAttachment?.({
             ...files,
+            ...(viewOnce ? { viewOnce } : {}),
             onProgress: callbacks?.onProgress,
             onStatus: callbacks?.onStatus as ((uri: string, status: UploadStatus) => void) | undefined,
           });
+          resetViewOnceAfterSend();
           return res !== false;
         }}
         onSendContacts={(contacts) => {
@@ -1145,7 +1157,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         palette={palette}
         onClose={closeCameraModal}
         onCapture={(files) => {
-          onSendAttachment?.(files);
+          onSendAttachment?.({ ...files, ...(viewOnce ? { viewOnce } : {}) });
+          resetViewOnceAfterSend();
         }}
       />
 

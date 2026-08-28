@@ -96,6 +96,12 @@ describe('resolveEmbeddedVoicePlaybackUri', () => {
     expect(resolveEmbeddedVoicePlaybackUri({ uri: 'file:///a.m4a', durationMs: 1 } as any)).toBe('file:///a.m4a');
     expect(resolveEmbeddedVoicePlaybackUri({ uri: 'content://media/a', durationMs: 1 } as any)).toBe('content://media/a');
   });
+
+  it('accepts a schemeless path issued by Django media endpoints (leading slash) so the caller can resolve it to absolute', () => {
+    expect(
+      resolveEmbeddedVoicePlaybackUri({ url: '/media/voice/note.m4a', durationMs: 1 } as any),
+    ).toBe('/media/voice/note.m4a');
+  });
 });
 
 describe('classifyVoicePlaybackReadiness', () => {

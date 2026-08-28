@@ -63,6 +63,7 @@ export const handleSend = async ({
   draftKey,
   dmRole,
   linkPreview,
+  viewOnce,
   ensureConversationId,
   editMessage,
   replyToMessage,
@@ -81,6 +82,7 @@ export const handleSend = async ({
   draftKey: string;
   dmRole: 'initiator' | 'recipient' | null;
   linkPreview?: { title?: string; description?: string; image?: string; site_name?: string; url: string };
+  viewOnce?: boolean;
   ensureConversationId: EnsureConversationId;
   editMessage: Function;
   replyToMessage: Function;
@@ -112,6 +114,7 @@ export const handleSend = async ({
       senderId: currentUserId,
       conversationId: convId,
       ...(linkPreview ? { linkPreview } : {}),
+      ...(viewOnce ? { viewOnce } : {}),
     });
     setReplyTo(null);
 
@@ -125,6 +128,7 @@ export const handleSend = async ({
       senderId: currentUserId,
       conversationId: convId,
       ...(linkPreview ? { linkPreview } : {}),
+      ...(viewOnce ? { viewOnce } : {}),
     });
   }
 
@@ -184,6 +188,7 @@ export const handleSendStyledText = async ({
 export const handleSendVoice = async ({
   uri,
   durationMs,
+  viewOnce,
   chat,
   authToken,
   currentUserId,
@@ -193,6 +198,7 @@ export const handleSendVoice = async ({
 }: {
   uri: string;
   durationMs: number;
+  viewOnce?: boolean;
   chat: any;
   authToken: string | null;
   currentUserId: string;
@@ -265,6 +271,7 @@ export const handleSendVoice = async ({
     // voiceAttachment.ts's resolveVoicePlaybackUri, which checks this as
     // a fallback.
     attachments: attachment ? [attachment] : [],
+    ...(viewOnce ? { viewOnce } : {}),
   });
 
   // Safe to remove the recorded temp file now that a remote copy exists —
@@ -428,6 +435,7 @@ export const handleSendAttachment = async ({
     text: caption || undefined,
     attachments,
     media: { attachments },
+    ...(input.viewOnce ? { viewOnce: input.viewOnce } : {}),
   });
 
   input.onUploadedReady?.();

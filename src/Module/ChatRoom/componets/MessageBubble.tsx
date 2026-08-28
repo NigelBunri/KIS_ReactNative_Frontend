@@ -24,6 +24,7 @@ import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl } from '@/netwo
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
+import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
@@ -571,9 +572,61 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return () => clearInterval(id);
   }, [disappearAfterSeconds, sentAt]);
 
-  // Top-level view-once (text messages flagged as view-once at message level)
+  // Top-level view-once — applies to the whole message (text, attachments,
+  // or voice, whichever it carries), not just text. A message is either
+  // view-once or it isn't; there's no per-attachment granularity.
   const isTopLevelViewOnce = !!(message as any).viewOnce;
-  const [topLevelViewOnceViewed, setTopLevelViewOnceViewed] = useState(false);
+  const [topLevelViewOnceViewed, setTopLevelViewOnceViewed] = useState(!!(message as any).viewedAt);
+  const [viewOnceModalOpen, setViewOnceModalOpen] = useState(false);
+  const viewOnceSnapshotRef = useRef<ViewOnceContentSnapshot | null>(null);
+
+  // Opening the viewer IS "the view": snapshot the still-present content
+  // into a ref (so the modal keeps showing it even after the parent strips
+  // the live message's content — see ChatRoomPage.tsx's handleViewOnce),
+  // mark it viewed so a re-mount (scrolling off-screen and back) respects
+  // the one-time reveal, and tell the parent to persist that + notify the
+  // server, which is what actually deletes the content, locally and
+  // remotely — this component never deletes anything itself.
+  const openViewOnceViewer = () => {
+    if (topLevelViewOnceViewed) return;
+    const snapshotAttachments = hasAttachments
+      ? attachments.map((att: any) => ({
+          url: att.url,
+          localUri: att.localUri,
+          mimeType: att.mimeType,
+          originalName: att.originalName,
+          kind: att.kind,
+          durationMs: att.durationMs,
+        }))
+      : undefined;
+    viewOnceSnapshotRef.current = {
+      text: text || undefined,
+      attachments: snapshotAttachments,
+      voice: voice
+        ? {
+            url: (voice as any).url,
+            localUri: (voice as any).localUri,
+            mimeType: (voice as any).mimeType,
+            originalName: (voice as any).fileName,
+            durationMs: (voice as any).durationMs,
+            kind: 'audio',
+          }
+        : undefined,
+    };
+    setTopLevelViewOnceViewed(true);
+    setViewOnceModalOpen(true);
+    const msgId = (message as any).serverId ?? (message as any).id;
+    if (msgId) onViewOnce?.(String(msgId));
+  };
+
+  const renderViewOnceModal = () => (
+    <ViewOnceViewerModal
+      visible={viewOnceModalOpen}
+      content={viewOnceSnapshotRef.current}
+      palette={palette}
+      onClose={() => setViewOnceModalOpen(false)}
+    />
+  );
 
   const isStarred = !!(message as any).isStarred;
 
@@ -3408,6 +3461,38 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   /* ─────────────────────────────────────────
    * 2) Voice-only bubble
    * ──────────────────────────────────────── */
+  if (isVoiceOnly && voice && isTopLevelViewOnce && !isMe && !topLevelViewOnceViewed) {
+    // Gate the whole player behind "Tap to view" — showing the normal
+    // player here would let the receiver play (and thus keep) the audio
+    // without ever going through the viewer modal + deletion flow below.
+    return (
+      <View style={[styles.messageRow, styles.messageRowThem]}>
+        <View style={[bubbleBaseStyle, pinnedStyle || undefined, selectedStyle || undefined, highlightedStyle || undefined]}>
+          {renderSenderName()}
+          {renderReplyPreview()}
+          <Pressable
+            onPress={openViewOnceViewer}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderRadius: 10,
+              backgroundColor: (palette.primarySoft ?? (palette.primary ? palette.primary + '22' : 'rgba(0,0,0,0.08)')),
+            }}
+          >
+            <KISIcon name="eye" size={18} color={palette.primary} />
+            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.primary }}>
+              Tap to view
+            </Text>
+          </Pressable>
+        </View>
+        {renderViewOnceModal()}
+      </View>
+    );
+  }
+
   if (isVoiceOnly && voice) {
     const durationLabel = formatTimeFromMs(
       isPlaying ? playbackPositionMs : playbackDurationMs || voice.durationMs,
@@ -3497,6 +3582,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           {renderSenderName()}
           {renderReplyPreview()}
+
+          {isTopLevelViewOnce && isMe && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+              <KISIcon name="eye" size={12} color={outgoingTextColor === '#111111' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.65)'} />
+              <Text style={{ fontSize: 10, color: outgoingTextColor === '#111111' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.65)', fontWeight: '600' }}>
+                View once
+              </Text>
+            </View>
+          )}
 
           {voicePlaybackSource ? (
             <Video
@@ -3754,7 +3848,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
         )}
 
-        {/* View-once overlay for incoming view-once text messages */}
+        {/* View-once overlay for incoming view-once messages of any kind
+            (text, attachments, or — post-strip, once its content is gone —
+            whatever this message used to be). Gates text AND attachments
+            below; a not-yet-viewed message shows only this. */}
         {isTopLevelViewOnce && !isMe && (
           topLevelViewOnceViewed ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
@@ -3763,11 +3860,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           ) : (
             <Pressable
-              onPress={() => {
-                setTopLevelViewOnceViewed(true);
-                const msgId = (message as any).serverId ?? (message as any).id;
-                if (msgId) onViewOnce?.(String(msgId));
-              }}
+              onPress={openViewOnceViewer}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -3924,16 +4017,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           );
         })()}
 
-        {/* Contacts / Poll / Event / Location / Product / Payment cards */}
-        {renderContactsCard()}
-        {renderPollCard()}
-        {renderEventCard()}
-        {renderLocationCard()}
-        {renderProductCard()}
-        {renderPaymentCard()}
+        {(!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && (
+          <>
+            {/* Contacts / Poll / Event / Location / Product / Payment cards */}
+            {renderContactsCard()}
+            {renderPollCard()}
+            {renderEventCard()}
+            {renderLocationCard()}
+            {renderProductCard()}
+            {renderPaymentCard()}
 
-        {/* Attachments (images, files, etc.) */}
-        {renderAttachments(attachments, (message as any).fromMe)}
+            {/* Attachments (images, files, etc.) */}
+            {renderAttachments(attachments, (message as any).fromMe)}
+          </>
+        )}
 
         {renderUploadOverlay()}
         {renderReactionsRow()}
@@ -4015,6 +4112,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </SafeAreaView>
         </Modal>
       )}
+      {renderViewOnceModal()}
     </View>
   );
 };

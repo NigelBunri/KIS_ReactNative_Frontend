@@ -47,7 +47,7 @@ type Props = {
   onVisibleMessageIds: (ids: string[]) => void;
   onChangeDraft: (value: string) => void;
   onSend: () => void;
-  onSendVoice: (payload: { uri: string; durationMs: number }) => void;
+  onSendVoice: (payload: { uri: string; durationMs: number; viewOnce?: boolean }) => void;
   onOpenStickerEditor: () => void;
   onChooseTextBackground: (color: string) => void;
   onSendSticker: (sticker: Sticker) => void;
@@ -99,6 +99,7 @@ type Props = {
   conversationId?: string;
 
   onLinkPreviewChange?: (preview: { title?: string; description?: string; image?: string; site_name?: string; url: string } | null) => void;
+  onViewOnceChange?: (enabled: boolean) => void;
 };
 
 export default function ChatRoomBody({
@@ -164,6 +165,7 @@ export default function ChatRoomBody({
   onSendScheduledNow,
   onCancelScheduled,
   onLinkPreviewChange,
+  onViewOnceChange,
   callHistory = [],
   onCallHistoryCallback,
 }: Props) {
@@ -288,6 +290,7 @@ export default function ChatRoomBody({
           onChangeText={onChangeDraft}
           onSend={onSend}
           onLinkPreviewChange={onLinkPreviewChange}
+          onViewOnceChange={onViewOnceChange}
           canSend={canSend}
           palette={palette}
           disabled={!chat}

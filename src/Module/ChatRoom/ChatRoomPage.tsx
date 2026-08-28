@@ -144,6 +144,7 @@ type UploadBubble = ChatMessage & {
 export type AttachmentFilePayload = {
   files?: FilesType[];
   caption?: string;
+  viewOnce?: boolean;
   onProgress?: (uri: string, progress: number) => void;
   onStatus?: (uri: string, status: UploadStatus) => void;
   onUploadedReady?: () => void;
@@ -562,6 +563,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     useState<MessageLocator | null>(null);
   const initialUnreadJumpRef = useRef<string | null>(null);
   const composerLinkPreviewRef = useRef<{ title?: string; description?: string; image?: string; site_name?: string; url: string } | null>(null);
+  const composerViewOnceRef = useRef(false);
 
   // member.tap popup (group sender avatar/name tap)
   const [memberTap, setMemberTap] = useState<{ userId?: string; name: string; avatarUrl?: string } | null>(null);
@@ -1559,6 +1561,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleSend = () => {
     const lp = composerLinkPreviewRef.current;
     composerLinkPreviewRef.current = null;
+    const viewOnce = composerViewOnceRef.current;
+    composerViewOnceRef.current = false;
     return Handlers.handleSend({
       draft,
       chat,
@@ -1568,6 +1572,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       draftKey,
       dmRole,
       linkPreview: lp ?? undefined,
+      viewOnce,
       ensureConversationId,
       editMessage,
       replyToMessage,
@@ -1656,7 +1661,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     setGroupUserIdInput('');
   };
 
-  const handleSendVoice = useCallback((p: { uri: string; durationMs: number }) => {
+  const handleSendVoice = useCallback((p: { uri: string; durationMs: number; viewOnce?: boolean }) => {
     const bubbleId = `__upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const bubble: UploadBubble = {
       id: bubbleId,
@@ -1970,10 +1975,58 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleViewOnce = useCallback(
     (messageId: string) => {
       const convId = String(conversationId ?? chat?.id ?? '');
+      // Persist locally first so re-mounting this bubble (scrolling it off-
+      // screen and back, reopening the chat, restarting the app) respects
+      // the one-time reveal instead of resetting to "tap to view" again —
+      // topLevelViewOnceViewed in MessageBubble only seeds its initial state
+      // from message.viewedAt, it doesn't track live updates to the prop.
+      //
+      // This also actually deletes the content — not just hides it. MessageBubble
+      // has already snapshotted whatever it needs into the viewer modal before
+      // calling this, so stripping the fields here doesn't affect what's on
+      // screen right now, only what's left in storage and in any future render
+      // (e.g. a re-mount). Deliberately NOT isDeleted — that flag renders
+      // "Message deleted" (a real delete-for-everyone), whereas this should
+      // keep rendering "Opened" (see MessageBubble's isTopLevelViewOnce +
+      // topLevelViewOnceViewed branch), so viewOnce/viewedAt are kept.
+      replaceMessages(messages.map((m) =>
+        m.id === messageId || (m as any).serverId === messageId
+          ? {
+              ...m,
+              viewedAt: new Date().toISOString(),
+              text: '',
+              styledText: undefined,
+              voice: undefined,
+              sticker: undefined,
+              attachments: [],
+              media: undefined,
+              contacts: undefined,
+              poll: undefined,
+              event: undefined,
+              linkPreview: undefined,
+            }
+          : m,
+      ));
       if (!convId || !socket) return;
-      (socket as any).emit('chat.view_once', { conversationId: convId, messageId });
+      // Server-side: purges the persisted message content / media asset for
+      // this messageId on receipt, mirroring the local strip above, so the
+      // deletion is real on both ends, not just visual. The ack is
+      // best-effort visibility only — the content is already gone from this
+      // screen regardless of outcome (the user already saw it), so a
+      // failure here is logged, not surfaced as an error to the user; the
+      // alternative (un-stripping already-shown content) would be more
+      // confusing than a silent local-only view-once.
+      (socket as any).emit('chat.view_once', { conversationId: convId, messageId }, (ack: any) => {
+        if (!ack?.ok) {
+          console.warn('[handleViewOnce] server-side purge failed; content only cleared locally', {
+            messageId,
+            conversationId: convId,
+            error: ack?.error ?? ack,
+          });
+        }
+      });
     },
-    [conversationId, chat?.id, socket],
+    [conversationId, chat?.id, socket, messages, replaceMessages],
   );
 
   // Resolve wallpaper background color
@@ -2340,6 +2393,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onChangeDraft={handleChangeDraft}
           onSend={handleSend}
           onLinkPreviewChange={(p: any) => { composerLinkPreviewRef.current = p; }}
+          onViewOnceChange={(enabled: boolean) => { composerViewOnceRef.current = enabled; }}
           onSendVoice={handleSendVoice}
           onOpenStickerEditor={() => setOpenStickerEditor(true)}
           onChooseTextBackground={setTextCardBg}

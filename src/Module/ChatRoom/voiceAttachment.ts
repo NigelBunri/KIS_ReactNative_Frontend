@@ -63,9 +63,15 @@ export function resolveEmbeddedVoicePlaybackUri(
 ): string | null {
   const candidate = voice?.localUri || voice?.url || voice?.uri || fallbackAttachmentUrl || null;
   if (!candidate) return null;
-  // A bare objectKey/id (no scheme) is not a playable URI — guards against
-  // `voice.uri` degrading to a non-URL value on old/partially-migrated rows.
-  if (!/^(https?|file|content):/i.test(candidate)) return null;
+  // A bare objectKey/id (no scheme, no leading slash) is not a playable URI —
+  // guards against `voice.uri` degrading to a non-URL value on old/partially-
+  // migrated rows. A leading `/` is accepted because Django's upload/media
+  // endpoints return relative paths (see resolveBackendAssetUrl in
+  // src/network/index.tsx), which the caller resolves to absolute afterward —
+  // rejecting them here (as this used to) meant every relative voice URL was
+  // discarded before it ever reached that resolver, permanently classifying
+  // the note as "unavailable" for both sender and receiver.
+  if (!/^(https?|file|content):/i.test(candidate) && !candidate.startsWith('/')) return null;
   return candidate;
 }
 

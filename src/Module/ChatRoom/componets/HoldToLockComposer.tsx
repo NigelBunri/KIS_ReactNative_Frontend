@@ -11,6 +11,9 @@ import {
   Pressable,
   StyleSheet,
   Easing,
+  Platform,
+  Alert,
+  Linking,
 } from 'react-native';
 
 import AudioRecorderPlayer, {
@@ -23,11 +26,51 @@ import AudioRecorderPlayer, {
   AudioEncoderAndroidType,
   AudioSourceAndroidType,
 } from 'react-native-audio-recorder-player';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { KISIcon } from '@/constants/kisIcons';
 import RNFS from 'react-native-fs';
 
 const audioRecorderPlayer = new AudioRecorderPlayer();
 audioRecorderPlayer.setSubscriptionDuration(0.09);
+
+// Mirrors CameraCaptureModal.tsx's ensureCameraPermission — same check/
+// request shape, so a permission that's already granted resolves instantly
+// with no native round-trip, and a first-time DENIED shows exactly one OS
+// prompt instead of silently failing.
+const getMicPermission = () =>
+  Platform.select({
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    default: undefined,
+  });
+
+const ensureMicPermission = async () => {
+  const micPermission = getMicPermission();
+  if (!micPermission) return true;
+
+  const currentStatus = await check(micPermission);
+  if (currentStatus === RESULTS.GRANTED || currentStatus === RESULTS.LIMITED) {
+    return true;
+  }
+
+  const nextStatus =
+    currentStatus === RESULTS.DENIED ? await request(micPermission) : currentStatus;
+
+  return nextStatus === RESULTS.GRANTED || nextStatus === RESULTS.LIMITED;
+};
+
+// Android's native module (RNAudioRecorderPlayerModule.kt) always resolves
+// startRecorder() with the literal string "file:///" + audioFileURL, with no
+// regard for whether audioFileURL itself already starts with a leading slash
+// — and it always does, since RNFS.CachesDirectoryPath is an absolute path.
+// That produces a malformed "file:////..." (4 slashes) URI, which is what
+// gets stored in recordUriRef and handed to local preview playback and to
+// uploadFileToBackend's stripFileScheme()/RNFS.exists() guard. iOS resolves
+// via a real URL object instead (see RNAudioRecorderPlayer.swift), so this
+// is Android-only. Collapsing any run of slashes after "file:" back down to
+// exactly 3 is a safe no-op on an already-well-formed URI (iOS, or a future
+// fixed native module) and fixes the Android case.
+const normalizeRecordedUri = (uri: string) => uri.replace(/^file:\/{2,}/, 'file:///');
 
 // Explicit codec config for voice notes — without this, startRecorder()
 // uses each platform's own default: Android already defaults to AAC-in-
@@ -89,6 +132,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
   const recordUriRef   = useRef<string | null>(null);
   const recordMsRef    = useRef(0);
   const playActiveRef  = useRef(false);
+  const permissionCheckInFlightRef = useRef(false);
 
   /* ── animated values ───────────────────────────────────────────────────── */
   const micScale   = useRef(new Animated.Value(1)).current;
@@ -223,7 +267,41 @@ export const HoldToLockComposer: React.FC<Props> = ({
   /* ── recording core ─────────────────────────────────────────────────────── */
 
   const startRecording = async () => {
-    if (disabled || voiceModeRef.current !== 'idle') return;
+    if (disabled || voiceModeRef.current !== 'idle' || permissionCheckInFlightRef.current) return;
+
+    // Gate on the mic permission BEFORE touching any recording UI state.
+    // Doing this after flipping into 'recordingHold' (the old behaviour) let
+    // the user see the full recording animation — waveform, timer, pulsing
+    // mic — flash on screen for a beat and then silently revert to idle the
+    // instant startRecorder()'s promise rejected, with no error message.
+    // That happens on every single attempt when RECORD_AUDIO isn't already
+    // granted: Android 10+'s native module (RNAudioRecorderPlayerModule.kt)
+    // fires the OS permission dialog AND synchronously rejects in the same
+    // call, with no retry once the user grants it. Requesting it explicitly
+    // here — the same check/request shape CameraCaptureModal.tsx already
+    // uses for the camera permission — means the first hold either starts a
+    // real recording (already granted) or surfaces one clear OS prompt with
+    // no fake recording UI; the user then holds again to actually record,
+    // same as every other hold-to-record chat app.
+    permissionCheckInFlightRef.current = true;
+    let granted: boolean;
+    try {
+      granted = await ensureMicPermission();
+    } finally {
+      permissionCheckInFlightRef.current = false;
+    }
+    if (disabled || voiceModeRef.current !== 'idle') return; // state changed while awaiting
+    if (!granted) {
+      Alert.alert(
+        'Microphone permission needed',
+        'Allow microphone access in your device settings to record voice messages in KIS.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open settings', onPress: () => void Linking.openSettings() },
+        ],
+      );
+      return;
+    }
 
     cancelledRef.current = false;
     startedRef.current   = false;
@@ -242,7 +320,17 @@ export const HoldToLockComposer: React.FC<Props> = ({
 
     try {
       const recordingPath = `${RNFS.CachesDirectoryPath}/kis-voice-${Date.now()}.m4a`;
-      const uri = await audioRecorderPlayer.startRecorder(`file://${recordingPath}`, VOICE_NOTE_AUDIO_SET);
+      // Android's native module (RNAudioRecorderPlayerModule.kt) passes this
+      // string straight to MediaRecorder.setOutputFile(), which expects a
+      // plain filesystem path, not a URI — a "file://" prefix there produces
+      // a bogus literal path, silently breaking the recording (it "records"
+      // and "sends" successfully, but the resulting file has no playable
+      // audio, since MediaRecorder never wrote to a real, valid location).
+      // iOS's native module (RNAudioRecorderPlayer.swift) explicitly detects
+      // and correctly URL-parses a "file://" prefix, so only add it there.
+      const recorderPath = Platform.OS === 'android' ? recordingPath : `file://${recordingPath}`;
+      const rawUri = await audioRecorderPlayer.startRecorder(recorderPath, VOICE_NOTE_AUDIO_SET);
+      const uri = rawUri ? normalizeRecordedUri(rawUri) : rawUri;
       if (cancelledRef.current) {
         // Finger was released before the recorder initialised
         try { await audioRecorderPlayer.stopRecorder(); } catch {}
