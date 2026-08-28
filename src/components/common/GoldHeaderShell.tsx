@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { useKISTheme } from '@/theme/useTheme';
 
 type GoldHeaderShellProps = {
   children?: React.ReactNode;
@@ -27,10 +27,11 @@ type GoldHeaderShellProps = {
  * approach this replaces.
  */
 export function GoldHeaderShell({ children, style, colors }: GoldHeaderShellProps) {
+  const { gradients } = useKISTheme();
   return (
     <View style={[styles.base, style]}>
       <LinearGradient
-        colors={(colors ?? KIS_ROYAL_GRADIENTS.goldHeader) as string[]}
+        colors={(colors ?? gradients.header) as string[]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}

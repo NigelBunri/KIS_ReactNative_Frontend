@@ -92,6 +92,9 @@ import ReanimatedScroll, { useAnimatedReaction, useSharedValue, withTiming } fro
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useAgeMode } from '@/theme/ageModeContext';
 import { useThemeMode, type KISThemeMode } from '@/theme/themeModeContext';
+import { useAccentTheme } from '@/theme/accentThemeContext';
+import { KIS_ACCENT_THEMES } from '@/theme/constants';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   getCachedHasPin,
   getLockTimeout,
@@ -284,6 +287,8 @@ export default function ProfileScreen() {
   );
   const { language, languages, setLanguage, downloadingLanguage } = useLanguage();
   const { themeMode, setThemeMode } = useThemeMode();
+  const { accentId, setAccentId } = useAccentTheme();
+  const [accentPickerExpanded, setAccentPickerExpanded] = useState(false);
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
   const { setAuth, setPhone, callingCode, hasPin, setHasPin, user: authUser } = useAuth();
   const c = useProfileController({
@@ -3175,6 +3180,139 @@ export default function ProfileScreen() {
                     );
                   })}
                 </View>
+              </View>
+
+              {/* ── Theme color: collapsed by default, Gold selected by
+                  default. Expanding reveals a row of small phone-shaped
+                  mockups, one per accent color, previewing that color's
+                  header gradient. The Light/Dark/System row above still
+                  governs how whichever color is picked here renders. ── */}
+              <View style={{ borderTopWidth: 1, borderTopColor: palette.divider }}>
+                <Pressable
+                  onPress={() => setAccentPickerExpanded(v => !v)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    backgroundColor: pressed ? palette.surfaceElevated : 'transparent',
+                  })}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 6, overflow: 'hidden' }}>
+                      <LinearGradient
+                        colors={[
+                          (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[0],
+                          (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[2],
+                        ]}
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                    <Text style={{ fontSize: responsive.labelFontSize, color: palette.text, fontWeight: '600' }}>
+                      Theme color · {(KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).name}
+                    </Text>
+                  </View>
+                  <KISIcon
+                    name="chevron-down"
+                    size={18}
+                    color={palette.subtext}
+                    style={{ transform: [{ rotate: accentPickerExpanded ? '180deg' : '0deg' }] }}
+                  />
+                </Pressable>
+
+                {accentPickerExpanded && (
+                  <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                    <Text style={{ fontSize: responsive.labelFontSize - 1, color: palette.subtext, marginBottom: 10 }}>
+                      Gold is the KIS default. Pick any color below, then use the theme row above to render it light, dark, or match your device.
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 16, paddingVertical: 4, paddingHorizontal: 2 }}
+                    >
+                      {KIS_ACCENT_THEMES.map((accentTheme) => {
+                        const selected = accentId === accentTheme.id;
+                        return (
+                          <Pressable
+                            key={accentTheme.id}
+                            onPress={() => setAccentId(accentTheme.id)}
+                            style={({ pressed }) => ({ alignItems: 'center', gap: 6, opacity: pressed ? 0.75 : 1 })}
+                          >
+                            <View style={{ position: 'relative' }}>
+                              {/* Small phone-shaped mockup of this color's header */}
+                              <View
+                                style={{
+                                  width: 46,
+                                  height: 78,
+                                  borderRadius: 14,
+                                  padding: 3,
+                                  borderWidth: selected ? 2.5 : 1,
+                                  borderColor: selected ? accentTheme.primary : palette.divider,
+                                  backgroundColor: palette.bg,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    alignSelf: 'center',
+                                    width: 14,
+                                    height: 3,
+                                    borderRadius: 2,
+                                    backgroundColor: palette.divider,
+                                    marginBottom: 3,
+                                  }}
+                                />
+                                <LinearGradient
+                                  colors={[accentTheme.headerGradient[0], accentTheme.headerGradient[2], accentTheme.headerGradient[3]]}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 0, y: 1 }}
+                                  style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}
+                                >
+                                  <View
+                                    style={{
+                                      height: 2,
+                                      backgroundColor: accentTheme.sheenColor,
+                                    }}
+                                  />
+                                </LinearGradient>
+                              </View>
+                              {selected && (
+                                <View
+                                  style={{
+                                    position: 'absolute',
+                                    top: -5,
+                                    right: -5,
+                                    width: 18,
+                                    height: 18,
+                                    borderRadius: 9,
+                                    backgroundColor: accentTheme.primary,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 2,
+                                    borderColor: palette.surface,
+                                  }}
+                                >
+                                  <KISIcon name="check" size={10} color="#FFFFFF" />
+                                </View>
+                              )}
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: selected ? '800' : '500',
+                                color: selected ? palette.text : palette.subtext,
+                                maxWidth: 60,
+                              }}
+                              numberOfLines={1}
+                            >
+                              {accentTheme.emoji} {accentTheme.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
             </View>
 

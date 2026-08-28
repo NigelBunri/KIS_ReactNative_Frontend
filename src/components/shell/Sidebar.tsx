@@ -20,7 +20,6 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useThemeMode } from '@/theme/themeModeContext';
 import { useAuth } from '../../../App';
 
@@ -63,7 +62,7 @@ function SidebarItem({
   badge?: number;
   onPress: () => void;
 }) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -73,7 +72,7 @@ function SidebarItem({
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
   };
 
-  const gradientColors = tone === 'dark' ? KIS_ROYAL_GRADIENTS.goldDark : KIS_ROYAL_GRADIENTS.goldLight;
+  const gradientColors = gradients.tabSelected;
   const iconColor = active ? (tone === 'dark' ? palette.royalInk : palette.ivory) : palette.subtext;
   const textColor = active ? palette.goldReadable : palette.text;
 
@@ -132,7 +131,7 @@ export function Sidebar({
   collapsed: boolean;
   onToggleCollapse: () => void;
 }) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   const { themeMode, setThemeMode } = useThemeMode();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -158,7 +157,7 @@ export function Sidebar({
     >
       <View style={[styles.logoRow, collapsed && styles.logoRowCollapsed]}>
         <LinearGradient
-          colors={(tone === 'dark' ? KIS_ROYAL_GRADIENTS.goldDark : KIS_ROYAL_GRADIENTS.goldLight) as unknown as string[]}
+          colors={gradients.tabSelected as unknown as string[]}
           style={styles.logoMark}
         >
           <Text style={[styles.logoMarkText, { color: isDark ? palette.royalInk : palette.ivory }]}>K</Text>
@@ -199,7 +198,7 @@ export function Sidebar({
           style={[styles.profileRow, collapsed && styles.profileRowCollapsed]}
         >
           <LinearGradient
-            colors={(tone === 'dark' ? KIS_ROYAL_GRADIENTS.goldDark : KIS_ROYAL_GRADIENTS.goldLight) as unknown as string[]}
+            colors={gradients.tabSelected as unknown as string[]}
             style={styles.avatar}
           >
             <Text style={[styles.avatarText, { color: isDark ? palette.royalInk : palette.ivory }]}>{initials}</Text>

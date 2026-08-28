@@ -186,6 +186,7 @@ import LanguageSwitcher from '@/languages/LanguageSwitcher';
 import { LanguageProvider, useLanguage } from '@/languages';
 import { AgeModeProvider, useAgeMode } from '@/theme/ageModeContext';
 import { ThemeModeProvider, useThemeMode } from '@/theme/themeModeContext';
+import { AccentThemeProvider } from '@/theme/accentThemeContext';
 import SetupPINScreen from '@/screens/SetupPINScreen';
 import QuickLockScreen from '@/screens/QuickLockScreen';
 import SubscriptionManagementScreen from '@/screens/SubscriptionManagementScreen';
@@ -1886,11 +1887,13 @@ export default function App() {
         <ErrorBoundary fallbackLabel="The app encountered an unexpected error. Please restart.">
           <LanguageProvider>
             <ThemeModeProvider>
-              <AgeModeProvider>
-                <GoldenSectionProvider>
-                  <AppContent />
-                </GoldenSectionProvider>
-              </AgeModeProvider>
+              <AccentThemeProvider>
+                <AgeModeProvider>
+                  <GoldenSectionProvider>
+                    <AppContent />
+                  </GoldenSectionProvider>
+                </AgeModeProvider>
+              </AccentThemeProvider>
             </ThemeModeProvider>
           </LanguageProvider>
         </ErrorBoundary>

@@ -814,8 +814,8 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               autoFocus
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => setShowAddParticipant(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#D9A875' }}>
-                <Text style={{ color: '#D9A875', fontWeight: '700' }}>Cancel</Text>
+              <Pressable onPress={() => setShowAddParticipant(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.gold }}>
+                <Text style={{ color: palette.gold, fontWeight: '700' }}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -823,7 +823,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                   if (uid && addParticipantCb.current) addParticipantCb.current([uid]);
                   setShowAddParticipant(false);
                 }}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: '#9A6A14' }}
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: palette.goldDeep }}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Invite</Text>
               </Pressable>

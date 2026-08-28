@@ -26,9 +26,9 @@ export function MainTabPageHeader({
   primaryAction?: HeaderAction;
   secondaryAction?: HeaderAction;
 }) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, accentId } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const selected = selectedControlStyles(tone);
+  const selected = selectedControlStyles(tone, accentId);
 
   return (
     <View
@@ -133,9 +133,9 @@ export function MainTabStateBlock({
   actionLabel?: string;
   onAction?: () => void;
 }) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, accentId } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const cards = cardStyles(tone);
+  const cards = cardStyles(tone, accentId);
 
   return (
     <View style={[cards.base, styles.stateBlock, { minHeight: responsive.isWatch ? 96 : 132, gap: responsive.cardGap }]}>

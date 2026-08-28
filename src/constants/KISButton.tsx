@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { createButtonStyles } from '@/theme/foundations/buttons';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { getAccentGradients } from '@/theme/constants';
 import { useKISTheme } from '@/theme/useTheme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -45,7 +45,7 @@ export default function KISButton({
   disabled,
   loading = false,
 }: Props) {
-  const { tone, palette, tokens } = useKISTheme();
+  const { tone, palette, tokens, accentId } = useKISTheme();
   const bs = createButtonStyles(tone, palette, tokens);
 
   // Resolve variant styles
@@ -67,7 +67,10 @@ export default function KISButton({
 
   const spinnerColor =
     (variantStyles.text as TextStyle | undefined)?.color || palette.text;
-  const metallicGoldGradient = [...KIS_ROYAL_GRADIENTS.goldDark];
+  // Always the "dark" gradient variant regardless of the app's current
+  // tone — the button's white text needs that contrast either way — so
+  // tone is forced here rather than read from the theme.
+  const metallicGoldGradient = [...getAccentGradients('dark', accentId).tabSelected];
   const shouldUseGoldGradient = variant === 'primary' && !isDisabled;
 
   return (

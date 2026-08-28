@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { getAccentGradients } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
 
@@ -31,12 +31,16 @@ const TABS: TabDef[] = [
 ];
 
 export default function BroadcastMainTabs({ value, onChange }: Props) {
-  const { palette, tokens } = useKISTheme();
+  const { palette, tokens, accentId } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const inactiveTextColor = 'rgba(255,255,255,0.90)';
   const inactiveIconColor = 'rgba(255,244,184,0.86)';
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  // Always the "dark" variant regardless of app tone, same reasoning as
+  // KISButton's metallic gradient — this pill sits on the gold header,
+  // which always uses white/cream text.
+  const activePillGradient = getAccentGradients('dark', accentId).tabSelected;
 
   return (
     <View
@@ -70,7 +74,7 @@ export default function BroadcastMainTabs({ value, onChange }: Props) {
             >
               {active ? (
                 <LinearGradient
-                  colors={[...KIS_ROYAL_GRADIENTS.goldDark]}
+                  colors={[...activePillGradient]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}

@@ -15,7 +15,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   fetchSocialRecommendationFoundation,
@@ -64,14 +63,13 @@ function FeaturedChannelCard({
   channel: BroadcastChannelSummary;
   onOpen: (channel: BroadcastChannelSummary) => void;
 }) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const cardWidth = compact
     ? Math.max(200, responsive.width - responsive.pageGutter * 3)
     : 270;
-  const bannerFallbackGradient =
-    tone === 'dark' ? KIS_ROYAL_GRADIENTS.goldDark : KIS_ROYAL_GRADIENTS.goldLight;
+  const bannerFallbackGradient = gradients.tabSelected;
 
   return (
     <Pressable

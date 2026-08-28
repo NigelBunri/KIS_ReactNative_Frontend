@@ -16,7 +16,6 @@ import Animated, {
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 import { useKISTheme } from '@/theme/useTheme';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
@@ -130,7 +129,7 @@ const TAB_SWIPE_MAX_VERTICAL_DRIFT = 30;
 const TAB_SWIPE_DIRECTION_RATIO = 2.5;
 
 export default function BroadcastScreen() {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
@@ -138,8 +137,8 @@ export default function BroadcastScreen() {
   const topInset = useRawTopInset();
   const compactBroadcast = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(palette), [palette]);
-  // goldHeader: gold-first so the transparent status bar shows gold, not dark.
-  const broadcastGoldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
+  // header: accent-first so the transparent status bar shows the accent, not dark.
+  const broadcastGoldGradient = [...gradients.header];
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');

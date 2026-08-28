@@ -13,7 +13,8 @@ import { useIsFocused } from '@react-navigation/native';
 
 export type GoldenSectionPayload = {
   content: React.ReactNode;
-  /** Gradient override; defaults to KIS_ROYAL_GRADIENTS.goldHeader inside GoldHeaderShell. */
+  /** Gradient override; defaults to the current accent theme's header gradient
+   *  (useKISTheme().gradients.header) inside GoldHeaderShell. */
   colors?: readonly string[];
   /** Merged onto the shared GoldHeaderShell (radius/shadow tweaks per page). */
   shellStyle?: StyleProp<ViewStyle>;

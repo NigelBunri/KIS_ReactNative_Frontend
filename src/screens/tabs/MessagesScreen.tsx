@@ -32,7 +32,7 @@ import {
   MaterialTopTabBar,
 } from '@react-navigation/material-top-tabs';
 import { useKISTheme } from '../../theme/useTheme';
-import { KIS_ROYAL_GRADIENTS, KIS_TOKENS } from '../../theme/constants';
+import { KIS_TOKENS } from '../../theme/constants';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
@@ -141,7 +141,7 @@ type GlobalSearchResult = {
  * - Avoid repeated setState on layout if height hasn't changed
  */
 export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, headerGradient, sheenColor: _sheenColor }: MessagesScreenProps) {
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   const insets = useSafeAreaInsets();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
@@ -1849,7 +1849,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // goldHeader starts with bright gold so the transparent status bar shows the
   // app's gold theme, not a dark void. The diagonal direction keeps the luxury
   // depth effect in the visible header below the status bar.
-  const messageGoldGradient: readonly string[] = headerGradient ?? [...KIS_ROYAL_GRADIENTS.goldHeader];
+  const messageGoldGradient: readonly string[] = headerGradient ?? [...gradients.header];
 
   // Gold header → always use dark icons for readability (push/pop so other
   // screens' bar styles are unaffected when navigating away).

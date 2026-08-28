@@ -16,7 +16,6 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
-import { KIS_ROYAL_GRADIENTS } from '../../theme/constants';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { useBibleData } from './bible/useBibleData';
@@ -63,15 +62,15 @@ export default function BibleScreen() {
   // is one of the 5 main-tab gold-header screens with its own hand-tuned
   // spacing, so it reads the raw (corrected) device inset instead.
   const topInset = useRawTopInset();
-  const { palette, tone } = useKISTheme();
+  const { palette, tone, gradients } = useKISTheme();
   // Gold header always needs dark icons (same as Broadcast + Messages)
   useStatusBarStyle(tone, 'dark-content');
   const responsive = useResponsiveLayout();
   const compactBible = responsive.isWatch || responsive.isCompactPhone;
   const tinyBible = responsive.isWatch;
   const metallicGoldGradient = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
-  // The same gold header gradient used across Messages and Broadcast screens
-  const bibleGoldGradient = [...KIS_ROYAL_GRADIENTS.goldHeader];
+  // The same header gradient used across Messages and Broadcast screens
+  const bibleGoldGradient = [...gradients.header];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
 
@@ -246,7 +245,7 @@ export default function BibleScreen() {
     content: (
       <>
         {/* Soft radial halo in the top-right corner for depth */}
-        <View style={[styles.headerHalo, {marginTop: topInset}]} />
+        <View style={[styles.headerHalo, { marginTop: topInset, backgroundColor: palette.gold }]} />
 
         {/* ── Always-visible header bar ─────────────────────────────────── */}
         <View style={[styles.headerBar, { paddingTop: topInset }]}>
@@ -417,7 +416,9 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#C9A24A',
+    // backgroundColor set inline where this style is used — this file's
+    // stylesheet is static (no palette), and the halo needs to track the
+    // current accent color.
     opacity: 0.14,
   },
 

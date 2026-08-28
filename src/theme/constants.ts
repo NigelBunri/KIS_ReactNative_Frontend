@@ -1,10 +1,64 @@
 import { Platform } from 'react-native';
+import { APP_COLOR_THEMES, DEFAULT_THEME_ID, getThemeById, type AppColorTheme } from '@/constants/appColorThemes';
 
 /** ─────────────────────────
  *  Color & Theme Foundations
  *  ───────────────────────── */
 
 export type KISTone = 'light' | 'dark';
+
+/** The 8 accent colors exposed in the app's own Appearance settings — Gold
+ *  (the default, first in the list) plus the 7 most broadly recognizable
+ *  colors from the larger Partner Pro set in appColorThemes.ts. Re-exported
+ *  from here (rather than duplicated) so the settings picker and the palette
+ *  generator below always agree on exactly which colors exist. */
+export const KIS_ACCENT_THEMES: AppColorTheme[] = (() => {
+  const gold = getThemeById(DEFAULT_THEME_ID);
+  const pickIds = ['royal_blue', 'emerald', 'crimson', 'amber', 'teal', 'rose', 'violet'];
+  const rest = pickIds
+    .map((id) => APP_COLOR_THEMES.find((t) => t.id === id))
+    .filter((t): t is AppColorTheme => !!t);
+  return [gold, ...rest];
+})();
+
+// ---- small hex color helpers, used only to derive accent-tinted palette
+// values below (lighten/darken toward white or black, and rgba() tints).
+// Deliberately simple linear channel blending rather than true HSL math —
+// good enough for UI tints and much easier to reason about/verify by eye.
+const clampChannel = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
+
+const hexToRgbChannels = (hex: string): [number, number, number] => {
+  const normalized = String(hex || '').trim().replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((c) => c + c).join('')
+    : normalized;
+  if (full.length !== 6) return [0, 0, 0];
+  return [
+    clampChannel(parseInt(full.slice(0, 2), 16)),
+    clampChannel(parseInt(full.slice(2, 4), 16)),
+    clampChannel(parseInt(full.slice(4, 6), 16)),
+  ];
+};
+
+const channelsToHex = (r: number, g: number, b: number) =>
+  `#${[r, g, b].map((c) => clampChannel(c).toString(16).padStart(2, '0')).join('')}`;
+
+/** Blends `hex` toward [255,255,255] (amount>0, lighten) or [0,0,0] (amount<0, darken). */
+export const shade = (hex: string, amount: number): string => {
+  const [r, g, b] = hexToRgbChannels(hex);
+  const target = amount >= 0 ? 255 : 0;
+  const t = Math.min(1, Math.abs(amount));
+  return channelsToHex(
+    r + (target - r) * t,
+    g + (target - g) * t,
+    b + (target - b) * t,
+  );
+};
+
+export const withAlpha = (hex: string, alpha: number): string => {
+  const [r, g, b] = hexToRgbChannels(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 export const KIS_COLORS = {
   brand: {
@@ -218,7 +272,13 @@ export type KISPalette = {
   [key: string]: string | undefined;
 };
 
-export const createPalette = (tone: KISTone): KISPalette => {
+/** The original, hand-tuned gold/coffee-brown palette — unchanged from
+ *  before accent colors existed. Every other accent starts from this same
+ *  base (so all the neutral surface/text/chat/state colors stay identical
+ *  across every accent) and then has its brand-specific keys overridden by
+ *  createPalette below. Kept private so accentId is never forgotten at a
+ *  call site — always go through createPalette. */
+const createBasePalette = (tone: KISTone): KISPalette => {
   const c = KIS_COLORS;
   const base = tone === 'dark' ? c.dark : c.light;
 
@@ -278,7 +338,11 @@ export const createPalette = (tone: KISTone): KISPalette => {
   const chatComposerBg = base.card;
 
   const composerInputBg = base.inputBg;
-  const composerInputBorder = base.inputBorder;
+  // Matches the `inputBorder` key below exactly (not base.inputBorder
+  // directly), so an accent override applied to one applies to both —
+  // otherwise the chat composer's own input border stayed gold-tinted no
+  // matter what accent was picked, since it read the raw un-accented value.
+  const composerInputBorder = tone === 'dark' ? tanGold : base.inputBorder;
 
   const avatarBg =
     tone === 'dark'
@@ -440,6 +504,131 @@ export const createPalette = (tone: KISTone): KISPalette => {
     surfaceSoft: elevated,
     successSoft,
     dangerSoft,
+  };
+};
+
+/**
+ * Derives the brand-specific slice of a palette from one accent color's
+ * `primary` hex, mirroring the shape of the hand-tuned gold values above
+ * (a dark shade for primary/badges/text-on-light-bg, a mid shade for the
+ * accent itself, soft rgba tints for weak/soft backgrounds). Applied as an
+ * override on top of createBasePalette's result, so every truly neutral
+ * surface, text, and state color is identical across every accent — only
+ * the "what color is the brand" keys change.
+ *
+ * This includes every key that carried a hardcoded gold/tan/coffee cast in
+ * the base palette, not just the keys literally named gold*: dividers,
+ * muted borders, the composer input border, the selected-item highlight in
+ * dark mode, and the outgoing chat bubble all used a fixed tan color
+ * regardless of accent until this override list covered them too — which
+ * is exactly what made a non-gold accent still look "goldenish" in the
+ * borders and backgrounds around it, even once the headers/buttons/tab bar
+ * had already switched color.
+ *
+ * The app's secondary royal-purple accents (purple*, royal*, incomingBubble,
+ * and selectedBg/Text/Border's LIGHT-mode branch specifically) are still
+ * deliberately left untouched: they're the app's fixed complementary color
+ * family — e.g. "your message is accent-colored, their message is neutral
+ * purple" — not a gold-specific choice that needs re-deriving per accent.
+ */
+const applyAccentOverride = (base: KISPalette, tone: KISTone, accent: AppColorTheme): KISPalette => {
+  const p = accent.primary;
+  const deep = shade(p, tone === 'dark' ? -0.15 : -0.35); // dark, readable shade for primary/badges
+  const light = shade(p, 0.35);
+  const highlight = shade(p, 0.55);
+  const readable = tone === 'dark' ? shade(p, 0.15) : shade(p, -0.4);
+  const border = tone === 'dark' ? shade(p, 0.1) : shade(p, -0.2);
+
+  return {
+    ...base,
+    primary: deep,
+    secondary: base.secondary,
+    gradientStart: light,
+    gradientEnd: deep,
+    goldHighlight: highlight,
+    goldLight: light,
+    gold: p,
+    goldRose: shade(p, 0.1),
+    goldDeep: deep,
+    goldShadow: shade(p, -0.55),
+    goldSoft: withAlpha(p, tone === 'dark' ? 0.15 : 0.14),
+    goldMuted: withAlpha(p, tone === 'dark' ? 0.35 : 0.30),
+    goldGradientStart: light,
+    goldGradientMid: p,
+    goldGradientEnd: deep,
+    goldReadable: readable,
+    goldBorder: border,
+    badgeBg: deep,
+    focusRing: withAlpha(p, tone === 'dark' ? 0.70 : 0.45),
+    primaryWeak: withAlpha(p, tone === 'dark' ? 0.08 : 0.10),
+    primarySoft: withAlpha(p, tone === 'dark' ? 0.18 : 0.24),
+    primaryStrong: tone === 'dark' ? readable : deep,
+    accent: deep,
+    accentPrimary: tone === 'dark' ? readable : deep,
+    inputBorder: tone === 'dark' ? p : border,
+    border: tone === 'dark' ? p : border,
+    composerInputBorder: tone === 'dark' ? p : border,
+    // Every card/list divider and muted border in the app read one of
+    // these two — a fixed tan rgba in dark mode, a fixed coffee hex in
+    // light mode — regardless of accent, which is why dividers/outlines
+    // kept looking gold-tinted even after the branded chrome switched.
+    divider: tone === 'dark' ? withAlpha(p, 0.30) : base.divider,
+    borderMuted: tone === 'dark' ? withAlpha(p, 0.38) : withAlpha(p, 0.35),
+    // Selected-item highlight: only the dark-mode branch was gold-tinted
+    // (light mode already used the fixed purple family, kept as-is here).
+    selectedBg: tone === 'dark' ? withAlpha(p, 0.15) : base.selectedBg,
+    selectedText: tone === 'dark' ? readable : base.selectedText,
+    selectedBorder: tone === 'dark' ? p : base.selectedBorder,
+    // The soft cream/tan text tone meant to sit on a primary-colored fill.
+    onPrimaryMuted: shade(p, tone === 'dark' ? 0.5 : 0.45),
+    // Outgoing chat bubble: "your messages are accent-colored" — the
+    // incoming bubble stays the fixed neutral purple/white pairing.
+    outgoingBubble: tone === 'dark' ? shade(p, -0.55) : shade(p, 0.55),
+  };
+};
+
+/** Builds the full semantic palette for a given tone and accent color.
+ *  `accentId` defaults to the gold KIS theme, so every existing call site
+ *  that doesn't know about accents keeps rendering exactly as before. */
+export const createPalette = (tone: KISTone, accentId: string = DEFAULT_THEME_ID): KISPalette => {
+  const base = createBasePalette(tone);
+  if (!accentId || accentId === DEFAULT_THEME_ID) return base;
+  const accent = getThemeById(accentId);
+  return applyAccentOverride(base, tone, accent);
+};
+
+export type KISAccentGradients = {
+  /** Bright-to-dark 4 stops for full-bleed "Golden Section" headers, the
+   *  shared button, and other chrome that always uses the same gradient
+   *  regardless of tone (mirrors KIS_ROYAL_GRADIENTS.goldHeader's shape). */
+  header: readonly [string, string, string, string];
+  /** Tone-branched 4 stops for smaller accents like the selected tab icon
+   *  circle and sidebar highlights (mirrors goldLight/goldDark's shapes). */
+  tabSelected: readonly [string, string, string, string];
+};
+
+/**
+ * The gradient equivalent of createPalette above — KIS_ROYAL_GRADIENTS is
+ * the fixed gold definition; this derives the same two gradient shapes for
+ * whichever accent is active, so headers/buttons/tab-bar chrome change
+ * color along with the flat palette values instead of staying gold no
+ * matter what the user picks. Gold itself is passed through untouched
+ * (same values as KIS_ROYAL_GRADIENTS), so nothing changes for the default.
+ */
+export const getAccentGradients = (tone: KISTone, accentId: string = DEFAULT_THEME_ID): KISAccentGradients => {
+  if (!accentId || accentId === DEFAULT_THEME_ID) {
+    return {
+      header: KIS_ROYAL_GRADIENTS.goldHeader,
+      tabSelected: tone === 'dark' ? (KIS_ROYAL_GRADIENTS.goldDark as any) : (KIS_ROYAL_GRADIENTS.goldLight as any),
+    };
+  }
+  const accent = getThemeById(accentId);
+  const p = accent.primary;
+  return {
+    header: [p, shade(p, -0.25), shade(p, -0.45), shade(p, -0.65)],
+    tabSelected: tone === 'dark'
+      ? [shade(p, -0.65), shade(p, -0.35), shade(p, -0.1), shade(p, -0.55)]
+      : [shade(p, 0.55), shade(p, 0.15), p, shade(p, -0.4)],
   };
 };
 
@@ -623,8 +812,8 @@ export const kisRadius = {
  *  Component Recipes
  *  ───────────────────────── */
 
-export const inputStyles = (tone: KISTone) => {
-  const palette = createPalette(tone);
+export const inputStyles = (tone: KISTone, accentId?: string) => {
+  const palette = createPalette(tone, accentId);
   return {
     container: {
       minHeight: KIS_COMPONENT_TOKENS.input.minHeight,
@@ -647,8 +836,8 @@ export const inputStyles = (tone: KISTone) => {
   };
 };
 
-export const cardStyles = (tone: KISTone) => {
-  const palette = createPalette(tone);
+export const cardStyles = (tone: KISTone, accentId?: string) => {
+  const palette = createPalette(tone, accentId);
   return {
     base: {
       borderRadius: KIS_COMPONENT_TOKENS.card.radius,
@@ -679,8 +868,8 @@ export const cardStyles = (tone: KISTone) => {
   };
 };
 
-export const selectedControlStyles = (tone: KISTone) => {
-  const palette = createPalette(tone);
+export const selectedControlStyles = (tone: KISTone, accentId?: string) => {
+  const palette = createPalette(tone, accentId);
   return {
     container: {
       minHeight: KIS_TOKENS.accessibility.minTouchTarget,
@@ -702,8 +891,8 @@ export const selectedControlStyles = (tone: KISTone) => {
   };
 };
 
-export const badgeStyles = (tone: KISTone) => {
-  const palette = createPalette(tone);
+export const badgeStyles = (tone: KISTone, accentId?: string) => {
+  const palette = createPalette(tone, accentId);
   return {
     container: {
       minWidth: KIS_COMPONENT_TOKENS.badge.minSize,

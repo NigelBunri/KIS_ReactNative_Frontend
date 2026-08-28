@@ -22,6 +22,7 @@ import { VerificationBadgeRow } from '@/components/verification';
 import type { VerificationSummary } from '@/services/verificationService';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { withAlpha } from '@/theme/constants';
 import {
   createProfileDashboardTheme,
   getProfileDashboardCardStyle,
@@ -340,11 +341,11 @@ export const ProfileHeroCard = ({
               </>
             ) : (
               <>
-                <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: '#C9A24A', opacity: 0.40 }]} />
-                <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: '#6F4515', opacity: 0.35 }]} />
-                <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: '#9A6A14', opacity: 0.30 }]} />
-                <View style={[dashboardStyles.heroArcLarge, { borderColor: 'rgba(255,244,184,0.15)' }]} />
-                <View style={[dashboardStyles.heroArcSmall, { borderColor: 'rgba(255,244,184,0.10)' }]} />
+                <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: palette.gold, opacity: 0.40 }]} />
+                <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: palette.goldDeep, opacity: 0.35 }]} />
+                <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: palette.goldReadable, opacity: 0.30 }]} />
+                <View style={[dashboardStyles.heroArcLarge, { borderColor: withAlpha(palette.goldHighlight, 0.15) }]} />
+                <View style={[dashboardStyles.heroArcSmall, { borderColor: withAlpha(palette.goldHighlight, 0.10) }]} />
               </>
             )}
           </View>

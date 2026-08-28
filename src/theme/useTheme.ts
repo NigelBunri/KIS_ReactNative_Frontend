@@ -7,12 +7,14 @@ import {
   KISTone,
   createPalette,
   KISPalette,
+  getAccentGradients,
 } from './constants';
 import { TYPOGRAPHY_PRESETS } from './foundations/typography';
 import type { TypographyPreset } from './foundations/fonts';
 import { ICON_SIZES, IconTone, getIconColor } from './foundations/icons';
 import { useAgeMode } from './ageModeContext';
 import { useThemeMode } from './themeModeContext';
+import { useAccentTheme } from './accentThemeContext';
 
 // Maps the stored key (older_adult) to the ageModes object key (olderAdult).
 const toAgeModeKey = (mode: string) => (mode === 'older_adult' ? 'olderAdult' : mode) as keyof typeof KIS_TOKENS.accessibility.ageModes;
@@ -23,8 +25,10 @@ export function useKISTheme(forced?: KISTone) {
   const resolvedSys = themeMode === 'system' ? sys : themeMode;
   const tone: KISTone = forced ?? (resolvedSys === 'dark' ? 'dark' : 'light');
   const { ageMode } = useAgeMode();
+  const { accentId } = useAccentTheme();
 
-  const palette: KISPalette = createPalette(tone);
+  const palette: KISPalette = createPalette(tone, accentId);
+  const gradients = getAccentGradients(tone, accentId);
 
   const ageModeTokens = KIS_TOKENS.accessibility.ageModes[toAgeModeKey(ageMode)] ?? KIS_TOKENS.accessibility.ageModes.adult;
   const { fontScale, minTouchTarget } = ageModeTokens;
@@ -78,7 +82,9 @@ export function useKISTheme(forced?: KISTone) {
   return {
     tone,
     isDark: tone === 'dark',
+    accentId,
     palette,
+    gradients,
     tokens,
     ageMode,
     brand: KIS_COLORS.brand,

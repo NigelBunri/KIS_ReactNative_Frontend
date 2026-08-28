@@ -20,12 +20,13 @@ import {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardAnimation } from 'react-native-keyboard-controller';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
 import { useGoldenSectionSuppression } from '@/contexts/GoldenSectionContext';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KIS_COMPONENT_TOKENS, KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import { KIS_COMPONENT_TOKENS, withAlpha } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
 import type { MainTabsParamList } from '@/navigation/types';
 import { TabletShell, TabletDialogOverlay, type SidebarNavKey } from '@/components/shell';
@@ -105,6 +106,9 @@ function AnimatedKISTabBar({
 
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
+  // Keyboard-aware offset for this bar specifically - see styles.fixedWrap's
+  // transform below for why this exists at all.
+  const { height: keyboardHeight } = useKeyboardAnimation();
 
   // ✅ Responsive width that updates on orientation / size change
   const { width } = useWindowDimensions();
@@ -116,17 +120,15 @@ function AnimatedKISTabBar({
   const iconSize = responsive.isWatch ? 19 : responsive.isCompactPhone ? 21 : 24;
   const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 62 : 72;
 
-  const { palette: p, tone } = theme;
+  const { palette: p, tone, gradients } = theme;
   const isRoyalLightBar = tone === 'light';
   const focusedTextColor = isRoyalLightBar ? p.goldReadable : p.goldLight;
   const unfocusedTextColor = p.subtext;
   const barBg = isRoyalLightBar ? (p.ivory ?? p.bg) : (p.bar ?? p.surface);
-  const selectedGoldGradient = tone === 'dark'
-    ? [...KIS_ROYAL_GRADIENTS.goldDark]
-    : [...KIS_ROYAL_GRADIENTS.goldLight];
+  const selectedGoldGradient = [...gradients.tabSelected];
   const separatorColors = tone === 'dark'
-    ? ['transparent', 'rgba(201,162,74,0.55)', 'rgba(185,133,46,0.75)', 'rgba(201,162,74,0.55)', 'transparent']
-    : ['transparent', 'rgba(185,133,46,0.30)', 'rgba(185,133,46,0.50)', 'rgba(185,133,46,0.30)', 'transparent'];
+    ? ['transparent', withAlpha(p.gold, 0.55), withAlpha(p.goldBorder, 0.75), withAlpha(p.gold, 0.55), 'transparent']
+    : ['transparent', withAlpha(p.goldBorder, 0.30), withAlpha(p.goldBorder, 0.50), withAlpha(p.goldBorder, 0.30), 'transparent'];
 
   const activeRouteName = state.routes[state.index]?.name ?? '';
   React.useEffect(() => {
@@ -151,7 +153,22 @@ function AnimatedKISTabBar({
           reserves that same space in normal flow, so every screen keeps
           exactly the layout it has today. */}
       <View style={{ height: barTotalHeight }} pointerEvents="none" />
-      <View
+      {/* translateY: keyboardHeight — this bar is pinned via fixedWrap's
+          position:absolute/bottom:0, but that's relative to this Activity's
+          own (possibly keyboard-resized) window, not the physical screen. A
+          software keyboard is always a separate system-level layer above
+          the app, so once it opens, a plain bottom:0 view ends up sitting
+          BEHIND it - fully obscured, not just shifted - on every root tab
+          screen with an inline search field (Messages, Bible, Broadcast,
+          Partners, Profile all have one). useKeyboardAnimation's height is
+          0 with the keyboard closed and tracks its live open/close motion
+          in real time when it isn't (see KeyboardAvoidingView/hooks.js:
+          `-reanimated.height.value` there confirms the sign — already
+          negative, already exactly what translateY needs), so the bar rides
+          up to sit right above the keyboard instead of disappearing behind
+          it, then eases back to its normal resting position the instant the
+          keyboard closes - it never just vanishes out from under the user. */}
+      <RNAnimated.View
         style={[
           styles.wrap,
           styles.fixedWrap,
@@ -159,6 +176,7 @@ function AnimatedKISTabBar({
             backgroundColor: barBg,
             paddingBottom: Math.max(insets.bottom, 0),
             paddingHorizontal: responsive.isWatch ? 2 : 6,
+            transform: [{ translateY: keyboardHeight }],
           },
         ]}
     >
@@ -284,7 +302,7 @@ function AnimatedKISTabBar({
           );
         })}
       </View>
-      </View>
+      </RNAnimated.View>
     </>
   );
 }
