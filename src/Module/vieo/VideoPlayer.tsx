@@ -338,6 +338,23 @@ export default function VideoPlayer({
         posterResizeMode="cover"
         resizeMode="contain"
         viewType={forceTextureView ? ViewType.TEXTURE : undefined}
+        // Android only (react-native-video ignores this on iOS - AVPlayer
+        // has no equivalent knob and doesn't need one here). ExoPlayer's own
+        // default DefaultLoadControl waits for a much larger initial buffer
+        // before starting playback than a short-form vertical feed needs -
+        // fine for a long sit-and-watch video, but it's the difference
+        // between "tap and it's already playing" and a multi-second wait
+        // for every short/reel/broadcast clip in this app. 1s is enough to
+        // absorb a brief network hiccup right at start without stalling
+        // immediately; minBufferMs/maxBufferMs stay close to ExoPlayer's own
+        // defaults so steady-state playback quality and seek buffering are
+        // unaffected - only the initial start threshold drops.
+        bufferConfig={{
+          minBufferMs: 5000,
+          maxBufferMs: 30000,
+          bufferForPlaybackMs: 1000,
+          bufferForPlaybackAfterRebufferMs: 2000,
+        }}
         onReadyForDisplay={handleReadyForDisplay}
         paused={!state.playing}
         muted={state.muted}

@@ -26,6 +26,15 @@
 -keep class com.kingdom.impact.DeviceIdModule { *; }
 -keep class com.kingdom.impact.SimInfoModule { *; }
 -keep class com.kingdom.impact.ShortcutModule { *; }
+-keep class com.kingdom.impact.RestoreCredentialModule { *; }
+
+# ── androidx.credentials (Restore Credentials / Zero-Tap Sign-In) ───────
+# The Credential Manager Play Services backend is resolved by class name at
+# runtime, the same reflection pattern WebRTC/Firebase above need protecting
+# from.
+-keep class androidx.credentials.** { *; }
+-keep class androidx.credentials.playservices.** { *; }
+-dontwarn androidx.credentials.**
 
 # ── react-native-webrtc ──────────────────────────────────────────────────
 # The native WebRTC library resolves classes via JNI using their exact

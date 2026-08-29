@@ -17,6 +17,7 @@ class MainApplication : Application(), ReactApplication {
           add(ShortcutPackage())
           add(SimInfoPackage())
           add(DeviceIdPackage())
+          add(RestoreCredentialPackage())
         },
     )
   }

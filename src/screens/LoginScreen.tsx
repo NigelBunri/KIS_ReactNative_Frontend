@@ -28,6 +28,7 @@ import { postRequest } from '@/network/post/index';
 import ROUTES from '@/network';
 import { useAuth } from '../../App';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { saveRestoreCredentialAfterLogin } from '@/services/auth/restoreCredentials';
 import { getSimPhoneNumber } from '@/services/simInfo';
 import { setAuthTokens } from '@/security/authStorage';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -336,6 +337,10 @@ export default function LoginScreen({ navigation }: any) {
       await setUserData(resolvedUser, res.data);
       setUser?.(resolvedUser);
       void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+      // Fire-and-forget, non-fatal either way — see the function's own doc
+      // comment. Lets a later migration to a new Android device sign back in
+      // with zero taps instead of the password form.
+      void saveRestoreCredentialAfterLogin(deviceId).catch(() => {});
       setAuth(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.');

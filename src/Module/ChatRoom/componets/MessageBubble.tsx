@@ -25,6 +25,7 @@ import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attach
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
+import { BIBLE_REFERENCE_RE, parseBibleReference, type ParsedBibleReference } from '@/utils/bibleReference';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
@@ -1527,6 +1528,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     source={{ uri: openableUri || uri, headers: mediaHeaders }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
+                    // Android only: decode the bitmap at roughly this
+                    // display size instead of the source's full resolution.
+                    // Chat images can be sent at up to 1600px (see
+                    // uploadFileToBackend.ts); rendered at bubble size,
+                    // that's a lot of avoidable bitmap memory across a
+                    // scrolling message list without this.
+                    resizeMethod="resize"
                     blurRadius={shouldBlurUntilDownloaded ? 9 : 0}
                     onError={markLocalMediaBroken}
                   />
@@ -1952,11 +1960,72 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     : [];
 
   const INVITE_PATH_RE = /\/join\/(group|community)\/([A-Za-z0-9_-]+)/;
-  const RICH_SPLIT_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+)/g;
+  const URL_OR_MENTION_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+/g;
+
+  const openBibleReference = (ref: ParsedBibleReference) => {
+    (navigation as any).navigate('MainTabs', { screen: 'Bible' });
+    DeviceEventEmitter.emit('bible.verse.open', {
+      reference: ref.reference,
+      book: ref.bookCode,
+      chapter: ref.chapter,
+      verse: ref.verseStart,
+    });
+  };
+
+  type RichToken =
+    | { type: 'text'; text: string }
+    | { type: 'mention' | 'url'; text: string }
+    | { type: 'bible'; text: string; bibleRef: ParsedBibleReference };
+
+  const tokenizeRichText = (raw: string): RichToken[] => {
+    // Scan for URLs/@mentions and Bible references independently (each has
+    // its own capture groups), then merge by position — split() can't be
+    // used for the combined pattern since mismatched group counts across
+    // alternatives would scramble the resulting array.
+    const found: Array<{ index: number; length: number; type: 'mention' | 'url' | 'bible'; text: string }> = [];
+
+    const urlMentionRe = new RegExp(URL_OR_MENTION_RE.source, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = urlMentionRe.exec(raw))) {
+      found.push({ index: m.index, length: m[0].length, type: m[0].startsWith('@') ? 'mention' : 'url', text: m[0] });
+    }
+
+    const bibleRe = new RegExp(BIBLE_REFERENCE_RE.source, 'gi');
+    while ((m = bibleRe.exec(raw))) {
+      found.push({ index: m.index, length: m[0].length, type: 'bible', text: m[0] });
+    }
+
+    found.sort((a, b) => a.index - b.index);
+
+    const tokens: RichToken[] = [];
+    let cursor = 0;
+    for (const match of found) {
+      if (match.index < cursor) continue; // overlaps an earlier match, skip
+      if (match.index > cursor) tokens.push({ type: 'text', text: raw.slice(cursor, match.index) });
+      if (match.type === 'bible') {
+        const bibleRef = parseBibleReference(match.text);
+        if (bibleRef) {
+          tokens.push({ type: 'bible', text: match.text, bibleRef });
+        } else {
+          tokens.push({ type: 'text', text: match.text });
+        }
+      } else {
+        tokens.push({ type: match.type, text: match.text });
+      }
+      cursor = match.index + match.length;
+    }
+    if (cursor < raw.length) tokens.push({ type: 'text', text: raw.slice(cursor) });
+    return tokens;
+  };
 
   const renderRichText = (raw: string) => {
-    const parts = raw.split(RICH_SPLIT_RE);
-    if (parts.length <= 1) {
+    const tokens = tokenizeRichText(raw);
+    // A message that's ENTIRELY one match (e.g. just "Genesis 12:16", no
+    // surrounding text) tokenizes to a single non-'text' token — length
+    // alone can't tell "nothing to link" apart from "the whole thing is a
+    // link", so check token type instead.
+    const hasRichToken = tokens.some((t) => t.type !== 'text');
+    if (!hasRichToken) {
       return <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>{raw}</Text>;
     }
     // outgoingTextColor is '#111111' on light bubbles, '#ffffff' on dark bubbles
@@ -1969,23 +2038,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       : (palette.primaryStrong ?? palette.primary);
     return (
       <Text style={[styles.messageText, { color: textColor, fontSize: bubbleTextSize }]}>
-        {parts.map((part, i) => {
-          if (/^@\w+$/.test(part)) {
+        {tokens.map((token, i) => {
+          if (token.type === 'mention') {
             return (
               <Pressable
                 key={i}
                 onPress={() => {
-                  const uname = part.slice(1).toLowerCase();
+                  const uname = token.text.slice(1).toLowerCase();
                   const uid = mentionMap?.[uname];
-                  if (uid) navigation.navigate('ViewProfile', { userId: uid, displayName: part.slice(1) });
+                  if (uid) navigation.navigate('ViewProfile', { userId: uid, displayName: token.text.slice(1) });
                 }}
               >
-                <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{part}</Text>
+                <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{token.text}</Text>
               </Pressable>
             );
           }
-          if (/^https?:\/\//.test(part)) {
-            const inviteMatch = part.match(INVITE_PATH_RE);
+          if (token.type === 'bible') {
+            return (
+              <Pressable key={i} onPress={() => openBibleReference(token.bibleRef)}>
+                <Text style={{ color: urlColor, fontWeight: '700', textDecorationLine: 'underline' }}>{token.text}</Text>
+              </Pressable>
+            );
+          }
+          if (token.type === 'url') {
+            const inviteMatch = token.text.match(INVITE_PATH_RE);
             if (inviteMatch) {
               return (
                 <Pressable
@@ -1995,17 +2071,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     token: inviteMatch[2],
                   })}
                 >
-                  <Text style={{ color: inviteColor, fontWeight: '700', textDecorationLine: 'underline' }}>{part}</Text>
+                  <Text style={{ color: inviteColor, fontWeight: '700', textDecorationLine: 'underline' }}>{token.text}</Text>
                 </Pressable>
               );
             }
             return (
-              <Pressable key={i} onPress={() => Linking.openURL(part).catch(() => {})}>
-                <Text style={{ color: urlColor, textDecorationLine: 'underline' }}>{part}</Text>
+              <Pressable key={i} onPress={() => Linking.openURL(token.text).catch(() => {})}>
+                <Text style={{ color: urlColor, textDecorationLine: 'underline' }}>{token.text}</Text>
               </Pressable>
             );
           }
-          return <React.Fragment key={i}>{part}</React.Fragment>;
+          return <React.Fragment key={i}>{token.text}</React.Fragment>;
         })}
       </Text>
     );
@@ -2991,6 +3067,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             source={{ uri: productData.imageUri }}
             style={{ width: '100%', height: 140, borderRadius: 8 }}
             resizeMode="cover"
+            resizeMethod="resize"
           />
         ) : (
           <View
@@ -3083,6 +3160,78 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
         </View>
       </View>
+    );
+  };
+
+  /* ─────────────────────────────────────────
+   * Bible verse / chapter share card
+   * ──────────────────────────────────────── */
+  const renderBibleVerseCard = () => {
+    const bibleVerse = (message as any).bibleVerse as
+      | { reference: string; bookCode?: string; bookName?: string; chapter: number; verseStart?: number; verseEnd?: number; text?: string }
+      | undefined;
+    const isBibleVerse = !!bibleVerse || (message as any).kind === 'bible_verse';
+    if (!isBibleVerse || !bibleVerse) return null;
+
+    return (
+      <Pressable
+        onPress={() => {
+          (navigation as any).navigate('MainTabs', { screen: 'Bible' });
+          DeviceEventEmitter.emit('bible.verse.open', {
+            reference: bibleVerse.reference,
+            book: bibleVerse.bookCode,
+            chapter: bibleVerse.chapter,
+            verse: bibleVerse.verseStart,
+          });
+        }}
+        style={({ pressed }) => ({
+          marginTop: text ? 8 : 0,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: palette.divider,
+          overflow: 'hidden',
+          backgroundColor: isMe ? 'rgba(255,255,255,0.10)' : (palette.surface),
+          minWidth: 200,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <View style={{ padding: 12, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <KISIcon name="book" size={16} color={isMe ? outgoingTextColor : palette.primary} />
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: isMe ? outgoingTextColor : palette.text,
+              }}
+            >
+              {bibleVerse.reference}
+            </Text>
+          </View>
+          {bibleVerse.text ? (
+            <Text
+              style={{
+                fontSize: 13,
+                fontStyle: 'italic',
+                color: isMe ? outgoingMetaColor : palette.subtext,
+              }}
+              numberOfLines={6}
+            >
+              “{bibleVerse.text}”
+            </Text>
+          ) : null}
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: isMe ? outgoingMetaColor : palette.primary,
+              alignSelf: 'flex-end',
+            }}
+          >
+            Read in Bible →
+          </Text>
+        </View>
+      </Pressable>
     );
   };
 
@@ -3343,6 +3492,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             source={{ uri: sticker.uri }}
             style={{ width: stickerWidth, height: stickerHeight }}
             resizeMode="contain"
+            resizeMethod="resize"
           />
 
           {renderReactionsRow()}
@@ -3947,6 +4097,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 source={{ uri: linkPreview.image }}
                 style={{ width: '100%', height: 120 }}
                 resizeMode="cover"
+                resizeMethod="resize"
               />
             ) : null}
             <View style={{ padding: 8, gap: 2 }}>
@@ -4025,6 +4176,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {renderEventCard()}
             {renderLocationCard()}
             {renderProductCard()}
+            {renderBibleVerseCard()}
             {renderPaymentCard()}
 
             {/* Attachments (images, files, etc.) */}

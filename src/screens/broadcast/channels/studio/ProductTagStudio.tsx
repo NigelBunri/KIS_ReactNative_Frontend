@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useKISTheme } from '@/theme/useTheme';
+import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -53,9 +56,47 @@ export default function ProductTagStudio({ contentId }: Props) {
   // Form state
   const [formTitle, setFormTitle] = useState('');
   const [formUrl, setFormUrl] = useState('');
+  // Holds the already-uploaded thumbnail's hosted URL, same shape as
+  // ThumbnailPickerSheet.tsx's handleSave - picking replaces this with a
+  // fresh upload rather than letting the user type/paste an arbitrary URL.
   const [formThumb, setFormThumb] = useState('');
+  const [thumbUploading, setThumbUploading] = useState(false);
   const [formPrice, setFormPrice] = useState('');
   const [formTimestamp, setFormTimestamp] = useState('');
+
+  const guessMime = (uri: string): string => {
+    const lower = uri.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  };
+
+  const pickThumbnail = useCallback(async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 });
+    if (result.didCancel || !result.assets?.length) return;
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+    setThumbUploading(true);
+    try {
+      const form = new FormData();
+      const name = asset.fileName ?? `product_thumb_${Date.now()}.jpg`;
+      const type = asset.type ?? guessMime(asset.uri);
+      form.append('attachment', { uri: asset.uri, name, type } as any);
+      const uploadRes = await postRequest(ROUTES.broadcasts.profileAttachment, form, {
+        errorMessage: 'Failed to upload thumbnail image.',
+      });
+      const uploadedUrl: string = uploadRes?.data?.attachment?.url ?? '';
+      if (!uploadRes.success || !uploadedUrl) {
+        Alert.alert('Error', uploadRes.message ?? 'Failed to upload thumbnail image.');
+        return;
+      }
+      setFormThumb(uploadedUrl);
+    } catch {
+      Alert.alert('Error', 'Failed to upload thumbnail image.');
+    } finally {
+      setThumbUploading(false);
+    }
+  }, []);
 
   const fetchTags = useCallback(async () => {
     if (!contentId) return;
@@ -178,15 +219,32 @@ export default function ProductTagStudio({ contentId }: Props) {
           keyboardType="url"
           style={[styles.input, { color: palette.text, borderColor: palette.border }]}
         />
-        <TextInput
-          value={formThumb}
-          onChangeText={setFormThumb}
-          placeholder="Thumbnail URL (optional)"
-          placeholderTextColor={palette.subtext}
-          autoCapitalize="none"
-          keyboardType="url"
-          style={[styles.input, { color: palette.text, borderColor: palette.border }]}
-        />
+        {formThumb ? (
+          <View style={[styles.thumbPreviewRow, { borderColor: palette.border }]}>
+            <Image source={{ uri: formThumb }} style={styles.thumbPreviewImage} resizeMode="cover" />
+            <Pressable onPress={pickThumbnail} style={styles.thumbPreviewBtn} disabled={thumbUploading}>
+              <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 12 }}>Change</Text>
+            </Pressable>
+            <Pressable onPress={() => setFormThumb('')} style={styles.thumbPreviewBtn} disabled={thumbUploading}>
+              <KISIcon name="close" size={16} color={palette.subtext} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={pickThumbnail}
+            disabled={thumbUploading}
+            style={[styles.thumbPickBtn, { borderColor: palette.border }]}
+          >
+            {thumbUploading ? (
+              <ActivityIndicator size="small" color={palette.primaryStrong} />
+            ) : (
+              <>
+                <KISIcon name="image" size={16} color={palette.subtext} />
+                <Text style={{ color: palette.subtext, fontSize: 13 }}>Pick thumbnail image (optional)</Text>
+              </>
+            )}
+          </Pressable>
+        )}
         <TextInput
           value={formPrice}
           onChangeText={setFormPrice}
@@ -280,6 +338,27 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
   },
+  thumbPickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minHeight: 44,
+  },
+  thumbPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+  },
+  thumbPreviewImage: { width: 44, height: 44, borderRadius: 6 },
+  thumbPreviewBtn: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   addBtn: {
     borderRadius: 8,
     minHeight: 44,

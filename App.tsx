@@ -136,7 +136,8 @@ import InAppNotificationToast, {
   InAppNotificationToastRef,
 } from './src/push/InAppNotificationToast';
 import NotificationPermissionModal from './src/push/NotificationPermissionModal';
-import { getAccessToken, AUTH_SESSION_EXPIRED_EVENT } from './src/security/authStorage';
+import { getAccessToken, setAuthTokens, AUTH_SESSION_EXPIRED_EVENT } from './src/security/authStorage';
+import { tryRestoreCredentialLogin } from './src/services/auth/restoreCredentials';
 import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
@@ -634,6 +635,20 @@ function AppContent() {
       setPhone(storedPhone);
 
       if (!token) {
+        // No stored session — this is the one case a device migration
+        // shows up as, so this is the one place to try Android's Restore
+        // Credentials before falling back to the login screen. A device
+        // that has ever logged in before (a normal reopen with an expired
+        // token, an app update, etc.) already has `token` set above and
+        // never reaches this branch, so this can't fire on every launch —
+        // only ones that look exactly like "brand new install."
+        const restored = online ? await tryRestoreCredentialLogin().catch(() => null) : null;
+        if (restored?.access) {
+          await setAuthTokens({ accessToken: restored.access, refreshToken: restored.refresh ?? null });
+          applyUser(restored.user ?? null);
+          setAuth(true);
+          return;
+        }
         setUser(null);
         setHasPin(null);
         setAuth(false);

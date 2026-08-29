@@ -70,6 +70,12 @@ import {
   upsertLocalBibleNote,
 } from '@/services/bibleUserPersistence';
 import { scheduleBibleReadingEventReminders } from '@/services/inAppNotificationService';
+import { formatBibleReference } from '@/utils/bibleReference';
+import type { BibleVerseMessage } from '@/Module/ChatRoom/chatTypes';
+import type { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
+import { ForwardChatSheet } from '@/Module/ChatRoom/componets/main/ForwardChatSheet';
+import { useSocket } from '../../../SocketProvider';
 
 const HIGHLIGHT_COLORS = [
   '#FDE68A',
@@ -166,6 +172,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   refreshing = false,
 }: Props, ref) {
   const { palette, isDark } = useKISTheme();
+  const { socket } = useSocket();
   const responsive = useResponsiveLayout();
   const compactReader = responsive.isWatch || responsive.isCompactPhone;
   const tinyReader = responsive.isWatch;
@@ -209,6 +216,9 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   const [verseActionMode, setVerseActionMode] = useState<
     'menu' | 'highlight' | 'note' | null
   >(null);
+  const [sharePayload, setSharePayload] = useState<BibleVerseMessage | null>(null);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [shareChats, setShareChats] = useState<Chat[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string | undefined>(
     reader?.translation?.language,
   );
@@ -742,6 +752,65 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
 
   const selectChapter = () => {
     setSelectedVerses(new Set(verses.map(verse => String(verse.id))));
+  };
+
+  const clearVerseSelection = () => setSelectedVerses(new Set());
+
+  const buildBibleVerseSharePayload = (verseList: BibleVerse[]): BibleVerseMessage | null => {
+    if (!verseList.length) return null;
+    const sorted = [...verseList].sort((a, b) => Number(a.number) - Number(b.number));
+    const bookName = selectedBookObj?.name ?? reader?.book?.name ?? currentReference.split(/\s+\d/)[0] ?? 'Bible';
+    const bookCode = selectedBookObj?.code ?? reader?.book?.code;
+    const verseStart = Number(sorted[0].number);
+    const verseEnd = Number(sorted[sorted.length - 1].number);
+    const reference = formatBibleReference(bookName, currentChapter, verseStart, verseEnd);
+    const rawText = sorted.map(v => `${v.number} ${v.text}`).join(' ');
+    const text = rawText.length > 500 ? `${rawText.slice(0, 500).trimEnd()}…` : rawText;
+    return { reference, bookCode, bookName, chapter: currentChapter, verseStart, verseEnd, text };
+  };
+
+  const openShareSheetForVerses = async (verseList: BibleVerse[]) => {
+    const payload = buildBibleVerseSharePayload(verseList);
+    if (!payload) {
+      Alert.alert('Select verses', 'Choose one or more verses first.');
+      return;
+    }
+    setSharePayload(payload);
+    setShareSheetVisible(true);
+    setMessage('Loading your chats…');
+    try {
+      const chats = await fetchConversationsForCurrentUser([]);
+      setShareChats(chats);
+      setMessage('');
+    } catch {
+      setShareChats([]);
+      setMessage('Could not load chats.');
+    }
+  };
+
+  const handleShareConfirm = (chatIds: string[]) => {
+    if (!chatIds.length || !sharePayload) {
+      setShareSheetVisible(false);
+      return;
+    }
+    if (!socket) {
+      Alert.alert('Share', 'Unable to share right now — check your connection.');
+      return;
+    }
+    chatIds.forEach(chatId => {
+      socket.emit('chat.send', {
+        conversationId: chatId,
+        clientId: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        kind: 'bible_verse',
+        bibleVerse: sharePayload,
+      });
+    });
+    setShareSheetVisible(false);
+    setSharePayload(null);
+    setActionVerse(null);
+    setVerseActionMode(null);
+    clearVerseSelection();
+    setMessage(`Shared ${sharePayload.reference} to ${chatIds.length} chat${chatIds.length > 1 ? 's' : ''}.`);
   };
 
   const createForVerses = async (
@@ -2029,6 +2098,12 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 onPress={() => actionVerse && addVerseToPlanner(actionVerse)}
               />
               <KISButton
+                title="Share"
+                size="sm"
+                variant="outline"
+                onPress={() => actionVerse && openShareSheetForVerses([actionVerse])}
+              />
+              <KISButton
                 title="Close"
                 size="sm"
                 variant="ghost"
@@ -2145,6 +2220,27 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
             >
               {currentReference}
             </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => verses.length && openShareSheetForVerses(verses)}
+              disabled={!verses.length}
+              style={[
+                styles.reloadIconButton,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.divider,
+                  opacity: verses.length ? 1 : 0.55,
+                  marginRight: 8,
+                },
+              ]}
+            >
+              <KISIcon name="share" size={17} color={palette.primaryStrong} />
+              {!tinyReader ? (
+                <Text style={[styles.reloadIconButtonText, { color: palette.primaryStrong }]}>
+                  Share chapter
+                </Text>
+              ) : null}
+            </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={reloadCurrentPassage}
@@ -2383,9 +2479,41 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
         ) : null}
       </ScrollView>
 
+      {selectedVerses.size > 0 ? (
+        <View
+          style={[
+            styles.selectionBar,
+            { backgroundColor: solidSheetBg, borderColor: palette.divider },
+          ]}
+        >
+          <Text style={{ color: palette.text, fontWeight: '700' }}>
+            {selectedVerses.size} verse{selectedVerses.size > 1 ? 's' : ''} selected
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <KISButton title="Clear" size="sm" variant="ghost" onPress={clearVerseSelection} />
+            <KISButton
+              title="Share"
+              size="sm"
+              onPress={() =>
+                openShareSheetForVerses(verses.filter(v => selectedVerses.has(String(v.id))))
+              }
+            />
+          </View>
+        </View>
+      ) : null}
+
       {renderAudioBar()}
       {renderFilterSheet()}
       {renderVerseActionModal()}
+
+      <ForwardChatSheet
+        visible={shareSheetVisible}
+        palette={palette}
+        chats={shareChats}
+        maxTargets={10}
+        onClose={() => setShareSheetVisible(false)}
+        onConfirm={handleShareConfirm}
+      />
     </View>
   );
 });
@@ -2424,6 +2552,14 @@ const styles = StyleSheet.create({
   wrapHeaderRow: { flexWrap: 'wrap' },
   kcanBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 8 },
+  selectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
   readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
   readerHeaderTitleRow: {
     flexDirection: 'row',

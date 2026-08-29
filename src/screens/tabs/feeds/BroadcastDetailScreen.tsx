@@ -35,6 +35,11 @@ import {
 } from '@/components/feeds/richTextValue';
 import { wasNativeShareCompleted } from '@/utils/shareCompletion';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
+import { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { TabletDialogOverlay } from '@/components/shell';
+import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
 
 const REACTION_EVENT = 'broadcast.reaction';
 
@@ -513,6 +518,47 @@ export default function BroadcastDetailScreen() {
     }
   }, [broadcastId, broadcastItem]);
 
+  // Opens a chat room directly over this screen instead of via the app-wide
+  // 'chat.open' event both comments and "share to a chat" used to rely on
+  // (comments) or would have hit the same problem with (share). That event
+  // is heard by AppNavigator's MainTabs, which renders its own chat overlay
+  // as a sibling inside MainTabs' own tree - fine for every OTHER screen
+  // that lives inside MainTabs, but this screen is pushed on the root stack
+  // ON TOP of MainTabs entirely (see App.tsx's RootStack.Screen for
+  // "BroadcastDetail"). The event still fired and MainTabs still opened its
+  // overlay, just invisibly behind this screen - the user saw nothing
+  // happen, and would only discover the chat already open if they
+  // separately navigated back. Owning the overlay locally sidesteps that
+  // stack-order mismatch entirely, and - same reasoning as the video
+  // preload block above - keeps this screen mounted and its video still
+  // playing underneath, since nothing here unmounts or navigates away from
+  // it. Shared by both the comments button and "share to a chat" below.
+  const overlaySlide = React.useRef(new Animated.Value(0)).current;
+  const [overlayChat, setOverlayChat] = useState<Chat | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+
+  const closeChatOverlay = useCallback(() => {
+    setOverlayVisible(false);
+    Animated.timing(overlaySlide, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => {
+      setOverlayChat(null);
+    });
+  }, [overlaySlide]);
+
+  const openChatOverlay = useCallback((chat: Chat) => {
+    setOverlayChat(chat);
+    setOverlayVisible(true);
+    overlaySlide.setValue(0);
+    Animated.timing(overlaySlide, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [overlaySlide]);
+
   const handleOpenComments = useCallback(async () => {
     if (!broadcastId) return;
     const res = await postRequest(
@@ -532,12 +578,14 @@ export default function BroadcastDetailScreen() {
       );
       return;
     }
-    DeviceEventEmitter.emit('chat.open', {
-      conversationId,
-      name: title,
-      kind: 'broadcast_comments',
+    openChatOverlay({
+      id: String(conversationId),
+      conversationId: String(conversationId),
+      name: title || 'Comments',
+      kind: 'group',
+      isGroup: true,
     });
-  }, [broadcastId, title]);
+  }, [broadcastId, openChatOverlay, title]);
 
   const handleToggleSaved = useCallback(async () => {
     if (!broadcastId) return;
@@ -565,14 +613,23 @@ export default function BroadcastDetailScreen() {
     }
   }, [broadcastId, broadcastItem?.viewer_saved]);
 
-  const handleShare = useCallback(async () => {
+  // Matches App.tsx's NavigationContainer linking config
+  // ("BroadcastDetail: 'broadcasts/:id'" under the
+  // https://kingdomimpactventures.org / kis:// / kisapp:// prefixes) - this
+  // screen already handles being opened via route.params.id (see
+  // deepLinkId above), so any of those three actually deep-links straight
+  // back to this exact video. The https form is the one worth sharing:
+  // it opens the app directly when installed (same as the custom schemes),
+  // but degrades to a real, working web page instead of a dead link for a
+  // recipient who doesn't have the app yet.
+  const shareUrl = useMemo(
+    () => (broadcastId ? `https://kingdomimpactventures.org/broadcasts/${broadcastId}` : null),
+    [broadcastId],
+  );
+
+  const logShare = useCallback(async () => {
     if (!broadcastId) return;
     const previousShareCount = Number(broadcastItem?.share_count ?? 0);
-    const shareResult = await Share.share({
-      title,
-      message: [title?.trim(), body?.trim()].filter(Boolean).join('\n\n'),
-    });
-    if (!wasNativeShareCompleted(shareResult)) return;
     const res = await postRequest(
       ROUTES.broadcasts.share(broadcastId),
       { platform: 'app' },
@@ -582,10 +639,49 @@ export default function BroadcastDetailScreen() {
       setBroadcastItem((prev: any) =>
         prev ? { ...prev, share_count: previousShareCount + 1 } : prev,
       );
-    } else {
-      Alert.alert('Share', 'Unable to log this share right now.');
     }
-  }, [body, broadcastId, broadcastItem?.share_count, title]);
+  }, [broadcastId, broadcastItem?.share_count]);
+
+  const [shareOptionsVisible, setShareOptionsVisible] = useState(false);
+  const [shareChatPickerVisible, setShareChatPickerVisible] = useState(false);
+
+  const handleShare = useCallback(() => {
+    if (!broadcastId) return;
+    setShareOptionsVisible(true);
+  }, [broadcastId]);
+
+  const handleShareToApp = useCallback(async () => {
+    setShareOptionsVisible(false);
+    const shareResult = await Share.share({
+      title,
+      message: [title?.trim(), body?.trim(), shareUrl].filter(Boolean).join('\n\n'),
+      ...(shareUrl ? { url: shareUrl } : {}),
+    });
+    if (!wasNativeShareCompleted(shareResult)) return;
+    await logShare();
+  }, [body, logShare, shareUrl, title]);
+
+  const handleShareToChatPicked = useCallback(async (pickedChat: Chat) => {
+    setShareChatPickerVisible(false);
+    const conversationId = pickedChat.conversationId ?? pickedChat.id;
+    if (conversationId && shareUrl) {
+      // Pre-fills the recipient's own composer with the link rather than
+      // sending it unattended - see openChatOverlay's declaration above
+      // for why this screen opens the chat locally instead of navigating
+      // away, and useDraftState.ts (DRAFT_PREFIX + `conv:${id}`) for why
+      // seeding this exact AsyncStorage key is what makes ChatRoomPage
+      // pick it up the moment it mounts for this conversation, with zero
+      // changes needed to the composer/draft-restore code itself. The user
+      // still presses send themselves - going through the real
+      // send pipeline (E2EE session, socket, message envelope shape) via
+      // the actual composer, not a second parallel "send a message" path
+      // this screen would otherwise have to reimplement and keep in sync.
+      const draftText = [title?.trim(), shareUrl].filter(Boolean).join('\n');
+      await AsyncStorage.setItem(`KIS_DRAFT_conv:${conversationId}`, draftText).catch(() => {});
+    }
+    openChatOverlay(pickedChat);
+    await logShare();
+  }, [logShare, openChatOverlay, shareUrl, title]);
 
   const attachments = useMemo(
     () =>
@@ -1156,6 +1252,51 @@ export default function BroadcastDetailScreen() {
           </Pressable>
         </View>
       </Modal>
+
+      {/* See openChatOverlay's declaration above for why this lives here as
+          a local overlay instead of the app-wide chat.open event. Shared by
+          both the comments button and "share to a chat". */}
+      <TabletDialogOverlay visible={overlayVisible} progress={overlaySlide} zIndex={50}>
+        {overlayChat ? (
+          <ChatRoomPage chat={overlayChat} onBack={closeChatOverlay} />
+        ) : null}
+      </TabletDialogOverlay>
+
+      {/* Share options: "share to another app" (native OS share sheet,
+          carries shareUrl above) vs. "share to a chat" (opens
+          ShareToChatModal's picker below). */}
+      <Modal
+        visible={shareOptionsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShareOptionsVisible(false)}
+      >
+        <Pressable style={styles.shareBackdrop} onPress={() => setShareOptionsVisible(false)} />
+        <View style={[styles.shareSheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.shareHandleRow}>
+            <View style={[styles.shareHandleBar, { backgroundColor: palette.border }]} />
+          </View>
+          <Pressable style={styles.shareOptionRow} onPress={handleShareToApp}>
+            <KISIcon name="share" size={20} color={palette.text} />
+            <Text style={[styles.shareOptionText, { color: palette.text }]}>Share to another app</Text>
+          </Pressable>
+          <Pressable
+            style={styles.shareOptionRow}
+            onPress={() => {
+              setShareOptionsVisible(false);
+              setShareChatPickerVisible(true);
+            }}
+          >
+            <KISIcon name="comment" size={20} color={palette.text} />
+            <Text style={[styles.shareOptionText, { color: palette.text }]}>Share to a chat</Text>
+          </Pressable>
+        </View>
+      </Modal>
+      <ShareToChatModal
+        visible={shareChatPickerVisible}
+        onClose={() => setShareChatPickerVisible(false)}
+        onPicked={handleShareToChatPicked}
+      />
     </View>
   );
 }
@@ -1385,4 +1526,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  shareBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  shareSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  shareHandleRow: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
+  shareHandleBar: { width: 36, height: 4, borderRadius: 2 },
+  shareOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  shareOptionText: { fontSize: 15, fontWeight: '700' },
 });

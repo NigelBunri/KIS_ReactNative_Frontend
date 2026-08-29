@@ -35,6 +35,12 @@ const authRoutes = {
     passwordChange: `${API_BASE_URL}/api/v1/auth/password/change/`,
     quicklockPin: `${API_BASE_URL}/api/v1/auth/quicklock-pin/`,
     quicklockPinVerify: `${API_BASE_URL}/api/v1/auth/quicklock-pin/verify/`,
+    // Android Restore Credentials (Zero-Tap Sign-In / device migration) —
+    // see apps/accounts/webauthn_restore.py on the Django backend.
+    restoreCredentialRegistrationOptions: `${API_BASE_URL}/api/v1/auth/restore-credentials/registration-options/`,
+    restoreCredentialRegister: `${API_BASE_URL}/api/v1/auth/restore-credentials/register/`,
+    restoreCredentialAuthenticationOptions: `${API_BASE_URL}/api/v1/auth/restore-credentials/authentication-options/`,
+    restoreCredentialAuthenticate: `${API_BASE_URL}/api/v1/auth/restore-credentials/authenticate/`,
   },
   user: {
     profile: `${API_BASE_URL}/api/v1/users/me/`,

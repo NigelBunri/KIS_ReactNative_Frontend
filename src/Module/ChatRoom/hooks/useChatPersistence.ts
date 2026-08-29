@@ -667,6 +667,7 @@ export function useChatPersistence(
           payload.poll ||
           payload.event ||
           (payload as any).location ||
+          payload.bibleVerse ||
           payload.attachments?.length ||
           payload.contacts?.length,
       );

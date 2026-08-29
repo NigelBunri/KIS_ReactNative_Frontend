@@ -76,15 +76,43 @@ const migrateLegacyToken = async (key: string): Promise<string | null> => {
   return legacy;
 };
 
+// In-memory mirror of the access token, kept in sync everywhere the real
+// (EncryptedStorage-backed) value changes below - see getAccessTokenCached's
+// doc for why this exists. `undefined` means "not read from storage yet
+// this app session"; `null` means "read, and there genuinely isn't one".
+let cachedAccessToken: string | null | undefined;
+
 const getToken = async (key: string): Promise<string | null> => {
   const secure = await readSecure(key);
   if (secure) return secure;
   return migrateLegacyToken(key);
 };
 
-export const getAccessToken = async (): Promise<string | null> => getToken(ACCESS_TOKEN_KEY);
+export const getAccessToken = async (): Promise<string | null> => {
+  const token = await getToken(ACCESS_TOKEN_KEY);
+  cachedAccessToken = token;
+  return token;
+};
 
 export const getRefreshToken = async (): Promise<string | null> => getToken(REFRESH_TOKEN_KEY);
+
+// Synchronous best-effort read of the access token, for callers that would
+// otherwise pay for the async EncryptedStorage round-trip in a way that's
+// actively harmful, not just slightly slower - specifically
+// network/index.tsx's useMediaHeaders(). A video player's `source` prop
+// (uri + headers together) is one object; when its headers arrive a beat
+// after mount because that first getAccessToken() call hadn't resolved yet,
+// the object's identity changes and react-native-video treats that as "load
+// a different video", tearing down and re-initializing the native player
+// mid-load. That's a real, measurable extra network round-trip plus a full
+// player restart on every single video open - not the async gap itself,
+// which is normally invisible, but this specific side effect of it.
+// Returns null (not "no token") when nothing has warmed the cache yet this
+// session; callers should treat that as "unknown, fall back to the async
+// path" rather than "definitely signed out" - by the time a user reaches
+// any auth-gated screen, something has already called getAccessToken() and
+// warmed this.
+export const getAccessTokenCached = (): string | null => cachedAccessToken ?? null;
 
 const persistToken = async (key: string, value: string | null | undefined): Promise<void> => {
   if (value === undefined) return;
@@ -109,6 +137,9 @@ export const setAuthTokens = async (tokens: {
   const { accessToken, refreshToken } = tokens;
   await persistToken(ACCESS_TOKEN_KEY, accessToken);
   await persistToken(REFRESH_TOKEN_KEY, refreshToken);
+  if (accessToken !== undefined) {
+    cachedAccessToken = accessToken ?? null;
+  }
   if (accessToken || refreshToken) {
     await persistSignedInSession(refreshToken, accessToken);
   }
@@ -137,6 +168,7 @@ export const getPersistedAuthSession = async (): Promise<{
 };
 
 export const clearAuthTokens = async (): Promise<void> => {
+  cachedAccessToken = null;
   await Promise.all([
     writeSecure(ACCESS_TOKEN_KEY, null),
     writeSecure(REFRESH_TOKEN_KEY, null),

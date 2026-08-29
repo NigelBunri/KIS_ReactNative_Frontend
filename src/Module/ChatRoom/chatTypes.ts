@@ -50,7 +50,8 @@ export type MessageKind =
   | 'event'
   | 'location'
   | 'attachment'
-  | 'call_event';
+  | 'call_event'
+  | 'bible_verse';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -242,6 +243,19 @@ export type LocationMessage = {
   expiresAt?: number | string;
 };
 
+/** Shared verse/chapter from the Bible screen — see src/utils/bibleReference.ts. */
+export type BibleVerseMessage = {
+  /** Canonical "Book chapter:verseStart[-verseEnd]" string used to reopen the exact spot. */
+  reference: string;
+  bookCode?: string;
+  bookName?: string;
+  chapter: number;
+  verseStart?: number;
+  verseEnd?: number;
+  /** Verse text snapshot so the receiver can read it inline without opening the Bible screen. */
+  text?: string;
+};
+
 /* ============================================================================
  * READ RECEIPT (per-user, groups)
  * ============================================================================
@@ -376,6 +390,8 @@ export type ChatMessage = {
   event?: EventMessage;
 
   location?: LocationMessage;
+
+  bibleVerse?: BibleVerseMessage;
 
   replyToId?: string;
 
