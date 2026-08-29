@@ -94,6 +94,17 @@ export default function BibleScreen() {
     setOpenReadFilters(() => open);
   }, []);
 
+  // Briefly highlights the verse(s) a chat link/search result/shared quote
+  // pointed at, once the reader actually has them loaded — token is bumped
+  // on every request so tapping the same link twice in a row re-triggers
+  // the highlight even though the other fields are identical.
+  const [highlightRequest, setHighlightRequest] = useState<{
+    chapter: number;
+    verseStart: number;
+    verseEnd?: number;
+    token: number;
+  } | null>(null);
+
   // Listen for bible.verse.open events (global search, a tapped chat
   // reference, a shared verse card, ...).
   const openVersePayload = useCallback((payload: BibleVerseOpenPayload | null | undefined) => {
@@ -103,7 +114,16 @@ export default function BibleScreen() {
       loadReader(undefined, undefined, undefined, String(payload.reference));
     } else if (payload.book && payload.chapter) {
       const startVerse = payload.verse ? Number(payload.verse) : undefined;
-      loadReader(undefined, String(payload.book), Number(payload.chapter), undefined, startVerse);
+      const endVerse = payload.verseEnd ? Number(payload.verseEnd) : undefined;
+      loadReader(undefined, String(payload.book), Number(payload.chapter), undefined, startVerse, endVerse);
+    }
+    if (payload.chapter && payload.verse) {
+      setHighlightRequest({
+        chapter: Number(payload.chapter),
+        verseStart: Number(payload.verse),
+        verseEnd: payload.verseEnd ? Number(payload.verseEnd) : undefined,
+        token: Date.now(),
+      });
     }
   }, [loadReader]);
 
@@ -158,6 +178,7 @@ export default function BibleScreen() {
             onRegisterFilterOpener={registerReadFilterOpener}
             onRefresh={handleBibleRefresh}
             refreshing={bibleRefreshing}
+            highlightRequest={highlightRequest}
           />
         );
       case 'daily':

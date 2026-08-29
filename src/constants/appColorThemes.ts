@@ -11,9 +11,9 @@ export type AppColorTheme = {
 };
 
 /**
- * 12 royal-luxury colour themes available to Partner Pro apps.
- * Themes 1-11 are distinct world-popular colours; theme 12 is the canonical
- * KIS Gold — fixed and immutable as a design system constant.
+ * 22 royal-luxury colour themes available to Partner Pro apps.
+ * All but the last are distinct world-popular colours; the last is the
+ * canonical KIS Gold — fixed and immutable as a design system constant.
  */
 export const APP_COLOR_THEMES: AppColorTheme[] = [
   {
@@ -103,6 +103,86 @@ export const APP_COLOR_THEMES: AppColorTheme[] = [
     primary: '#CC5DE8',
     headerGradient: ['#1A0828', '#3D1560', '#8A35C0', '#2A0A45'],
     sheenColor: 'rgba(230,184,255,0.45)',
+  },
+  {
+    id: 'turquoise',
+    name: 'Turquoise',
+    emoji: '🌊',
+    primary: '#22C3C3',
+    headerGradient: ['#031F1F', '#0A4A4A', '#1AABAB', '#073636'],
+    sheenColor: 'rgba(184,255,255,0.45)',
+  },
+  {
+    id: 'magenta',
+    name: 'Magenta',
+    emoji: '💗',
+    primary: '#E0369D',
+    headerGradient: ['#2E0620', '#661044', '#C42E8C', '#450C30'],
+    sheenColor: 'rgba(255,196,230,0.45)',
+  },
+  {
+    id: 'indigo',
+    name: 'Indigo',
+    emoji: '💠',
+    primary: '#5B6EE8',
+    headerGradient: ['#0F1240', '#232B80', '#4655CC', '#191F5C'],
+    sheenColor: 'rgba(206,212,255,0.45)',
+  },
+  {
+    id: 'burgundy',
+    name: 'Burgundy',
+    emoji: '🍷',
+    primary: '#A03A54',
+    headerGradient: ['#280811', '#571223', '#8A2F48', '#3D0F1B'],
+    sheenColor: 'rgba(244,196,208,0.45)',
+  },
+  {
+    id: 'mint',
+    name: 'Mint',
+    emoji: '🌿',
+    primary: '#3ED9A8',
+    headerGradient: ['#04241A', '#0C4C38', '#1FAE82', '#0A3628'],
+    sheenColor: 'rgba(190,255,230,0.45)',
+  },
+  {
+    id: 'coral',
+    name: 'Coral',
+    emoji: '🪸',
+    primary: '#FF6F5E',
+    headerGradient: ['#330E09', '#6B2116', '#C4523F', '#4A1810'],
+    sheenColor: 'rgba(255,206,199,0.45)',
+  },
+  {
+    id: 'sunshine_yellow',
+    name: 'Sunshine Yellow',
+    emoji: '☀️',
+    primary: '#F4C430',
+    headerGradient: ['#2B2200', '#5C4700', '#C49A00', '#453700'],
+    sheenColor: 'rgba(255,240,184,0.45)',
+  },
+  {
+    id: 'navy',
+    name: 'Navy',
+    emoji: '⚓',
+    primary: '#3B5998',
+    headerGradient: ['#0A1428', '#152A54', '#2C4A8A', '#0F1F3C'],
+    sheenColor: 'rgba(190,208,240,0.45)',
+  },
+  {
+    id: 'charcoal',
+    name: 'Charcoal',
+    emoji: '🪨',
+    primary: '#6B7785',
+    headerGradient: ['#14171C', '#2A3038', '#4A5460', '#1E2228'],
+    sheenColor: 'rgba(210,218,226,0.45)',
+  },
+  {
+    id: 'terracotta',
+    name: 'Terracotta',
+    emoji: '🏺',
+    primary: '#C1603F',
+    headerGradient: ['#2B0F06', '#5C2412', '#A34A2A', '#421A0C'],
+    sheenColor: 'rgba(255,206,180,0.45)',
   },
   {
     // KIS is always last — the canonical royal gold. Fixed, immutable.

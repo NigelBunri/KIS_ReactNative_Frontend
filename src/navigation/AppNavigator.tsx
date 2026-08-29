@@ -593,6 +593,30 @@ export function MainTabs() {
     });
   }, [chatSlide, subRoomSlide]);
 
+  // Fully dismisses the chat overlay (and any sub-room layered on top of it)
+  // in one shot, instead of closeChat's one-level-at-a-time pop — for
+  // callers navigating the user somewhere else entirely (e.g. a Bible
+  // reference link), where leaving the overlay open behind the destination
+  // tab would make it look like nothing happened.
+  //
+  // Goes through the same RNAnimated.timing(...).start(callback) path as
+  // closeChat (just with duration: 0) rather than calling chatSlide/
+  // subRoomSlide.setValue() directly — these values were started with
+  // useNativeDriver: true, and a bare .setValue() while the native driver
+  // still owns the node isn't guaranteed to promptly reflect in the
+  // rendered transform, which left the overlay visually stuck open.
+  const closeAllChats = useCallback(() => {
+    RNAnimated.timing(subRoomSlide, { toValue: 0, duration: 0, useNativeDriver: true }).start();
+    RNAnimated.timing(chatSlide, { toValue: 0, duration: 0, useNativeDriver: true }).start(() => {
+      setChatHistory([]);
+    });
+  }, [chatSlide, subRoomSlide]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('chat.close_all', closeAllChats);
+    return () => sub.remove();
+  }, [closeAllChats]);
+
   const openInfo = useCallback((payload: { chat: Chat | null; currentUserId: string | null }) => {
     if (!payload.chat) return;
     setActiveInfo({ chat: payload.chat, currentUserId: payload.currentUserId });
@@ -759,7 +783,7 @@ export function MainTabs() {
         }}
       >
         <Tabs.Navigator
-          initialRouteName="Messages"
+          // initialRouteName="Messages"
           screenOptions={{
             headerShown: false,
             tabBarShowLabel: false,
@@ -773,27 +797,27 @@ export function MainTabs() {
             />
           )}
         >
-          <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} />
+          {/* <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} /> */}
 
-          <Tabs.Screen
+          {/* <Tabs.Screen
             name="Bible"
             component={BibleScreen}
             options={{ title: translateString('Bible') }}
-          />
+          /> */}
 
-          <Tabs.Screen
+          {/* <Tabs.Screen
             name="Broadcast"
             component={BroadcastScreen}
             options={{ title: translateString('Broadcast') }}
-          />
+          /> */}
 
           <Tabs.Screen name="Partners" options={{ title: translateString('Partners') }} component={PartnersTabScreen} />
 
-          <Tabs.Screen
+          {/* <Tabs.Screen
             name="Profile"
             component={ProfileScreen}
             options={{ title: translateString('Profile') }}
-          />
+          /> */}
         </Tabs.Navigator>
       </TabletShell>
 

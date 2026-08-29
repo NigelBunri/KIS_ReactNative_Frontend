@@ -25,7 +25,13 @@ import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attach
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
-import { BIBLE_REFERENCE_RE, parseBibleReference, type ParsedBibleReference } from '@/utils/bibleReference';
+import {
+  BIBLE_REFERENCE_RE,
+  BIBLE_QUOTE_BLOCK_RE,
+  parseBibleReference,
+  parseBibleQuoteBlock,
+  type ParsedBibleReference,
+} from '@/utils/bibleReference';
 import { openBibleVerse } from '@/utils/bibleVerseOpenBridge';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
@@ -1964,31 +1970,49 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const URL_OR_MENTION_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+/g;
 
   const openBibleReference = (ref: ParsedBibleReference) => {
+    // The chat room is a full-screen overlay layered above the tab
+    // navigator, not a stack screen — switching tabs underneath it doesn't
+    // close it. Dismiss it explicitly so the Bible tab is actually visible.
+    DeviceEventEmitter.emit('chat.close_all');
     (navigation as any).navigate('MainTabs', { screen: 'Bible' });
     openBibleVerse({
       reference: ref.reference,
       book: ref.bookCode,
       chapter: ref.chapter,
       verse: ref.verseStart,
+      verseEnd: ref.verseEnd,
     });
   };
 
   type RichToken =
     | { type: 'text'; text: string }
     | { type: 'mention' | 'url'; text: string }
-    | { type: 'bible'; text: string; bibleRef: ParsedBibleReference };
+    | { type: 'bible'; text: string; bibleRef: ParsedBibleReference }
+    | { type: 'bible-quote'; text: string; bibleRef: ParsedBibleReference; quote: string };
 
   const tokenizeRichText = (raw: string): RichToken[] => {
-    // Scan for URLs/@mentions and Bible references independently (each has
-    // its own capture groups), then merge by position — split() can't be
-    // used for the combined pattern since mismatched group counts across
-    // alternatives would scramble the resulting array.
-    const found: Array<{ index: number; length: number; type: 'mention' | 'url' | 'bible'; text: string }> = [];
+    // Scan for URLs/@mentions, "reference + quoted line" blocks, and bare
+    // Bible references independently (each has its own capture groups),
+    // then merge by position — split() can't be used for the combined
+    // pattern since mismatched group counts across alternatives would
+    // scramble the resulting array.
+    const found: Array<{ index: number; length: number; type: 'mention' | 'url' | 'bible' | 'bible-quote'; text: string }> = [];
 
     const urlMentionRe = new RegExp(URL_OR_MENTION_RE.source, 'g');
     let m: RegExpExecArray | null;
     while ((m = urlMentionRe.exec(raw))) {
       found.push({ index: m.index, length: m[0].length, type: m[0].startsWith('@') ? 'mention' : 'url', text: m[0] });
+    }
+
+    // Quote-block matches are pushed BEFORE bare-reference matches, and
+    // Array#sort is stable, so when both match at the same starting index
+    // (a bare reference is always a prefix of its own quote-block match)
+    // the quote-block — the longer, more specific match — sorts first and
+    // wins; the bare-reference match at that same index then gets skipped
+    // below as an overlap.
+    const quoteBlockRe = new RegExp(BIBLE_QUOTE_BLOCK_RE.source, 'gi');
+    while ((m = quoteBlockRe.exec(raw))) {
+      found.push({ index: m.index, length: m[0].length, type: 'bible-quote', text: m[0] });
     }
 
     const bibleRe = new RegExp(BIBLE_REFERENCE_RE.source, 'gi');
@@ -2003,7 +2027,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     for (const match of found) {
       if (match.index < cursor) continue; // overlaps an earlier match, skip
       if (match.index > cursor) tokens.push({ type: 'text', text: raw.slice(cursor, match.index) });
-      if (match.type === 'bible') {
+      if (match.type === 'bible-quote') {
+        const block = parseBibleQuoteBlock(match.text);
+        if (block) {
+          tokens.push({ type: 'bible-quote', text: match.text, bibleRef: block.referenceMatch, quote: block.quote });
+        } else {
+          tokens.push({ type: 'text', text: match.text });
+        }
+      } else if (match.type === 'bible') {
         const bibleRef = parseBibleReference(match.text);
         if (bibleRef) {
           tokens.push({ type: 'bible', text: match.text, bibleRef });
@@ -2051,6 +2082,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
               >
                 <Text style={{ color: palette.mentionColor ?? palette.primary, fontWeight: '700' }}>{token.text}</Text>
+              </Pressable>
+            );
+          }
+          if (token.type === 'bible-quote') {
+            return (
+              <Pressable key={i} onPress={() => openBibleReference(token.bibleRef)}>
+                <Text style={{ color: urlColor, fontWeight: '700', textDecorationLine: 'underline' }}>
+                  {token.bibleRef.reference}
+                </Text>
+                <Text>{'\n'}</Text>
+                <Text style={{ color: urlColor, fontStyle: 'italic', textDecorationLine: 'underline' }}>
+                  “{token.quote}”
+                </Text>
               </Pressable>
             );
           }
@@ -3177,12 +3221,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <Pressable
         onPress={() => {
+          DeviceEventEmitter.emit('chat.close_all');
           (navigation as any).navigate('MainTabs', { screen: 'Bible' });
           openBibleVerse({
             reference: bibleVerse.reference,
             book: bibleVerse.bookCode,
             chapter: bibleVerse.chapter,
             verse: bibleVerse.verseStart,
+            verseEnd: bibleVerse.verseEnd,
           });
         }}
         style={({ pressed }) => ({

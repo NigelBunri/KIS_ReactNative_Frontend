@@ -148,3 +148,49 @@ export function formatBibleReference(bookName: string, chapter: number, verseSta
     ? `${bookName} ${chapter}:${verseStart}-${verseEnd}`
     : `${bookName} ${chapter}:${verseStart}`;
 }
+
+/**
+ * Plain-text message body for sharing a verse/chapter to chat: a reference
+ * line followed by the quoted passage on the next line, e.g.
+ *   Genesis 12:16
+ *   "And he entreated Abram well for her sake..."
+ * Sent as an ordinary 'text' message — no special message kind needed — and
+ * rendered as one tappable link back to the exact spot by
+ * BIBLE_QUOTE_BLOCK_RE below.
+ */
+export function formatBibleShareText(reference: string, quoteText: string): string {
+  const oneLineQuote = quoteText.replace(/\s*\n\s*/g, ' ').replace(/"/g, '“').trim();
+  return `${reference}\n"${oneLineQuote}"`;
+}
+
+// Matches a reference line immediately followed by a quoted passage on the
+// next line (the exact shape formatBibleShareText produces) — the WHOLE
+// block (reference + quote) renders as a single tappable link, per product
+// requirement: both the reference and the quotation under it link back to
+// the Bible. A plain reference with no quote line still matches
+// BIBLE_REFERENCE_RE/BIBLE_REFERENCE_SPLIT_RE alone.
+const QUOTE_BLOCK_PATTERN = `${REFERENCE_PATTERN}\\r?\\n"[^"\\n]+"`;
+export const BIBLE_QUOTE_BLOCK_RE = new RegExp(QUOTE_BLOCK_PATTERN, 'i');
+export const BIBLE_QUOTE_BLOCK_SPLIT_RE = new RegExp(`(${QUOTE_BLOCK_PATTERN})`, 'gi');
+
+export type ParsedBibleQuoteBlock = {
+  raw: string;
+  referenceMatch: ParsedBibleReference;
+  quote: string;
+};
+
+/** Parses a "reference line + quoted line" block, or null if `text` isn't shaped that way. */
+export function parseBibleQuoteBlock(text: string): ParsedBibleQuoteBlock | null {
+  const match = text.match(BIBLE_QUOTE_BLOCK_RE);
+  if (!match) return null;
+  const quoteMatch = match[0].match(/"([^"\n]+)"\s*$/);
+  if (!quoteMatch) return null;
+  // The regex has no separate capture group for just the reference line (it
+  // reuses REFERENCE_PATTERN's own groups) — narrow match[0] back down to
+  // the reference-only text before parsing, so referenceMatch.raw means
+  // what its type promises elsewhere (just the reference, not the quote too).
+  const referenceLineText = match[0].slice(0, match[0].length - quoteMatch[0].length).replace(/\r?\n$/, '');
+  const referenceMatch = parseBibleReference(referenceLineText);
+  if (!referenceMatch) return null;
+  return { raw: match[0], referenceMatch, quote: quoteMatch[1] };
+}

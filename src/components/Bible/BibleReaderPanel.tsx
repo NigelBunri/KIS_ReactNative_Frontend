@@ -70,7 +70,7 @@ import {
   upsertLocalBibleNote,
 } from '@/services/bibleUserPersistence';
 import { scheduleBibleReadingEventReminders } from '@/services/inAppNotificationService';
-import { formatBibleReference } from '@/utils/bibleReference';
+import { formatBibleReference, formatBibleShareText } from '@/utils/bibleReference';
 import type { BibleVerseMessage } from '@/Module/ChatRoom/chatTypes';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
@@ -112,6 +112,8 @@ type Props = {
     startVerse?: number,
     endVerse?: number,
   ) => void;
+  /** Briefly highlights (and scrolls to) this verse range once it's loaded — set by a chat link/search tap. */
+  highlightRequest?: { chapter: number; verseStart: number; verseEnd?: number; token: number } | null;
 };
 
 type LibraryItem = {
@@ -169,6 +171,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   onScroll,
   onRefresh,
   refreshing = false,
+  highlightRequest,
 }: Props, ref) {
   const { palette, isDark } = useKISTheme();
   const { socket } = useSocket();
@@ -190,6 +193,10 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   const [referenceInput, setReferenceInput] = useState('');
   const [chapters, setChapters] = useState<any[]>([]);
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
+  // Verse numbers to briefly highlight after a chat-link/search tap lands
+  // here — separate from selectedVerses (which drives the share-selection
+  // UI and shouldn't auto-clear on a timer).
+  const [linkHighlightVerseNumbers, setLinkHighlightVerseNumbers] = useState<Set<number>>(new Set());
   const [noteText, setNoteText] = useState('');
   const [message, setMessage] = useState('');
   const [libraryLoading, setLibraryLoading] = useState(false);
@@ -419,6 +426,28 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     pendingScrollVerseRef.current = null;
     setTimeout(() => scrollToVerseNumber(target), 220);
   }, [reader?.chapter?.number, scrollToVerseNumber, verses]);
+
+  // Scroll to and briefly highlight a verse (or range) requested from
+  // outside this component (chat link, search result, shared quote) once
+  // it's actually present in the loaded chapter — mirrors the
+  // pendingScrollVerseRef effect above, but for an external request that
+  // also needs a visible "here it is" highlight, not just a scroll.
+  useEffect(() => {
+    if (!highlightRequest) return;
+    if (Number(reader?.chapter?.number) !== highlightRequest.chapter) return;
+    const { verseStart, verseEnd } = highlightRequest;
+    const exists = verses.some(verse => Number(verse.number) === verseStart);
+    if (!exists) return;
+
+    const rangeEnd = verseEnd ?? verseStart;
+    const numbers = new Set<number>();
+    for (let n = verseStart; n <= rangeEnd; n++) numbers.add(n);
+    setLinkHighlightVerseNumbers(numbers);
+    setTimeout(() => scrollToVerseNumber(verseStart), 220);
+
+    const clearTimer = setTimeout(() => setLinkHighlightVerseNumbers(new Set()), 3000);
+    return () => clearTimeout(clearTimer);
+  }, [highlightRequest, reader?.chapter?.number, verses, scrollToVerseNumber]);
 
   useEffect(() => {
     onRegisterFilterOpener?.(() => setFilterOpen(true));
@@ -786,13 +815,17 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     }
     const conversationId = String((chat as any)?.conversationId ?? chat.id);
     const payload = sharePayload;
+    // Plain 'text' kind, not the custom 'bible_verse' kind — works today on
+    // any backend with no server-side changes required, and the reference +
+    // quote are turned back into a tappable link on render (see
+    // BIBLE_QUOTE_BLOCK_RE / renderRichText in MessageBubble.tsx).
     socket.timeout(20000).emit(
       'chat.send',
       {
         conversationId,
         clientId: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        kind: 'bible_verse',
-        bibleVerse: payload,
+        kind: 'text',
+        text: formatBibleShareText(payload.reference, payload.text ?? ''),
       },
       (err: any, ackResult: { ok?: boolean; error?: string } | undefined) => {
         if (err) {
@@ -2371,6 +2404,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 {verses.map(verse => {
                   const id = String(verse.id);
                   const selected = selectedVerses.has(id);
+                  const linkHighlighted = linkHighlightVerseNumbers.has(Number(verse.number));
                   const highlightColor = highlightByVerse.get(id);
                   const text = String(verse.text || '');
                   const isChapterStart =
@@ -2381,7 +2415,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   const markedTextColor = isDark && hasSavedHighlight ? '#111111' : palette.text;
                   const markedNumberColor = isDark && hasSavedHighlight
                     ? '#2A1B08'
-                    : selected
+                    : selected || linkHighlighted
                       ? palette.primaryStrong
                       : palette.subtext;
                   return (
@@ -2402,12 +2436,16 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                           ? styles.chapterStartVerse
                           : styles.bibleVerseLine,
                         {
-                          backgroundColor: selected
-                            ? palette.primarySoft
-                            : highlightColor || 'transparent',
-                          borderColor: selected
-                            ? palette.primaryStrong
-                            : 'transparent',
+                          backgroundColor: linkHighlighted
+                            ? palette.goldSoft
+                            : selected
+                              ? palette.primarySoft
+                              : highlightColor || 'transparent',
+                          borderColor: linkHighlighted
+                            ? palette.goldDeep
+                            : selected
+                              ? palette.primaryStrong
+                              : 'transparent',
                         },
                       ]}
                     >

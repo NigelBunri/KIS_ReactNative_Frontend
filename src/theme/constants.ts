@@ -7,14 +7,18 @@ import { APP_COLOR_THEMES, DEFAULT_THEME_ID, getThemeById, type AppColorTheme } 
 
 export type KISTone = 'light' | 'dark';
 
-/** The 8 accent colors exposed in the app's own Appearance settings — Gold
- *  (the default, first in the list) plus the 7 most broadly recognizable
+/** The 18 accent colors exposed in the app's own Appearance settings — Gold
+ *  (the default, first in the list) plus the 17 most broadly recognizable
  *  colors from the larger Partner Pro set in appColorThemes.ts. Re-exported
  *  from here (rather than duplicated) so the settings picker and the palette
  *  generator below always agree on exactly which colors exist. */
 export const KIS_ACCENT_THEMES: AppColorTheme[] = (() => {
   const gold = getThemeById(DEFAULT_THEME_ID);
-  const pickIds = ['royal_blue', 'emerald', 'crimson', 'amber', 'teal', 'rose', 'violet'];
+  const pickIds = [
+    'royal_blue', 'emerald', 'crimson', 'amber', 'teal', 'rose', 'violet',
+    'turquoise', 'magenta', 'indigo', 'burgundy', 'mint', 'coral',
+    'sunshine_yellow', 'navy', 'charcoal', 'terracotta',
+  ];
   const rest = pickIds
     .map((id) => APP_COLOR_THEMES.find((t) => t.id === id))
     .filter((t): t is AppColorTheme => !!t);

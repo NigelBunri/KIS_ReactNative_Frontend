@@ -17,6 +17,8 @@ export type BibleVerseOpenPayload = {
   book?: string;
   chapter?: number;
   verse?: number;
+  /** End of a verse range (e.g. the 30 in "Mark 13:23-30") — highlights the whole range, not just `verse`. */
+  verseEnd?: number;
 };
 
 let pending: BibleVerseOpenPayload | null = null;
