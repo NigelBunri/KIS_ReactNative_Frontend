@@ -79,23 +79,24 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
   const channelId = item.channel?.id;
   const isSubscribed = channelId ? subscribedChannels.has(channelId) : false;
 
-  // Double-tap like detection
-  const lastTapRef = useRef<number>(0);
+  // Double-tap like detection - fires via KISVideo's onDoubleTapMiddle
+  // (see VideoPlayer.tsx's doc on that prop), not this view's own onPress
+  // anymore: restoring tap-to-play/pause meant the player's own tap zones
+  // became real Pressables covering the whole video, and a nested
+  // Pressable's onPress always wins over an ancestor's - this outer one
+  // stopped reliably firing at all once that happened, silently, rather
+  // than just moving where the gesture is wired from.
   const [showHeart, setShowHeart] = useState(false);
 
-  const handleVideoTap = useCallback(() => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      onLike(item.id);
-      setShowHeart(true);
-      setTimeout(() => setShowHeart(false), 800);
-    }
-    lastTapRef.current = now;
+  const handleDoubleTapLike = useCallback(() => {
+    onLike(item.id);
+    setShowHeart(true);
+    setTimeout(() => setShowHeart(false), 800);
   }, [item.id, onLike]);
 
   return (
     <View style={[styles.card, { height: SCREEN_HEIGHT }]}>
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={handleVideoTap}>
+      <View style={StyleSheet.absoluteFillObject}>
         {item.videoUrl && (isVisible || shouldPreload) ? (
           <KISVideo
             sourceUrl={item.videoUrl}
@@ -105,6 +106,23 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
             muted={!isVisible}
             containerStyle={StyleSheet.absoluteFillObject}
             videoStyle={{ borderRadius: 0 }}
+            onDoubleTapMiddle={handleDoubleTapLike}
+            // Sits just below infoRow (channel name/caption/like-comment-
+            // share column, which starts at bottom: Math.max(60,
+            // bottomInset + 20) below) instead of VideoControls' full
+            // panel, which was built for an inline card player and would
+            // visually collide with this full-bleed vertical feed's own
+            // bottom chrome. Only actually visible/interactive for
+            // whichever card is on-screen either way - the preloading
+            // neighbor this same component tree also renders for isn't
+            // shown to the user at all.
+            progressBarOnly
+            progressBarStyle={{
+              position: 'absolute',
+              left: 16,
+              right: 16,
+              bottom: bottomInset + 4,
+            }}
           />
         ) : item.thumbUrl ? (
           // Not the visible card or its immediate neighbor - a real player
@@ -119,7 +137,7 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
             <KISIcon name="play" size={48} color={palette.border} />
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* Double-tap heart flash */}
       {showHeart && (

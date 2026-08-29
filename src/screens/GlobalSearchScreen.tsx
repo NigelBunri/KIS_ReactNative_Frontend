@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import SearchScreen from './SearchScreen';
 import type { RootStackParamList } from '@/navigation/types';
 import type { HealthInstitutionType } from '@/screens/tabs/profile-screen/types';
+import { openBibleVerse } from '@/utils/bibleVerseOpenBridge';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -119,8 +120,7 @@ export default function GlobalSearchScreen() {
         case 'bible_verse':
           // Switch to Bible tab and emit verse navigation
           (navigation as any).navigate('MainTabs', { screen: 'Bible' });
-          DeviceEventEmitter.emit('bible.verse.open', {
-            verseId: id,
+          openBibleVerse({
             reference: String(meta.reference ?? meta.verse_ref ?? result.title ?? id),
             book: meta.book,
             chapter: meta.chapter,

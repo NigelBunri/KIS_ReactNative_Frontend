@@ -32,6 +32,7 @@ import { KISIcon } from '../../constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/ConsumerSpiritualRevenuePreviewCard';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
+import { BIBLE_VERSE_OPEN_EVENT, consumePendingBibleVerseOpen, type BibleVerseOpenPayload } from '@/utils/bibleVerseOpenBridge';
 
 export default function BibleScreen() {
   const {
@@ -93,19 +94,28 @@ export default function BibleScreen() {
     setOpenReadFilters(() => open);
   }, []);
 
-  // Listen for bible.verse.open events from global search
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('bible.verse.open', (payload: any) => {
-      setActiveTab('read');
-      if (payload?.reference) {
-        loadReader(undefined, undefined, undefined, String(payload.reference));
-      } else if (payload?.book && payload?.chapter) {
-        const startVerse = payload.verse ? Number(payload.verse) : undefined;
-        loadReader(undefined, String(payload.book), Number(payload.chapter), undefined, startVerse);
-      }
-    });
-    return () => sub.remove();
+  // Listen for bible.verse.open events (global search, a tapped chat
+  // reference, a shared verse card, ...).
+  const openVersePayload = useCallback((payload: BibleVerseOpenPayload | null | undefined) => {
+    if (!payload) return;
+    setActiveTab('read');
+    if (payload.reference) {
+      loadReader(undefined, undefined, undefined, String(payload.reference));
+    } else if (payload.book && payload.chapter) {
+      const startVerse = payload.verse ? Number(payload.verse) : undefined;
+      loadReader(undefined, String(payload.book), Number(payload.chapter), undefined, startVerse);
+    }
   }, [loadReader]);
+
+  useEffect(() => {
+    // Pick up a request that arrived before this screen ever mounted — the
+    // Bible tab is lazy, so a chat-link tap's navigate() + emit() can both
+    // fire before this component (and its listener below) exists yet.
+    openVersePayload(consumePendingBibleVerseOpen());
+
+    const sub = DeviceEventEmitter.addListener(BIBLE_VERSE_OPEN_EVENT, openVersePayload);
+    return () => sub.remove();
+  }, [openVersePayload]);
 
   useEffect(() => {
     if (activeTab === 'daily') {

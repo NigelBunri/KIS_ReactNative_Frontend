@@ -26,6 +26,7 @@ import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from 
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 import { BIBLE_REFERENCE_RE, parseBibleReference, type ParsedBibleReference } from '@/utils/bibleReference';
+import { openBibleVerse } from '@/utils/bibleVerseOpenBridge';
 
 const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
 
@@ -1964,7 +1965,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const openBibleReference = (ref: ParsedBibleReference) => {
     (navigation as any).navigate('MainTabs', { screen: 'Bible' });
-    DeviceEventEmitter.emit('bible.verse.open', {
+    openBibleVerse({
       reference: ref.reference,
       book: ref.bookCode,
       chapter: ref.chapter,
@@ -3177,7 +3178,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       <Pressable
         onPress={() => {
           (navigation as any).navigate('MainTabs', { screen: 'Bible' });
-          DeviceEventEmitter.emit('bible.verse.open', {
+          openBibleVerse({
             reference: bibleVerse.reference,
             book: bibleVerse.bookCode,
             chapter: bibleVerse.chapter,

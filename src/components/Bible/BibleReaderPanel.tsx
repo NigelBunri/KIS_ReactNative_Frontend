@@ -73,8 +73,7 @@ import { scheduleBibleReadingEventReminders } from '@/services/inAppNotification
 import { formatBibleReference } from '@/utils/bibleReference';
 import type { BibleVerseMessage } from '@/Module/ChatRoom/chatTypes';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
-import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
-import { ForwardChatSheet } from '@/Module/ChatRoom/componets/main/ForwardChatSheet';
+import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
 import { useSocket } from '../../../SocketProvider';
 
 const HIGHLIGHT_COLORS = [
@@ -218,7 +217,6 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   >(null);
   const [sharePayload, setSharePayload] = useState<BibleVerseMessage | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
-  const [shareChats, setShareChats] = useState<Chat[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string | undefined>(
     reader?.translation?.language,
   );
@@ -769,7 +767,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     return { reference, bookCode, bookName, chapter: currentChapter, verseStart, verseEnd, text };
   };
 
-  const openShareSheetForVerses = async (verseList: BibleVerse[]) => {
+  const openShareSheetForVerses = (verseList: BibleVerse[]) => {
     const payload = buildBibleVerseSharePayload(verseList);
     if (!payload) {
       Alert.alert('Select verses', 'Choose one or more verses first.');
@@ -777,40 +775,41 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     }
     setSharePayload(payload);
     setShareSheetVisible(true);
-    setMessage('Loading your chats…');
-    try {
-      const chats = await fetchConversationsForCurrentUser([]);
-      setShareChats(chats);
-      setMessage('');
-    } catch {
-      setShareChats([]);
-      setMessage('Could not load chats.');
-    }
   };
 
-  const handleShareConfirm = (chatIds: string[]) => {
-    if (!chatIds.length || !sharePayload) {
-      setShareSheetVisible(false);
-      return;
-    }
+  const handleSharePick = (chat: Chat) => {
+    setShareSheetVisible(false);
+    if (!sharePayload) return;
     if (!socket) {
       Alert.alert('Share', 'Unable to share right now — check your connection.');
       return;
     }
-    chatIds.forEach(chatId => {
-      socket.emit('chat.send', {
-        conversationId: chatId,
+    const conversationId = String((chat as any)?.conversationId ?? chat.id);
+    const payload = sharePayload;
+    socket.timeout(20000).emit(
+      'chat.send',
+      {
+        conversationId,
         clientId: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         kind: 'bible_verse',
-        bibleVerse: sharePayload,
-      });
-    });
-    setShareSheetVisible(false);
+        bibleVerse: payload,
+      },
+      (err: any, ackResult: { ok?: boolean; error?: string } | undefined) => {
+        if (err) {
+          Alert.alert('Share failed', 'No response from the server — please try again.');
+          return;
+        }
+        if (ackResult && ackResult.ok === false) {
+          Alert.alert('Share failed', ackResult.error || 'The chat could not accept this message.');
+          return;
+        }
+        setMessage(`Shared ${payload.reference} to ${chat.name || 'chat'}.`);
+      },
+    );
     setSharePayload(null);
     setActionVerse(null);
     setVerseActionMode(null);
     clearVerseSelection();
-    setMessage(`Shared ${sharePayload.reference} to ${chatIds.length} chat${chatIds.length > 1 ? 's' : ''}.`);
   };
 
   const createForVerses = async (
@@ -2506,13 +2505,10 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
       {renderFilterSheet()}
       {renderVerseActionModal()}
 
-      <ForwardChatSheet
+      <ShareToChatModal
         visible={shareSheetVisible}
-        palette={palette}
-        chats={shareChats}
-        maxTargets={10}
         onClose={() => setShareSheetVisible(false)}
-        onConfirm={handleShareConfirm}
+        onPicked={handleSharePick}
       />
     </View>
   );

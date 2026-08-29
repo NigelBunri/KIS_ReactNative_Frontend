@@ -37,6 +37,12 @@ type Props = {
   // hosting this preview has lost navigation focus or the app has
   // backgrounded, so audio doesn't keep playing off-screen.
   externalPause?: boolean;
+  // See VideoPlayer.tsx's progressBarOnly/progressBarStyle docs - for
+  // full-bleed viewers (BroadcastDetailScreen) that need a drag-to-seek
+  // scrubber positioned to clear their own caption/action-button chrome,
+  // instead of the full VideoControls panel.
+  progressBarOnly?: boolean;
+  progressBarStyle?: StyleProp<ViewStyle>;
 };
 
 const basePlaybackMessage = 'Unable to play this video preview.';
@@ -50,6 +56,8 @@ export default function BroadcastFeedVideoPreview({
   posterOverride,
   forceTextureView = false,
   externalPause = false,
+  progressBarOnly = false,
+  progressBarStyle,
 }: Props) {
   const mediaHeaders = useMediaHeaders();
   const sources = useMemo(
@@ -234,7 +242,7 @@ export default function BroadcastFeedVideoPreview({
   return (
     // overflow:hidden clips the video player to the container bounds and prevents
     // the controls overlay from visually escaping into surrounding content.
-    <View style={[styles.outerWrap, containerStyle]}>
+    <View style={[ containerStyle]}>
       <KISVideo
         sourceUrl={activeSource.url}
         sourceHeaders={activeSourceHeaders}
@@ -247,6 +255,8 @@ export default function BroadcastFeedVideoPreview({
         videoStyle={videoStyle}
         forceTextureView={forceTextureView}
         externalPause={externalPause}
+        progressBarOnly={progressBarOnly}
+        progressBarStyle={progressBarStyle}
       />
       {playbackError && sourceIndex > 0 ? (
         <View

@@ -15,6 +15,7 @@ import {
 import Video, { SelectedVideoTrackType, SelectedTrackType, ViewType } from 'react-native-video';
 import { useKISTheme } from '@/theme/useTheme';
 import VideoControls from './components/VideoControls';
+import VideoProgressBar from './components/VideoProgressBar';
 import { useVideoPlayer } from './hooks/useVideoPlayer';
 import { normalizeVideoUrl } from './utils';
 import type { ChannelContentChapter } from '@/screens/broadcast/channels/api/channels.types';
@@ -30,6 +31,19 @@ export type VideoPlayerProps = {
   loop?: boolean;
   muted?: boolean;
   showControls?: boolean;
+  // When true, renders VideoProgressBar (just the drag-to-any-position
+  // scrubber) instead of the full VideoControls panel - for full-bleed
+  // reels/shorts-style viewers that already have their own caption text and
+  // action-button column occupying the bottom of the screen, where
+  // VideoControls' full panel (time text, settings/captions/pip/fullscreen
+  // row, play/pause, mute, speed) visually collides with that existing
+  // chrome rather than adding anything a vertical short-form video needs.
+  // Has no effect when showControls is false.
+  progressBarOnly?: boolean;
+  // Positions the progress bar in progressBarOnly mode - callers place it
+  // wherever it clears their own bottom UI (VideoControls' own bottom:12
+  // default only makes sense for an inline card player).
+  progressBarStyle?: StyleProp<ViewStyle>;
   allowFullScreen?: boolean;
   pictureInPicture?: boolean;
   enablePip?: boolean;
@@ -40,6 +54,16 @@ export type VideoPlayerProps = {
   onError?: (message: string | null) => void;
   onEnd?: () => void;
   onProgress?: (currentTime: number) => void;
+  // Fires on a double tap in the middle zone (the same zone that toggles
+  // play/pause on a single tap - see handleMiddleTap) instead of anything
+  // internal to this component. For a caller like ShortsScreen that wraps
+  // this whole player in its own outer Pressable for a double-tap-to-like
+  // gesture: that outer Pressable's onPress never fires once the tap zones
+  // below became real Pressables of their own (nested Pressables give the
+  // touch to the innermost one), so without a way to route a double tap
+  // back out, restoring play/pause here would have silently broken that
+  // gesture instead of just moving where it's wired from.
+  onDoubleTapMiddle?: () => void;
   chapters?: ChannelContentChapter[];
   // Android renders <Video> through a SurfaceView by default, which has
   // its own separate rendering surface and reliably fails to composite
@@ -79,6 +103,8 @@ export default function VideoPlayer({
   loop = false,
   muted = false,
   showControls = true,
+  progressBarOnly = false,
+  progressBarStyle,
   allowFullScreen = false,
   pictureInPicture = false,
   enablePip = false,
@@ -89,6 +115,7 @@ export default function VideoPlayer({
   onError,
   onEnd,
   onProgress: onProgressProp,
+  onDoubleTapMiddle,
   chapters,
   forceTextureView = false,
   externalPause = false,
@@ -170,6 +197,14 @@ export default function VideoPlayer({
   const rightSeekAnim = useRef(new Animated.Value(0)).current;
   const lastLeftTap = useRef(0);
   const lastRightTap = useRef(0);
+  // Pending play/pause toggle from a tap on the left/right zone that
+  // hasn't (yet) turned out to be the first half of a double-tap seek -
+  // see handleLeftTap/handleRightTap below. Cleared instead of fired if a
+  // second tap arrives in time.
+  const pendingToggleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingToggleTimer.current) clearTimeout(pendingToggleTimer.current);
+  }, []);
 
   const flashOverlay = (anim: Animated.Value) => {
     anim.setValue(1);
@@ -274,12 +309,30 @@ export default function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.loading]);
 
+  // A tap on either edge zone might be the whole gesture (play/pause, same
+  // as tapping the middle) or the first half of a double-tap (seek
+  // ±10s) - there's no way to know which until the double-tap window
+  // passes, so the play/pause toggle is scheduled rather than fired
+  // immediately, and cancelled if a second tap arrives in time to make it
+  // a seek instead. The middle zone has no double-tap gesture of its own,
+  // so it skips this entirely and toggles immediately - no reason to make
+  // the common "tap to pause" case feel laggy where there's no ambiguity
+  // to resolve.
   const handleLeftTap = () => {
     const now = Date.now();
     if (now - lastLeftTap.current < 300) {
+      if (pendingToggleTimer.current) {
+        clearTimeout(pendingToggleTimer.current);
+        pendingToggleTimer.current = null;
+      }
       actions.seekBackward10();
       Vibration.vibrate(15);
       flashOverlay(leftSeekAnim);
+    } else {
+      pendingToggleTimer.current = setTimeout(() => {
+        pendingToggleTimer.current = null;
+        actions.togglePlay();
+      }, 300);
     }
     lastLeftTap.current = now;
   };
@@ -287,11 +340,42 @@ export default function VideoPlayer({
   const handleRightTap = () => {
     const now = Date.now();
     if (now - lastRightTap.current < 300) {
+      if (pendingToggleTimer.current) {
+        clearTimeout(pendingToggleTimer.current);
+        pendingToggleTimer.current = null;
+      }
       actions.seekForward10();
       Vibration.vibrate(15);
       flashOverlay(rightSeekAnim);
+    } else {
+      pendingToggleTimer.current = setTimeout(() => {
+        pendingToggleTimer.current = null;
+        actions.togglePlay();
+      }, 300);
     }
     lastRightTap.current = now;
+  };
+
+  const lastMiddleTap = useRef(0);
+  const handleMiddleTap = () => {
+    const now = Date.now();
+    if (onDoubleTapMiddle && now - lastMiddleTap.current < 300) {
+      lastMiddleTap.current = 0; // consumed - a third tap starts fresh, doesn't chain
+      onDoubleTapMiddle();
+      return;
+    }
+    lastMiddleTap.current = now;
+    if (!onDoubleTapMiddle) {
+      // No double-tap gesture registered for this zone, so there's nothing
+      // to disambiguate - toggle immediately (see this function's usage
+      // above for why left/right can't do the same).
+      actions.togglePlay();
+      return;
+    }
+    pendingToggleTimer.current = setTimeout(() => {
+      pendingToggleTimer.current = null;
+      actions.togglePlay();
+    }, 300);
   };
 
   if (!safeUrl) {
@@ -421,12 +505,15 @@ export default function VideoPlayer({
           </Pressable>
         </View>
       ) : null}
-      {/* Double-tap seek zones — sits below controls in z-order */}
+      {/* Tap zones — sits below controls in z-order. Left/right: single tap
+          toggles play/pause (delayed - see handleLeftTap/handleRightTap),
+          double tap seeks ±10s. Middle: single tap toggles play/pause
+          immediately, no double-tap gesture of its own. */}
       {!state.error && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
           <View style={{ flexDirection: 'row', flex: 1 }}>
             <Pressable style={{ flex: 0.3, height: '100%' }} onPress={handleLeftTap} />
-            <View style={{ flex: 0.4 }} pointerEvents="none" />
+            <Pressable style={{ flex: 0.4, height: '100%' }} onPress={handleMiddleTap} />
             <Pressable style={{ flex: 0.3, height: '100%' }} onPress={handleRightTap} />
           </View>
         </View>
@@ -443,15 +530,24 @@ export default function VideoPlayer({
       </Animated.View>
 
       {showControls && !state.error && (
-        <VideoControls
-          state={state}
-          actions={actions}
-          onSeekComplete={actions.seekTo}
-          onFullScreenPress={allowFullScreen ? onFullScreenPress : undefined}
-          chapters={chapters}
-          enablePip={enablePip || pictureInPicture}
-          onPipPress={handlePipPress}
-        />
+        progressBarOnly ? (
+          <VideoProgressBar
+            state={state}
+            actions={actions}
+            onSeekComplete={actions.seekTo}
+            style={progressBarStyle}
+          />
+        ) : (
+          <VideoControls
+            state={state}
+            actions={actions}
+            onSeekComplete={actions.seekTo}
+            onFullScreenPress={allowFullScreen ? onFullScreenPress : undefined}
+            chapters={chapters}
+            enablePip={enablePip || pictureInPicture}
+            onPipPress={handlePipPress}
+          />
+        )
       )}
     </View>
   );

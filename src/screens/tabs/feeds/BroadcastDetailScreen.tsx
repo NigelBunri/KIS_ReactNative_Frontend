@@ -1056,6 +1056,19 @@ export default function BroadcastDetailScreen() {
                 // compositing and doesn't have this failure mode.
                 forceTextureView
                 externalPause={videoExternalPause}
+                // Sits in the gap between the very bottom edge and where the
+                // caption/action-button chrome starts (both begin at
+                // insets.bottom + 24 - see bottomDescription/floatingAction
+                // below) - clear of both instead of VideoControls' full
+                // panel, which was built for an inline card player and
+                // visually collided with this screen's own bottom UI here.
+                progressBarOnly
+                progressBarStyle={{
+                  position: 'absolute',
+                  left: 16,
+                  right: 16,
+                  bottom: insets.bottom + 2,
+                }}
               />
             ) : attachmentUrl ? (
               <Pressable
