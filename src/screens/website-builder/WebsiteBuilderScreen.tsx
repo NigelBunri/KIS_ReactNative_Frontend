@@ -6,7 +6,8 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import { KISIcon } from '@/constants/kisIcons';
@@ -55,18 +56,24 @@ type WebsiteRecord = {
 
 const WEBSITE_PUBLIC_BASE_URL = 'https://kingdomimpactventures.org';
 
+// Direct-to-S3 via Nest — every caller below pickers with mediaType: 'photo',
+// so there's no video-processing dependency keeping this on Django.
 const uploadSectionImage = async (asset: any, context: string): Promise<string> => {
   if (!asset?.uri) return '';
-  const form = new FormData();
-  form.append('attachment', {
-    uri: asset.uri,
-    name: asset.fileName || `website-${Date.now()}.jpg`,
-    type: asset.type || 'image/jpeg',
-  } as any);
-  form.append('context', context);
-  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form);
-  const file = (res as any)?.data?.attachment ?? (res as any)?.attachment ?? {};
-  return String(file?.url || file?.uri || file?.file_url || file?.fileUrl || asset.uri);
+  try {
+    const attachment = await uploadFileToBackend({
+      file: {
+        uri: asset.uri,
+        name: asset.fileName || `website-${Date.now()}.jpg`,
+        type: asset.type || 'image/jpeg',
+      },
+      baseUrl: NEST_API_BASE_URL,
+      context,
+    });
+    return String(attachment?.url || attachment?.displayUrl || asset.uri);
+  } catch {
+    return asset.uri;
+  }
 };
 
 function PageTab({

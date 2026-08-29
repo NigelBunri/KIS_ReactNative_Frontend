@@ -1,7 +1,8 @@
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { postRequest } from '@/network/post';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Asset } from 'react-native-image-picker';
 import type { InsightPayload, TimeRange } from '@/api/insights/types';
@@ -1247,19 +1248,25 @@ export const uploadHealthDashboardImage = async (
   if (Date.now() < uploadBlockedUntil) {
     throw new Error('Image uploads are temporarily rate-limited. Please wait and try again.');
   }
-  const form = new FormData();
-  form.append('attachment', {
-    uri: asset.uri,
-    name: asset.fileName || `image-${Date.now()}.jpg`,
-    type: asset.type || 'image/jpeg',
-  } as any);
-  form.append('context', context);
-  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form);
-  if (Number(res?.status) === 429) {
-    uploadBlockedUntil = Date.now() + 60 * 1000;
+  // Direct-to-S3 via Nest — image-only by contract (function name/default
+  // mime), so there's no video-processing dependency keeping it on Django.
+  try {
+    const attachment = await uploadFileToBackend({
+      file: {
+        uri: asset.uri,
+        name: asset.fileName || `image-${Date.now()}.jpg`,
+        type: asset.type || 'image/jpeg',
+      },
+      baseUrl: NEST_API_BASE_URL,
+      context,
+    });
+    return attachment ?? null;
+  } catch (err: any) {
+    if (Number(err?.status) === 429) {
+      uploadBlockedUntil = Date.now() + 60 * 1000;
+    }
+    throw new Error(err?.message || 'Unable to upload image.');
   }
-  if (!res?.success) throw new Error(res?.message || 'Unable to upload image.');
-  return res.data?.attachment ?? null;
 };
 
 export type InstitutionDashboardAnalyticsResult = {

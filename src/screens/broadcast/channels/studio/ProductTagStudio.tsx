@@ -17,9 +17,10 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -78,16 +79,18 @@ export default function ProductTagStudio({ contentId }: Props) {
     if (!asset?.uri) return;
     setThumbUploading(true);
     try {
-      const form = new FormData();
+      // Direct-to-S3 via Nest — this picker is mediaType: 'photo' only, so
+      // there's no video-processing dependency keeping it on Django.
       const name = asset.fileName ?? `product_thumb_${Date.now()}.jpg`;
       const type = asset.type ?? guessMime(asset.uri);
-      form.append('attachment', { uri: asset.uri, name, type } as any);
-      const uploadRes = await postRequest(ROUTES.broadcasts.profileAttachment, form, {
-        errorMessage: 'Failed to upload thumbnail image.',
+      const attachment = await uploadFileToBackend({
+        file: { uri: asset.uri, name, type },
+        baseUrl: NEST_API_BASE_URL,
+        context: 'product_thumbnail',
       });
-      const uploadedUrl: string = uploadRes?.data?.attachment?.url ?? '';
-      if (!uploadRes.success || !uploadedUrl) {
-        Alert.alert('Error', uploadRes.message ?? 'Failed to upload thumbnail image.');
+      const uploadedUrl = attachment?.url || attachment?.displayUrl || '';
+      if (!uploadedUrl) {
+        Alert.alert('Error', 'Failed to upload thumbnail image.');
         return;
       }
       setFormThumb(uploadedUrl);

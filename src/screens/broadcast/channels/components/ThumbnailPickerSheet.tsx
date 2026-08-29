@@ -13,8 +13,8 @@ import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
 import { patchRequest } from '@/network/patch';
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
@@ -60,19 +60,20 @@ export default function ThumbnailPickerSheet({
     if (!asset?.uri) return;
     setSaving(true);
     try {
-      // Step 1: upload the raw image bytes to get a hosted URL.
-      const uploadForm = new FormData();
+      // Step 1: upload the raw image bytes to get a hosted URL. Direct-to-S3
+      // via Nest — this picker is mediaType: 'photo' only, so there's no
+      // video-processing dependency keeping it on Django.
       const name = asset.fileName ?? `thumbnail_${Date.now()}.jpg`;
       const type = asset.type ?? guessMime(asset.uri);
-      uploadForm.append('attachment', { uri: asset.uri, name, type } as any);
-
-      const uploadRes = await postRequest(ROUTES.broadcasts.profileAttachment, uploadForm, {
-        errorMessage: 'Failed to upload thumbnail image.',
+      const attachment = await uploadFileToBackend({
+        file: { uri: asset.uri, name, type },
+        baseUrl: NEST_API_BASE_URL,
+        context: 'channel_content_thumbnail',
       });
 
-      const uploadedUrl: string = uploadRes?.data?.attachment?.url ?? '';
-      if (!uploadRes.success || !uploadedUrl) {
-        Alert.alert('Error', uploadRes.message ?? 'Failed to upload thumbnail image.');
+      const uploadedUrl = attachment?.url || attachment?.displayUrl || '';
+      if (!uploadedUrl) {
+        Alert.alert('Error', 'Failed to upload thumbnail image.');
         return;
       }
 

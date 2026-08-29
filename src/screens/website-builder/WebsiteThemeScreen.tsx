@@ -2,8 +2,8 @@ import React, { useCallback, useState } from 'react';
 import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { patchRequest } from '@/network/patch';
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import KISButton from '@/constants/KISButton';
 import {
   getHealthThemeColors,
@@ -24,18 +24,26 @@ type ButtonFill = 'solid' | 'outline';
 
 const DEFAULT_PALETTE: Palette = { primary: '#1a1a2e', secondary: '#e94560', background: '#ffffff', text: '#0f0f1a' };
 
+// Direct-to-S3 via Nest — website logos are image-only (the picker below is
+// mediaType: 'photo'), so there's no video-processing dependency keeping
+// this on Django's profileAttachment endpoint the way there is for e.g.
+// useProfileController.ts's mixed image/video profile-attachment upload.
 const uploadLogo = async (asset: any): Promise<string> => {
   if (!asset?.uri) return '';
-  const form = new FormData();
-  form.append('attachment', {
-    uri: asset.uri,
-    name: asset.fileName || `website-logo-${Date.now()}.jpg`,
-    type: asset.type || 'image/jpeg',
-  } as any);
-  form.append('context', 'website_logo');
-  const res = await postRequest(ROUTES.broadcasts.profileAttachment, form);
-  const file = (res as any)?.data?.attachment ?? (res as any)?.attachment ?? {};
-  return String(file?.url || file?.uri || file?.file_url || file?.fileUrl || asset.uri);
+  try {
+    const attachment = await uploadFileToBackend({
+      file: {
+        uri: asset.uri,
+        name: asset.fileName || `website-logo-${Date.now()}.jpg`,
+        type: asset.type || 'image/jpeg',
+      },
+      baseUrl: NEST_API_BASE_URL,
+      context: 'website_logo',
+    });
+    return String(attachment?.url || attachment?.displayUrl || asset.uri);
+  } catch {
+    return asset.uri;
+  }
 };
 
 const SWATCHES = [

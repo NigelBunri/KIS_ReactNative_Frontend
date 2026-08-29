@@ -9,7 +9,8 @@ import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
-import ROUTES from '@/network';
+import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { CacheConfig } from '@/network/cacheKeys';
 import { clearAuthTokens } from '@/security/authStorage';
 import { unregisterPushToken } from '@/push/notifications';
@@ -718,6 +719,26 @@ export const useProfileController = (opts: {
   const uploadProfileAttachment = useCallback(
     async (asset: Asset, context?: string) => {
       if (!asset?.uri) throw new Error('No asset supplied.');
+      // The picker feeding this (ProfileScreen.tsx's handleAttachProfileFile)
+      // uses mediaType: 'mixed', so this can be a video — and Django's
+      // profileAttachment endpoint does real work for video specifically
+      // (probes duration, creates a BroadcastVideo row, generates a
+      // thumbnail) that Nest's direct-to-S3 flow has no equivalent for yet.
+      // Images have no such dependency, so only those move to Nest; video
+      // stays on the legacy path until that server-side work exists there.
+      const isVideo = String(asset.type || '').toLowerCase().startsWith('video/');
+      if (!isVideo) {
+        const attachment = await uploadFileToBackend({
+          file: {
+            uri: asset.uri,
+            name: asset.fileName || `attachment-${Date.now()}`,
+            type: asset.type || 'application/octet-stream',
+          },
+          baseUrl: NEST_API_BASE_URL,
+          context,
+        });
+        return attachment ?? null;
+      }
       const form = new FormData();
       form.append('attachment', {
         uri: asset.uri,
