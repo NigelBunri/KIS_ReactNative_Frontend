@@ -11,6 +11,7 @@ import App from './App';
 import { name as appName } from './app.json';
 import { installLocalizationRuntime } from './src/languages/runtimePatch';
 import { registerAndroidEvents } from './src/services/calls/callKitService';
+import { registerBackgroundPushHandler } from './src/push/notifications';
 
 // react-native-reorderable-list's documented nested-list pattern
 // (ScrollViewContainer + NestedReorderableList, scrollable={false} —
@@ -29,6 +30,16 @@ installLocalizationRuntime();
 // react-native-callkeep isn't installed) so headless JS invocations from a
 // killed-state FCM call push can still route native answer/decline actions.
 registerAndroidEvents();
+
+// Must also run unconditionally at JS entry, not later inside App.tsx's
+// useEffect — Android only spins up a headless JS instance to run a
+// background FCM handler that was registered *before* the push arrived.
+// A handler attached after App.tsx mounts only exists once the app has
+// already booted once (backgrounded-but-alive), never for a fully killed
+// process, which silently dropped data-only pushes (incoming call rings)
+// while regular notification-block pushes (chat messages) kept working
+// since the OS displays those natively without any JS involved at all.
+registerBackgroundPushHandler();
 
 if (!global.Buffer) {
   global.Buffer = Buffer;

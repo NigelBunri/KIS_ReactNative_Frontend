@@ -25,20 +25,26 @@ export function buildVoiceAttachment(opts: {
 }): VoiceAttachment {
   const { attachment, localUri, durationMs } = opts;
   const url = attachment?.url || attachment?.downloadUrl || attachment?.displayUrl || undefined;
-  // Django's MediaAsset.id — see apps/media/views.py's UploadFileView,
-  // which returns assetId/mediaAssetId/mediaAssetRef all pointing at the
-  // same value. This is the PERMANENT identity — never the expiring `url`
-  // itself — that voicePlaybackResolver.ts sends to Nest's
+  // Voice notes now upload direct-to-S3 through Nest (see
+  // ChatRoomHandlers.tsx's handleSendVoice, which passes
+  // baseUrl: NEST_API_BASE_URL) — Nest's response only carries `id` (the
+  // UploadIntent.attachmentId), not assetId/mediaAssetId/mediaAssetRef
+  // (those were Django MediaAsset field names, kept here only so old
+  // server responses/cached rows from before this change still resolve).
+  // This is the PERMANENT identity — never the expiring `url` itself —
+  // that voicePlaybackResolver.ts sends to Nest's
   // GET /chat/messages/:messageId/voice/playback-url to get a fresh url.
-  const mediaAssetId = attachment?.assetId || attachment?.mediaAssetId || attachment?.mediaAssetRef || undefined;
+  const mediaAssetId =
+    attachment?.assetId || attachment?.mediaAssetId || attachment?.mediaAssetRef || attachment?.id || undefined;
 
   return {
     uri: url || localUri,
     url,
     mediaAssetId,
-    // Django never exposes the real S3 key to a client — this mirrors
-    // mediaAssetId today purely for backward-compat display, not because
-    // it's a genuine storage key. See chatTypes.ts's VoiceAttachment.
+    // Nest's own attachment id doubles as the object-key lookup handle on
+    // its side (VoicePlaybackService resolves it via UploadIntent); this
+    // field is otherwise only used for backward-compat display. See
+    // chatTypes.ts's VoiceAttachment.
     objectKey: mediaAssetId,
     id: attachment?.id,
     mimeType: attachment?.mimeType,

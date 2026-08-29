@@ -71,6 +71,125 @@ const registerPushToken = async (payload: {
   }
 };
 
+// Background/killed FCM message handler. Exported so index.js can register
+// it synchronously at JS entry — Android only spins up a headless JS
+// instance to run a background handler that was registered *before* the
+// message arrived; a handler attached later, inside initPushHandlers()
+// (which only runs once App.tsx mounts), never gets that chance when the
+// app process was fully killed rather than merely backgrounded. This is
+// also why call pushes (data-only, so delivery depends entirely on this
+// handler running) were silently dropped while regular message pushes
+// (which carry a `notification` block the OS displays natively, no JS
+// required) kept working — see initPushHandlers() below for that split.
+//
+// FCM shows `notification`-keyed messages automatically via the OS. For
+// data-only messages we persist them to AsyncStorage so the app can
+// surface them on next foreground resume.
+export const handleBackgroundPushMessage = async (remoteMessage: any) => {
+  try {
+    const data = remoteMessage?.data ?? {};
+    const title: string = data?.title ?? remoteMessage?.notification?.title ?? '';
+    const body: string = data?.body ?? remoteMessage?.notification?.body ?? '';
+
+    // Incoming calls: show the native CallKit/ConnectionService ringing
+    // UI directly instead of queueing a regular notification — the
+    // call UI *is* the notification here, matching WhatsApp. Uses the
+    // same callId as the CallKeep UUID that the socket-path
+    // (SocketProvider.tsx) uses, so there's no duplicate/conflicting
+    // entry once the app wakes and the real call.offer event arrives.
+    if (data?.type === 'incoming_call' && data?.callId) {
+      displayIncomingCall({
+        callUUID: String(data.callId),
+        callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
+        callType: (data.callType as any) ?? 'voice',
+      });
+      return;
+    }
+
+    if (!title && !body) return;
+
+    // DND check — same midnight-wrap logic as the foreground handler.
+    try {
+      const dndEnabled = await AsyncStorage.getItem('KIS_DND_ENABLED');
+      if (dndEnabled === 'true') {
+        const dndFrom = (await AsyncStorage.getItem('KIS_DND_FROM')) ?? '22:00';
+        const dndTo = (await AsyncStorage.getItem('KIS_DND_TO')) ?? '08:00';
+        const now = new Date();
+        const [fromH, fromM] = dndFrom.split(':').map(Number);
+        const [toH, toM] = dndTo.split(':').map(Number);
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        const fromMins = fromH * 60 + fromM;
+        const toMins = toH * 60 + toM;
+        const inQuietWindow =
+          fromMins <= toMins
+            ? nowMins >= fromMins && nowMins < toMins
+            : nowMins >= fromMins || nowMins < toMins; // wraps midnight
+        if (inQuietWindow) return;
+      }
+    } catch { /* silent */ }
+
+    // Per-chat sound check — if the conversation is set to 'None', skip storing.
+    const convId: string = data?.conversationId ?? data?.conversation_id ?? '';
+    if (convId) {
+      try {
+        const sound = await AsyncStorage.getItem(`KIS_NOTIF_SOUND_${convId}`);
+        if (sound === 'None') return;
+      } catch { /* silent */ }
+    }
+
+    // Channel notification toggles — check user's per-category preferences
+    try {
+      const channelKey = (() => {
+        if (data.conversation_id || data.conversationId) return 'notif_messages';
+        if (data.broadcast_id || data.channel_id || data.channel_content_id) return 'notif_feed';
+        if (data.appointment_id || data.health_service_session_id) return 'notif_health';
+        if (data.type === 'bible' || data.bible_id) return 'notif_bible';
+        return null;
+      })();
+      if (channelKey) {
+        const enabled = await AsyncStorage.getItem(channelKey);
+        if (enabled === 'false') return;
+      }
+    } catch { /* silent */ }
+
+    const raw = await AsyncStorage.getItem('KIS_BACKGROUND_NOTIFS').catch(() => null);
+    const queue: any[] = raw ? JSON.parse(raw) : [];
+    queue.push({
+      messageId: remoteMessage?.messageId ?? String(Date.now()),
+      title,
+      body,
+      data,
+      receivedAt: new Date().toISOString(),
+    });
+    // Keep at most 20 missed notifications
+    await AsyncStorage.setItem(
+      'KIS_BACKGROUND_NOTIFS',
+      JSON.stringify(queue.slice(-20)),
+    ).catch(() => {});
+  } catch { /* silent */ }
+};
+
+// Registers handleBackgroundPushMessage as early as possible (called from
+// index.js, before App.tsx mounts). Safe to call even if Firebase's native
+// module isn't ready yet on a stale/mismatched build — mirrors the same
+// require()-inside-try/catch defensive pattern initPushHandlers() uses.
+export function registerBackgroundPushHandler(): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const appMod = require('@react-native-firebase/app');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const messagingMod = require('@react-native-firebase/messaging');
+    const getApp = appMod?.getApp;
+    const getMessaging = messagingMod?.getMessaging;
+    const setBackgroundMessageHandler = messagingMod?.setBackgroundMessageHandler;
+    if (typeof getApp !== 'function' || typeof getMessaging !== 'function' || typeof setBackgroundMessageHandler !== 'function') {
+      return;
+    }
+    const messaging = getMessaging(getApp());
+    setBackgroundMessageHandler(messaging, handleBackgroundPushMessage);
+  } catch { /* silent — retried once initPushHandlers() runs from App.tsx */ }
+}
+
 const retryPendingPushToken = async () => {
   try {
     const raw = await AsyncStorage.getItem(PENDING_PUSH_TOKEN_KEY);
@@ -356,93 +475,17 @@ export async function initPushHandlers(navigation?: any) {
       });
     }
 
-    // Background/killed message handler. FCM shows `notification`-keyed messages
-    // automatically via the OS. For data-only messages we persist them to
-    // AsyncStorage so the app can surface them on next foreground resume.
+    // Background/killed message handler is registered eagerly at JS entry
+    // (index.js, via registerBackgroundPushHandler()) so Android can invoke
+    // it from a headless JS context even when the app process was fully
+    // killed — a handler attached only here, inside initPushHandlers(),
+    // would exist only after the app has already booted once and mounted
+    // App.tsx, which is exactly the "backgrounded but still alive" case,
+    // not the "killed" case. Re-registering here too is harmless (RNFB just
+    // replaces the same handler reference) and keeps this path working
+    // identically to before for the already-alive case.
     if (typeof setBackgroundMessageHandler === 'function') {
-      setBackgroundMessageHandler(messaging, async (remoteMessage: any) => {
-        try {
-          const data = remoteMessage?.data ?? {};
-          const title: string = data?.title ?? remoteMessage?.notification?.title ?? '';
-          const body: string = data?.body ?? remoteMessage?.notification?.body ?? '';
-
-          // Incoming calls: show the native CallKit/ConnectionService ringing
-          // UI directly instead of queueing a regular notification — the
-          // call UI *is* the notification here, matching WhatsApp. Uses the
-          // same callId as the CallKeep UUID that the socket-path
-          // (SocketProvider.tsx) uses, so there's no duplicate/conflicting
-          // entry once the app wakes and the real call.offer event arrives.
-          if (data?.type === 'incoming_call' && data?.callId) {
-            displayIncomingCall({
-              callUUID: String(data.callId),
-              callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
-              callType: (data.callType as any) ?? 'voice',
-            });
-            return;
-          }
-
-          if (!title && !body) return;
-
-          // DND check — same midnight-wrap logic as the foreground handler.
-          try {
-            const dndEnabled = await AsyncStorage.getItem('KIS_DND_ENABLED');
-            if (dndEnabled === 'true') {
-              const dndFrom = (await AsyncStorage.getItem('KIS_DND_FROM')) ?? '22:00';
-              const dndTo = (await AsyncStorage.getItem('KIS_DND_TO')) ?? '08:00';
-              const now = new Date();
-              const [fromH, fromM] = dndFrom.split(':').map(Number);
-              const [toH, toM] = dndTo.split(':').map(Number);
-              const nowMins = now.getHours() * 60 + now.getMinutes();
-              const fromMins = fromH * 60 + fromM;
-              const toMins = toH * 60 + toM;
-              const inQuietWindow =
-                fromMins <= toMins
-                  ? nowMins >= fromMins && nowMins < toMins
-                  : nowMins >= fromMins || nowMins < toMins; // wraps midnight
-              if (inQuietWindow) return;
-            }
-          } catch { /* silent */ }
-
-          // Per-chat sound check — if the conversation is set to 'None', skip storing.
-          const convId: string = data?.conversationId ?? data?.conversation_id ?? '';
-          if (convId) {
-            try {
-              const sound = await AsyncStorage.getItem(`KIS_NOTIF_SOUND_${convId}`);
-              if (sound === 'None') return;
-            } catch { /* silent */ }
-          }
-
-          // Channel notification toggles — check user's per-category preferences
-          try {
-            const channelKey = (() => {
-              if (data.conversation_id || data.conversationId) return 'notif_messages';
-              if (data.broadcast_id || data.channel_id || data.channel_content_id) return 'notif_feed';
-              if (data.appointment_id || data.health_service_session_id) return 'notif_health';
-              if (data.type === 'bible' || data.bible_id) return 'notif_bible';
-              return null;
-            })();
-            if (channelKey) {
-              const enabled = await AsyncStorage.getItem(channelKey);
-              if (enabled === 'false') return;
-            }
-          } catch { /* silent */ }
-
-          const raw = await AsyncStorage.getItem('KIS_BACKGROUND_NOTIFS').catch(() => null);
-          const queue: any[] = raw ? JSON.parse(raw) : [];
-          queue.push({
-            messageId: remoteMessage?.messageId ?? String(Date.now()),
-            title,
-            body,
-            data,
-            receivedAt: new Date().toISOString(),
-          });
-          // Keep at most 20 missed notifications
-          await AsyncStorage.setItem(
-            'KIS_BACKGROUND_NOTIFS',
-            JSON.stringify(queue.slice(-20)),
-          ).catch(() => {});
-        } catch { /* silent */ }
-      });
+      setBackgroundMessageHandler(messaging, handleBackgroundPushMessage);
     }
 
     // Foreground message handler — show an in-app toast banner.

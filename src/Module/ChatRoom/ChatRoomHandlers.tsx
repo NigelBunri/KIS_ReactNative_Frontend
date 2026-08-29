@@ -232,6 +232,13 @@ export const handleSendVoice = async ({
         // players sniffing by declared type than the real registered MIME.
         type: 'audio/mp4',
       },
+      // Direct-to-S3, same as every other chat attachment — voice notes
+      // used to omit baseUrl and fall through to Django's legacy multipart
+      // proxy (the only reason being that proxy's AI content-safety scan,
+      // which images/videos/docs sent through Nest already skip too — see
+      // uploadFileToBackend.ts's header comment). Nest's VoicePlaybackService
+      // presigns playback GETs itself for uploads that land here now.
+      baseUrl: NEST_API_BASE_URL,
       authToken,
       deviceId: deviceId || undefined,
       conversationId: String(convId),
@@ -322,6 +329,8 @@ export const handleSendSticker = async ({
         name: `${sticker.id}.png`,
         type: 'image/png',
       },
+      // Direct-to-S3 — see the matching comment in handleSendVoice above.
+      baseUrl: NEST_API_BASE_URL,
       authToken,
       conversationId: String(convId),
     });
