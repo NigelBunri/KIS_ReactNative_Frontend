@@ -59,6 +59,16 @@ export default function BroadcastFeedVideoPreview({
   progressBarOnly = false,
   progressBarStyle,
 }: Props) {
+  // See VideoPlayer.tsx's containerAspectFallback/hasOwnSizing comments -
+  // same conflict, same fix: styles.outerWrap's own aspectRatio:16/9
+  // fallback (below) only makes sense when the caller hasn't already given
+  // this component real sizing of its own. BroadcastDetailScreen's
+  // full-bleed containerStyle={styles.fullMedia} (explicit width/height:
+  // '100%') is exactly the case that needs it skipped.
+  const hasOwnSizing = useMemo(() => {
+    const flat = StyleSheet.flatten(containerStyle) || {};
+    return flat.height != null || flat.position === 'absolute';
+  }, [containerStyle]);
   const mediaHeaders = useMediaHeaders();
   const sources = useMemo(
     () => getBroadcastFeedVideoSources(attachment),
@@ -242,7 +252,7 @@ export default function BroadcastFeedVideoPreview({
   return (
     // overflow:hidden clips the video player to the container bounds and prevents
     // the controls overlay from visually escaping into surrounding content.
-    <View style={[ containerStyle]}>
+    <View style={[styles.outerWrap, !hasOwnSizing && styles.outerWrapAspectFallback, containerStyle]}>
       <KISVideo
         sourceUrl={activeSource.url}
         sourceHeaders={activeSourceHeaders}
@@ -288,9 +298,14 @@ const styles = StyleSheet.create({
   // Outer container: clips children so controls never overflow surrounding UI.
   outerWrap: {
     width: '100%',
-    aspectRatio: 16 / 9,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+  // Fallback height for simple embeds that only give this component a
+  // width - skipped when containerStyle already establishes real sizing
+  // (see hasOwnSizing above).
+  outerWrapAspectFallback: {
+    aspectRatio: 16 / 9,
   },
   // Inner video fills the entire outer container exactly.
   innerFill: {
