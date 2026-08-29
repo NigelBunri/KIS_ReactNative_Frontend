@@ -128,6 +128,15 @@ const getFirstFeedImageUrl = (item: any) => {
     .filter(Boolean)[0];
 };
 
+// The prev/next neighbor of the active swipe page - see getFirstVideoAttachment
+// usage below for why this exists.
+const getFirstVideoAttachment = (item: any): any | null => {
+  const attachments = Array.isArray(item?.attachments)
+    ? item.attachments.filter(Boolean)
+    : [];
+  return attachments.find((attachment: any) => isVideoAttachment(attachment)) ?? null;
+};
+
 export default function BroadcastDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'BroadcastDetail'>>();
   const navigation =
@@ -851,6 +860,61 @@ export default function BroadcastDetailScreen() {
         </Animated.View>
       ) : null}
 
+      {/* Invisible preload warm-up for the immediate neighbors' video, so
+          swiping to them doesn't cost a fresh network fetch the user has to
+          sit through - the whole point of a swipeable feed is that the next
+          item should already be there. Deliberately rendered here as a
+          top-level sibling of the transform-positioned prev/next
+          Animated.Views above, NOT nested inside them: those still use
+          `transform` for their own slide position (they only ever show a
+          static Image preview, never a live video, so that was never a
+          problem for them) - but this component mounts a real
+          react-native-video instance, and nesting it under a transformed
+          ancestor is exactly the SurfaceView-compositing failure documented
+          on `swipeY` above. Sitting outside that ancestor chain avoids the
+          question entirely rather than relying on paused-and-hidden
+          somehow being exempt from it. autoPlay is always false here - see
+          BroadcastFeedVideoPreview's forceTextureView/externalPause doc -
+          so nothing is ever heard or seen from these instances; they exist
+          purely to let the player start buffering the source. The item
+          becomes a fresh, fully-visible mount of its own once it's actually
+          swiped to (the key= below the active page remounts on item
+          change), so this warms the network fetch, not a continuous player
+          instance - still the part that otherwise costs the user real
+          waiting time on a slow connection. */}
+      {(() => {
+        const preloadNextAttachment = getFirstVideoAttachment(nextFeedItem);
+        return preloadNextAttachment ? (
+          <View style={styles.preloadHidden} pointerEvents="none">
+            <BroadcastFeedVideoPreview
+              key={`preload-next:${(preloadNextAttachment as any)?.id ?? (preloadNextAttachment as any)?.mediaAssetId ?? nextFeedItem?.id}`}
+              attachment={preloadNextAttachment}
+              palette={palette as any}
+              containerStyle={styles.fullMedia}
+              videoStyle={styles.fullMedia}
+              autoPlay={false}
+              externalPause
+            />
+          </View>
+        ) : null;
+      })()}
+      {(() => {
+        const preloadPreviousAttachment = getFirstVideoAttachment(previousFeedItem);
+        return preloadPreviousAttachment ? (
+          <View style={styles.preloadHidden} pointerEvents="none">
+            <BroadcastFeedVideoPreview
+              key={`preload-prev:${(preloadPreviousAttachment as any)?.id ?? (preloadPreviousAttachment as any)?.mediaAssetId ?? previousFeedItem?.id}`}
+              attachment={preloadPreviousAttachment}
+              palette={palette as any}
+              containerStyle={styles.fullMedia}
+              videoStyle={styles.fullMedia}
+              autoPlay={false}
+              externalPause
+            />
+          </View>
+        ) : null;
+      })()}
+
       <Animated.View
         style={[
           styles.pageFrame,
@@ -1102,6 +1166,14 @@ const styles = StyleSheet.create({
   },
   pageFrame: {
     ...StyleSheet.absoluteFillObject,
+  },
+  // Deliberately still full-screen sized (not shrunk to 0) despite opacity:0
+  // - a video needs real layout bounds to actually begin loading/buffering,
+  // which is the entire point of mounting it here. See the preload
+  // comment above this style's usage for the rest of the reasoning.
+  preloadHidden: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0,
   },
   refreshOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -52,6 +53,14 @@ function normalizeShort(item: any): ShortsItem {
 type ShortCardProps = {
   item: ShortsItem;
   isVisible: boolean;
+  // True for the card immediately above/below the visible one - see the
+  // FlatList windowSize comment below for why this exists as its own flag
+  // rather than just relying on whatever FlatList's virtualization window
+  // happens to mount: it's the difference between "the very next swipe
+  // target is already buffered and shows instantly" (this flag) and either
+  // wastefully keeping a real player alive for every card 10 screens away,
+  // or - on a tighter window - not preloading anything at all.
+  shouldPreload: boolean;
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
   onShare: (item: ShortsItem) => void;
@@ -60,7 +69,7 @@ type ShortCardProps = {
   subscribedChannels: Set<string>;
 };
 
-function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
+function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
   const { palette } = useKISTheme();
   const { minTouchTarget } = useResponsiveLayout();
   const { bottom: bottomInset } = useSafeAreaInsets();
@@ -87,16 +96,24 @@ function ShortCard({ item, isVisible, onLike, onDislike, onShare, onCommentPress
   return (
     <View style={[styles.card, { height: SCREEN_HEIGHT }]}>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={handleVideoTap}>
-        {item.videoUrl ? (
+        {item.videoUrl && (isVisible || shouldPreload) ? (
           <KISVideo
             sourceUrl={item.videoUrl}
             poster={item.thumbUrl}
             autoPlay={isVisible}
             loop
-            muted={false}
+            muted={!isVisible}
             containerStyle={StyleSheet.absoluteFillObject}
             videoStyle={{ borderRadius: 0 }}
           />
+        ) : item.thumbUrl ? (
+          // Not the visible card or its immediate neighbor - a real player
+          // instance here would just be buffering a video the user may
+          // never scroll to. The poster alone is enough to make the feed
+          // look fully populated while scrolling past; it upgrades to a
+          // real (already-buffering) player the moment this card becomes
+          // the visible card's immediate neighbor.
+          <Image source={{ uri: item.thumbUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
             <KISIcon name="play" size={48} color={palette.border} />
@@ -287,6 +304,7 @@ export default function ShortsScreen() {
           <ShortCard
             item={item}
             isVisible={index === visibleIndex}
+            shouldPreload={Math.abs(index - visibleIndex) === 1}
             onLike={handleLike}
             onDislike={handleDislike}
             onShare={handleShare}
@@ -302,6 +320,16 @@ export default function ShortsScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
         getItemLayout={(_, index) => ({ length: SCREEN_HEIGHT, offset: SCREEN_HEIGHT * index, index })}
+        // Bounds how many cards FlatList keeps mounted around the visible
+        // one to roughly match shouldPreload's own ±1 window above - wide
+        // enough that the immediate neighbor (the only one shouldPreload
+        // ever turns into a real player) is guaranteed to actually be
+        // mounted for that flag to matter, not so wide that a swipe feed
+        // ends up quietly holding a dozen concurrent video players in
+        // memory on lower-end devices.
+        windowSize={5}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
       />
 
       {/* Comments bottom sheet */}

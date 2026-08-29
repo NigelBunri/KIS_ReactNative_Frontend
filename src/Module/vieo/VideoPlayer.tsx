@@ -94,6 +94,15 @@ export default function VideoPlayer({
   externalPause = false,
 }: VideoPlayerProps) {
   const { palette } = useKISTheme();
+  // See containerAspectFallback's comment above `styles` - only fall back to
+  // a fixed 16:9 aspect ratio when the caller's own containerStyle doesn't
+  // already establish real sizing itself (explicit height, or absolute
+  // positioning - which every full-screen/reels-style caller in this app
+  // uses via StyleSheet.absoluteFillObject with no height of its own).
+  const hasOwnSizing = useMemo(() => {
+    const flat = StyleSheet.flatten(containerStyle) || {};
+    return flat.height != null || flat.position === 'absolute';
+  }, [containerStyle]);
   const safeUrl = useMemo(() => normalizeVideoUrl(sourceUrl), [sourceUrl]);
   const videoSource = useMemo(() => {
     if (!safeUrl) return undefined;
@@ -139,13 +148,22 @@ export default function VideoPlayer({
   // before there's really a frame to show. Mirrored into a ref (in
   // addition to state) so the dev-only diagnostic timeout below can read
   // its latest value without a stale closure.
-  // A ref (not state) is enough here: nothing renders off this value
-  // directly — setShowPoster(false) in handleReadyForDisplay already
-  // triggers the re-render that matters — and the diagnostic timeout below
-  // needs to read the latest value without a stale-closure risk.
+  // Also mirrored into state (readyForDisplay, not just the ref below) so
+  // the loading indicator can stay up for the FULL gap until a real frame
+  // renders, not just until onLoad. Without this, a video with no poster
+  // (poster is optional/frequently absent on user-generated shorts/reels
+  // content) would drop the indicator the instant metadata resolved — the
+  // exact moment state.loading flips false — and briefly show this
+  // component's own #000 container background with nothing overlaid on it,
+  // even on a completely healthy load that renders its first frame a beat
+  // later. The ref stays too: the dev-only diagnostic timeout below still
+  // needs to read the latest value without a stale-closure risk, which a
+  // plain state variable captured in that effect's closure wouldn't give it.
+  const [readyForDisplay, setReadyForDisplayState] = useState(false);
   const readyForDisplayRef = useRef(false);
   const setReadyForDisplay = (value: boolean) => {
     readyForDisplayRef.current = value;
+    setReadyForDisplayState(value);
   };
 
   const leftSeekAnim = useRef(new Animated.Value(0)).current;
@@ -294,7 +312,7 @@ export default function VideoPlayer({
 
   return (
     <View
-      style={[styles.container, containerStyle]}
+      style={[styles.container, !hasOwnSizing && styles.containerAspectFallback, containerStyle]}
       onLayout={
         __DEV__
           ? (e) => {
@@ -365,7 +383,11 @@ export default function VideoPlayer({
       {poster && showPoster && !state.error && (
         <Image source={{ uri: poster }} style={[styles.poster, videoStyle]} resizeMode="cover" />
       )}
-      {state.loading && !state.error ? (
+      {/* Stays up through the FULL gap until a real frame renders
+          (readyForDisplay), not just until state.loading clears on onLoad -
+          see readyForDisplay's declaration above for why that distinction
+          matters whenever there's no poster to fall back on visually. */}
+      {!readyForDisplay && !state.error ? (
         <View style={styles.indicator} pointerEvents="none">
           <ActivityIndicator color={palette.primaryStrong} size="large" />
         </View>
@@ -421,10 +443,30 @@ export default function VideoPlayer({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 16 / 9,
     backgroundColor: '#000',
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  // Fallback height for simple embeds that only give this component a
+  // width (e.g. `containerStyle={{ width: '100%', borderRadius: 18 }}`) and
+  // expect a sensible 16:9 box in return. Applied conditionally - see
+  // `hasOwnSizing` below - and MUST be a separate style object from
+  // `container` above, not a merged-in property on it: a caller whose own
+  // containerStyle already establishes real sizing (explicit height, or
+  // `position: absolute` with all four edges pinned, e.g. every full-screen
+  // reels/shorts-style video viewer in this app) still gets this same
+  // `container` object merged in ahead of their own style in the array, and
+  // Yoga's behavior when a node has BOTH aspectRatio AND fully-pinned
+  // absolute edges is a documented cross-platform inconsistency - the
+  // computed box can silently collapse or mis-size on Android. That's a
+  // plausible, layout-only explanation for the "audio plays, no picture"
+  // class of bug distinct from the SurfaceView-under-transform one
+  // documented elsewhere in this file: the video is decoding and playing
+  // completely normally, its container is just sized wrong (e.g. 0 height),
+  // so there is nothing to see - the container's own #000 background is all
+  // that's visible, reading exactly like "a dark box over it".
+  containerAspectFallback: {
+    aspectRatio: 16 / 9,
   },
   video: {
     ...StyleSheet.absoluteFillObject,
