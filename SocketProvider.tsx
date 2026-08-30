@@ -94,6 +94,14 @@ type SocketContextValue = {
   presenceByUser?: Record<string, { isOnline: boolean; at: number }>;
   activeCall?: CallSession | null;
   startCall?: (args: StartCallArgs) => Promise<boolean>;
+  /**
+   * Open (or create) a persistent voice channel room with nobody being
+   * rung — unlike startCall, which stays in 'dialing' forever when there's
+   * no invitee to answer. Use this for a Discord-style "join voice channel"
+   * button; use joinExistingCall instead if GET calls.active already shows
+   * a live session for this conversation.
+   */
+  startVoiceChannel?: (args: { conversationId: string; title: string }) => Promise<boolean>;
   answerCall?: () => Promise<void>;
   rejectCall?: (reason?: string) => Promise<void>;
   /** Leave without ending the call for other participants. */
@@ -643,6 +651,105 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     // Release lock after a safety timeout in case the server never ACKs
+    setTimeout(() => { _startingCallRef.current = false; }, 8000);
+
+    DeviceEventEmitter.emit('calls.refresh');
+    return true;
+  }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
+
+  const startVoiceChannel = useCallback(async (args: { conversationId: string; title: string }): Promise<boolean> => {
+    const s = socketRef.current;
+    if (!s || !currentUserIdRef.current) {
+      Alert.alert('Voice channel unavailable', 'Connection not ready yet.');
+      return false;
+    }
+    if (_startingCallRef.current) return false;
+    if (activeCallRef.current && activeCallRef.current.state !== 'ended' && activeCallRef.current.state !== 'missed') {
+      Alert.alert('Already in a call', 'Leave the current call before joining a voice channel.');
+      return false;
+    }
+    _startingCallRef.current = true;
+
+    const callType: CallType = 'voice-group';
+    const granted = await requestCallPermissions(callType);
+    if (!granted) { _startingCallRef.current = false; return false; }
+
+    const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const localUserId = currentUserIdRef.current;
+
+    await fetchAndApplyIceServers();
+    audioRouteManager.start('voice');
+    await webRTCService.startLocalStream(false);
+    _offeredPeersRef.current.clear();
+    setupWebRTC(callType);
+
+    const localParticipant = makeParticipant({
+      userId: localUserId,
+      displayName: 'You',
+      isLocal: true,
+      isMuted: false,
+      isVideoOff: true,
+      stream: webRTCService.getLocalStream(),
+      role: 'host',
+    });
+
+    // No invitees to ring, so there is nobody who will ever emit call.answer
+    // for us — unlike startCall, we don't wait in 'dialing'/CallKit-outgoing
+    // state. We're already "in the room"; other members join independently
+    // via joinExistingCall and CALL_PARTICIPANT_JOINED drives the roster.
+    const session: CallSession = {
+      callId,
+      conversationId: args.conversationId,
+      callType,
+      title: safeDisplayName(args.title, 'Voice channel'),
+      state: 'connecting',
+      participants: [localParticipant],
+      localUserId,
+      initiatedBy: localUserId,
+      startedAt: new Date().toISOString(),
+      isMuted: false,
+      isVideoEnabled: false,
+      isSpeakerOn: false,
+      isFrontCamera: true,
+      isScreenSharing: false,
+      layout: 'speaker',
+      pinnedUserId: null,
+      activeSpeakerId: null,
+      isControlsVisible: true,
+      chatMessages: [],
+      raisedHands: [],
+      reactions: [],
+      networkQuality: 4,
+      unreadChatCount: 0,
+      viewerCount: 0,
+      isRecording: false,
+      knockingUsers: [],
+      isAudioOnly: true,
+      isNoiseCancellationOn: true,
+    };
+
+    setCallMinimised(false);
+    setActiveCall(session);
+
+    s.emit('call.offer', {
+      callId,
+      conversationId: args.conversationId,
+      callType,
+      media: 'voice',
+      title: session.title,
+      inviteeUserIds: [],
+      createdBy: localUserId,
+      startedAt: session.startedAt,
+    }, (ack?: any) => {
+      _startingCallRef.current = false;
+      if (!ack?.ok) {
+        setActiveCall(null);
+        webRTCService.closeAll();
+        audioRouteManager.stop();
+        Alert.alert('Unable to join', ack?.error ?? 'Unable to open this voice channel.');
+      }
+    });
+
     setTimeout(() => { _startingCallRef.current = false; }, 8000);
 
     DeviceEventEmitter.emit('calls.refresh');
@@ -2586,6 +2693,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     presenceByUser,
     activeCall,
     startCall,
+    startVoiceChannel,
     answerCall,
     rejectCall,
     leaveCall,
@@ -2617,7 +2725,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wbClear,
     joinExistingCall,
     getCallInviteLink,
-  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink]);
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 

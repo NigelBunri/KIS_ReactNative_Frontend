@@ -13,6 +13,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { useSocket } from '../../../SocketProvider';
 
 type Props = {
   isOpen: boolean;
@@ -26,15 +27,18 @@ type Category = { id: string | number; name: string; order: number; is_private?:
 type ChannelRow = {
   id: string | number;
   name: string;
-  channel_type: 'text' | 'announcement' | 'private';
+  channel_type: 'text' | 'announcement' | 'private' | 'voice';
   category?: string | number | null;
   is_archived?: boolean;
+  conversation_id?: string | null;
 };
 
-const CHANNEL_TYPES: ChannelRow['channel_type'][] = ['text', 'announcement', 'private'];
+const CHANNEL_TYPES: ChannelRow['channel_type'][] = ['text', 'announcement', 'private', 'voice'];
 
 export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslateX, partnerId, onClose }: Props) {
   const { palette } = useKISTheme();
+  const { activeCall, joinExistingCall, startVoiceChannel } = useSocket();
+  const [joiningVoiceChannelId, setJoiningVoiceChannelId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [channels, setChannels] = useState<ChannelRow[]>([]);
@@ -149,6 +153,33 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
         },
       },
     ]);
+  };
+
+  const joinVoiceChannel = async (channel: ChannelRow) => {
+    if (!channel.conversation_id) {
+      Alert.alert('Unavailable', 'This voice channel is not ready yet.');
+      return;
+    }
+    if (activeCall && activeCall.state !== 'ended' && activeCall.state !== 'missed') {
+      Alert.alert('Already in a call', 'Leave your current call before joining a voice channel.');
+      return;
+    }
+    setJoiningVoiceChannelId(channel.id);
+    const res = await getRequest(ROUTES.calls.active(channel.conversation_id), {
+      errorMessage: 'Unable to check voice channel status.',
+    });
+    const liveCall = res?.data?.call ?? null;
+    if (liveCall?.callId && joinExistingCall) {
+      await joinExistingCall({
+        callId: liveCall.callId,
+        conversationId: channel.conversation_id,
+        callType: liveCall.callType ?? 'voice-group',
+        title: channel.name,
+      });
+    } else if (startVoiceChannel) {
+      await startVoiceChannel({ conversationId: channel.conversation_id, title: channel.name });
+    }
+    setJoiningVoiceChannelId(null);
   };
 
   const moveChannelToCategory = async (channel: ChannelRow, categoryId: string | number | null) => {
@@ -315,10 +346,17 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
                       style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface, marginTop: 6 }]}
                     >
                       <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>
-                        {channel.channel_type === 'announcement' ? '📢 ' : channel.channel_type === 'private' ? '🔒 ' : '# '}
+                        {channel.channel_type === 'voice' ? '🔊 ' : channel.channel_type === 'announcement' ? '📢 ' : channel.channel_type === 'private' ? '🔒 ' : '# '}
                         {channel.name}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                        {channel.channel_type === 'voice' ? (
+                          <Pressable onPress={() => joinVoiceChannel(channel)} disabled={joiningVoiceChannelId === channel.id}>
+                            <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '600' }}>
+                              {joiningVoiceChannelId === channel.id ? 'Joining…' : 'Join'}
+                            </Text>
+                          </Pressable>
+                        ) : null}
                         <Pressable onPress={() => moveChannelToCategory(channel, null)}>
                           <Text style={{ color: palette.subtext, fontSize: 12 }}>Uncategorize</Text>
                         </Pressable>
@@ -343,6 +381,13 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
                       {channel.name}
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                      {channel.channel_type === 'voice' ? (
+                        <Pressable onPress={() => joinVoiceChannel(channel)} disabled={joiningVoiceChannelId === channel.id}>
+                          <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '600' }}>
+                            {joiningVoiceChannelId === channel.id ? 'Joining…' : 'Join'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
                       {categories.map((cat) => (
                         <Pressable key={cat.id} onPress={() => moveChannelToCategory(channel, cat.id)}>
                           <Text style={{ color: palette.primary, fontSize: 12 }}>→ {cat.name}</Text>
