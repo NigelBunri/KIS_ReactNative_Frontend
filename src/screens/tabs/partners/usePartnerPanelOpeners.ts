@@ -8,6 +8,11 @@ type PanelOpeners = {
   openReports: () => void;
   openGovernance: () => void;
   openComplaints: () => void;
+  openMembers?: () => void;
+  openRoles?: () => void;
+  openChannels?: () => void;
+  openVerification?: () => void;
+  setMembersPanelInitialTab?: (tab: 'members' | 'log') => void;
 };
 
 export const usePartnerPanelOpeners = ({
@@ -20,6 +25,11 @@ export const usePartnerPanelOpeners = ({
   openReports,
   openGovernance,
   openComplaints,
+  openMembers,
+  openRoles,
+  openChannels,
+  openVerification,
+  setMembersPanelInitialTab,
 }: PanelOpeners) => {
   return {
     handleOpenRecruitment: () => {
@@ -53,6 +63,28 @@ export const usePartnerPanelOpeners = ({
     handleOpenComplaints: () => {
       closePanel();
       openComplaints();
+    },
+    handleOpenMembers: () => {
+      closePanel();
+      setMembersPanelInitialTab?.('members');
+      openMembers?.();
+    },
+    handleOpenModerationLog: () => {
+      closePanel();
+      setMembersPanelInitialTab?.('log');
+      openMembers?.();
+    },
+    handleOpenRoles: () => {
+      closePanel();
+      openRoles?.();
+    },
+    handleOpenChannels: () => {
+      closePanel();
+      openChannels?.();
+    },
+    handleOpenVerification: () => {
+      closePanel();
+      openVerification?.();
     },
   };
 };

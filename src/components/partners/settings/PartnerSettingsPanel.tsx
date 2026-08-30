@@ -32,6 +32,11 @@ type Props = {
   onOpenFeature?: (feature: { key: string; title: string; description?: string }) => void;
   onOpenOrgProfile?: () => void;
   onOpenComplaints?: () => void;
+  onOpenMembers?: () => void;
+  onOpenModerationLog?: () => void;
+  onOpenRoles?: () => void;
+  onOpenChannels?: () => void;
+  onOpenVerification?: () => void;
 };
 
 export default function PartnerSettingsPanel({
@@ -51,6 +56,11 @@ export default function PartnerSettingsPanel({
   onOpenFeature,
   onOpenOrgProfile,
   onOpenComplaints,
+  onOpenMembers,
+  onOpenModerationLog,
+  onOpenRoles,
+  onOpenChannels,
+  onOpenVerification,
 }: Props) {
   const { palette } = useKISTheme();
 
@@ -185,6 +195,26 @@ export default function PartnerSettingsPanel({
                     }
                     if (feature.key === 'complaints') {
                       onOpenComplaints?.();
+                      return;
+                    }
+                    if (feature.key === 'team_members') {
+                      onOpenMembers?.();
+                      return;
+                    }
+                    if (feature.key === 'moderation_log') {
+                      onOpenModerationLog?.();
+                      return;
+                    }
+                    if (feature.key === 'roles_permissions') {
+                      onOpenRoles?.();
+                      return;
+                    }
+                    if (feature.key === 'create_channel') {
+                      onOpenChannels?.();
+                      return;
+                    }
+                    if (feature.key === 'verification') {
+                      onOpenVerification?.();
                       return;
                     }
                     if (onOpenFeature) {

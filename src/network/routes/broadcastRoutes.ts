@@ -225,6 +225,8 @@ const broadcastRoutes = {
     auditEvents: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/audit-events/`,
     roles: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/roles/`,
+    roleDetail: (id: string, roleId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/roles/${roleId}/`,
     roleAssignments: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/role-assignments/`,
     removeRoleAssignment: (id: string) =>
@@ -297,6 +299,28 @@ const broadcastRoutes = {
     inviteDetail: (id: string, inviteId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/invites/${inviteId}/`,
     redeemInvite: `${API_BASE_URL}/api/v1/partners/redeem-invite/`,
+    // Members, moderation, admins — see PartnerMembersPanel.tsx.
+    members: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/members/`,
+    memberUpdate: (id: string, userId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/members/${userId}/`,
+    moderateMember: (id: string, userId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/members/${userId}/moderate/`,
+    moderationActions: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/moderation-actions/`,
+    addAdmin: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/admins/`,
+    removeAdmin: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/admins/remove/`,
+    // Custom roles — see PartnerRolesPanel.tsx.
+    roleAssignmentsRemove: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/role-assignments/remove/`,
+    // Server categories — see PartnerChannelsPanel.tsx.
+    serverCategories: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/server-categories/`,
+    serverCategoryDetail: (id: string, categoryId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/server-categories/${categoryId}/`,
+    serverLayout: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/server-layout/`,
+    // Verification — see PartnerVerificationPanel.tsx.
+    verificationCasesReview: (id: string, caseId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/verification/cases/${caseId}/review/`,
+    staffVerificationQueue: `${API_BASE_URL}/api/v1/verification/staff/cases/`,
   },
   broadcasts: {
     list: `${API_BASE_URL}/api/v1/broadcasts/`,

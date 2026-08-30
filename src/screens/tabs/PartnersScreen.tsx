@@ -24,6 +24,10 @@ import { usePartnerAutomationPanel } from './partners/usePartnerAutomationPanel'
 import { usePartnerReportsPanel } from './partners/usePartnerReportsPanel';
 import { usePartnerNavigationActions } from './partners/usePartnerNavigationActions';
 import { usePartnerGovernancePanel } from './partners/usePartnerGovernancePanel';
+import { usePartnerMembersPanel } from './partners/usePartnerMembersPanel';
+import { usePartnerRolesPanel } from './partners/usePartnerRolesPanel';
+import { usePartnerChannelsPanel } from './partners/usePartnerChannelsPanel';
+import { usePartnerVerificationPanel } from './partners/usePartnerVerificationPanel';
 import { usePartnerPanelOpeners } from './partners/usePartnerPanelOpeners';
 import { usePartnerFeaturePanel } from './partners/usePartnerFeaturePanel';
 import { usePartnerOrgProfilePanel } from './partners/usePartnerOrgProfilePanel';
@@ -365,6 +369,35 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeGovernancePanel,
   } = usePartnerGovernancePanel(shellContentWidth);
   const {
+    panelWidth: membersPanelWidth,
+    panelTranslateX: membersPanelTranslateX,
+    isOpen: isMembersPanelOpen,
+    open: openMembersPanel,
+    close: closeMembersPanel,
+  } = usePartnerMembersPanel(shellContentWidth);
+  const {
+    panelWidth: rolesPanelWidth,
+    panelTranslateX: rolesPanelTranslateX,
+    isOpen: isRolesPanelOpen,
+    open: openRolesPanel,
+    close: closeRolesPanel,
+  } = usePartnerRolesPanel(shellContentWidth);
+  const {
+    panelWidth: channelsPanelWidth,
+    panelTranslateX: channelsPanelTranslateX,
+    isOpen: isChannelsPanelOpen,
+    open: openChannelsPanel,
+    close: closeChannelsPanel,
+  } = usePartnerChannelsPanel(shellContentWidth);
+  const {
+    panelWidth: verificationPanelWidth,
+    panelTranslateX: verificationPanelTranslateX,
+    isOpen: isVerificationPanelOpen,
+    open: openVerificationPanel,
+    close: closeVerificationPanel,
+  } = usePartnerVerificationPanel(shellContentWidth);
+  const [membersPanelInitialTab, setMembersPanelInitialTab] = React.useState<'members' | 'log'>('members');
+  const {
     panelWidth: featurePanelWidth,
     panelTranslateX: featurePanelTranslateX,
     isOpen: isFeaturePanelOpen,
@@ -492,6 +525,11 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     handleOpenReports,
     handleOpenGovernance,
     handleOpenComplaints,
+    handleOpenMembers,
+    handleOpenModerationLog,
+    handleOpenRoles,
+    handleOpenChannels,
+    handleOpenVerification,
   } = usePartnerPanelOpeners({
     closePanel,
     openRecruitment: openRecruitmentPanel,
@@ -502,6 +540,11 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     openReports: openReportsPanel,
     openGovernance: openGovernancePanel,
     openComplaints: complaintsPanel.open,
+    openMembers: openMembersPanel,
+    openRoles: openRolesPanel,
+    openChannels: openChannelsPanel,
+    openVerification: openVerificationPanel,
+    setMembersPanelInitialTab,
   });
 
   const handleOpenOrganizationApps = useCallback(() => {
@@ -685,6 +728,11 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onOpenFeature: handleOpenFeature,
             onOpenOrgProfile: handleOpenOrgProfile,
             onOpenComplaints: handleOpenComplaints,
+            onOpenMembers: handleOpenMembers,
+            onOpenModerationLog: handleOpenModerationLog,
+            onOpenRoles: handleOpenRoles,
+            onOpenChannels: handleOpenChannels,
+            onOpenVerification: handleOpenVerification,
           },
           createPanel: {
             isOpen: isCreatePanelOpen,
@@ -743,6 +791,33 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelWidth: governancePanelWidth,
             panelTranslateX: governancePanelTranslateX,
             onClose: closeGovernancePanel,
+          },
+          membersPanel: {
+            isOpen: isMembersPanelOpen,
+            panelWidth: membersPanelWidth,
+            panelTranslateX: membersPanelTranslateX,
+            onClose: closeMembersPanel,
+            isOwner: canManageOrganizationApps,
+            initialTab: membersPanelInitialTab,
+          },
+          rolesPanel: {
+            isOpen: isRolesPanelOpen,
+            panelWidth: rolesPanelWidth,
+            panelTranslateX: rolesPanelTranslateX,
+            onClose: closeRolesPanel,
+          },
+          channelsPanel: {
+            isOpen: isChannelsPanelOpen,
+            panelWidth: channelsPanelWidth,
+            panelTranslateX: channelsPanelTranslateX,
+            onClose: closeChannelsPanel,
+          },
+          verificationPanel: {
+            isOpen: isVerificationPanelOpen,
+            panelWidth: verificationPanelWidth,
+            panelTranslateX: verificationPanelTranslateX,
+            onClose: closeVerificationPanel,
+            isGoStaff: isSuperuser,
           },
           featurePanel: {
             isOpen: isFeaturePanelOpen,

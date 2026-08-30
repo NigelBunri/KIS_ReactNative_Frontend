@@ -73,6 +73,10 @@ type Props = {
     automationPanel: any;
     reportsPanel: any;
     governancePanel: any;
+    membersPanel: any;
+    rolesPanel: any;
+    channelsPanel: any;
+    verificationPanel: any;
     featurePanel: any;
     orgProfilePanel: any;
     coursesPanel: any;
@@ -265,6 +269,10 @@ export default function PartnerLayout({
         automationPanel={panels.automationPanel}
         reportsPanel={panels.reportsPanel}
         governancePanel={panels.governancePanel}
+        membersPanel={panels.membersPanel}
+        rolesPanel={panels.rolesPanel}
+        channelsPanel={panels.channelsPanel}
+        verificationPanel={panels.verificationPanel}
         featurePanel={panels.featurePanel}
         orgProfilePanel={panels.orgProfilePanel}
         appsPanel={{

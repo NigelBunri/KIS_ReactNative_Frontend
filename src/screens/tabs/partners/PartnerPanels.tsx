@@ -16,6 +16,10 @@ import PartnerLinksPanel from '@/components/partners/PartnerLinksPanel';
 import PartnerCoursesPanel from '@/components/partners/PartnerCoursesPanel';
 import PartnerComplaintsPanel from '@/components/partners/PartnerComplaintsPanel';
 import PartnerOrganizationsPanel from '@/components/partners/PartnerOrganizationsPanel';
+import PartnerMembersPanel from '@/components/partners/PartnerMembersPanel';
+import PartnerRolesPanel from '@/components/partners/PartnerRolesPanel';
+import PartnerChannelsPanel from '@/components/partners/PartnerChannelsPanel';
+import PartnerVerificationPanel from '@/components/partners/PartnerVerificationPanel';
 import type { PartnerProfileLink } from '@/screens/broadcast/education/api/education.models';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import type {
@@ -43,6 +47,11 @@ type Props = {
     onOpenFeature: (feature: any) => void;
     onOpenOrgProfile: () => void;
     onOpenComplaints: () => void;
+    onOpenMembers?: () => void;
+    onOpenModerationLog?: () => void;
+    onOpenRoles?: () => void;
+    onOpenChannels?: () => void;
+    onOpenVerification?: () => void;
   };
   createPanel: {
     isOpen: boolean;
@@ -101,6 +110,33 @@ type Props = {
     panelWidth: number;
     panelTranslateX: any;
     onClose: () => void;
+  };
+  membersPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    isOwner?: boolean;
+    initialTab?: 'members' | 'log';
+  };
+  rolesPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  channelsPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  verificationPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    isGoStaff?: boolean;
   };
   featurePanel: {
     isOpen: boolean;
@@ -180,6 +216,10 @@ export default function PartnerPanels({
   automationPanel,
   reportsPanel,
   governancePanel,
+  membersPanel,
+  rolesPanel,
+  channelsPanel,
+  verificationPanel,
   featurePanel,
   orgProfilePanel,
   appsPanel,
@@ -207,6 +247,11 @@ export default function PartnerPanels({
         onOpenFeature={settingsPanel.onOpenFeature}
         onOpenOrgProfile={settingsPanel.onOpenOrgProfile}
         onOpenComplaints={settingsPanel.onOpenComplaints}
+        onOpenMembers={settingsPanel.onOpenMembers}
+        onOpenModerationLog={settingsPanel.onOpenModerationLog}
+        onOpenRoles={settingsPanel.onOpenRoles}
+        onOpenChannels={settingsPanel.onOpenChannels}
+        onOpenVerification={settingsPanel.onOpenVerification}
       />
 
       <PartnerCreatePanel
@@ -282,6 +327,41 @@ export default function PartnerPanels({
         panelTranslateX={governancePanel.panelTranslateX}
         partnerId={selectedPartnerId}
         onClose={governancePanel.onClose}
+      />
+
+      <PartnerMembersPanel
+        isOpen={membersPanel.isOpen}
+        panelWidth={membersPanel.panelWidth}
+        panelTranslateX={membersPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        isOwner={membersPanel.isOwner}
+        initialTab={membersPanel.initialTab}
+        onClose={membersPanel.onClose}
+      />
+
+      <PartnerRolesPanel
+        isOpen={rolesPanel.isOpen}
+        panelWidth={rolesPanel.panelWidth}
+        panelTranslateX={rolesPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={rolesPanel.onClose}
+      />
+
+      <PartnerChannelsPanel
+        isOpen={channelsPanel.isOpen}
+        panelWidth={channelsPanel.panelWidth}
+        panelTranslateX={channelsPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={channelsPanel.onClose}
+      />
+
+      <PartnerVerificationPanel
+        isOpen={verificationPanel.isOpen}
+        panelWidth={verificationPanel.panelWidth}
+        panelTranslateX={verificationPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        isGoStaff={verificationPanel.isGoStaff}
+        onClose={verificationPanel.onClose}
       />
 
       <PartnerFeaturePanel
