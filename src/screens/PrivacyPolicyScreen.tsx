@@ -110,6 +110,7 @@ const SECTIONS: Section[] = [
     title: '10. Your Privacy Rights & Choices',
     body: [
       `You can manage many privacy choices directly within the app, under Settings → Privacy & Compliance, including: toggling Analytics and Personalization preferences; downloading a copy of your data ("Download My Data"); permanently deleting your account and associated data ("Delete All My Data"); clearing locally cached data; and managing your logged-in devices and sessions.`,
+      `If you no longer have the app installed, you can still request that your account and associated data be deleted at https://api.kingdomimpactventures.org/delete-account/.`,
       `Depending on your location, you may have additional rights under applicable data protection law, including the right to access, correct, delete, restrict, or port your personal data, and the right to object to certain processing. To exercise these rights, use the in-app tools described above or contact us at ${SUPPORT_EMAIL}.`,
       `You can control camera, microphone, location, contacts, and notification permissions at any time through your device's operating system settings.`,
     ],
