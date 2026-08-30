@@ -80,6 +80,11 @@ export const tierMetaFor = (tier: any) => {
       'Unlimited media limits',
       'Better groups, communities, channels, and feeds management',
       'Organizational management tools',
+      'Custom roles & granular permissions',
+      'Member moderation (mute, timeout, kick, ban) with a full audit log',
+      'Voice channels',
+      'Channels, categories, and per-channel permission overwrites',
+      'Verified organization badge request & review',
     ];
   } else if (!list.length && name.includes('partner')) {
     tagline = 'Organizations, ministries, and enterprises';
@@ -98,6 +103,10 @@ export const tierMetaFor = (tier: any) => {
       'Higher media limits (13 GB for broadcast feeds and profile gallery)',
       'Unlimited health profiles creation',
       'Unlimited education profiles creation',
+      'Custom roles & granular permissions',
+      'Member moderation (mute, timeout, kick, ban) with a full audit log',
+      'Channels, categories, and per-channel permission overwrites',
+      'Verified organization badge request & review',
     ];
   } else if (!list.length && name.includes('business pro')) {
     tagline = 'High-impact teams and creators';
