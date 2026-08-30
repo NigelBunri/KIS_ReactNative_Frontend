@@ -55,17 +55,11 @@ const PERMISSION_CATALOG: { group: string; keys: string[] }[] = [
   },
   {
     group: 'Channels',
-    keys: [
-      'view_channel',
-      'send_messages',
-      'manage_channel',
-      'manage_categories',
-      'manage_roles',
-      'kick_members',
-      'ban_members',
-      'manage_webhooks',
-      'mention_everyone',
-    ],
+    keys: ['view_channel', 'send_messages', 'manage_channel', 'mention_everyone', 'partner.categories.manage'],
+  },
+  {
+    group: 'Moderation',
+    keys: ['partner.members.kick', 'partner.members.ban'],
   },
 ];
 
