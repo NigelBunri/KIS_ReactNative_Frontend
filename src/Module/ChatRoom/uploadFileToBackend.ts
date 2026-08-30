@@ -207,6 +207,11 @@ export type AttachmentMeta = {
   localUri?: string;
   localPath?: string;
   localUploadKey?: string;
+  // Unmodified server attachment JSON — an escape hatch for callers that
+  // need server-specific fields this normalized shape doesn't carry (e.g.
+  // broadcast video's video_url/thumbnail_url/type/pipeline from Django's
+  // process-video-upload webhook — see uploadBroadcastVideo.ts).
+  raw?: Record<string, unknown>;
 };
 
 // Extracts a safe, user-facing message from a JSON error body — shared by
@@ -299,6 +304,11 @@ async function uploadViaSignedUrl(params: {
   deviceId?: string;
   onStatus?: (status: 'verifying' | 'uploading' | 'done' | 'failed' | 'verification_failed') => void;
   onProgress?: (progress: number) => void;
+  // broadcast_video context only — passed straight through to Nest's
+  // /uploads/:id/confirm, which forwards them to Django's post-confirm
+  // video-processing webhook (see upload-intent.service.ts on the Nest
+  // side). Ignored server-side for every other context.
+  confirmExtra?: { title?: string; description?: string; channelId?: string; thumbnailAttachmentId?: string };
 }): Promise<any> {
   const {
     baseUrl,
@@ -311,6 +321,7 @@ async function uploadViaSignedUrl(params: {
     deviceId,
     onStatus,
     onProgress,
+    confirmExtra,
   } = params;
   const contentType = inferUploadMime(uploadFile.name, uploadFile.type);
 
@@ -398,9 +409,16 @@ async function uploadViaSignedUrl(params: {
     xhr.send({ uri: uploadFile.uri, type: contentType, name: 'upload' } as any);
   });
 
+  const confirmBody: Record<string, unknown> = {
+    ...(durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {}),
+    ...(confirmExtra?.title ? { title: confirmExtra.title } : {}),
+    ...(confirmExtra?.description ? { description: confirmExtra.description } : {}),
+    ...(confirmExtra?.channelId ? { channelId: confirmExtra.channelId } : {}),
+    ...(confirmExtra?.thumbnailAttachmentId ? { thumbnailAttachmentId: confirmExtra.thumbnailAttachmentId } : {}),
+  };
   const confirmRes = await authedJsonPost(
     `${baseUrl}${buildConfirmPath(uploadId)}`,
-    durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {},
+    confirmBody,
     firstToken,
     deviceId,
   );
@@ -418,6 +436,8 @@ export async function uploadFileToBackend(opts: {
   clientId?: string;
   metadata?: Record<string, string | number>;
   context?: string;
+  // broadcast_video context only — see uploadViaSignedUrl's confirmExtra.
+  confirmExtra?: { title?: string; description?: string; channelId?: string; thumbnailAttachmentId?: string };
 }): Promise<AttachmentMeta> {
   const {
     file,
@@ -428,6 +448,7 @@ export async function uploadFileToBackend(opts: {
     conversationId,
     clientId,
     metadata: optsMetadata,
+    confirmExtra,
   } = opts;
   const baseUrl = providedBaseUrl ?? API_BASE_URL;
   const resolvedDeviceId = opts.deviceId || (await AsyncStorage.getItem('device_id')) || undefined;
@@ -516,6 +537,7 @@ export async function uploadFileToBackend(opts: {
         deviceId: resolvedDeviceId,
         onStatus,
         onProgress,
+        confirmExtra,
       });
     } else {
       json = await uploadViaMultipartProxy({
@@ -626,6 +648,7 @@ export async function uploadFileToBackend(opts: {
     localUri: originalFile.uri,
     localPath: originalFile.uri?.startsWith('file://') ? stripFileScheme(originalFile.uri) : undefined,
     localUploadKey: `${originalFile.uri}:${originalFile.name}:${originalFile.type ?? ''}`,
+    raw: attachment,
   } as AttachmentMeta;
 }
 

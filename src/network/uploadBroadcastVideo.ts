@@ -1,5 +1,5 @@
-import { postRequest } from '@/network/post';
-import ROUTES from '@/network';
+import { NEST_API_BASE_URL } from '@/network';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 
 export type BroadcastVideoUploadMetadata = {
   title?: string;
@@ -38,6 +38,13 @@ const guessThumbnailName = (uri?: string): string => {
   return last.split('?')[0] || `thumbnail_${Date.now()}.jpg`;
 };
 
+// Direct-to-S3 via Nest, with Django's duration-probe/BroadcastVideo-row/
+// thumbnail work now happening via a post-confirm webhook instead of inline
+// in the upload request itself — see apps/broadcasts/views_internal.py's
+// ProcessBroadcastVideoUploadView (Django side) and upload-intent.service.ts's
+// confirm() broadcast_video branch (Nest side). Bytes never touch Django or
+// nginx's request-body limit here; only the (much smaller) presigned-PUT and
+// initiate/confirm JSON round-trips do.
 export const uploadBroadcastVideoAttachment = async (
   attachment: any,
   metadata: BroadcastVideoUploadMetadata = {},
@@ -49,32 +56,47 @@ export const uploadBroadcastVideoAttachment = async (
   }
   const name = attachment?.originalName ?? attachment?.name ?? `broadcast_${Date.now()}.mp4`;
   const type = attachment?.mimeType ?? attachment?.type ?? 'video/mp4';
-  const form = new FormData();
-  form.append('file', {
-    uri,
-    name,
-    type,
-  } as any);
-  if (options.thumbnailUri) {
-    form.append('thumbnail', {
-      uri: options.thumbnailUri,
-      name: options.thumbnailName ?? guessThumbnailName(options.thumbnailUri),
-      type: options.thumbnailType ?? guessThumbnailMimeType(options.thumbnailUri),
-    } as any);
+
+  try {
+    let thumbnailAttachmentId: string | undefined;
+    if (options.thumbnailUri) {
+      try {
+        const thumbAttachment = await uploadFileToBackend({
+          file: {
+            uri: options.thumbnailUri,
+            name: options.thumbnailName ?? guessThumbnailName(options.thumbnailUri),
+            type: options.thumbnailType ?? guessThumbnailMimeType(options.thumbnailUri),
+          },
+          baseUrl: NEST_API_BASE_URL,
+          context: 'broadcast_video_thumbnail',
+        });
+        thumbnailAttachmentId = thumbAttachment?.id;
+      } catch {
+        // A custom thumbnail failing to upload shouldn't block the video
+        // itself — Django auto-generates a frame-grab thumbnail when none
+        // is supplied (see ensure_local_thumbnail on the Django side).
+      }
+    }
+
+    const videoAttachment = await uploadFileToBackend({
+      file: { uri, name, type },
+      baseUrl: NEST_API_BASE_URL,
+      context: 'broadcast_video',
+      confirmExtra: {
+        title: metadata.title,
+        description: metadata.description,
+        thumbnailAttachmentId,
+      },
+    });
+
+    // mapServerVideoAttachment (below) reads Django's raw snake_case field
+    // names (video_url, thumbnail_url, type, pipeline, ...) — the same
+    // shape ProcessBroadcastVideoUploadView returns and this flow's confirm
+    // step merges in unmodified under .raw (see uploadFileToBackend.ts).
+    return { success: true, data: videoAttachment?.raw ?? videoAttachment };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Unable to upload video.' };
   }
-  if (metadata.title) {
-    form.append('title', metadata.title);
-  }
-  if (metadata.description) {
-    form.append('description', metadata.description);
-  }
-  const res = await postRequest(ROUTES.broadcasts.upload, form, {
-    errorMessage: 'Unable to upload video.',
-  });
-  if (!res.success) {
-    return { success: false, message: res.message || 'Unable to upload video.' };
-  }
-  return { success: true, data: res.data };
 };
 
 export const mapServerVideoAttachment = (serverData: any, kind: string, fallbackThumbnail?: string) => ({
