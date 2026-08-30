@@ -783,7 +783,7 @@ export function MainTabs() {
         }}
       >
         <Tabs.Navigator
-          // initialRouteName="Messages"
+          initialRouteName="Messages"
           screenOptions={{
             headerShown: false,
             tabBarShowLabel: false,
@@ -797,27 +797,27 @@ export function MainTabs() {
             />
           )}
         >
-          {/* <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} /> */}
+          <Tabs.Screen name="Messages" options={{ title: translateString('Messages') }} component={MessagesTabScreen} />
 
-          {/* <Tabs.Screen
+          <Tabs.Screen
             name="Bible"
             component={BibleScreen}
             options={{ title: translateString('Bible') }}
-          /> */}
+          />
 
-          {/* <Tabs.Screen
+          <Tabs.Screen
             name="Broadcast"
             component={BroadcastScreen}
             options={{ title: translateString('Broadcast') }}
-          /> */}
+          />
 
           <Tabs.Screen name="Partners" options={{ title: translateString('Partners') }} component={PartnersTabScreen} />
 
-          {/* <Tabs.Screen
+          <Tabs.Screen
             name="Profile"
             component={ProfileScreen}
             options={{ title: translateString('Profile') }}
-          /> */}
+          />
         </Tabs.Navigator>
       </TabletShell>
 
