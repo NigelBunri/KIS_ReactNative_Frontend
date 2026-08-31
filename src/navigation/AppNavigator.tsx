@@ -83,6 +83,164 @@ type AnimatedKISTabBarProps = BottomTabBarProps & {
   onTabBarState?: (info: { navigation: BottomTabBarProps['navigation']; activeRouteName: string }) => void;
 };
 
+type KISTabBarItemProps = {
+  focused: boolean;
+  onPress: () => void;
+  tabWidth: number;
+  tabBarHeight: number;
+  isTinyTabBar: boolean;
+  iconCircleSize: number;
+  iconSize: number;
+  circleRadius: number;
+  unfocusedCircleBg: string;
+  selectedGoldGradient: string[];
+  routeIcon: KISIconName;
+  focusedIconColor: string;
+  unfocusedIconColor: string;
+  badgeCount: number;
+  badgeBg: string;
+  badgeBorder: string;
+  badgeTextColor: string;
+  label: string;
+  focusedTextColor: string;
+  unfocusedTextColor: string;
+  labelFontSize: number;
+  unfocusedLabelFontSize: number;
+};
+
+// Extracted from AnimatedKISTabBar's route-map so each tab can own its own
+// Animated.Value — hooks can't be called inside .map(). The active-tab gold
+// pill used to be a plain `focused ? <LinearGradient/> : null` conditional
+// mount, popping in/out instantly with zero transition, and press feedback
+// was a raw opacity/scale swap tied straight to Pressable's `pressed`
+// render-prop — also instant, no easing. Both read as unpolished/"janky"
+// compared to the rest of the app's animated surfaces. Keeping the gradient
+// always mounted and animating its opacity (plus a small scale pop) via
+// Animated.spring, and easing the press feedback via onPressIn/onPressOut,
+// fixes both without changing any layout or hit-testing behavior.
+function KISTabBarItem({
+  focused,
+  onPress,
+  tabWidth,
+  tabBarHeight,
+  isTinyTabBar,
+  iconCircleSize,
+  iconSize,
+  circleRadius,
+  unfocusedCircleBg,
+  selectedGoldGradient,
+  routeIcon,
+  focusedIconColor,
+  unfocusedIconColor,
+  badgeCount,
+  badgeBg,
+  badgeBorder,
+  badgeTextColor,
+  label,
+  focusedTextColor,
+  unfocusedTextColor,
+  labelFontSize,
+  unfocusedLabelFontSize,
+}: KISTabBarItemProps) {
+  const focusAnim = useRef(new RNAnimated.Value(focused ? 1 : 0)).current;
+  const pressAnim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    RNAnimated.spring(focusAnim, {
+      toValue: focused ? 1 : 0,
+      useNativeDriver: true,
+      speed: 18,
+      bounciness: 6,
+    }).start();
+  }, [focused, focusAnim]);
+
+  const handlePressIn = useCallback(() => {
+    RNAnimated.timing(pressAnim, { toValue: 1, duration: 90, useNativeDriver: true }).start();
+  }, [pressAnim]);
+  const handlePressOut = useCallback(() => {
+    RNAnimated.timing(pressAnim, { toValue: 0, duration: 140, useNativeDriver: true }).start();
+  }, [pressAnim]);
+
+  const pressScale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
+  const focusScale = focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const pressOpacity = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.78] });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[styles.tab, { width: tabWidth, height: tabBarHeight }]}
+    >
+      <RNAnimated.View
+        style={[
+          styles.tabInner,
+          {
+            gap: isTinyTabBar ? 0 : 5,
+            opacity: pressOpacity,
+            transform: [{ scale: RNAnimated.multiply(pressScale, focusScale) }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.iconCircle,
+            {
+              width: iconCircleSize,
+              height: iconCircleSize,
+              borderRadius: circleRadius,
+              backgroundColor: unfocusedCircleBg,
+            },
+          ]}
+        >
+          <RNAnimated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFillObject, { opacity: focusAnim, borderRadius: circleRadius }]}
+          >
+            <LinearGradient
+              colors={selectedGoldGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFillObject, styles.selectedTabGradient, { borderRadius: circleRadius }]}
+            />
+            <View pointerEvents="none" style={styles.goldSheen} />
+          </RNAnimated.View>
+          <KISIcon
+            name={routeIcon}
+            size={iconSize}
+            color={focused ? focusedIconColor : unfocusedIconColor}
+            focused={focused}
+          />
+          {badgeCount > 0 ? (
+            <View style={[styles.badge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
+              <Text style={[styles.badgeLabel, { color: badgeTextColor }]}>
+                {badgeCount > 99 ? '99+' : String(badgeCount)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {!isTinyTabBar ? (
+          <Text
+            style={[
+              styles.label,
+              {
+                color: focused ? focusedTextColor : unfocusedTextColor,
+                fontSize: focused ? labelFontSize : unfocusedLabelFontSize,
+                fontWeight: focused ? '800' : '600',
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {label}
+          </Text>
+        ) : null}
+      </RNAnimated.View>
+    </Pressable>
+  );
+}
+
 function AnimatedKISTabBar({
   state,
   descriptors,
@@ -214,91 +372,31 @@ function AnimatedKISTabBar({
           };
 
           return (
-            <Pressable
+            <KISTabBarItem
               key={route.key}
+              focused={focused}
               onPress={onPress}
-              style={({ pressed }) => [
-                styles.tab,
-                {
-                  width: tabWidth,
-                  height: tabBarHeight,
-                  opacity: pressed ? 0.78 : 1,
-                  transform: [{ scale: pressed ? 0.96 : 1 }],
-                },
-              ]}
-            >
-              <View style={[styles.tabInner, { gap: isTinyTabBar ? 0 : 5 }]}>
-                <View
-                  style={[
-                    styles.iconCircle,
-                    {
-                      width: iconCircleSize,
-                      height: iconCircleSize,
-                      borderRadius: responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius,
-                      backgroundColor: focused
-                        ? p.goldDeep
-                        : isRoyalLightBar
-                          ? 'rgba(184,133,46,0.09)'
-                          : 'rgba(255,255,255,0.06)',
-                    },
-                  ]}
-                >
-                  {focused ? (
-                    <LinearGradient
-                      colors={selectedGoldGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[
-                        StyleSheet.absoluteFillObject,
-                        styles.selectedTabGradient,
-                        { borderRadius: responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius },
-                      ]}
-                    />
-                  ) : null}
-                  {focused ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
-                  <KISIcon
-                    name={routeIconMap[route.name as RouteKey]}
-                    size={iconSize}
-                    color={focused ? p.onPrimary : unfocusedTextColor}
-                    focused={focused}
-                  />
-                  {badgeCount > 0 ? (
-                    <View
-                      style={[
-                        styles.badge,
-                        {
-                          backgroundColor: p.badgeBg,
-                          borderColor: barBg,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.badgeLabel, { color: p.ivory }]}>
-                        {badgeCount > 99 ? '99+' : String(badgeCount)}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {!isTinyTabBar ? (
-                  <Text
-                    style={[
-                      styles.label,
-                      {
-                        color: focused ? focusedTextColor : unfocusedTextColor,
-                        fontSize: focused
-                          ? (responsive.isCompactPhone ? 11 : 12)
-                          : (responsive.isCompactPhone ? 10 : 11),
-                        fontWeight: focused ? '800' : '600',
-                      },
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                  >
-                    {label}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
+              tabWidth={tabWidth}
+              tabBarHeight={tabBarHeight}
+              isTinyTabBar={isTinyTabBar}
+              iconCircleSize={iconCircleSize}
+              iconSize={iconSize}
+              circleRadius={responsive.isWatch ? 14 : KIS_COMPONENT_TOKENS.tab.selectedRadius}
+              unfocusedCircleBg={isRoyalLightBar ? 'rgba(184,133,46,0.09)' : 'rgba(255,255,255,0.06)'}
+              selectedGoldGradient={selectedGoldGradient}
+              routeIcon={routeIconMap[route.name as RouteKey]}
+              focusedIconColor={p.onPrimary}
+              unfocusedIconColor={unfocusedTextColor}
+              badgeCount={badgeCount}
+              badgeBg={p.badgeBg}
+              badgeBorder={barBg}
+              badgeTextColor={p.ivory}
+              label={label}
+              focusedTextColor={focusedTextColor}
+              unfocusedTextColor={unfocusedTextColor}
+              labelFontSize={responsive.isCompactPhone ? 11 : 12}
+              unfocusedLabelFontSize={responsive.isCompactPhone ? 10 : 11}
+            />
           );
         })}
       </View>

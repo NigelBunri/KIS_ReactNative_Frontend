@@ -4,9 +4,11 @@ import type { LayoutChangeEvent } from 'react-native';
 import {
   Extrapolation,
   interpolate,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 /**
@@ -53,6 +55,30 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
   // fix shape as ProfileDashboardBlocks.tsx's hand-rolled equivalent, which
   // seeds from an estimate instead of 0 for the same reason.
   const naturalHeight = useSharedValue(collapseDistance);
+  // Eased mirror of scrollY used only to drive collapseStyle below — never
+  // returned, never used for anything else. collapseStyle animates
+  // maxHeight, a real layout property, on a box that sits as a normal-flow
+  // sibling above the screen's own ScrollView (see GoldHeaderShell.tsx).
+  // Shrinking it on every raw scroll frame resizes the ScrollView's own
+  // container, which perturbs its content offset and re-fires the scroll
+  // handler on literally every touch-move frame. On a slow drag there's
+  // time for each correction to land before the next touch-move, so it
+  // reads as the whole screen vibrating in place (a fast flick outruns the
+  // loop and looks fine, which is why this only showed up while scrolling
+  // slowly). Retargeting only once the raw offset has moved a few pixels,
+  // then easing to it, is coarse enough that the resize can no longer fire
+  // on every frame. Same fix as ProfileScreen's hand-rolled profileHeaderY,
+  // applied once here so every consumer of this hook gets it for free
+  // instead of each screen needing its own copy.
+  const collapseScrollY = useSharedValue(0);
+  useAnimatedReaction(
+    () => scrollY.value,
+    (current) => {
+      if (Math.abs(current - collapseScrollY.value) > 6) {
+        collapseScrollY.value = withTiming(current, { duration: 160 });
+      }
+    },
+  );
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (e) => {
@@ -69,13 +95,13 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
 
   const collapseStyle = useAnimatedStyle(() => ({
     maxHeight: interpolate(
-      scrollY.value,
+      collapseScrollY.value,
       [0, collapseDistance],
       [naturalHeight.value, 0],
       Extrapolation.CLAMP,
     ),
     opacity: interpolate(
-      scrollY.value,
+      collapseScrollY.value,
       [0, collapseDistance * 0.6],
       [1, 0],
       Extrapolation.CLAMP,
