@@ -197,7 +197,16 @@ export default function PartnerSettingsPanel({
                       onOpenComplaints?.();
                       return;
                     }
-                    if (feature.key === 'team_members') {
+                    {/* 'team_members'/'roles_permissions' below never actually
+                        occur in partnerSettingsData.ts's real catalog — kept
+                        for safety in case a future entry uses those exact
+                        keys — but 'member_blocks'/'role_matrix'/
+                        'assign_admins' are the real keys that should reach
+                        these same panels; without this they fell straight
+                        through to the generic PartnerFeaturePanel despite
+                        PartnerMembersPanel/PartnerRolesPanel already existing
+                        and being fully wired here. */}
+                    if (['team_members', 'member_blocks'].includes(feature.key)) {
                       onOpenMembers?.();
                       return;
                     }
@@ -205,7 +214,7 @@ export default function PartnerSettingsPanel({
                       onOpenModerationLog?.();
                       return;
                     }
-                    if (feature.key === 'roles_permissions') {
+                    if (['roles_permissions', 'role_matrix', 'assign_admins'].includes(feature.key)) {
                       onOpenRoles?.();
                       return;
                     }

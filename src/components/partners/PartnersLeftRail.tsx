@@ -28,14 +28,14 @@ export default function PartnersLeftRail({
   loading = false,
   topInset = 0,
 }: Props) {
-  const { palette, isDark, tone } = useKISTheme();
+  const { palette, isDark, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const railWidth = responsive.isWatch ? 52 : responsive.isCompactPhone ? 60 : LEFT_RAIL_WIDTH;
   const avatarSize = responsive.isWatch ? 38 : responsive.isCompactPhone ? 42 : 48;
-  const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  // Accent-reactive 4-stop gradient (was a hardcoded gold-only array that
+  // ignored the user's chosen accent color).
+  const metallicGoldGradient = [...gradients.header];
   const selectedPartner =
     partners.find(p => p.id === selectedPartnerId) ?? partners[0];
   const entrance = React.useRef(new Animated.Value(0)).current;
@@ -62,7 +62,7 @@ export default function PartnersLeftRail({
           // paddingTop uses the safe-area inset so the rail background fills all
           // the way to y=0 (no gap at the top) while content clears the notch.
           paddingTop: topInset,
-          backgroundColor: isDark ? 'rgba(10,9,14,0.92)' : '#FFFFFF',
+          backgroundColor: palette.bar,
           borderRightColor: palette.divider,
           opacity: entrance,
           transform: [

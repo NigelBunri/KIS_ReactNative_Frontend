@@ -119,6 +119,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [website, setWebsite] = useState<WebsiteRecord | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
@@ -145,6 +146,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await getRequest(ROUTES.websites.mine, { params: { owner_type: ownerType, owner_id: ownerId } });
       const data = (res as any)?.data ?? res;
@@ -156,7 +158,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
       setPageSeoDescription(home?.seo?.description || '');
       setPageSeoImageUrl(home?.seo?.share_image_url || '');
     } catch (error: any) {
-      Alert.alert('Website Builder', error?.message || 'Unable to load your website.');
+      setLoadError(error?.message || 'Unable to load your website.');
     } finally {
       setLoading(false);
     }
@@ -506,8 +508,18 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     return (
       <View style={{ flex: 1, backgroundColor: palette.bg }}>
         <ScreenHeader title="Website Builder" onBack={() => navigation.goBack()} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={palette.accentPrimary} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+          {loading ? (
+            <ActivityIndicator color={palette.accentPrimary} />
+          ) : (
+            <>
+              <KISIcon name="warning" size={40} color={palette.subtext} />
+              <Text style={{ ...typography.body, color: palette.text, marginTop: spacing.md, textAlign: 'center' }}>
+                {loadError || 'Unable to load your website.'}
+              </Text>
+              <KISButton title="Try again" onPress={load} style={{ marginTop: spacing.lg }} />
+            </>
+          )}
         </View>
       </View>
     );

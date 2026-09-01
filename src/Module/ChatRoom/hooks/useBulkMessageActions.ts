@@ -204,8 +204,8 @@ export function useBulkMessageActions({
             return;
           }
           Alert.alert(
-            'Reported',
-            'Thanks, this message has been reported (local only for now).',
+            'Report unavailable',
+            'Reporting is not available from this screen right now. Please try again from the chat.',
           );
           exitSelectionMode();
         },

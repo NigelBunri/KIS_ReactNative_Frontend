@@ -31,6 +31,7 @@ const authRoutes = {
     twoFactorDisable: `${API_BASE_URL}/api/v1/auth/2fa/disable/`,
     twoFactorStatus: `${API_BASE_URL}/api/v1/auth/2fa/status/`,
     accountDelete: `${API_BASE_URL}/api/v1/auth/account/`,
+    accountReactivate: `${API_BASE_URL}/api/v1/auth/account/reactivate/`,
     dataExport: `${API_BASE_URL}/api/v1/auth/data-export/`,
     passwordChange: `${API_BASE_URL}/api/v1/auth/password/change/`,
     quicklockPin: `${API_BASE_URL}/api/v1/auth/quicklock-pin/`,
@@ -41,6 +42,14 @@ const authRoutes = {
     restoreCredentialRegister: `${API_BASE_URL}/api/v1/auth/restore-credentials/register/`,
     restoreCredentialAuthenticationOptions: `${API_BASE_URL}/api/v1/auth/restore-credentials/authentication-options/`,
     restoreCredentialAuthenticate: `${API_BASE_URL}/api/v1/auth/restore-credentials/authenticate/`,
+  },
+  engagement: {
+    // Server-authoritative daily feed time limit — see
+    // apps/accounts/responsible_feed.py on the backend. The heartbeat
+    // endpoint deliberately ignores any client-reported elapsed time; only
+    // the fact a request arrived matters, so there is nothing to spoof.
+    feedHeartbeat: `${API_BASE_URL}/api/v1/engagement/feed-heartbeat/`,
+    feedStatus: `${API_BASE_URL}/api/v1/engagement/feed-status/`,
   },
   user: {
     profile: `${API_BASE_URL}/api/v1/users/me/`,

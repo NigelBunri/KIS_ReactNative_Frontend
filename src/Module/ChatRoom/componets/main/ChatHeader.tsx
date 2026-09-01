@@ -14,6 +14,7 @@ type ChatHeaderProps = {
   onBack: () => void;
   palette: any;
   onOpenInfo?: () => void;
+  onOpenTasks?: () => void;
   onStartVoiceCall?: () => void;
   onStartVideoCall?: () => void;
   onStartBroadcast?: () => void;
@@ -67,6 +68,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   palette,
   onOpenInfo,
+  onOpenTasks,
   onStartVoiceCall,
   onStartVideoCall,
   onStartBroadcast,
@@ -396,6 +398,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 size={20}
                 color={palette.onHeader ?? palette.text}
               />
+            </Pressable>
+          )}
+          {onOpenTasks && (
+            <Pressable style={styles.headerIconButton} onPress={onOpenTasks}>
+              <Text style={{ fontSize: 18, color: palette.onHeader ?? palette.text }}>✓</Text>
             </Pressable>
           )}
           <Pressable style={styles.headerIconButton} onPress={onStartVideoCall}>

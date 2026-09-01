@@ -19,6 +19,24 @@ import PartnerOrganizationsPanel from '@/components/partners/PartnerOrganization
 import PartnerMembersPanel from '@/components/partners/PartnerMembersPanel';
 import PartnerRolesPanel from '@/components/partners/PartnerRolesPanel';
 import PartnerChannelsPanel from '@/components/partners/PartnerChannelsPanel';
+import PartnerTasksPanel from '@/components/partners/PartnerTasksPanel';
+import PartnerTaskBoardsPanel from '@/components/partners/PartnerTaskBoardsPanel';
+import PartnerOrgStructurePanel from '@/components/partners/PartnerOrgStructurePanel';
+import PartnerMembershipRulesPanel from '@/components/partners/PartnerMembershipRulesPanel';
+import PartnerSpacesDirectoryPanel from '@/components/partners/PartnerSpacesDirectoryPanel';
+import PartnerAnalyticsPanel from '@/components/partners/PartnerAnalyticsPanel';
+import PartnerLeadershipPanel from '@/components/partners/PartnerLeadershipPanel';
+import PartnerResourcesPanel from '@/components/partners/PartnerResourcesPanel';
+import PartnerTrainingTracksPanel from '@/components/partners/PartnerTrainingTracksPanel';
+import PartnerEventsCalendarPanel from '@/components/partners/PartnerEventsCalendarPanel';
+import PartnerBroadcastCenterPanel from '@/components/partners/PartnerBroadcastCenterPanel';
+import PartnerSupportInboxPanel from '@/components/partners/PartnerSupportInboxPanel';
+import PartnerPostTemplatesPanel from '@/components/partners/PartnerPostTemplatesPanel';
+import PartnerSurveysPanel from '@/components/partners/PartnerSurveysPanel';
+import PartnerBudgetTrackingPanel from '@/components/partners/PartnerBudgetTrackingPanel';
+import PartnerVolunteerRosterPanel from '@/components/partners/PartnerVolunteerRosterPanel';
+import PartnerDonationTrackingPanel from '@/components/partners/PartnerDonationTrackingPanel';
+import PartnerWorkspaceBrandingPanel from '@/components/partners/PartnerWorkspaceBrandingPanel';
 import PartnerVerificationPanel from '@/components/partners/PartnerVerificationPanel';
 import type { PartnerProfileLink } from '@/screens/broadcast/education/api/education.models';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
@@ -131,6 +149,131 @@ type Props = {
     panelTranslateX: any;
     onClose: () => void;
   };
+  tasksPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    channelId?: string | null;
+    channelName?: string | null;
+    currentUserId?: string | null;
+    canManageTasks?: boolean;
+  };
+  taskBoardsPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    currentUserId?: string | null;
+    canManageTasks?: boolean;
+  };
+  orgStructurePanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  membershipRulesPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  spacesDirectoryPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  analyticsPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  leadershipPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  resourcesPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    canManage?: boolean;
+  };
+  trainingTracksPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  eventsCalendarPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    canManage?: boolean;
+  };
+  broadcastCenterPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  supportInboxPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    canManage?: boolean;
+  };
+  postTemplatesPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  surveysPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    canManage?: boolean;
+  };
+  budgetTrackingPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  volunteerRosterPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+    canManage?: boolean;
+  };
+  donationTrackingPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  workspaceBrandingPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
+  directoryChannels?: any[];
+  directoryGroups?: any[];
+  directoryCommunities?: any[];
+  onSelectDirectoryChannel?: (id: string) => void;
+  onSelectDirectoryGroup?: (id: string) => void;
+  onSelectDirectoryCommunity?: (id: string) => void;
   verificationPanel: {
     isOpen: boolean;
     panelWidth: number;
@@ -219,6 +362,30 @@ export default function PartnerPanels({
   membersPanel,
   rolesPanel,
   channelsPanel,
+  tasksPanel,
+  taskBoardsPanel,
+  orgStructurePanel,
+  membershipRulesPanel,
+  spacesDirectoryPanel,
+  analyticsPanel,
+  leadershipPanel,
+  resourcesPanel,
+  trainingTracksPanel,
+  eventsCalendarPanel,
+  broadcastCenterPanel,
+  supportInboxPanel,
+  postTemplatesPanel,
+  surveysPanel,
+  budgetTrackingPanel,
+  volunteerRosterPanel,
+  donationTrackingPanel,
+  workspaceBrandingPanel,
+  directoryChannels,
+  directoryGroups,
+  directoryCommunities,
+  onSelectDirectoryChannel,
+  onSelectDirectoryGroup,
+  onSelectDirectoryCommunity,
   verificationPanel,
   featurePanel,
   orgProfilePanel,
@@ -353,6 +520,167 @@ export default function PartnerPanels({
         panelTranslateX={channelsPanel.panelTranslateX}
         partnerId={selectedPartnerId}
         onClose={channelsPanel.onClose}
+      />
+
+      <PartnerTasksPanel
+        isOpen={tasksPanel.isOpen}
+        panelWidth={tasksPanel.panelWidth}
+        panelTranslateX={tasksPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        channelId={tasksPanel.channelId}
+        channelName={tasksPanel.channelName}
+        currentUserId={tasksPanel.currentUserId}
+        canManageTasks={tasksPanel.canManageTasks}
+        onClose={tasksPanel.onClose}
+      />
+
+      <PartnerTaskBoardsPanel
+        isOpen={taskBoardsPanel.isOpen}
+        panelWidth={taskBoardsPanel.panelWidth}
+        panelTranslateX={taskBoardsPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        channels={directoryChannels ?? []}
+        currentUserId={taskBoardsPanel.currentUserId}
+        canManageTasks={taskBoardsPanel.canManageTasks}
+        onClose={taskBoardsPanel.onClose}
+      />
+
+      <PartnerOrgStructurePanel
+        isOpen={orgStructurePanel.isOpen}
+        panelWidth={orgStructurePanel.panelWidth}
+        panelTranslateX={orgStructurePanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={orgStructurePanel.onClose}
+      />
+
+      <PartnerMembershipRulesPanel
+        isOpen={membershipRulesPanel.isOpen}
+        panelWidth={membershipRulesPanel.panelWidth}
+        panelTranslateX={membershipRulesPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={membershipRulesPanel.onClose}
+      />
+
+      <PartnerSpacesDirectoryPanel
+        isOpen={spacesDirectoryPanel.isOpen}
+        panelWidth={spacesDirectoryPanel.panelWidth}
+        panelTranslateX={spacesDirectoryPanel.panelTranslateX}
+        channels={directoryChannels ?? []}
+        groups={directoryGroups ?? []}
+        communities={directoryCommunities ?? []}
+        onSelectChannel={onSelectDirectoryChannel ?? (() => {})}
+        onSelectGroup={onSelectDirectoryGroup ?? (() => {})}
+        onSelectCommunity={onSelectDirectoryCommunity ?? (() => {})}
+        onClose={spacesDirectoryPanel.onClose}
+      />
+
+      <PartnerAnalyticsPanel
+        isOpen={analyticsPanel.isOpen}
+        panelWidth={analyticsPanel.panelWidth}
+        panelTranslateX={analyticsPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={analyticsPanel.onClose}
+      />
+
+      <PartnerLeadershipPanel
+        isOpen={leadershipPanel.isOpen}
+        panelWidth={leadershipPanel.panelWidth}
+        panelTranslateX={leadershipPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={leadershipPanel.onClose}
+      />
+
+      <PartnerResourcesPanel
+        isOpen={resourcesPanel.isOpen}
+        panelWidth={resourcesPanel.panelWidth}
+        panelTranslateX={resourcesPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        canManage={resourcesPanel.canManage}
+        onClose={resourcesPanel.onClose}
+      />
+
+      <PartnerTrainingTracksPanel
+        isOpen={trainingTracksPanel.isOpen}
+        panelWidth={trainingTracksPanel.panelWidth}
+        panelTranslateX={trainingTracksPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={trainingTracksPanel.onClose}
+      />
+
+      <PartnerEventsCalendarPanel
+        isOpen={eventsCalendarPanel.isOpen}
+        panelWidth={eventsCalendarPanel.panelWidth}
+        panelTranslateX={eventsCalendarPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        canManage={eventsCalendarPanel.canManage}
+        onClose={eventsCalendarPanel.onClose}
+      />
+
+      <PartnerBroadcastCenterPanel
+        isOpen={broadcastCenterPanel.isOpen}
+        panelWidth={broadcastCenterPanel.panelWidth}
+        panelTranslateX={broadcastCenterPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={broadcastCenterPanel.onClose}
+      />
+
+      <PartnerSupportInboxPanel
+        isOpen={supportInboxPanel.isOpen}
+        panelWidth={supportInboxPanel.panelWidth}
+        panelTranslateX={supportInboxPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        canManage={supportInboxPanel.canManage}
+        onClose={supportInboxPanel.onClose}
+      />
+
+      <PartnerPostTemplatesPanel
+        isOpen={postTemplatesPanel.isOpen}
+        panelWidth={postTemplatesPanel.panelWidth}
+        panelTranslateX={postTemplatesPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={postTemplatesPanel.onClose}
+      />
+
+      <PartnerSurveysPanel
+        isOpen={surveysPanel.isOpen}
+        panelWidth={surveysPanel.panelWidth}
+        panelTranslateX={surveysPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        canManage={surveysPanel.canManage}
+        onClose={surveysPanel.onClose}
+      />
+
+      <PartnerBudgetTrackingPanel
+        isOpen={budgetTrackingPanel.isOpen}
+        panelWidth={budgetTrackingPanel.panelWidth}
+        panelTranslateX={budgetTrackingPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={budgetTrackingPanel.onClose}
+      />
+
+      <PartnerVolunteerRosterPanel
+        isOpen={volunteerRosterPanel.isOpen}
+        panelWidth={volunteerRosterPanel.panelWidth}
+        panelTranslateX={volunteerRosterPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        canManage={volunteerRosterPanel.canManage}
+        onClose={volunteerRosterPanel.onClose}
+      />
+
+      <PartnerDonationTrackingPanel
+        isOpen={donationTrackingPanel.isOpen}
+        panelWidth={donationTrackingPanel.panelWidth}
+        panelTranslateX={donationTrackingPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={donationTrackingPanel.onClose}
+      />
+
+      <PartnerWorkspaceBrandingPanel
+        isOpen={workspaceBrandingPanel.isOpen}
+        panelWidth={workspaceBrandingPanel.panelWidth}
+        panelTranslateX={workspaceBrandingPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={workspaceBrandingPanel.onClose}
       />
 
       <PartnerVerificationPanel

@@ -3377,6 +3377,12 @@ export default function ProfileScreen() {
                   badge: false,
                 },
                 {
+                  label: 'Family & Parental Controls',
+                  route: 'FamilyHub' as const,
+                  danger: false,
+                  badge: false,
+                },
+                {
                   label: 'Delete Account',
                   route: 'AccountDeletion' as const,
                   danger: true,

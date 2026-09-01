@@ -85,6 +85,7 @@ export const tierMetaFor = (tier: any) => {
       'Voice channels',
       'Channels, categories, and per-channel permission overwrites',
       'Verified organization badge request & review',
+      'Task management & team collaboration boards in every channel',
     ];
   } else if (!list.length && name.includes('partner')) {
     tagline = 'Organizations, ministries, and enterprises';
@@ -107,6 +108,7 @@ export const tierMetaFor = (tier: any) => {
       'Member moderation (mute, timeout, kick, ban) with a full audit log',
       'Channels, categories, and per-channel permission overwrites',
       'Verified organization badge request & review',
+      'Task management & team collaboration boards in every channel',
     ];
   } else if (!list.length && name.includes('business pro')) {
     tagline = 'High-impact teams and creators';

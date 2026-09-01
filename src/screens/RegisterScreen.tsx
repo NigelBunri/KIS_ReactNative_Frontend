@@ -30,6 +30,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISText from '@/components/common/KISText';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
 
 const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
@@ -147,6 +148,12 @@ export default function RegisterScreen({ navigation }: any) {
   );
 
   const [displayName, setDisplayName] = useState('');
+  // Optional deliberately: this field is new, and rejecting a signup
+  // over it would put a burden on the user that the backend itself
+  // doesn't require (date_of_birth is optional there too, for the same
+  // reason). It's still validated in KISDateTimeInput's min/maxDate and
+  // by the backend's own 13+ check if the user does provide one.
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [regPhone, setRegPhone] = useState('');
   const [countryCode, setCountryCode] = useState<CountryCode>('CM');
   const [callingCode, setCallingCode] = useState('+237');
@@ -238,6 +245,7 @@ export default function RegisterScreen({ navigation }: any) {
         ...(simPhoneNumber ? { sim_phone_number: simPhoneNumber } : {}),
       };
       if (displayName.trim()) payload.display_name = displayName.trim();
+      if (dateOfBirth) payload.date_of_birth = dateOfBirth.slice(0, 10);
 
       const res = await postRequest(ROUTES.auth.register, payload, {
         cacheKey: 'USER_KEY',
@@ -335,6 +343,16 @@ export default function RegisterScreen({ navigation }: any) {
               style={[styles.input, inputStyle]}
             />
           </View>
+
+          <KISDateTimeInput
+            label="Date of birth (optional)"
+            mode="date"
+            value={dateOfBirth}
+            onChange={setDateOfBirth}
+            placeholder="Select date of birth"
+            maximumDate={new Date()}
+            minimumDate={new Date(new Date().getFullYear() - 130, 0, 1)}
+          />
 
           <View style={styles.field}>
             <KISText preset="label" color={palette.text}>Phone</KISText>

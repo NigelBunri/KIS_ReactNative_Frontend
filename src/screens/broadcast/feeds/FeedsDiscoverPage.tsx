@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
@@ -29,6 +29,8 @@ import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroa
 import { KISIcon } from '@/constants/kisIcons';
 import AddToPlaylistSheet from '@/screens/broadcast/playlists/AddToPlaylistSheet';
 import { getPlaylistsState, subscribeToPlaylists } from '@/screens/broadcast/playlists/playlistManager';
+import { useResponsibleFeedLimit } from '@/hooks/useResponsibleFeedLimit';
+import { FeedTimeLimitBanner, FeedTimeLimitBlock } from '@/components/broadcast/FeedTimeLimitBanner';
 
 type FeedCategory = 'for_you' | 'following' | 'trending' | 'live' | 'channels' | 'community' | 'market' | 'education';
 
@@ -70,6 +72,8 @@ export default function FeedsDiscoverPage({
   const { palette } = useKISTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const isFocused = useIsFocused();
+  const { status: feedLimitStatus } = useResponsibleFeedLimit(isFocused);
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   // Use controlled props when provided, else fall back to local state
   const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
@@ -546,6 +550,12 @@ export default function FeedsDiscoverPage({
           <KISIcon name="chevron-right" size={14} color={palette.subtext} />
         </Pressable>
 
+        <FeedTimeLimitBanner status={feedLimitStatus} />
+
+        {feedLimitStatus?.limitReached ? (
+          <FeedTimeLimitBlock status={feedLimitStatus} onGoBack={() => navigation.goBack()} />
+        ) : (
+          <>
         {/* Live items banner */}
         {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
           <Pressable
@@ -673,6 +683,8 @@ export default function FeedsDiscoverPage({
             await runToggle();
           }}
         />
+          </>
+        )}
       </View>
 
       <AddToPlaylistSheet

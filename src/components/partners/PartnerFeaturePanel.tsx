@@ -1,20 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+// src/components/partners/PartnerFeaturePanel.tsx
+//
+// Fallback for settings-catalog features that don't have a purpose-built
+// panel yet (most of them have no backend behind them at all — this isn't
+// a config screen, there's nothing real to configure). It used to let
+// people "edit" an arbitrary key/value config blob that nothing on the
+// backend ever read, which looked like a working settings form but did
+// nothing — worse than admitting the feature isn't built. This is an
+// honest empty state instead: no input fields, no false affordance.
+import React from 'react';
+import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
-import ROUTES from '@/network';
-import { getRequest } from '@/network/get';
-import { patchRequest } from '@/network/patch';
+import { KISIcon } from '@/constants/kisIcons';
 import type { PartnerFeatureMeta } from '@/screens/tabs/partners/usePartnerFeaturePanel';
-import KeyValueEditor, { type KeyValueRow } from '@/components/partners/forms/KeyValueEditor';
 
 type Props = {
   isOpen: boolean;
@@ -29,70 +27,16 @@ export default function PartnerFeaturePanel({
   isOpen,
   panelWidth,
   panelTranslateX,
-  partnerId,
   feature,
   onClose,
 }: Props) {
   const { palette } = useKISTheme();
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<KeyValueRow[]>([]);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
-
-  const loadConfig = useCallback(async () => {
-    if (!partnerId || !feature?.key) return;
-    const res = await getRequest(
-      ROUTES.partners.settingsConfigDetail(partnerId, feature.key),
-      { errorMessage: 'Unable to load setting config.' },
-    );
-    const config = res?.data?.config ?? res?.config ?? {};
-    const entries = Object.entries(config ?? {}).map(([key, value]) => ({
-      key,
-      value: String(value ?? ''),
-    }));
-    setRows(entries.length ? entries : [{ key: '', value: '' }]);
-  }, [feature?.key, partnerId]);
-
-  useEffect(() => {
-    if (!isOpen || !feature) return;
-    setLoading(true);
-    loadConfig().finally(() => setLoading(false));
-  }, [isOpen, feature, loadConfig]);
-
-  const onSave = async () => {
-    if (!partnerId || !feature?.key) return;
-    const config: Record<string, any> = {};
-    rows.forEach((row) => {
-      if (!row.key.trim()) return;
-      config[row.key.trim()] = coerceValue(row.value);
-    });
-    const res = await patchRequest(
-      ROUTES.partners.settingsConfigDetail(partnerId, feature.key),
-      { config },
-      { errorMessage: 'Unable to update settings.' },
-    );
-    if (!res?.success) {
-      Alert.alert('Update failed', res?.message ?? 'Please try again.');
-      return;
-    }
-    Alert.alert('Saved', 'Settings updated successfully.');
-  };
-
-  const coerceValue = (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed === '') return '';
-    if (trimmed === 'true') return true;
-    if (trimmed === 'false') return false;
-    const asNumber = Number(trimmed);
-    if (!Number.isNaN(asNumber) && trimmed === String(asNumber)) {
-      return asNumber;
-    }
-    return trimmed;
-  };
 
   if (!isOpen || !feature) return null;
 
@@ -131,51 +75,42 @@ export default function PartnerFeaturePanel({
             <Text style={[styles.settingsPanelTitle, { color: palette.text }]}>
               {feature.title}
             </Text>
-            <Text style={[styles.settingsPanelDescription, { color: palette.subtext }]}>
-              {feature.description ?? 'Configure settings for this feature.'}
-            </Text>
           </View>
         </View>
 
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.settingsPanelBody}
+          contentContainerStyle={[styles.settingsPanelBody, { flexGrow: 1 }]}
           showsVerticalScrollIndicator={false}
         >
-          {loading ? (
-            <ActivityIndicator size="small" color={palette.primary} />
-          ) : (
-            <View
-              style={[
-                styles.settingsFeatureRow,
-                { borderColor: palette.borderMuted, backgroundColor: palette.surface },
-              ]}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+            <KISIcon name="warning" size={40} color={palette.subtext} />
+            <Text
+              style={{
+                color: palette.text,
+                fontSize: 16,
+                fontWeight: '700',
+                marginTop: 16,
+                textAlign: 'center',
+              }}
             >
-              <Text style={[styles.settingsFeatureTitle, { color: palette.text }]}>
-                Configuration
-              </Text>
-              <KeyValueEditor palette={palette} rows={rows} onChange={setRows} />
-              <Pressable
-                onPress={onSave}
-                style={({ pressed }) => [
-                  {
-                    marginTop: 10,
-                    paddingVertical: 8,
-                    borderRadius: 10,
-                    borderWidth: 2,
-                    borderColor: palette.borderMuted,
-                    backgroundColor: palette.primarySoft ?? palette.surface,
-                    opacity: pressed ? 0.8 : 1,
-                    alignItems: 'center',
-                  },
-                ]}
-              >
-                <Text style={{ color: palette.primaryStrong ?? palette.text, fontWeight: '700' }}>
-                  SAVE SETTINGS
-                </Text>
-              </Pressable>
-            </View>
-          )}
+              Not built yet
+            </Text>
+            <Text
+              style={{
+                color: palette.subtext,
+                fontSize: 13,
+                marginTop: 8,
+                textAlign: 'center',
+                paddingHorizontal: 24,
+                lineHeight: 19,
+              }}
+            >
+              {feature.description
+                ? `${feature.description} This isn't available yet — let us know if you need it sooner.`
+                : "This feature isn't available yet — let us know if you need it sooner."}
+            </Text>
+          </View>
         </ScrollView>
       </Animated.View>
     </View>

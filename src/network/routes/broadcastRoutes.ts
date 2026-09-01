@@ -53,7 +53,12 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/bible/course-enrollments/${id}/purchase/`,
     lessonProgress: `${API_BASE_URL}/api/v1/bible/lesson-progress/`,
     courseTracks: `${API_BASE_URL}/api/v1/bible/course-tracks/`,
+    courseTrackDetail: (id: string | number) => `${API_BASE_URL}/api/v1/bible/course-tracks/${id}/`,
+    courseTrackAssign: (id: string | number) => `${API_BASE_URL}/api/v1/bible/course-tracks/${id}/assign/`,
+    courseTrackUnassign: (id: string | number) => `${API_BASE_URL}/api/v1/bible/course-tracks/${id}/unassign/`,
+    courseTrackRoster: (id: string | number) => `${API_BASE_URL}/api/v1/bible/course-tracks/${id}/roster/`,
     courseTrackItems: `${API_BASE_URL}/api/v1/bible/course-track-items/`,
+    courseTrackItemDetail: (id: string | number) => `${API_BASE_URL}/api/v1/bible/course-track-items/${id}/`,
     coursePrerequisites: `${API_BASE_URL}/api/v1/bible/course-prerequisites/`,
     quizzes: `${API_BASE_URL}/api/v1/bible/quizzes/`,
     quizQuestions: `${API_BASE_URL}/api/v1/bible/quiz-questions/`,
@@ -231,6 +236,46 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/${id}/role-assignments/`,
     removeRoleAssignment: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/role-assignments/remove/`,
+    // Org Setup — see PartnerOrgStructurePanel.tsx.
+    departments: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/departments/`,
+    departmentDetail: (id: string, departmentId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/departments/${departmentId}/`,
+    departmentMembers: (id: string, departmentId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/departments/${departmentId}/members/`,
+    // Leadership & Org Tree — see PartnerLeadershipPanel.tsx.
+    leadership: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/leadership/`,
+    departmentNotes: (id: string, departmentId?: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/department-notes/${departmentId ? `?department_id=${departmentId}` : ''}`,
+    departmentNoteDetail: (id: string, noteId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/department-notes/${noteId}/`,
+    // Resource Library & Knowledge Base — see PartnerResourcesPanel.tsx.
+    resources: (id: string, params?: { kind?: string; category?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.kind) qs.set('kind', params.kind);
+      if (params?.category) qs.set('category', params.category);
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/resources/${suffix ? `?${suffix}` : ''}`;
+    },
+    resourceDetail: (id: string, resourceId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/resources/${resourceId}/`,
+    // Events Calendar — see PartnerEventsCalendarPanel.tsx.
+    calendarEvents: (id: string, params?: { upcoming?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (params?.upcoming) qs.set('upcoming', '1');
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/calendar-events/${suffix ? `?${suffix}` : ''}`;
+    },
+    calendarEventDetail: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/calendar-events/${eventId}/`,
+    calendarEventRsvp: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/calendar-events/${eventId}/rsvp/`,
+    calendarEventAttendees: (id: string, eventId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/calendar-events/${eventId}/attendees/`,
+    locations: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/locations/`,
+    locationDetail: (id: string, locationId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/locations/${locationId}/`,
+    // Community Governance > Membership Rules — see PartnerMembershipRulesPanel.tsx.
+    joinConfig: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/join-config/`,
     integrations: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/integrations/`,
     integrationUpdate: (id: string, integrationId: string) =>
@@ -252,6 +297,11 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/${id}/automation-rules/${ruleId}/remove/`,
     reportsSummary: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/reports/summary/`,
+    // Analytics & Insights — see PartnerAnalyticsPanel.tsx. Distinct from
+    // AdminAnalyticsPanel.tsx, which is the KCAN-staff-only platform-wide
+    // dashboard — this is one partner's own view of its own data.
+    analytics: (id: string, days?: number) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/analytics/${days ? `?days=${days}` : ''}`,
     exports: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/exports/`,
     exportSchedules: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/export-schedules/`,
@@ -286,6 +336,77 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/posts/${id}/edit/`,
     postBroadcast: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/posts/${id}/broadcast/`,
+    // Broadcast Center & Announcement Scheduler — see PartnerBroadcastCenterPanel.tsx.
+    postQueue: (partnerId: string) =>
+      `${API_BASE_URL}/api/v1/partners/posts/queue/?partner=${partnerId}`,
+    postPublishNow: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/posts/${id}/publish-now/`,
+    postCancelScheduled: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/posts/${id}/cancel-scheduled/`,
+    // Support Inbox & Helpdesk — see PartnerSupportInboxPanel.tsx.
+    supportTickets: (id: string, params?: { status?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set('status', params.status);
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/support-tickets/${suffix ? `?${suffix}` : ''}`;
+    },
+    supportTicketDetail: (id: string, ticketId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/support-tickets/${ticketId}/`,
+    supportTicketReplies: (id: string, ticketId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/support-tickets/${ticketId}/replies/`,
+    supportInboxSummary: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/support-inbox-summary/`,
+    // Post Templates — see PartnerPostTemplatesPanel.tsx.
+    postTemplates: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/post-templates/`,
+    postTemplateDetail: (id: string, templateId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/post-templates/${templateId}/`,
+    // Feedback Hub & Surveys — see PartnerSurveysPanel.tsx.
+    surveys: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/surveys/`,
+    surveyDetail: (id: string, surveyId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/surveys/${surveyId}/`,
+    surveyRespond: (id: string, surveyId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/surveys/${surveyId}/respond/`,
+    surveyResults: (id: string, surveyId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/surveys/${surveyId}/results/`,
+    // Budget Tracking — see PartnerBudgetTrackingPanel.tsx.
+    budgets: (id: string, params?: { department?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.department) qs.set('department', params.department);
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/budgets/${suffix ? `?${suffix}` : ''}`;
+    },
+    budgetDetail: (id: string, budgetId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/budgets/${budgetId}/`,
+    budgetExpenses: (id: string, budgetId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/budgets/${budgetId}/expenses/`,
+    budgetExpenseDetail: (id: string, budgetId: string, expenseId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/budgets/${budgetId}/expenses/${expenseId}/`,
+    // Volunteer Roster — see PartnerVolunteerRosterPanel.tsx.
+    volunteerShifts: (id: string, params?: { upcoming?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (params?.upcoming) qs.set('upcoming', '1');
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/volunteer-shifts/${suffix ? `?${suffix}` : ''}`;
+    },
+    volunteerShiftDetail: (id: string, shiftId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/volunteer-shifts/${shiftId}/`,
+    volunteerShiftSignup: (id: string, shiftId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/volunteer-shifts/${shiftId}/signup/`,
+    volunteerShiftRoster: (id: string, shiftId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/volunteer-shifts/${shiftId}/roster/`,
+    // Donation Tracking — see PartnerDonationTrackingPanel.tsx.
+    donations: (id: string, params?: { fund?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.fund) qs.set('fund', params.fund);
+      const suffix = qs.toString();
+      return `${API_BASE_URL}/api/v1/partners/${id}/donations/${suffix ? `?${suffix}` : ''}`;
+    },
+    donationDetail: (id: string, donationId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/donations/${donationId}/`,
+    donationsSummary: (id: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/donations-summary/`,
     deactivate: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/deactivate/`,
     reactivate: (id: string) =>
@@ -321,6 +442,25 @@ const broadcastRoutes = {
     verificationCasesReview: (id: string, caseId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/verification/cases/${caseId}/review/`,
     staffVerificationQueue: `${API_BASE_URL}/api/v1/verification/staff/cases/`,
+    // Tasks — see PartnerTasksPanel.tsx. Partner+/Partner Pro only.
+    channelTasks: (id: string, channelId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/channels/${channelId}/tasks/`,
+    channelTaskSummary: (id: string, channelId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/channels/${channelId}/tasks/summary/`,
+    myTasks: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/tasks/mine/`,
+    taskSummary: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/tasks/summary/`,
+    // Task Boards — every task across every channel, admin-only. See
+    // PartnerTaskBoardsPanel.tsx.
+    allTasks: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/tasks/`,
+  },
+  tasks: {
+    detail: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/`,
+    assign: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/assign/`,
+    submit: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/submit/`,
+    status: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/status/`,
+    undo: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/undo/`,
+    comments: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/comments/`,
+    activity: (taskId: string) => `${API_BASE_URL}/api/v1/tasks/${taskId}/activity/`,
   },
   broadcasts: {
     list: `${API_BASE_URL}/api/v1/broadcasts/`,

@@ -39,6 +39,7 @@ type Props = {
   onFeedPress: () => void;
   onCommunityFeedPress: (id: string) => void;
   onPartnerHeaderPress: () => void;
+  onInfoPress?: () => void;
   width: number;
   messagesOffsetAnim: any;
   messagePanHandlers: Record<string, any>;
@@ -46,6 +47,7 @@ type Props = {
   toggleMessagesPane: () => void;
   handleCloseMessages: () => void;
   onOpenInfo: any;
+  onOpenTasks?: () => void;
   onOpenInsights?: () => void;
   isPartnerSheetOpen: boolean;
   sheetHeight: number;
@@ -76,6 +78,24 @@ type Props = {
     membersPanel: any;
     rolesPanel: any;
     channelsPanel: any;
+    tasksPanel: any;
+    taskBoardsPanel: any;
+    orgStructurePanel: any;
+    membershipRulesPanel: any;
+    spacesDirectoryPanel: any;
+    analyticsPanel: any;
+    leadershipPanel: any;
+    resourcesPanel: any;
+    trainingTracksPanel: any;
+    eventsCalendarPanel: any;
+    broadcastCenterPanel: any;
+    supportInboxPanel: any;
+    postTemplatesPanel: any;
+    surveysPanel: any;
+    budgetTrackingPanel: any;
+    volunteerRosterPanel: any;
+    donationTrackingPanel: any;
+    workspaceBrandingPanel: any;
     verificationPanel: any;
     featurePanel: any;
     orgProfilePanel: any;
@@ -116,6 +136,7 @@ export default function PartnerLayout({
   onFeedPress,
   onCommunityFeedPress,
   onPartnerHeaderPress,
+  onInfoPress,
   width,
   messagesOffsetAnim,
   messagePanHandlers,
@@ -123,6 +144,7 @@ export default function PartnerLayout({
   toggleMessagesPane,
   handleCloseMessages,
   onOpenInfo,
+  onOpenTasks,
   isPartnerSheetOpen,
   sheetHeight,
   sheetOffsetAnim,
@@ -203,6 +225,7 @@ export default function PartnerLayout({
         onFeedPress={onFeedPress}
         onCommunityFeedPress={onCommunityFeedPress}
         onPartnerHeaderPress={onPartnerHeaderPress}
+        onInfoPress={onInfoPress}
         isKcanAdmin={isKcanAdmin}
         onOpenAdminDashboard={onOpenAdminDashboard}
         onOpenInsights={onOpenInsights}
@@ -236,6 +259,7 @@ export default function PartnerLayout({
         communitiesForPartner={communitiesForPartner}
         selectedPartner={selectedPartner}
         onOpenInfo={onOpenInfo}
+        onOpenTasks={onOpenTasks}
       />
 
       <PartnerSheet
@@ -272,6 +296,30 @@ export default function PartnerLayout({
         membersPanel={panels.membersPanel}
         rolesPanel={panels.rolesPanel}
         channelsPanel={panels.channelsPanel}
+        tasksPanel={panels.tasksPanel}
+        taskBoardsPanel={panels.taskBoardsPanel}
+        orgStructurePanel={panels.orgStructurePanel}
+        membershipRulesPanel={panels.membershipRulesPanel}
+        spacesDirectoryPanel={panels.spacesDirectoryPanel}
+        analyticsPanel={panels.analyticsPanel}
+        leadershipPanel={panels.leadershipPanel}
+        resourcesPanel={panels.resourcesPanel}
+        trainingTracksPanel={panels.trainingTracksPanel}
+        eventsCalendarPanel={panels.eventsCalendarPanel}
+        broadcastCenterPanel={panels.broadcastCenterPanel}
+        supportInboxPanel={panels.supportInboxPanel}
+        postTemplatesPanel={panels.postTemplatesPanel}
+        surveysPanel={panels.surveysPanel}
+        budgetTrackingPanel={panels.budgetTrackingPanel}
+        volunteerRosterPanel={panels.volunteerRosterPanel}
+        donationTrackingPanel={panels.donationTrackingPanel}
+        workspaceBrandingPanel={panels.workspaceBrandingPanel}
+        directoryChannels={channelsForPartner}
+        directoryGroups={groupsForPartner}
+        directoryCommunities={communitiesForPartner}
+        onSelectDirectoryChannel={onChannelPress}
+        onSelectDirectoryGroup={onGroupPress}
+        onSelectDirectoryCommunity={onCommunityFeedPress}
         verificationPanel={panels.verificationPanel}
         featurePanel={panels.featurePanel}
         orgProfilePanel={panels.orgProfilePanel}

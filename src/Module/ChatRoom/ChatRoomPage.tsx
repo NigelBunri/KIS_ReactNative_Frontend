@@ -183,6 +183,10 @@ const normalizeSubRoom = (
 type ExtendedChatRoomPageProps = ChatRoomPageProps & {
   hideHeader?: boolean;
   onOpenInfo?: (payload: { chat: ChatRoomPageProps['chat']; currentUserId: string | null }) => void;
+  // Partner-channel Tasks board — see PartnerTasksPanel.tsx. Only passed
+  // by PartnersMessagesPane for the channel branch (never for groups/DMs),
+  // so ChatHeader gates the button purely on whether this is provided.
+  onOpenTasks?: () => void;
   onOpenChat?: (chat: NonNullable<ChatRoomPageProps['chat']>) => void;
   initialTargetMessageId?: string | null;
   headerContextLabel?: string | null;
@@ -209,6 +213,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   onForwardMessages,
   hideHeader,
   onOpenInfo,
+  onOpenTasks,
   onOpenChat,
   initialTargetMessageId,
   headerContextLabel,
@@ -2228,6 +2233,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onBack={selectionMode ? exitSelectionMode : onBack}
           palette={palette}
           onOpenInfo={selectionMode ? undefined : handleOpenInfo}
+          onOpenTasks={selectionMode ? undefined : onOpenTasks}
           onStartVoiceCall={selectionMode ? undefined : () => void handleStartCall('voice')}
           onStartVideoCall={selectionMode ? undefined : () => void handleStartCall('video')}
           onStartBroadcast={
