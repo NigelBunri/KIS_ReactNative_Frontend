@@ -51,6 +51,7 @@ type Props = {
   onFeedPress: () => void;
   onCommunityFeedPress: (communityId: string) => void;
   onPartnerHeaderPress: () => void;
+  onInfoPress?: () => void;
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
   onOpenInsights?: () => void;
@@ -76,6 +77,7 @@ export default function PartnersCenterPane({
   onFeedPress,
   onCommunityFeedPress,
   onPartnerHeaderPress,
+  onInfoPress,
   isKcanAdmin,
   onOpenAdminDashboard,
   onOpenInsights,
@@ -202,6 +204,7 @@ export default function PartnersCenterPane({
           topInset={topInset}
           pageGutter={responsive.pageGutter}
           onSettingsPress={onPartnerHeaderPress}
+          onInfoPress={onInfoPress}
           verificationSummary={partnerVerificationSummary}
         />
         <ReanimatedScroll.View style={[collapseStyle, { overflow: 'hidden' }]}>
@@ -696,6 +699,7 @@ type CompactGoldBarProps = {
   topInset: number;
   pageGutter: number;
   onSettingsPress?: () => void;
+  onInfoPress?: () => void;
   verificationSummary?: any;
 };
 
@@ -704,12 +708,10 @@ function PartnerCompactGoldBar({
   topInset,
   pageGutter,
   onSettingsPress,
+  onInfoPress,
   verificationSummary,
 }: CompactGoldBarProps) {
-  const { palette, tone } = useKISTheme();
-  const metallicGold = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const { palette } = useKISTheme();
   const { initials, roleName } = getPartnerIdentity(partner);
 
   return (
@@ -736,7 +738,12 @@ function PartnerCompactGoldBar({
         )}
       </View>
 
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <Pressable
+        style={{ flex: 1, minWidth: 0 }}
+        onPress={onInfoPress}
+        disabled={!onInfoPress}
+        hitSlop={6}
+      >
         <Text
           numberOfLines={1}
           style={{ color: 'rgba(255,244,184,0.96)', fontSize: 17, fontWeight: '900' }}
@@ -749,7 +756,7 @@ function PartnerCompactGoldBar({
         >
           {roleName}{verificationSummary?.verified ? ' · Verified ✓' : ''}
         </Text>
-      </View>
+      </Pressable>
 
       {onSettingsPress && (
         <Pressable

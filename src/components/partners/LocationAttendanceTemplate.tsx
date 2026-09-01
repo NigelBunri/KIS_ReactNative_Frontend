@@ -26,6 +26,8 @@ import useGeolocationData, {
   LocationEvent,
   MyAttendanceStatus,
 } from '@/screens/tabs/partners/hooks/useGeolocationData';
+import { useKISTheme } from '@/theme/useTheme';
+import type { KISPalette } from '@/theme/constants';
 
 type BrandColors = {
   primary?: string;
@@ -47,14 +49,18 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export default function LocationAttendanceTemplate({ partnerId, brandColors, theme = 'dark' }: Props) {
-  const isDark = theme === 'dark';
-  const primary = brandColors?.primary ?? '#c9a84c';
-  const bg = brandColors?.background ?? (isDark ? '#141414' : '#f8f6f0');
-  const textColor = brandColors?.text ?? (isDark ? '#f0e6c8' : '#1a1a1a');
-  const subColor = isDark ? '#888' : '#666';
-  const cardBg = isDark ? '#1f1f1f' : '#ffffff';
-  const borderColor = isDark ? '#2a2a2a' : '#e8e0d0';
+export default function LocationAttendanceTemplate({ partnerId, brandColors, theme }: Props) {
+  // `theme` is the partner org-app's own white-label setting (may differ from
+  // the user's global app theme) — forced into useKISTheme so the palette
+  // still comes from the real theme system (and reacts to the user's chosen
+  // accent color) instead of a second, hand-maintained set of hex fallbacks.
+  const { palette } = useKISTheme(theme);
+  const primary = brandColors?.primary ?? palette.gold;
+  const bg = brandColors?.background ?? palette.bg;
+  const textColor = brandColors?.text ?? palette.text;
+  const subColor = palette.subtext;
+  const cardBg = palette.card;
+  const borderColor = palette.border;
 
   const geo = useGeolocationData(partnerId);
   const [selectedEvent, setSelectedEvent] = useState<LocationEvent | null>(null);
@@ -125,7 +131,7 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
     setCheckingIn(false);
   }, [selectedEvent, geo]);
 
-  const s = buildStyles(primary, bg, textColor, subColor, cardBg, borderColor, isDark, brandColors?.accent);
+  const s = buildStyles(palette, primary, bg, textColor, subColor, cardBg, borderColor, brandColors?.accent);
 
   // ── Event list ──
   if (!selectedEvent) {
@@ -156,7 +162,7 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
             {event.show_checkin_count_to_members && (
               <Text style={s.eventMeta}>{event.attendance_count} checked in</Text>
             )}
-            <View style={[s.pill, { backgroundColor: event.is_checkin_open ? primary + '22' : '#88888822' }]}>
+            <View style={[s.pill, { backgroundColor: event.is_checkin_open ? primary + '22' : subColor + '22' }]}>
               <Text style={[s.pillText, { color: event.is_checkin_open ? primary : subColor }]}>
                 {event.is_checkin_open ? '✅ Check-in open' : STATUS_LABELS[event.status]}
               </Text>
@@ -252,8 +258,8 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
                 disabled={checkingIn}
               >
                 {checkingIn
-                  ? <ActivityIndicator size="small" color={isDark ? '#1a1a1a' : '#fff'} />
-                  : <Text style={[s.btnText, { color: isDark ? '#1a1a1a' : '#fff' }]}>📍 Check In Now</Text>
+                  ? <ActivityIndicator size="small" color={palette.onPrimary} />
+                  : <Text style={[s.btnText, { color: palette.onPrimary }]}>📍 Check In Now</Text>
                 }
               </TouchableOpacity>
             </>
@@ -269,13 +275,13 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
 }
 
 function buildStyles(
+  palette: KISPalette,
   primary: string,
   bg: string,
   textColor: string,
   subColor: string,
   cardBg: string,
   borderColor: string,
-  isDark: boolean,
   accent?: string,
 ) {
   return StyleSheet.create({
@@ -302,14 +308,14 @@ function buildStyles(
     pill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8, alignSelf: 'flex-start' },
     pillText: { fontSize: 12, fontWeight: '600' },
     safetyNotice: {
-      backgroundColor: isDark ? '#1a2a1a' : '#f0fff0',
+      backgroundColor: `${palette.success}10`,
       borderRadius: 10,
       padding: 14,
       marginVertical: 16,
       borderWidth: 1,
-      borderColor: isDark ? '#2a3a2a' : '#c0e0c0',
+      borderColor: `${palette.success}30`,
     },
-    safetyText: { color: isDark ? '#5aaf5a' : '#2a7a2a', fontSize: 12, lineHeight: 18 },
+    safetyText: { color: palette.success, fontSize: 12, lineHeight: 18 },
     consentBox: {
       backgroundColor: cardBg,
       borderRadius: 12,
@@ -328,25 +334,25 @@ function buildStyles(
       marginBottom: 12,
     },
     btnDisabled: { opacity: 0.5 },
-    btnText: { color: isDark ? '#1a1a1a' : '#ffffff', fontSize: 15, fontWeight: '700' },
+    btnText: { color: palette.onPrimary, fontSize: 15, fontWeight: '700' },
     checkedInBox: { alignItems: 'center', paddingVertical: 32, gap: 8 },
     checkedInIcon: { fontSize: 48 },
-    checkedInTitle: { color: accent ?? '#4caf50', fontSize: 17, fontWeight: '700' },
+    checkedInTitle: { color: accent ?? palette.success, fontSize: 17, fontWeight: '700' },
     arrivalNumber: { fontSize: 52, fontWeight: '900' },
     warningBox: {
-      backgroundColor: isDark ? 'rgba(243,156,18,0.07)' : '#fff8e8',
+      backgroundColor: `${palette.gold}10`,
       borderRadius: 10,
       padding: 14,
       marginBottom: 12,
       borderWidth: 1,
-      borderColor: 'rgba(243,156,18,0.27)',
+      borderColor: `${palette.gold}30`,
     },
-    warningText: { color: '#f39c12', fontSize: 13 },
+    warningText: { color: palette.gold, fontSize: 13 },
     checkinGuide: { color: subColor, fontSize: 13, marginBottom: 12, textAlign: 'center' },
-    errorText: { color: '#e74c3c', fontSize: 13, marginBottom: 12, textAlign: 'center' },
+    errorText: { color: palette.danger, fontSize: 13, marginBottom: 12, textAlign: 'center' },
     backBtn: { marginBottom: 12 },
     backBtnText: { fontSize: 14, fontWeight: '600' },
     revokeBtn: { alignItems: 'center', paddingVertical: 12 },
-    revokeBtnText: { color: '#e74c3c', fontSize: 13 },
+    revokeBtnText: { color: palette.danger, fontSize: 13 },
   });
 }

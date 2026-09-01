@@ -52,7 +52,7 @@ function Bone({
 // Matches the shape of PartnersLeftRail: stacked avatar bubbles.
 
 export function PartnerLeftRailSkeleton() {
-  const { palette, isDark } = useKISTheme();
+  const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const railWidth = responsive.isWatch ? 52 : responsive.isCompactPhone ? 60 : LEFT_RAIL_WIDTH;
   const avatarSize = responsive.isWatch ? 38 : responsive.isCompactPhone ? 42 : 48;
@@ -63,7 +63,7 @@ export function PartnerLeftRailSkeleton() {
         styles.leftRail,
         {
           width: railWidth,
-          backgroundColor: isDark ? 'rgba(10,9,14,0.92)' : '#FFFFFF',
+          backgroundColor: palette.bar,
           borderRightColor: palette.divider,
         },
       ]}

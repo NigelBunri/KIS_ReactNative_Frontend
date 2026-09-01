@@ -56,9 +56,7 @@ export default function PartnerAutomationPanel({
   const [conditions, setConditions] = useState<ConditionRow[]>([
     { field: '', op: 'eq', value: '' },
   ]);
-  const [actions, setActions] = useState<ActionRow[]>([
-    { type: '', params: [{ key: '', value: '' }] },
-  ]);
+  const [actions, setActions] = useState<ActionRow[]>([{ type: '', params: {} }]);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -115,17 +113,14 @@ export default function PartnerAutomationPanel({
     const conditionsObj = conditionList.length ? { all: conditionList } : {};
 
     const actionsObj = actions
-      .filter((action) => action.type.trim())
+      .filter((action) => action.type)
       .map((action) => {
         const params: Record<string, any> = {};
-        action.params.forEach((param) => {
-          if (!param.key.trim()) return;
-          params[param.key.trim()] = coerceValue(param.value);
+        Object.entries(action.params || {}).forEach(([key, value]) => {
+          if (value === undefined || value === '') return;
+          params[key] = value;
         });
-        return {
-          type: action.type.trim(),
-          params,
-        };
+        return { type: action.type, params };
       });
     if (!actionsObj.length) {
       Alert.alert('Missing actions', 'Add at least one action.');
@@ -145,7 +140,7 @@ export default function PartnerAutomationPanel({
     setName('');
     setTrigger(DEFAULT_TRIGGER);
     setConditions([{ field: '', op: 'eq', value: '' }]);
-    setActions([{ type: '', params: [{ key: '', value: '' }] }]);
+    setActions([{ type: '', params: {} }]);
     loadRules();
   };
 
@@ -265,6 +260,7 @@ export default function PartnerAutomationPanel({
                 />
                 <AutomationActionsForm
                   palette={palette}
+                  partnerId={partnerId}
                   actions={actions}
                   onChange={setActions}
                 />

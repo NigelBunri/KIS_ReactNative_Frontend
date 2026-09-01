@@ -49,7 +49,6 @@ import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
 import CallsTab from '@/screens/tabs/MesssagingSubTabs/CallsTab';
 import CommunitiesTab from '@/screens/tabs/CommunitiesTab';
-import MessagesOfflineCard from '@/screens/tabs/MesssagingSubTabs/MessagesOfflineCard';
 import NetInfo from '@react-native-community/netinfo';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -2361,7 +2360,6 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       {/* ------------ Offline state — below the gold header's filter chips, ------------
           above the Chats/Updates/Calls/Communities tabs. Replaces the old red
           error bar (previously rendered app-wide in AppNavigator's MainTabs). */}
-      <MessagesOfflineCard visible={isOffline} onRetry={handleRetryConnection} />
 
       {/* ------------ Updates/Calls Search Modal ------------ */}
       {tabSearchOpen && activeTopTab !== 'Chats' ? (

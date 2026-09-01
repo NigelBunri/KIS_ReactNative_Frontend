@@ -12,10 +12,10 @@ type Props = {
 };
 
 export default function PartnerHeaderSection({ partner, onPress }: Props) {
-  const { palette, tone, isDark } = useKISTheme();
-  const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const { palette, isDark, gradients } = useKISTheme();
+  // Accent-reactive 4-stop gradient (was a hardcoded gold-only array that
+  // ignored the user's chosen accent color).
+  const metallicGoldGradient = [...gradients.header];
   const initials =
     partner?.initials || partner?.name?.slice(0, 2).toUpperCase();
   const titleColor = isDark ? palette.ivory : palette.text;
@@ -36,7 +36,7 @@ export default function PartnerHeaderSection({ partner, onPress }: Props) {
       {/* Avatar row: initials box left, settings button right */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <LinearGradient
-          colors={isDark ? ['#5A372D', '#8A5A12', '#D9A875'] : [palette.primarySoft, palette.surface, palette.primarySoft]}
+          colors={isDark ? [palette.goldDeep, palette.goldReadable, palette.goldLight] : [palette.primarySoft, palette.surface, palette.primarySoft]}
           style={[
             styles.partnerHeroAvatar,
             { borderColor: isDark ? palette.goldLight : palette.borderMuted },

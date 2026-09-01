@@ -27,6 +27,24 @@ import { usePartnerGovernancePanel } from './partners/usePartnerGovernancePanel'
 import { usePartnerMembersPanel } from './partners/usePartnerMembersPanel';
 import { usePartnerRolesPanel } from './partners/usePartnerRolesPanel';
 import { usePartnerChannelsPanel } from './partners/usePartnerChannelsPanel';
+import { usePartnerTasksPanel } from './partners/usePartnerTasksPanel';
+import { usePartnerTaskBoardsPanel } from './partners/usePartnerTaskBoardsPanel';
+import { usePartnerOrgStructurePanel } from './partners/usePartnerOrgStructurePanel';
+import { usePartnerMembershipRulesPanel } from './partners/usePartnerMembershipRulesPanel';
+import { usePartnerSpacesDirectoryPanel } from './partners/usePartnerSpacesDirectoryPanel';
+import { usePartnerAnalyticsPanel } from './partners/usePartnerAnalyticsPanel';
+import { usePartnerLeadershipPanel } from './partners/usePartnerLeadershipPanel';
+import { usePartnerResourcesPanel } from './partners/usePartnerResourcesPanel';
+import { usePartnerTrainingTracksPanel } from './partners/usePartnerTrainingTracksPanel';
+import { usePartnerEventsCalendarPanel } from './partners/usePartnerEventsCalendarPanel';
+import { usePartnerBroadcastCenterPanel } from './partners/usePartnerBroadcastCenterPanel';
+import { usePartnerSupportInboxPanel } from './partners/usePartnerSupportInboxPanel';
+import { usePartnerPostTemplatesPanel } from './partners/usePartnerPostTemplatesPanel';
+import { usePartnerSurveysPanel } from './partners/usePartnerSurveysPanel';
+import { usePartnerBudgetTrackingPanel } from './partners/usePartnerBudgetTrackingPanel';
+import { usePartnerVolunteerRosterPanel } from './partners/usePartnerVolunteerRosterPanel';
+import { usePartnerDonationTrackingPanel } from './partners/usePartnerDonationTrackingPanel';
+import { usePartnerWorkspaceBrandingPanel } from './partners/usePartnerWorkspaceBrandingPanel';
 import { usePartnerVerificationPanel } from './partners/usePartnerVerificationPanel';
 import { usePartnerPanelOpeners } from './partners/usePartnerPanelOpeners';
 import { usePartnerFeaturePanel } from './partners/usePartnerFeaturePanel';
@@ -76,7 +94,8 @@ import {
 
 export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
-  const { setAuth } = useAuth();
+  const { setAuth, user } = useAuth();
+  const currentUserId = user?.id ?? null;
   const { width, height } = useWindowDimensions();
   // Slide-over panels below must size themselves off the width actually
   // available inside the tablet/desktop shell's content column, not the raw
@@ -390,6 +409,132 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeChannelsPanel,
   } = usePartnerChannelsPanel(shellContentWidth);
   const {
+    panelWidth: tasksPanelWidth,
+    panelTranslateX: tasksPanelTranslateX,
+    isOpen: isTasksPanelOpen,
+    open: openTasksPanel,
+    close: closeTasksPanel,
+  } = usePartnerTasksPanel(shellContentWidth);
+  const {
+    panelWidth: taskBoardsPanelWidth,
+    panelTranslateX: taskBoardsPanelTranslateX,
+    isOpen: isTaskBoardsPanelOpen,
+    open: openTaskBoardsPanel,
+    close: closeTaskBoardsPanel,
+  } = usePartnerTaskBoardsPanel(shellContentWidth);
+  const {
+    panelWidth: orgStructurePanelWidth,
+    panelTranslateX: orgStructurePanelTranslateX,
+    isOpen: isOrgStructurePanelOpen,
+    open: openOrgStructurePanel,
+    close: closeOrgStructurePanel,
+  } = usePartnerOrgStructurePanel(shellContentWidth);
+  const {
+    panelWidth: membershipRulesPanelWidth,
+    panelTranslateX: membershipRulesPanelTranslateX,
+    isOpen: isMembershipRulesPanelOpen,
+    open: openMembershipRulesPanel,
+    close: closeMembershipRulesPanel,
+  } = usePartnerMembershipRulesPanel(shellContentWidth);
+  const {
+    panelWidth: spacesDirectoryPanelWidth,
+    panelTranslateX: spacesDirectoryPanelTranslateX,
+    isOpen: isSpacesDirectoryPanelOpen,
+    open: openSpacesDirectoryPanel,
+    close: closeSpacesDirectoryPanel,
+  } = usePartnerSpacesDirectoryPanel(shellContentWidth);
+  const {
+    panelWidth: analyticsPanelWidth,
+    panelTranslateX: analyticsPanelTranslateX,
+    isOpen: isAnalyticsPanelOpen,
+    open: openAnalyticsPanel,
+    close: closeAnalyticsPanel,
+  } = usePartnerAnalyticsPanel(shellContentWidth);
+  const {
+    panelWidth: leadershipPanelWidth,
+    panelTranslateX: leadershipPanelTranslateX,
+    isOpen: isLeadershipPanelOpen,
+    open: openLeadershipPanel,
+    close: closeLeadershipPanel,
+  } = usePartnerLeadershipPanel(shellContentWidth);
+  const {
+    panelWidth: resourcesPanelWidth,
+    panelTranslateX: resourcesPanelTranslateX,
+    isOpen: isResourcesPanelOpen,
+    open: openResourcesPanel,
+    close: closeResourcesPanel,
+  } = usePartnerResourcesPanel(shellContentWidth);
+  const {
+    panelWidth: trainingTracksPanelWidth,
+    panelTranslateX: trainingTracksPanelTranslateX,
+    isOpen: isTrainingTracksPanelOpen,
+    open: openTrainingTracksPanel,
+    close: closeTrainingTracksPanel,
+  } = usePartnerTrainingTracksPanel(shellContentWidth);
+  const {
+    panelWidth: eventsCalendarPanelWidth,
+    panelTranslateX: eventsCalendarPanelTranslateX,
+    isOpen: isEventsCalendarPanelOpen,
+    open: openEventsCalendarPanel,
+    close: closeEventsCalendarPanel,
+  } = usePartnerEventsCalendarPanel(shellContentWidth);
+  const {
+    panelWidth: broadcastCenterPanelWidth,
+    panelTranslateX: broadcastCenterPanelTranslateX,
+    isOpen: isBroadcastCenterPanelOpen,
+    open: openBroadcastCenterPanel,
+    close: closeBroadcastCenterPanel,
+  } = usePartnerBroadcastCenterPanel(shellContentWidth);
+  const {
+    panelWidth: supportInboxPanelWidth,
+    panelTranslateX: supportInboxPanelTranslateX,
+    isOpen: isSupportInboxPanelOpen,
+    open: openSupportInboxPanel,
+    close: closeSupportInboxPanel,
+  } = usePartnerSupportInboxPanel(shellContentWidth);
+  const {
+    panelWidth: postTemplatesPanelWidth,
+    panelTranslateX: postTemplatesPanelTranslateX,
+    isOpen: isPostTemplatesPanelOpen,
+    open: openPostTemplatesPanel,
+    close: closePostTemplatesPanel,
+  } = usePartnerPostTemplatesPanel(shellContentWidth);
+  const {
+    panelWidth: surveysPanelWidth,
+    panelTranslateX: surveysPanelTranslateX,
+    isOpen: isSurveysPanelOpen,
+    open: openSurveysPanel,
+    close: closeSurveysPanel,
+  } = usePartnerSurveysPanel(shellContentWidth);
+  const {
+    panelWidth: budgetTrackingPanelWidth,
+    panelTranslateX: budgetTrackingPanelTranslateX,
+    isOpen: isBudgetTrackingPanelOpen,
+    open: openBudgetTrackingPanel,
+    close: closeBudgetTrackingPanel,
+  } = usePartnerBudgetTrackingPanel(shellContentWidth);
+  const {
+    panelWidth: volunteerRosterPanelWidth,
+    panelTranslateX: volunteerRosterPanelTranslateX,
+    isOpen: isVolunteerRosterPanelOpen,
+    open: openVolunteerRosterPanel,
+    close: closeVolunteerRosterPanel,
+  } = usePartnerVolunteerRosterPanel(shellContentWidth);
+  const {
+    panelWidth: donationTrackingPanelWidth,
+    panelTranslateX: donationTrackingPanelTranslateX,
+    isOpen: isDonationTrackingPanelOpen,
+    open: openDonationTrackingPanel,
+    close: closeDonationTrackingPanel,
+  } = usePartnerDonationTrackingPanel(shellContentWidth);
+  const {
+    panelWidth: workspaceBrandingPanelWidth,
+    panelTranslateX: workspaceBrandingPanelTranslateX,
+    isOpen: isWorkspaceBrandingPanelOpen,
+    open: openWorkspaceBrandingPanel,
+    close: closeWorkspaceBrandingPanel,
+  } = usePartnerWorkspaceBrandingPanel(shellContentWidth);
+  const {
     panelWidth: verificationPanelWidth,
     panelTranslateX: verificationPanelTranslateX,
     isOpen: isVerificationPanelOpen,
@@ -583,6 +728,101 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       handleOpenGeolocation();
       return;
     }
+    if (feature.key === 'create_community') {
+      onOpenCreate('community');
+      return;
+    }
+    if (feature.key === 'create_group') {
+      onOpenCreate('group');
+      return;
+    }
+    if (feature.key === 'task_boards') {
+      openTaskBoardsPanel();
+      return;
+    }
+    if (['units_departments', 'org_locations'].includes(feature.key)) {
+      openOrgStructurePanel();
+      return;
+    }
+    if (feature.key === 'content_rules') {
+      handleOpenPolicy();
+      return;
+    }
+    if (feature.key === 'membership_rules') {
+      openMembershipRulesPanel();
+      return;
+    }
+    if (feature.key === 'spaces_directory') {
+      openSpacesDirectoryPanel();
+      return;
+    }
+    if ([
+      'engagement_overview', 'reaction_trends', 'top_contributors', 'growth_funnel',
+      'content_performance', 'channel_health', 'community_heatmap', 'participation_depth',
+      'sentiment_snapshot', 'message_velocity', 'retention', 'campaign_tracking',
+      'response_times', 'event_uptake', 'resource_downloads',
+    ].includes(feature.key)) {
+      openAnalyticsPanel();
+      return;
+    }
+    if ([
+      'org_tree_view', 'leadership_roles', 'succession_plan', 'team_health',
+      'leadership_directory', 'mentorship_routes', 'skills_matrix', 'capacity_planning',
+      'role_alignment', 'org_announcements', 'org_tree_notes', 'role_requirements',
+      'onboarding_paths', 'leadership_goals', 'cross_team_projects', 'reporting_lines',
+      'span_of_control', 'diversity_dashboard', 'conflict_resolution', 'leadership_scorecards',
+    ].includes(feature.key)) {
+      if (feature.key === 'leadership_roles') {
+        handleOpenRoles();
+        return;
+      }
+      openLeadershipPanel();
+      return;
+    }
+    if (['resource_library', 'knowledge_base'].includes(feature.key)) {
+      openResourcesPanel();
+      return;
+    }
+    if (feature.key === 'training_tracks') {
+      openTrainingTracksPanel();
+      return;
+    }
+    if (feature.key === 'events_calendar') {
+      openEventsCalendarPanel();
+      return;
+    }
+    if (['broadcast_center', 'announcement_scheduler'].includes(feature.key)) {
+      openBroadcastCenterPanel();
+      return;
+    }
+    if (['support_inbox', 'helpdesk'].includes(feature.key)) {
+      openSupportInboxPanel();
+      return;
+    }
+    if (feature.key === 'templates') {
+      openPostTemplatesPanel();
+      return;
+    }
+    if (['feedback_hub', 'surveys'].includes(feature.key)) {
+      openSurveysPanel();
+      return;
+    }
+    if (feature.key === 'budget_tracking') {
+      openBudgetTrackingPanel();
+      return;
+    }
+    if (feature.key === 'volunteer_roster') {
+      openVolunteerRosterPanel();
+      return;
+    }
+    if (feature.key === 'donation_tracking') {
+      openDonationTrackingPanel();
+      return;
+    }
+    if (feature.key === 'workspace_branding') {
+      openWorkspaceBrandingPanel();
+      return;
+    }
     openFeaturePanel(feature);
   };
 
@@ -608,14 +848,14 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const handleOpenPartnerInfo = useCallback(() => {
     const activePartnerId = String(selectedPartner?.id || '');
     if (!activePartnerId) {
-      onOpenInfo?.();
+      // No partner selected — nothing to show info/landing-page-builder for.
       return;
     }
     Alert.alert('Partner actions', 'Choose what to open.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Open info',
-        onPress: () => onOpenInfo?.(),
+        onPress: () => openOrgProfilePanel(),
       },
       {
         text: 'Landing page builder',
@@ -627,7 +867,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
           }),
       },
     ]);
-  }, [onOpenInfo, rootNavigation, selectedPartner?.id, selectedPartner?.name]);
+  }, [openOrgProfilePanel, rootNavigation, selectedPartner?.id, selectedPartner?.name]);
   const {
     rootPanHandlers,
     onAddPartnerPress,
@@ -685,13 +925,15 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         onFeedPress={onFeedPress}
         onCommunityFeedPress={onCommunityFeedPress}
         onPartnerHeaderPress={onPartnerHeaderPress}
+        onInfoPress={handleOpenPartnerInfo}
         width={width}
         messagesOffsetAnim={messagesOffsetAnim}
         messagePanHandlers={messagePanHandlers}
         isMessagesExpanded={isMessagesExpanded}
         toggleMessagesPane={toggleMessagesPane}
         handleCloseMessages={handleCloseMessages}
-        onOpenInfo={handleOpenPartnerInfo}
+        onOpenInfo={onOpenInfo}
+        onOpenTasks={openTasksPanel}
         isPartnerSheetOpen={isPartnerSheetOpen}
         sheetHeight={sheetHeight}
         sheetOffsetAnim={sheetOffsetAnim}
@@ -811,6 +1053,125 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelWidth: channelsPanelWidth,
             panelTranslateX: channelsPanelTranslateX,
             onClose: closeChannelsPanel,
+          },
+          tasksPanel: {
+            isOpen: isTasksPanelOpen,
+            panelWidth: tasksPanelWidth,
+            panelTranslateX: tasksPanelTranslateX,
+            onClose: closeTasksPanel,
+            channelId: selectedChannelId,
+            channelName: channelsForPartner?.find((c: any) => c.id === selectedChannelId)?.name ?? null,
+            currentUserId,
+            canManageTasks: canManageOrganizationApps,
+          },
+          taskBoardsPanel: {
+            isOpen: isTaskBoardsPanelOpen,
+            panelWidth: taskBoardsPanelWidth,
+            panelTranslateX: taskBoardsPanelTranslateX,
+            onClose: closeTaskBoardsPanel,
+            currentUserId,
+            canManageTasks: canManageOrganizationApps,
+          },
+          orgStructurePanel: {
+            isOpen: isOrgStructurePanelOpen,
+            panelWidth: orgStructurePanelWidth,
+            panelTranslateX: orgStructurePanelTranslateX,
+            onClose: closeOrgStructurePanel,
+          },
+          membershipRulesPanel: {
+            isOpen: isMembershipRulesPanelOpen,
+            panelWidth: membershipRulesPanelWidth,
+            panelTranslateX: membershipRulesPanelTranslateX,
+            onClose: closeMembershipRulesPanel,
+          },
+          spacesDirectoryPanel: {
+            isOpen: isSpacesDirectoryPanelOpen,
+            panelWidth: spacesDirectoryPanelWidth,
+            panelTranslateX: spacesDirectoryPanelTranslateX,
+            onClose: closeSpacesDirectoryPanel,
+          },
+          analyticsPanel: {
+            isOpen: isAnalyticsPanelOpen,
+            panelWidth: analyticsPanelWidth,
+            panelTranslateX: analyticsPanelTranslateX,
+            onClose: closeAnalyticsPanel,
+          },
+          leadershipPanel: {
+            isOpen: isLeadershipPanelOpen,
+            panelWidth: leadershipPanelWidth,
+            panelTranslateX: leadershipPanelTranslateX,
+            onClose: closeLeadershipPanel,
+          },
+          resourcesPanel: {
+            isOpen: isResourcesPanelOpen,
+            panelWidth: resourcesPanelWidth,
+            panelTranslateX: resourcesPanelTranslateX,
+            onClose: closeResourcesPanel,
+            canManage: canManageOrganizationApps,
+          },
+          trainingTracksPanel: {
+            isOpen: isTrainingTracksPanelOpen,
+            panelWidth: trainingTracksPanelWidth,
+            panelTranslateX: trainingTracksPanelTranslateX,
+            onClose: closeTrainingTracksPanel,
+          },
+          eventsCalendarPanel: {
+            isOpen: isEventsCalendarPanelOpen,
+            panelWidth: eventsCalendarPanelWidth,
+            panelTranslateX: eventsCalendarPanelTranslateX,
+            onClose: closeEventsCalendarPanel,
+            canManage: canManageOrganizationApps,
+          },
+          broadcastCenterPanel: {
+            isOpen: isBroadcastCenterPanelOpen,
+            panelWidth: broadcastCenterPanelWidth,
+            panelTranslateX: broadcastCenterPanelTranslateX,
+            onClose: closeBroadcastCenterPanel,
+          },
+          supportInboxPanel: {
+            isOpen: isSupportInboxPanelOpen,
+            panelWidth: supportInboxPanelWidth,
+            panelTranslateX: supportInboxPanelTranslateX,
+            onClose: closeSupportInboxPanel,
+            canManage: canManageOrganizationApps,
+          },
+          postTemplatesPanel: {
+            isOpen: isPostTemplatesPanelOpen,
+            panelWidth: postTemplatesPanelWidth,
+            panelTranslateX: postTemplatesPanelTranslateX,
+            onClose: closePostTemplatesPanel,
+          },
+          surveysPanel: {
+            isOpen: isSurveysPanelOpen,
+            panelWidth: surveysPanelWidth,
+            panelTranslateX: surveysPanelTranslateX,
+            onClose: closeSurveysPanel,
+            canManage: canManageOrganizationApps,
+          },
+          budgetTrackingPanel: {
+            isOpen: isBudgetTrackingPanelOpen,
+            panelWidth: budgetTrackingPanelWidth,
+            panelTranslateX: budgetTrackingPanelTranslateX,
+            onClose: closeBudgetTrackingPanel,
+          },
+          volunteerRosterPanel: {
+            isOpen: isVolunteerRosterPanelOpen,
+            panelWidth: volunteerRosterPanelWidth,
+            panelTranslateX: volunteerRosterPanelTranslateX,
+            onClose: closeVolunteerRosterPanel,
+            canManage: canManageOrganizationApps,
+          },
+          donationTrackingPanel: {
+            isOpen: isDonationTrackingPanelOpen,
+            panelWidth: donationTrackingPanelWidth,
+            panelTranslateX: donationTrackingPanelTranslateX,
+            onClose: closeDonationTrackingPanel,
+          },
+          workspaceBrandingPanel: {
+            isOpen: isWorkspaceBrandingPanelOpen,
+            panelWidth: workspaceBrandingPanelWidth,
+            panelTranslateX: workspaceBrandingPanelTranslateX,
+            onClose: closeWorkspaceBrandingPanel,
           },
           verificationPanel: {
             isOpen: isVerificationPanelOpen,

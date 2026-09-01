@@ -30,6 +30,7 @@ type Props = {
   communitiesForPartner: PartnerCommunity[];
   selectedPartner?: Partner;
   onOpenInfo?: (payload: { chat: any; currentUserId: string | null }) => void;
+  onOpenTasks?: () => void;
 };
 
 export default function PartnersMessagesPane({
@@ -48,6 +49,7 @@ export default function PartnersMessagesPane({
   communitiesForPartner,
   selectedPartner,
   onOpenInfo,
+  onOpenTasks,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -150,6 +152,7 @@ export default function PartnersMessagesPane({
           onBack={closeMessagesPane}
           allChats={[]}
           onOpenInfo={onOpenInfo}
+          onOpenTasks={onOpenTasks}
         />
       ) : selectedGroupId && chatForGroup ? (
         <ChatRoomPage

@@ -248,9 +248,48 @@ export default function LoginScreen({ navigation }: any) {
           );
         }
         if (errorCode === 'account_disabled') {
+          // "Disabled" covers both a moderation ban and a self-requested
+          // deletion still inside its grace period — the reactivate
+          // endpoint safely no-ops (400, no state change) for anything
+          // that isn't the latter, so it's safe to always offer this.
           return Alert.alert(
             'Account disabled',
-            'This account has been disabled. Please contact support.',
+            'This account has been disabled, or a deletion request may still be within its cancellation window.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Try to Reactivate',
+                onPress: async () => {
+                  try {
+                    const reactivateRes = await postRequest(
+                      ROUTES.auth.accountReactivate,
+                      { phone: phoneE164, password },
+                      { errorMessage: 'Unable to reactivate this account.' },
+                    );
+                    if (reactivateRes?.success) {
+                      Alert.alert(
+                        'Account reactivated',
+                        'Your scheduled deletion has been cancelled. Please log in again.',
+                      );
+                    } else {
+                      Alert.alert(
+                        'Reactivation unavailable',
+                        String(
+                          reactivateRes?.data?.detail ||
+                          reactivateRes?.message ||
+                          'This account has no pending deletion to cancel. Please contact support.',
+                        ),
+                      );
+                    }
+                  } catch (reactivateError: any) {
+                    Alert.alert(
+                      'Error',
+                      reactivateError?.message ?? 'Unexpected error while reactivating.',
+                    );
+                  }
+                },
+              },
+            ],
           );
         }
         if (

@@ -25,6 +25,11 @@ type ContentCard = {
   thumbnail_url?: string;
   view_count?: number;
   duration_seconds?: number;
+  // "Why am I seeing this?" - a plain-language explanation of whichever
+  // real ranking signal (subscription, engagement, recency, watch
+  // history) actually placed this item here. See
+  // ChannelContentRecommendationsView on the backend.
+  recommendation_reason?: string;
 };
 
 type Props = {
@@ -131,6 +136,14 @@ export default function RecommendationsSection({ onPressContent, style }: Props)
         {!!item.view_count && (
           <Text style={[styles.cardMeta, { color: palette.subtext }]}>
             {formatViewCount(item.view_count)}
+          </Text>
+        )}
+        {!!item.recommendation_reason && (
+          <Text
+            style={[styles.cardReason, { color: palette.subtext }]}
+            numberOfLines={1}
+          >
+            {item.recommendation_reason}
           </Text>
         )}
       </View>
@@ -241,6 +254,11 @@ const styles = StyleSheet.create({
   },
   cardMeta: {
     fontSize: 11,
+    marginTop: 2,
+  },
+  cardReason: {
+    fontSize: 10,
+    fontStyle: 'italic',
     marginTop: 2,
   },
   empty: {

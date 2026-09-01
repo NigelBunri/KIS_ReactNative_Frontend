@@ -18,10 +18,10 @@ export default function PartnerGroupsSection({
   onGroupPress,
   showHeader = true,
 }: Props) {
-  const { palette, tone } = useKISTheme();
-  const metallicGoldGradient = tone === 'dark'
-    ? ['#3B271E', '#6F4515', '#B9852E', '#56321F']
-    : ['#5A372D', '#8A5A12', '#D9A875', '#7A4B3E'];
+  const { palette, gradients } = useKISTheme();
+  // Accent-reactive 4-stop gradient (was a hardcoded gold-only array that
+  // ignored the user's chosen accent color).
+  const metallicGoldGradient = [...gradients.header];
 
   return (
     <>

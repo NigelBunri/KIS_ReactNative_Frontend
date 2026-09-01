@@ -101,7 +101,7 @@ export default function PartnerSheet({
           />
         </View>
         <ScrollView
-          style={{ flex: 1 }}
+          style={{ marginTop: 200}}
           contentContainerStyle={styles.settingsScrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -115,6 +115,7 @@ export default function PartnerSheet({
                   ]}
                 >
                   Partner control room
+                  {compact}
                 </Text>
                 <Text
                   style={[styles.settingsTitle, { color: palette.text }]}
