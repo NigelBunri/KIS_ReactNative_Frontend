@@ -15,6 +15,26 @@ let latestVideoProps: any = null;
 
 const DEV_API_BASE = `http://${DEV_BACKEND_HOST}:${API_PORT}`;
 
+// @/network/config's real API_BASE_URL now prefers an env-configured
+// backend (APP_ENV.KIS_DJANGO_BASE_URL) over the local-dev IP whenever one
+// is set — see config.ts's __DEV__ ternary — so leaving it unmocked makes
+// this test depend on whatever .env happens to be checked out (it was
+// resolving to the deployed production API on this machine, not the local
+// host DEV_API_BASE above assumes). Pinning it here keeps the test's
+// notion of "the configured backend base" self-consistent regardless of
+// ambient env config.
+jest.mock('@/network/config', () => {
+  const DEV_BACKEND_HOST = '10.165.154.99';
+  const API_PORT = 8000;
+  const API_BASE_URL = `http://${DEV_BACKEND_HOST}:${API_PORT}`;
+  return {
+    DEV_BACKEND_HOST,
+    API_PORT,
+    API_BASE_URL,
+    NEST_API_BASE_URL: API_BASE_URL,
+  };
+});
+
 jest.mock('@/Module/vieo', () => ({
   KISVideo: (props: any) => {
     latestVideoProps = props;
@@ -71,7 +91,11 @@ describe('broadcast feeds video playback', () => {
     });
 
     expect(sources).toHaveLength(1);
-    expect(sources[0].url).toBe(`${DEV_API_BASE}/api/v1/broadcasts/videos/video-1/stream/`);
+    // parseVideoUrl strips a trailing slash from resolved video URLs — see
+    // its "Hermes URL parser may append a trailing slash to file paths"
+    // comment in feedVideoPlayback.ts — even though the source attachment
+    // above has one.
+    expect(sources[0].url).toBe(`${DEV_API_BASE}/api/v1/broadcasts/videos/video-1/stream`);
     expect(sources[0].host).toBe(DEV_BACKEND_HOST);
     expect(['http-source', 'loopback-host']).toContain(getBroadcastFeedVideoRiskNote(sources[0]));
   });
@@ -91,7 +115,9 @@ describe('broadcast feeds video playback', () => {
       );
     });
 
-    expect(latestVideoProps.sourceUrl).toBe('https://api.example.com/api/v1/broadcasts/videos/video-1/stream/');
+    // Trailing slash stripped by parseVideoUrl — see the comment on the
+    // first test's equivalent assertion above.
+    expect(latestVideoProps.sourceUrl).toBe('https://api.example.com/api/v1/broadcasts/videos/video-1/stream');
 
     await ReactTestRenderer.act(async () => {
       latestVideoProps.onError('stream failed');

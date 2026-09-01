@@ -101,7 +101,13 @@ describe('broadcast feeds useFeedsData', () => {
       expect.stringContaining('/api/v1/broadcasts/?q=alpha&code=broadcast_feed_entry&limit=20&offset=0'),
       expect.objectContaining({ errorMessage: 'Unable to load feeds.' }),
     );
-    expect(ref.current?.items.map((item) => item.id)).toEqual(['broadcast-1', 'broadcast-2']);
+    // loadFirstPage runs results through shuffleFeedItems (an unseeded
+    // Fisher-Yates shuffle - see useFeedsData.ts) before storing them, so
+    // the backend's response order isn't preserved; assert the same set
+    // of ids came back, not a specific sequence.
+    expect(ref.current?.items.map((item) => item.id).sort()).toEqual(
+      ['broadcast-1', 'broadcast-2'].sort(),
+    );
     expect(ref.current?.loading).toBe(false);
     expect(ref.current?.loadingMore).toBe(false);
   });
@@ -144,7 +150,13 @@ describe('broadcast feeds useFeedsData', () => {
       'https://kis.app/api/v1/broadcasts/?limit=20&offset=20',
       expect.objectContaining({ errorMessage: 'Unable to load more.' }),
     );
-    expect(ref.current?.items.map((item) => item.id)).toEqual(['broadcast-1', 'broadcast-2', 'broadcast-3']);
+    // First page's two items are shuffled (see the comment on the first
+    // test above); loadMore appends the next page's items after them in
+    // their original order without reshuffling (see loadMore's `merged`
+    // push loop), so broadcast-3 is reliably last.
+    const ids = ref.current?.items.map((item) => item.id) ?? [];
+    expect(ids.slice(0, 2).sort()).toEqual(['broadcast-1', 'broadcast-2'].sort());
+    expect(ids[2]).toBe('broadcast-3');
   });
 
   test('handles optimistic react success, save, hide, and subscribe transitions', async () => {
@@ -189,7 +201,7 @@ describe('broadcast feeds useFeedsData', () => {
     expect(ref.current?.items).toEqual([]);
   });
 
-  test('rolls back optimistic reaction and keeps state stable on errors', async () => {
+  test('keeps optimistic state and queues a retry when reacting/saving fail, but never optimistically hides', async () => {
     mockedGetRequest.mockResolvedValueOnce({
       success: true,
       data: { count: 1, next: null, previous: null, results: [baseItem] },
@@ -207,17 +219,23 @@ describe('broadcast feeds useFeedsData', () => {
       ReactTestRenderer.create(<HookHarness ref={ref} />);
     });
 
+    // reactToItem/toggleSaved deliberately don't roll back on failure —
+    // see the "Queue for retry when offline — optimistic state stays
+    // intact" comments in useFeedsData.ts. A failed request enqueues the
+    // mutation via enqueueMutation for later retry instead, so the user
+    // never sees their like/save flicker back off.
     await ReactTestRenderer.act(async () => {
       const result = await ref.current?.reactToItem('broadcast-1');
       expect(result?.ok).toBe(false);
     });
-    expect(ref.current?.items[0].reaction_count).toBe(1);
+    expect(ref.current?.items[0].reaction_count).toBe(2);
+    expect(ref.current?.items[0].viewer_reaction).toBe('❤️');
 
     await ReactTestRenderer.act(async () => {
       const result = await ref.current?.toggleSaved('broadcast-1', false);
       expect(result?.ok).toBe(false);
     });
-    expect(ref.current?.items[0].viewer_saved).toBe(false);
+    expect(ref.current?.items[0].viewer_saved).toBe(true);
 
     await ReactTestRenderer.act(async () => {
       const result = await ref.current?.hideItem('broadcast-1');

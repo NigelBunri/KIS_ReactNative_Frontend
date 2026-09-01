@@ -6,14 +6,16 @@ import ReactTestRenderer from 'react-test-renderer';
 import FeedsDiscoverPage from '@/screens/broadcast/feeds/FeedsDiscoverPage';
 import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
 import { postRequest } from '@/network/post';
+// Patched in place with jest.spyOn rather than replaced wholesale
+// (`ReactNative.Share = {...}` etc.) — see the same fix/rationale in
+// broadcast-feeds.detail-screen.test.tsx: a fresh replacement object here
+// isn't guaranteed to be what the component under test still holds a
+// reference to; spying on the existing singletons' methods is.
 const ReactNative = require('react-native');
-ReactNative.Share = {
-  share: jest.fn(() => Promise.resolve({ action: 'sharedAction' })),
-};
-ReactNative.DeviceEventEmitter = {
-  emit: jest.fn(),
-  addListener: jest.fn(() => ({ remove: jest.fn() })),
-};
+jest.spyOn(ReactNative.Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+jest.spyOn(ReactNative.Alert, 'alert').mockImplementation(() => {});
+jest.spyOn(ReactNative.DeviceEventEmitter, 'emit').mockImplementation(() => {});
+jest.spyOn(ReactNative.DeviceEventEmitter, 'addListener').mockReturnValue({ remove: jest.fn() });
 ReactNative.RefreshControl = ReactNative.View;
 
 jest.mock('@react-native-clipboard/clipboard', () => ({
@@ -23,6 +25,11 @@ jest.mock('@react-native-clipboard/clipboard', () => ({
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate }),
+  useIsFocused: () => true,
+}));
+
+jest.mock('@/hooks/useResponsibleFeedLimit', () => ({
+  useResponsibleFeedLimit: () => ({ status: null, refreshStatus: jest.fn() }),
 }));
 
 jest.mock('@/theme/useTheme', () => ({
@@ -189,9 +196,15 @@ describe('broadcast feeds discover page', () => {
     await ReactTestRenderer.act(async () => {
       mainSectionProps.onOpenItem(item);
     });
+    // handleOpenItem also passes the active feed list + the tapped item's
+    // position in it now (see FeedsDiscoverPage.tsx), so BroadcastDetail
+    // can page between items without a round trip back through this
+    // screen — not just the single tapped item.
     expect(mockNavigate).toHaveBeenCalledWith('BroadcastDetail', {
       id: 'broadcast-1',
       item,
+      items: hookValue.items,
+      index: 0,
     });
 
     await ReactTestRenderer.act(async () => {
@@ -248,6 +261,16 @@ describe('broadcast feeds discover page', () => {
       await hideButton.onPress();
     });
     expect(hookValue.toggleSaved).toHaveBeenCalledWith('broadcast-1', false);
+    // "Hide" from the menu opens its own confirmation alert ("You will
+    // never see this post again.") rather than hiding right away — hideItem
+    // only fires once that second alert's destructive button is pressed.
+    const hideConfirmButtons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] ?? [];
+    const confirmHideButton = hideConfirmButtons.find(
+      (entry: any) => entry.text === 'Yes, hide',
+    );
+    await ReactTestRenderer.act(async () => {
+      await confirmHideButton.onPress();
+    });
     expect(hookValue.hideItem).toHaveBeenCalledWith('broadcast-1');
 
     await ReactTestRenderer.act(async () => {
@@ -276,7 +299,21 @@ describe('broadcast feeds discover page', () => {
       true,
     );
 
-    const scrollView = renderer!.root.findByType('ScrollView');
+    // findByType('ScrollView') (a string) never matches: like Pressable
+    // (see broadcast-feeds.detail-screen.test.tsx), ScrollView is a
+    // composite component, not a host primitive — its test-instance type
+    // is never the literal string "ScrollView". There are two ScrollViews
+    // in this tree (an inner horizontal category-chip row plus the outer
+    // page scroller); only the outer one takes onScroll.
+    // The RN jest preset's own ScrollView mock has test-instance type
+    // name "ScrollViewMock" (found by first collecting every node with an
+    // onScroll prop, which also picks up its inner "Component"/
+    // "RCTScrollView" wrapper layers) — not the string "ScrollView" (a
+    // composite component, not a host primitive; see the Pressable/
+    // findAllByType comment in broadcast-feeds.detail-screen.test.tsx).
+    const scrollView = renderer!.root.findAll(
+      (node) => (node.type as any)?.name === 'ScrollViewMock',
+    )[0];
     await ReactTestRenderer.act(async () => {
       scrollView.props.onScroll({
         nativeEvent: {

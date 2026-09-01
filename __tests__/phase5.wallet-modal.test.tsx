@@ -68,13 +68,19 @@ describe('WalletModal promotional-credit safety copy', () => {
       const value = node.props.children;
       return Array.isArray(value) ? value.join('') : String(value);
     });
-    expect(
-      texts.some(value => value.includes('cannot be bought, transferred, withdrawn, sold, or converted to cash')),
-    ).toBe(true);
+    // WalletModal no longer renders a wallet-specific safety disclaimer
+    // itself (that copy now lives in AccountCreditsCard.tsx) — every mode
+    // other than 'loyalty'/'invoices' collapses into the same generic
+    // read-only card below, so this asserts on that current copy.
     expect(texts.some(value => value.includes('Read-only credit center'))).toBe(true);
+    expect(
+      texts.some(value =>
+        value.includes('Promotional credits can only subsidize eligible KIS account upgrades'),
+      ),
+    ).toBe(true);
   });
 
-  test('explains legacy wallet actions are unavailable', () => {
+  test('shows the same read-only credit center for legacy wallet modes', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
@@ -96,6 +102,9 @@ describe('WalletModal promotional-credit safety copy', () => {
       const value = node.props.children;
       return Array.isArray(value) ? value.join('') : String(value);
     });
-    expect(texts.some(value => value.includes('This wallet action is unavailable'))).toBe(true);
+    // 'transfer' isn't specially handled anymore — any mode other than
+    // 'loyalty'/'invoices' falls into the same generic read-only card, so
+    // there's no mode-specific "this action is unavailable" copy to find.
+    expect(texts.some(value => value.includes('Read-only credit center'))).toBe(true);
   });
 });

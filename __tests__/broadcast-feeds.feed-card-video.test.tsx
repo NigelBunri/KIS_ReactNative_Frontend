@@ -29,6 +29,10 @@ jest.mock('@/constants/kisIcons', () => ({
 
 jest.mock('@/network', () => ({
   resolveBackendAssetUrl: (value: string) => value,
+  // BroadcastFeedVideoPreview reads auth/device headers for the video
+  // source via this hook; a real render doesn't need real headers, just a
+  // stable object so it doesn't crash for being undefined.
+  useMediaHeaders: () => ({}),
 }));
 
 jest.mock('@/components/common/KISText', () => {
@@ -75,13 +79,15 @@ describe('broadcast feed card video cues', () => {
       );
     });
 
-    const textNodes = renderer!.root.findAllByType('Text');
-    const renderedText = textNodes
-      .map((node) => {
-        const children = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
-        return children.filter((value) => value !== null && value !== undefined).join('');
-      })
-      .join(' ');
-    expect(renderedText).toContain('Play video');
+    // BroadcastFeedCard's own "Play video" text pill (styles.playText) is
+    // now only a fallback for the rare case where an attachment couldn't
+    // be resolved to a raw record — see the comment above its render
+    // condition in BroadcastFeedCard.tsx. This attachment resolves fine,
+    // so BroadcastFeedVideoPreview renders its own (icon-only, no text)
+    // poster instead; the equivalent, current "play cue" to assert on is
+    // that the player mounts paused (autoPlay defaults to false here),
+    // which is what makes that poster/tap-to-play affordance show at all.
+    const video = renderer!.root.findByProps({ testID: 'mock-video' });
+    expect(video.props.paused).toBe(true);
   });
 });
