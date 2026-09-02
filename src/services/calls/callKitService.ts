@@ -21,17 +21,20 @@
 //   On a real iPhone/iPad, CallKit and WebRTC cooperate via the CXProviderDelegate
 //   audio activation callbacks (provider(_:didActivate:)) so there is no conflict.
 //
-//   CALLKIT_ENABLED is therefore FALSE in __DEV__ builds (which includes the
-//   simulator). Set it to true for a real-device debug or Release build.
+//   The audio-session conflict above is an iOS-Simulator-only problem — there is
+//   no equivalent issue on Android (emulator or device), so gating CallKeep off
+//   for every __DEV__ build (including real-device Android debug builds, which
+//   is how this app is actually tested) was disabling the exact background
+//   incoming-call UI needed to reproduce/verify call delivery. Android is
+//   therefore always enabled; iOS stays gated by __DEV__ since we can't
+//   reliably tell simulator from real-device debug without an extra native
+//   dependency (react-native-device-info). Set the iOS side to `true` too
+//   once testing moves to a real-device debug or Release build.
 
 import { Platform, PermissionsAndroid } from 'react-native';
 import type { CallType } from './callTypes';
 
-// Disable in any DEBUG build (simulator + real-device debug).
-// Change to `true` when you want to test CallKit on a physical device.
-// Release builds (App Store / TestFlight) automatically have __DEV__ = false,
-// so CallKit is always active in production.
-const CALLKIT_ENABLED = !__DEV__;
+const CALLKIT_ENABLED = Platform.OS === 'android' ? true : !__DEV__;
 
 let RNCallKeep: any = null;
 if (CALLKIT_ENABLED) {

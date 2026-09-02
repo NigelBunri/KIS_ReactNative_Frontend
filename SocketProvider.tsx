@@ -249,6 +249,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const activeCallRef = useRef<CallSession | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
   const persistCallEndRef = useRef<((session: CallSession | null, state: 'ended' | 'missed') => void) | null>(null);
+  // Lets the ring-timeout (declared alongside startCall, above endCall in
+  // this file) invoke the always-current endCall without a hoisting/stale-
+  // closure issue — same pattern as persistCallEndRef above.
+  const endCallRef = useRef<((reason?: string) => Promise<void>) | null>(null);
   const lastSocketRecoveryKickRef = useRef(0);
   const lastSocketConnectErrorLogRef = useRef(0);
   // Concurrency guards
@@ -256,6 +260,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const _answeringRef    = useRef(false);
   const _leavingRef      = useRef(false);
   const _sfuJoiningRef   = useRef(false);
+  // Ring timeout for an outgoing call that nobody answers — see startCall.
+  // Without this, a call the callee never sees (e.g. backgrounded/killed)
+  // stays "active" server-side until a 60s backend fallback kicks in, and
+  // every retry to the same conversation in the meantime is rejected with
+  // CALL_ALREADY_ACTIVE.
+  const _ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks peers we've already sent a WebRTC offer to for the current call.
   // The backend may deliver call.answer twice (conv-room broadcast + targeted
   // user-room emit to the creator), and creating a second offer on a peer that
@@ -631,6 +641,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Register outgoing call with the OS call system
     startOutgoingCall({ callUUID: callId, callerName: safeDisplayName(args.title, 'Call'), callType });
 
+    if (_ringTimeoutRef.current) clearTimeout(_ringTimeoutRef.current);
+
     s.emit('call.offer', {
       callId,
       conversationId: args.conversationId,
@@ -643,12 +655,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, (ack?: any) => {
       _startingCallRef.current = false;
       if (!ack?.ok) {
+        if (_ringTimeoutRef.current) { clearTimeout(_ringTimeoutRef.current); _ringTimeoutRef.current = null; }
         setActiveCall(null);
         webRTCService.closeAll();
         audioRouteManager.stop();
         Alert.alert('Call failed', ack?.error ?? 'Unable to start the call.');
       }
     });
+
+    // Ring timeout: if nobody answers within 45s, end the call as
+    // 'no_answer' instead of leaving it "active" server-side forever.
+    // Without this, an unanswered call (e.g. the invitee never saw it
+    // while backgrounded) blocks every retry to this conversation with
+    // CALL_ALREADY_ACTIVE until the backend's own stale-call fallback
+    // kicks in. Only meaningful when there's actually someone to ring.
+    if (invitees.length > 0) {
+      _ringTimeoutRef.current = setTimeout(() => {
+        _ringTimeoutRef.current = null;
+        if (activeCallRef.current?.callId === callId && activeCallRef.current.state === 'dialing') {
+          endCallRef.current?.('no_answer');
+        }
+      }, 45000);
+    }
 
     // Release lock after a safety timeout in case the server never ACKs
     setTimeout(() => { _startingCallRef.current = false; }, 8000);
@@ -911,9 +939,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     sfuPeerStreamsRef.current.clear();
     audioRouteManager.stop();
 
-    const resolvedState = reason === 'missed' || reason === 'rejected' || reason === 'busy' ? 'missed' : 'ended';
+    const resolvedState = reason === 'missed' || reason === 'rejected' || reason === 'busy' || reason === 'no_answer' ? 'missed' : 'ended';
     persistCallEnd(session, resolvedState);
     reportCallEnded(session?.callId ?? '', resolvedState === 'missed' ? 'rejected' : 'ended');
+
+    if (_ringTimeoutRef.current) { clearTimeout(_ringTimeoutRef.current); _ringTimeoutRef.current = null; }
 
     setActiveCall(prev => prev ? {
       ...prev,
@@ -924,6 +954,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     DeviceEventEmitter.emit('calls.refresh');
   }, [persistCallEnd]);
+
+  // Keep endCallRef current so the ring-timeout (declared earlier in this
+  // file, inside startCall) can invoke the always-current endCall.
+  useEffect(() => { endCallRef.current = endCall; }, [endCall]);
 
   const rejectCall = useCallback(async (reason = 'rejected') => endCall(reason), [endCall]);
 
@@ -1796,6 +1830,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // Someone answered. Stop the ringback, transition to active, and
           // create the WebRTC peer offer to the person who just joined.
           audioRouteManager.stopRingback();
+          if (_ringTimeoutRef.current) { clearTimeout(_ringTimeoutRef.current); _ringTimeoutRef.current = null; }
           setActiveCall(prev => {
             if (!prev || prev.callId !== callId) return prev;
             const justConnected = CALL_STATES_BEFORE_CONNECT.has(prev.state);
@@ -2573,21 +2608,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (!isAuth) return;
     let cancelled = false;
-    const check = async (reason: string) => {
+    // `strict` also checks socket.io's own `.connected` flag, not just
+    // whether the socket object exists. A backgrounded app can leave a
+    // "zombie" socket behind: the object is still non-null but its
+    // transport actually died while JS execution was throttled/suspended,
+    // so socket.io's own reconnect loop never got a chance to run. A bare
+    // `!s` check never catches this — it was the root cause of incoming
+    // calls silently never arriving after backgrounding until a full app
+    // restart. Reserved for the app-foreground transition (rather than
+    // every interval tick) so it doesn't fight with socket.io's own
+    // reconnect backoff during a normal brief network blip.
+    const check = async (reason: string, opts?: { strict?: boolean }) => {
       const state = await NetInfo.fetch().catch(() => null);
       if (cancelled) return;
       const online = !!(state?.isConnected && state.isInternetReachable !== false);
       setIsNetworkOnline(online);
       if (!online) return;
       const s = socketRef.current;
-      if (!s) requestSocketRecovery(reason);
+      if (!s || (opts?.strict && !s.connected)) requestSocketRecovery(reason);
     };
     void check('watchdog.initial');
     const interval = setInterval(() => {
       void check('watchdog.interval');
     }, 7000);
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void check('watchdog.app_active');
+      if (state === 'active') void check('watchdog.app_active', { strict: true });
     });
     return () => {
       cancelled = true;
