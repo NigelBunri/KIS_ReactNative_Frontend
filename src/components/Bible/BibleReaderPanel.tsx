@@ -75,6 +75,8 @@ import type { BibleVerseMessage } from '@/Module/ChatRoom/chatTypes';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
 import { useSocket } from '../../../SocketProvider';
+import useBibleReadAloud from '@/screens/tabs/bible/useBibleReadAloud';
+import BibleReadAloudSheet from './BibleReadAloudSheet';
 
 const HIGHLIGHT_COLORS = [
   '#FDE68A',
@@ -254,6 +256,17 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   const currentTranslationCode =
     selectedTranslation ?? reader?.translation?.code ?? translations[0]?.code;
   const currentBookCode = selectedBook ?? reader?.book?.code ?? books[0]?.code;
+
+  // Text-to-speech "Read aloud" — device voice reads the passage, verse by
+  // verse, and keeps going chapter after chapter (via reader.navigation.next)
+  // until the max duration is hit or the whole Bible has been read.
+  const [readAloudSheetOpen, setReadAloudSheetOpen] = useState(false);
+  const readAloud = useBibleReadAloud({
+    reader,
+    verses,
+    translationCode: currentTranslationCode,
+    onLoadChapter: onLoad,
+  });
   const selectedBookObj = useMemo(
     () => books.find(book => book.code === currentBookCode) || books[0],
     [books, currentBookCode],
@@ -448,6 +461,12 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     const clearTimer = setTimeout(() => setLinkHighlightVerseNumbers(new Set()), 3000);
     return () => clearTimeout(clearTimer);
   }, [highlightRequest, reader?.chapter?.number, verses, scrollToVerseNumber]);
+
+  // Keep the currently-narrated verse in view while Read aloud is playing.
+  useEffect(() => {
+    if (readAloud.status !== 'playing' || readAloud.currentVerseNumber == null) return;
+    scrollToVerseNumber(readAloud.currentVerseNumber);
+  }, [readAloud.status, readAloud.currentVerseNumber, scrollToVerseNumber]);
 
   useEffect(() => {
     onRegisterFilterOpener?.(() => setFilterOpen(true));
@@ -2254,6 +2273,30 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
+              onPress={() => setReadAloudSheetOpen(true)}
+              disabled={!verses.length}
+              style={[
+                styles.reloadIconButton,
+                readAloud.isActive
+                  ? { backgroundColor: palette.goldDeep, borderColor: palette.goldLight }
+                  : { backgroundColor: palette.surface, borderColor: palette.divider },
+                { opacity: verses.length ? 1 : 0.55, marginRight: 8 },
+              ]}
+            >
+              <KISIcon name="volume" size={17} color={readAloud.isActive ? palette.ivory : palette.primaryStrong} />
+              {!tinyReader ? (
+                <Text
+                  style={[
+                    styles.reloadIconButtonText,
+                    { color: readAloud.isActive ? palette.ivory : palette.primaryStrong },
+                  ]}
+                >
+                  {readAloud.status === 'playing' ? 'Reading…' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
               onPress={() => verses.length && openShareSheetForVerses(verses)}
               disabled={!verses.length}
               style={[
@@ -2405,6 +2448,9 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   const id = String(verse.id);
                   const selected = selectedVerses.has(id);
                   const linkHighlighted = linkHighlightVerseNumbers.has(Number(verse.number));
+                  const readAloudHighlighted =
+                    (readAloud.status === 'playing' || readAloud.status === 'paused') &&
+                    readAloud.currentVerseNumber === Number(verse.number);
                   const highlightColor = highlightByVerse.get(id);
                   const text = String(verse.text || '');
                   const isChapterStart =
@@ -2415,7 +2461,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   const markedTextColor = isDark && hasSavedHighlight ? '#111111' : palette.text;
                   const markedNumberColor = isDark && hasSavedHighlight
                     ? '#2A1B08'
-                    : selected || linkHighlighted
+                    : selected || linkHighlighted || readAloudHighlighted
                       ? palette.primaryStrong
                       : palette.subtext;
                   return (
@@ -2436,16 +2482,21 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                           ? styles.chapterStartVerse
                           : styles.bibleVerseLine,
                         {
-                          backgroundColor: linkHighlighted
+                          backgroundColor: readAloudHighlighted
                             ? palette.goldSoft
-                            : selected
-                              ? palette.primarySoft
-                              : highlightColor || 'transparent',
-                          borderColor: linkHighlighted
+                            : linkHighlighted
+                              ? palette.goldSoft
+                              : selected
+                                ? palette.primarySoft
+                                : highlightColor || 'transparent',
+                          borderColor: readAloudHighlighted
                             ? palette.goldDeep
-                            : selected
-                              ? palette.primaryStrong
-                              : 'transparent',
+                            : linkHighlighted
+                              ? palette.goldDeep
+                              : selected
+                                ? palette.primaryStrong
+                                : 'transparent',
+                          borderWidth: readAloudHighlighted ? 2 : undefined,
                         },
                       ]}
                     >
@@ -2548,6 +2599,30 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
         onClose={() => setShareSheetVisible(false)}
         onPicked={handleSharePick}
       />
+
+      <BibleReadAloudSheet
+        visible={readAloudSheetOpen}
+        onClose={() => setReadAloudSheetOpen(false)}
+        status={readAloud.status}
+        finishReason={readAloud.finishReason}
+        currentVerseNumber={readAloud.currentVerseNumber}
+        currentReference={currentReference}
+        elapsedMs={readAloud.elapsedMs}
+        remainingMs={readAloud.remainingMs}
+        ttsReady={readAloud.ttsReady}
+        errorMessage={readAloud.errorMessage}
+        voices={readAloud.voices}
+        voicesLoading={readAloud.voicesLoading}
+        selectedVoiceId={readAloud.selectedVoiceId}
+        speed={readAloud.speed}
+        maxDurationMinutes={readAloud.maxDurationMinutes}
+        onPlay={readAloud.play}
+        onPause={readAloud.pause}
+        onStop={readAloud.stop}
+        onSetVoice={readAloud.setVoice}
+        onSetSpeed={readAloud.setSpeed}
+        onSetMaxDurationMinutes={readAloud.setMaxDurationMinutes}
+      />
     </View>
   );
 });
@@ -2597,9 +2672,11 @@ const styles = StyleSheet.create({
   readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
   readerHeaderTitleRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+    rowGap: 8,
     marginTop: 4,
   },
   translationLabel: { fontSize: 12, textTransform: 'uppercase' },

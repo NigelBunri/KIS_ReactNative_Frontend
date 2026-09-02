@@ -3634,6 +3634,8 @@ PODS:
     - SocketRocket
     - Yoga
   - SocketRocket (0.7.1)
+  - TextToSpeech (4.1.1):
+    - React-Core
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -3761,6 +3763,7 @@ DEPENDENCIES:
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
   - SocketRocket (~> 0.7.1)
+  - TextToSpeech (from `../node_modules/react-native-tts`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -4008,6 +4011,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-vector-icons"
   RNWorklets:
     :path: "../node_modules/react-native-worklets"
+  TextToSpeech:
+    :path: "../node_modules/react-native-tts"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -4138,8 +4143,9 @@ SPEC CHECKSUMS:
   RNVectorIcons: 791f13226ec4a3fd13062eda9e892159f0981fae
   RNWorklets: 437811d275dac2d504dd4c266de6321f04859fa1
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  TextToSpeech: 89b239221ec378d213af422d14789a729705360b
   Yoga: 689c8e04277f3ad631e60fe2a08e41d411daf8eb
 
 PODFILE CHECKSUM: 2ce7aa606dc7a26db6f0356409474a3d426baacf
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.17.0

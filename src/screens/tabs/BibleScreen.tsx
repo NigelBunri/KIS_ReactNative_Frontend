@@ -295,20 +295,10 @@ export default function BibleScreen() {
             </View>
           </View>
 
-          {/* Right: filter + settings only (streak is shown inside the collapsing section) */}
+          {/* Right: settings only (streak is shown inside the collapsing section; the Read
+              tab's filter button now floats bottom-right over the content instead — see
+              the floating filter button rendered near the end of this component). */}
           <View style={styles.headerActions}>
-            {/* Filter — only on Read tab */}
-            {activeTab === 'read' && openReadFilters ? (
-              <Pressable
-                onPress={openReadFilters}
-                style={[styles.headerIconBtn, { backgroundColor: 'rgba(23,17,31,0.28)', borderColor: 'rgba(255,244,184,0.30)' }]}
-                hitSlop={6}
-                accessibilityLabel="Filters"
-              >
-                <KISIcon name="filter" size={17} color={palette.onGold} />
-              </Pressable>
-            ) : null}
-
             {/* Settings shortcut */}
             <Pressable
               onPress={() => setActiveTab('settings')}
@@ -421,6 +411,29 @@ export default function BibleScreen() {
           </ScrollView>
         )}
       </View>
+
+      {/* Floating passage-filter button — Read tab only. Moved here from the gold
+          header so it's always within thumb reach while scrolling a chapter,
+          instead of stuck up top out of easy reach. */}
+      {activeTab === 'read' && openReadFilters ? (
+        <Pressable
+          onPress={openReadFilters}
+          style={[
+            styles.filterFab,
+            {
+              right: responsive.pageGutter,
+              bottom: (compactBible ? 20 : 24) + insets.bottom,
+              backgroundColor: palette.goldReadable,
+              shadowColor: palette.royalInk,
+            },
+          ]}
+          hitSlop={6}
+          accessibilityLabel="Filters"
+          accessibilityRole="button"
+        >
+          <KISIcon name="filter" size={20} color={palette.onGold} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -506,5 +519,19 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255,255,255,0.16)',
     transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
+  },
+
+  // ── Floating passage-filter button (Read tab) ──────────────────────────────
+  filterFab: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 });
