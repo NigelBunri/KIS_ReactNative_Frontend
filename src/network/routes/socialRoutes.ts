@@ -126,16 +126,33 @@ const socialRoutes = {
   nestNotifications: {
     deviceTokenRegister: `${NEST_API_BASE_URL}/api/v1/notifications/tokens/register`,
   },
+  // CallsController (Nestjs) is @Controller('calls') — mounted at /calls,
+  // NOT /api/v1/calls. This whole block previously pointed at the wrong
+  // prefix for every route except `history`, which happened to 401/200
+  // instead of 404 only because app.controller.ts has a deliberate DEAD
+  // STUB at exactly /api/v1/calls/history (`return { results: [], count: 0
+  // }`, left over from before real server-side call history existed) that
+  // silently absorbed the request and always returned empty — so the app
+  // looked like it was "syncing" while actually always getting nothing
+  // back, permanently falling back to local-only AsyncStorage history that
+  // a fresh install has none of. Every other route here was a flat-out 404
+  // (verified live: iceServers/missedCount/scheduled/active/conversation/
+  // join/invite-link all 404 at .../api/v1/calls/*, 401 — i.e. reachable —
+  // at .../calls/*), meaning ICE/TURN credentials, scheduled calls, the
+  // active-call banner, and invite-link joining were ALL silently broken
+  // too, not just call history. iceServers failing silently and falling
+  // back to STUN-only defaults is a very plausible contributor to the
+  // reported "delays in connecting".
   calls: {
-    iceServers: `${NEST_API_BASE_URL}/api/v1/calls/ice-servers`,
-    history: `${NEST_API_BASE_URL}/api/v1/calls/history`,
-    missedCount: `${NEST_API_BASE_URL}/api/v1/calls/missed-count`,
-    standalone: `${NEST_API_BASE_URL}/api/v1/calls/standalone`,
-    scheduled: `${NEST_API_BASE_URL}/api/v1/calls/scheduled`,
-    inviteLink: `${NEST_API_BASE_URL}/api/v1/calls/invite-link`,
-    joinByToken: (token: string) => `${NEST_API_BASE_URL}/api/v1/calls/join/${token}`,
-    active: (conversationId: string) => `${NEST_API_BASE_URL}/api/v1/calls/active?conversationId=${encodeURIComponent(conversationId)}`,
-    forConversation: (conversationId: string, limit = 30) => `${NEST_API_BASE_URL}/api/v1/calls/conversation?conversationId=${encodeURIComponent(conversationId)}&limit=${limit}`,
+    iceServers: `${NEST_API_BASE_URL}/calls/ice-servers`,
+    history: `${NEST_API_BASE_URL}/calls/history`,
+    missedCount: `${NEST_API_BASE_URL}/calls/missed-count`,
+    standalone: `${NEST_API_BASE_URL}/calls/standalone`,
+    scheduled: `${NEST_API_BASE_URL}/calls/scheduled`,
+    inviteLink: `${NEST_API_BASE_URL}/calls/invite-link`,
+    joinByToken: (token: string) => `${NEST_API_BASE_URL}/calls/join/${token}`,
+    active: (conversationId: string) => `${NEST_API_BASE_URL}/calls/active?conversationId=${encodeURIComponent(conversationId)}`,
+    forConversation: (conversationId: string, limit = 30) => `${NEST_API_BASE_URL}/calls/conversation?conversationId=${encodeURIComponent(conversationId)}&limit=${limit}`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>
