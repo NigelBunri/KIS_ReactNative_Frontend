@@ -53,6 +53,7 @@ import {
 import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
 import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
+import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 
 // Use SFU when a group call grows beyond this threshold.
 // Below it, P2P is used (lower latency, no server media).
@@ -836,6 +837,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } : prev);
 
     reportCallAnswered(session.callId);
+    void logCallDiagnostic({ stage: 'USER_ANSWERED', callId: session.callId, callType: session.callType });
 
     s.emit('call.answer', {
       conversationId: session.conversationId,
@@ -955,6 +957,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const endCall = useCallback(async (reason = 'ended') => {
     const session = activeCallRef.current;
     const s = socketRef.current;
+
+    if (session) {
+      void logCallDiagnostic({ stage: 'CALL_ENDED', callId: session.callId, callType: session.callType, detail: reason });
+    }
 
     if (session && s) {
       s.emit('call.end', {
@@ -1829,11 +1835,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return;
         }
 
+        void logCallDiagnostic({ stage: 'SOCKET_OFFER_RECEIVED', callId, callType });
         // Show OS lock-screen call UI (CallKit on iOS, ConnectionService on Android)
-        displayIncomingCall({
+        void logCallDiagnostic({ stage: 'CALLKEEP_REQUESTED', callId, callType });
+        const displayed = displayIncomingCall({
           callUUID: callId,
           callerName: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
           callType: callType,
+        });
+        void logCallDiagnostic({
+          stage: displayed ? 'CALLKEEP_DISPLAYED_OK' : 'CALLKEEP_DISPLAYED_FAILED',
+          callId,
+          callType,
         });
       });
 

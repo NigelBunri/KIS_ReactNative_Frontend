@@ -20,18 +20,26 @@ jest.mock('@/network/config', () => ({ NEST_API_BASE_URL: 'https://nest.example.
 
 jest.mock('../notificationRouter', () => ({ routeNotification: jest.fn() }));
 jest.mock('../InAppNotificationToast', () => ({ InAppNotificationToastRef: { current: null } }));
-jest.mock('@/services/calls/callKitService', () => ({ displayIncomingCall: jest.fn() }));
+jest.mock('@/services/calls/callKitService', () => ({
+  displayIncomingCall: jest.fn(),
+  callKeepAvailable: true,
+}));
+jest.mock('@/services/calls/callDiagnostics', () => ({ logCallDiagnostic: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/security/e2ee', () => ({ ensureDeviceId: jest.fn().mockResolvedValue('device-1') }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
-import { unregisterPushToken, reregisterPushTokensForCurrentUser } from '../notifications';
+import { unregisterPushToken, reregisterPushTokensForCurrentUser, handleBackgroundPushMessage } from '../notifications';
+import { displayIncomingCall } from '@/services/calls/callKitService';
+import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<typeof AsyncStorage.getItem>;
 const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<typeof AsyncStorage.setItem>;
 const mockedRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<typeof AsyncStorage.removeItem>;
+const mockedDisplayIncomingCall = displayIncomingCall as jest.MockedFunction<typeof displayIncomingCall>;
+const mockedLogCallDiagnostic = logCallDiagnostic as jest.MockedFunction<typeof logCallDiagnostic>;
 
 describe('unregisterPushToken', () => {
   beforeEach(() => {
@@ -151,5 +159,67 @@ describe('registerPushToken — Nest registration tracked independently of Djang
       'KIS_PENDING_NEST_PUSH_TOKEN',
       expect.stringContaining('"pushToken":"fcm-token-1"'),
     );
+  });
+});
+
+// Coverage for FAILURE B (background calling reliability): the background
+// FCM handler is the ONLY path that can wake a fully-killed app into
+// CallKeep. These tests lock in the pipeline-stage diagnostics added so a
+// physical-device "it rang but no UI" report can actually be traced, and
+// verify the handler correctly branches on displayIncomingCall's
+// success/failure result instead of assuming it always worked.
+describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('parses an incoming_call payload and requests CallKeep display with the right args', async () => {
+    mockedDisplayIncomingCall.mockReturnValue(true);
+
+    await handleBackgroundPushMessage({
+      data: { type: 'incoming_call', callId: 'call-123', callerName: 'Jane', callType: 'video' },
+    });
+
+    expect(mockedDisplayIncomingCall).toHaveBeenCalledWith({
+      callUUID: 'call-123',
+      callerName: 'Jane',
+      callType: 'video',
+    });
+  });
+
+  it('logs the full pipeline stage sequence when CallKeep display succeeds', async () => {
+    mockedDisplayIncomingCall.mockReturnValue(true);
+
+    await handleBackgroundPushMessage({
+      data: { type: 'incoming_call', callId: 'call-123', callType: 'voice' },
+    });
+
+    const stages = mockedLogCallDiagnostic.mock.calls.map((c) => c[0].stage);
+    expect(stages).toEqual([
+      'PUSH_RECEIVED',
+      'BACKGROUND_HANDLER_STARTED',
+      'CALL_PAYLOAD_PARSED',
+      'CALLKEEP_REQUESTED',
+      'CALLKEEP_DISPLAYED_OK',
+    ]);
+  });
+
+  it('logs CALLKEEP_DISPLAYED_FAILED — not OK — when displayIncomingCall reports failure', async () => {
+    mockedDisplayIncomingCall.mockReturnValue(false);
+
+    await handleBackgroundPushMessage({
+      data: { type: 'incoming_call', callId: 'call-456', callType: 'video' },
+    });
+
+    const stages = mockedLogCallDiagnostic.mock.calls.map((c) => c[0].stage);
+    expect(stages).toContain('CALLKEEP_DISPLAYED_FAILED');
+    expect(stages).not.toContain('CALLKEEP_DISPLAYED_OK');
+  });
+
+  it('does not treat a non-call push (e.g. a regular message) as an incoming call', async () => {
+    await handleBackgroundPushMessage({
+      data: { type: 'message', conversationId: 'conv-1' },
+      notification: { title: 'New message', body: 'Hi' },
+    });
+
+    expect(mockedDisplayIncomingCall).not.toHaveBeenCalled();
   });
 });

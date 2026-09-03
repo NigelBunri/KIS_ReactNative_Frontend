@@ -12,6 +12,7 @@ import {
   SectionList,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Alert,
 } from 'react-native';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +32,8 @@ import { callTypeLabel, callTypeIcon, formatDuration } from '@/services/calls/ca
 import ScheduleCallSheet, { type StandaloneCallResult } from '@/screens/calls/ScheduleCallSheet';
 import { loadCallHistory, saveCallHistory } from '@/services/calls/callHistoryStorage';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { resolveCallbackInvitees } from './callsTabHelpers';
+import CallDiagnosticsModal from '@/screens/calls/CallDiagnosticsModal';
 
 type CallsTabProps = {
   searchTerm?: string;
@@ -97,7 +100,11 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
   const [scheduled, setScheduled] = useState<ScheduledCallItem[]>([]);
   const [conversationNameById, setConversationNameById] = useState<Record<string, string>>({});
+  // Live conversation membership, keyed the same way as conversationNameById.
+  // See handleCallback below for why this exists.
+  const [conversationParticipantsById, setConversationParticipantsById] = useState<Record<string, string[]>>({});
   const [showNewCallSheet, setShowNewCallSheet] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const loadCalls = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -251,11 +258,23 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
     const load = async () => {
       const convs = await fetchConversationsForCurrentUser([], currentUserId ?? undefined);
       const map: Record<string, string> = {};
+      const participantsMap: Record<string, string[]> = {};
+      const myId = String(currentUserId ?? '');
       for (const c of convs) {
-        if (c?.conversationId) map[String(c.conversationId)] = c.name ?? 'Conversation';
-        if (c?.id) map[String(c.id)] = c.name ?? 'Conversation';
+        const ids = (Array.isArray((c as any)?.participants) ? (c as any).participants : [])
+          .map((p: any) => String(p.userId ?? p.id ?? ''))
+          .filter((id: string) => id && id !== myId);
+        if (c?.conversationId) {
+          map[String(c.conversationId)] = c.name ?? 'Conversation';
+          participantsMap[String(c.conversationId)] = ids;
+        }
+        if (c?.id) {
+          map[String(c.id)] = c.name ?? 'Conversation';
+          participantsMap[String(c.id)] = ids;
+        }
       }
       setConversationNameById(map);
+      setConversationParticipantsById(participantsMap);
     };
     load();
   }, [currentUserId]);
@@ -274,13 +293,25 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   const handleCallback = useCallback(async (item: CallHistoryItem) => {
     if (!startCall) return;
     const ct = resolveCallType(item);
+    // See callsTabHelpers.ts for why this can't just read item.participants
+    // directly — that was the actual root cause of call-history callbacks
+    // silently starting a call with zero invitees.
+    const inviteeUserIds = resolveCallbackInvitees(
+      item,
+      conversationParticipantsById[item.conversationId],
+      currentUserId,
+    );
+    if (!item.isStandalone && !item.conversationId?.startsWith('standalone:') && inviteeUserIds.length === 0) {
+      Alert.alert('Call unavailable', "Couldn't find who to call back — try opening the conversation instead.");
+      return;
+    }
     await startCall({
       conversationId: item.conversationId,
       title: conversationNameById[item.conversationId] ?? 'Call',
       callType: ct,
-      inviteeUserIds: item.participants?.map(p => p.userId).filter(id => id !== currentUserId) ?? [],
+      inviteeUserIds,
     });
-  }, [startCall, conversationNameById, currentUserId]);
+  }, [startCall, conversationNameById, conversationParticipantsById, currentUserId]);
 
   const handleCreateStandalone = useCallback(async (params: {
     callId: string;
@@ -480,9 +511,15 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   return (
     <View style={[styles.wrap, { backgroundColor: palette.bg, padding: responsive.pageGutter }]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>
-          Calls
-        </Text>
+        {/* Long-press opens Call Diagnostics — deliberately not a visible
+            button; this needs to work on the real release build testers
+            install, not just __DEV__, but shouldn't be advertised to
+            ordinary users either. See CallDiagnosticsModal.tsx. */}
+        <Pressable onLongPress={() => setShowDiagnostics(true)} delayLongPress={1200}>
+          <Text style={[styles.headerTitle, { color: palette.text, fontSize: responsive.isWatch ? 17 : 20 }]}>
+            Calls
+          </Text>
+        </Pressable>
         <View style={styles.headerActions}>
           <Pressable onPress={() => loadCalls()} style={styles.iconBtn} hitSlop={8}>
             <KISIcon name="refresh-cw" size={17} color={palette.text} />
@@ -556,6 +593,8 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
         onCreate={handleCreateStandalone}
         onStart={handleStandaloneStart}
       />
+
+      <CallDiagnosticsModal visible={showDiagnostics} onClose={() => setShowDiagnostics(false)} />
     </View>
   );
 });

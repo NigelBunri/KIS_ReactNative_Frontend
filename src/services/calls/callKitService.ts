@@ -107,6 +107,34 @@ export function setupCallKit(callbacks: CallKeepCallbacks): void {
         buttonPositive: 'Allow',
       },
     ).catch((e) => logCallKitError('READ_PHONE_STATE permission request', e));
+
+    // PLAUSIBLE ROOT CAUSE of "background video calls have never worked,
+    // background voice worked once then failed" (unverified without a
+    // physical device — see displayIncomingCall's own diagnostics for the
+    // actual failure signal). VoiceConnectionService declares
+    // foregroundServiceType="phoneCall|microphone|camera". On Android 14+,
+    // the OS requires the runtime permission matching a foreground-service
+    // type to ALREADY be granted before that service is allowed to start —
+    // otherwise the start is refused outright (ForegroundServiceStart-
+    // NotAllowedException natively). Camera/mic permission was previously
+    // requested for the FIRST time only reactively, inside
+    // requestCallPermissions() — called from startCall/answerCall, which
+    // only ever run once the user is actively interacting with the app in
+    // the foreground. An incoming call while backgrounded never goes
+    // through that path at all, so displayIncomingCall() could be trying
+    // to start a camera-typed foreground service with camera permission
+    // never yet granted — every time, for anyone who has never personally
+    // initiated a video call before. Mic-only (voice) needing just
+    // RECORD_AUDIO is more likely to have already been granted for other
+    // reasons (voice notes, etc.), matching "worked once" instead of never.
+    // Requesting both here, once, early (this effect runs once per app
+    // session via SocketProvider's CallKit-setup useEffect) means both are
+    // already granted by the time ANY incoming call — foreground or
+    // background — needs to start that foreground service.
+    PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+    ]).catch((e) => logCallKitError('proactive mic/camera permission request', e));
   }
 
   try {

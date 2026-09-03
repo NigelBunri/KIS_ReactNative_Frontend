@@ -5,8 +5,9 @@ import { postRequest } from '@/network/post';
 import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
-import { displayIncomingCall } from '@/services/calls/callKitService';
+import { displayIncomingCall, callKeepAvailable } from '@/services/calls/callKitService';
 import { ensureDeviceId } from '@/security/e2ee';
+import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 // Nest's registration is tracked SEPARATELY from Django's above. They're two
@@ -143,6 +144,8 @@ const retryPendingNestPushToken = async () => {
 // data-only messages we persist them to AsyncStorage so the app can
 // surface them on next foreground resume.
 export const handleBackgroundPushMessage = async (remoteMessage: any) => {
+  void logCallDiagnostic({ stage: 'PUSH_RECEIVED', detail: `dataOnly=${!remoteMessage?.notification}` });
+  void logCallDiagnostic({ stage: 'BACKGROUND_HANDLER_STARTED' });
   try {
     const data = remoteMessage?.data ?? {};
     const title: string = data?.title ?? remoteMessage?.notification?.title ?? '';
@@ -155,10 +158,20 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
     // (SocketProvider.tsx) uses, so there's no duplicate/conflicting
     // entry once the app wakes and the real call.offer event arrives.
     if (data?.type === 'incoming_call' && data?.callId) {
-      displayIncomingCall({
-        callUUID: String(data.callId),
+      const callId = String(data.callId);
+      const callType = String((data.callType as any) ?? 'voice');
+      void logCallDiagnostic({ stage: 'CALL_PAYLOAD_PARSED', callId, callType });
+      void logCallDiagnostic({ stage: 'CALLKEEP_REQUESTED', callId, callType });
+      const displayed = displayIncomingCall({
+        callUUID: callId,
         callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
-        callType: (data.callType as any) ?? 'voice',
+        callType: callType as any,
+      });
+      void logCallDiagnostic({
+        stage: displayed ? 'CALLKEEP_DISPLAYED_OK' : 'CALLKEEP_DISPLAYED_FAILED',
+        callId,
+        callType,
+        detail: displayed ? undefined : (callKeepAvailable ? 'native call returned false' : 'RNCallKeep unavailable'),
       });
       return;
     }
