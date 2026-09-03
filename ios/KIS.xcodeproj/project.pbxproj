@@ -50,6 +50,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = KIS/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = KIS/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1B6B951D133126018D6E3493 /* KIS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = KIS.entitlements; sourceTree = "<group>"; };
+		9A2E6D0F5B7C48A1902FDEB3 /* KISRelease.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = KISRelease.entitlements; sourceTree = "<group>"; };
 		1B90FCDD6FAD01BBFEA7C0B1 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1D479AB9881473D785F039A7 /* SampleHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-KIS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KIS.debug.xcconfig"; path = "Target Support Files/Pods-KIS/Pods-KIS.debug.xcconfig"; sourceTree = "<group>"; };
@@ -96,6 +97,7 @@
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				1B6B951D133126018D6E3493 /* KIS.entitlements */,
+				9A2E6D0F5B7C48A1902FDEB3 /* KISRelease.entitlements */,
 				BBD9F51B5CB790C01348379D /* VoipTokenModule.swift */,
 				7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */,
 			);
@@ -396,7 +398,7 @@
 				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = K692889KRM;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = KIS/Info.plist;
@@ -428,10 +430,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = KIS/KIS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = KIS/KISRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = K692889KRM;
 				INFOPLIST_FILE = KIS/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -463,7 +465,7 @@
 				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = K692889KRM;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
@@ -639,7 +641,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = RTCScreenSharingExtension/RTCScreenSharingExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RTCScreenSharingExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
