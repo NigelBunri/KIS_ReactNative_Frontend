@@ -547,6 +547,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       callId: info.callId,
       callType: info.callType,
       media: needsVideo ? 'video' : 'voice',
+    }, (ack?: any) => {
+      if (ack?.ok) return;
+      // Same stale-answer protection as answerCall — the backend is
+      // authoritative on whether this call is still joinable.
+      webRTCService.closeAll();
+      audioRouteManager.stop();
+      setActiveCall(prev => (prev && prev.callId === info.callId) ? {
+        ...prev,
+        state: 'missed',
+        reason: ack?.error ?? 'call_ended',
+        endedAt: new Date().toISOString(),
+      } : prev);
+      reportCallEnded(info.callId, 'missed');
+      Alert.alert('Call ended', 'This call is no longer available.');
     });
 
     _answeringRef.current = false;
@@ -828,6 +842,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       callId: session.callId,
       callType: session.callType,
       media: needsVideo ? 'video' : 'voice',
+    }, (ack?: any) => {
+      if (ack?.ok) return;
+      // The backend is authoritative — it rejects a stale answer (e.g. the
+      // ring timeout/reaper already closed this call out before a delayed
+      // push finally got this answer through). Without checking this ack,
+      // we'd optimistically stay in 'connecting' forever: there's no real
+      // caller left to signal with, so roll the local state back instead
+      // of leaving the user stuck on a phantom connecting screen.
+      webRTCService.closeAll();
+      audioRouteManager.stop();
+      setActiveCall(prev => (prev && prev.callId === session.callId) ? {
+        ...prev,
+        state: 'missed',
+        reason: ack?.error ?? 'call_ended',
+        endedAt: new Date().toISOString(),
+      } : prev);
+      reportCallEnded(session.callId, 'missed');
+      Alert.alert('Call ended', 'This call is no longer available.');
     });
 
     // The caller creates the SDP offer when it receives call.answer.
@@ -1724,6 +1756,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           s.emit('call.end', { conversationId, callId, reason: 'busy' });
           return;
         }
+        // Duplicate/resent call.offer for the SAME callId we're already on
+        // (e.g. a queued emit flushed after a socket reconnect) must be
+        // idempotent — it must NOT reset an already-answered call back to a
+        // ring screen, and must NOT re-trigger the native incoming-call UI
+        // a second time. Only a call we haven't acted on yet ('incoming'/
+        // 'lobby'/'waiting-for-host') is safe to re-render from a fresh copy.
+        if (existing && existing.callId === callId &&
+            !['incoming', 'lobby', 'waiting-for-host'].includes(existing.state)) {
+          return;
+        }
 
         const rawType = payload?.callType ?? (payload?.media === 'video' ? 'video' : 'voice');
         const callType: CallType = rawType as CallType;
@@ -1903,6 +1945,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const fromUserId = String(payload?.fromUserId ?? '');
         const sdp = payload?.sdp;
         if (!fromUserId || !sdp) return;
+        // Same stale-signaling guard as call.ice.candidate below: a queued/
+        // delayed SDP offer from an old callId (e.g. a reconnect resend
+        // arriving after we already moved to a new call) must not be
+        // applied to whatever WebRTC peer connection currently exists.
+        {
+          const cur = activeCallRef.current;
+          const payloadCallId = payload?.callId ? String(payload.callId) : null;
+          if (!cur || cur.state === 'ended' || cur.state === 'missed') return;
+          if (payloadCallId && cur.callId !== payloadCallId) return;
+        }
 
         // Group-mesh fix: when we JOIN a call that already has participants, the
         // existing members each send us an SDP offer. They are NOT announced to us
@@ -1950,6 +2002,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const fromUserId = String(payload?.fromUserId ?? '');
         const sdp = payload?.sdp;
         if (!fromUserId || !sdp) return;
+        const cur = activeCallRef.current;
+        const payloadCallId = payload?.callId ? String(payload.callId) : null;
+        if (!cur || cur.state === 'ended' || cur.state === 'missed') return;
+        if (payloadCallId && cur.callId !== payloadCallId) return;
         await webRTCService.handleAnswer(fromUserId, sdp);
       });
 
@@ -2307,6 +2363,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             callId: session.callId,
             callType: session.callType,
             media: needsVideo ? 'video' : 'voice',
+          }, (ack?: any) => {
+            if (ack?.ok) return;
+            webRTCService.closeAll();
+            audioRouteManager.stop();
+            setActiveCall(prev => (prev && prev.callId === session.callId) ? {
+              ...prev,
+              state: 'missed',
+              reason: ack?.error ?? 'call_ended',
+              endedAt: new Date().toISOString(),
+            } : prev);
+            reportCallEnded(session.callId, 'missed');
+            Alert.alert('Call ended', 'This call is no longer available.');
           });
         }
       });

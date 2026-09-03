@@ -36,16 +36,35 @@ import type { CallType } from './callTypes';
 
 const CALLKIT_ENABLED = Platform.OS === 'android' ? true : !__DEV__;
 
+// Structured, secret-free diagnostic log for every CallKeep failure. This
+// infrastructure is what surfaces an incoming ring screen, so a silently
+// swallowed failure here previously looked identical (from the outside) to
+// "the push/socket never arrived" — indistinguishable failure modes that
+// wasted real debugging time. Never pass RNCallKeep call args (callerName
+// etc. are just display strings, not secrets, but keep this narrow anyway)
+// — only the operation name and the error's own message/code.
+const logCallKitError = (op: string, error: any): void => {
+  const detail = error?.message ?? error?.code ?? String(error);
+  console.warn(`[CallKit] ${op} failed: ${detail}`);
+};
+
 let RNCallKeep: any = null;
 if (CALLKIT_ENABLED) {
   try {
     RNCallKeep = require('react-native-callkeep').default;
-  } catch {
-    // Package not installed - falls back to in-app UI.
+  } catch (e) {
+    // Native module not installed/linked for this build. This is NOT a
+    // silent "falls back to in-app UI" no-op in practice — the in-app
+    // ring UI still shows, but the OS-level lock-screen/background ring
+    // (the entire reason CallKeep exists) will not, so log it loudly.
+    logCallKitError('require(react-native-callkeep)', e);
   }
 }
 
 export const callKeepAvailable = !!RNCallKeep;
+if (CALLKIT_ENABLED && !callKeepAvailable) {
+  console.warn('[CallKit] CALLKIT_ENABLED is true but the native module failed to load — background/lock-screen ringing will not work on this build.');
+}
 
 // Registers the headless-task handler that RNCallKeepBackgroundMessagingService
 // (declared in AndroidManifest.xml) needs to route native call-UI actions
@@ -58,7 +77,9 @@ export function registerAndroidEvents(): void {
   if (!RNCallKeep || Platform.OS !== 'android') return;
   try {
     RNCallKeep.registerAndroidEvents();
-  } catch {}
+  } catch (e) {
+    logCallKitError('registerAndroidEvents', e);
+  }
 }
 
 const APP_NAME = 'KIS';
@@ -85,7 +106,7 @@ export function setupCallKit(callbacks: CallKeepCallbacks): void {
         message: 'KIS needs access to your phone state to manage calls.',
         buttonPositive: 'Allow',
       },
-    ).catch(() => {});
+    ).catch((e) => logCallKitError('READ_PHONE_STATE permission request', e));
   }
 
   try {
@@ -114,7 +135,7 @@ export function setupCallKit(callbacks: CallKeepCallbacks): void {
           notificationTitle: 'KIS call in progress',
         },
       },
-    }).catch(() => {});
+    }).catch((e: any) => logCallKitError('setup', e));
 
     RNCallKeep.addEventListener('answerCall', ({ callUUID }: { callUUID: string }) => {
       _callbacks?.onAnswerCall(callUUID);
@@ -134,7 +155,9 @@ export function setupCallKit(callbacks: CallKeepCallbacks): void {
         _callbacks?.onToggleHold(hold, callUUID);
       },
     );
-  } catch {}
+  } catch (e) {
+    logCallKitError('setupCallKit (event listeners)', e);
+  }
 }
 
 export function teardownCallKit(): void {
@@ -144,15 +167,23 @@ export function teardownCallKit(): void {
     RNCallKeep.removeEventListener('endCall');
     RNCallKeep.removeEventListener('didPerformSetMutedCallAction');
     RNCallKeep.removeEventListener('didToggleHoldCallAction');
-  } catch {}
+  } catch (e) {
+    logCallKitError('teardownCallKit', e);
+  }
 }
 
+/** Returns whether the native call actually got shown, so callers (the
+ * push/socket call.offer handlers) can tell "we tried to ring and it
+ * failed" apart from "everything worked" instead of assuming success. */
 export function displayIncomingCall(params: {
   callUUID: string;
   callerName: string;
   callType: CallType;
-}): void {
-  if (!RNCallKeep) return;
+}): boolean {
+  if (!RNCallKeep) {
+    console.warn(`[CallKit] displayIncomingCall skipped for callId=${params.callUUID}: RNCallKeep unavailable — no native ring UI will show.`);
+    return false;
+  }
   try {
     const hasVideo =
       params.callType === 'video' || params.callType === 'video-group';
@@ -163,7 +194,11 @@ export function displayIncomingCall(params: {
       'generic',
       hasVideo,
     );
-  } catch {}
+    return true;
+  } catch (e) {
+    logCallKitError(`displayIncomingCall callId=${params.callUUID}`, e);
+    return false;
+  }
 }
 
 export function startOutgoingCall(params: {
@@ -182,14 +217,18 @@ export function startOutgoingCall(params: {
       'generic',
       hasVideo,
     );
-  } catch {}
+  } catch (e) {
+    logCallKitError(`startOutgoingCall callId=${params.callUUID}`, e);
+  }
 }
 
 export function reportCallAnswered(callUUID: string): void {
   if (!RNCallKeep) return;
   try {
     RNCallKeep.setCurrentCallActive(callUUID, true);
-  } catch {}
+  } catch (e) {
+    logCallKitError(`reportCallAnswered callId=${callUUID}`, e);
+  }
 }
 
 export function reportCallEnded(
@@ -200,12 +239,16 @@ export function reportCallEnded(
   const reasonCode = reason === 'missed' ? 2 : reason === 'rejected' ? 6 : 1;
   try {
     RNCallKeep.reportEndCallWithUUID(callUUID, reasonCode);
-  } catch {}
+  } catch (e) {
+    logCallKitError(`reportCallEnded callId=${callUUID}`, e);
+  }
 }
 
 export function setMuted(callUUID: string, muted: boolean): void {
   if (!RNCallKeep) return;
   try {
     RNCallKeep.setMutedCall(callUUID, muted);
-  } catch {}
+  } catch (e) {
+    logCallKitError(`setMuted callId=${callUUID}`, e);
+  }
 }

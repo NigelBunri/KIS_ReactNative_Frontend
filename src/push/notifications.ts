@@ -9,6 +9,17 @@ import { displayIncomingCall } from '@/services/calls/callKitService';
 import { ensureDeviceId } from '@/security/e2ee';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
+// Nest's registration is tracked SEPARATELY from Django's above. They're two
+// independent HTTP calls to two independent backends — one succeeding says
+// nothing about the other. Nest's is the ONLY registry incoming-call pushes
+// read from, so a silently-dropped write here (Nest briefly unavailable, a
+// transient 5xx, a mid-deploy restart) previously had no retry of its own:
+// registerPushToken() fired the Nest call with a bare `.catch(() => {})`
+// that discarded even a clean {success:false} result, unlike Django's path
+// a few lines above it. That's the same class of bug as the original
+// "texts work, calls don't" report — see [[project_kis_calls]].
+const PENDING_NEST_PUSH_TOKEN_KEY = 'KIS_PENDING_NEST_PUSH_TOKEN';
+const PENDING_VOIP_PUSH_TOKEN_KEY = 'KIS_PENDING_VOIP_PUSH_TOKEN';
 
 // TEMPORARY diagnostic helper — piggybacks on the tokens/register endpoint
 // (unvalidated token field) to report where push init actually exits, since
@@ -57,18 +68,64 @@ const registerPushToken = async (payload: {
         JSON.stringify({ pushToken, apnsToken: payload.apnsToken || '', timestamp: Date.now() }),
       ).catch(() => {});
     }
-
-    // Also register with NestJS chat service (uses different field names)
-    postRequest(
-      `${NEST_API_BASE_URL}/notifications/tokens/register`,
-      { token: pushToken, platform: platform || 'android', deviceId: deviceId },
-    ).catch(() => { /* Non-fatal — chat push degrades gracefully */ });
   } catch {
     await AsyncStorage.setItem(
       PENDING_PUSH_TOKEN_KEY,
       JSON.stringify({ pushToken, apnsToken: payload.apnsToken || '', timestamp: Date.now() }),
     ).catch(() => {});
   }
+
+  // Register with Nest SEPARATELY — this is the ONLY registry incoming-call
+  // pushes read from, so its failure must be tracked and retried on its own
+  // schedule rather than discarded. postRequest() never throws (it resolves
+  // {success:false,...} on any HTTP/network failure), so the old bare
+  // `.catch()` here was dead code — the real bug was never checking `res`.
+  try {
+    const nestRes = await postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: pushToken, platform: platform || 'android', deviceId },
+    );
+    if (nestRes?.success) {
+      await AsyncStorage.removeItem(PENDING_NEST_PUSH_TOKEN_KEY).catch(() => {});
+    } else {
+      await AsyncStorage.setItem(
+        PENDING_NEST_PUSH_TOKEN_KEY,
+        JSON.stringify({ pushToken, deviceId, platform, timestamp: Date.now() }),
+      ).catch(() => {});
+    }
+  } catch {
+    await AsyncStorage.setItem(
+      PENDING_NEST_PUSH_TOKEN_KEY,
+      JSON.stringify({ pushToken, deviceId, platform, timestamp: Date.now() }),
+    ).catch(() => {});
+  }
+};
+
+/**
+ * Retries whichever of Django/Nest's push-token registration attempts
+ * failed last time, using the token/device values captured at that time —
+ * not a fresh Firebase getToken() call, so this works even if Firebase
+ * itself is temporarily unreachable. Safe to call opportunistically (app
+ * launch, foreground) since each branch is a no-op once its pending key is
+ * cleared by a successful registerPushToken() call.
+ */
+const retryPendingNestPushToken = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_NEST_PUSH_TOKEN_KEY);
+    if (!raw) return;
+    const pending: { pushToken: string; deviceId: string; platform: string } = JSON.parse(raw);
+    if (!pending?.pushToken) {
+      await AsyncStorage.removeItem(PENDING_NEST_PUSH_TOKEN_KEY).catch(() => {});
+      return;
+    }
+    const res = await postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: pending.pushToken, platform: pending.platform || 'android', deviceId: pending.deviceId },
+    );
+    if (res?.success) {
+      await AsyncStorage.removeItem(PENDING_NEST_PUSH_TOKEN_KEY).catch(() => {});
+    }
+  } catch { /* still pending — next trigger (launch/foreground) retries again */ }
 };
 
 // Background/killed FCM message handler. Exported so index.js can register
@@ -206,15 +263,62 @@ const retryPendingPushToken = async () => {
 // iOS PushKit VoIP token — a SEPARATE token from the FCM/APNs token above.
 // Only NestJS needs it (calls are entirely its domain); Django never sends
 // call pushes, so there's no reason to dual-write this one to Django.
+// Tracked with its own pending-retry key: without a live VoIP token, a
+// killed iOS app can never be woken into CallKit for an incoming call at
+// all (the FCM fallback push can't do it), so a silently-dropped
+// registration here is at least as severe as the Android FCM case.
 const registerVoipPushToken = async (voipToken: string) => {
   if (!voipToken) return;
   const deviceId = await ensureDeviceId();
   try {
-    await postRequest(
+    const res = await postRequest(
       `${NEST_API_BASE_URL}/notifications/tokens/register`,
       { token: voipToken, platform: 'ios', tokenType: 'voip', deviceId },
     );
-  } catch { /* Non-fatal — falls back to FCM-only call push. */ }
+    if (res?.success) {
+      await AsyncStorage.removeItem(PENDING_VOIP_PUSH_TOKEN_KEY).catch(() => {});
+    } else {
+      await AsyncStorage.setItem(
+        PENDING_VOIP_PUSH_TOKEN_KEY,
+        JSON.stringify({ voipToken, deviceId, timestamp: Date.now() }),
+      ).catch(() => {});
+    }
+  } catch {
+    await AsyncStorage.setItem(
+      PENDING_VOIP_PUSH_TOKEN_KEY,
+      JSON.stringify({ voipToken, deviceId, timestamp: Date.now() }),
+    ).catch(() => {});
+  }
+};
+
+const retryPendingVoipPushToken = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_VOIP_PUSH_TOKEN_KEY);
+    if (!raw) return;
+    const pending: { voipToken: string; deviceId: string } = JSON.parse(raw);
+    if (!pending?.voipToken) {
+      await AsyncStorage.removeItem(PENDING_VOIP_PUSH_TOKEN_KEY).catch(() => {});
+      return;
+    }
+    const res = await postRequest(
+      `${NEST_API_BASE_URL}/notifications/tokens/register`,
+      { token: pending.voipToken, platform: 'ios', tokenType: 'voip', deviceId: pending.deviceId },
+    );
+    if (res?.success) {
+      await AsyncStorage.removeItem(PENDING_VOIP_PUSH_TOKEN_KEY).catch(() => {});
+    }
+  } catch { /* still pending — next trigger retries again */ }
+};
+
+/** Retries every push-registration channel that failed last time. Called
+ * opportunistically (app launch, app-foreground) — each branch no-ops once
+ * its own pending key has been cleared by a successful registration. */
+const retryAllPendingPushRegistrations = async () => {
+  await Promise.all([
+    retryPendingPushToken(),
+    retryPendingNestPushToken(),
+    retryPendingVoipPushToken(),
+  ]);
 };
 
 /**
@@ -247,6 +351,17 @@ export async function unregisterPushToken(): Promise<void> {
       ).catch(() => {}),
     ]);
   } catch { /* Best-effort — local session cleanup proceeds regardless. */ }
+
+  // Clear any pending-registration retries too — without this, a failed
+  // registration queued for retry under the OLD account would still fire
+  // (and succeed, associating this device with the wrong user) the next
+  // time retryAllPendingPushRegistrations() runs after a different user
+  // logs into this install.
+  await Promise.all([
+    AsyncStorage.removeItem(PENDING_PUSH_TOKEN_KEY).catch(() => {}),
+    AsyncStorage.removeItem(PENDING_NEST_PUSH_TOKEN_KEY).catch(() => {}),
+    AsyncStorage.removeItem(PENDING_VOIP_PUSH_TOKEN_KEY).catch(() => {}),
+  ]);
 }
 
 /**
@@ -419,7 +534,7 @@ export async function initPushHandlers(navigation?: any) {
         if (apnsToken) {
           await AsyncStorage.setItem('apns_token', apnsToken);
         }
-        await retryPendingPushToken();
+        await retryAllPendingPushRegistrations();
         await registerPushToken({ pushToken: fcmToken, apnsToken });
         await reportDiag('success');
         return true;
@@ -448,6 +563,19 @@ export async function initPushHandlers(navigation?: any) {
         });
       });
     }
+
+    // Independent of the FCM-acquisition retry loop above (that one only
+    // runs while there's NO token at all): a token can exist locally while
+    // its write to Nest/Django/VoIP specifically failed (backend briefly
+    // down, mid-deploy, transient 5xx). Without this, that failure was only
+    // ever retried on the next full app launch — for a session left running
+    // for days, calls could silently never ring the whole time. Foregrounding
+    // is a natural, already-occurring event (no new polling interval), and
+    // each retry branch is a cheap no-op once its pending key clears.
+    AppState.addEventListener('change', (state) => {
+      if (state === 'active') void retryAllPendingPushRegistrations();
+    });
+    void retryAllPendingPushRegistrations();
 
     // PushKit VoIP token init is intentionally OUTSIDE the FCM try block above.
     // getToken() can legitimately throw here — iOS FCM requires an APNs token
