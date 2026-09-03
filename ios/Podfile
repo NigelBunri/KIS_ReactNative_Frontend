@@ -88,6 +88,16 @@ target 'KIS' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_config|
         build_config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+
+        # Some pods (e.g. FBLPromises_Privacy, RNImagePickerPrivacyInfo resource
+        # bundles) ship with an unset/ancient IPHONEOS_DEPLOYMENT_TARGET (9.0),
+        # which current Xcode rejects outright (min supported is 12.0). Floor
+        # every pod target to the app's own minimum so `pod install` output
+        # always builds on the toolchain in use.
+        pod_target_version = build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if pod_target_version && Gem::Version.new(pod_target_version) < Gem::Version.new(min_ios_version_supported)
+          build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+        end
       end
     end
   end
