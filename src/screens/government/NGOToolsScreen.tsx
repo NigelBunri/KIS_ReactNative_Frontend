@@ -108,10 +108,14 @@ export default function NGOToolsScreen(_props: Props) {
         focus_areas: focusAreas.trim(),
         country: country.trim(),
       };
-      const result = (await postRequest(
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - the previous
+      // whole-wrapper cast was a real bug, not just a type nuisance.
+      const apiResult = await postRequest(
         ROUTES.government.ngoProfiles,
         payload,
-      )) as NGOProfile;
+      );
+      const result = (apiResult?.data ?? apiResult) as NGOProfile;
       setProfile(result);
       Alert.alert('Saved', 'NGO profile saved successfully.');
     } catch {
@@ -128,10 +132,11 @@ export default function NGOToolsScreen(_props: Props) {
     }
     setSavingGrant(true);
     try {
-      const result = (await postRequest(ROUTES.government.grants, {
+      const apiResult = await postRequest(ROUTES.government.grants, {
         title: grantTitle.trim(),
         amount: grantAmount.trim(),
-      })) as Grant;
+      });
+      const result = (apiResult?.data ?? apiResult) as Grant;
       setGrants((prev) => [result, ...prev]);
       setGrantTitle('');
       setGrantAmount('');

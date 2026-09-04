@@ -126,7 +126,15 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
   const { palette } = useKISTheme();
   const listRef = useRef<FlatList>(null);
   useImperativeHandle(ref, () => ({
-    scrollTo: ({ y, animated }) => listRef.current?.getScrollResponder()?.scrollTo({ y, animated }),
+    // FlatList.getScrollResponder()'s bundled RN types return a bare
+    // `Element`, which doesn't expose `scrollTo` - the value at runtime is
+    // actually a ScrollView-like scroll responder (this exact call already
+    // works and is used the same way via SectionList elsewhere, e.g.
+    // CallsTab.tsx, whose getScrollResponder() type is unaffected). Narrow
+    // cast is scoped to just this call, not the ref's declared type.
+    scrollTo: ({ y, animated }) =>
+      (listRef.current?.getScrollResponder() as { scrollTo: (opts: { y: number; animated?: boolean }) => void } | null | undefined)
+        ?.scrollTo({ y, animated }),
   }), []);
 
   const getStatusSymbol = (status?: MessageStatus) => {

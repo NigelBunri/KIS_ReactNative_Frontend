@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type KISThemeMode = 'system' | 'light' | 'dark';
@@ -34,8 +34,14 @@ export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, mode).catch(() => {});
   }, []);
 
+  // Memoized for the same reason as AccentThemeProvider (see
+  // accentThemeContext.tsx) - GoldenSectionContext.tsx documents a past
+  // production crash from an unmemoized context value at this same depth
+  // of the provider tree; this applies that fix here too.
+  const value = useMemo(() => ({ themeMode, setThemeMode }), [themeMode, setThemeMode]);
+
   return (
-    <ThemeModeContext.Provider value={{ themeMode, setThemeMode }}>
+    <ThemeModeContext.Provider value={value}>
       {children}
     </ThemeModeContext.Provider>
   );

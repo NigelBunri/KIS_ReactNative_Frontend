@@ -59,10 +59,14 @@ export default function WhistleblowerScreen(_props: Props) {
     }
     setSubmitting(true);
     try {
-      const result = (await postRequest(
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - the previous
+      // whole-wrapper cast was a real bug, not just a type nuisance.
+      const apiResult = await postRequest(
         ROUTES.government.whistleblowerSubmit,
         { content: content.trim(), category },
-      )) as { case_ref: string };
+      );
+      const result = (apiResult?.data ?? apiResult) as { case_ref: string };
       setCaseRef(result.case_ref);
       setContent('');
     } catch {
@@ -80,9 +84,15 @@ export default function WhistleblowerScreen(_props: Props) {
     setChecking(true);
     setCaseStatus(null);
     try {
-      const result = (await getRequest(
+      // getRequest resolves to the ApiResult/GetResponse wrapper ({success,
+      // data, message, status: <HTTP status code>}) - the previous
+      // whole-wrapper cast was a real bug: `result.status` read the
+      // wrapper's own HTTP status code (a number, hence the type error)
+      // instead of the case's actual status string nested under `.data`.
+      const apiResult = await getRequest(
         `${ROUTES.government.whistleblowerStatus}?case_ref=${encodeURIComponent(checkRef.trim())}`,
-      )) as { status: string; message?: string };
+      );
+      const result = (apiResult?.data ?? apiResult) as { status: string; message?: string };
       setCaseStatus(result.status ?? 'Unknown');
     } catch {
       Alert.alert('Not Found', 'No case found with that reference.');

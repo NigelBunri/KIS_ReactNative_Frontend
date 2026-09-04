@@ -105,12 +105,16 @@ export default function ComplianceTrackerScreen(_props: Props) {
     }
     setSaving(true);
     try {
-      const result = (await postRequest(ROUTES.government.compliance, {
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - the previous
+      // whole-wrapper cast was a real bug, not just a type nuisance.
+      const apiResult = await postRequest(ROUTES.government.compliance, {
         title: formTitle.trim(),
         type: formType.trim(),
         due_date: formDueDate.trim(),
         notes: formNotes.trim() || undefined,
-      })) as ComplianceItem;
+      });
+      const result = (apiResult?.data ?? apiResult) as ComplianceItem;
       setItems((prev) => {
         const updated = [result, ...prev];
         updated.sort(

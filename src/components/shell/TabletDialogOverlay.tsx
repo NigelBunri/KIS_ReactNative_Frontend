@@ -35,6 +35,22 @@ export function TabletDialogOverlay({
   const { width, height } = useWindowDimensions();
   const { shellMode } = useResponsiveLayout();
 
+  // `children` (ChatRoomPage/ChatInfoPage/CommunityRoomPage/
+  // CommunityInfoPage - each a large, effect-heavy screen) previously
+  // rendered unconditionally the moment MainTabs mounted, regardless of
+  // whether the user had ever opened chat/community, just to keep them
+  // mounted for the slide animation. `everOpened` mounts them lazily on
+  // first open and then keeps them mounted (matching the original
+  // always-mounted behavior for every open after the first, so the slide
+  // animation stays exactly as smooth as before) - this is a "derive state
+  // during render" update (react.dev's supported pattern for this), not an
+  // effect, so there's no extra frame where the panel slides in empty.
+  const [everOpened, setEverOpened] = React.useState(visible);
+  if (visible && !everOpened) {
+    setEverOpened(true);
+  }
+  const content = everOpened ? children : null;
+
   if (shellMode === 'phone') {
     const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
     return (
@@ -45,7 +61,7 @@ export function TabletDialogOverlay({
           { transform: [{ translateX }], zIndex, backgroundColor: palette.bg },
         ]}
       >
-        {children}
+        {content}
       </Animated.View>
     );
   }
@@ -73,7 +89,7 @@ export function TabletDialogOverlay({
           },
         ]}
       >
-        {children}
+        {content}
       </Animated.View>
     </Animated.View>
   );

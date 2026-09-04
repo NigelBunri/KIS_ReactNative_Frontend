@@ -32,7 +32,7 @@ type Prayer = {
   created_at: string;
 };
 
-export default function FamilyPrayerScreen({ navigation }: Props) {
+export default function FamilyPrayerScreen({ navigation: _navigation }: Props) {
   const { palette } = useKISTheme();
   const layout = useResponsiveLayout();
   const [prayers, setPrayers] = useState<Prayer[]>([]);
@@ -64,7 +64,12 @@ export default function FamilyPrayerScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const created = await postRequest(ROUTES.family.prayers, { text: newPrayer.trim() }) as Prayer;
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - see FamilyAlbumScreen
+      // for the same fix and why the previous whole-wrapper cast was a real
+      // bug, not just a type nuisance.
+      const createdResult = await postRequest(ROUTES.family.prayers, { text: newPrayer.trim() });
+      const created = (createdResult?.data ?? createdResult) as Prayer;
       setPrayers((prev) => [created, ...prev]);
       setShowForm(false);
       setNewPrayer('');
@@ -78,10 +83,11 @@ export default function FamilyPrayerScreen({ navigation }: Props) {
   async function handleToggleAnswered(prayer: Prayer) {
     setTogglingId(prayer.id);
     try {
-      const updated = await patchRequest(
+      const updatedResult = await patchRequest(
         `${ROUTES.family.prayers}${prayer.id}/`,
         { answered: !prayer.answered },
-      ) as Prayer;
+      );
+      const updated = (updatedResult?.data ?? updatedResult) as Prayer;
       setPrayers((prev) => prev.map((p) => (p.id === prayer.id ? { ...p, ...updated } : p)));
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to update prayer');

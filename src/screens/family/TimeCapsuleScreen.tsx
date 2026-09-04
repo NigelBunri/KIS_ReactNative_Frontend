@@ -42,7 +42,7 @@ function daysUntil(dateStr: string): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-export default function TimeCapsuleScreen({ navigation }: Props) {
+export default function TimeCapsuleScreen({ navigation: _navigation }: Props) {
   const { palette } = useKISTheme();
   const layout = useResponsiveLayout();
   const [capsules, setCapsules] = useState<TimeCapsule[]>([]);
@@ -75,11 +75,16 @@ export default function TimeCapsuleScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const created = await postRequest(ROUTES.family.timeCapsules, {
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - see
+      // FamilyAlbumScreen for the same fix and why the previous
+      // whole-wrapper cast was a real bug, not just a type nuisance.
+      const createdResult = await postRequest(ROUTES.family.timeCapsules, {
         title: formTitle.trim(),
         message: formMessage.trim() || undefined,
         unlock_date: formUnlockDate.trim(),
-      }) as TimeCapsule;
+      });
+      const created = (createdResult?.data ?? createdResult) as TimeCapsule;
       setCapsules((prev) => [created, ...prev]);
       setShowForm(false);
       setFormTitle('');

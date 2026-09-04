@@ -39,7 +39,7 @@ type Album = {
   photos?: Photo[];
 };
 
-export default function FamilyAlbumScreen({ navigation }: Props) {
+export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
   const { palette } = useKISTheme();
   const layout = useResponsiveLayout();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -75,7 +75,13 @@ export default function FamilyAlbumScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const created = await postRequest(ROUTES.family.albums, { name: newName.trim() }) as Album;
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly - the previous `as
+      // Album` cast on the whole wrapper was a real bug (created.id/name/
+      // photo_count were all reading through to the wrapper's own fields,
+      // i.e. undefined), not just a type-check nuisance.
+      const createdResult = await postRequest(ROUTES.family.albums, { name: newName.trim() });
+      const created = (createdResult?.data ?? createdResult) as Album;
       setAlbums((prev) => [...prev, { ...created, photo_count: 0 }]);
       setShowCreate(false);
       setNewName('');

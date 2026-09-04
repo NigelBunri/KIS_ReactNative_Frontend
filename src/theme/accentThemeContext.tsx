@@ -6,7 +6,7 @@
 // and light/dark/system mode are independent choices — a user picks a color,
 // then still separately chooses whether it renders light, dark, or follows
 // the system, via the existing ThemeModeContext.
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_COLOR_THEMES, DEFAULT_THEME_ID } from '@/constants/appColorThemes';
 
@@ -42,8 +42,14 @@ export function AccentThemeProvider({ children }: { children: React.ReactNode })
     AsyncStorage.setItem(STORAGE_KEY, id).catch(() => {});
   }, []);
 
+  // Memoized so a re-render of whatever mounts this provider (it sits near
+  // the app root) doesn't hand every useAccentTheme() consumer a new object
+  // identity - and therefore force them all to re-render - unless accentId
+  // itself actually changed. setAccentId is already a stable useCallback.
+  const value = useMemo(() => ({ accentId, setAccentId }), [accentId, setAccentId]);
+
   return (
-    <AccentThemeContext.Provider value={{ accentId, setAccentId }}>
+    <AccentThemeContext.Provider value={value}>
       {children}
     </AccentThemeContext.Provider>
   );

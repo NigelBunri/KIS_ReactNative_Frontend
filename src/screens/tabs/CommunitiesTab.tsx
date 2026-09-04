@@ -106,7 +106,11 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => {
       const activeRef = !selected ? communitiesListRef : tab === 'feed' ? feedListRef : groupsListRef;
-      activeRef.current?.getScrollResponder()?.scrollTo(opts);
+      // See MessageTabs.tsx's identical scrollTo for why this cast is here:
+      // FlatList.getScrollResponder()'s bundled RN types return a bare
+      // `Element`, which doesn't expose `scrollTo`.
+      (activeRef.current?.getScrollResponder() as { scrollTo: (opts: { y: number; animated?: boolean }) => void } | null | undefined)
+        ?.scrollTo(opts);
     },
   }), [selected, tab]);
   const [communityVisible, setCommunityVisible] = useState(false);
@@ -792,7 +796,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                   {item.is_owner
                     ? 'Owner'
                     : item.current_user_role
-                    ? item.current_user_role.replace(/^./, (value) => value.toUpperCase())
+                    ? item.current_user_role.replace(/^./, (value: string) => value.toUpperCase())
                     : 'Member'}
                 </Text>
                 <KISIcon name="chevron-right" size={16} color={palette.subtext} />

@@ -9,7 +9,6 @@ import {
   Animated,
   Alert,
   Easing,
-  LayoutChangeEvent,
   NativeSyntheticEvent,
   NativeScrollEvent,
   AccessibilityInfo,
@@ -193,7 +192,7 @@ const effectiveCurrentUserId = currentUserId || authCacheUserId || null;
 const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
-const [isOffline, setIsOffline] = useState(false);
+const [_isOffline, setIsOffline] = useState(false);
 const avatarAnim = useRef(new Animated.Value(0)).current;
 const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
@@ -692,16 +691,6 @@ useEffect(() => {
     }
   });
   return () => unsubscribe();
-}, []);
-
-const handleRetryConnection = useCallback(() => {
-  NetInfo.fetch().then((state) => {
-    const connected = state.isConnected === true && state.isInternetReachable !== false;
-    setIsOffline(!connected);
-    if (connected) {
-      flushPendingMutations().catch(() => {});
-    }
-  });
 }, []);
 
 const communitiesMountedRef = useRef(true);
@@ -1872,7 +1861,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
     [conversationMeta],
   );
   const onlineNowCount = useMemo(
-    () => Object.values(presenceByUser).filter((entry) => entry.isOnline).length,
+    () => Object.values(presenceByUser ?? {}).filter((entry) => entry.isOnline).length,
     [presenceByUser],
   );
   const firstName = (contextPanelUser?.display_name || contextPanelUser?.profile?.display_name || contextPanelUser?.username || '').split(' ')[0];

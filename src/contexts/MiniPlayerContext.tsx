@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 type MiniPlayerInfo = {
   contentId: string;
@@ -44,16 +44,22 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
     setPlaying(prev => !prev);
   }, []);
 
+  // Memoized so any useMiniPlayer() consumer mounted elsewhere in the tree
+  // only re-renders when the player's own state actually changes, not on
+  // every unrelated re-render of whatever sits above this provider (which
+  // wraps the entire RootStack.Navigator).
+  const value = useMemo<MiniPlayerCtx>(() => ({
+    contentId: info?.contentId ?? null,
+    videoUrl: info?.videoUrl ?? null,
+    title: info?.title ?? null,
+    channelName: info?.channelName ?? null,
+    posterUrl: info?.posterUrl ?? null,
+    playing,
+    show, dismiss, togglePlay,
+  }), [info, playing, show, dismiss, togglePlay]);
+
   return (
-    <MiniPlayerContext.Provider value={{
-      contentId: info?.contentId ?? null,
-      videoUrl: info?.videoUrl ?? null,
-      title: info?.title ?? null,
-      channelName: info?.channelName ?? null,
-      posterUrl: info?.posterUrl ?? null,
-      playing,
-      show, dismiss, togglePlay,
-    }}>
+    <MiniPlayerContext.Provider value={value}>
       {children}
     </MiniPlayerContext.Provider>
   );

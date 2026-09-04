@@ -42,7 +42,7 @@ import {
   openSettings,
   type PermissionStatus,
 } from 'react-native-permissions';
-import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
@@ -147,7 +147,6 @@ import {
   DEFAULT_CALLING_CODE,
   DEFAULT_COUNTRY_ISO,
   LocationCountryError,
-  callingCodeForCountry,
   resolveLocationCountry,
   wasLocationPermissionEverGranted,
   getLastCachedLocationCountry,
@@ -298,8 +297,6 @@ import PPVEventsScreen from '@/screens/broadcast/media_extended/PPVEventsScreen'
 import { GoldenSectionProvider, useGoldenSection } from '@/contexts/GoldenSectionContext';
 import { GoldHeaderShell } from '@/components/common/GoldHeaderShell';
 import { useKISTheme } from '@/theme/useTheme';
-import LinearGradient from 'react-native-linear-gradient';
-import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
 
 
 type AuthCtx = {
@@ -366,7 +363,7 @@ function GoldenSection() {
 }
 
 function AppContent() {
-  const { language, languageVersion } = useLanguage();
+  const { languageVersion } = useLanguage();
   const { ageVersion } = useAgeMode();
   const { themeMode } = useThemeMode();
   const sysScheme = useColorScheme();
@@ -377,7 +374,6 @@ function AppContent() {
   const [booting, setBooting] = useState(true);
 
   const navigationRef = useRef<any>(null);
-  const insets = useSafeAreaInsets();
 
   // getCurrentRoute() returns the deepest focused leaf route, not the bottom
   // tab. The Messages tab nests its own Tab.Navigator (Chats/Updates/Calls/
@@ -460,7 +456,7 @@ function AppContent() {
   const [locationStatus, setLocationStatus] = useState<PermissionStatus | null>(
     null,
   );
-  const [locationError, setLocationError] = useState(
+  const [_locationError, setLocationError] = useState(
     'Location access is required to use KIS.',
   );
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -1239,240 +1235,240 @@ function AppContent() {
                     <RootStack.Screen name="MainTabs" component={MainTabs} />
                     <RootStack.Screen
                       name="BroadcastDetail"
-                      component={BroadcastDetailScreen}
+                      getComponent={() => BroadcastDetailScreen}
                     />
                     <RootStack.Screen
                       name="ChannelHome"
-                      component={ChannelHomePage}
+                      getComponent={() => ChannelHomePage}
                     />
                     <RootStack.Screen
                       name="ChannelContentDetail"
-                      component={ChannelContentDetailPage}
+                      getComponent={() => ChannelContentDetailPage}
                     />
                     <RootStack.Screen
                       name="LiveWatch"
-                      component={LiveWatchPage}
+                      getComponent={() => LiveWatchPage}
                     />
                     <RootStack.Screen
                       name="WatchHistory"
-                      component={WatchHistoryScreen}
+                      getComponent={() => WatchHistoryScreen}
                     />
                     <RootStack.Screen
                       name="LikedVideosScreen"
-                      component={LikedVideosScreen}
+                      getComponent={() => LikedVideosScreen}
                     />
                     <RootStack.Screen
                       name="DownloadsScreen"
-                      component={DownloadsScreen}
+                      getComponent={() => DownloadsScreen}
                     />
                     <RootStack.Screen
                       name="SubscriptionsScreen"
-                      component={SubscriptionsScreen}
+                      getComponent={() => SubscriptionsScreen}
                     />
                     <RootStack.Screen
                       name="LibraryScreen"
-                      component={LibraryScreen}
+                      getComponent={() => LibraryScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ShortsScreen"
-                      component={ShortsScreen}
+                      getComponent={() => ShortsScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ClipsListScreen"
-                      component={ClipsListScreen}
+                      getComponent={() => ClipsListScreen}
                     />
                     <RootStack.Screen
                       name="TrendingScreen"
-                      component={TrendingScreen}
+                      getComponent={() => TrendingScreen}
                       options={{ title: 'Trending' }}
                     />
                     <RootStack.Screen
                       name="CategoryBrowsePage"
-                      component={CategoryBrowsePage}
+                      getComponent={() => CategoryBrowsePage}
                       options={{ title: 'Categories' }}
                     />
                     <RootStack.Screen
                       name="BroadcastSearchScreen"
-                      component={BroadcastSearchScreen}
+                      getComponent={() => BroadcastSearchScreen}
                       options={{ title: 'Search' }}
                     />
                     <RootStack.Screen
                       name="ActivityNotifications"
-                      component={ActivityNotificationsScreen}
+                      getComponent={() => ActivityNotificationsScreen}
                     />
                     <RootStack.Screen
                       name="ChannelMembersScreen"
-                      component={ChannelMembersScreen}
+                      getComponent={() => ChannelMembersScreen}
                     />
                     <RootStack.Screen
                       name="Membership"
-                      component={MembershipScreen}
+                      getComponent={() => MembershipScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="PartnerInsights"
-                      component={PartnerInsightsScreen}
+                      getComponent={() => PartnerInsightsScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="OrganizationApp"
-                      component={OrganizationAppScreen}
+                      getComponent={() => OrganizationAppScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="OrgAppLaunch"
-                      component={OrgAppLaunchScreen}
+                      getComponent={() => OrgAppLaunchScreen}
                     />
                     <RootStack.Screen
                       name="InviteJoin"
-                      component={InviteJoinScreen}
+                      getComponent={() => InviteJoinScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="CallJoin"
-                      component={CallJoinScreen}
+                      getComponent={() => CallJoinScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="PartnerRedeemInvite"
-                      component={PartnerRedeemInviteScreen}
+                      getComponent={() => PartnerRedeemInviteScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="OrganizationAppForm"
-                      component={OrganizationAppFormScreen}
+                      getComponent={() => OrganizationAppFormScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="AdminTools"
-                      component={AdminToolsScreen}
+                      getComponent={() => AdminToolsScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="AdminUserManagement"
-                      component={AdminUserManagementScreen}
+                      getComponent={() => AdminUserManagementScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ModerationConsole"
-                      component={ModerationConsoleScreen}
+                      getComponent={() => ModerationConsoleScreen}
                       options={{ presentation: 'modal', title: 'Moderation Console' }}
                     />
                     <RootStack.Screen
                       name="GlobalSearch"
-                      component={GlobalSearchScreen}
+                      getComponent={() => GlobalSearchScreen}
                       options={{ presentation: 'modal', title: 'Search' }}
                     />
                     <RootStack.Screen
                       name="Events"
-                      component={EventsScreen}
+                      getComponent={() => EventsScreen}
                       options={{ presentation: 'modal', title: 'Events' }}
                     />
                     <RootStack.Screen
                       name="AnalyticsDashboard"
-                      component={AnalyticsDashboardScreen}
+                      getComponent={() => AnalyticsDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="EventsDashboard"
-                      component={EventsDashboardScreen}
+                      getComponent={() => EventsDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ContentDashboard"
-                      component={ContentDashboardScreen}
+                      getComponent={() => ContentDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="SurveysDashboard"
-                      component={SurveysDashboardScreen}
+                      getComponent={() => SurveysDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MediaDashboard"
-                      component={MediaDashboardScreen}
+                      getComponent={() => MediaDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="BridgeDashboard"
-                      component={BridgeDashboardScreen}
+                      getComponent={() => BridgeDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="BridgeManagement"
-                      component={BridgeManagementScreen}
+                      getComponent={() => BridgeManagementScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="TiersDashboard"
-                      component={TiersDashboardScreen}
+                      getComponent={() => TiersDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="NotificationsDashboard"
-                      component={NotificationsDashboardScreen}
+                      getComponent={() => NotificationsDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ShopDashboard"
-                      component={ShopDashboardScreen}
+                      getComponent={() => ShopDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ServiceBooking"
-                      component={ServiceBookingScreen}
+                      getComponent={() => ServiceBookingScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ProductDetail"
-                      component={ProductDetailsPage}
+                      getComponent={() => ProductDetailsPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ShopProducts"
-                      component={ShopProductsPage}
+                      getComponent={() => ShopProductsPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ShopServices"
-                      component={ShopServicesPage}
+                      getComponent={() => ShopServicesPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="CartsList"
-                      component={CartsListPage}
+                      getComponent={() => CartsListPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="CartDetail"
-                      component={CartDetailPage}
+                      getComponent={() => CartDetailPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MarketplaceOrders"
-                      component={MyOrdersPage}
+                      getComponent={() => MyOrdersPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MarketplaceProviderOrders"
-                      component={ProviderOrdersPage}
+                      getComponent={() => ProviderOrdersPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MarketplaceReceivedOrders"
-                      component={ProviderOrdersPage}
+                      getComponent={() => ProviderOrdersPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MarketplaceOrderDetail"
-                      component={MarketplaceOrderDetailPage}
+                      getComponent={() => MarketplaceOrderDetailPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ProfileRecentActivity"
-                      component={ProfileRecentActivityScreen}
+                      getComponent={() => ProfileRecentActivityScreen}
                       options={{
                         presentation: 'modal',
                         title: 'Recent activity',
@@ -1480,7 +1476,7 @@ function AppContent() {
                     />
                     <RootStack.Screen
                       name="ProfileImpactSnapshot"
-                      component={ProfileImpactSnapshotScreen}
+                      getComponent={() => ProfileImpactSnapshotScreen}
                       options={{
                         presentation: 'modal',
                         title: 'Impact snapshot',
@@ -1488,7 +1484,7 @@ function AppContent() {
                     />
                     <RootStack.Screen
                       name="ProfileNotifications"
-                      component={ProfileNotificationsScreen}
+                      getComponent={() => ProfileNotificationsScreen}
                       options={{
                         presentation: 'modal',
                         title: 'Notifications',
@@ -1496,12 +1492,12 @@ function AppContent() {
                     />
                     <RootStack.Screen
                       name="ProfileNotificationDetail"
-                      component={ProfileNotificationDetailScreen}
+                      getComponent={() => ProfileNotificationDetailScreen}
                       options={{ presentation: 'modal', title: 'Notification' }}
                     />
                     <RootStack.Screen
                       name="KISPrinciples"
-                      component={KISPrinciplesScreen}
+                      getComponent={() => KISPrinciplesScreen}
                       options={{
                         presentation: 'modal',
                         title: 'KIS Principles',
@@ -1509,48 +1505,48 @@ function AppContent() {
                     />
                     <RootStack.Screen
                       name="PasswordChange"
-                      component={PasswordChangeScreen}
+                      getComponent={() => PasswordChangeScreen}
                     />
                     <RootStack.Screen
                       name="EmailVerification"
-                      component={EmailVerificationScreen}
+                      getComponent={() => EmailVerificationScreen}
                     />
                     <RootStack.Screen
                       name="ComplianceSettings"
-                      component={ComplianceSettingsScreen}
+                      getComponent={() => ComplianceSettingsScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="CacheManagement"
-                      component={CacheManagementScreen}
+                      getComponent={() => CacheManagementScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="TermsAndConditions"
-                      component={TermsAndConditionsScreen}
+                      getComponent={() => TermsAndConditionsScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="PrivacyPolicy"
-                      component={PrivacyPolicyScreen}
+                      getComponent={() => PrivacyPolicyScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="DeviceManagement"
-                      component={DeviceManagementScreen}
+                      getComponent={() => DeviceManagementScreen}
                     />
                     <RootStack.Screen
                       name="QRScanLogin"
-                      component={QRScanLoginScreen}
+                      getComponent={() => QRScanLoginScreen}
                       options={{ presentation: 'fullScreenModal', headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ParentRecovery"
-                      component={ParentRecoveryScreen}
+                      getComponent={() => ParentRecoveryScreen}
                     />
                     <RootStack.Screen
                       name="AccountDeletion"
-                      component={AccountDeletionScreen}
+                      getComponent={() => AccountDeletionScreen}
                     />
                     <RootStack.Screen
                       name="BlockedContacts"
@@ -1562,267 +1558,267 @@ function AppContent() {
                     </RootStack.Screen>
                     <RootStack.Screen
                       name="InvoiceList"
-                      component={InvoiceListScreen}
+                      getComponent={() => InvoiceListScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="Loyalty"
-                      component={LoyaltyScreen}
+                      getComponent={() => LoyaltyScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="Referrals"
-                      component={ReferralScreen}
+                      getComponent={() => ReferralScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="HowRewardsWork"
-                      component={HowRewardsWorkScreen}
+                      getComponent={() => HowRewardsWorkScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="PromoCode"
-                      component={PromoCodeScreen}
+                      getComponent={() => PromoCodeScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="SubscriptionManagement"
-                      component={SubscriptionManagementScreen}
+                      getComponent={() => SubscriptionManagementScreen}
                       options={{ presentation: 'modal', title: 'Subscription' }}
                     />
                     <RootStack.Screen
                       name="PlaylistList"
-                      component={PlaylistsScreen}
+                      getComponent={() => PlaylistsScreen}
                     />
                     <RootStack.Screen
                       name="PlaylistDetail"
-                      component={PlaylistDetailScreen}
+                      getComponent={() => PlaylistDetailScreen}
                     />
                     <RootStack.Screen
                       name="ServiceBookingDetails"
-                      component={ServiceBookingDetailsPage}
+                      getComponent={() => ServiceBookingDetailsPage}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="HealthInstitutionDetail"
-                      component={HealthInstitutionDetailScreen}
+                      getComponent={() => HealthInstitutionDetailScreen}
                     />
                     <RootStack.Screen
                       name="HealthInstitutionManagement"
-                      component={HealthInstitutionManagementScreen}
+                      getComponent={() => HealthInstitutionManagementScreen}
                     />
                     <RootStack.Screen
                       name="ClinicalCommandCenter"
-                      component={ClinicalCommandCenterScreen}
+                      getComponent={() => ClinicalCommandCenterScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteBuilder"
-                      component={WebsiteBuilderScreen}
+                      getComponent={() => WebsiteBuilderScreen}
                     />
                     <RootStack.Screen
                       name="WebsitePreview"
-                      component={WebsitePreviewScreen}
+                      getComponent={() => WebsitePreviewScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteTheme"
-                      component={WebsiteThemeScreen}
+                      getComponent={() => WebsiteThemeScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteFormResponses"
-                      component={WebsiteFormResponsesScreen}
+                      getComponent={() => WebsiteFormResponsesScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteWebhooks"
-                      component={WebsiteWebhooksScreen}
+                      getComponent={() => WebsiteWebhooksScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteCollaborators"
-                      component={WebsiteCollaboratorsScreen}
+                      getComponent={() => WebsiteCollaboratorsScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteJoin"
-                      component={WebsiteJoinScreen}
+                      getComponent={() => WebsiteJoinScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteVisits"
-                      component={WebsiteVisitsScreen}
+                      getComponent={() => WebsiteVisitsScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteCustomDomain"
-                      component={WebsiteCustomDomainScreen}
+                      getComponent={() => WebsiteCustomDomainScreen}
                     />
                     <RootStack.Screen
                       name="WebsiteTemplatePicker"
-                      component={WebsiteTemplatePickerScreen}
+                      getComponent={() => WebsiteTemplatePickerScreen}
                     />
                     <RootStack.Screen
                       name="AvailabilityManagement"
-                      component={AvailabilityManagementScreen}
+                      getComponent={() => AvailabilityManagementScreen}
                     />
                     <RootStack.Screen
                       name="HealthInstitutionMembers"
-                      component={HealthInstitutionMembersScreen}
+                      getComponent={() => HealthInstitutionMembersScreen}
                     />
                     <RootStack.Screen
                       name="HealthInstitutionServicesCatalog"
-                      component={InstitutionServicesCatalogScreen}
+                      getComponent={() => InstitutionServicesCatalogScreen}
                     />
                     <RootStack.Screen
                       name="HealthInstitutionCards"
-                      component={HealthInstitutionCardsScreen}
+                      getComponent={() => HealthInstitutionCardsScreen}
                     />
                     <RootStack.Screen
                       name="HealthServiceSession"
-                      component={HealthServiceSessionScreen}
+                      getComponent={() => HealthServiceSessionScreen}
                     />
                     <RootStack.Screen
                       name="InstitutionLandingPreview"
-                      component={InstitutionLandingPreviewScreen}
+                      getComponent={() => InstitutionLandingPreviewScreen}
                     />
                     <RootStack.Screen
                       name="AdminDashboard"
-                      component={AdminDashboardScreen}
+                      getComponent={() => AdminDashboardScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="AIIntegration"
-                      component={AIIntegrationScreen}
+                      getComponent={() => AIIntegrationScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="MediaAssetManager"
-                      component={MediaAssetManagerScreen}
+                      getComponent={() => MediaAssetManagerScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="SurveyManager"
-                      component={SurveyManagerScreen}
+                      getComponent={() => SurveyManagerScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="SetupPIN"
-                      component={SetupPINScreen}
+                      getComponent={() => SetupPINScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
                       name="ViewProfile"
-                      component={UserProfileScreen}
+                      getComponent={() => UserProfileScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="JobsBoard"
-                      component={JobsBoardScreen}
+                      getComponent={() => JobsBoardScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="MyApplications"
-                      component={MyApplicationsScreen}
+                      getComponent={() => MyApplicationsScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="Connections"
-                      component={ConnectionsScreen}
+                      getComponent={() => ConnectionsScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="TalentDiscover"
-                      component={TalentDiscoverScreen}
+                      getComponent={() => TalentDiscoverScreen}
                       options={{ headerShown: false }}
                     />
-                    <RootStack.Screen name="TestimonyHub" component={TestimonyHubScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SeasonsBrowser" component={SeasonsBrowserScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="DeclareSeasonSheet" component={DeclareSeasonSheet} options={{ headerShown: false, presentation: 'modal' }} />
-                    <RootStack.Screen name="DeclareTestimonySheet" component={DeclareTestimonySheet} options={{ headerShown: false, presentation: 'modal' }} />
-                    <RootStack.Screen name="ReachOutSheet" component={ReachOutSheet} options={{ headerShown: false, presentation: 'modal' }} />
-                    <RootStack.Screen name="TestimonyReachInbox" component={TestimonyReachInboxScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="LinkedDevices" component={LinkedDevicesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="TestimonyHub" getComponent={() => TestimonyHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SeasonsBrowser" getComponent={() => SeasonsBrowserScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DeclareSeasonSheet" getComponent={() => DeclareSeasonSheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="DeclareTestimonySheet" getComponent={() => DeclareTestimonySheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="ReachOutSheet" getComponent={() => ReachOutSheet} options={{ headerShown: false, presentation: 'modal' }} />
+                    <RootStack.Screen name="TestimonyReachInbox" getComponent={() => TestimonyReachInboxScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LinkedDevices" getComponent={() => LinkedDevicesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NotificationSettings" getComponent={() => NotificationSettingsScreen} options={{ headerShown: false }} />
 
                     {/* ── Family ── */}
-                    <RootStack.Screen name="FamilyHub" component={FamilyHubScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilySetup" component={FamilySetupScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyCalendar" component={FamilyCalendarScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyAlbum" component={FamilyAlbumScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyTree" component={FamilyTreeScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyMembers" component={FamilyMembersScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyMilestones" component={FamilyMilestonesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyTimeCapsules" component={FamilyTimeCapsuleScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyNoticeBoard" component={FamilyNoticeBoardScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilyPrayer" component={FamilyPrayerScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="GriefSupport" component={GriefSupportScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="ParentalControls" component={ParentalControlsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FamilySOS" component={FamilySOSScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyHub" getComponent={() => FamilyHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilySetup" getComponent={() => FamilySetupScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyCalendar" getComponent={() => FamilyCalendarScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyAlbum" getComponent={() => FamilyAlbumScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyTree" getComponent={() => FamilyTreeScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyMembers" getComponent={() => FamilyMembersScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyMilestones" getComponent={() => FamilyMilestonesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyTimeCapsules" getComponent={() => FamilyTimeCapsuleScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyNoticeBoard" getComponent={() => FamilyNoticeBoardScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyPrayer" getComponent={() => FamilyPrayerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="GriefSupport" getComponent={() => GriefSupportScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ParentalControls" getComponent={() => ParentalControlsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilySOS" getComponent={() => FamilySOSScreen} options={{ headerShown: false }} />
 
                     {/* ── Church ── */}
-                    <RootStack.Screen name="ChurchHome" component={ChurchScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="GiveNow" component={GiveNowScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="ChurchGiving" component={ChurchGivingScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="TitheStatement" component={TitheStatementScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="PrayerWall" component={PrayerWallScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="NewPrayerRequest" component={NewPrayerRequestScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="FastingTracker" component={FastingTrackerScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SmallGroups" component={SmallGroupsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SmallGroupDetail" component={SmallGroupDetailScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="ChurchAttendance" component={ChurchAttendanceScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="MemberDirectory" component={MemberDirectoryScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="MinistryDepartments" component={MinistryScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="EvangelismTracker" component={EvangelismScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="DiscipleshipJourney" component={DiscipleshipScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SpiritualGifts" component={SpiritualGiftsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SetLists" component={SetListScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SongLibrary" component={SongLibraryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchHome" getComponent={() => ChurchScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="GiveNow" getComponent={() => GiveNowScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchGiving" getComponent={() => ChurchGivingScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="TitheStatement" getComponent={() => TitheStatementScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PrayerWall" getComponent={() => PrayerWallScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NewPrayerRequest" getComponent={() => NewPrayerRequestScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FastingTracker" getComponent={() => FastingTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SmallGroups" getComponent={() => SmallGroupsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SmallGroupDetail" getComponent={() => SmallGroupDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchAttendance" getComponent={() => ChurchAttendanceScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MemberDirectory" getComponent={() => MemberDirectoryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MinistryDepartments" getComponent={() => MinistryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EvangelismTracker" getComponent={() => EvangelismScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DiscipleshipJourney" getComponent={() => DiscipleshipScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SpiritualGifts" getComponent={() => SpiritualGiftsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SetLists" getComponent={() => SetListScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SongLibrary" getComponent={() => SongLibraryScreen} options={{ headerShown: false }} />
 
                     {/* ── Government ── */}
-                    <RootStack.Screen name="GovernmentHub" component={GovernmentHubScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Petitions" component={PetitionsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="PetitionDetail" component={PetitionDetailScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CreatePetition" component={CreatePetitionScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CivicPolls" component={CivicPollsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="LegalAid" component={LegalAidScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="LegalTemplates" component={LegalTemplatesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="DiasporaCommunities" component={DiasporaScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="NGOTools" component={NGOToolsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="ComplianceTracker" component={ComplianceTrackerScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="BoardGovernance" component={BoardGovernanceScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="WhistleblowerReport" component={WhistleblowerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="GovernmentHub" getComponent={() => GovernmentHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Petitions" getComponent={() => PetitionsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PetitionDetail" getComponent={() => PetitionDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreatePetition" getComponent={() => CreatePetitionScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CivicPolls" getComponent={() => CivicPollsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LegalAid" getComponent={() => LegalAidScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="LegalTemplates" getComponent={() => LegalTemplatesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DiasporaCommunities" getComponent={() => DiasporaScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="NGOTools" getComponent={() => NGOToolsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ComplianceTracker" getComponent={() => ComplianceTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BoardGovernance" getComponent={() => BoardGovernanceScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="WhistleblowerReport" getComponent={() => WhistleblowerScreen} options={{ headerShown: false }} />
 
                     {/* ── Business ── */}
-                    <RootStack.Screen name="BusinessHub" component={BusinessHubScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Crowdfunding" component={CrowdfundScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CrowdfundDetail" component={CrowdfundDetailScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CreateCampaign" component={CreateCampaignScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SavingsGroups" component={SavingsGroupsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SavingsGroupDetail" component={SavingsGroupDetailScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="BusinessMentorship" component={MentorshipScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CoWorkingSpaces" component={CoWorkingScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="KingdomCertification" component={KingdomCertificationScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="BusinessImpactReport" component={ImpactReportScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="JobDetail" component={BusinessJobDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BusinessHub" getComponent={() => BusinessHubScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Crowdfunding" getComponent={() => CrowdfundScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CrowdfundDetail" getComponent={() => CrowdfundDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreateCampaign" getComponent={() => CreateCampaignScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SavingsGroups" getComponent={() => SavingsGroupsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SavingsGroupDetail" getComponent={() => SavingsGroupDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BusinessMentorship" getComponent={() => MentorshipScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CoWorkingSpaces" getComponent={() => CoWorkingScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomCertification" getComponent={() => KingdomCertificationScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BusinessImpactReport" getComponent={() => ImpactReportScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="JobDetail" getComponent={() => BusinessJobDetailScreen} options={{ headerShown: false }} />
                     {/* JobApplications → consolidated into MyApplications */}
 
                     {/* ── Health sub-screens ── */}
-                    <RootStack.Screen name="TelemedicineHub" component={TelemedicineScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="DoctorDirectory" component={DoctorDirectoryScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="ConsultDetail" component={ConsultDetailScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="EmergencyHub" component={EmergencyScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="HealthGoals" component={HealthGoalsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="PregnancyTrackerScreen" component={PregnancyTrackerScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="BabyMilestones" component={BabyMilestonesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Medications" component={MedicationsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="MentalHealthHub" component={MentalHealthScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="MoodJournal" component={MoodJournalScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="CrisisResources" component={CrisisResourcesScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="AddictionRecovery" component={AddictionRecoveryScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SobrietyTracker" component={SobrietyTrackerScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="SymptomChecker" component={SymptomCheckerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="TelemedicineHub" getComponent={() => TelemedicineScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="DoctorDirectory" getComponent={() => DoctorDirectoryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ConsultDetail" getComponent={() => ConsultDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EmergencyHub" getComponent={() => EmergencyScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="HealthGoals" getComponent={() => HealthGoalsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PregnancyTrackerScreen" getComponent={() => PregnancyTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BabyMilestones" getComponent={() => BabyMilestonesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Medications" getComponent={() => MedicationsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MentalHealthHub" getComponent={() => MentalHealthScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MoodJournal" getComponent={() => MoodJournalScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CrisisResources" getComponent={() => CrisisResourcesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="AddictionRecovery" getComponent={() => AddictionRecoveryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SobrietyTracker" getComponent={() => SobrietyTrackerScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="SymptomChecker" getComponent={() => SymptomCheckerScreen} options={{ headerShown: false }} />
 
                     {/* ── Broadcast education & media extended ── */}
-                    <RootStack.Screen name="CreatorAnalytics" component={CreatorAnalyticsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="KingdomNews" component={KingdomNewsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="KingdomMusic" component={KingdomMusicScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Ebooks" component={EbooksScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Podcasts" component={PodcastsScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="PPVEvents" component={PPVEventsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreatorAnalytics" getComponent={() => CreatorAnalyticsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomNews" getComponent={() => KingdomNewsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="KingdomMusic" getComponent={() => KingdomMusicScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Ebooks" getComponent={() => EbooksScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="Podcasts" getComponent={() => PodcastsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="PPVEvents" getComponent={() => PPVEventsScreen} options={{ headerShown: false }} />
                   </>
                 ) : (
                   <>
