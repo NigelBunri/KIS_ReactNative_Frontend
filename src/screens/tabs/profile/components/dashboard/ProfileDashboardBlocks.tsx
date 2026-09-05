@@ -14,6 +14,7 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolation,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import KISButton from '@/constants/KISButton';
@@ -347,15 +348,24 @@ export const ProfileHeroCard = ({
             // visibly nudged the bottom tab bar once per load. Delaying the
             // commit collapses however many fire during load into the one
             // that actually matters — the final, settled height.
+            //
+            // That still leaves one real commit once the verification
+            // summary/tier badge legitimately resolves more than 150ms
+            // after mount — the debounce window has nothing left to
+            // collapse against by then, so that commit was landing as an
+            // instant snap. Wrapping it in withTiming eases that
+            // still-legitimate late correction into a soft settle instead
+            // of a jump — same fix as useCollapsingGoldHeader.ts's.
             const measured = e.nativeEvent.layout.height;
             if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
             pendingLayoutTimer.current = setTimeout(() => {
               pendingLayoutTimer.current = null;
-              collapseNaturalHeight.value = resolveNaturalHeight({
+              const resolved = resolveNaturalHeight({
                 measured,
                 current: collapseNaturalHeight.value,
                 collapseDriverValue: scrollY.value,
               });
+              collapseNaturalHeight.value = withTiming(resolved, { duration: 220 });
             }, 150);
           }}
           style={{ paddingTop: topInset, position: 'relative', overflow: 'hidden' }}
