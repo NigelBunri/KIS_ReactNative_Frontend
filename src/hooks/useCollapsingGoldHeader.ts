@@ -10,6 +10,7 @@ import {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { resolveNaturalHeight } from './goldHeaderNaturalHeight';
 
 /**
  * Shared mechanism for every main-tab screen's Golden Section: a sticky
@@ -27,12 +28,14 @@ import {
  * `collapseDistance`: scroll px over which the card fully collapses.
  *
  * The natural height is measured via `onHeaderLayout`, attached to the
- * un-clipped content inside the collapsing card. It's grow-only - once the
- * card starts being clipped by its own shrinking maxHeight, onLayout can
- * re-fire with the *constrained* height; recording that would shrink the
- * "expanded" target on every scroll-down tick, so scrolling back up could
- * never fully re-open the header. Only genuine content growth (e.g. longer
- * text) should ever raise the recorded value.
+ * un-clipped content inside the collapsing card. Measurements are trusted
+ * unconditionally only while the header is at rest (fully expanded, where
+ * maxHeight can't be constraining anything) and are grow-only otherwise —
+ * see goldHeaderNaturalHeight.ts's resolveNaturalHeight for the full
+ * rationale (shared with ProfileDashboardBlocks.tsx's bespoke equivalent).
+ * This lets genuinely shorter content shrink the reserved space back down
+ * (once scrolled back to rest) without reintroducing the old bug where a
+ * mid-collapse remeasurement could permanently ratchet the ceiling down.
  *
  * For screens that also need a direct drag on the header (Bible, Messages),
  * write into the returned `scrollY.value` from a PanResponder's
@@ -87,11 +90,12 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
   });
 
   const onHeaderLayout = useCallback((e: LayoutChangeEvent) => {
-    const measured = e.nativeEvent.layout.height;
-    if (measured > naturalHeight.value) {
-      naturalHeight.value = measured;
-    }
-  }, [naturalHeight]);
+    naturalHeight.value = resolveNaturalHeight({
+      measured: e.nativeEvent.layout.height,
+      current: naturalHeight.value,
+      collapseDriverValue: collapseScrollY.value,
+    });
+  }, [naturalHeight, collapseScrollY]);
 
   const collapseStyle = useAnimatedStyle(() => ({
     maxHeight: interpolate(

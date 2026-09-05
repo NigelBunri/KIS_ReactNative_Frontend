@@ -109,6 +109,29 @@ export function GoldenSectionProvider({ children }: { children: React.ReactNode 
 }
 
 /**
+ * The Golden Section's own lifecycle, as three deterministic, mutually
+ * exclusive states (a screen's *internal* expanded/collapsing/collapsed
+ * progression — driven by useCollapsingGoldHeader's scrollY — is a further
+ * subdivision of 'active' that this context doesn't need to know about,
+ * since it never affects who owns the slot or whether it renders):
+ *
+ *  - 'inactive'   — no screen currently owns the slot. Renders nothing.
+ *  - 'active'     — exactly one screen's payload is showing.
+ *  - 'suppressed' — a full-screen overlay (chat room, community room — see
+ *                   useGoldenSectionSuppression) is forcing the slot hidden,
+ *                   regardless of whether a screen still owns it underneath.
+ *                   Registration keeps happening normally while suppressed
+ *                   (the owning screen doesn't need to know or care), so the
+ *                   instant every suppressor clears, 'active' resumes with
+ *                   no re-registration needed.
+ *
+ * Transitions are driven entirely by GoldenSectionProvider's two pieces of
+ * state (`state`, `suppressors`) — this is a derived read, not separate
+ * state of its own, so it can never drift out of sync with them.
+ */
+export type GoldenSectionStatus = 'inactive' | 'active' | 'suppressed';
+
+/**
  * Raw payload/suppression access — used by the App.tsx-hosted GoldenSection
  * shell. `ownerKey` identifies which screen instance currently owns the
  * slot — pass it as the shared GoldHeaderShell's `key` so a screen switch
@@ -118,9 +141,15 @@ export function GoldenSectionProvider({ children }: { children: React.ReactNode 
 export function useGoldenSection() {
   const entry = useContext(GoldenSectionPayloadContext);
   const suppressed = useContext(GoldenSectionSuppressedContext);
+  const status: GoldenSectionStatus = suppressed
+    ? 'suppressed'
+    : entry
+    ? 'active'
+    : 'inactive';
   return {
     payload: suppressed ? null : entry?.payload ?? null,
     ownerKey: entry?.owner ?? null,
+    status,
   };
 }
 

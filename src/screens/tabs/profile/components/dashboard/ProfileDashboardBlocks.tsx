@@ -27,6 +27,7 @@ import {
   createProfileDashboardTheme,
   getProfileDashboardCardStyle,
 } from '../../profileDashboardTheme';
+import { resolveNaturalHeight } from '@/hooks/goldHeaderNaturalHeight';
 
 import creditIcon from '../../../../../assets/KIS-Coin.png';
 
@@ -311,17 +312,21 @@ export const ProfileHeroCard = ({
       <Animated.View style={[collapseStyle, { overflow: 'hidden' }]}>
         <View
           onLayout={(e) => {
-            // Once maxHeight above starts constraining this view, onLayout
-            // re-fires with the *clipped* height, not the natural content
-            // height — recording that would shrink the "expanded" target on
-            // every scroll-down tick, so scrolling back up could never fully
-            // re-open the hero. Only ever grow the recorded height, never
-            // shrink it, so a single unclipped measurement (mount, or fully
-            // scrolled back to the top) sticks.
-            const measured = e.nativeEvent.layout.height;
-            if (measured > collapseNaturalHeight.value) {
-              collapseNaturalHeight.value = measured;
-            }
+            // Shared policy with useCollapsingGoldHeader.ts — trust the
+            // measurement fully at rest (scrollY === 0, i.e. maxHeight can't
+            // be constraining anything here), grow-only otherwise. See
+            // goldHeaderNaturalHeight.ts's resolveNaturalHeight for the full
+            // rationale: this is the same "once maxHeight starts
+            // constraining this view, onLayout can re-fire with the
+            // *clipped* height" problem, now fixed so genuinely shorter
+            // content (e.g. a headline wrapping to fewer lines) can shrink
+            // the reserved space back down once scrolled back to rest,
+            // instead of permanently ratcheting the ceiling up only.
+            collapseNaturalHeight.value = resolveNaturalHeight({
+              measured: e.nativeEvent.layout.height,
+              current: collapseNaturalHeight.value,
+              collapseDriverValue: scrollY.value,
+            });
           }}
           style={{ paddingTop: topInset, position: 'relative', overflow: 'hidden' }}
         >
