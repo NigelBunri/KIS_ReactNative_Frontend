@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -271,6 +271,20 @@ export const ProfileHeroCard = ({
   // comment) and the collapse animation fights that stale ceiling for a few
   // frames before it can settle, reading as a stutter right as scroll starts.
   const collapseNaturalHeight = useSharedValue(topInset + 250);
+  // Debounces the onLayout commit below by the same 150ms and for the same
+  // reason as useCollapsingGoldHeader.ts's identical fix: this hero's real
+  // content (avatar, tier badge, verification summary) typically settles
+  // across more than one onLayout call as its own data loads in, and since
+  // the hero is at rest for that whole window, each intermediate measurement
+  // would otherwise commit as its own visible correction to maxHeight —
+  // which, since this card sits above the entire tab navigator, visibly
+  // nudges the bottom tab bar too. Delaying the commit collapses however
+  // many fire during load into the one that actually matters: the final,
+  // settled height.
+  const pendingLayoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
+  }, []);
   const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
   console.log('profile Image', avatarUrl);
   const collapseStyle = useAnimatedStyle(() => ({
@@ -322,11 +336,27 @@ export const ProfileHeroCard = ({
             // content (e.g. a headline wrapping to fewer lines) can shrink
             // the reserved space back down once scrolled back to rest,
             // instead of permanently ratcheting the ceiling up only.
-            collapseNaturalHeight.value = resolveNaturalHeight({
-              measured: e.nativeEvent.layout.height,
-              current: collapseNaturalHeight.value,
-              collapseDriverValue: scrollY.value,
-            });
+            //
+            // The commit itself is debounced 150ms for the same reason as
+            // useCollapsingGoldHeader.ts's onHeaderLayout: this hero's real
+            // content (avatar, tier badge, verification summary) typically
+            // settles across more than one onLayout call as its own data
+            // loads in, and since this card sits as a normal-flow sibling
+            // above the entire tab navigator (see GoldenSection in
+            // App.tsx), committing each intermediate measurement separately
+            // visibly nudged the bottom tab bar once per load. Delaying the
+            // commit collapses however many fire during load into the one
+            // that actually matters — the final, settled height.
+            const measured = e.nativeEvent.layout.height;
+            if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
+            pendingLayoutTimer.current = setTimeout(() => {
+              pendingLayoutTimer.current = null;
+              collapseNaturalHeight.value = resolveNaturalHeight({
+                measured,
+                current: collapseNaturalHeight.value,
+                collapseDriverValue: scrollY.value,
+              });
+            }, 150);
           }}
           style={{ paddingTop: topInset, position: 'relative', overflow: 'hidden' }}
         >

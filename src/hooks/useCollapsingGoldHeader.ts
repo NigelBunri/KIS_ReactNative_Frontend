@@ -1,5 +1,5 @@
 // src/hooks/useCollapsingGoldHeader.ts
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import {
   Extrapolation,
@@ -89,12 +89,40 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
     },
   });
 
+  // A screen's real header content typically doesn't settle in one
+  // onHeaderLayout call during initial load — e.g. Messages' online-count
+  // badge, or any tier/subscription-gated row, mounts once with placeholder
+  // content then again once its own async fetch resolves, each a separate
+  // layout pass. Since the header is at rest for the whole loading window,
+  // resolveNaturalHeight trusts every one of those measurements immediately
+  // (that's correct in isolation — see its own doc comment), but committing
+  // each one straight to naturalHeight.value means every intermediate
+  // measurement is its own visible correction to maxHeight, and since this
+  // card sits as a normal-flow sibling above the entire tab navigator (see
+  // GoldenSection in App.tsx), each correction visibly nudges the bottom tab
+  // bar's containing box too — the reported "tab bar moves during load" bug.
+  // Debouncing the *commit* (not the measurement policy itself) collapses
+  // however many of these fire in quick succession into the one that
+  // actually matters — the final, settled height — so there's at most one
+  // visible correction instead of one per async data source. 150ms matches
+  // collapseScrollY's own withTiming duration just above, for the same
+  // "don't react to every individual layout blip" reasoning.
+  const pendingLayoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
+  }, []);
+
   const onHeaderLayout = useCallback((e: LayoutChangeEvent) => {
-    naturalHeight.value = resolveNaturalHeight({
-      measured: e.nativeEvent.layout.height,
-      current: naturalHeight.value,
-      collapseDriverValue: collapseScrollY.value,
-    });
+    const measured = e.nativeEvent.layout.height;
+    if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
+    pendingLayoutTimer.current = setTimeout(() => {
+      pendingLayoutTimer.current = null;
+      naturalHeight.value = resolveNaturalHeight({
+        measured,
+        current: naturalHeight.value,
+        collapseDriverValue: collapseScrollY.value,
+      });
+    }, 150);
   }, [naturalHeight, collapseScrollY]);
 
   const collapseStyle = useAnimatedStyle(() => ({
