@@ -95,6 +95,10 @@ export default function MembersScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={members}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 16, paddingBottom: 80 }}

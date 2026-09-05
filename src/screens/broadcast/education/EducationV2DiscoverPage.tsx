@@ -1485,6 +1485,10 @@ export default function EducationV2DiscoverPage({
           </Pressable>
         </View>
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={section.items}
           horizontal
           showsHorizontalScrollIndicator={false}

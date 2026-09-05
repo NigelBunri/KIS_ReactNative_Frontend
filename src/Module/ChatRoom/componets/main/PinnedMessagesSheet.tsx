@@ -205,6 +205,10 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
             </View>
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={nonExpiredPins}
               keyExtractor={item => item.id}
               renderItem={renderItem}

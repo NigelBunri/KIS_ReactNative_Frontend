@@ -127,6 +127,10 @@ export default function MedicationsScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={medications}
           keyExtractor={(m) => m.id}
           contentContainerStyle={[styles.list, { paddingBottom: 100 }]}

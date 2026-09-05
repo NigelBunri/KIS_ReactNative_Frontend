@@ -123,6 +123,10 @@ export default function AdminAuditTrailPanel({
 
       {!loading && (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={entries}
           keyExtractor={e => e.id}
           contentContainerStyle={styles.listContent}

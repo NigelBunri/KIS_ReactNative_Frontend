@@ -319,6 +319,10 @@ export default function LinkedDevicesScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={devices}
           keyExtractor={item => item.deviceId}
           renderItem={renderDevice}

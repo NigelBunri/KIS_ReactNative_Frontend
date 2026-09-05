@@ -236,6 +236,10 @@ export default function JobsScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={jobs}
         keyExtractor={item => item.id}
         renderItem={renderJob}

@@ -124,6 +124,10 @@ export default function MyApplicationsScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={applications}
         keyExtractor={item => item.id}
         renderItem={renderItem}

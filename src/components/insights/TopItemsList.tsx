@@ -15,6 +15,10 @@ export default function TopItemsList({ title, items }: Props) {
     <View style={{ marginTop: 12 }}>
       <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (

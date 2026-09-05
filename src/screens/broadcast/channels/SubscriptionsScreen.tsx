@@ -128,6 +128,10 @@ export default function SubscriptionsScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={channels}
           keyExtractor={item => item.id}
           refreshControl={

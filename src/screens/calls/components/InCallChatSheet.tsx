@@ -169,6 +169,10 @@ export default function InCallChatSheet({ messages, visible, onClose, onSend, lo
 
       {/* Messages */}
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         ref={listRef}
         data={messages}
         keyExtractor={m => m.id}

@@ -150,6 +150,10 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={items}
           keyExtractor={i => `${i.kind}-${i.id}`}
           contentContainerStyle={{ paddingVertical: 8, paddingBottom: 40 }}

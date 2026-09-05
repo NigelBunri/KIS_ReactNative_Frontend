@@ -68,6 +68,10 @@ export default function WebsiteFormResponsesScreen({ route, navigation }: Props)
       />
       <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={submissions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}

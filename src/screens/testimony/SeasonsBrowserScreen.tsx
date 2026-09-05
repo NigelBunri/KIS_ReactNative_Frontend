@@ -243,6 +243,10 @@ export default function SeasonsBrowserScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={seasons}
           keyExtractor={item => String(item.id)}
           renderItem={renderSeasonCard}

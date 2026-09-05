@@ -129,6 +129,10 @@ export default function MinistryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={departments}
           keyExtractor={d => d.id}
           numColumns={2}

@@ -143,6 +143,10 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={blocks}
           keyExtractor={(b) => b.id}
           contentContainerStyle={styles.listContent}

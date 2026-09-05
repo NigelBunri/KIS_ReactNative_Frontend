@@ -37,6 +37,10 @@ export default function EducationContinueLearning({ items, onResume }: Props) {
   return (
     <View style={{ gap: 10 }}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={items}
         keyExtractor={progress =>
           `${progress.contentType}-${progress.contentId}`

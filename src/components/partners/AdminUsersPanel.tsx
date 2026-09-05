@@ -164,6 +164,10 @@ export default function AdminUsersPanel({
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={users}
           keyExtractor={u => u.id}
           renderItem={({ item }) => (

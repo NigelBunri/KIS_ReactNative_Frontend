@@ -218,6 +218,10 @@ export default function MentorshipScreen({ navigation }: Props) {
 
       {activeTab === 'browse' ? (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={mentors}
           keyExtractor={item => item.id}
           renderItem={renderMentor}
@@ -236,6 +240,10 @@ export default function MentorshipScreen({ navigation }: Props) {
         />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={myMentorships}
           keyExtractor={item => item.id}
           renderItem={renderMentorship}

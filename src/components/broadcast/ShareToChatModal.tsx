@@ -92,6 +92,10 @@ export default function ShareToChatModal({ visible, onClose, onPicked }: Props) 
           <Text style={[styles.emptyText, { color: palette.subtext }]}>Loading chats…</Text>
         ) : (
           <FlatList
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            removeClippedSubviews
             data={filtered}
             keyExtractor={(item) => item.id}
             style={{ maxHeight: 420 }}

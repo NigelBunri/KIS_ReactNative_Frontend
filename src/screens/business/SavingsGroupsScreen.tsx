@@ -192,6 +192,10 @@ export default function SavingsGroupsScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={groups}
         keyExtractor={item => item.id}
         renderItem={renderGroup}

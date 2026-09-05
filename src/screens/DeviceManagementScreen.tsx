@@ -538,6 +538,10 @@ export default function DeviceManagementScreen() {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={listData}
         keyExtractor={item => String(item.id)}
         renderItem={renderDevice}

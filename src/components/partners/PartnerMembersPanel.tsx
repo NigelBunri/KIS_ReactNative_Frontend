@@ -336,6 +336,10 @@ export default function PartnerMembersPanel({
             <ActivityIndicator size="small" color={palette.primary} style={{ marginTop: 24 }} />
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={logEntries}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ padding: 16, gap: 8 }}
@@ -360,6 +364,10 @@ export default function PartnerMembersPanel({
           <ActivityIndicator size="small" color={palette.primary} style={{ marginTop: 24 }} />
         ) : (
           <FlatList
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            removeClippedSubviews
             data={filtered}
             keyExtractor={(item) => item.user_id}
             contentContainerStyle={{ padding: 16, gap: 8 }}

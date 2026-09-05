@@ -212,6 +212,10 @@ export default function ImpactReportScreen({ navigation }: Props) {
 
               {metrics.length > 0 ? (
                 <FlatList
+                  initialNumToRender={20}
+                  maxToRenderPerBatch={10}
+                  windowSize={10}
+                  removeClippedSubviews
                   data={metrics}
                   keyExtractor={item => item.key}
                   renderItem={renderMetricCard}

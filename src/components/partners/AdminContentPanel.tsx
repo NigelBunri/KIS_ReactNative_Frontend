@@ -163,6 +163,10 @@ export default function AdminContentPanel({
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={flags}
           keyExtractor={f => f.id}
           renderItem={({ item }) => (

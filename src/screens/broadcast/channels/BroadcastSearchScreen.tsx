@@ -284,6 +284,10 @@ export default function BroadcastSearchScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           key={`search-cols-${numColumns}`}
           data={results}
           keyExtractor={item => item.id}

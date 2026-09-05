@@ -356,6 +356,10 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
 
       {!loading && sections.length > 0 && (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={sections}
           keyExtractor={([kind]) => kind}
           ListEmptyComponent={

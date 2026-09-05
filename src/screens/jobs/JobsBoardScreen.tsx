@@ -222,6 +222,10 @@ export default function JobsBoardScreen() {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={jobs}
         keyExtractor={(item) => item.id}
         renderItem={renderJob}
@@ -232,6 +236,10 @@ export default function JobsBoardScreen() {
         ListHeaderComponent={
           <View>
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               horizontal
               data={JOB_TYPE_FILTERS}
               keyExtractor={(item) => item.key}

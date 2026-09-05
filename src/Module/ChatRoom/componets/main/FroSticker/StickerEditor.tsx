@@ -657,6 +657,10 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
               </View>
             ) : (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={remotePacks}
                 keyExtractor={p => p.id}
                 contentContainerStyle={{ padding: 16 }}

@@ -349,6 +349,10 @@ const ShopProductsPage = () => {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={products}
           keyExtractor={(item, index) =>
             String(item.id ?? `shop-product-${index}`)

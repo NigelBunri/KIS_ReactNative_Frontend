@@ -1045,6 +1045,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           </View>
         ) : (
           <FlatList
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            removeClippedSubviews
             data={statuses}
             horizontal
             keyExtractor={item => item.id}

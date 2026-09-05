@@ -206,6 +206,10 @@ export default function CategoryBrowsePage(props: Props) {
       <View style={[styles.container, { backgroundColor: palette.card, paddingTop: topInset }]}>
         <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>Browse Categories</Text>
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           key={`category-cols-${numColumns}`}
           data={categories}
           keyExtractor={item => item.id}
@@ -257,6 +261,10 @@ export default function CategoryBrowsePage(props: Props) {
         <Text style={[styles.pageTitle, { color: palette.text, paddingHorizontal: pageGutter, paddingTop: pageGutter }]}>{categoryName}</Text>
       ) : null}
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         key={`category-content-cols-${numColumns}`}
         data={contents}
         keyExtractor={item => item.id}

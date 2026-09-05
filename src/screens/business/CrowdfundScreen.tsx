@@ -140,6 +140,10 @@ export default function CrowdfundScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={campaigns}
         keyExtractor={item => item.id}
         renderItem={renderCampaign}

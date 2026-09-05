@@ -189,6 +189,10 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
             <ActivityIndicator style={styles.loader} color={palette.gold} />
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={tips}
               renderItem={renderTip}
               keyExtractor={t => t.id}

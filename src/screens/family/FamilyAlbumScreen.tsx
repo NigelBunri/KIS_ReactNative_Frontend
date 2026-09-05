@@ -155,6 +155,10 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={albums}
         keyExtractor={(item) => item.id}
         numColumns={2}

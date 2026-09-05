@@ -253,6 +253,10 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={renderChannelRow}
@@ -294,6 +298,10 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
             <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={discoverResults}
               keyExtractor={item => item.id}
               contentContainerStyle={{ padding: 12, paddingBottom: 40 }}

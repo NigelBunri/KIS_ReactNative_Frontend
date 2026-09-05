@@ -243,6 +243,10 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
             </View>
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={subRooms}
               keyExtractor={item => item.id}
               renderItem={renderItem}

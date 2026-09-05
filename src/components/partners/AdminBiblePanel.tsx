@@ -421,6 +421,10 @@ function MeditationsSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filtered}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 8 }}
@@ -599,6 +603,10 @@ function BooksSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filtered}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 8 }}
@@ -733,6 +741,10 @@ function PrayerRequestsSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filtered}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 40, gap: 8 }}
@@ -857,6 +869,10 @@ function DailyPassagesSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={items}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 8 }}
@@ -1081,6 +1097,10 @@ function PrayerCalendarSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={months}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 8 }}
@@ -1161,6 +1181,10 @@ function CoursesSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={items}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 40, gap: 8 }}
@@ -1212,6 +1236,10 @@ function ReadingPlansSection({ palette }: { palette: any }) {
         <SectionError message={error} onRetry={load} palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={items}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: 12, paddingBottom: 40, gap: 8 }}
@@ -1334,6 +1362,10 @@ function GenericSection({ section, palette }: { section: BibleSection; palette: 
         <EmptyState icon="📋" text="No items yet." palette={palette} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={items}
           keyExtractor={(item, i) => String(item?.id ?? i)}
           contentContainerStyle={{ padding: 12, gap: 8 }}

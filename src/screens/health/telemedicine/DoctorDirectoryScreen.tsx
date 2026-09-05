@@ -130,6 +130,10 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={doctors}
           keyExtractor={(d) => d.id}
           contentContainerStyle={[styles.list, { paddingBottom: 80 }]}

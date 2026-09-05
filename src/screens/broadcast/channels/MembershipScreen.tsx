@@ -153,6 +153,10 @@ export default function MembershipScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={tiers}
           keyExtractor={t => t.id}
           contentContainerStyle={{ padding: responsive.pageGutter, maxWidth: responsive.contentMaxWidth, width: '100%', alignSelf: 'center', gap: 16 }}
