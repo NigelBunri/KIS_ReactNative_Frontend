@@ -581,16 +581,25 @@ export default function FeedScreen<T extends FeedPost>({
         composerType: payload.composerType,
       });
       try {
+        // Both helpers below already Alert.alert the user with a specific
+        // message before returning null on failure — but returning (rather
+        // than throwing) still resolves this function normally, which
+        // FeedComposerSheet reads as "succeeded" and closes the composer,
+        // discarding the draft right on top of the failure alert the user
+        // just saw. Throwing signals FeedComposerSheet to keep the
+        // composer open instead; `alreadyAlerted` tells the catch below
+        // not to show its own generic alert on top of the specific one
+        // these helpers already showed.
         const prepared = await prepareBroadcastVideoPayload(payload);
         if (!prepared) {
           console.warn('[FeedScreen] handleCreate aborted: prepareBroadcastVideoPayload returned null (video upload likely failed)');
-          return;
+          throw Object.assign(new Error('Video upload failed.'), { alreadyAlerted: true });
         }
 
         const enrichedPayload = await uploadFeedAttachmentsIfNeeded(prepared);
         if (!enrichedPayload) {
           console.warn('[FeedScreen] handleCreate aborted: uploadFeedAttachmentsIfNeeded returned null (attachment upload/auth failed)');
-          return;
+          throw Object.assign(new Error('Attachment upload failed.'), { alreadyAlerted: true });
         }
 
         const requestPayload = { ...enrichedPayload };
@@ -629,13 +638,27 @@ export default function FeedScreen<T extends FeedPost>({
           queued: (res as any)?.queued,
           message: (res as any)?.message,
         });
-        if (res?.success) loadFeed();
-      } catch (error) {
-        console.error('[FeedScreen] handleCreate threw before reaching the server', {
+        if (res?.success) {
+          loadFeed();
+        } else {
+          // A non-throwing failure response (validation error, moderation
+          // rejection, etc.) — falling through without throwing here used
+          // to look identical to success to FeedComposerSheet, which
+          // closed itself and discarded the user's post right after this
+          // function returned normally. Throwing routes it through the
+          // same catch/Alert below and — via that catch's rethrow —
+          // signals FeedComposerSheet to keep the composer open instead.
+          throw new Error(res?.message || composerErrorMessage || 'Unable to post.');
+        }
+      } catch (error: any) {
+        console.error('[FeedScreen] handleCreate failed', {
           composerEndpoint,
           error: error instanceof Error ? error.message : String(error),
         });
-        Alert.alert('Post failed', 'Something went wrong while posting. Please try again.');
+        if (!error?.alreadyAlerted) {
+          Alert.alert('Post failed', 'Something went wrong while posting. Please try again.');
+        }
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
     [composerContext, composerEndpoint, composerErrorMessage, loadFeed],

@@ -1050,6 +1050,11 @@ export default function ProfileScreen() {
           'Broadcast item',
           error?.message || 'Unable to save this item.',
         );
+        // Rethrown so FeedComposerSheet (this handler is its onSubmit)
+        // knows the submission failed and keeps the composer open instead
+        // of closing and discarding the user's draft — it only closes
+        // when onSubmit resolves without throwing.
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
     [c],

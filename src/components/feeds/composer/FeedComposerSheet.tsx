@@ -296,7 +296,25 @@ export default function FeedComposerSheet({
     setSubmitting(true);
     try {
       await onSubmit(payload);
+      // Only reached if onSubmit resolved without throwing — every current
+      // onSubmit implementation (FeedScreen/CommunityFeedPage/
+      // PartnerFeedPage/ProfileScreen's handleCreate-family callbacks)
+      // already shows its own Alert and throws on failure (a server
+      // success:false response as well as a thrown network error), so
+      // reaching this line means the post genuinely succeeded.
       closeSheet();
+    } catch {
+      // Deliberately not closing here (unlike the try branch above) — the
+      // previous code called closeSheet() unconditionally after `await
+      // onSubmit(payload)`, treating "the promise didn't throw" as "it
+      // succeeded". Every onSubmit implementation actually resolves
+      // normally on lots of *failure* paths too (a success:false server
+      // response isn't a rejected promise), so a failed post silently
+      // closed this sheet and discarded everything the user had typed,
+      // with their own already-shown failure Alert being the only
+      // (confusing, easy to miss) sign anything went wrong. Not showing a
+      // second alert here — onSubmit's own catch already told the user
+      // what happened; this only needs to keep their draft open to retry.
     } finally {
       setSubmitting(false);
       setUploadingVideo(false);

@@ -174,6 +174,16 @@ export default function CommunityFeedPage({
     );
     if (res?.success) {
       loadFeed();
+    } else {
+      // A success:false response resolves normally (postRequest never
+      // throws), so silently falling through here — the previous code —
+      // gave the user no indication their post failed, and let
+      // FeedComposerSheet close and discard it anyway (that promise never
+      // rejected). Alerting and throwing surfaces the failure and keeps
+      // the composer open so the post isn't lost.
+      const message = res?.message || 'Unable to post to community feed.';
+      Alert.alert('Post failed', message);
+      throw new Error(message);
     }
   };
 
