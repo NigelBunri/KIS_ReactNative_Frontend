@@ -3,7 +3,11 @@
 // E2EE is deferred until key exchange protocol is validated end-to-end. Messages use server-side encryption via TLS. Flip to true when crypto module passes integration tests.
 const E2EE_ENABLED = true;
 const STALE_SIGNAL_DECRYPTS_KEY = 'kis.chat.stale_signal_decrypts.v1';
-const DEBUG_STALE_DECRYPTS = false;
+// Flipped on for the "initial messages arrive garbled in a brand-new
+// conversation" investigation — this was silencing exactly the failure mode
+// (a stale/mismatched Signal session) most consistent with that symptom.
+// Flip back to false once root-caused; it's noisy in a long-running app.
+const DEBUG_STALE_DECRYPTS = true;
 
 import {
   useCallback,
@@ -455,6 +459,20 @@ export function useChatMessaging({
           ? { ...message, ...patch }
           : message,
       );
+      if (__DEV__ && !next.some((m) => m.serverId === messageId || m.id === messageId)) {
+        // The decrypted plaintext was already persisted to local storage by
+        // the caller (saveDecryptedMessage runs before this), so it isn't
+        // lost — but nothing in the currently-rendered list matched this id,
+        // so this specific call did nothing visible. Only a *retry* that
+        // reaches loadDecryptedMessage's cache-hit path recovers it; if
+        // whatever triggers that retry never fires (or the fragile
+        // "already readable" check above short-circuits it — see
+        // decryptChatMessage), this plaintext stays invisible indefinitely
+        // even though it was decrypted successfully.
+        console.warn('[useChatMessaging] patchDecryptedMessage found no matching message in state', {
+          messageId,
+        });
+      }
       await replaceMessages(next);
       const updated = next.find((message) => message.serverId === messageId || message.id === messageId);
       const convId = updated?.conversationId ?? conversationIdRef.current;
@@ -487,7 +505,27 @@ export function useChatMessaging({
             return sameMessage && text.length > 0 && text.toLowerCase() !== 'encrypted message';
           })
         : null;
-      if (existingReadable) return;
+      if (existingReadable) {
+        // This is meant to short-circuit re-decrypting a message we've
+        // already successfully decrypted in this session — but it infers
+        // "already decrypted" purely from mapped.text not being blank/not
+        // being the exact literal "Encrypted message". If the raw payload
+        // ever arrives with anything else in that field (a placeholder
+        // string that doesn't match exactly, a stray copy of the ciphertext
+        // itself, etc.), this treats that as trustworthy content and skips
+        // decryption entirely — permanently, since every future call (e.g.
+        // on reopening the chat) re-derives the same text and hits the same
+        // skip. Logging this explicitly for the "initial messages arrive
+        // garbled" investigation: if this fires for a message that's
+        // actually still ciphertext, this check is the bug.
+        if (__DEV__) {
+          console.warn('[useChatMessaging] skipping decrypt — existing text treated as already-readable', {
+            messageId,
+            textPreview: String(existingReadable.text ?? '').slice(0, 80),
+          });
+        }
+        return;
+      }
 
       const storedPlaintext = await loadDecryptedMessage(
         String(currentUserId),
@@ -537,7 +575,14 @@ export function useChatMessaging({
           // recipient envelopes, this device must only decrypt its own envelope.
           // Falling back to another ciphertext consumes/reads the wrong session
           // counter and causes MessageCounterError on history replay.
-          if (isOwnCurrentDeviceMessage && !recipientCipher) return;
+          if (isOwnCurrentDeviceMessage && !recipientCipher) {
+            if (__DEV__) {
+              console.warn('[useChatMessaging] no envelope for own current device — skipping', {
+                messageId, senderDeviceId, currentDeviceId,
+              });
+            }
+            return;
+          }
           if (recipients.length > 0 && !recipientCipher) {
             // No envelope for this user/device — the message was encrypted
             // before this user joined the group (forward secrecy). Show a clear
@@ -548,6 +593,13 @@ export function useChatMessaging({
               (m) => (m.serverId === messageId || m.id === messageId) &&
                 typeof m.text === 'string' && m.text === PRE_JOIN_TEXT,
             );
+            if (__DEV__) {
+              console.warn('[useChatMessaging] no recipient envelope for this user/device', {
+                messageId, currentUserId, currentDeviceId,
+                recipientUserIds: recipients.map((r: any) => r?.userId),
+                alreadyPatched: !!alreadyPatched,
+              });
+            }
             if (!alreadyPatched) {
               const patch = { text: PRE_JOIN_TEXT };
               await saveDecryptedMessage(String(currentUserId), mapped, patch);
@@ -558,7 +610,17 @@ export function useChatMessaging({
 
           const ciphertext = recipientCipher?.ciphertext ?? mapped.ciphertext;
           const type = recipientCipher?.type ?? encMeta?.type ?? 1;
-          if (!mapped.senderId || !senderDeviceId || !ciphertext) return;
+          if (!mapped.senderId || !senderDeviceId || !ciphertext) {
+            if (__DEV__) {
+              console.warn('[useChatMessaging] missing required decrypt inputs — skipping', {
+                messageId,
+                hasSenderId: !!mapped.senderId,
+                hasSenderDeviceId: !!senderDeviceId,
+                hasCiphertext: !!ciphertext,
+              });
+            }
+            return;
+          }
 
           const signalStaleKey = [
             currentDeviceId,
@@ -590,6 +652,11 @@ export function useChatMessaging({
             String(ciphertext),
             Number(type),
           );
+          if (__DEV__) {
+            console.log('[useChatMessaging] signal decrypt succeeded', {
+              messageId, senderId: mapped.senderId, senderDeviceId, type,
+            });
+          }
           let parsed: any = null;
           try {
             parsed = JSON.parse(plaintext);
@@ -690,6 +757,13 @@ export function useChatMessaging({
           const existing = messageId
             ? messagesRef.current.find((m) => m.serverId === messageId || m.id === messageId || m.clientId === messageId)
             : null;
+          if (__DEV__) {
+            console.warn('[useChatMessaging] Signal message-counter error (ratchet state mismatch)', {
+              messageId, senderId: mapped.senderId, senderDeviceId, currentDeviceId,
+              alreadyHasReadableText: !!(existing?.text && existing.text !== 'Encrypted message'),
+              error: serializeErrorForDiagnostics(error),
+            });
+          }
           if (existing?.text && existing.text !== 'Encrypted message') {
             return;
           }
