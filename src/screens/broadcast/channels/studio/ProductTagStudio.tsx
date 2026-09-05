@@ -109,11 +109,12 @@ export default function ProductTagStudio({ contentId }: Props) {
         ROUTES.broadcasts.contentProducts(contentId),
         { errorMessage: '' },
       );
-      const raw: ProductTag[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: ProductTag[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setTags(raw);
     } catch {
       // silently fail

@@ -51,7 +51,11 @@ export default function KingdomNewsScreen({ navigation }: Props) {
       setLoading(true);
       getRequest(ROUTES.mediaExtended.news)
         .then((res: any) => {
-          if (active) setArticles(res?.data ?? res ?? []);
+          // getRequest resolves (never throws) on failure too, with `data`
+          // undefined — the old `?? res` fallback set `articles` to the
+          // wrapper object itself (truthy, so `?? []` never fired), and
+          // `articles.filter(...)` below crashed the screen.
+          if (active) setArticles(Array.isArray(res?.data) ? res.data : []);
         })
         .catch(() => {})
         .finally(() => { if (active) setLoading(false); });

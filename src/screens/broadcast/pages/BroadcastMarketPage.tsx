@@ -1109,7 +1109,12 @@ export default function BroadcastMarketPage({
             errorMessage: 'Unable to load shop details.',
           },
         );
-        const data = response?.data ?? response ?? null;
+        // getRequest resolves (never throws) on failure too, with `data`
+        // undefined — the old `?? response` fallback cached the wrapper
+        // object itself as this shop's detail, which then got reused by
+        // every later reader of shopDetailCache[shopId] (landing-preview
+        // navigation, visibility resolution) as if it were real shop data.
+        const data = response?.success ? response?.data ?? null : null;
         if (data) {
           setShopLandingVisibility(prev => ({
             ...prev,

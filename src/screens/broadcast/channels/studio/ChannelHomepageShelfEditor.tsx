@@ -70,11 +70,14 @@ function ShelfItemsPanel({
         ROUTES.broadcasts.channelShelfItems(shelfId),
         { errorMessage: '' },
       );
-      const raw: ShelfItem[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — Array.isArray(res) can never be true (the wrapper is
+      // never an array), and the final `res?.results` fallback checked the
+      // wrapper instead of `res.data.results`, so a paginated response here
+      // always fell through to [].
+      const raw: ShelfItem[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setItems(raw);
     } finally {
       setLoading(false);
@@ -230,11 +233,11 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
         ROUTES.broadcasts.channelShelves(channelId),
         { errorMessage: '' },
       );
-      const raw: Shelf[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // Same fix as loadItems above — the wrapper (`res`), not the
+      // payload (`res.data`), was being inspected in the final fallback.
+      const raw: Shelf[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setShelves(raw.sort((a, b) => a.sort_order - b.sort_order));
     } catch {
       setError('Could not load shelves.');

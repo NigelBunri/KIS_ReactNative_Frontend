@@ -75,7 +75,13 @@ export default function PartnerReportsPanel({
     const res = await getRequest(ROUTES.partners.reportsSummary(partnerId), {
       errorMessage: 'Unable to load reports summary.',
     });
-    setSummary(res?.data ?? res ?? null);
+    // getRequest resolves (never throws) on failure too — the old
+    // `res?.data ?? res` fallback set `summary` to the wrapper object,
+    // which `summaryRows`'s Object.entries(summary) below would have
+    // rendered as fake metrics (its primitive-value filter lets `success`
+    // and `message` straight through), and which was also passed directly
+    // into <PartnerAnalyticsCharts summary={summary} />.
+    setSummary(res?.success ? res?.data ?? null : null);
   }, [partnerId]);
 
   const loadExports = useCallback(async () => {

@@ -56,7 +56,21 @@ export function useParentalControls(memberId?: string | null) {
         }
       }
       const res = await getRequest(ROUTES.family.parentalControl(memberId));
-      const data: ParentalControls = res?.data ?? res ?? DEFAULT;
+      // getRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — on a genuine network-level failure (not just a non-2xx
+      // HTTP response, which still carries a `data` body), `data` is
+      // undefined, so `res?.data ?? res` fell back to the wrapper itself.
+      // That corrupted object has neither `restricted_sections` nor
+      // `content_filter`, which broke this hook's own enforcement
+      // functions in two DIFFERENT, inconsistent directions at once:
+      // isSectionRestricted() read `controls.restricted_sections?.[x]` as
+      // undefined -> false, silently *unrestricting* every section, while
+      // isContentAllowed() read `controls.content_filter` as undefined,
+      // whose order.indexOf() of -1 made every comparison fail -> blocking
+      // *all* content. Falling back to the real, intentionally-permissive
+      // DEFAULT here (rather than to `res`) is the one safe, deterministic
+      // failure state for parental-control enforcement.
+      const data: ParentalControls = res?.success && res?.data ? res.data : DEFAULT;
       setControls(data);
       _memCache = { data, ts: Date.now() };
       await AsyncStorage.setItem(`${CACHE_KEY}:${memberId}`, JSON.stringify(_memCache));

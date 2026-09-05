@@ -83,11 +83,12 @@ export default function TrendingScreen({ onPressContent }: Props) {
         `${ROUTES.broadcasts.trending}?period=${p}`,
         { errorMessage: '' },
       );
-      const raw: TrendingItem[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: TrendingItem[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setItems(raw.map((item, idx) => ({ ...item, rank: idx + 1 })));
     } catch {
       setError('Could not load trending content.');

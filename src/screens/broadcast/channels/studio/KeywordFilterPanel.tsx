@@ -75,11 +75,12 @@ export default function KeywordFilterPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelKeywordFilters(channelId),
         { errorMessage: '' },
       );
-      const raw: KeywordFilter[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: KeywordFilter[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setFilters(raw);
     } catch {
       setError('Could not load keyword filters.');

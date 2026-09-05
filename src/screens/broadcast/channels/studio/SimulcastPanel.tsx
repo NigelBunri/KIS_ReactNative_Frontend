@@ -81,11 +81,12 @@ export default function SimulcastPanel({ streamId }: Props) {
         ROUTES.broadcasts.liveStreamSimulcast(streamId),
         { errorMessage: '' },
       );
-      const raw: SimulcastTarget[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: SimulcastTarget[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setTargets(raw);
     } catch {
       // silently fail — list may be empty on first open

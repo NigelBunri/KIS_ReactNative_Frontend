@@ -91,7 +91,20 @@ export default function ParentalControlsScreen({ route }: Props) {
       getRequest(ROUTES.family.parentalControl(memberId))
         .then((res: any) => {
           if (!active) return;
-          if (res) setControls(res);
+          // getRequest always resolves to the ApiResult wrapper
+          // ({success, data, message}), never the bare record — `if (res)
+          // setControls(res)` was setting `controls` to that wrapper
+          // itself on every load (the wrapper is always a truthy object,
+          // whether the fetch succeeded or failed), so `controls.
+          // restricted_sections` was always undefined and the unguarded
+          // `controls.restricted_sections[key]` read in the Restricted
+          // Sections toggles below crashed the screen on essentially every
+          // real open. Same class of bug already fixed in FamilyAlbumScreen
+          // / FamilyPrayerScreen's create flows — this is the fetch-side
+          // equivalent. On failure, deliberately leave the sensible
+          // useState defaults in place rather than overwrite them with
+          // partial/garbage data.
+          if (res?.success && res?.data) setControls(res.data);
         })
         .catch(() => {})
         .finally(() => { if (active) setLoading(false); });

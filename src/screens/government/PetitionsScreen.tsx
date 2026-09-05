@@ -53,7 +53,9 @@ export default function PetitionsScreen({ navigation }: Props) {
       getRequest(ROUTES.government.petitions)
         .then((res: any) => {
           if (!active) return;
-          setPetitions(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as CivicPollsScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setPetitions(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setPetitions([]))
         .finally(() => { if (active) setLoading(false); });

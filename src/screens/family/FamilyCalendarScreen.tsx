@@ -73,7 +73,9 @@ export default function FamilyCalendarScreen({}: Props) {
       getRequest(ROUTES.family.events)
         .then((res: any) => {
           if (!active) return;
-          setEvents(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as FamilyAlbumScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setEvents(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setEvents([]))
         .finally(() => { if (active) setLoading(false); });

@@ -57,7 +57,9 @@ export default function GriefSupportScreen({ navigation }: Props) {
       getRequest(ROUTES.family.griefGroups)
         .then((res: any) => {
           if (!active) return;
-          setGroups(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as FamilyAlbumScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setGroups(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setGroups([]))
         .finally(() => { if (active) setLoading(false); });

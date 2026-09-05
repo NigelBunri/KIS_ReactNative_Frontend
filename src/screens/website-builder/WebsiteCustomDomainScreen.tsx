@@ -48,8 +48,12 @@ export default function WebsiteCustomDomainScreen({ route }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(ROUTES.websites.customDomain(websiteId));
-      const data = (res as any)?.data ?? res;
+      const res: any = await getRequest(ROUTES.websites.customDomain(websiteId));
+      // Same fix as WebsiteVisitsScreen — on a network-level failure the
+      // old fallback set `state` to the wrapper object, which is truthy
+      // and passed the typeof check, so `!state.enabled` rendered as a
+      // confident "custom domain not enabled" instead of a genuine error.
+      const data = res?.success ? res?.data : null;
       setState(data && typeof data === 'object' ? data : null);
     } finally {
       setLoading(false);

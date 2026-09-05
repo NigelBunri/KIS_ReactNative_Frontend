@@ -60,7 +60,9 @@ export default function TimeCapsuleScreen({ navigation: _navigation }: Props) {
       getRequest(ROUTES.family.timeCapsules)
         .then((res: any) => {
           if (!active) return;
-          setCapsules(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as FamilyAlbumScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setCapsules(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setCapsules([]))
         .finally(() => { if (active) setLoading(false); });

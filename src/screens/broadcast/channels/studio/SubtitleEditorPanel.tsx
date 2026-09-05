@@ -63,11 +63,12 @@ export default function SubtitleEditorPanel({ contentId }: Props) {
         ROUTES.broadcasts.contentSubtitles(contentId),
         { errorMessage: '' },
       );
-      const raw: SubtitleTrack[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: SubtitleTrack[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setTracks(raw);
     } catch {
       setError('Could not load subtitle tracks.');

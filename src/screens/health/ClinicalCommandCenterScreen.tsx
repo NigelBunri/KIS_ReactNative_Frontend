@@ -191,7 +191,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
     setAnalyticsLoading(true);
     try {
       const res = await getRequest(ROUTES.analytics.clinicalReports);
-      setAnalyticsData(res?.data ?? res ?? null);
+      // getRequest resolves to the ApiResult wrapper — on a genuine
+      // network-level failure `res.data` is undefined, so this fell back
+      // to the wrapper object itself instead of null.
+      setAnalyticsData(res?.success && res?.data ? res.data : null);
     } catch {
       // non-blocking — analytics is supplementary
     } finally {

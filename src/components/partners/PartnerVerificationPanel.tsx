@@ -95,7 +95,15 @@ export default function PartnerVerificationPanel({
     const res = await getRequest(ROUTES.partners.verificationStatus(partnerId), {
       errorMessage: 'Unable to load verification status.',
     });
-    const payload = (res?.data ?? res ?? null) as StatusPayload | null;
+    // getRequest resolves (never throws) on failure too — the old
+    // `res?.data ?? res` fallback set `status` to the wrapper object
+    // instead of null on a network failure. Defensive-only: every read
+    // below (status?.verified, status?.case, etc.) is already optional-
+    // chained and renders the identical "Not verified" state for `null`
+    // and for the wrapper alike, so this doesn't change any observable
+    // behavior today — it only removes a latent landmine (e.g. a future
+    // render path that checks `status !== null` directly).
+    const payload = (res?.success ? res?.data ?? null : null) as StatusPayload | null;
     setStatus(payload);
   }, [partnerId]);
 

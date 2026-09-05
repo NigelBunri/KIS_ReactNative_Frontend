@@ -680,8 +680,17 @@ export default function ChannelContentDetailPage() {
       );
       setTipModal(false);
       setSelectedTipAmount(null);
-      if (res?.payment_required) {
-        const url = res.payment_url || res.checkout_url;
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — `res?.payment_required`/`res.payment_url`/
+      // `res.checkout_url` read fields the wrapper never has (they live
+      // under `res.data`), so this was always false and the payment URL
+      // was never opened, silently dropping the user's tip intent. Also
+      // added the missing failure alert — a non-throwing `success: false`
+      // response previously produced no feedback at all.
+      if (!res?.success) {
+        Alert.alert('Error', res?.message || 'Could not process tip. Please try again.');
+      } else if (res.data?.payment_required) {
+        const url = res.data.payment_url || res.data.checkout_url;
         if (url) {
           await Linking.openURL(url);
         }

@@ -50,7 +50,9 @@ export default function LegalTemplatesScreen(_props: Props) {
       getRequest(ROUTES.government.legalTemplates)
         .then((res: any) => {
           if (!active) return;
-          setTemplates(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as CivicPollsScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setTemplates(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setTemplates([]))
         .finally(() => { if (active) setLoading(false); });

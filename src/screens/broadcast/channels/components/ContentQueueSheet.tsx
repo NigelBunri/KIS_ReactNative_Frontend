@@ -51,11 +51,12 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
     setLoading(true);
     try {
       const res = await getRequest(ROUTES.broadcasts.queue, { errorMessage: '' });
-      const raw: QueueItem[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: QueueItem[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setItems(raw);
     } catch {
       // silently fail

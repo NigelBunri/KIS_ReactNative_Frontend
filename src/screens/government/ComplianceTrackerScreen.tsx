@@ -62,9 +62,11 @@ export default function ComplianceTrackerScreen(_props: Props) {
       getRequest(ROUTES.government.compliance)
         .then((res: any) => {
           if (!active) return;
-          const list: ComplianceItem[] = Array.isArray(res)
-            ? res
-            : res?.results ?? [];
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload was `res.data`, not `res`.
+          const list: ComplianceItem[] = Array.isArray(res?.data)
+            ? res.data
+            : res?.data?.results ?? [];
           // Sort by due date ascending
           list.sort(
             (a, b) =>

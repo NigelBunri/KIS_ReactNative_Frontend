@@ -80,8 +80,14 @@ export default function UserProfileScreen() {
         errorMessage: 'Unable to load profile.',
         forceNetwork: true,
       });
-      if (res?.success || res?.data) {
-        const data = res?.data ?? res;
+      // Narrower than `res?.success || res?.data` — that guard let a
+      // theoretical (success:true, data:falsy) response fall through to
+      // `res?.data ?? res`, writing the wrapper itself into
+      // applyProfileData AND persisting it to the offline cache below;
+      // unlike an in-memory-only mistake, that corruption would survive
+      // and get read back as "cached profile" on a future launch.
+      if (res?.success && res?.data) {
+        const data = res.data;
         applyProfileData(data, freshOfflineMeta);
         await writeOfflineStructuredCache(cacheKey, data);
       }

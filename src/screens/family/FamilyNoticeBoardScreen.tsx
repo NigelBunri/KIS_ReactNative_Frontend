@@ -53,7 +53,9 @@ export default function FamilyNoticeBoardScreen({ navigation }: Props) {
       getRequest(ROUTES.family.notices)
         .then((res: any) => {
           if (!active) return;
-          setNotices(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as FamilyAlbumScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setNotices(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setNotices([]))
         .finally(() => { if (active) setLoading(false); });

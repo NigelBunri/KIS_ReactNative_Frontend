@@ -325,7 +325,10 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
       title: params.title,
       scheduled_for: params.scheduledFor?.toISOString() ?? undefined,
     });
-    if (!res.success) throw new Error(res.error ?? 'Failed to create call');
+    // ApiResult's failure field is `message`, not `error` — `res.error` was
+    // always undefined, silently discarding the server's actual reason and
+    // always falling back to the generic message below.
+    if (!res.success) throw new Error(res.message ?? 'Failed to create call');
     return res.data as StandaloneCallResult;
   }, []);
 

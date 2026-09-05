@@ -56,7 +56,9 @@ export default function MembersScreen({ navigation }: Props) {
       getRequest(ROUTES.family.members)
         .then((res: any) => {
           if (!active) return;
-          const data = Array.isArray(res) ? res : res?.results ?? [];
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload was `res.data`, not `res`.
+          const data = Array.isArray(res?.data) ? res.data : res?.data?.results ?? [];
           setMembers(data);
         })
         .catch(() => setMembers([]))

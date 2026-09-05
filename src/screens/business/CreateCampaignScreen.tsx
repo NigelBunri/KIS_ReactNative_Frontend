@@ -61,7 +61,17 @@ export default function CreateCampaignScreen({ navigation }: Props) {
         deadline: deadline.trim(),
         category: category.toLowerCase(),
       });
-      const created = res?.data ?? res;
+      // postRequest resolves (never throws) on a failed request too, with
+      // `data` undefined — the old `res?.data ?? res` fallback made
+      // `created` the wrapper object, and `created?.id` being undefined
+      // fell through to the ELSE branch, which showed a "Created!" success
+      // alert and navigated away for a campaign that was never actually
+      // created. Throwing on a genuine failure routes it to the existing
+      // error alert below instead.
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to create campaign.');
+      }
+      const created = res.data;
       if (created?.id) {
         navigation.replace('CrowdfundDetail', { campaignId: created.id });
       } else {

@@ -55,7 +55,10 @@ export default function CivicPollsScreen(_props: Props) {
       getRequest(ROUTES.government.polls)
         .then((res: any) => {
           if (!active) return;
-          setPolls(Array.isArray(res) ? res : res?.results ?? []);
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload this dual-shape check was meant
+          // to inspect is `res.data`, not `res` itself.
+          setPolls(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setPolls([]))
         .finally(() => { if (active) setLoading(false); });

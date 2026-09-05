@@ -95,11 +95,12 @@ export default function CategoryBrowsePage(props: Props) {
     setError(null);
     try {
       const res = await getRequest(ROUTES.broadcasts.categories, { errorMessage: '' });
-      const raw: Category[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: Category[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setCategories(raw);
     } catch {
       setError('Could not load categories.');
@@ -117,15 +118,22 @@ export default function CategoryBrowsePage(props: Props) {
         `${ROUTES.broadcasts.categoryBrowse(slug)}?page=${nextPage}`,
         { errorMessage: '' },
       );
-      const name: string = res?.category_name ?? res?.name ?? slug;
+      // Both reads below inspected the ApiResult wrapper (`res`) instead of
+      // its payload (`res.data`) — `res?.category_name`/`res?.name` are
+      // fields the wrapper never has, and the list fallback had the same
+      // `res?.results` bug fixed elsewhere in this sweep.
+      const name: string = res?.data?.category_name ?? res?.data?.name ?? slug;
       if (nextPage === 1) setCategoryName(name);
-      const raw: ChannelContent[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      const raw: ChannelContent[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setContents(prev => append ? [...prev, ...raw] : raw);
-      setHasMore(raw.length > 0 && !!(res?.next || res?.has_more));
+      // Same wrapper-vs-payload bug as `name`/`raw` above — `res?.next`/
+      // `res?.has_more` read fields the wrapper never has, so `hasMore`
+      // always resolved to false after the very first page, silently
+      // truncating "Load more" pagination to just page 1 regardless of how
+      // many more results the backend actually had.
+      setHasMore(raw.length > 0 && !!(res?.data?.next || res?.data?.has_more));
     } catch {
       setError('Could not load content.');
     } finally {

@@ -38,6 +38,7 @@ export default function TwoFactorScreen({ onBack }: Props) {
   const responsive = useResponsiveLayout();
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<'idle' | 'setup' | 'verify'>('idle');
@@ -46,9 +47,25 @@ export default function TwoFactorScreen({ onBack }: Props) {
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await getRequest(ROUTES.auth.twoFactorStatus, { errorMessage: '2FA status unavailable' });
-      setStatus(res?.data ?? null);
+      // getRequest never throws — a failed request still resolves, with
+      // `success: false` and `data` set to the raw error body (not the
+      // shape TwoFactorStatus expects). Unconditionally doing
+      // `setStatus(res?.data ?? null)` here (the previous code) treated
+      // that error body as if it were a real status object; since it has
+      // no `enabled` field, the screen would confidently render "2FA is
+      // currently disabled" on a network failure — indistinguishable from
+      // genuinely being disabled, with no indication anything went wrong
+      // and no way to retry except leaving and re-entering the screen.
+      if (res?.success) {
+        setStatus(res?.data ?? null);
+      } else {
+        setLoadError(res?.message || '2FA status unavailable. Please try again.');
+      }
+    } catch (e: any) {
+      setLoadError(e?.message || '2FA status unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -126,6 +143,18 @@ export default function TwoFactorScreen({ onBack }: Props) {
     return (
       <View style={[styles.root, styles.centered, { backgroundColor: palette.bg, }]}>
         <ActivityIndicator color={palette.primary} />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.root, styles.centered, { backgroundColor: palette.bg, padding: 24, gap: 12 }]}>
+        <KISIcon name="warning" size={28} color={palette.danger} />
+        <Text style={[styles.desc, { color: palette.subtext, textAlign: 'center' }]}>{loadError}</Text>
+        <Pressable onPress={loadStatus} style={[styles.primaryBtn, { backgroundColor: palette.primary, paddingHorizontal: 24 }]}>
+          <Text style={[styles.primaryBtnText, { color: palette.onPrimary }]}>Retry</Text>
+        </Pressable>
       </View>
     );
   }

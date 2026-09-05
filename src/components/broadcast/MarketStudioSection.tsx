@@ -1197,7 +1197,12 @@ export default function MarketStudioSection({
               { shop: shopId, title: 'New lesson', status: 'draft' },
               { errorMessage: 'Unable to create lesson.' },
             );
-            if (res?.id) {
+            // postRequest resolves to the ApiResult wrapper ({success, data,
+            // message}) — `res?.id` read a field the wrapper never has (the
+            // created lesson's id lives at `res.data.id`), so this was
+            // always false and a *successful* lesson creation incorrectly
+            // showed the "Unable to create lesson" failure alert.
+            if (res?.success && res?.data?.id) {
               Alert.alert('Lesson created', 'Draft lesson created. Edit the title and content in the broadcasts section.');
             } else {
               Alert.alert('Create lesson', res?.message ?? 'Unable to create lesson. Check your shop is active.');

@@ -1243,11 +1243,19 @@ function AnalyticsSection({ palette }: { palette: any }) {
     setLoading(true); setError(null);
     try {
       const res: any = await getRequest('/api/v1/bible/admin/analytics/');
-      setData(res?.data ?? res ?? {});
+      // getRequest never throws (failures resolve with success:false), so
+      // the catch below is effectively unreachable today — but on a
+      // genuine network-level failure `res.data` is undefined, and the old
+      // `res?.data ?? res` fallback rendered success/message as fake
+      // analytics rows via the generic Object.entries(data) dashboard
+      // below (the wrapper is a non-empty object, so it doesn't hit the
+      // "no analytics data" empty state either). Same fix applied to the
+      // fallback branch for consistency, in case that path is ever reached.
+      setData(res?.success ? res?.data ?? {} : {});
     } catch (e: any) {
       try {
         const fallback: any = await getRequest((ROUTES as any).bible.stats);
-        setData(fallback?.data ?? fallback ?? {});
+        setData(fallback?.success ? fallback?.data ?? {} : {});
       } catch {
         setError(e?.message || 'Failed to load analytics.');
       }

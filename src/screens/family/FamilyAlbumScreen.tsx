@@ -56,7 +56,12 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
       getRequest(ROUTES.family.albums)
         .then((res: any) => {
           if (!active) return;
-          setAlbums(Array.isArray(res) ? res : res?.results ?? []);
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload this dual-shape check was meant
+          // to inspect is `res.data`, not `res` itself. Array.isArray(res)
+          // and res?.results could never be true against the wrapper, so
+          // every successful fetch silently fell through to `[]`.
+          setAlbums(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setAlbums([]))
         .finally(() => { if (active) setLoading(false); });

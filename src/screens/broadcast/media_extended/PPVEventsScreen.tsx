@@ -49,7 +49,9 @@ export default function PPVEventsScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const res: any = await getRequest(ROUTES.mediaExtended.ppvEvents);
-      setEvents(res?.data ?? res ?? []);
+      // Same fix as KingdomNewsScreen — `events.map(...)` below would
+      // crash on the leaked wrapper object.
+      setEvents(Array.isArray(res?.data) ? res.data : []);
     } catch {}
     setLoading(false);
   }, []);

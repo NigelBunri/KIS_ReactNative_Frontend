@@ -148,10 +148,16 @@ export default function BibleBooksPanel() {
       if (q.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
       if (params.length) url += `?${params.join('&')}`;
       const res = await getRequest(url, {});
-      if (res.ok && res.payload?.results) {
-        setBooks(res.payload.results);
-      } else if (res.ok && Array.isArray(res.payload)) {
-        setBooks(res.payload);
+      // getRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — this read `.ok`/`.payload`, fields that wrapper never
+      // has (that's a raw fetch() Response shape, not this contract), so
+      // both conditions were always false and `setBooks` was never called
+      // — the Bible books list stayed permanently empty regardless of what
+      // the backend returned.
+      if (res.success && res.data?.results) {
+        setBooks(res.data.results);
+      } else if (res.success && Array.isArray(res.data)) {
+        setBooks(res.data);
       }
     } finally {
       setLoading(false);

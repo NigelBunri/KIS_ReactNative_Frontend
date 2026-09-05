@@ -49,7 +49,16 @@ export default function FamilyPrayerScreen({ navigation: _navigation }: Props) {
       getRequest(ROUTES.family.prayers)
         .then((res: any) => {
           if (!active) return;
-          setPrayers(Array.isArray(res) ? res : res?.results ?? []);
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload this dual-shape check was meant
+          // to inspect is `res.data`, not `res` itself. Array.isArray(res)
+          // and res?.results could never be true against the wrapper, so
+          // this always fell through to `[]` — the family prayer list was
+          // always empty on load regardless of actual data (caught by a
+          // broader wrapper-unwrap sweep after this screen was previously,
+          // incorrectly, cleared as safe on the strength of its correctly
+          // written mutation handlers alone).
+          setPrayers(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setPrayers([]))
         .finally(() => { if (active) setLoading(false); });

@@ -62,7 +62,15 @@ export default function PetitionDetailScreen({ route }: Props) {
       getRequest(ROUTES.government.petition(petitionId))
         .then((res: any) => {
           if (!active) return;
-          setPetition(res ?? null);
+          // getRequest always resolves to the ApiResult wrapper ({success,
+          // data, message}), never the bare record — `setPetition(res ??
+          // null)` set `petition` to that wrapper itself (always a truthy
+          // object, success or failure), so `!petition` below never
+          // caught a failed fetch, and every real render crashed at
+          // `petition.signature_count.toLocaleString()` since the wrapper
+          // has no such field. Same class of bug as
+          // ParentalControlsScreen's fetch handler.
+          setPetition(res?.success && res?.data ? res.data : null);
         })
         .catch(() => setPetition(null))
         .finally(() => { if (active) setLoading(false); });

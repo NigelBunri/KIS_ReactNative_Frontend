@@ -61,7 +61,17 @@ export default function RevenueAnalyticsPanel({ channelId }: Props) {
         `${ROUTES.broadcasts.channelRevenue(channelId)}?period=${p}`,
         { errorMessage: '' },
       );
-      setData(res?.data ?? res ?? {});
+      // getRequest resolves (never throws) on failure too — the catch
+      // below only ever caught a thrown exception, so a plain failed
+      // request fell through to `res?.data ?? res` and rendered every
+      // revenue figure as a confident $0.00 via the optional-chained
+      // defaults below, indistinguishable from "you made no money this
+      // period." A creator-facing revenue dashboard misreporting a failed
+      // load as zero earnings is worse than the genuine "no data" case
+      // elsewhere in this sweep, so this routes through the same
+      // existing error state instead.
+      if (!res?.success) throw new Error('Could not load revenue data.');
+      setData(res.data ?? {});
     } catch {
       setError('Could not load revenue data.');
     } finally {

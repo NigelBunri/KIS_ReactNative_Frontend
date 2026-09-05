@@ -87,7 +87,14 @@ export default function PartnerOrganizationProfilePanel({
     const res = await getRequest(ROUTES.partners.organizationProfile(partnerId), {
       errorMessage: 'Unable to load organization profile.',
     });
-    const data = res?.data ?? res ?? {};
+    // getRequest resolves (never throws) on failure too — the old
+    // `res?.data ?? res` fallback set `form` to the wrapper object on a
+    // network failure, which onSave() below spreads directly into its
+    // PATCH payload (`{ ...form, ... }`). That payload would carry none of
+    // the real profile fields (only the wrapper's own success/data/
+    // message), so hitting Save right after a failed load could send an
+    // incomplete/corrupt update to a real organization's profile.
+    const data = res?.success ? res?.data ?? {} : {};
     setForm(data);
     setBrandColors((data.brand_colors || []).join(', '));
     const socials = data.social_links || {};

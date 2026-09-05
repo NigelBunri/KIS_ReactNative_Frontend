@@ -108,8 +108,17 @@ export default function KingdomCertificationScreen({ navigation }: Props) {
     setVerifying(true);
     setVerifyResult(null);
     try {
-      const res = await getRequest(`${ROUTES.business.certificationVerify}?business_name=${encodeURIComponent(verifyName.trim())}`);
-      const data = res?.data ?? res;
+      const res: any = await getRequest(`${ROUTES.business.certificationVerify}?business_name=${encodeURIComponent(verifyName.trim())}`);
+      // getRequest resolves (never throws) on a failed request too, with
+      // `data` undefined — the old `res?.data ?? res` fallback made
+      // `verifyResult` the wrapper object itself, which is truthy so it
+      // skipped the `{ found: false }` default, and `verifyResult.found`
+      // read as undefined -> falsy, rendering the confident "Not
+      // Certified" result for what was actually just a failed check, not
+      // a real verification. Matches the same "can't verify -> found:
+      // false" fallback already used in the catch block below, just
+      // extended to this resolved-failure path.
+      const data = res?.success ? res?.data : null;
       setVerifyResult(data ?? { found: false });
     } catch {
       setVerifyResult({ found: false });

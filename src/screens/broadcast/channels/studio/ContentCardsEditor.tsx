@@ -135,11 +135,12 @@ export default function ContentCardsEditor({ contentId }: Props) {
         ROUTES.broadcasts.contentCards(contentId),
         { errorMessage: '' },
       );
-      const raw: ContentCard[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: ContentCard[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setCards(raw.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
     } catch {
       setError('Could not load content cards.');

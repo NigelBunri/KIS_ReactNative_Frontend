@@ -48,8 +48,14 @@ export default function WebsiteVisitsScreen({ route }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(ROUTES.websites.analyticsSummary(websiteId, 30));
-      const data = (res as any)?.data ?? res;
+      const res: any = await getRequest(ROUTES.websites.analyticsSummary(websiteId, 30));
+      // On a genuine network-level failure, res.data is undefined, so the
+      // old `?? res` fallback made `data` the wrapper object — which,
+      // being a truthy `typeof === 'object'` value, passed the check below
+      // and bypassed whatever "no summary yet" rendering this screen has
+      // for a genuine null summary. `summary.daily.map(...)` below then
+      // threw on the wrapper's missing `daily` field, crashing the screen.
+      const data = res?.success ? res?.data : null;
       setSummary(data && typeof data === 'object' ? data : null);
     } finally {
       setLoading(false);

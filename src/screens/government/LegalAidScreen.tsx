@@ -49,7 +49,9 @@ export default function LegalAidScreen(_props: Props) {
       getRequest(ROUTES.government.legalAid)
         .then((res: any) => {
           if (!active) return;
-          setProviders(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as CivicPollsScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setProviders(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setProviders([]))
         .finally(() => { if (active) setLoading(false); });

@@ -51,7 +51,9 @@ export default function EbooksScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const res: any = await getRequest(ROUTES.mediaExtended.ebooks);
-      setEbooks(res?.data ?? res ?? []);
+      // Same fix as KingdomNewsScreen — `ebooks.filter(...)` below would
+      // crash on the leaked wrapper object.
+      setEbooks(Array.isArray(res?.data) ? res.data : []);
     } catch {}
     setLoading(false);
   }, []);

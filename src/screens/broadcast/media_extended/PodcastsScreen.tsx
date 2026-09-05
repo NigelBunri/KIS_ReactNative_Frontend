@@ -60,7 +60,9 @@ export default function PodcastsScreen({ navigation }: Props) {
       setLoading(true);
       getRequest(ROUTES.mediaExtended.podcastChannels)
         .then((res: any) => {
-          if (active) setChannels(res?.data ?? res ?? []);
+          // Same fix as KingdomNewsScreen — `channels.map(...)`/`.filter(...)`
+          // below would crash on the leaked wrapper object.
+          if (active) setChannels(Array.isArray(res?.data) ? res.data : []);
         })
         .catch(() => {})
         .finally(() => { if (active) setLoading(false); });
@@ -84,7 +86,9 @@ export default function PodcastsScreen({ navigation }: Props) {
       setLoadingEpisodes(channel.id);
       try {
         const res: any = await getRequest(ROUTES.mediaExtended.podcastEpisodes + `?channel=${channel.id}`);
-        setEpisodes((prev) => ({ ...prev, [channel.id]: res?.data ?? res ?? [] }));
+        // Same fix as loadChannels above — `episodes[id].map(...)` in the
+        // render below would crash on the leaked wrapper object.
+        setEpisodes((prev) => ({ ...prev, [channel.id]: Array.isArray(res?.data) ? res.data : [] }));
       } catch {}
       setLoadingEpisodes(null);
     }

@@ -93,7 +93,16 @@ export default function CommunityCommentThreadPanel({
         { text },
         { errorMessage: 'Unable to post comment.' },
       );
-      const created = response?.data ?? response;
+      // postRequest resolves (never throws) on a failed request too — with
+      // no `response?.success` check, a rejected comment (moderation,
+      // validation, or a genuine network failure where `response.data` is
+      // undefined) still fell through to `created = response` and got
+      // appended to the thread as if it were a real comment, while the
+      // draft was cleared as if the post had succeeded.
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to post comment.');
+      }
+      const created = response.data;
       setComments((previous) => [...previous, created as CommunityComment]);
       setDraft('');
     } catch (err: any) {

@@ -65,7 +65,15 @@ export default function FamilyHubScreen({ navigation }: Props) {
       getRequest(ROUTES.family.accounts)
         .then((res: any) => {
           if (!active) return;
-          const data = Array.isArray(res) ? res[0] : res?.results?.[0] ?? res;
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload this "single account, either
+          // shape" check was meant to inspect is `res.data`, not `res`
+          // itself. The old code's final fallback (`?? res`) meant a
+          // successful-but-resultless fetch set `family` to the wrapper
+          // object, not null — same bug family as the list screens, just
+          // manifesting as garbage data here instead of an always-empty list.
+          const payload = res?.data;
+          const data = Array.isArray(payload) ? payload[0] : payload?.results?.[0] ?? payload;
           setFamily(data ?? null);
         })
         .catch(() => setFamily(null))

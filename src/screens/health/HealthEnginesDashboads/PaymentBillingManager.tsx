@@ -68,10 +68,18 @@ export default function PaymentBillingManager({ institutionId }: Props) {
       const res = await getRequest(
         `${ROUTES.healthOps.billingSessions}?institution=${institutionId}`,
       );
-      if (Array.isArray(res?.results)) {
-        setSessions(res.results);
+      // getRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — `res?.results` checked the wrapper, which never has
+      // that field, so a paginated response (`res.data.results`) matched
+      // neither branch and `setSessions` was never called at all, leaving
+      // whatever `sessions` held before (stale, or never populated on
+      // first load) with no visible error.
+      if (Array.isArray(res?.data?.results)) {
+        setSessions(res.data.results);
       } else if (Array.isArray(res?.data)) {
         setSessions(res.data);
+      } else {
+        setSessions([]);
       }
     } finally {
       setLoading(false);

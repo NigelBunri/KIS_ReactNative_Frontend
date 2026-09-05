@@ -100,7 +100,12 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
         setFlags(flagList);
       } else if (section === 'analytics') {
         const res: any = await getRequest((ROUTES as any).adminAnalytics || '/api/v1/admin/analytics/');
-        const d = res?.data ?? res;
+        // On a genuine network-level failure, res.data is undefined, so the
+        // old `res?.data ?? res` fell back to the wrapper itself — which,
+        // being a plain object, passed the `typeof d === 'object'` check
+        // below unfiltered and rendered success/message as if they were
+        // analytics fields.
+        const d = res?.success ? res?.data : null;
         setAnalytics(typeof d === 'object' && d ? d : {});
       } else if (section === 'shortcut_analytics') {
         const res: any = await getRequest(ROUTES.partners.appShortcutsAnalytics);
@@ -140,7 +145,8 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
         setData(Array.isArray(d) ? d : d?.results ?? []);
       } else if (section === 'realtime') {
         const res: any = await getRequest('/api/v1/admin/realtime-health/');
-        const d = res?.data ?? res;
+        // Same fix as the 'analytics' branch above.
+        const d = res?.success ? res?.data : null;
         setAnalytics(typeof d === 'object' && d ? d : {});
       }
     } catch (e: any) {

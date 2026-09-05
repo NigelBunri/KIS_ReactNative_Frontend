@@ -47,7 +47,9 @@ export default function DiasporaScreen(_props: Props) {
       getRequest(ROUTES.government.diaspora)
         .then((res: any) => {
           if (!active) return;
-          setCommunities(Array.isArray(res) ? res : res?.results ?? []);
+          // Same fix as CivicPollsScreen — the wrapper (`res`), not the
+          // payload (`res.data`), was being inspected here.
+          setCommunities(Array.isArray(res?.data) ? res.data : res?.data?.results ?? []);
         })
         .catch(() => setCommunities([]))
         .finally(() => { if (active) setLoading(false); });

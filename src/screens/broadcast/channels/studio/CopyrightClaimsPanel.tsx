@@ -63,11 +63,12 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelCopyrightClaims(channelId),
         { errorMessage: '' },
       );
-      const raw: CopyrightClaim[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: CopyrightClaim[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setClaims(raw);
     } catch {
       setError('Could not load copyright claims.');

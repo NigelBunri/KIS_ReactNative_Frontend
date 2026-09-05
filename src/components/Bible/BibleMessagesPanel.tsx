@@ -263,7 +263,11 @@ export default function BibleMessagesPanel() {
     setLoading(true);
     try {
       const res = await getRequest(ROUTES.bible.kcanMessageTopics, {});
-      const data = res.payload?.results ?? res.payload ?? [];
+      // getRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — `.payload` is a field the wrapper never has (that's a
+      // raw fetch() Response shape, not this contract), so `data` was
+      // always [] regardless of what the backend returned.
+      const data = res.data?.results ?? res.data ?? [];
       setTopics(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
@@ -274,7 +278,8 @@ export default function BibleMessagesPanel() {
     setLoading(true);
     try {
       const res = await getRequest(`${ROUTES.bible.kcanMinisters}?topic=${topicId}`, {});
-      const data = res.payload?.results ?? res.payload ?? [];
+      // Same fix as loadTopics above.
+      const data = res.data?.results ?? res.data ?? [];
       setMinisters(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
@@ -290,7 +295,8 @@ export default function BibleMessagesPanel() {
       if (q?.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
       const url = `${ROUTES.bible.kcanMessages}${params.length ? '?' + params.join('&') : ''}`;
       const res = await getRequest(url, {});
-      const data = res.payload?.results ?? res.payload ?? [];
+      // Same fix as loadTopics above.
+      const data = res.data?.results ?? res.data ?? [];
       setMessages(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);

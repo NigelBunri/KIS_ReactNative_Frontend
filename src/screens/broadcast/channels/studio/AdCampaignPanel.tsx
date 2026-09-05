@@ -72,11 +72,12 @@ export default function AdCampaignPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelAdCampaigns(channelId),
         { errorMessage: '' },
       );
-      const raw: Campaign[] = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
+      // getRequest resolves to the ApiResult wrapper — the final
+      // `res?.results` fallback checked the wrapper instead of
+      // `res.data.results`, so a paginated response always fell through to [].
+      const raw: Campaign[] = Array.isArray(res?.data)
         ? res.data
-        : res?.results ?? [];
+        : res?.data?.results ?? [];
       setCampaigns(raw);
     } catch {
       setError('Could not load campaigns.');

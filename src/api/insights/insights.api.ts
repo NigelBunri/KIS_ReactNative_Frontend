@@ -107,7 +107,13 @@ export const fetchNotificationsSummary = async (
     const res = await getRequest(ROUTES.notifications.notifications, {
       params: { limit },
     });
-    const entries = arrayize(res?.data?.results ?? res?.data ?? res ?? []).slice(0, limit);
+    // getRequest resolves (never throws) on failure too, with `data`
+    // undefined — the old `?? res` fallback let arrayize() wrap the
+    // wrapper object itself as a single fake entry (arrayize treats any
+    // non-null object it doesn't recognize as a one-item list), producing
+    // a garbage placeholder notification on any failed fetch.
+    if (!res?.success) return [];
+    const entries = arrayize(res?.data?.results ?? res?.data ?? []).slice(0, limit);
     return entries.map((entry, idx) => ({
       id: String(entry.id ?? entry.key ?? `notif-${idx}`),
       title: entry.title ?? entry.name ?? entry.subject ?? 'Notification',
@@ -183,7 +189,9 @@ const mapProductEntries = (entries: any[]): ProductInsightItem[] =>
 export const fetchPartnerCampaigns = async (limit = 6): Promise<CampaignInsightItem[]> => {
   try {
     const res = await getRequest(ROUTES.tiers.campaigns, { params: { limit } });
-    const list = arrayize(res?.data?.results ?? res?.data ?? res ?? []);
+    // Same fix as fetchNotificationsSummary above.
+    if (!res?.success) return [];
+    const list = arrayize(res?.data?.results ?? res?.data ?? []);
     return mapCampaignEntries(list);
   } catch (err) {
     console.warn('[insights] partner campaigns fetch failed', err);
@@ -194,7 +202,9 @@ export const fetchPartnerCampaigns = async (limit = 6): Promise<CampaignInsightI
 export const fetchMarketplaceProducts = async (limit = 6): Promise<ProductInsightItem[]> => {
   try {
     const res = await getRequest(ROUTES.commerce.products, { params: { limit } });
-    const list = arrayize(res?.data?.results ?? res?.data ?? res ?? []);
+    // Same fix as fetchNotificationsSummary above.
+    if (!res?.success) return [];
+    const list = arrayize(res?.data?.results ?? res?.data ?? []);
     return mapProductEntries(list);
   } catch (err) {
     console.warn('[insights] marketplace products fetch failed', err);

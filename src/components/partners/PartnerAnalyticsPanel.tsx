@@ -93,7 +93,11 @@ export default function PartnerAnalyticsPanel({ isOpen, panelWidth, panelTransla
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.analytics(partnerId, windowDays), { errorMessage: 'Unable to load analytics.' });
-    const payload = (res?.data ?? res ?? {}) as Analytics;
+    // getRequest resolves (never throws) on failure too, with `data`
+    // undefined — the old `?? res` fallback set `data` to the wrapper
+    // object, and unguarded reads like `data.members.total` below (not
+    // optional-chained) crashed the panel on any network failure.
+    const payload = (res?.success ? res?.data : null) as Analytics | null;
     setData(payload);
   }, [partnerId, windowDays]);
 

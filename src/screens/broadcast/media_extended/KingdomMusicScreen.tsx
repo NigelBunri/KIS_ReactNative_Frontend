@@ -51,7 +51,9 @@ export default function KingdomMusicScreen({ navigation }: Props) {
       setLoading(true);
       getRequest(ROUTES.mediaExtended.musicTracks)
         .then((res: any) => {
-          if (active) setTracks(res?.data ?? res ?? []);
+          // Same fix as KingdomNewsScreen — `tracks.filter(...)` below
+          // would crash on the leaked wrapper object.
+          if (active) setTracks(Array.isArray(res?.data) ? res.data : []);
         })
         .catch(() => {})
         .finally(() => { if (active) setLoading(false); });

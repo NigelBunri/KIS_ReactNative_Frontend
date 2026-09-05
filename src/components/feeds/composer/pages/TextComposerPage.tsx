@@ -298,7 +298,16 @@ export function TextComposerPage({
       setMentionSearching(true);
       try {
         const res = await getRequest(`${ROUTES.profiles.discover}?search=${encodeURIComponent(mentionQuery)}&limit=8`, { errorMessage: '' });
-        const items = Array.isArray(res) ? res : (res?.data ?? res?.results ?? []);
+        // getRequest resolves to the ApiResult wrapper — `res?.data` alone
+        // is truthy-but-wrong-shape when this endpoint paginates (an
+        // object like { results: [...] }, not an array), so `items` could
+        // end up as that object and `.slice()` below would throw. Same
+        // endpoint is correctly treated as paginated in TalentDiscoverScreen.
+        const items: any[] = Array.isArray(res?.data?.results)
+          ? res.data.results
+          : Array.isArray(res?.data)
+          ? res.data
+          : [];
         setMentionResults(items.slice(0, 8));
       } catch { setMentionResults([]); }
       finally { setMentionSearching(false); }

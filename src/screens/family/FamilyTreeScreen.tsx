@@ -87,11 +87,20 @@ export default function FamilyTreeScreen({ route, navigation }: Props) {
       getRequest(ROUTES.family.accountTree(familyId))
         .then((res: any) => {
           if (!active) return;
-          // Accept either { roots: [...] } or a flat array
-          if (Array.isArray(res)) {
-            setTreeData({ roots: res });
-          } else if (res?.roots) {
-            setTreeData(res);
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual server payload this "accept either
+          // shape" logic was meant to inspect is `res.data`, not `res`
+          // itself. Checking `res` directly meant Array.isArray(res) and
+          // res?.roots could never be true (the wrapper is never an array
+          // and never has a top-level `roots` field), so every successful
+          // fetch silently fell through to the empty-tree branch — the
+          // family tree always rendered as empty regardless of what the
+          // backend actually returned.
+          const payload = res?.success ? res.data : null;
+          if (Array.isArray(payload)) {
+            setTreeData({ roots: payload });
+          } else if (payload?.roots) {
+            setTreeData(payload);
           } else {
             setTreeData({ roots: [] });
           }

@@ -94,8 +94,16 @@ export default function MembershipScreen() {
         { errorMessage: 'Could not join.' }
       );
 
-      if (res?.payment_required) {
-        const url = res.payment_url || res.checkout_url;
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}) — `res?.payment_required`/`res?.joined`/`res.payment_url`
+      // all read fields the wrapper never has (they live under `res.data`),
+      // so neither branch below ever fired: joining any tier — free or
+      // paid — silently did nothing, no payment prompt and no "Joined!"
+      // confirmation, regardless of what the backend actually returned.
+      if (!res?.success) {
+        Alert.alert('Error', res?.message || 'Could not join. Please try again.');
+      } else if (res.data?.payment_required) {
+        const url = res.data.payment_url || res.data.checkout_url;
         if (url) {
           const canOpen = await Linking.canOpenURL(url).catch(() => false);
           if (canOpen) {
@@ -111,7 +119,7 @@ export default function MembershipScreen() {
         } else {
           Alert.alert('Error', 'Payment link unavailable. Please try again.');
         }
-      } else if (res?.joined) {
+      } else if (res.data?.joined) {
         Alert.alert('Joined!', `You are now a ${tier.title} member.`);
         await load();
       }
