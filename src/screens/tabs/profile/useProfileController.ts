@@ -1603,14 +1603,15 @@ export const useProfileController = (opts: {
             throw new Error('Language is required.');
           }
           const languageId = String(payload?.id || '').trim();
-          if (languageId) {
-            await patchRequest(ROUTES.profileLanguages.detail(languageId), {
-              name: normalizedLanguage,
-            });
-          } else {
-            await postRequest(ROUTES.profileLanguages.list, {
-              name: normalizedLanguage,
-            });
+          const langRes = languageId
+            ? await patchRequest(ROUTES.profileLanguages.detail(languageId), {
+                name: normalizedLanguage,
+              })
+            : await postRequest(ROUTES.profileLanguages.list, {
+                name: normalizedLanguage,
+              });
+          if (!langRes?.success) {
+            throw new Error(langRes?.message || 'Unable to save language.');
           }
           setPrefsDraft({
             ...nextPrefs,
@@ -1623,12 +1624,15 @@ export const useProfileController = (opts: {
           setPrefsDraft(nextPrefs);
 
           const prefId = profile?.preferences?.id;
-          if (prefId)
-            await patchRequest(
-              ROUTES.profilePreferences.detail(prefId),
-              nextPrefs,
-            );
-          else await postRequest(ROUTES.profilePreferences.list, nextPrefs);
+          const prefRes = prefId
+            ? await patchRequest(
+                ROUTES.profilePreferences.detail(prefId),
+                nextPrefs,
+              )
+            : await postRequest(ROUTES.profilePreferences.list, nextPrefs);
+          if (!prefRes?.success) {
+            throw new Error(prefRes?.message || 'Unable to save preferences.');
+          }
         }
       } else {
         const baseUrl = baseMap[type];
@@ -1652,6 +1656,7 @@ export const useProfileController = (opts: {
           delete payload.description;
         }
 
+        let itemRes;
         if (payload.file?.uri) {
           const form = new FormData();
           Object.keys(payload).forEach(k => {
@@ -1663,18 +1668,33 @@ export const useProfileController = (opts: {
             name: payload.file.name,
             type: payload.file.type,
           } as any);
-          if (payload.id) await patchRequest(`${baseUrl}${payload.id}/`, form);
-          else await postRequest(baseUrl, form);
+          itemRes = payload.id
+            ? await patchRequest(`${baseUrl}${payload.id}/`, form)
+            : await postRequest(baseUrl, form);
         } else {
-          if (payload.id)
-            await patchRequest(`${baseUrl}${payload.id}/`, payload);
-          else await postRequest(baseUrl, payload);
+          itemRes = payload.id
+            ? await patchRequest(`${baseUrl}${payload.id}/`, payload)
+            : await postRequest(baseUrl, payload);
+        }
+        // postRequest/patchRequest resolve (never throw) on a failed
+        // request too — the previous code discarded the result entirely
+        // and unconditionally closed the sheet + reloaded the profile in
+        // `finally` regardless of whether the save actually succeeded, so
+        // a rejected save (validation error, auth failure, etc.) silently
+        // closed the form with no error shown and nothing was ever
+        // created — indistinguishable from success except that the item
+        // never appears anywhere afterward.
+        if (!itemRes?.success) {
+          throw new Error(itemRes?.message || 'Unable to save this item.');
         }
       }
-    } finally {
-      setSaving(false);
+
       closeSheet();
       loadProfile();
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message || 'Unable to save this item.');
+    } finally {
+      setSaving(false);
     }
   };
 
