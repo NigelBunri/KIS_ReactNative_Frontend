@@ -107,6 +107,17 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
   // visible correction instead of one per async data source. 150ms matches
   // collapseScrollY's own withTiming duration just above, for the same
   // "don't react to every individual layout blip" reasoning.
+  //
+  // That still leaves one real commit per async data source when those
+  // sources resolve more than 150ms apart (a slow badge-count fetch, say) —
+  // the debounce window has nothing left to collapse against by then. That
+  // commit was landing as an instant snap (a bare .value assignment), which
+  // on screens whose data legitimately arrives a moment after the screen is
+  // already visible (every screen except Bible, which has no such
+  // secondary async source) read as the tab bar suddenly jumping on its
+  // own. Wrapping the commit in withTiming doesn't try to prevent this
+  // still-legitimate late correction — it just eases it, so a correction
+  // that has to happen reads as a soft settle instead of a jump.
   const pendingLayoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
@@ -117,11 +128,12 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
     if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
     pendingLayoutTimer.current = setTimeout(() => {
       pendingLayoutTimer.current = null;
-      naturalHeight.value = resolveNaturalHeight({
+      const resolved = resolveNaturalHeight({
         measured,
         current: naturalHeight.value,
         collapseDriverValue: collapseScrollY.value,
       });
+      naturalHeight.value = withTiming(resolved, { duration: 220 });
     }, 150);
   }, [naturalHeight, collapseScrollY]);
 
