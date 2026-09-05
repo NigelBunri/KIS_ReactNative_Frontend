@@ -58,17 +58,27 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
 
   const styles = useMemo(() => makeStyles(palette, layout), [palette, layout]);
 
+  // Extracted so a successful contribution can re-run the exact same fetch
+  // that focus already does, instead of leaving the raised-amount progress
+  // bar showing its pre-contribution value until the user navigates away
+  // and back. `silent` skips the full-screen spinner for that refetch —
+  // the user is already looking at the campaign, so re-showing the loading
+  // state would hide it right after they just saw a success confirmation.
+  const loadCampaign = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    return getRequest(ROUTES.business.crowdfundDetail(campaignId))
+      .then(res => {
+        const data = res?.data ?? res;
+        if (data?.id) setCampaign(data);
+      })
+      .catch(() => {})
+      .finally(() => { if (!silent) setLoading(false); });
+  }, [campaignId]);
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      getRequest(ROUTES.business.crowdfundDetail(campaignId))
-        .then(res => {
-          const data = res?.data ?? res;
-          if (data?.id) setCampaign(data);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }, [campaignId]),
+      void loadCampaign();
+    }, [loadCampaign]),
   );
 
   const handleContribute = async () => {
@@ -85,6 +95,7 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
         message: message.trim() || undefined,
       });
       if (res?.success || res?.id || res?.data?.id) {
+        void loadCampaign(true);
         Alert.alert('Contribution recorded!', 'Thank you for supporting this campaign.', [
           { text: 'OK', onPress: () => {
             setAmount('');

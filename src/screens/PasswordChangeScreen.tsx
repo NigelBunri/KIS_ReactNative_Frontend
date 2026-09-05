@@ -20,6 +20,73 @@ import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
+type Palette = ReturnType<typeof useKISTheme>['palette'];
+type Styles = ReturnType<typeof createStyles>;
+
+// Hoisted out of PasswordChangeScreen's body — it used to be declared
+// *inside* that component's function, which made it a brand-new component
+// type on every single render. PasswordChangeScreen re-renders on every
+// keystroke (it owns currentPassword/newPassword/confirmPassword state), so
+// every keystroke made React tear down and remount all three <TextInput>
+// native views from scratch. The `value` prop was still correctly wired
+// (this wasn't a controlled/uncontrolled mismatch), but a mid-edit remount
+// of a focused native text field is exactly what makes typing look like it
+// "clears itself" — the OS input loses focus/composing state and, on
+// Android especially, the field can visibly blank for a frame before the
+// fresh instance catches up. Declaring it here instead gives it one stable
+// identity for the component's whole lifetime, so re-renders update the
+// existing TextInput in place instead of replacing it.
+function PasswordField({
+  label,
+  value,
+  onChangeText,
+  show,
+  onToggle,
+  palette,
+  styles,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  palette: Palette;
+  styles: Styles;
+}) {
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={[styles.fieldLabel, { color: palette.subtext }]}>{label}</Text>
+      <View
+        style={[
+          styles.inputRow,
+          {
+            backgroundColor: palette.surfaceElevated,
+            borderColor: palette.divider,
+          },
+        ]}
+      >
+        <TextInput
+          style={[styles.input, { color: palette.text }]}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholderTextColor={palette.subtext}
+          placeholder="••••••••"
+        />
+        <Pressable onPress={onToggle} style={styles.eyeButton}>
+          <KISIcon
+            name={show ? 'eye-off' : 'eye'}
+            size={20}
+            color={palette.subtext}
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function PasswordChangeScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
@@ -68,51 +135,6 @@ export default function PasswordChangeScreen() {
     }
   };
 
-  const PasswordField = ({
-    label,
-    value,
-    onChangeText,
-    show,
-    onToggle,
-  }: {
-    label: string;
-    value: string;
-    onChangeText: (v: string) => void;
-    show: boolean;
-    onToggle: () => void;
-  }) => (
-    <View style={styles.fieldGroup}>
-      <Text style={[styles.fieldLabel, { color: palette.subtext }]}>{label}</Text>
-      <View
-        style={[
-          styles.inputRow,
-          {
-            backgroundColor: palette.surfaceElevated,
-            borderColor: palette.divider,
-          },
-        ]}
-      >
-        <TextInput
-          style={[styles.input, { color: palette.text }]}
-          value={value}
-          onChangeText={onChangeText}
-          secureTextEntry={!show}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholderTextColor={palette.subtext}
-          placeholder="••••••••"
-        />
-        <Pressable onPress={onToggle} style={styles.eyeButton}>
-          <KISIcon
-            name={show ? 'eye-off' : 'eye'}
-            size={20}
-            color={palette.subtext}
-          />
-        </Pressable>
-      </View>
-    </View>
-  );
-
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]}>
       <View
@@ -144,6 +166,8 @@ export default function PasswordChangeScreen() {
             onChangeText={setCurrentPassword}
             show={showCurrent}
             onToggle={() => setShowCurrent(v => !v)}
+            palette={palette}
+            styles={styles}
           />
           <PasswordField
             label="New password (8+ characters)"
@@ -151,6 +175,8 @@ export default function PasswordChangeScreen() {
             onChangeText={setNewPassword}
             show={showNew}
             onToggle={() => setShowNew(v => !v)}
+            palette={palette}
+            styles={styles}
           />
           <PasswordField
             label="Confirm new password"
@@ -158,6 +184,8 @@ export default function PasswordChangeScreen() {
             onChangeText={setConfirmPassword}
             show={showConfirm}
             onToggle={() => setShowConfirm(v => !v)}
+            palette={palette}
+            styles={styles}
           />
         </View>
 

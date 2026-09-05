@@ -115,9 +115,10 @@ type DowngradeModalProps = {
   palette: ReturnType<typeof useKISTheme>['palette'];
   onClose: () => void;
   onConfirm: (tier: string) => void;
+  submitting: boolean;
 };
 
-function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: DowngradeModalProps) {
+function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm, submitting }: DowngradeModalProps) {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
@@ -167,11 +168,14 @@ function DowngradeModal({ visible, currentTier, palette, onClose, onConfirm }: D
           </View>
 
           <Pressable
-            style={[m.confirmBtn, { backgroundColor: selectedTier ? palette.primaryStrong : palette.divider }]}
+            style={[m.confirmBtn, { backgroundColor: submitting ? palette.subtext : selectedTier ? palette.primaryStrong : palette.divider }]}
             onPress={handleConfirm}
-            disabled={!selectedTier}
+            disabled={submitting || !selectedTier}
           >
-            <Text style={[m.confirmBtnText, { color: palette.onPrimary }]}>Confirm Downgrade</Text>
+            {submitting
+              ? <ActivityIndicator color={palette.onPrimary} size="small" />
+              : <Text style={[m.confirmBtnText, { color: palette.onPrimary }]}>Confirm Downgrade</Text>
+            }
           </Pressable>
           <Pressable onPress={onClose} style={m.cancelBtn}>
             <Text style={[m.cancelBtnText, { color: palette.subtext }]}>Cancel</Text>
@@ -714,6 +718,7 @@ export default function SubscriptionManagementScreen() {
         palette={palette}
         onClose={() => setDowngradeModalVisible(false)}
         onConfirm={handleDowngrade}
+        submitting={submitting}
       />
     </SafeAreaView>
   );

@@ -1,7 +1,7 @@
 // src/screens/calls/components/InCallPollSheet.tsx
 // In-call poll creation and voting UI.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { InCallPoll } from '@/services/calls/callTypes';
-import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 type Props = {
   visible: boolean;
@@ -34,18 +33,29 @@ export default function InCallPollSheet({
 }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
-  const topInset = useSafeTopInset();
   const slideAnim = useRef(new Animated.Value(500)).current;
   const [mounted, setMounted] = useState(visible);
   const [creating, setCreating] = useState(false);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '']);
+  // Each option carries a stable id, independent of its position in the
+  // list. Keying the rows below by array index instead of this id would
+  // make React reuse each row's native <TextInput> by *position*: deleting
+  // any option except the last one reindexes every option after it, so the
+  // TextInput a user is mid-edit in keeps its native identity but silently
+  // gets handed a *different* option's value — reading as the typed text
+  // jumping to the wrong row or vanishing. A stable id survives deletion,
+  // so a row's TextInput always stays matched to the same logical option.
+  const nextOptionId = useRef(2);
+  const [options, setOptions] = useState<{ id: number; text: string }[]>([
+    { id: 0, text: '' },
+    { id: 1, text: '' },
+  ]);
 
   useEffect(() => {
     if (visible) setMounted(true);
     Animated.spring(slideAnim, { toValue: visible ? 0 : 500, useNativeDriver: true, tension: 60, friction: 12 })
       .start(({ finished }) => { if (finished && !visible) setMounted(false); });
-  }, [visible]);
+  }, [visible, slideAnim]);
 
   if (!mounted) return null;
 
@@ -55,11 +65,12 @@ export default function InCallPollSheet({
 
   const handleCreate = () => {
     const q = question.trim();
-    const opts = options.map(o => o.trim()).filter(Boolean);
+    const opts = options.map(o => o.text.trim()).filter(Boolean);
     if (!q || opts.length < 2) return;
     onCreatePoll(q, opts);
     setQuestion('');
-    setOptions(['', '']);
+    setOptions([{ id: 0, text: '' }, { id: 1, text: '' }]);
+    nextOptionId.current = 2;
     setCreating(false);
   };
 
@@ -101,30 +112,39 @@ export default function InCallPollSheet({
               maxLength={200}
             />
             {options.map((opt, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <View key={opt.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <TextInput
                   style={[styles.input, { flex: 1, backgroundColor: palette.surface, borderColor: palette.inputBorder, color: palette.text }]}
                   placeholder={`Option ${i + 1}`}
                   placeholderTextColor={palette.subtext}
-                  value={opt}
-                  onChangeText={v => { const next = [...options]; next[i] = v; setOptions(next); }}
+                  value={opt.text}
+                  onChangeText={v => setOptions(prev => prev.map(o => (o.id === opt.id ? { ...o, text: v } : o)))}
                   maxLength={100}
                 />
                 {options.length > 2 && (
-                  <Pressable onPress={() => setOptions(options.filter((_, j) => j !== i))} hitSlop={8}>
+                  <Pressable onPress={() => setOptions(prev => prev.filter(o => o.id !== opt.id))} hitSlop={8}>
                     <KISIcon name="close" size={16} color={palette.danger} />
                   </Pressable>
                 )}
               </View>
             ))}
             {options.length < 6 && (
-              <Pressable onPress={() => setOptions([...options, ''])} style={styles.addOptionBtn}>
+              <Pressable
+                onPress={() => setOptions(prev => [...prev, { id: nextOptionId.current++, text: '' }])}
+                style={styles.addOptionBtn}
+              >
                 <KISIcon name="plus" size={14} color={palette.subtext} />
                 <Text style={[styles.addOptionText, { color: palette.subtext }]}>Add option</Text>
               </Pressable>
             )}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <Pressable onPress={() => { setCreating(false); setQuestion(''); setOptions(['', '']); }}
+              <Pressable
+                onPress={() => {
+                  setCreating(false);
+                  setQuestion('');
+                  setOptions([{ id: 0, text: '' }, { id: 1, text: '' }]);
+                  nextOptionId.current = 2;
+                }}
                 style={[styles.cancelBtn, { borderColor: palette.inputBorder }]}>
                 <Text style={[styles.cancelText, { color: palette.subtext }]}>Cancel</Text>
               </Pressable>
