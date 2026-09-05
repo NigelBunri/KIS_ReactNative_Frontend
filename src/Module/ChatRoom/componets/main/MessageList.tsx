@@ -159,6 +159,26 @@ export const MessageList: React.FC<MessageListProps> = ({
     });
   }, [messages, callHistory]);
 
+  // O(1) reply-source lookup — renderItem previously ran messages.find(...)
+  // for every rendered row with a replyToId, an O(n) linear scan of the
+  // *entire* conversation per row. For a long, reply-heavy chat that's
+  // O(n * visible rows) of scanning on every scroll frame, which is exactly
+  // the kind of per-frame JS-thread work a low-end device doesn't have
+  // headroom for. A message can be matched by id, serverId, or clientId
+  // (mirroring the three checks the old .find() made) — first-match-wins
+  // per key, same as .find()'s "first match in array order" semantics, so
+  // this is a pure optimization with no behavior change.
+  const messagesById = useMemo(() => {
+    const map = new Map<string, ChatMessage>();
+    for (const m of messages) {
+      const anyM = m as any;
+      if (!map.has(m.id)) map.set(m.id, m);
+      if (anyM.serverId != null && !map.has(anyM.serverId)) map.set(anyM.serverId, m);
+      if (anyM.clientId != null && !map.has(anyM.clientId)) map.set(anyM.clientId, m);
+    }
+    return map;
+  }, [messages]);
+
   const [highlightedMessageId, setHighlightedMessageId] = useState<
     string | null
   >(null);
@@ -365,6 +385,171 @@ export const MessageList: React.FC<MessageListProps> = ({
     setUnreadCount(0);
   }, []);
 
+  /**
+   * Renders a richer attachment strip for a message:
+   * - Images: thumbnail.
+   * - PDFs: first-page preview with react-native-pdf.
+   * - Other docs: mini preview card (extension badge, filename, mime, size, url hint).
+   */
+
+  // Hooks must run unconditionally on every render (Rules of Hooks), so this
+  // is declared here, above the `isEmpty` early return below, even though
+  // it's only ever handed to the FlatList in the non-empty render path.
+  //
+  // Wrapped in useCallback (was an inline arrow function passed straight to
+  // FlatList's renderItem prop) so a parent re-render that doesn't actually
+  // touch any of this closure's own dependencies reuses the same function
+  // reference instead of handing FlatList's cell renderer a brand-new one
+  // every time — a fresh renderItem identity forces every visible cell to
+  // re-render regardless of whether that cell's own data changed. `messages`
+  // (and therefore `timelineItems`) still changes on every new message, so
+  // this doesn't help mid-conversation — the real fix for that would be
+  // extracting each row into its own React.memo'd component keyed on its
+  // own props, a larger refactor left for a follow-up — but it does stop
+  // every visible bubble re-rendering for the *other*, more common re-render
+  // triggers here that don't touch the conversation itself: selection mode
+  // toggling, a highlight flashing in and out, participant/mention maps
+  // refreshing, etc.
+  const renderTimelineItem = useCallback(
+    ({ item: timelineItem, index }: { item: TimelineItem; index: number }) => {
+      const previousTimelineItem = timelineItems[index - 1];
+      const showTimestampHeader = shouldShowTimestampHeader(
+        previousTimelineItem?.createdAt,
+        timelineItem.createdAt,
+      );
+
+      if (timelineItem.type === 'call') {
+        return (
+          <View>
+            {showTimestampHeader && (
+              <View style={styles.timestampHeaderContainer}>
+                <Text
+                  style={[
+                    styles.timestampHeaderText,
+                    {
+                      backgroundColor: palette.timestampBg ?? '#00000033',
+                      color: palette.onTimestamp ?? '#fff',
+                    },
+                  ]}
+                >
+                  {formatDayLabel(timelineItem.createdAt)}
+                </Text>
+              </View>
+            )}
+            <CallHistoryRow
+              entry={timelineItem.call}
+              currentUserId={String(currentUserId ?? '')}
+              onCallBack={onCallHistoryCallback}
+            />
+          </View>
+        );
+      }
+
+      const item = timelineItem.message;
+      const previous = previousTimelineItem?.type === 'message'
+        ? previousTimelineItem.message
+        : undefined;
+      const nextTimelineItem = timelineItems[index + 1];
+      const next = nextTimelineItem?.type === 'message'
+        ? nextTimelineItem.message
+        : undefined;
+
+      const prevSender = previous?.senderId;
+      const nextSender = next?.senderId;
+      const thisSender = item.senderId;
+      const isFirstInGroup = prevSender !== thisSender;
+      const isLastInGroup = nextSender !== thisSender;
+
+      const replySource =
+        item.replyToId != null ? messagesById.get(item.replyToId) : undefined;
+
+      const isHighlighted =
+        item.id === highlightedMessageId ||
+        (item as any).serverId === highlightedMessageId;
+      const isSelected = selectedMessageIds.includes(item.id);
+
+      return (
+        <View>
+          {showTimestampHeader && (
+            <View style={styles.timestampHeaderContainer}>
+              <Text
+                style={[
+                  styles.timestampHeaderText,
+                  {
+                    backgroundColor: palette.timestampBg ?? '#00000033',
+                    color: palette.onTimestamp ?? '#fff',
+                  },
+                ]}
+              >
+                {formatDayLabel(item.createdAt)}
+              </Text>
+            </View>
+          )}
+
+          <InteractiveMessageRow
+            message={item}
+            palette={palette}
+            currentUserId={currentUserId}
+            replySource={replySource}
+            isHighlighted={isHighlighted}
+            isSelected={isSelected}
+            selectionMode={selectionMode}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            onPressReplySource={handlePressReplySource}
+            onReplyToMessage={onReplyToMessage}
+            onEditMessage={onEditMessage}
+            onForwardMessage={onForwardMessage}
+            onDeleteMessage={onDeleteMessage}
+            onPinMessage={onPinMessage}
+            onReactMessage={onReactMessage}
+            onVotePoll={onVotePoll}
+            onRetryMessage={onRetryMessage}
+            onStartSelection={onStartSelection}
+            onToggleSelect={onToggleSelect}
+            onStarMessage={onStarMessage}
+            onShowReadReceipts={onShowReadReceipts}
+            onViewOnce={onViewOnce}
+            onLocalDeleteMessage={onLocalDeleteMessage}
+            onUpdateMessage={onUpdateMessage}
+            mentionMap={mentionMap}
+            participantMap={participantMap}
+            participantAvatarMap={participantAvatarMap}
+          />
+        </View>
+      );
+    },
+    [
+      timelineItems,
+      palette,
+      currentUserId,
+      onCallHistoryCallback,
+      messagesById,
+      highlightedMessageId,
+      selectedMessageIds,
+      selectionMode,
+      handlePressReplySource,
+      onReplyToMessage,
+      onEditMessage,
+      onForwardMessage,
+      onDeleteMessage,
+      onPinMessage,
+      onReactMessage,
+      onVotePoll,
+      onRetryMessage,
+      onStartSelection,
+      onToggleSelect,
+      onStarMessage,
+      onShowReadReceipts,
+      onViewOnce,
+      onLocalDeleteMessage,
+      onUpdateMessage,
+      mentionMap,
+      participantMap,
+      participantAvatarMap,
+    ],
+  );
+
   if (isEmpty) {
     return (
       <View style={styles.emptyStateContainer}>
@@ -380,13 +565,6 @@ export const MessageList: React.FC<MessageListProps> = ({
       </View>
     );
   }
-
-  /**
-   * Renders a richer attachment strip for a message:
-   * - Images: thumbnail.
-   * - PDFs: first-page preview with react-native-pdf.
-   * - Other docs: mini preview card (extension badge, filename, mime, size, url hint).
-   */
 
   const E2EEBanner = isE2EE ? (
     <View style={{
@@ -435,122 +613,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             animated: true,
           });
         }}
-        renderItem={({ item: timelineItem, index }) => {
-          const previousTimelineItem = timelineItems[index - 1];
-          const showTimestampHeader = shouldShowTimestampHeader(
-            previousTimelineItem?.createdAt,
-            timelineItem.createdAt,
-          );
-
-          if (timelineItem.type === 'call') {
-            return (
-              <View>
-                {showTimestampHeader && (
-                  <View style={styles.timestampHeaderContainer}>
-                    <Text
-                      style={[
-                        styles.timestampHeaderText,
-                        {
-                          backgroundColor: palette.timestampBg ?? '#00000033',
-                          color: palette.onTimestamp ?? '#fff',
-                        },
-                      ]}
-                    >
-                      {formatDayLabel(timelineItem.createdAt)}
-                    </Text>
-                  </View>
-                )}
-                <CallHistoryRow
-                  entry={timelineItem.call}
-                  currentUserId={String(currentUserId ?? '')}
-                  onCallBack={onCallHistoryCallback}
-                />
-              </View>
-            );
-          }
-
-          const item = timelineItem.message;
-          const previous = previousTimelineItem?.type === 'message'
-            ? previousTimelineItem.message
-            : undefined;
-          const nextTimelineItem = timelineItems[index + 1];
-          const next = nextTimelineItem?.type === 'message'
-            ? nextTimelineItem.message
-            : undefined;
-
-          const prevSender = previous?.senderId;
-          const nextSender = next?.senderId;
-          const thisSender = item.senderId;
-          const isFirstInGroup = prevSender !== thisSender;
-          const isLastInGroup = nextSender !== thisSender;
-
-          const replySource =
-            item.replyToId != null
-              ? messages.find(
-                  (m) =>
-                    m.id === item.replyToId ||
-                    (m as any).serverId === item.replyToId ||
-                    (m as any).clientId === item.replyToId,
-                )
-              : undefined;
-
-          const isHighlighted =
-            item.id === highlightedMessageId ||
-            (item as any).serverId === highlightedMessageId;
-          const isSelected = selectedMessageIds.includes(item.id);
-
-
-          return (
-            <View>
-              {showTimestampHeader && (
-                <View style={styles.timestampHeaderContainer}>
-                  <Text
-                    style={[
-                      styles.timestampHeaderText,
-                      {
-                        backgroundColor: palette.timestampBg ?? '#00000033',
-                        color: palette.onTimestamp ?? '#fff',
-                      },
-                    ]}
-                  >
-                    {formatDayLabel(item.createdAt)}
-                  </Text>
-                </View>
-              )}
-
-              <InteractiveMessageRow
-                message={item}
-                palette={palette}
-                currentUserId={currentUserId}
-                replySource={replySource}
-                isHighlighted={isHighlighted}
-                isSelected={isSelected}
-                selectionMode={selectionMode}
-                isFirstInGroup={isFirstInGroup}
-                isLastInGroup={isLastInGroup}
-                onPressReplySource={handlePressReplySource}
-                onReplyToMessage={onReplyToMessage}
-                onEditMessage={onEditMessage}
-                onForwardMessage={onForwardMessage}
-                onDeleteMessage={onDeleteMessage}
-                onPinMessage={onPinMessage}
-                onReactMessage={onReactMessage}
-                onVotePoll={onVotePoll}
-                onRetryMessage={onRetryMessage}
-                onStartSelection={onStartSelection}
-                onToggleSelect={onToggleSelect}
-                onStarMessage={onStarMessage}
-                onShowReadReceipts={onShowReadReceipts}
-                onViewOnce={onViewOnce}
-                onLocalDeleteMessage={onLocalDeleteMessage}
-                onUpdateMessage={onUpdateMessage}
-                mentionMap={mentionMap}
-                participantMap={participantMap}
-                participantAvatarMap={participantAvatarMap}
-              />
-            </View>
-          );
-        }}
+        renderItem={renderTimelineItem}
       />
 
       {/* Jump-to-latest FAB */}
