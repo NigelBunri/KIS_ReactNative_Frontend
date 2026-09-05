@@ -866,7 +866,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       logDownload('request', { attachmentId: att.attachmentId, endpoint: safeUrlForLog(fetchUrl), destinationPath: destPath });
 
-      const task = RNBlobUtil.config({ fileCache: true, path: destPath, addAndroidDownloads: { useDownloadManager: true, notification: true, title: safeName, path: destPath } })
+      // No addAndroidDownloads here — that hands the write off to Android's
+      // *system* DownloadManager process, which can only write into shared/
+      // public storage (Environment.DIRECTORY_DOWNLOADS or a MediaStore
+      // entry). destPath is always inside this app's own private storage
+      // (RNFS.DocumentDirectoryPath/KIS/ChatMedia/Downloads — see
+      // chatMediaStorage.ts), which the DownloadManager process has no
+      // permission to write into regardless of any storage permission this
+      // app holds (they're sandboxed per-app by UID, not by permission
+      // grant). Pairing useDownloadManager with a private path isn't just
+      // unreliable, it's a guaranteed crash on every attempt — this was the
+      // literal cause of "the app crashes every time I try to download a
+      // file" on Android. Nothing downstream needs the system Downloads
+      // entry or its notification anyway: the file is opened straight from
+      // destPath via actionViewIntent below, and progress is already shown
+      // via this component's own downloadState UI. A plain fileCache+path
+      // fetch writes directly into the app's own sandbox with no such
+      // restriction, exactly like every other platform this same call
+      // already works on.
+      const task = RNBlobUtil.config({ fileCache: true, path: destPath })
         .fetch('GET', fetchUrl, requestHeaders);
       task.progress((received: number, total: number) => {
         if (total > 0) {
