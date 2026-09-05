@@ -59,7 +59,11 @@ import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
 import VerificationChannelSelectScreen from './src/screens/VerificationChannelSelectScreen';
 import TwoFactorScreen from './src/screens/TwoFactorScreen';
-import { MainTabs } from '@/navigation/AppNavigator';
+import { MainTabs, AnimatedKISTabBar } from '@/navigation/AppNavigator';
+import {
+  DetachedTabBarProvider,
+  useDetachedTabBarProps,
+} from '@/contexts/DetachedTabBarContext';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
 import PlaylistsScreen from '@/screens/broadcast/playlists/PlaylistsScreen';
@@ -360,6 +364,20 @@ function GoldenSection() {
       <NetworkStatusPill />
     </View>
   );
+}
+
+// Renders the real bottom tab bar as a sibling *after* the Golden Section's
+// whole content column below, instead of nested inside it (where it used to
+// live, inside MainTabs' own Tab.Navigator) — see DetachedTabBarContext.tsx
+// for the full reasoning. AnimatedKISTabBar still pins itself via
+// position:absolute, bottom:0 exactly as before; only its nearest View
+// ancestor changed, from a box whose height the Golden Section's live
+// height could shrink/grow, to this component's own parent here, whose
+// height is fixed regardless of what the Golden Section is doing.
+function DetachedTabBarOutlet() {
+  const props = useDetachedTabBarProps();
+  if (!props) return null;
+  return <AnimatedKISTabBar {...props} />;
 }
 
 function AppContent() {
@@ -1162,6 +1180,11 @@ function AppContent() {
   return (
     <AuthContext.Provider value={ctx}>
       <SocketProvider>
+        {/* Provides the bridge MainTabs' Tab.Navigator forwards its tabBar
+            render props through, and DetachedTabBarOutlet below reads them
+            back out of — see DetachedTabBarContext.tsx. Scoped here (not
+            wider) since nothing outside this tree needs it. */}
+        <DetachedTabBarProvider>
         <View style={{ flex: 1 }}>
           <StatusBar
             animated
@@ -1876,6 +1899,11 @@ function AppContent() {
             </MiniPlayerProvider>
           </NavigationContainer>
             </View>
+          {/* Sibling of the content column above, not nested inside it — see
+              DetachedTabBarContext.tsx and DetachedTabBarOutlet's own doc
+              comment for why this is what finally makes the bottom tab bar
+              immune to the Golden Section's live height changes. */}
+          <DetachedTabBarOutlet />
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
           <NotificationPermissionModal />
@@ -1886,6 +1914,7 @@ function AppContent() {
             }} />
           ) : null}
         </View>
+        </DetachedTabBarProvider>
       </SocketProvider>
     </AuthContext.Provider>
   );

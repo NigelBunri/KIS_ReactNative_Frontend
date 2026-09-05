@@ -19,12 +19,14 @@ import {
   createBottomTabNavigator,
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardAnimation } from 'react-native-keyboard-controller';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
 import { useGoldenSectionSuppression } from '@/contexts/GoldenSectionContext';
+import { DetachedTabBarBridge } from '@/contexts/DetachedTabBarContext';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_COMPONENT_TOKENS, withAlpha } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
@@ -71,7 +73,10 @@ const routeIconMap: Record<RouteKey, KISIconName> = {
 };
 
 // 👇 extend props to accept hidNav
-type AnimatedKISTabBarProps = BottomTabBarProps & {
+// Exported so DetachedTabBarContext.tsx can type the props it bridges up to
+// where AnimatedKISTabBar actually renders now (see that file's own doc
+// comment for why it no longer renders in place here).
+export type AnimatedKISTabBarProps = BottomTabBarProps & {
   hidNav: boolean;
   badgeCounts: MainTabBadgeCounts;
   // Tablet shell needs the tab navigator's own `navigation` object (to drive
@@ -241,7 +246,10 @@ function KISTabBarItem({
   );
 }
 
-function AnimatedKISTabBar({
+// Exported so App.tsx can render this directly as a sibling of the Golden
+// Section's content column instead of in-place inside this navigator's own
+// `tabBar` slot — see DetachedTabBarContext.tsx for why.
+export function AnimatedKISTabBar({
   state,
   descriptors,
   navigation,
@@ -408,6 +416,18 @@ function AnimatedKISTabBar({
 export function MainTabs() {
   const { currentUserId, socket } = useSocket();
   const { shellMode } = useResponsiveLayout();
+  // MainTabs is itself one screen in App.tsx's RootStack (alongside detail
+  // pushes like BroadcastDetail, ChannelHome, etc.) — it stays mounted (per
+  // React Navigation's default stack behavior) even while one of those is
+  // on top, just no longer focused. Previously that didn't matter: the tab
+  // bar rendered nested inside this screen's own tree, so it was simply
+  // covered by whatever got pushed on top of it. Now that AnimatedKISTabBar
+  // renders detached (see DetachedTabBarContext.tsx), it has no "on top of"
+  // relationship to the pushed screen to be covered by, so it needs an
+  // explicit signal to hide instead — this is that signal, folded into the
+  // same hidNav OR-chain already used for the tablet-shell/manual-hide cases
+  // below.
+  const mainTabsFocused = useIsFocused();
   const [tabBarState, setTabBarState] = useState<
     { navigation: BottomTabBarProps['navigation']; activeRouteName: string } | null
   >(null);
@@ -887,9 +907,9 @@ export function MainTabs() {
             tabBarShowLabel: false,
           }}
           tabBar={(p) => (
-            <AnimatedKISTabBar
+            <DetachedTabBarBridge
               {...p}
-              hidNav={hidNav || shellMode !== 'phone'}
+              hidNav={hidNav || shellMode !== 'phone' || !mainTabsFocused}
               badgeCounts={badgeCounts}
               onTabBarState={setTabBarState}
             />
