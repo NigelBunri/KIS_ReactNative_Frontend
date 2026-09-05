@@ -128,6 +128,27 @@ const isBadMacDecryptError = (error: any): boolean => {
   return name.includes('badmac') || message.includes('bad mac');
 };
 
+// Thrown by libsignal's SessionCipher when this device has no Signal session
+// at all for the sender's (userId, deviceId) address — i.e. the message was
+// encrypted as a plain ratchet continuation (type 1) rather than a fresh
+// handshake (type 3, PreKeyWhisperMessage), but this device has nothing to
+// continue. Confirmed via a live repro: the sender's app was trusting a
+// stale local session left over from earlier testing, while the receiving
+// device (a fresh install) had none — a mismatch neither side can detect on
+// its own, since delivery acks only confirm the message reached the server,
+// not that the recipient could actually decrypt it. There is currently no
+// channel for a receiver to tell a sender "re-key with me" (Signal/WhatsApp
+// solve this with an explicit re-handshake flow) — sending a reply happens
+// to force a fresh mutual session as a side effect, which is why a
+// conversation can "heal" after the receiver responds, but the original
+// message stays permanently unreadable. Until a real re-key protocol exists,
+// the honest thing to do is tell the user plainly rather than leave them
+// looking at nothing, mirroring the existing pre-join placeholder pattern.
+const isNoSignalSessionError = (error: any): boolean => {
+  const message = String(error?.message ?? error ?? '').toLowerCase();
+  return message.includes('no record for');
+};
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const normalizeUuid = (value: unknown): string | null => {
@@ -772,6 +793,34 @@ export function useChatMessaging({
           // once the sender/recipient sessions catch up, rather than
           // leaving the message stuck behind the 🔒 icon for the rest of
           // the session.
+          return;
+        } else if (isNoSignalSessionError(error)) {
+          // See isNoSignalSessionError's doc comment for the full mechanism.
+          // Unlike the counter-error/bad-mac cases above, this isn't a
+          // transient mismatch that a later resync can resolve on its own —
+          // the sender needs to re-key with this device, and nothing today
+          // asks them to. Show a clear, honest placeholder (WhatsApp-style,
+          // same pattern as the pre-join case above) instead of leaving the
+          // message unexplained.
+          const messageId = String(mapped.serverId ?? mapped.id ?? mapped.clientId ?? '');
+          const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
+          const UNDECRYPTABLE_TEXT = '🔒 This message could not be decrypted. Ask them to send it again.';
+          const alreadyPatched = messagesRef.current.find(
+            (m) => (m.serverId === messageId || m.id === messageId) &&
+              typeof m.text === 'string' && m.text === UNDECRYPTABLE_TEXT,
+          );
+          if (__DEV__) {
+            console.warn('[useChatMessaging] no Signal session for sender — undecryptable', {
+              messageId, senderId: mapped.senderId, senderDeviceId,
+              alreadyPatched: !!alreadyPatched,
+              error: serializeErrorForDiagnostics(error),
+            });
+          }
+          if (!alreadyPatched) {
+            const patch = { text: UNDECRYPTABLE_TEXT };
+            await saveDecryptedMessage(String(currentUserId), mapped, patch);
+            await patchDecryptedMessage(messageId, patch);
+          }
           return;
         } else if (isBadMacDecryptError(error)) {
           if (__DEV__ && DEBUG_STALE_DECRYPTS) {
