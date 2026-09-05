@@ -31,13 +31,21 @@ export function EditItemModal(props: EditItemModalProps) {
             setDraftItem((s: any) => {
               const next = s || { type: draftItem?.type, data: {} };
               const data = next?.data || {};
+              // Was `data?.title != null ? t : data?.title` — on a brand-new
+              // item (Add Experience/Education/etc., where data starts as
+              // {}) `data.title` is undefined on every keystroke, so this
+              // condition was always false and kept assigning `undefined`
+              // back to title/name — every character typed was discarded
+              // immediately, which is why the field looked like it
+              // "cleared itself." Editing an *existing* item worked because
+              // its title was already non-null before the user typed
+              // anything. This field is a single shared "Title / Name"
+              // input for several item types, so both keys are written
+              // unconditionally — whichever one the item type actually
+              // uses picks up the value.
               return {
                 ...next,
-                data: {
-                  ...data,
-                  title: data?.title != null ? t : data?.title,
-                  name: data?.name != null ? t : data?.name,
-                },
+                data: { ...data, title: t, name: t },
               };
             })
           }
