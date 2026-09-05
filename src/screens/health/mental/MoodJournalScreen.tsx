@@ -114,6 +114,10 @@ export default function MoodJournalScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={entries}
           keyExtractor={(e) => e.id}
           contentContainerStyle={[styles.list, { paddingBottom: 100 }]}

@@ -106,6 +106,10 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={participants}
         keyExtractor={p => p.userId}
         contentContainerStyle={[styles.list, { paddingBottom: Math.max(insets.bottom, 12) }]}

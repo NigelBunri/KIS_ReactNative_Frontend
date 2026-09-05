@@ -80,6 +80,10 @@ export default function SurveysDashboardScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={surveys}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={[styles.list, { paddingHorizontal: responsive.pageGutter }]}

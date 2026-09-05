@@ -187,6 +187,10 @@ export default function BlockedContactsScreen({ onBack }: Props) {
         <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={contacts}
           keyExtractor={(item) => item.userId}
           renderItem={renderItem}

@@ -635,6 +635,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} />
             ) : (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={gifResults}
                 keyExtractor={(g) => g.id}
                 numColumns={2}

@@ -171,6 +171,10 @@ export const ForwardChatSheet: React.FC<ForwardChatSheetProps> = ({
 
         {/* Chats list */}
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filteredChats}
           keyExtractor={item => item.id}
           renderItem={({ item }) => {

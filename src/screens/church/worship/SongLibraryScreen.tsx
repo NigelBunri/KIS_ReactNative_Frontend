@@ -131,6 +131,10 @@ export default function SongLibraryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={songs}
           keyExtractor={s => s.id}
           renderItem={renderSong}

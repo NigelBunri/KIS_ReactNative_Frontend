@@ -126,6 +126,10 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
 
   return (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       data={invoices}
       keyExtractor={(inv) => inv.id}
       scrollEnabled={false}

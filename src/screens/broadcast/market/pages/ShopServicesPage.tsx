@@ -356,6 +356,10 @@ const ShopServicesPage = () => {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={services}
           keyExtractor={(item, index) => String(item.id ?? `service-${index}`)}
           renderItem={renderServiceItem}

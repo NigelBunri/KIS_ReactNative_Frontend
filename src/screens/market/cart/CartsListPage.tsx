@@ -360,6 +360,10 @@ const CartsListPage = () => {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={carts}
           keyExtractor={item => item.shopId}
           renderItem={({ item }) => renderCart(item)}

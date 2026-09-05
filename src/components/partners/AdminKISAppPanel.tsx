@@ -316,6 +316,10 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
               </View>
             ) : activeSection === 'feature_flags' ? (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={flags}
                 keyExtractor={item => item.key}
                 contentContainerStyle={{ padding: 12, gap: 8 }}
@@ -359,6 +363,10 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
               </ScrollView>
             ) : (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={data}
                 keyExtractor={(item, i) => String(item?.id ?? i)}
                 contentContainerStyle={{ padding: 12, gap: 8 }}

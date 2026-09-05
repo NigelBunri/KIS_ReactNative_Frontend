@@ -129,6 +129,10 @@ export default function MemberDirectoryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={members}
           keyExtractor={m => m.id}
           renderItem={renderItem}

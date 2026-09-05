@@ -1080,6 +1080,10 @@ export default function FeedScreen<T extends FeedPost>({
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           ref={listRef}
           data={feedItems}
           keyExtractor={(item, idx) => (item.type === 'post' ? item.data.id : item.id ?? String(idx))}
@@ -2199,6 +2203,10 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
             </View>
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               ref={listRef}
               data={messages}
               keyExtractor={(item) => item.id}

@@ -145,6 +145,10 @@ export default function GriefSupportScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: 80, paddingTop: 12 }}

@@ -451,6 +451,10 @@ export default function ConnectionsScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={activeData as any[]}
           keyExtractor={(item) => item.id}
           renderItem={activeRender as any}

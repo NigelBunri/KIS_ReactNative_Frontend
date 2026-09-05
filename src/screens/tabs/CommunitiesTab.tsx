@@ -701,6 +701,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 </Pressable>
               </View>
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 ref={feedListRef}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
@@ -732,6 +736,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 <Text style={{ color: palette.bg, fontWeight: '600' }}>Create Group</Text>
               </Pressable>
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 ref={groupsListRef}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
@@ -762,6 +770,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           ref={communitiesListRef}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -891,6 +903,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
               <ActivityIndicator color={palette.primary} />
             ) : (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={groupContacts}
                 keyExtractor={(item) => item.userId ?? item.id}
                 style={{ maxHeight: 220 }}
@@ -1003,6 +1019,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
             <ActivityIndicator color={palette.primary} style={{ marginTop: 24 }} />
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={discoverResults}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: insets.bottom + 12 }}

@@ -135,6 +135,10 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
         </View>
       </View>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={webhooks}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}

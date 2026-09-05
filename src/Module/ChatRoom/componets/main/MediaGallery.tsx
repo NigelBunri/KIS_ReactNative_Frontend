@@ -221,6 +221,10 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           </View>
         ) : (
           <FlatList
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            removeClippedSubviews
             data={filtered}
             keyExtractor={(item) => item.key}
             numColumns={COLUMN_COUNT}

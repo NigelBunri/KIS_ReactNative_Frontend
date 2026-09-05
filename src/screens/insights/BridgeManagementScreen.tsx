@@ -239,6 +239,10 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
   return (
     <View style={{ flex: 1 }}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={accounts}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.list}
@@ -520,6 +524,10 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
   return (
     <View style={{ flex: 1 }}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={automations}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.list}
@@ -701,6 +709,10 @@ function MessagesTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
 
   return (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       data={messages}
       keyExtractor={item => String(item.id)}
       contentContainerStyle={styles.list}

@@ -274,6 +274,10 @@ function ModerationQueueTab() {
         <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={flags}
           keyExtractor={f => f.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
@@ -403,6 +407,10 @@ function UserManagementTab() {
         <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={users}
           keyExtractor={u => u.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); search(query, true); }} />}
@@ -490,6 +498,10 @@ function AuditLogTab() {
     <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
   ) : (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       data={entries}
       keyExtractor={e => e.id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}

@@ -704,6 +704,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           })}
         </ScrollView>
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filteredTasks}
           keyExtractor={(item, idx) => String(item.id ?? idx)}
           renderItem={renderTaskItem}
@@ -769,6 +773,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
 
     return (
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={escalations}
         keyExtractor={(item, idx) => String(item.id ?? idx)}
         renderItem={renderEscalationItem}
@@ -841,6 +849,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
 
     return (
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={triageQueue}
         keyExtractor={(item, idx) => String(item.id ?? idx)}
         renderItem={renderTriageItem}
@@ -908,6 +920,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
 
     return (
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={referrals}
         keyExtractor={(item, idx) => String(item.id ?? idx)}
         renderItem={renderReferralItem}
@@ -1059,6 +1075,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
 
     return (
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={workflowSessions}
         keyExtractor={(item, idx) => String(item.id ?? idx)}
         renderItem={renderWorkflowSessionCard}

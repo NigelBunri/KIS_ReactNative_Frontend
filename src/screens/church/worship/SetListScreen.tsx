@@ -222,6 +222,10 @@ export default function SetListScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={grouped}
           keyExtractor={g => g.dateLabel}
           contentContainerStyle={styles.list}

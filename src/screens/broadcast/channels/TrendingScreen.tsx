@@ -226,6 +226,10 @@ export default function TrendingScreen({ onPressContent }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           key={`trending-cols-${numColumns}`}
           data={items}
           keyExtractor={item => item.id}

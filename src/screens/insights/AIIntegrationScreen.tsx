@@ -139,6 +139,10 @@ function ModelsTab({ palette }: { palette: any }) {
 
   return (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       data={models}
       keyExtractor={item => String(item.id)}
       contentContainerStyle={[styles.listContent, { paddingHorizontal: responsive.pageGutter }]}
@@ -240,6 +244,10 @@ function JobsTab({ palette }: { palette: any }) {
   return (
     <>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={jobs}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
@@ -412,6 +420,10 @@ function QnASessionsTab({ palette }: { palette: any }) {
   return (
     <>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={sessions}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
@@ -652,6 +664,10 @@ function SchedulesTab({ palette }: { palette: any }) {
   return (
     <>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={schedules}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
@@ -774,6 +790,10 @@ function PipelinesTab({ palette }: { palette: any }) {
   return (
     <>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={pipelines}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}

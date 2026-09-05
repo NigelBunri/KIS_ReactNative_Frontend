@@ -884,6 +884,10 @@ export default function EventsScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={filteredEvents}
           keyExtractor={(e) => e.id}
           renderItem={({ item }) => {
@@ -1513,6 +1517,10 @@ export default function EventsScreen() {
               </Text>
             ) : (
               <FlatList
+                initialNumToRender={20}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                removeClippedSubviews
                 data={attendees}
                 keyExtractor={(a) => a.id}
                 renderItem={({ item }) => (

@@ -173,6 +173,10 @@ export default function FeedsListScreen() {
 
   return (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       data={items}
       keyExtractor={item => item.id}
       renderItem={renderItem}

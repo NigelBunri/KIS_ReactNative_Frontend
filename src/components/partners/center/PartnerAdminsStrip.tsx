@@ -20,6 +20,10 @@ export default function PartnerAdminsStrip({ admins }: Props) {
         Executive admins
       </Text>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={admins}
         keyExtractor={a => a.id}
         horizontal

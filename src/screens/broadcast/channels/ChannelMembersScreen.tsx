@@ -97,6 +97,10 @@ export default function ChannelMembersScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={subscribers}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 32 }}

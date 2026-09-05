@@ -116,6 +116,10 @@ export default function AdminVerificationPanel({
 
       {!loading && (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={cases}
           keyExtractor={c => c.id}
           contentContainerStyle={styles.listContent}

@@ -134,6 +134,10 @@ export default function ClipsListScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={clips}
           keyExtractor={item => item.id}
           renderItem={renderClip}

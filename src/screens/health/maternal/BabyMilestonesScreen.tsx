@@ -130,6 +130,10 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={milestones}
           keyExtractor={(m) => m.id}
           contentContainerStyle={[styles.list, { paddingBottom: 100 }]}

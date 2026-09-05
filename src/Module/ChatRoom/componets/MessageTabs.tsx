@@ -727,6 +727,10 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
 
   return (
     <FlatList
+      initialNumToRender={20}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      removeClippedSubviews
       ref={listRef}
       contentContainerStyle={{ padding: 16 }}
       data={listData}

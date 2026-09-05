@@ -160,6 +160,10 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
             </View>
           ) : (
             <FlatList
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews
               data={contacts}
               keyExtractor={item => item.id}
               style={{ maxHeight: 320 }}

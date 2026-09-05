@@ -460,6 +460,10 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           ref={listRef}
           data={feedItems}
           keyExtractor={(item, idx) =>

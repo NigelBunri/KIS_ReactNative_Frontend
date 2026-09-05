@@ -160,6 +160,10 @@ export default function CoWorkingScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={spaces}
         keyExtractor={item => item.id}
         renderItem={renderSpace}

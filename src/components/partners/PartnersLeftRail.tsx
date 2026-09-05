@@ -104,6 +104,10 @@ export default function PartnersLeftRail({
       </Pressable>
 
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={partners}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.partnerList}

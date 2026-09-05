@@ -507,6 +507,10 @@ export default function ChannelHomePage() {
                 <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 24 }} />
               ) : tabContents.length ? (
                 <FlatList
+                  initialNumToRender={20}
+                  maxToRenderPerBatch={10}
+                  windowSize={10}
+                  removeClippedSubviews
                   data={tabContents}
                   keyExtractor={item => item.id}
                   numColumns={columns}

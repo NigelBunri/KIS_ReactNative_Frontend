@@ -164,6 +164,10 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
   return (
     <View style={{ flex: 1 }}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={jobs}
         keyExtractor={item => item.id}
         renderItem={renderJob}

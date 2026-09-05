@@ -183,6 +183,10 @@ export default function WatchHistoryScreen() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={history}
           keyExtractor={item => item.content_id}
           contentContainerStyle={{ paddingBottom: 32 }}

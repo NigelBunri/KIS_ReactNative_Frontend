@@ -150,6 +150,10 @@ export default function PrayerWallScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={prayers}
           keyExtractor={p => p.id}
           renderItem={renderPrayer}

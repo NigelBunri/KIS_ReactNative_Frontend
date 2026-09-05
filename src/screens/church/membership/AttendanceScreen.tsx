@@ -94,6 +94,10 @@ export default function AttendanceScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FlatList
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews
         data={history}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingBottom: 80 }}

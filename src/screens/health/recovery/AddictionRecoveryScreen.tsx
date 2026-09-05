@@ -124,6 +124,10 @@ export default function AddictionRecoveryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={groups}
           keyExtractor={(g) => g.id}
           contentContainerStyle={[styles.list, { paddingBottom: 80 }]}

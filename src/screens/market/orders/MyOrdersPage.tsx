@@ -396,6 +396,10 @@ export default function MyOrdersPage() {
         </View>
       ) : (
         <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
           data={orders}
           keyExtractor={item => item.id}
           renderItem={renderOrder}
