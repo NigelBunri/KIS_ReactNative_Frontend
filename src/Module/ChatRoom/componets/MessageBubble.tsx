@@ -640,6 +640,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [videoFullscreen, setVideoFullscreen] = useState<{ localUri?: string; remoteUri: string } | null>(null);
   const [videoFullscreenUseRemote, setVideoFullscreenUseRemote] = useState(false);
+  // Same shape as videoFullscreen above (single already-resolved uri here,
+  // not a separate local/remote pair - unlike video, openableUri going into
+  // these is already whatever's currently usable, resolved the same way it
+  // always was before this only handed off to Linking.openURL). Shown
+  // in-app instead of redirecting to an external viewer/app.
+  const [imageFullscreenUri, setImageFullscreenUri] = useState<string | null>(null);
+  const [pdfFullscreenUri, setPdfFullscreenUri] = useState<string | null>(null);
 
   const [mediaHeaders, setMediaHeaders] = useState<Record<string, string>>({});
 
@@ -1535,9 +1542,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     void downloadFile(att);
                     return;
                   }
-                  Linking.openURL(openableUri).catch((err) =>
-                    console.warn('open attachment error', err),
-                  );
+                  setImageFullscreenUri(openableUri);
                 }}
               >
                 {(!autoLoadImages && !tappedImageIds.has(downloadKey)) ? (
@@ -1602,9 +1607,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     void downloadFile(att);
                     return;
                   }
-                  Linking.openURL(openableUri).catch((err) =>
-                    console.warn('open pdf error', err),
-                  );
+                  setPdfFullscreenUri(openableUri);
                 }}
               >
                 {/* First page as preview */}
@@ -4322,6 +4325,59 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
             <Pressable
               onPress={() => { setVideoFullscreen(null); setVideoFullscreenUseRemote(false); }}
+              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+          </SafeAreaView>
+        </Modal>
+      )}
+
+      {/* Fullscreen image viewer — same shape as the video player above,
+          shown in-app instead of handing off to Linking.openURL. */}
+      {imageFullscreenUri && (
+        <Modal
+          visible
+          transparent={false}
+          animationType="fade"
+          onRequestClose={() => setImageFullscreenUri(null)}
+          statusBarTranslucent
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
+            <Image
+              source={{ uri: imageFullscreenUri }}
+              style={{ flex: 1 }}
+              resizeMode="contain"
+            />
+            <Pressable
+              onPress={() => setImageFullscreenUri(null)}
+              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+          </SafeAreaView>
+        </Modal>
+      )}
+
+      {/* Fullscreen PDF viewer — same shape again. No singlePage/page={1}
+          this time (unlike the grid thumbnail above), so every page is
+          rendered and scrollable, matching what an external PDF viewer
+          would have shown. */}
+      {pdfFullscreenUri && (
+        <Modal
+          visible
+          transparent={false}
+          animationType="fade"
+          onRequestClose={() => setPdfFullscreenUri(null)}
+          statusBarTranslucent
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
+            <Pdf
+              source={{ uri: pdfFullscreenUri, cache: true, headers: mediaHeaders }}
+              style={{ flex: 1 }}
+            />
+            <Pressable
+              onPress={() => setPdfFullscreenUri(null)}
               style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />
