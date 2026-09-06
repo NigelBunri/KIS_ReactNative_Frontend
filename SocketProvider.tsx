@@ -51,6 +51,7 @@ import {
   setMuted as callKitSetMuted,
 } from '@/services/calls/callKitService';
 import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
+import { setCallPiPActive } from '@/services/calls/callPiPService';
 import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
@@ -1560,6 +1561,25 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => teardownCallKit();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ─── Video-call Picture-in-Picture ──────────────────────────────────────── */
+  //
+  // A single reactive effect rather than a call inserted at every relevant
+  // call-state transition, deliberately: PiP eligibility depends on *two*
+  // independently-changing things (is the call actually connected, and does
+  // it currently have video - a voice call can turn video on mid-call, and
+  // vice versa), and Phase 1 of this same feature found three real bugs
+  // from exactly that scattered-call-site approach (state transitions whose
+  // OS-facing side effect was missed). Re-deriving both from the current
+  // session on every relevant change and telling the native side the
+  // current truth is much harder to get wrong than trying to enumerate
+  // every place either fact could change.
+  useEffect(() => {
+    const isVideo = !!activeCall && hasVideo(activeCall.callType);
+    const isCallActive = activeCall?.state === 'active';
+    setCallPiPActive(isCallActive, isVideo);
+    return () => setCallPiPActive(false, false);
+  }, [activeCall]);
 
   /* ─── Socket connection ──────────────────────────────────────────────────── */
 
