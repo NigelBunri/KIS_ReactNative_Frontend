@@ -144,6 +144,8 @@ import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
 import { MiniPlayerProvider } from '@/contexts/MiniPlayerContext';
 import MiniPlayer from '@/components/common/MiniPlayer';
+import { VoiceMessagePlayerProvider } from '@/contexts/VoiceMessagePlayerContext';
+import VoiceMessageMiniBadge from '@/components/chat/VoiceMessageMiniBadge';
 import { initPushHandlers, reregisterPushTokensForCurrentUser } from './src/push/notifications';
 import { routeDeepLink } from './src/push/deepLinkRouter';
 import InAppNotificationToast, {
@@ -1337,6 +1339,7 @@ function AppContent() {
               },
             }}
           >
+            <VoiceMessagePlayerProvider>
             <MiniPlayerProvider>
             <GlobalProfilePreviewProvider>
               <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -1984,6 +1987,8 @@ function AppContent() {
             </GlobalProfilePreviewProvider>
             <MiniPlayer />
             </MiniPlayerProvider>
+            <VoiceMessageMiniBadge />
+            </VoiceMessagePlayerProvider>
           </NavigationContainer>
             </View>
           {/* Sibling of the content column above, not nested inside it — see

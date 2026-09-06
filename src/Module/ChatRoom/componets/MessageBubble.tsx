@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
-import Video, { type VideoRef } from 'react-native-video';
+import Video from 'react-native-video';
 import RNFS from 'react-native-fs';
 
 import { chatRoomStyles as styles } from '../chatRoomStyles';
@@ -33,8 +33,7 @@ import {
   type ParsedBibleReference,
 } from '@/utils/bibleReference';
 import { openBibleVerse } from '@/utils/bibleVerseOpenBridge';
-
-const CHAT_VOICE_PLAYBACK_EVENT = 'chat.voice.playback.started';
+import { useVoiceMessagePlayer } from '@/contexts/VoiceMessagePlayerContext';
 
 /**
  * Shape coming from the backend, e.g.
@@ -506,19 +505,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1
-  const [playbackPositionMs, setPlaybackPositionMs] = useState(0);
-  const [playbackDurationMs, setPlaybackDurationMs] = useState(0);
+  // Playback engine state (isPlaying/progress/position/duration/buffering/
+  // speed, and the actual <Video> element itself) now lives in
+  // VoiceMessagePlayerContext, not here — that's the whole point of that
+  // context existing: a local <Video>/local state died the instant this
+  // bubble unmounted (navigating away from the chat), so nothing survived
+  // leaving the screen. What stays local here is everything about
+  // *resolving* a playable url in the first place (local file vs. a fresh
+  // Nest url vs. the embedded url vs. the attachments[] fallback — see
+  // voiceAttachment.ts) — that waterfall is unchanged; only the actual
+  // decode/output step was handed off.
+  const voicePlayer = useVoiceMessagePlayer();
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
-  const [voiceBuffering, setVoiceBuffering] = useState(false);
   // Set once resolveFreshVoicePlaybackUrl() returns a url the embedded
   // voice.url/attachments[0] didn't have (expired/missing) — see
   // handleVoicePress/onError below.
   const [remoteResolvedUrl, setRemoteResolvedUrl] = useState<string | null>(null);
   const [voiceResolving, setVoiceResolving] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
-  const voiceVideoRef = useRef<VideoRef | null>(null);
   // Guards setState-after-unmount from an in-flight resolveFreshVoicePlaybackUrl
   // call, and against a stale response landing after the message/bubble has
   // already moved on (e.g. fast list scroll while a refresh was in flight).
@@ -554,13 +557,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(message as any).id, (message as any).serverId, (message as any).kind, status]);
 
-  // One automatic retry per play attempt after a playback error — reset in
-  // beginPlayback() so a later, separate attempt gets its own retry budget.
-  const voiceRetriedRef = useRef(false);
-  const playbackOwnerRef = useRef(
-    String((message as any).serverId ?? (message as any).id ?? `voice-${Date.now()}`),
-  );
-  const SPEED_CYCLE: Array<0.5 | 1 | 1.5 | 2> = [1, 1.5, 2, 0.5];
+  // The messageId handed to VoiceMessagePlayerContext is computed fresh
+  // each render, below, from (message as any).serverId ?? .id — a message's
+  // own identity never changes post-mount, so unlike the old per-bubble
+  // CHAT_VOICE_PLAYBACK_EVENT coordination this replaced, there's no need
+  // for a stable ref to hold it. The one-shot retry-after-playback-error
+  // budget now lives inside the context itself (see its own handleError),
+  // not here.
 
   // Disappearing messages countdown
   const disappearAfterSeconds = (message as any).disappearAfterSeconds as number | null | undefined;
@@ -1138,41 +1141,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     string | null
   >(null);
 
-  const stopPlayback = (reset = false) => {
-    setIsPlaying(false);
-    setVoiceBuffering(false);
-    if (reset) {
-      voiceVideoRef.current?.seek(0);
-      setProgress(0);
-      setPlaybackPositionMs(0);
-    }
-  };
-
-  const handleCycleSpeed = () => {
-    const currentIdx = SPEED_CYCLE.indexOf(playbackSpeed);
-    const nextSpeed = SPEED_CYCLE[(currentIdx + 1) % SPEED_CYCLE.length];
-    setPlaybackSpeed(nextSpeed);
-  };
-
-  // Shared by the fast path (embedded url already usable) and the resolver
-  // path (handleVoicePress below, after a fresh url comes back) so both
-  // start playback identically.
-  const beginPlayback = () => {
-    voiceRetriedRef.current = false;
-    setVoicePlaybackError(null);
-    setVoiceBuffering(true);
-    DeviceEventEmitter.emit(CHAT_VOICE_PLAYBACK_EVENT, playbackOwnerRef.current);
-    setIsPlaying(true);
-  };
-
-  const handleTogglePlay = () => {
-    if (!voice) return;
-    if (isPlaying) {
-      stopPlayback(false);
-    } else {
-      beginPlayback();
-    }
-  };
+  // Playback start/toggle/speed-cycle now go straight through voicePlayer
+  // (VoiceMessagePlayerContext) from handleVoicePress, further down where
+  // this message's resolved playback source is actually in scope — see that
+  // context for beginPlayback/stopPlayback/speed-cycle's replacements, and
+  // its own header comment for why cross-bubble "only one plays at a time"
+  // coordination no longer needs its own DeviceEventEmitter channel: with a
+  // single shared player instance, there is structurally only ever one
+  // thing playing, so the coordination problem that event solved no longer
+  // exists.
 
   const handlePollOptionPress = (optionKey: string, rawOptionId: string) => {
     setSelectedPollOptionKey(optionKey);
@@ -1181,20 +1158,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       onVotePoll?.(messageId, rawOptionId);
     }
   };
-
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      CHAT_VOICE_PLAYBACK_EVENT,
-      (ownerId: string) => {
-        if (ownerId !== playbackOwnerRef.current) {
-          stopPlayback(true);
-        }
-      },
-    );
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   const bubbleBaseStyle = [
     styles.messageBubble,
@@ -3712,12 +3675,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }
 
   if (isVoiceOnly && voice) {
+    const voiceMessageId = String((message as any).serverId ?? (message as any).id ?? '');
+    // This bubble mirrors the shared player's state only while IT is the
+    // message currently loaded there — every other bubble (including this
+    // one, before its own play button is ever pressed) shows its own
+    // resting state instead, exactly as if playback were still local.
+    const isThisVoiceActive = voicePlayer.isActive(voiceMessageId);
+    const isPlaying = isThisVoiceActive && voicePlayer.playing;
+    const voiceBuffering = isThisVoiceActive && voicePlayer.buffering;
+    const playbackPositionMs = isThisVoiceActive ? voicePlayer.positionMs : 0;
+    const playbackDurationMs = isThisVoiceActive ? voicePlayer.durationMs : 0;
+    const playbackSpeed = isThisVoiceActive ? voicePlayer.speed : 1;
+    // Mid-playback failures (a resolved url expiring while playing, a
+    // dropped connection) surface through the context since that's where
+    // the actual <Video> element lives now; pre-playback resolution
+    // failures (handleVoicePress's own catch, below) stay in this bubble's
+    // own voicePlaybackError exactly as before — two different moments that
+    // can each fail independently, shown together below.
+    const activePlaybackError = isThisVoiceActive ? voicePlayer.error : null;
+
     const durationLabel = formatTimeFromMs(
       isPlaying ? playbackPositionMs : playbackDurationMs || voice.durationMs,
     );
     const totalDurationLabel = formatTimeFromMs(playbackDurationMs || voice.durationMs);
-
-    const voiceMessageId = String((message as any).serverId ?? (message as any).id ?? '');
     // Falls back to objectKey for messages persisted before mediaAssetId
     // existed as its own field — see chatTypes.ts's VoiceAttachment and
     // voice-playback.service.ts's identical fallback on the Nest side.
@@ -3752,9 +3732,46 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const isVoiceRecoverableViaResolver = voiceReadiness === 'unavailable' && Boolean(voiceMediaAssetId);
     const isVoiceUnavailable = voiceReadiness === 'unavailable' && !isVoiceRecoverableViaResolver;
 
+    const voicePlaybackSource = voicePlaybackUri
+      ? {
+          uri: voicePlaybackUri,
+          ...(voicePlaybackUri.startsWith(API_BASE_URL) && Object.keys(mediaHeaders).length
+            ? { headers: mediaHeaders }
+            : {}),
+        }
+      : null;
+
+    // Same sender-label resolution renderSenderName() already uses — shown
+    // on the floating badge (see VoiceMessageMiniBadge.tsx) once playback
+    // hands off to the shared context and this bubble may no longer be
+    // mounted to answer for itself.
+    const voiceSenderLabel = senderName || (senderId ? participantMap?.[senderId] ?? '' : '') || undefined;
+    const voiceConversationId = String((message as any).conversationId ?? '');
+
+    const startOrResumePlayback = () => {
+      if (!voicePlaybackSource) return;
+      voicePlayer.play({
+        messageId: voiceMessageId,
+        conversationId: voiceConversationId,
+        conversationTitle: voiceSenderLabel ?? 'Chat',
+        senderName: voiceSenderLabel,
+        source: voicePlaybackSource,
+        mediaAssetId: voiceMediaAssetId,
+        initialDurationMs: playbackDurationMs || voice.durationMs,
+      });
+    };
+
     const handleVoicePress = async () => {
       if (voicePlaybackUri) {
-        handleTogglePlay();
+        // Pause only applies while THIS message is the one actually loaded
+        // in the shared player — otherwise (a different note is playing, or
+        // nothing is) this is always a fresh/resumed start, matching the
+        // single-active-note behavior the old per-bubble coordination had.
+        if (isThisVoiceActive && isPlaying) {
+          voicePlayer.togglePlay();
+        } else {
+          startOrResumePlayback();
+        }
         return;
       }
       if (!isVoiceRecoverableViaResolver || !voiceMessageId) return;
@@ -3765,22 +3782,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         if (!voiceMountedRef.current) return; // bubble unmounted mid-request
         setVoiceResolving(false);
         setRemoteResolvedUrl(resolved.url);
-        beginPlayback();
+        voicePlayer.play({
+          messageId: voiceMessageId,
+          conversationId: voiceConversationId,
+          conversationTitle: voiceSenderLabel ?? 'Chat',
+          senderName: voiceSenderLabel,
+          source: { uri: resolved.url },
+          mediaAssetId: voiceMediaAssetId,
+          initialDurationMs: playbackDurationMs || voice.durationMs,
+        });
       } catch (error) {
         if (!voiceMountedRef.current) return;
         setVoiceResolving(false);
         setVoicePlaybackError(describeVoicePlaybackError(error));
       }
     };
-
-    const voicePlaybackSource = voicePlaybackUri
-      ? {
-          uri: voicePlaybackUri,
-          ...(voicePlaybackUri.startsWith(API_BASE_URL) && Object.keys(mediaHeaders).length
-            ? { headers: mediaHeaders }
-            : {}),
-        }
-      : null;
 
     return (
       <View
@@ -3810,77 +3826,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           )}
 
-          {voicePlaybackSource ? (
-            <Video
-              ref={voiceVideoRef}
-              source={voicePlaybackSource}
-              paused={!isPlaying}
-              rate={playbackSpeed}
-              volume={1}
-              muted={false}
-              controls={false}
-              audioOutput="speaker"
-              ignoreSilentSwitch="ignore"
-              mixWithOthers="duck"
-              playInBackground={false}
-              playWhenInactive={false}
-              progressUpdateInterval={100}
-              onLoadStart={() => {
-                if (isPlaying) setVoiceBuffering(true);
-              }}
-              onLoad={({ duration }) => {
-                const durationMs = Math.max(0, Number(duration || 0) * 1000);
-                if (durationMs > 0) setPlaybackDurationMs(durationMs);
-                setVoiceBuffering(false);
-              }}
-              onBuffer={({ isBuffering }) => setVoiceBuffering(isBuffering)}
-              onProgress={({ currentTime }) => {
-                const positionMs = Math.max(0, Number(currentTime || 0) * 1000);
-                const durationMs = playbackDurationMs || voice.durationMs || 0;
-                setVoiceBuffering(false);
-                setPlaybackPositionMs(positionMs);
-                setProgress(durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0);
-              }}
-              onEnd={() => stopPlayback(true)}
-              onError={(error) => {
-                if (__DEV__) {
-                  console.warn('[MessageBubble] voice media error', {
-                    sourceUrl: safeUrlForLog(voicePlaybackUri ?? undefined),
-                    error,
-                  });
-                }
-                stopPlayback(false);
-                // One automatic retry: the embedded/cached url may simply
-                // be expired. Force-refresh via Nest and retry play once
-                // before showing a failure — see voiceRetriedRef (reset in
-                // beginPlayback so a later, separate attempt gets its own
-                // budget).
-                if (!voiceRetriedRef.current && voiceMediaAssetId && voiceMessageId) {
-                  voiceRetriedRef.current = true;
-                  setVoiceBuffering(true);
-                  resolveFreshVoicePlaybackUrl(voiceMessageId, { force: true })
-                    .then((resolved) => {
-                      if (!voiceMountedRef.current) return;
-                      setRemoteResolvedUrl(resolved.url);
-                      beginPlayback();
-                    })
-                    .catch((refreshError) => {
-                      if (!voiceMountedRef.current) return;
-                      setVoiceBuffering(false);
-                      setVoicePlaybackError(describeVoicePlaybackError(refreshError));
-                    });
-                  return;
-                }
-                // react-native-video's onError doesn't reliably surface the
-                // underlying HTTP status (401/403/404 vs a network/format
-                // failure all collapse into the same generic decoder error
-                // on both ExoPlayer and AVPlayer) — this is the honest,
-                // achievable message rather than a fabricated status code.
-                setVoicePlaybackError('Unable to play this voice message. Check your connection and try again.');
-              }}
-              style={styles.hiddenVoicePlayer}
-            />
-          ) : null}
+          {/* No local <Video> here anymore — VoiceMessagePlayerContext owns
+              the one real player instance for whichever note is currently
+              active, precisely so it survives this bubble unmounting (see
+              that context's header comment). This bubble only ever *reads*
+              isThisVoiceActive/isPlaying/etc. above and calls
+              startOrResumePlayback()/voicePlayer.togglePlay() below. */}
 
           <Pressable
             onPress={() => {
@@ -3916,7 +3867,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <View
                   style={{
                     height: 3,
-                    width: `${Math.round(progress * 100)}%`,
+                    width: `${Math.round((playbackDurationMs > 0 ? Math.min(1, playbackPositionMs / playbackDurationMs) : 0) * 100)}%`,
                     backgroundColor: isMe
                       ? palette.onPrimary
                       : palette.primary,
@@ -3954,16 +3905,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             'inline',
           )}
 
-          {voicePlaybackError || isVoiceUnavailable ? (
+          {voicePlaybackError || activePlaybackError || isVoiceUnavailable ? (
             <Text style={{ marginTop: 6, fontSize: 11, color: palette.danger }}>
-              {voicePlaybackError || 'This voice message could not be found. It may still be uploading, or the sender may need to resend it.'}
+              {voicePlaybackError || activePlaybackError || 'This voice message could not be found. It may still be uploading, or the sender may need to resend it.'}
             </Text>
           ) : null}
 
           {/* Speed control + Transcription */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 12 }}>
             <Pressable
-              onPress={handleCycleSpeed}
+              onPress={voicePlayer.cycleSpeed}
               style={{
                 paddingHorizontal: 8,
                 paddingVertical: 3,
