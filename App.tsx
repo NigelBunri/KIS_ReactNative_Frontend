@@ -15,6 +15,7 @@ import React, {
 } from 'react';
 import {
   NavigationContainer,
+  NavigationContainerRefContext,
   DefaultTheme,
   DarkTheme,
 } from '@react-navigation/native';
@@ -1994,8 +1995,24 @@ function AppContent() {
               DetachedChatOverlayContext.tsx. zIndex 1000-1003 here beats
               this outlet's own 10 and Golden Section's unset stacking, but
               stays below QuickLockScreen's 9999 so the lock screen still
-              wins over an open chat. */}
-          <DetachedChatOverlayOutlet />
+              wins over an open chat.
+
+              NavigationContainerRefContext.Provider re-supplies the one
+              thing detaching outside <NavigationContainer> actually costs:
+              ChatRoomPage (and friends) call useNavigation() internally,
+              which throws ("Couldn't find a navigation object...") if
+              there's no NavigationContext *and* no NavigationContainerRefContext
+              in scope - true here now, since this outlet renders as a
+              sibling of NavigationContainer, not a descendant.
+              NavigationContainer's own internals hand this exact object to
+              navigationRef via useImperativeHandle (see
+              BaseNavigationContainer.tsx) - it's the same value
+              NavigationContainerRefContext already carries inside the
+              container, just re-provided here so useNavigation()'s fallback
+              path resolves outside it too. */}
+          <NavigationContainerRefContext.Provider value={navigationRef.current}>
+            <DetachedChatOverlayOutlet />
+          </NavigationContainerRefContext.Provider>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
           <NotificationPermissionModal />
