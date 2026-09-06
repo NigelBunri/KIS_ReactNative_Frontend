@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -249,6 +250,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onUpdateMessage,
 }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Fullscreen viewers below (video/image/PDF) position their close button
+  // with `position: absolute` inside a SafeAreaView - absolutely-positioned
+  // children ignore their parent's own safe-area padding in RN's layout
+  // engine, so a bare `top: 8` sits right under the status bar/notch/Dynamic
+  // Island instead of below it. useSafeTopInset() is this app's actual
+  // real-inset value; add it to the button's top offset instead.
+  const fullscreenCloseButtonTop = useSafeTopInset() + 8;
 
   // ── Auto-download preference ──────────────────────────────────────────────
   const [autoLoadImages, setAutoLoadImages] = React.useState(true);
@@ -4276,7 +4284,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
             <Pressable
               onPress={() => { setVideoFullscreen(null); setVideoFullscreenUseRemote(false); }}
-              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', top: fullscreenCloseButtonTop, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
@@ -4302,7 +4310,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
             <Pressable
               onPress={() => setImageFullscreenUri(null)}
-              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', top: fullscreenCloseButtonTop, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
@@ -4329,7 +4337,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
             <Pressable
               onPress={() => setPdfFullscreenUri(null)}
-              style={{ position: 'absolute', top: 8, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', top: fullscreenCloseButtonTop, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
