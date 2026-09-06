@@ -371,7 +371,21 @@ export const HoldToLockComposer: React.FC<Props> = ({
     let uri: string | null = null;
     try { uri = (await audioRecorderPlayer.stopRecorder()) ?? null; } catch {}
     try { audioRecorderPlayer.removeRecordBackListener(); } catch {}
-    setIsRecording(false);
+    // Deliberately does NOT call setIsRecording(false) here. This is the
+    // shared "stop the native recorder" step for both stopToPreview (which
+    // immediately transitions to voiceMode 'preview', not 'idle') and
+    // handleSendLocked — MessageComposer.tsx's isVoiceActive (= isRecording)
+    // controls whether the composer's normal row (text input, +, camera,
+    // view-once) is hidden to give this component the whole width. Setting
+    // it false here fired the instant recording stopped, before the preview
+    // row ever rendered, which re-revealed that whole row and squeezed the
+    // preview UI into whatever space was left over — exactly the
+    // "preview goes to the side, controls become inaccessible" bug, since
+    // this component was never meant to share a row with anything once a
+    // recording exists. isRecording now only goes false once resetAll()
+    // runs — i.e. once the user has actually sent, deleted, or the
+    // recording turned out to be invalid — so it stays true for the full
+    // hold → lock → preview lifecycle, not just while actively recording.
     const effective = uri ?? recordUriRef.current;
     if (effective) recordUriRef.current = effective;
     return effective;
@@ -400,11 +414,15 @@ export const HoldToLockComposer: React.FC<Props> = ({
       setIsPlayingPreview(false);
       setPreviewProgress(0);
     } else {
-      lockedRef.current    = false;
-      recordUriRef.current = null;
-      recordMsRef.current  = 0;
-      setVoiceMode('idle');
-      setRecordSeconds(0);
+      // Invalid/too-short recording — there's nothing to preview, so this
+      // genuinely is a real return to idle (unlike the branch above). Routed
+      // through resetAll() rather than duplicating its reset list by hand,
+      // which is what let this branch previously fall out of sync (it never
+      // reset isPlayingPreview/previewProgress, and — before this fix — got
+      // isRecording=false "for free" from stopRecordingCore instead of ever
+      // clearing it itself, meaning it would have gone permanently stuck as
+      // voice-active the moment that side effect was removed).
+      resetAll();
     }
   };
 
@@ -457,7 +475,13 @@ export const HoldToLockComposer: React.FC<Props> = ({
     setRecordSeconds(0);
     setIsPlayingPreview(false);
     setPreviewProgress(0);
-  }, []);
+    // The one place isRecording actually goes back to false — see
+    // stopRecordingCore's comment for why it can no longer do this itself.
+    // Every real exit from the voice flow (sent, deleted, or an invalid/
+    // too-short recording) routes through here, so MessageComposer.tsx's
+    // normal row only reappears once there's truly nothing left to show.
+    setIsRecording(false);
+  }, [setIsRecording]);
 
   const handleSendPreview = async () => {
     if (isPlayingPreview) await stopPlayback();
