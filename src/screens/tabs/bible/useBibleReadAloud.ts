@@ -211,11 +211,25 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
   // trade-off, since KJV verse text is always plain, speakable text.
   useEffect(() => {
     if (!Tts) return;
-    Tts.addEventListener('tts-finish', handleUtteranceEnd);
-    Tts.addEventListener('tts-start', handleUtteranceStart);
+    // Not Tts.addEventListener/removeEventListener: react-native-tts@4.1.1's
+    // own removeEventListener() is implemented as
+    // `this.removeListener(type, handler)`, delegating to
+    // NativeEventEmitter.prototype.removeListener - a method RN removed
+    // entirely as of ~0.82 (the modern API is calling .remove() on the
+    // subscription object addListener() returns instead), so it throws
+    // "this.removeListener is not a function" on every cleanup/unmount,
+    // crashing the whole Bible reader via ErrorBoundary. addEventListener()
+    // just forwards to this.addListener() (Tts extends NativeEventEmitter),
+    // which still works fine and still returns a real subscription -
+    // calling addListener/subscription.remove() directly, the same way the
+    // library's own addEventListener already does internally, sidesteps its
+    // broken removeEventListener() without needing to patch the vendored
+    // package.
+    const finishSub = Tts.addListener('tts-finish', handleUtteranceEnd);
+    const startSub = Tts.addListener('tts-start', handleUtteranceStart);
     return () => {
-      Tts?.removeEventListener('tts-finish', handleUtteranceEnd);
-      Tts?.removeEventListener('tts-start', handleUtteranceStart);
+      finishSub.remove();
+      startSub.remove();
     };
   }, [handleUtteranceEnd, handleUtteranceStart]);
 

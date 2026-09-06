@@ -25,23 +25,19 @@ import { useKeyboardAnimation } from 'react-native-keyboard-controller';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '../theme/useTheme';
-import { useGoldenSectionSuppression } from '@/contexts/GoldenSectionContext';
 import { DetachedTabBarBridge } from '@/contexts/DetachedTabBarContext';
+import { DetachedChatOverlayBridge } from '@/contexts/DetachedChatOverlayContext';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_COMPONENT_TOKENS, withAlpha } from '@/theme/constants';
 import { KISIcon, KISIconName } from '@/constants/kisIcons';
 import type { MainTabsParamList } from '@/navigation/types';
-import { TabletShell, TabletDialogOverlay, type SidebarNavKey } from '@/components/shell';
+import { TabletShell, type SidebarNavKey } from '@/components/shell';
 
 import MessagesScreen from '../screens/tabs/MessagesScreen';
 import PartnersScreen from '../screens/tabs/PartnersScreen';
 import BibleScreen from '../screens/tabs/BibleScreen';
 import BroadcastScreen from '../screens/tabs/BroadcastScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
-import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
-import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
-import ChatInfoPage from '@/Module/ChatRoom/ChatInfoPage';
-import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import { useSocket } from '../../SocketProvider';
 import ROUTES from '@/network';
@@ -455,14 +451,15 @@ export function MainTabs() {
   const communityInfoSlide = useRef(new RNAnimated.Value(0)).current;
 
   // These full-screen overlays (chat room, sub-room, chat info, community
-  // room/info) are position:absolute within this component's own root View,
-  // which sits below the Golden Section — they can't reach up to cover it
-  // themselves. Force-hide the Golden Section while any is open instead, so
-  // this View's box (and the overlay inside it) expands to fill that space
-  // and genuinely covers the whole screen.
-  useGoldenSectionSuppression(
-    chatVisible || subRoomVisible || infoVisible || communityVisible || communityInfoVisible,
-  );
+  // room/info) used to force-hide the Golden Section (useGoldenSectionSuppression)
+  // and the tab bar (hidNav, below) while open, since they render
+  // position:absolute within this component's own root View and couldn't
+  // reach up to cover either. They're detached to a true top-level sibling
+  // in App.tsx now instead (see DetachedChatOverlayContext.tsx -
+  // DetachedChatOverlayBridge below forwards everything there), so both can
+  // stay exactly as they are and just get visually covered - no more
+  // Golden-Section-hides / tab-bar-hides / chat-slides-in triple-animation
+  // for one user action.
 
   // 👇 control for hiding the nav bar (managed ONLY here)
   const [hidNav, setHidNav] = useState(false);
@@ -819,8 +816,24 @@ export function MainTabs() {
   }, []);
 
   // Slide-progress values (chatSlide/subRoomSlide/infoSlide/communitySlide/
-  // communityInfoSlide, 0..1) are consumed directly by TabletDialogOverlay
-  // below, which owns the phone-slide vs tablet-dialog interpolation itself.
+  // communityInfoSlide, 0..1) are forwarded via DetachedChatOverlayBridge
+  // below to wherever TabletDialogOverlay actually renders now (App.tsx) -
+  // it still owns the phone-slide vs tablet-dialog interpolation itself,
+  // just from a different render location.
+
+  // ChatInfoPage's onChatUpdated needs to reach back into this component's
+  // own chatHistory/activeInfo state - defined here (not inline in JSX)
+  // since it now has to cross the DetachedChatOverlayBridge as a single
+  // prop rather than being written inline where the setters already live.
+  const onChatInfoUpdated = useCallback((updated: Chat) => {
+    setChatHistory((prev: Chat[]) =>
+      prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
+    );
+    setActiveInfo((prev) => {
+      if (!prev) return prev;
+      return { ...prev, chat: { ...prev.chat, ...updated } };
+    });
+  }, []);
 
   // Stable screen components — defined with useCallback so their identity only
   // changes when the callbacks they depend on change.  Inline arrow functions
@@ -909,22 +922,12 @@ export function MainTabs() {
           tabBar={(p) => (
             <DetachedTabBarBridge
               {...p}
-              // chat room / sub-room / community overlays are rendered as
-              // TabletDialogOverlay siblings below (zIndex 1000-1003), local
-              // to MainTabs' own View. AnimatedKISTabBar no longer shares
-              // that stacking context - it renders detached, as a sibling of
-              // the whole NavigationContainer one level up in App.tsx (see
-              // DetachedTabBarContext.tsx) - so its zIndex:10 there beats
-              // NavigationContainer's outer zIndex:1 regardless of what's
-              // nested inside it, and these overlays' local zIndex can never
-              // reach far enough to paint over it. Same fix as
-              // mainTabsFocused above: hide the bar explicitly instead of
-              // relying on stacking order, reusing the exact overlay-visible
-              // signal useGoldenSectionSuppression already uses below.
-              hidNav={
-                hidNav || shellMode !== 'phone' || !mainTabsFocused
-                || chatVisible || subRoomVisible || infoVisible || communityVisible || communityInfoVisible
-              }
+              // Chat room / sub-room / community overlays no longer need to
+              // hide this bar - they're detached to their own true top-level
+              // sibling in App.tsx too now (see DetachedChatOverlayContext.tsx),
+              // with a zIndex above this bar's 10, so they simply paint over
+              // it instead of requiring it to disappear first.
+              hidNav={hidNav || shellMode !== 'phone' || !mainTabsFocused}
               badgeCounts={badgeCounts}
               onTabBarState={setTabBarState}
             />
@@ -954,70 +957,40 @@ export function MainTabs() {
         </Tabs.Navigator>
       </TabletShell>
 
-      {/* 💥 Chat Room overlay ABOVE tabs + bar — full-bleed slide on phone, floating centered dialog on tablet/desktop (TabletDialogOverlay) */}
-      <TabletDialogOverlay visible={chatVisible} progress={chatSlide} zIndex={1001}>
-        <ChatRoomPage
-          chat={activeChat}
-          onBack={closeChat}
-          onOpenInfo={openInfo}
-          onOpenChat={openChat}
-          initialTargetMessageId={(activeChat as any)?.initialTargetMessageId ?? null}
-        />
-      </TabletDialogOverlay>
-
-      {/* Sub-room layer — opens on top when user taps a sub-room from inside a chat */}
-      <TabletDialogOverlay visible={subRoomVisible} progress={subRoomSlide} zIndex={1002}>
-        {activeSubRoom && (
-          <ChatRoomPage
-            chat={activeSubRoom}
-            onBack={closeChat}
-            onOpenInfo={openInfo}
-            onOpenChat={openChat}
-            initialTargetMessageId={(activeSubRoom as any)?.initialTargetMessageId ?? null}
-          />
-        )}
-      </TabletDialogOverlay>
-
-      <TabletDialogOverlay visible={infoVisible} progress={infoSlide} zIndex={1002}>
-        {activeInfo ? (
-          <ChatInfoPage
-            chat={activeInfo.chat}
-            currentUserId={activeInfo.currentUserId}
-            onBack={closeInfo}
-            onChatUpdated={(updated) => {
-              setChatHistory((prev: Chat[]) =>
-                prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
-              );
-              setActiveInfo((prev) => {
-                if (!prev) return prev;
-                return { ...prev, chat: { ...prev.chat, ...updated } };
-              });
-            }}
-          />
-        ) : null}
-      </TabletDialogOverlay>
-
-      <TabletDialogOverlay visible={communityVisible} progress={communitySlide} zIndex={1000}>
-        {activeCommunity ? (
-          <CommunityRoomPage
-            community={activeCommunity}
-            onBack={closeCommunity}
-            onOpenChat={openChat}
-            onOpenInfo={openCommunityInfo}
-          />
-        ) : null}
-      </TabletDialogOverlay>
-
-      <TabletDialogOverlay visible={communityInfoVisible} progress={communityInfoSlide} zIndex={1003}>
-        {activeCommunityInfo ? (
-          <CommunityInfoPage
-            communityId={activeCommunityInfo.id}
-            communityName={activeCommunityInfo.name}
-            currentUserId={currentUserId ?? null}
-            onBack={closeCommunityInfo}
-          />
-        ) : null}
-      </TabletDialogOverlay>
+      {/* Chat room / sub-room / chat-info / community-room / community-info
+          overlays used to render here directly (TabletDialogOverlay,
+          zIndex 1000-1003) - moved to a true top-level sibling in App.tsx
+          (see DetachedChatOverlayContext.tsx's own doc comment for why:
+          this View's box sits below the Golden Section and the detached
+          tab bar, so nothing rendered inside it could ever cover either).
+          All the state/callbacks/animated values stay right here; this
+          just forwards them up to wherever the pixels now actually paint. */}
+      <DetachedChatOverlayBridge
+        chatVisible={chatVisible}
+        chatSlide={chatSlide}
+        activeChat={activeChat}
+        subRoomVisible={subRoomVisible}
+        subRoomSlide={subRoomSlide}
+        activeSubRoom={activeSubRoom}
+        infoVisible={infoVisible}
+        infoSlide={infoSlide}
+        activeInfo={activeInfo}
+        communityVisible={communityVisible}
+        communitySlide={communitySlide}
+        activeCommunity={activeCommunity}
+        communityInfoVisible={communityInfoVisible}
+        communityInfoSlide={communityInfoSlide}
+        activeCommunityInfo={activeCommunityInfo}
+        currentUserId={currentUserId ?? null}
+        openChat={openChat}
+        openInfo={openInfo}
+        openCommunityInfo={openCommunityInfo}
+        closeChat={closeChat}
+        closeInfo={closeInfo}
+        closeCommunity={closeCommunity}
+        closeCommunityInfo={closeCommunityInfo}
+        onChatInfoUpdated={onChatInfoUpdated}
+      />
     </View>
   );
 }

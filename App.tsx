@@ -64,6 +64,15 @@ import {
   DetachedTabBarProvider,
   useDetachedTabBarProps,
 } from '@/contexts/DetachedTabBarContext';
+import {
+  DetachedChatOverlayProvider,
+  useDetachedChatOverlayProps,
+} from '@/contexts/DetachedChatOverlayContext';
+import { TabletDialogOverlay } from '@/components/shell';
+import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
+import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
+import ChatInfoPage from '@/Module/ChatRoom/ChatInfoPage';
+import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
 import PlaylistsScreen from '@/screens/broadcast/playlists/PlaylistsScreen';
@@ -378,6 +387,80 @@ function DetachedTabBarOutlet() {
   const props = useDetachedTabBarProps();
   if (!props) return null;
   return <AnimatedKISTabBar {...props} />;
+}
+
+// Renders the chat room / sub-room / chat-info / community-room / community-
+// info overlays as true top-level siblings, same reasoning and same shape as
+// DetachedTabBarOutlet just above — see DetachedChatOverlayContext.tsx for
+// the full stacking-context explanation. zIndex values (1000-1003) are
+// unchanged from where these overlays used to render inside MainTabs; only
+// the render location moved, from a box capped by the zIndex:1 View wrapping
+// NavigationContainer below to this component's own top-level position,
+// which is why the same zIndex numbers now actually work: they only ever
+// needed to beat AnimatedKISTabBar's zIndex:10 and Golden Section's implicit
+// (unset) stacking, both of which they can finally reach from here.
+function DetachedChatOverlayOutlet() {
+  const p = useDetachedChatOverlayProps();
+  if (!p) return null;
+  return (
+    <>
+      <TabletDialogOverlay visible={p.chatVisible} progress={p.chatSlide} zIndex={1001}>
+        <ChatRoomPage
+          chat={p.activeChat}
+          onBack={p.closeChat}
+          onOpenInfo={p.openInfo}
+          onOpenChat={p.openChat}
+          initialTargetMessageId={(p.activeChat as any)?.initialTargetMessageId ?? null}
+        />
+      </TabletDialogOverlay>
+
+      {/* Sub-room layer — opens on top when user taps a sub-room from inside a chat */}
+      <TabletDialogOverlay visible={p.subRoomVisible} progress={p.subRoomSlide} zIndex={1002}>
+        {p.activeSubRoom && (
+          <ChatRoomPage
+            chat={p.activeSubRoom}
+            onBack={p.closeChat}
+            onOpenInfo={p.openInfo}
+            onOpenChat={p.openChat}
+            initialTargetMessageId={(p.activeSubRoom as any)?.initialTargetMessageId ?? null}
+          />
+        )}
+      </TabletDialogOverlay>
+
+      <TabletDialogOverlay visible={p.infoVisible} progress={p.infoSlide} zIndex={1002}>
+        {p.activeInfo ? (
+          <ChatInfoPage
+            chat={p.activeInfo.chat}
+            currentUserId={p.activeInfo.currentUserId}
+            onBack={p.closeInfo}
+            onChatUpdated={p.onChatInfoUpdated}
+          />
+        ) : null}
+      </TabletDialogOverlay>
+
+      <TabletDialogOverlay visible={p.communityVisible} progress={p.communitySlide} zIndex={1000}>
+        {p.activeCommunity ? (
+          <CommunityRoomPage
+            community={p.activeCommunity}
+            onBack={p.closeCommunity}
+            onOpenChat={p.openChat}
+            onOpenInfo={p.openCommunityInfo}
+          />
+        ) : null}
+      </TabletDialogOverlay>
+
+      <TabletDialogOverlay visible={p.communityInfoVisible} progress={p.communityInfoSlide} zIndex={1003}>
+        {p.activeCommunityInfo ? (
+          <CommunityInfoPage
+            communityId={p.activeCommunityInfo.id}
+            communityName={p.activeCommunityInfo.name}
+            currentUserId={p.currentUserId}
+            onBack={p.closeCommunityInfo}
+          />
+        ) : null}
+      </TabletDialogOverlay>
+    </>
+  );
 }
 
 function AppContent() {
@@ -1185,6 +1268,9 @@ function AppContent() {
             back out of — see DetachedTabBarContext.tsx. Scoped here (not
             wider) since nothing outside this tree needs it. */}
         <DetachedTabBarProvider>
+        {/* Same bridge shape as above, for the chat/community overlays -
+            see DetachedChatOverlayContext.tsx. */}
+        <DetachedChatOverlayProvider>
         <View style={{ flex: 1 }}>
           <StatusBar
             animated
@@ -1904,6 +1990,12 @@ function AppContent() {
               comment for why this is what finally makes the bottom tab bar
               immune to the Golden Section's live height changes. */}
           <DetachedTabBarOutlet />
+          {/* Same reasoning, for the chat/community overlays — see
+              DetachedChatOverlayContext.tsx. zIndex 1000-1003 here beats
+              this outlet's own 10 and Golden Section's unset stacking, but
+              stays below QuickLockScreen's 9999 so the lock screen still
+              wins over an open chat. */}
+          <DetachedChatOverlayOutlet />
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
           <NotificationPermissionModal />
@@ -1914,6 +2006,7 @@ function AppContent() {
             }} />
           ) : null}
         </View>
+        </DetachedChatOverlayProvider>
         </DetachedTabBarProvider>
       </SocketProvider>
     </AuthContext.Provider>
