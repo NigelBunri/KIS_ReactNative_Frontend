@@ -9,6 +9,7 @@ import React, {
 import {
   Alert,
   Animated,
+  AppState,
   DeviceEventEmitter,
   Easing,
   Modal,
@@ -28,7 +29,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
-import { RTCView } from '@/services/calls/webRTCService';
+import { RTCView, RTCPIPView, startIOSPIP, stopIOSPIP } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { addCallPiPModeChangeListener } from '@/services/calls/callPiPService';
 
@@ -957,15 +958,44 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
 }) {
   const remote = remoteParticipants[0] ?? null;
 
+  // iOS Picture-in-Picture: react-native-webrtc ships this fully built
+  // (RTCPIPView + startIOSPIP/stopIOSPIP, backed by its own PIPController +
+  // AVPictureInPictureController natively) - there is no equivalent to
+  // Android's "minimal render swap" needed here, because iOS PiP is a
+  // genuinely separate floating system window showing whatever the video
+  // view's sample buffer layer publishes, not a transformation of this
+  // app's own window the way Android's enterPictureInPictureMode() is. This
+  // screen keeps rendering completely normally underneath/behind it.
+  const pipRef = useRef<any>(null);
+  useEffect(() => {
+    const start = startIOSPIP;
+    const stop = stopIOSPIP;
+    if (Platform.OS !== 'ios' || !RTCPIPView || !start || !stop) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (session.state !== 'active') return;
+      if (state === 'background') start(pipRef);
+      else if (state === 'active') stop(pipRef);
+    });
+    return () => sub.remove();
+  }, [session.state]);
+
+  const RemoteVideoView = RTCPIPView ?? RTCView;
+  // Only RTCPIPView (iOS) understands iosPIP - spreading it onto the plain
+  // RTCView fallback (Android, or any build without RTCPIPView) would hand
+  // an unrecognized prop to a native component that isn't expecting it.
+  const remoteVideoExtraProps = RTCPIPView ? { iosPIP: { enabled: true } } : {};
+
   return (
     <View style={StyleSheet.absoluteFill}>
       {/* Remote video — full screen */}
-      {remote?.stream && RTCView ? (
-        <RTCView
+      {remote?.stream && RemoteVideoView ? (
+        <RemoteVideoView
+          ref={pipRef}
           streamURL={remote.stream.toURL()}
           style={StyleSheet.absoluteFill}
           objectFit="cover"
           zOrder={1}
+          {...remoteVideoExtraProps}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
