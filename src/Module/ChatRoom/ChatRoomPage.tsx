@@ -80,6 +80,8 @@ import {
 import type { CallType } from '@/services/calls/callTypes';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { loadMessages } from './Storage/chatStorage';
+import RNFS from 'react-native-fs';
+import { stripFileScheme } from './chatMediaStorage';
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -1980,6 +1982,29 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleViewOnce = useCallback(
     (messageId: string) => {
       const convId = String(conversationId ?? chat?.id ?? '');
+      // Stripping the message's fields below (attachments: [], voice:
+      // undefined, ...) only clears what this attachment *references* — if
+      // a copy was ever downloaded to this device (MessageBubble's own
+      // download flow persists that path straight onto the attachment/voice
+      // record via onUpdateMessage - see persistDownloadedAttachmentPath),
+      // the actual file at localUri/localPath is untouched by any of that
+      // and stays readable on disk indefinitely, view-once or not. Collect
+      // those paths from the *original* (pre-strip) message now, so they can
+      // be unlinked after - this is the piece that was missing: content was
+      // "deleted" everywhere except the one place a copy could actually
+      // still exist.
+      const target = messages.find((m) => m.id === messageId || (m as any).serverId === messageId);
+      const localPathsToDelete: string[] = [];
+      const collectLocalPath = (item: any) => {
+        const raw = item?.localPath || item?.localUri;
+        if (typeof raw === 'string' && raw) localPathsToDelete.push(stripFileScheme(raw));
+      };
+      if (target) {
+        ((target as any).attachments as any[] | undefined)?.forEach(collectLocalPath);
+        collectLocalPath((target as any).voice);
+        collectLocalPath((target as any).media);
+      }
+
       // Persist locally first so re-mounting this bubble (scrolling it off-
       // screen and back, reopening the chat, restarting the app) respects
       // the one-time reveal instead of resetting to "tap to view" again —
@@ -2012,6 +2037,16 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             }
           : m,
       ));
+
+      // Best-effort, fire-and-forget — same posture as the server-side purge
+      // below: the user has already seen the content by this point, so a
+      // failed delete here isn't worth surfacing, only logging.
+      localPathsToDelete.forEach((path) => {
+        RNFS.unlink(path).catch((error) => {
+          console.warn('[handleViewOnce] failed to delete local copy', { path, error });
+        });
+      });
+
       if (!convId || !socket) return;
       // Server-side: purges the persisted message content / media asset for
       // this messageId on receipt, mirroring the local strip above, so the
