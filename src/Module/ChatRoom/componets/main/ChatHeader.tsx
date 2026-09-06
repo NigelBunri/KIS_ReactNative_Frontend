@@ -58,6 +58,13 @@ type ChatHeaderProps = {
   isE2EE?: boolean;
   isConnecting?: boolean;
 
+  // Which call button (if any) is currently placing a call - shows a
+  // spinner in place of that button's icon and disables both call
+  // buttons until the call screen actually takes over, so a tap gets
+  // immediate feedback instead of appearing to do nothing while
+  // ensureConversationId()/startCall() are in flight.
+  callPlacingMedia?: 'voice' | 'video' | null;
+
   // Status-bar clearance, applied as this header's own top padding so its
   // background (not the screen's) is what bleeds behind the status bar.
   topInset?: number;
@@ -101,6 +108,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onPressContext,
   isE2EE = false,
   isConnecting = false,
+  callPlacingMedia = null,
   topInset = 0,
 }) => {
   const title = chat?.name ?? 'Chat';
@@ -405,19 +413,35 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <Text style={{ fontSize: 18, color: palette.onHeader ?? palette.text }}>✓</Text>
             </Pressable>
           )}
-          <Pressable style={styles.headerIconButton} onPress={onStartVideoCall}>
-            <KISIcon
-              name="video"
-              size={20}
-              color={palette.onHeader ?? palette.text}
-            />
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={onStartVideoCall}
+            disabled={!!callPlacingMedia}
+          >
+            {callPlacingMedia === 'video' ? (
+              <ActivityIndicator size="small" color={palette.onHeader ?? palette.text} />
+            ) : (
+              <KISIcon
+                name="video"
+                size={20}
+                color={palette.onHeader ?? palette.text}
+              />
+            )}
           </Pressable>
-          <Pressable style={styles.headerIconButton} onPress={onStartVoiceCall}>
-            <KISIcon
-              name="phone"
-              size={20}
-              color={palette.onHeader ?? palette.text}
-            />
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={onStartVoiceCall}
+            disabled={!!callPlacingMedia}
+          >
+            {callPlacingMedia === 'voice' ? (
+              <ActivityIndicator size="small" color={palette.onHeader ?? palette.text} />
+            ) : (
+              <KISIcon
+                name="phone"
+                size={20}
+                color={palette.onHeader ?? palette.text}
+              />
+            )}
           </Pressable>
           <Pressable
             style={styles.headerIconButton}

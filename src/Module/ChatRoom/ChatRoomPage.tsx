@@ -2152,6 +2152,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     });
   }, [startCall, currentConvId, chat, currentUserId]);
 
+  // Which call button is currently placing a call - shown as a spinner on
+  // that button (see ChatHeader's callPlacingMedia prop) so a tap gets
+  // immediate feedback while ensureConversationId()/startCall() are in
+  // flight, instead of the button appearing to do nothing until the call
+  // screen takes over.
+  const [callPlacingMedia, setCallPlacingMedia] = useState<'voice' | 'video' | null>(null);
+
   const handleStartCall = useCallback(
     async (media: 'voice' | 'video' | 'broadcast') => {
       if (!chat || !startCall) {
@@ -2159,36 +2166,41 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
         return;
       }
 
-      const resolvedConversationId =
-        conversationId ??
-        (await ensureConversationId().catch(() => null)) ??
-        chat.conversationId ??
-        chat.id ??
-        null;
+      if (media !== 'broadcast') setCallPlacingMedia(media);
+      try {
+        const resolvedConversationId =
+          conversationId ??
+          (await ensureConversationId().catch(() => null)) ??
+          chat.conversationId ??
+          chat.id ??
+          null;
 
-      if (!resolvedConversationId) {
-        Alert.alert('Call unavailable', 'Conversation is not ready yet.');
-        return;
-      }
+        if (!resolvedConversationId) {
+          Alert.alert('Call unavailable', 'Conversation is not ready yet.');
+          return;
+        }
 
-      const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
-        (id) => String(id) !== String(currentUserId ?? ''),
-      );
+        const inviteeUserIds = participantsToIds(chat.participants ?? []).filter(
+          (id) => String(id) !== String(currentUserId ?? ''),
+        );
 
-      if (media === 'broadcast') {
-        await startCall({
-          conversationId: String(resolvedConversationId),
-          title: chat.name ?? 'Broadcast',
-          callType: 'broadcast',
-          inviteeUserIds,
-        });
-      } else {
-        await startCall({
-          conversationId: String(resolvedConversationId),
-          title: chat.name ?? 'Call',
-          media,
-          inviteeUserIds,
-        });
+        if (media === 'broadcast') {
+          await startCall({
+            conversationId: String(resolvedConversationId),
+            title: chat.name ?? 'Broadcast',
+            callType: 'broadcast',
+            inviteeUserIds,
+          });
+        } else {
+          await startCall({
+            conversationId: String(resolvedConversationId),
+            title: chat.name ?? 'Call',
+            media,
+            inviteeUserIds,
+          });
+        }
+      } finally {
+        if (media !== 'broadcast') setCallPlacingMedia(null);
       }
     },
     [chat, startCall, conversationId, ensureConversationId, currentUserId],
@@ -2236,6 +2248,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onOpenTasks={selectionMode ? undefined : onOpenTasks}
           onStartVoiceCall={selectionMode ? undefined : () => void handleStartCall('voice')}
           onStartVideoCall={selectionMode ? undefined : () => void handleStartCall('video')}
+          callPlacingMedia={selectionMode ? null : callPlacingMedia}
           onStartBroadcast={
             selectionMode ? undefined
               : (chat?.participants?.length ?? 0) > 2
